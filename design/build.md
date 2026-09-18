@@ -59,9 +59,7 @@ url/licence, so `publishToMavenLocal` gives another project on the same machine 
 `io.ltr8:tson:0.36.0-SNAPSHOT` dependency instead of an included build. **No remote repository is
 configured, deliberately** — Maven Central needs signed artifacts and a POM with scm/developers, and
 publishing under a name is not a decision the build should make quietly. The jars carry real
-`module-info.class`es, so a consumer works on the class path or the module path; `tson-annotation` and
-`tson-regex` land in a consumer's POM at runtime scope (they are `implementation` dependencies of the
-modules that use them), which is enough for both, verified end to end against a real consuming build.
-
-`BACKLOG.md` tracks the actively-maintained engineering backlog; `SPEC-FEEDBACK.md` records spec issues;
-`STRUCTURED-OUTPUT.md` holds the target-use-case plan (LLM structured-output validation, JSON
+`module-info.class`es, so a consumer works on the class path or the module path. `tson-regex` lands in a
+consumer's POM at runtime scope (an `implementation` dependency of the modules that use it); `tson-annotation`
+lands at compile scope, because `tson-schema` declares it `api`: a module-path compile of anything requiring
+`io.ltr8.tson.schema` needs `io.ltr8.annotation` present, though no public signature names an annotation type.

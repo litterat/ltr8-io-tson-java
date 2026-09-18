@@ -56,10 +56,8 @@ import java.util.function.Function;
  * at the declaration is what turns "every application of this fails" into "this template is wrong".
  *
  * <p><b>A parameter the fixed point leaves undetermined is a type parameter, and that is forced</b> -- see
- * {@code groundRemainingAsType}. §5.10 makes such a parameter a resolver error ("grounded only in mutual
- * recursion between templates, with no concrete kind-determining use"); this implementation reads it as
- * having one consistent assignment instead, because being a value parameter <em>means</em> standing in a
- * scalar slot and a slot is what grounds a parameter. [TSON-SCHEMA] §5.10 states the rule.
+ * {@code groundRemainingAsType}: being a value parameter <em>means</em> standing in a scalar slot, and a slot
+ * is what grounds a parameter. [TSON-SCHEMA] §5.10 states the rule.
  */
 final class ParameterKinds {
 
@@ -205,9 +203,8 @@ final class ParameterKinds {
          *
          * <p>{@code loop => <T> loop<T>} is the case that cannot be written any other way: a reference
          * template's body <em>is</em> the application, so there is no second slot to put a concrete use in,
-         * and T is passed only to the parameter it is. §5.10 makes such a parameter a resolver error; this
-         * implementation reads the assignment as forced instead and leaves the declaration to be judged on
-         * what is actually wrong with it -- for that one, that it applies itself forever.
+         * and T is passed only to the parameter it is. The declaration is then judged on what is actually
+         * wrong with it -- for that one, that it applies itself forever (§5.10).
          */
         void groundRemainingAsType() {
             for (String parameter : parameters) {

@@ -76,7 +76,7 @@ structural hash at the end, computed over the binding and never over this text.
 
 **A part is capped at 64 characters, hash included.** Nothing in the series bounds a name — §8.2 asks for
 freshness, stability and a content-derived spelling, and §7.7's grammar is unbounded — but a part is spliced
-from author-written content and `derivedName` walks a whole binding record, nested records and arrays
+from author-written content and `DerivedName.ofBinding` walks a whole binding record, nested records and arrays
 included, so an unbounded rule makes name length a function of document size: a realistic REST path already
 mints 139 characters. Past the budget the readable half has stopped being readable and is only cost, at every
 reference to the entry and in §8 output. Truncation appends the hash rather than simply cutting, so two long
@@ -111,7 +111,7 @@ error; `IdentifierProfile.hygiene` returns the restricted-character rule's verdi
 because a refusal is not
 one.
 
-**A refusal carries a policy code, not `SCHEMA_ERROR`** (`Diagnostic.ofSchemaRefusal`): `CONFUSABLE_NAMES`
+**A refusal carries a policy code, not `SCHEMA_ERROR`** (`TsonDiagnostics.ofSchemaRefusal`): `CONFUSABLE_NAMES`
 for names that read alike, `RESTRICTED_CHARACTER` for a character outside the identifier profile and
 `RESTRICTED_SCRIPT` for a script the restriction level does not admit — one per rule, and the same codes
 a *read* reports for the same rules, so one schema and one document that break the same rule come back

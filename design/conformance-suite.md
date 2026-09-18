@@ -109,11 +109,10 @@ letting a document's own text shape a namespace name, and would refuse any schem
 script; exempting minted names from the walk would answer that by leaving the hole open.
 `design/name-hygiene-and-minted-names.md` has the detail.
 
-**One place is the point, not a tidiness.** The restricted-character rule used to run at the reading
-positions instead — spread over the schema parser, the definition resolver and the atom vocabulary — and had
-holes at exactly the positions only some of them reached: an enum member and a group's member labels were
-checked for reading alike and for script mixing, and never for a restricted character. A scope list can be
-reviewed; three call sites cannot. **A field name is a name and meets all three rules** (§2.5, §7.7) — the two
+**One place is the point, not a tidiness.** Run at the reading positions instead — spread over the schema
+parser, the definition resolver and the atom vocabulary — the restricted-character rule would have holes at
+exactly the positions only some of them reach, such as an enum member or a group's member labels. A scope
+list can be reviewed; three call sites cannot. **A field name is a name and meets all three rules** (§2.5, §7.7) — the two
 per-name ones in `DefaultTsonReadContext` beside a type-ref's and an annotation's, the look-alike one in
 `SchemalessTreeReader`, which is where it belongs because it is a property of a *set*. There is no
 conformance class in which a record's field names are judged by a different rule. The identifier policy
@@ -136,8 +135,8 @@ over a changed corpus, which is the one thing a conformance signal must not do.
 editing vectors must see their own edits), then the pinned copy `scripts/fetch-references.sh` fetches
 into `.references/`, with `-Dtson.testSuite.dir` overriding both authoritatively. An absent corpus
 aborts through `Assumptions` so a bare clone stays green, **except where `TSON_REQUIRE_TEST_SUITE` is
-set — CI sets it — where it fails instead**. CI used not to check the corpus out at all, so every vector
-aborted and the build went green while measuring nothing; that is what the variable exists to stop.
+set — CI sets it — where it fails instead**. Without it a CI run with no corpus would abort every vector and
+go green while measuring nothing.
 **The pin is a commit, never a branch**: an upstream vector must not be able to turn this repo red with
 no change here.
 

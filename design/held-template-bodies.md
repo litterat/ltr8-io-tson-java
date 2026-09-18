@@ -7,9 +7,9 @@ lives in git.
 
 **Invariants**
 
-- Every open entry's body is a `HeldBody` or a `Reference`, an error placeholder included (`WireForm.heldEmptyRecord`);
+- Every open entry's body is held (a `TemplateBody`), an error placeholder included (`WireForm.heldEmptyRecord`);
   `close` dispatches on the constructor head — `record` closes to the instantiation, `reference` to a name, everything
-  else to a synthetic — and a third body shape is an `IllegalStateException`.
+  else to a synthetic — and any other body shape is an `IllegalStateException`.
 - A held body is text; the parsed form is a working value that is never retained, and nothing outside `resolver` sees a
   `DataValue`.
 - Substitution is one rule at every depth: an **unquoted** token in a tree, rewritten when its text resolves into the
@@ -65,11 +65,11 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     to a **synthetic** named for the form, which the instantiation then references — a form has no
     author-written name for identity to key on. That is the whole of the divergence; everything before it is
     shared.
-  - **There is no third case.** Every open entry's body is a `HeldBody` or a `Reference` — an *error
+  - **There is no other body shape.** Every open entry's body is held — an *error
     placeholder* included, which holds an empty record (`WireForm.heldEmptyRecord`) rather than being the one
     parameterised `RecordBody` in the system. A placeholder of that shape would oblige `TemplateMaterialiser`
     to keep a general substitution over *resolved* bodies beside the held one, to serve an entry with no
-    fields to substitute into. Holding it makes `close` total on two branches and the third an
+    fields to substitute into. Holding it makes `close` total over held bodies, with any other shape an
     `IllegalStateException` naming the invariant.
   - **§5.7's fixation happens here** (`fixRoutedValues`), which is what a held record body's retirement of
     the single `value` channel costs and where §5.7 says to pay it: a field routed by `= P` is held as
@@ -114,8 +114,10 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     - **A fixed point, not one walk.** meta-kernel's own `type_argument` puts a parameter of *either* kind on
       the reference channel ("parameters ride the reference channel because a token there is always a
       reference"), so a parameter passed to another template says nothing locally: it takes the callee's kind
-      at that position, and two templates may wait on each other. §5.10 anticipates the cycle and makes a
-      parameter grounded only by it an error, which `BACKLOG.md` still carries.
+      at that position, and two templates may wait on each other. A parameter the fixed point leaves
+      undetermined is a TYPE parameter (`ParameterKinds.groundRemainingAsType`), as §5.10 states: a value
+      parameter is one standing in a scalar slot, so a parameter with no concrete use anywhere in its cycle
+      cannot be one. `loop => <T> loop<T>` is then judged on what is wrong with it — it applies itself forever.
     - **Two declaration-time verdicts fall out**, neither of which has to wait for an application: a
       parameter standing for a whole collection or record (`<T> !enum { members: T }`) is neither a reference
       nor a scalar, and a parameter standing in both kinds of position (`<T> { v: T  w: int32 ~ T }`) has no
@@ -132,7 +134,7 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       application.
   - **That is where §8.2's deferred value-level check lands**, and it needs no code of its own:
     `<N> [text; N]` is a fine declaration, `<"two">` is where it stops being one, and the reader reports it
-    (`'two' is not a valid integer`) exactly as it would for a written body. D7's split — binding names,
+    (`'two' is not a valid integer`) exactly as it would for a written body. The split — binding names,
     REQUIRED coverage and concrete typing at the declaration; what substitution supplies, here — is the
     whole of it.
   - **The form is named for itself, not for the application** (§8.2). An open synthetic's own name is
@@ -166,8 +168,9 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     apart by the constructor head: the body shape does not distinguish them, every open entry's being held.
   - **`reference`'s kind is not a base kind**, so `DefinitionResolver`
     dispatches the head instead of judging it by the generic `!C value` rule: §4.1 gives an alias
-    `kind: REFERENCE`, which is a `type_kind` with nothing in the supertype chain to supply it, and the
-    kernel leaves `reference` unmarked because it describes no value. Both facts are the kernel's own. The
+    `kind: REFERENCE`, a derived kind (`TypeDefinition.kind`, this resolver's `@Unbound` component — the
+    kernel declares no `type_kind`) with nothing in the supertype chain to supply it, because `reference`
+    describes no value. The
     binding check still runs — `reference`'s vocabulary is a record like any other. §5.10 is explicit that this mints no
   intermediate entry per
   alias hop, so a chain of aliases collapses and the origin survives only in the composed entry's own

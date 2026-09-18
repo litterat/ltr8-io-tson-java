@@ -76,15 +76,15 @@ at the value too.
 
 **Which is one instance of a line that runs through the whole vocabulary.** `UNKNOWN_TYPE_REF` means the
 written name *denotes nothing* — the schemaless reader's own check (`TypeRefCheck`) and an annotation naming
-no type the governing schema declares (`AnnotationCapture`), which are the only three sites left. Everything
+no type the governing schema declares (`AnnotationCapture`) — two classes, and the only ones that report it. Everything
 where a name resolves and is merely not admissible is `TYPE_MISMATCH`: §7.2 subsumption, a choice's variant
 membership, a union's member test, a type-ref naming a template. So is a position where a **required**
 selector is absent, since no type is established either way — which is what the family readers already gave
 `tagRequired`, and what makes "a required tag is missing" need no member of its own. The distinction is what
 a consumer routes on: one says *correct the name*, the other says *this name means nothing here*. It also
 decides §8.1's category, `validation` against `resolver`, so getting it wrong misfiles the verdict as well as
-misnaming it — which is exactly what had happened, twice, in two different pairs of readers that each agreed
-internally.
+misnaming it. Two readers that each agree internally can still disagree with each other, which is why
+the line is stated once, here.
 
 **The pin table is derived at construction**, keyed by what the pins compare as (`ValueIdentity`), and both
 sides go through one parser: a schema pinning `= "dog"` matches an unquoted `dog`, and `= 0xFF` matches `255`.

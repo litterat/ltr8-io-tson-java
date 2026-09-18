@@ -78,7 +78,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
     carry it directly — the primitives and boxes, `String`, and `BigInteger`/`BigDecimal`, §5.3's own exact
     tiers.
   - **`registerAtoms(List)` and `AtomContext.hostTypes()` are why this reads well.** The vocabulary is a
-    named list rather than a chain of eleven calls, so a caller adds it to their own builder in the order
+    named list rather than a chain of twelve calls, so a caller adds it to their own builder in the order
     things happen — `DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())` —
     instead of wrapping their builder in a helper that returns it. And a test asserting a context carries
     the vocabulary asserts against that list rather than a second copy of it.

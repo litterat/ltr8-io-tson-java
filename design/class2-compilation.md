@@ -55,11 +55,11 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   registered factory or out of the governing meta's scope — which only a meta-layer constructor this library
   has never seen can be (§2.2.2's extension point), every constructor meta-kernel.tn and meta.tn declare
   having a factory — or a factory that rejects one entry.
-    - **It reports `NOT_IMPLEMENTED` and skips the value**, exactly as `OpenTemplateReader` does for the
-      entry it refuses — report before consuming so the position names the value, then `EventSkip.dataValue`
-      so the stream stays in step. The code, not the channel, is what says this is a gap rather than a
-      verdict, which is the same rule the schema pipeline follows: throwing instead would cost the whole
-      read, and in a multi-document `tson validate` the whole envelope, for one unreadable field.
+    - **It reports `NOT_IMPLEMENTED` and skips the value**, the same report-then-skip shape `OpenTemplateReader` uses
+      (with `TYPE_MISMATCH`) for the entry it refuses — report before consuming so the position names the value, then
+      `EventSkip.dataValue` so the stream stays in step. The code, not the channel, is what says this is a gap rather
+      than a verdict, which is the same rule the schema pipeline follows: throwing instead would cost the whole read,
+      and in a multi-document `tson validate` the whole envelope, for one unreadable field.
       `SchemaFailure` classifies a *compile* gap met during a read the same way, so no gap travels by
       channel. Fail-fast loses nothing — `report` raises `ReadException`, which carries the same
       `Diagnostic`, so `e.diagnostic().code()` is the question rather than the exception type.

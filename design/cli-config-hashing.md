@@ -131,7 +131,7 @@ Java class in this tool**, **70 (`EX_SOFTWARE`) the library failing to reach a v
 but 0, 1 and 2 is the run declining to give a verdict rather than giving a bad one, and each names who could
 not give it: 69/75 whoever was to serve the schema, 78 whoever wired the reading application, 70 this
 library. That is why 1 is not enough — and 70 in particular is what
-makes `Diagnostic.ofBaseSyntaxError`'s rethrow worth anything: the read loop catches only
+makes `TsonDiagnostics.ofBaseSyntaxError`'s rethrow worth anything: the read loop catches only
 `IOException` (an unreadable file *is* that file's verdict), so a `RuntimeException` — which `Tson.validate`
 raises only for a bug, never for a bad document — reaches `TsonCli`'s own handler instead of being folded
 into "invalid". `UsageException` exists for the same reason one layer up: a bare `IllegalArgumentException`
@@ -159,7 +159,7 @@ surface.
 **69 and 75 are reached two ways each, and all of them are `SchemaFetchException`.** A data document's
 `!!schema` that no configured source will serve arrives through `SchemaFailure` as a read diagnostic; a
 schema document's own `!!import`/`!!meta` that will not load arrives through `Tson.validateSchema`'s own
-catch as `Diagnostic.ofSchemaUnavailable`, located at the root pointer. So `tson validate` missing a schema
+catch as `TsonDiagnostics.ofSchemaUnavailable`, located at the root pointer. So `tson validate` missing a schema
 file and `tson compile` on a schema importing something the CLI cannot fetch land alike: neither run read the
 thing it needed. **Which way it failed is the code**, one per `Reason` —
 `SCHEMA_NOT_PERMITTED`/`SCHEMA_NOT_FOUND`/`SCHEMA_TOO_LARGE` are 69 because no rerun obtains them, and

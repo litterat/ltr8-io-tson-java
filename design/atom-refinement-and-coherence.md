@@ -77,10 +77,10 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   - **The linker asks every family, and needs no list to do it.** `TsonSchemaLinker` asks **every** family the
     same question again for the entries materialisation mints, which is how §8.2's "every family coherence rule
     ... asked once more of the closed record" is met without a list — "a resolver needs no list", as it puts it.
-  - **Hooked in `bindAtomInstance`, not at either call site**, because that is where the `!C value` and
-    `!I ^ { ... }` paths meet — one hook covers both, and a non-`Atom` body passes through. Running it after
-    binding is what makes it generic: facets arrive converted to the host type their family compares on, with
-    the constructor's own schema-composed defaults already filled in.
+  - **Hooked in `bindAtomInstance`, not at either call site**, because that is where the `!C value` and `!I ^ { ... }`
+    paths meet — one hook covers both. `checkCoherent` asks an `Atom`, `Product` or `Sum` body; any other passes
+    through. Running it after binding is what makes it generic: facets arrive converted to the host type their family
+    compares on, with the constructor's own schema-composed defaults already filled in.
   - **Emptiness is the rule, not narrowness.** `{ min: 5 max: 5 }` pins a constant and resolves; the same
     range with either end exclusive admits nothing and does not. Integer folds its `size`-derived range in
     first, so it is the one family where a single stated bound can be incoherent on its own — the opposite of

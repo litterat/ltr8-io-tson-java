@@ -26,7 +26,7 @@ Related: `design/reader-naming-and-schema-location.md`, `design/scope-push.md`, 
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`.
 
-## Streaming readers and read context (`tson-compiler/.../reader/`)
+## Streaming readers (`tson-compiler/.../reader/`) and `TsonReadContext` (the root package)
 
 Every reader in `reader` pulls `TsonEvent`s directly off a `TsonEventSource` via `TsonReadContext` — no
 reader ever requires a materialized `DataValue` tree, so schema-validated reading and diagnostics can
@@ -37,8 +37,8 @@ is small and parsed once.)
   `position()` derived live from the last event, `path()` (RFC 6901), `field(name)`/`index(i)` (push a
   path segment — a *node*, not a string, see
   `design/reader-naming-and-schema-location.md`), `at`/`withSchemaPosition`/`withPosition`,
-  `report(code, message, expected, actual)`, `reported()`. One factory, `of(events, receiver)` (plus
-  `throwing(events)` sugar), over one
+  `report(code, message, expected, actual)`, `reported()`. The factories are `of(events, receiver)`,
+  `of(events, receiver, identifierPolicy)` and `throwing(events, identifierPolicy)`, over one
   implementation. **The context holds no error policy**: `report` builds the `Diagnostic` from the path and
   positions it tracks and hands it to the read's **`DiagnosticsReceiver`**, which decides its fate —
   `throwing()` raises `ReadException` at the first problem, `collecting()` accumulates into a

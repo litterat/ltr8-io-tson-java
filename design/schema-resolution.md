@@ -16,8 +16,9 @@ field states, groups, subtraction, and the exception boundary. Current form only
 - Subtraction runs last, empties `type_definition.supertypes` (every supertype goes) and keeps `record.supertypes` as
   lineage.
 - `subtypes` is linking's throughout: a closed entry's own `subtypes` is empty when it is minted.
-- A schema error's verdict doesn't change when this library improves; a gap's does — and only
-  `SchemaValidationException` is collected into a `Diagnostic`.
+- A schema error's verdict doesn't change when this library improves; a gap's does. `SchemaResolver` collects three
+  exception types into a `Diagnostic`, and the type picks the code: `SchemaValidationException` → `SCHEMA_ERROR`,
+  `UnsupportedOperationException` → `NOT_IMPLEMENTED`, `BindMismatchException` → `BIND_MISMATCH`.
 - `TypeArgument` stays a sealed interface (`Ref`/`Value`), on the modelling argument (exactly one is present); a
   `schema.meta` bind target with more than one public
   constructor needs `@Record` on the canonical one.
@@ -100,8 +101,9 @@ are kept in step deliberately.
   (`TemplateMaterialiser.closedExtension`): §5.7 fixation pins the selectors and clears their marks, so a
   member is an ordinary concrete record, where ABSTRACT does travel and is how `@abstract` reaches every
   instantiation. One dispatcher serves both kinds of base — `RecordMemberDispatchReader` takes the selector
-  *fields* rather than a body, so a closed base supplies them from its own fields and a template from
-  `HeldBody.selectors()`, and `RecordExtension` checks the family against that same derivation.
+  *fields* rather than a body, and `FamilySelectors.of` (`schema.meta`) derives them — a closed base from its own
+  fields, a template base from its members' fields of those names, its own body being held text.
+  `RecordExtension` checks the family against that same derivation.
 - **Two different edges populate a family's `subtypes`, and they are minted by two different mechanisms.**
   The first is §5.8's reference-valued `supertypes`: `result => @abstract <T> { payload: T }` with `ok => <T>
   result<T> & { note: text }` closes at `result<text>` to an ABSTRACT entry whose `subtypes` holds `ok<text>`
@@ -186,10 +188,11 @@ are kept in step deliberately.
   members left is dropped — §5.11 runs the arity ladder to zero and states the two-member minimum as an
   invariant of resolved output.
 - **Two exception types, and which one is deliberate.** `UnsupportedOperationException` means *this library
-  hasn't implemented that yet*. No schema construct reaches one: what is left in `DefinitionResolver` is the
-  catch-all around the compiled meta reader (a failure binding a body or an annotation value that is not a
-  `ReadException`), a grammar-layer `TypeDef` shape the dispatch does not know, and a container sugar form
-  arriving unlifted — each the library's fault rather than a verdict. The identity-diagonal FIXED-value
+  hasn't implemented that yet*. No schema construct reaches one: the sites left in `DefinitionResolver` are the
+  catch-alls around the compiled meta reader and the re-serialisation of a body (a failure that is not a
+  `ReadException`), and shape guards an ordinary pipeline never trips — a grammar-layer `TypeDef` shape the
+  dispatch does not know, a container sugar form arriving unlifted, a missing recorded constructor or
+  application closer — each the library's fault rather than a verdict. The identity-diagonal FIXED-value
   invariant (a restated FIXED field MUST NOT change its pinned value) is not a throw site at all: it is
   unchecked, and is the one deferred design question below.
   `SchemaValidationException` means *the schema is wrong*, and the spec says so: a tightening outside
@@ -210,9 +213,9 @@ are kept in step deliberately.
   against a `DataValueEvents` replay whose positions are all the `(0,0,0)` placeholder and whose `path`
   points into a synthetic body; the declaration's real position comes from `SchemaResolver`'s catch.
   Telling an author their correctly-rejected schema is
-  unsupported sends them looking for the wrong fix, and costs more than clarity: only the validation
-  exception is collected into a `Diagnostic`, so a misfiled author error also aborts the run instead of
-  joining the other problems. The useful test is that **a schema error's verdict doesn't change when this
+  unsupported sends them looking for the wrong fix, and costs more than clarity: both are collected, but a
+  misfiled author error is reported as `NOT_IMPLEMENTED`, which the CLI exits 70 on — a library fault rather
+  than a verdict on the schema. The useful test is that **a schema error's verdict doesn't change when this
   library improves; a gap's does.** The split is worth keeping honest —
   `IllegalStateException` is the third, for an invariant only a malformed `TypeDefinition` could break (an
   applicable head — an entry that IS-A `top` — with a non-record body, a constructor being record-shaped,
@@ -239,27 +242,24 @@ are kept in step deliberately.
 
 ## The current boundary: what resolves, and what a gap still is
 
-**No `NOT_IMPLEMENTED` is reachable from a schema**, the pipeline reporting `SCHEMA_ERROR` for
-everything it refuses. A parameterized supertype resolves (`vip => <T> customer & box<T>` absorbs the
-operand's fields while the application is open, the operand contributing its own supertypes but not its
-name to the open entry's contract index, a template being no type -- while `record.supertypes`, typed
-`[type_ref]`, keeps the application itself, so closing mints the edge to `box<text>` and not to
-`box<int32>`), and so does an argument that is itself an application (`box<inner<T>>` —
-substitution writes a bound reference through `WireForm.refValue`, which spells one carrying
-arguments in `type_ref`'s record form). **A template may be `@abstract`**, the mark being stated in the held
-body's own text (`extension: ABSTRACT`) and read back by the `record` constructor's reader when the body
-closes, so every instantiation is abstract over the family the edge above builds. **`@sealed` is accepted
-too** — a template carrying `extension` takes part in IS-A and its `subtypes` holds its own instantiations,
-which is the set the claim ranges over — and SEALED does not travel to a member, §5.7 fixation having pinned
-the selectors and cleared their marks. Only `@final` stays a resolver error there: every application is a
-subtype of the template by construction, so the claim is false before an author writes anything else
-(`SPEC-FEEDBACK.md` #13, correcting #11).
-`OpenOperandCompositionTest` pins the substitutability table,
-`SubtypeTemplateFamilyTest` the family a base template and its subtype templates close into, and
-`AbstractTemplateFamilyTest` the mark over that family. `DefinitionResolver`'s Javadoc is the exact current boundary.
-The `UnsupportedOperationException` sites left in the resolver are not constructs a schema can write: the
-catch-alls around the compiled meta reader, shape guards an ordinary pipeline never trips, and the bootstrap's closed
-switch over meta-kernel's own declarations.
+**No `NOT_IMPLEMENTED` is reachable from a schema**, the pipeline reporting `SCHEMA_ERROR` (or `BIND_MISMATCH`, for a
+class that cannot bind a type) for everything it refuses. A parameterized supertype resolves (`vip => <T> customer &
+box<T>` absorbs the operand's fields while the application is open, the operand contributing its own supertypes but not
+its name to the open entry's contract index, a template being no type -- while `record.supertypes`, typed `[type_ref]`,
+keeps the application itself, so closing mints the edge to `box<text>` and not to `box<int32>`), and so does an argument
+that is itself an application (`box<inner<T>>` — substitution writes a bound reference through `WireForm.refValue`,
+which spells one carrying arguments in `type_ref`'s record form). **A template may be `@abstract`**, the mark being
+stated in the held body's own text (`extension: ABSTRACT`) and read back by the `record` constructor's reader when the
+body closes, so every instantiation is abstract over the family the edge above builds. **`@sealed` is accepted too** — a
+template carrying `extension` takes part in IS-A and its `subtypes` holds its own instantiations, which is the set the
+claim ranges over — and SEALED does not travel to a member, §5.7 fixation having pinned the selectors and cleared their
+marks. Only `@final` stays a resolver error there: every application is a subtype of the template by construction, so
+the claim is false before an author writes anything else (`SPEC-FEEDBACK.md` #13, correcting #11).
+`OpenOperandCompositionTest` pins the substitutability table, `SubtypeTemplateFamilyTest` the family a base template and
+its subtype templates close into, and `AbstractTemplateFamilyTest` the mark over that family. `DefinitionResolver`'s
+Javadoc is the exact current boundary. The `UnsupportedOperationException` sites left in the resolver are not constructs
+a schema can write: the catch-alls around the compiled meta reader, shape guards an ordinary pipeline never trips, and
+the bootstrap's closed switch over meta-kernel's own declarations.
 
 **No gap reaches a read either**: every constructor
 meta-kernel.tn and meta.tn declare builds a real reader, and `CoreSchemaImportTest` asserts that no entry

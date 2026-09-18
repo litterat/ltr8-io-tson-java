@@ -1,8 +1,9 @@
 package io.ltr8.tson.schema.meta;
 
 /**
- * The meta-kernel's {@code type_kind} enum (Part 2 §4.1, §8.1) -- every resolved {@link
- * TypeDefinition} carries exactly one, the REQUIRED, never-defaulted {@code kind} field.
+ * The kind of a resolved {@link TypeDefinition} (Part 2 §4.1, §8.1) -- derived from the entry's own supertypes and
+ * body rather than declared, since the meta-kernel has no {@code type_kind}. {@code TypeDefinition.kind} carries it as
+ * an {@code @Unbound} component: computed at resolution for this resolver's own use, never written.
  */
 public enum TypeKind {
     ATOM, PRODUCT, SUM, REFERENCE,

@@ -18,7 +18,8 @@ that resolves meta-kernel itself. Current form only; history lives in git.
   `REFERENCE` entry. `ReferenceChain` is the one walk — `ParameterKinds` keeps its own loop deliberately.
 - `@synthetic` goes on the **key** of exactly the sugar-form entries (both channels), never on an instantiation entry
   or a `TypeDefinition` value, and the linker re-attaches it (`withNameAnnotations`), imports included.
-- The bootstrap is two passes over a closed `instanceBody` switch with no compiled reader, and attaches no `@synthetic`.
+- The bootstrap is three passes — ordinary declarations, instances, atom refinements — over a closed `instanceBody`
+  switch and a hand-written `refinedBody` merge, with no compiled reader, and attaches no `@synthetic`.
 
 Related: `design/schema-resolution.md` (definition resolution), `design/template-materialisation.md` and
 `design/held-template-bodies.md` (the callers of `WireForm` and `DerivedName`), `design/constructor-application.md`,
@@ -190,11 +191,19 @@ needs that constructor's vocabulary already known, and every constructor meta-ke
 within meta-kernel.
 
 `MetaKernelBootstrapResolver.getMetaKernelSchema()` (its only public method) produces the resolved
-meta-kernel `TsonSchema` in **two passes** over its declarations: non-`Instance` declarations first
-(ordinary `DefinitionResolver`), then the deferred `Instance` declarations (`value => !unit {}`, `boolean
+meta-kernel `TsonSchema` in **three passes** over its declarations: ordinary declarations first
+(`DefinitionResolver`), then the deferred `Instance` declarations (`value => !unit {}`, `boolean
 => !enum [true false]`, …) once every constructor they reference — including ones declared later in the
-file — has an entry to transfer a kind from. `TsonSchemaResolver` alone is single-pass, strict source
-order, so it can't handle `boolean` preceding `enum`; this two-pass ordering lives here.
+file — has an entry to transfer a kind from, then the deferred atom refinements, whose source is an instance
+and so exists only after the second pass. `TsonSchemaResolver` alone is single-pass, strict source order, so
+it can't handle `boolean` preceding `enum`; this ordering lives here.
+
+- **An open instance is held, not constructed.** An `Instance` with type parameters is a §5.10 template, so
+  the second pass stores it as a `TEMPLATE` entry whose body is `HeldBody.held(…)` — the application as
+  written, applied later by materialisation. Constructing it would resolve `element_type: T` into a reference
+  to a type called `T`. Held bodies are the one thing the bootstrap shares with ordinary resolution.
+- **An atom refinement merges through `refinedBody`**, `instanceBody`'s twin and bounded the same way:
+  meta-kernel refines exactly one family, so the merge handles that one and refuses any other by name.
 
 - **Constructor-application binding goes through a closed `instanceBody` switch, not the generic path.**
   Meta-kernel instantiates constructors in exactly three shapes — a bare `{}` (each target's

@@ -51,8 +51,7 @@ Related: `design/readers-and-diagnostics.md`, `design/scope-push.md`, `design/re
     - **A materialised application is named the same way**, and it is why the mechanism sits on the entry
       rather than on the position. That entry's body is a `Reference`, so it compiles to its target's reader —
       and `TsonSchemaCompiler` names it for the entry doing the referring, whose `source` is the application
-      (`b<10>`). Without it a violation against `b<10>` reads `'integer_type_10_100_786fbcfb': …`, the one
-      shape that made `EntryDisplayName`'s fallback reachable.
+      (`b<10>`). Without it a violation against `b<10>` would read `'integer_type_10_100_786fbcfb': …`.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per
       read — and the variant that rejected the value is the informative name anyway.
@@ -63,43 +62,41 @@ Related: `design/readers-and-diagnostics.md`, `design/scope-push.md`, `design/re
     principle. A compiled reader is shared by every name that reaches it — `order_response => paged<order>`
     compiles to the instantiation entry's own reader — so the root cannot come from the reader and comes
     from the facade, which seeds `ctx.underDeclaration(compiled.rootDeclaration(name))` before the read.
-    `inRecord` then keeps that pointer and re-anchors only identity and line, which is the interaction those
-    two methods were already written for; a non-alias root seeds exactly what the reader would have
-    established, so nothing else changes.
+    `inRecord` then keeps that pointer and re-anchors only identity and line; a non-alias root seeds exactly
+    what the reader would have established.
   - **A declaration with no line of its own contributes none** (`SchemaLocation.anchoredOn`), leaving
     whatever the descent had established rather than replacing it with an absence. Entries without a line
     are exactly those nobody wrote, and taking their absence answered "which line do I open" with nothing
     for a document whose author has a perfectly good line: the alias they wrote, or the record whose field
-    the application sits at. That half is independent of the seed — a template application at a *field*
-    already had the right pointer and was still losing its position.
+    the application sits at. That half is independent of the seed: a template application at a *field* has
+    the right pointer from the descent and needs only its line kept.
 
 ## The cursor's position is wrapped when it is asked for, not when it is set
 
 `peek`/`next` record the event's own `SourcePosition` in the cursor as it is; `position()` wraps it in an
-`Optional` on the way out. The reverse — wrapping on every pull — cost an allocation per event for a value
-the event already carries and that only `report` ever reads, which measured 2.6 KB of a ~23 KB read. The
-same shape as the pointers below: build the object where the diagnostic is built.
+`Optional` on the way out. Wrapping on every pull would cost an allocation per event for a value the event
+already carries and that only `report` ever reads. The same shape as the pointers below: build the object
+where the diagnostic is built.
 
 What it does *not* do is remove the `Position` from the event, which is the structural version of the same
 question and a much larger change: every event holds one, so the sources (`TsonDataStream`'s queue, the
 rewind buffer, `ListEventSource`'s replayed lists) would all have to carry line/column/offset alongside the
 event instead — which is to say `TsonEventSource` becomes a cursor with accessors rather than a producer of
-objects. Worth roughly another 1 KB here and much more in a port where an object is not a pointer bump; see
-the porting notes.
+objects. It would matter more in a port where an object is not a pointer bump.
 
 ## Both pointers are built when a diagnostic is, not while descending
 
 A step of the descent is one `PathStep` node linked to the step before it, and the RFC 6901 pointers are
-rendered from that chain only when `report` (or a caller) asks. Concatenating each step onto the last —
-what this did — is **quadratic in depth**: every level copies the whole prefix again, and a read that
+rendered from that chain only when `report` (or a caller) asks. Concatenating each step onto the last
+would be **quadratic in depth**: every level copies the whole prefix again, and a read that
 reports nothing throws all of it away, which is every read of a valid document. `schemaToo` on each step is
 what keeps the two pointers apart in one chain: every schema step is a data step, but an array index moves
 through the document without moving through the schema, whose element type is declared once for the array.
 
 The schema end keeps its identity and line beside the chain rather than in it, because a re-anchoring
 record replaces those while the pointer keeps growing — `inRecord`/`underDeclaration` set them, the chain
-does not. `SchemaLocation` is unchanged and is still what `schemaLocation()` hands back; it is simply built
-on demand instead of once per field.
+does not. `SchemaLocation` is what `schemaLocation()` hands back, built on demand rather than once per
+field.
 
 `AllocationHarnessTest.nestingCostsTheSameAtEveryDepth` pins the shape rather than a byte count: it prices
 a level of nesting in a shallow part of a document and in a deep one and requires the two to agree. The

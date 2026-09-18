@@ -61,7 +61,7 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
     schema map hasn't started. And the **lexer is the floor**: a token that won't lex raises `LexException`
     from underneath the recovery, since resynchronising means reading the very tokens that don't exist
     (`STRUCTURED-OUTPUT.md` tracks that layer).
-- **A schema syntax error locates itself at the schema end** (`Diagnostic.ofSchemaSyntaxError`), the
+- **A schema syntax error locates itself at the schema end** (`TsonDiagnostics.ofSchemaSyntaxError`), the
   schema-side peer of `ofBaseSyntaxError`: `path`/`dataPosition` empty, the token's position in
   `schemaPosition` beside a `/name` pointer, so a syntax error and a resolution error against the same
   declaration render identically. The code stays `VALIDATION_ERROR` — *where* the problem is found is what
@@ -82,8 +82,8 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
   broken schema: `Tson.validateSchema` and `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)` — the
   latter being how a *data* read reports on the schema its `!!schema` names.
 - **Two reporting overloads, `SchemaResolver.resolveSchema(document, positions, receiver)` and
-  `TsonSchemaLinker.link(schema, loader, receiver)`.** The existing overloads are untouched and still throw
-  at the first problem. **The fail-fast paths deliberately do not route through
+  `TsonSchemaLinker.link(schema, loader, receiver)`.** The receiver-less overloads throw at the first
+  problem. **The fail-fast paths deliberately do not route through
   `DiagnosticsReceiver.throwing()`** — that raises `ReadException`, and a schema that fails to
   resolve is not a read failure; the CLI's exit 1 against exit 70 turns on the distinction. They rethrow the
   original untouched.
@@ -251,7 +251,7 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
 - **Desugaring reports too, and needs no gate of its own.** `SchemaDesugarer.desugar` takes a
   `DesugarFailureReporter` — a `(Declaration, SchemaValidationException)` callback rather than a receiver,
   keeping the diagnostics vocabulary out of a phase whose whole shape is AST-in/AST-out, and keeping
-  `Diagnostic.ofSchemaError` construction in `SchemaResolver`, which alone holds the canonical id and the
+  `TsonDiagnostics.ofSchemaError` construction in `SchemaResolver`, which alone holds the canonical id and the
   identity-keyed position table. It needs no phase boundary because it runs *inside* `resolveSchema`, so
   whatever it reports is already behind the gate the caller checks. A reported declaration is replaced with
   an `absorbed` stand-in (a zero-field record keeping the declaration's type parameters, the AST-level

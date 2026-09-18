@@ -12,12 +12,14 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 
 - [x] Lexer and structural parser — records, maps, arrays, annotations, directives (`!!id`/
       `!!schema`/`!!meta` arguments are validated as URIs, not just single-line tokens)
-- [x] Base types — null, boolean, string, numbers (integer, float, hex-float, based-integer)
+- [x] Base types — boolean, string, numbers (integer, float, hex-float, based-integer), and the absent
+      sentinel `_`
 - [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, `positive_integer` and siblings
 - [x] Decimal/float types — `number`, `float32`, `float64`, `rational`, `complex`
-- [x] Identifier/network types — `uuid`, `uri`, `ipv4`, `ipv6`
-- [x] Binary types — `base64`, `base64url`, `base32`, `hex`
-- [x] Temporal types — `date`, `time`, `datetime`, `duration`
+- [x] Identifier/network/text types — `uuid`, `uri`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `email`,
+      `text`, `regex` (RFC 9485 I-Regexp)
+- [x] Binary type — `bytes`, with its encoding (`base64`, `base64url`, `base32`, `hex`) chosen by the type
+- [x] Temporal types — `date`, `time`, `datetime`, `duration`, `period`
 - [x] Object binding — Java records, hand-written immutable classes, `Map<K, V>`, tuples, plain
       enums, sealed interfaces/unions
 - [x] Wire-format annotation access — a bound record's own `@name[:value]` annotations, via an
@@ -45,9 +47,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       the spec's own real `meta-kernel.tn`/`meta.tn`/`core.tn` fixtures
 - [x] Part 2 schema resolution — composition (`&`), refinement (`^`) including tightening, bare and
       generic type references, field modifiers/defaults/fixed values, type parameters, array sugar,
-      and generalized constructor-application/atom-refinement resolution (`!C value`); `meta-kernel.tn`
-      resolves all 49 of its own declarations, `meta.tn` all 31, and `core.tn` all 48, all
-      end-to-end (see [BACKLOG.md](BACKLOG.md) for the specific constructs still out of scope)
+      and generalized constructor-application/atom-refinement resolution (`!C value`); every declaration
+      in `meta-kernel.tn`, `meta.tn` and `core.tn` resolves end to end (see [BACKLOG.md](BACKLOG.md) for
+      the specific constructs still out of scope)
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
       directives during resolution, flattens argument-bearing type references into real named
       entries, merges `!!import`s, validates every reference in a schema actually resolves, and
@@ -59,6 +61,12 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       can `!!import` `core.tn` (itself governed by `meta.tn`, governed by `meta-kernel.tn`) and
       compile cleanly with real, manually-registered Java classes bound against records composed
       from its imported vocabulary, reading real TSON data through the whole chain
+- [x] Resource limits (§9.1) — nesting depth is bounded (64 by default, `ProcessorConfig.withLimits`,
+      `tson validate --max-depth`), and a refusal is reported as `LIMIT_EXCEEDED` rather than as a
+      verdict on the document
+- [x] The JSON encoding ([spec/tson-part3-json.md](spec/tson-part3-json.md), drafted here) — a stack of its
+      own in `tson-json`: lexer, event stream, `JsonValue` tree, schemaless binding, and schema-directed
+      tree reads against the same TSON schemas; `tson validate` reads `.json` files with `--schema`/`--type`
 
 **Not yet implemented:**
 
