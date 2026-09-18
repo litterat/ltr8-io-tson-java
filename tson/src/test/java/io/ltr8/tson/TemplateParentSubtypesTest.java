@@ -34,9 +34,14 @@ class TemplateParentSubtypesTest {
         return Tson.standard().resolve(HEADER.formatted(id) + "{\n" + declarations + "}");
     }
 
-    /** The entry a `name => head<args>` alias resolves to -- the instantiation materialisation minted. */
+    /**
+     * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
+     * its instantiation ({@code SPEC-FEEDBACK.md} #15), or the entry it aliases where an earlier declaration
+     * already named the same application.
+     */
     private static String target(TsonLinkedSchema schema, String alias) {
-        return schema.schema().entries().get(alias).source().orElseThrow().name();
+        return schema.schema().entries().get(alias).body() instanceof io.ltr8.tson.schema.meta.Reference ref
+                ? ref.target().name() : alias;
     }
 
     private static List<String> subtypesOf(TsonLinkedSchema schema, String name) {

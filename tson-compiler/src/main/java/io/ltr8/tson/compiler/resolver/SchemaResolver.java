@@ -346,6 +346,68 @@ public final class SchemaResolver {
             republish(namespace, resolvedLocals, instantiations);
         }
 
+        // A declaration whose body is a fully-bound application IS the instantiation entry, not a reference
+        // to a content-named one ({@code SPEC-FEEDBACK.md} #15). §8.2 makes a declared entry's identity its
+        // name, and a declaration that *constructs* a type already keeps it -- §5.3's lift leaves
+        // `text_list => [text]` as the entry -- so this makes one that *denotes* a type obey the same rule.
+        // Materialisation has already closed the application, so the work is to adopt the entry it minted
+        // and rewrite every reference onto the declared name. One entry per application survives, which is
+        // what §8.2's "two fully-bound applications denote the same entry" requires within a schema, and the
+        // hop that used to stand between an author's name and its own type is gone from resolved output.
+        //
+        // A *synthetic* is deliberately never adopted: §8.2 shares one synthetic per distinct form
+        // schema-wide, so binding one to a declared name would make a shared entry answer to a single namer.
+        Map<String, String> adopted = new LinkedHashMap<>();
+        Set<String> syntheticNames = materialiser.syntheticNames();
+        for (String name : declarations.keySet()) {
+            TypeDefinition local = resolvedLocals.get(name);
+            if (local == null || !(local.body() instanceof io.ltr8.tson.schema.meta.Reference reference)) {
+                continue;
+            }
+            String target = reference.target().name();
+            // A second declaration of one application stays an ordinary bare-name alias of the first: §8.2
+            // privileges neither, and an alias composes and refines through §4.3's chain walk like any other.
+            if (!instantiations.containsKey(target) || syntheticNames.contains(target)
+                    || adopted.containsKey(target)) {
+                continue;
+            }
+            adopted.put(target, name);
+        }
+        if (!adopted.isEmpty()) {
+            adopted.forEach((minted, declared) -> {
+                TypeDefinition instantiation = instantiations.remove(minted);
+                TypeDefinition declaration = resolvedLocals.get(declared);
+                // The instantiation's own facts under the author's name, keeping the declaration's position
+                // and annotations. `source` stays the canonical application, which identity is keyed on.
+                resolvedLocals.put(declared, new TypeDefinition(instantiation.source(), instantiation.kind(),
+                        instantiation.supertypes(), instantiation.subtypes(), instantiation.body(),
+                        declaration.position(), declaration.annotations()));
+                namespace.remove(minted);
+            });
+            java.util.function.UnaryOperator<io.ltr8.tson.schema.meta.TypeRef> onto = ref -> {
+                String to = adopted.get(ref.name());
+                return to == null ? ref
+                        : new io.ltr8.tson.schema.meta.TypeRef(to, ref.arguments(), ref.annotations());
+            };
+            // `MetaRefs.mapRefs` covers `source` and every reference a body carries, and deliberately not
+            // the two name-level indexes -- §8.1 makes `supertypes`/`subtypes` lists of *names* rather than
+            // type-refs, so they are invisible to a walk over refs. A composition that absorbed the
+            // instantiation put the minted name in its contract index, and leaving that behind is an
+            // unresolved supertype the linker refuses. So the rename covers both channels, not just one.
+            java.util.function.UnaryOperator<TypeDefinition> reindexed = definition -> {
+                TypeDefinition mapped = MetaRefs.mapRefs(definition, onto);
+                List<String> supertypes = mapped.supertypes().stream()
+                        .map(entry -> adopted.getOrDefault(entry, entry)).toList();
+                List<String> subtypes = mapped.subtypes().stream()
+                        .map(entry -> adopted.getOrDefault(entry, entry)).toList();
+                return new TypeDefinition(mapped.source(), mapped.kind(), supertypes, subtypes,
+                        mapped.body(), mapped.position(), mapped.annotations());
+            };
+            resolvedLocals.replaceAll((entryName, definition) -> reindexed.apply(definition));
+            instantiations.replaceAll((entryName, definition) -> reindexed.apply(definition));
+            republish(namespace, resolvedLocals, instantiations);
+        }
+
         // §6's name-position annotations. Binding one can fail the way a definition's can (an annotation type
         // §3.3.3 cannot reach), and this loop runs outside the memoized getter that catches those -- so it
         // catches its own, once per name, leaving the entry intact and unannotated rather than losing the

@@ -127,6 +127,10 @@ class TypeInhabitanceTest {
      * array_tree_text_a7f070f6_1_f3d1a035} would name two entries the author never wrote, about a recursion
      * they did -- the same rule {@code EntryDisplayName} already applies on the read side, which is where
      * this borrows its rendering from.
+     *
+     * <p>The chain is now one link shorter, and for the reason this test exists: {@code use} <em>is</em> the
+     * instantiation of {@code tree<text>} rather than a reference to it ({@code SPEC-FEEDBACK.md} #15), so
+     * there is no hop to render between the author's name and the recursion it names.
      */
     @Test
     void theChainIsSpelledTheWayTheAuthorWroteIt() {
@@ -134,7 +138,7 @@ class TypeInhabitanceTest {
                   tree => <T> { value: T  children: [tree<T>; 1..] }
                   use  => tree<text>""");
 
-        assertTrue(message.contains("use needs tree<text> needs [tree<text>; 1..] needs tree<text>"), message);
+        assertTrue(message.contains("use needs [use; 1..] needs use"), message);
     }
 
     /** The other half of the same rule: unapplied, it is not judged, and that is not a warning either. */

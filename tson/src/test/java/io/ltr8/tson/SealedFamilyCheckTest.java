@@ -223,14 +223,17 @@ class SealedFamilyCheckTest {
     }
 
     /**
-     * <b>A colliding member is named the way the author wrote it.</b> Both members here are template
-     * applications, so the entries that collide are minted and named by content (§8.2) -- and a message
-     * naming {@code pet_of_cat_int32_1c52dc45} points at nothing an author can open. {@code
-     * EntryDisplayName} renders a minted entry as the application that produced it, which is the same rule
-     * every reader's own messages follow.
+     * <b>A colliding member is named the way the author wrote it.</b> Both members here are declared
+     * applications, so each declaration <em>is</em> its instantiation ({@code SPEC-FEEDBACK.md} #15) and the
+     * names that collide are {@code a} and {@code b} -- names an author can open and edit.
+     *
+     * <p>The rule the message applies is unchanged; what changed is that there is no derived name left to
+     * render for this shape. While the declaration was a hop, the collision was between two content-named
+     * entries and the message depended on {@code EntryDisplayName} rendering each as the application that
+     * produced it. The negative assertion stays either way: no content-derived name reaches the author.
      */
     @Test
-    void collidingMembersAreNamedAsTheApplicationsThatProducedThem() {
+    void collidingMembersAreNamedByTheDeclarationsThatCollide() {
         String refusal = problems(Tson.standard(), "displayed", """
                 {
                   pet => @sealed { @discriminator pet_type: text }
@@ -239,8 +242,8 @@ class SealedFamilyCheckTest {
                   b => pet_of<"cat", int32>
                 }""");
 
-        assertTrue(refusal.contains("pet_of<cat, int32>"), refusal);
-        assertTrue(refusal.contains("pet_of<cat, text>"), refusal);
+        assertTrue(refusal.contains("'a'"), refusal);
+        assertTrue(refusal.contains("'b'"), refusal);
         assertFalse(refusal.matches("(?s).*pet_of_cat_[a-z0-9]+_[0-9a-f]{8}.*"),
                 "no content-derived entry name reaches the author: " + refusal);
     }

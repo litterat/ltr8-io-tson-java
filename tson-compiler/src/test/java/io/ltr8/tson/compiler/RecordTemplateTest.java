@@ -136,21 +136,22 @@ class RecordTemplateTest {
     }
 
     /**
-     * A declaration naming the application is an <b>alias</b> to the instantiation entry, not a second copy
-     * of it -- so a `box<text>` written elsewhere lands on the same entry rather than on this name.
+     * A declaration naming the application <b>is</b> the instantiation entry, not a hop to a content-named
+     * one ({@code SPEC-FEEDBACK.md} #15) -- so a {@code box<text>} written elsewhere resolves to that
+     * declaration rather than minting a second entry, and one entry serves both under the author's name.
      */
     @Test
-    void aDeclarationPositionApplicationAliasesTheSameEntry() {
+    void aDeclarationPositionApplicationIsTheEntryEveryUseSiteReaches() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   text_box => box<text>
                   holder => { b: box<text> }""");
 
-        assertEquals(1, instantiationsOf(compiled, "box").size());
-        String made = instantiationsOf(compiled, "box").get(0);
-        assertEquals(made, fieldType(compiled, "holder", "b"));
-        assertEquals(made, assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
-                compiled.schema().entries().get("text_box").body()).target().name());
+        assertEquals(List.of(), instantiationsOf(compiled, "box"),
+                () -> "nothing is minted beside the declaration: " + instantiationsOf(compiled, "box"));
+        assertEquals("text_box", fieldType(compiled, "holder", "b"),
+                "the use site names the declaration the application denotes");
+        assertEquals(TypeRef.of("text"), fieldOf(compiled, "text_box", "v").type(), "T := text");
     }
 
     /** A value parameter binds the literal it was applied with, and the route is gone once bound (§5.10). */
@@ -221,9 +222,13 @@ class RecordTemplateTest {
                   nested  => box<box<text>>
                   three   => counted<3>""");
 
-        assertEquals(2, instantiationsOf(compiled, "box").size(), "the inner and outer box");
-        assertEquals("3", fieldOf(compiled, instantiationsOf(compiled, "counted").get(0), "n")
-                .value().orElseThrow().text());
+        // The outer application is the declaration itself (#15); only the inner `box<text>`, which no
+        // declaration names, is still minted.
+        assertEquals(1, instantiationsOf(compiled, "box").size(),
+                () -> "the inner box is minted, the outer is `nested`: " + instantiationsOf(compiled, "box"));
+        assertEquals(instantiationsOf(compiled, "box").get(0), fieldOf(compiled, "nested", "v").type().name(),
+                "the outer's field names the inner entry");
+        assertEquals("3", fieldOf(compiled, "three", "n").value().orElseThrow().text());
     }
 
     /**

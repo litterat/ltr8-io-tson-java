@@ -522,11 +522,10 @@ class ContainerSugarEndToEndTest {
             TsonCompiledSchema compiled = assertDoesNotThrow(
                     () -> compile("  odd => <T> { v: %s }\n  use => odd<int32>".formatted(body)), body);
 
-            // The closure is a real body of the constructor the sugar names, not a deferred anything.
-            String closure = compiled.schema().entries().keySet().stream()
-                    .filter(n -> n.startsWith("odd_int32_")).findFirst().orElseThrow();
+            // The closure is a real body of the constructor the sugar names, not a deferred anything -- and
+            // it is `use` itself, a declaration naming an application being that instantiation (#15).
             RecordBody closed = assertInstanceOf(RecordBody.class,
-                    compiled.schema().entries().get(closure).body(), body);
+                    compiled.schema().entries().get("use").body(), body);
             Top variant = compiled.schema().entries().get(closed.fields().getFirst().type().name()).body();
             assertTrue(variant instanceof ChoiceBody || variant instanceof TupleBody,
                     () -> body + " closed to " + variant);
