@@ -556,6 +556,17 @@ recorded open form, and replacing the application with a reference to the entry 
       distinction prevents. `OpenOperandCompositionTest` pins all three rows and the argument specificity:
       the edge is to `box<text>` and not to `box<int32>`, which is why the parent is carried as a reference
       rather than as the head name §5.8 describes.
+    - **A closed operand on a declaration with no parameters of its own states the edge at resolution.**
+      `dog => pet<"dog"> & { breed: text }` is never held, so nothing later closes the application kept in
+      `record.supertypes` and no instantiation ever arrives to carry the edge — which is the same "no later
+      materialisation of this body" that makes §5.7's fixation run here rather than at closing. So the edge is
+      stated where the composition resolves, and to the *family base* rather than to the application: a
+      record-bodied template carries `extension` — SEALED where a discriminator survives, ABSTRACT otherwise —
+      which is what makes it a type a member can be IS-A (`SPEC-FEEDBACK.md` #13). That is what puts the member
+      in the base's `subtypes` and lets a position typed `pet` dispatch to it, by the discriminators or by a
+      tag. The application in between still mints nothing, and §5.9 is untouched: a removal empties the
+      contract index whatever was put in it. `ClosedOperandFamilyTest` pins it, `OpenOperandCompositionTest`
+      the boundary against the open case above.
     - **An argument that is itself an application survives whole.** Substitution writes a bound reference
       through `WireForm.refValue` — positionally when it carries no arguments, in `type_ref`'s record
       form when it does — so `box<inner<T>>` keeps `inner<T>` and the absorbing declaration's own
