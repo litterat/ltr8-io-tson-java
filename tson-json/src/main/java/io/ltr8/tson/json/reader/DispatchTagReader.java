@@ -31,10 +31,13 @@ import java.util.Set;
  * <p><b>Every name it admits was resolved to a reader when the schema compiled.</b> A base's {@code
  * subtypes} is its whole family, not only its children, so a tag naming a type any number of levels down
  * reaches that type's reader in one step, and every alias meaning one of them ([TSON-SCHEMA] §7.2's "after
- * reference flattening of both") reaches the same reader. The scan this makes is handed to the reader it
- * selects ({@link ScannedReader}), so an object is scanned once however deep its type sits.
+ * reference flattening of both") reaches the same reader.
+ *
+ * <p><b>It decides from the leading members and reads no further</b> ({@link ReservedMembers#lead}): §3.3
+ * puts {@code $type} first, after a {@code $schema} where one is present, so the selector is known before any
+ * of the object's own members, and the reader it selects reads the object once, from the start.
  */
-final class DispatchTagReader implements JsonTypeReader<Object>, ScannedReader {
+final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
 
     private final String name;
     private final String displayName;
@@ -107,45 +110,46 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ScannedReader {
             EventSkip.value(ctx, found);
             return null;
         }
-        return dispatch(ctx, ReservedMembers.scan(ctx));
+        return dispatch(ctx, ReservedMembers.lead(ctx));
     }
 
+    /** Reached by a tag naming this base from an enclosing position: placed again, from the leading members. */
     @Override
-    public Object readScanned(JsonReadContext ctx, ReservedMembers.Tag tag) {
-        return dispatch(ctx.inRecord(schemaLocation), tag);
+    public Object readExact(JsonReadContext ctx, JsonTypeReader<?> wrapped) {
+        return read(ctx);
     }
 
-    private Object dispatch(JsonReadContext ctx, ReservedMembers.Tag tag) {
-        if (untagged != null && (tag.type() == null || !tag.wrapper() && selfNames.contains(tag.type()))) {
-            // Untagged, an inline restatement, or reserved members with no type among them: all of it is the
+    private Object dispatch(JsonReadContext ctx, ReservedMembers.Lead lead) {
+        if (untagged != null && (lead.type() == null || !lead.wrapper() && selfNames.contains(lead.type()))) {
+            // Untagged, an inline restatement, or leading reserved members naming no type: all of it is the
             // record's own reader's to judge, on exactly the terms a record without subtypes judges it. A
             // restating wrapper takes its route instead, whose `$value` may name a subtype of its own.
-            return untagged instanceof ScannedReader scanned ? scanned.readScanned(ctx, tag) : untagged.read(ctx);
+            return untagged instanceof ExactReader exact ? exact.readExact(ctx, this) : untagged.read(ctx);
         }
-        if (Tags.refusesMisuse(ctx, tag, displayName, Tags.RECORD)) {
+        if (Tags.refusesScope(ctx, lead, displayName, Tags.RECORD)) {
             return null;
         }
-        if (tag.type() == null) {
+        if (lead.type() == null) {
             // Before the members: §6.1.5 is explicit that nothing about the object's shape is consulted, so
             // an abstract position with no tag fails whatever it holds.
             return refuse(ctx, extension.tagRequired(ReservedMembers.TYPE));
         }
-        Route route = routes.get(tag.type());
+        Route route = routes.get(lead.type());
         if (route == null) {
             // Located at the value and not at `/$type`, though the member is right there. §9.4 holds both
             // encodings to one pointer for a rule, and TSON's tag is an annotation with no pointer step of its
             // own -- so a rule they share can only be located where they both have a location.
-            if (!NameHygiene.refuses(ctx, tag.type())) {
-                ctx.report(untagged != null ? subsumption.notAdmissible(tag.type(), admissible())
+            if (!NameHygiene.refuses(ctx, lead.type())) {
+                ctx.report(untagged != null ? subsumption.notAdmissible(lead.type(), admissible())
                         // The base itself is not admissible here, which is the whole of what ABSTRACT means --
                         // where a concrete position would take a tag naming it as a redundant restatement.
-                        : selfNames.contains(tag.type()) ? extension.tagNamesTheBase(ReservedMembers.TYPE)
-                        : extension.notASubtype(ReservedMembers.TYPE, tag.type()));
+                        : selfNames.contains(lead.type()) ? extension.tagNamesTheBase(ReservedMembers.TYPE)
+                        : extension.notASubtype(ReservedMembers.TYPE, lead.type()));
             }
             EventSkip.nextValue(ctx);
             return null;
         }
-        return route.read(ctx, tag);
+        return route.read(ctx, lead);
     }
 
     /** What a {@code $type} may name at an OPEN position, for a diagnostic's machine-readable {@code expected}. */

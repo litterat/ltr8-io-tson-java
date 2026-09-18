@@ -150,14 +150,13 @@ public final class JsonReadContext {
      * whatever reads next sees a stream nothing has touched.
      *
      * <p><b>Why one event of peek is not enough.</b> {@link #peek()} answers "what is here". Recognising an
-     * annotation object ([TSON-JSON] §3.3) asks something else: whether this object carries any member of
-     * the reserved set, and §6.1.6 gives member order no meaning -- so {@code $type} may sit anywhere in it
-     * and the decision cannot be made from the opening brace. Reading the members to find out is not a
-     * substitute, because the reader that ends up building the value must see them all.
+     * annotation object ([TSON-JSON] §3.3) asks something else: which members lead the object -- {@code
+     * $schema}, {@code $type}, a sealed position's discriminators -- and the reader that ends up building the
+     * value must still see them all, so reading them to find out is not a substitute.
      *
      * <p>Consumed events are replayed from a buffer rather than re-lexed, so a lookahead costs what it
-     * looked past and never the document; a scan for reserved names skips values without materialising
-     * them, so what it looks past is one object's member names. {@link #position()} is deliberately left
+     * looked past and never the document. The selectors lead (§3.3, §6.1.5), so what the reserved-member peek
+     * looks past is a few scalar members, a count the schema fixes (§10.1). {@link #position()} is deliberately left
      * where the lookahead reached rather than restored: a caller looks ahead in order to say something
      * about what it found, and that is where the saying belongs.
      *

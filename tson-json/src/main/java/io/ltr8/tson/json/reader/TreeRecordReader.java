@@ -41,7 +41,7 @@ import java.util.Set;
  * declared field is §6.1.1's closure error, full stop. That is the stricter reading and the correct one until
  * a consumer has shown what the directive's stated shape has to survive.
  */
-final class TreeRecordReader implements JsonTypeReader<JsonValue>, ScannedReader {
+final class TreeRecordReader implements JsonTypeReader<JsonValue>, ExactReader {
 
     /**
      * The concrete reading of an OPEN or FINAL record. Which reader a record position actually gets is {@link
@@ -120,19 +120,16 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue>, ScannedReader
 
     @Override
     public JsonValue read(JsonReadContext ctx) {
-        return readScanned(ctx, ctx.peek() instanceof JsonEvent.ObjectStart
-                ? ReservedMembers.scan(ctx)
-                : ReservedMembers.Tag.NONE);
+        return readExact(ctx, this);
     }
 
+    /**
+     * The object itself -- §6.1's whole reading, and §3.3's annotation object where its first member is {@code
+     * $type}. Nothing is read ahead: the leading members are judged as the member loop meets them.
+     */
     @Override
-    public JsonValue readScanned(JsonReadContext ctx, ReservedMembers.Tag tag) {
+    public JsonValue readExact(JsonReadContext ctx, JsonTypeReader<?> wrapped) {
         ctx = ctx.inRecord(schemaLocation);
-        return tag.present() || tag.unknown() != null ? tagged(ctx, tag) : readObject(ctx);
-    }
-
-    /** The object itself, reserved members already judged -- §6.1's whole reading, tag or no tag. */
-    private JsonValue readObject(JsonReadContext ctx) {
         JsonEvent first = ctx.next();
         if (!(first instanceof JsonEvent.ObjectStart)) {
             ctx.report(rules.notARecord(JsonAtoms.describe(first)));
@@ -141,7 +138,10 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue>, ScannedReader
         }
         JsonValue[] values = new JsonValue[fields.size()];
         boolean[] seen = new boolean[fields.size()];
-        readMembers(ctx, values, seen);
+        JsonValue instead = readMembers(ctx, first, values, seen, wrapped);
+        if (instead != null) {
+            return instead;
+        }
         fillAbsent(ctx.withPosition(first.position()), values, seen);
         if (hasGroups) {
             validateGroups(ctx.withPosition(first.position()), seen);
@@ -170,52 +170,40 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue>, ScannedReader
     }
 
     /**
-     * An object the scan found reserved members on: [TSON-JSON] §3.3's annotation object, at a record
-     * position, which §6.1.5 makes the JSON spelling of {@code !employee} at a {@code person} field.
+     * The member loop, ending at the object's own close. Each member is matched, then read or discarded.
      *
-     * <p><b>A tag is never wrong</b> (§8.1) -- a redundant {@code $type} restating this position's own type
-     * is admitted and changes nothing. What it may not do is name another type: this reader is reached only
-     * for its own, a tag naming a subtype having been placed by the dispatcher in front of a record that has
-     * any ({@link DispatchFactories}), so here {@code $type} names this entry, or an alias of it, and nothing else.
+     * <p>Answers null when the record was read, and otherwise what the position yields instead: the wrapper's
+     * value, or tree mode's placeholder once a reserved member has refused the object -- the rest of it then
+     * skipped, the refusal being the object's.
      */
-    private JsonValue tagged(JsonReadContext ctx, ReservedMembers.Tag tag) {
-        if (Tags.refusesMisuse(ctx, tag, displayName, Tags.RECORD)) {
-            return JsonNull.INSTANCE;
-        }
-        if (tag.type() == null) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                    "this object carries this encoding's reserved members but no '$type' naming a type (§3.3)",
-                    "a '$type' member holding a type name", "no $type");
-            EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
-        }
-        if (!selfNames.contains(tag.type())) {
-            // §9.4 reaches every `$type` too, and for the same reason: a look-alike type name is refused
-            // rather than reported as naming nothing.
-            if (!NameHygiene.refuses(ctx, tag.type())) {
-                // At the value, not at `/$type`, though the member is right there: §9.4 holds both encodings
-                // to one pointer for a rule they share, and TSON's tag is an annotation with no pointer step
-                // of its own. §3.3's reserved members are apparatus rather than data, which agrees. The
-                // family readers already locate their tag refusals here.
-                ctx.report(subsumption.noSubtypeToName(tag.type()));
-            }
-            EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
-        }
-        // §3.3's inline form is the record with its reserved members passed over; the wrapper holds it in
-        // `$value`, read here again since the value inside may carry a tag of its own.
-        return tag.wrapper() ? Nodes.node(ReservedMembers.readWrapped(ctx, this)) : readObject(ctx);
-    }
-
-    /** The member loop, ending at the object's own close. Each member is matched, then read or discarded. */
-    private void readMembers(JsonReadContext ctx, JsonValue[] values, boolean[] seen) {
-        while (true) {
+    private JsonValue readMembers(JsonReadContext ctx, JsonEvent opening, JsonValue[] values, boolean[] seen,
+                                  JsonTypeReader<?> wrapped) {
+        boolean tagged = false;
+        for (int position = 0; ; position++) {
             JsonEvent event = ctx.next();
             if (event instanceof JsonEvent.ObjectEnd) {
-                return;
+                return null;
             }
             if (!(event instanceof JsonEvent.MemberName member)) {
                 throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);
+            }
+            if (ReservedMembers.isReserved(member.name())) {
+                String name = member.name();
+                if (ReservedMembers.VALUE.equals(name) && tagged && position == 1) {
+                    // §3.3's wrapper: the value is `$value`, at the reader the enclosing position chose for it,
+                    // since the value inside may carry a tag of its own.
+                    return Nodes.node(ReservedMembers.readWrappedValue(ctx, wrapped));
+                }
+                if (ReservedMembers.TYPE.equals(name) && position == 0 && admitsTag(ctx)) {
+                    tagged = true;
+                    ctx.next();
+                    continue;
+                }
+                if (!ReservedMembers.TYPE.equals(name) || position != 0) {
+                    refuseReserved(ctx, name, tagged);
+                }
+                EventSkip.value(ctx, opening);
+                return JsonNull.INSTANCE;
             }
             String memberName = Nfc.of(member.name());
             Integer at = index.get(memberName);
@@ -234,20 +222,53 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue>, ScannedReader
     }
 
     /**
-     * A member no declared field matches. §6.1.1's closure error, except that the reserved namespace is not
-     * a field name at all: §3.2 reserves every {@code $}-initial name wherever member names are field names,
-     * and the three it defines are the annotation object's, which §3.3 and §8 own and this reader does not
-     * implement yet.
+     * Whether the leading {@code $type} at the cursor may stand here, reporting it where it may not. <b>A tag is
+     * never wrong</b> (§8.1): one restating this entry, or an alias of it, is admitted and changes nothing. It
+     * may not name another type -- this reader is reached only for its own, a tag naming a subtype having been
+     * placed by the dispatcher in front of a record that has any ({@link DispatchFactories}).
+     */
+    private boolean admitsTag(JsonReadContext ctx) {
+        if (!(ctx.peek() instanceof JsonEvent.StringValue tag)) {
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                    "this object leads with this encoding's reserved members but no '$type' naming a type (§3.3)",
+                    "a '$type' member holding a type name", "no $type");
+            return false;
+        }
+        if (selfNames.contains(tag.value())) {
+            return true;
+        }
+        // §9.4 reaches every `$type`, and a look-alike type name is refused rather than reported as naming
+        // nothing. At the value, not at `/$type`, though the member is right there: §9.4 holds both encodings
+        // to one pointer for a rule they share, and TSON's tag is an annotation with no pointer step of its own.
+        if (!NameHygiene.refuses(ctx, tag.value())) {
+            ctx.report(subsumption.noSubtypeToName(tag.value()));
+        }
+        return false;
+    }
+
+    /**
+     * A reserved member where none may stand (§3.2, §3.3): a {@code $schema}, which no record position
+     * admits; a {@code $type} or {@code $value} out of its leading place; or a name outside the closed set.
+     */
+    private void refuseReserved(JsonReadContext ctx, String name, boolean tagged) {
+        switch (name) {
+            case ReservedMembers.SCHEMA -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
+            case ReservedMembers.TYPE -> ReservedMembers.refuseMisplaced(ctx, name);
+            case ReservedMembers.VALUE -> ctx.field(name).report(Diagnostic.Code.UNRECOGNIZED_FIELD, tagged
+                    ? "'$value' follows members of the record's own, and an annotation object in wrapper form "
+                            + "admits nothing beside it (§3.3)"
+                    : "'$value' belongs to an annotation object in wrapper form, which leads with '$type' "
+                            + "naming the value's type (§3.3)", "'$value' straight after a leading '$type'", name);
+            default -> ReservedMembers.refuseUnknown(ctx, name);
+        }
+    }
+
+    /**
+     * A member no declared field matches: §6.1.1's closure error. A reserved name never reaches here -- §3.2
+     * reserves every {@code $}-initial name wherever member names are field names, and the loop judges those.
      */
     private void unmatched(JsonReadContext ctx, String memberName) {
         JsonReadContext at = ctx.field(memberName);
-        if (ReservedMembers.isReserved(memberName)) {
-            // §3.3: the record is the object minus its reserved members. Whether they were admissible here
-            // was settled by the scan before any member was read, so passing over one now is not a decision
-            // being skipped -- it is the decision already taken.
-            EventSkip.nextValue(at);
-            return;
-        }
         // §8.2 before §6.1.1, and the order is the point: a name-hygiene refusal MUST NOT be reported in one
         // of §8.1's four categories, so a look-alike field name is refused here rather than told it is
         // unknown -- which would be a verdict on the document for a policy rule, and would advise adding a

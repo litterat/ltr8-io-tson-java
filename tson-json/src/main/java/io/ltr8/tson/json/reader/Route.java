@@ -35,11 +35,15 @@ record Route(JsonTypeReader<?> entry, JsonTypeReader<?> inline) {
                 : entry;
     }
 
-    /** Reads the tagged value at {@code ctx}'s cursor, handing {@code tag} on so nothing scans it twice. */
-    Object read(JsonReadContext ctx, ReservedMembers.Tag tag) {
-        if (tag.wrapper()) {
+    /**
+     * Reads the tagged value at {@code ctx}'s cursor. A wrapper's {@code $value} is read at {@link #entry}; an
+     * inline object goes to the exact reader, and where there is none -- a type that does not read an object
+     * as its own value -- the object can only be a wrapper, and is read as one, refusing what it is not.
+     */
+    Object read(JsonReadContext ctx, ReservedMembers.Lead lead) {
+        if (lead.wrapper() || !(inline instanceof ExactReader exact)) {
             return ReservedMembers.readWrapped(ctx, entry);
         }
-        return inline instanceof ScannedReader scanned ? scanned.readScanned(ctx, tag) : inline.read(ctx);
+        return exact.readExact(ctx, entry);
     }
 }

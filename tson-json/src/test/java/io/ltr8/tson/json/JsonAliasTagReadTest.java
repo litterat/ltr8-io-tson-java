@@ -118,7 +118,7 @@ class JsonAliasTagReadTest {
     @Test
     void anAliasOfTheDispatchedMemberAgreesWithTheDiscriminatorAtASealedPosition() {
         read("pet", """
-                {"pet_type":"dog","bark":"woof","$type":"dog_of"}""").accepted();
+                {"$type":"dog_of","pet_type":"dog","bark":"woof"}""").accepted();
     }
 
     /** §5.4 variant membership takes the same flattening: an alias of a variant names that variant. */

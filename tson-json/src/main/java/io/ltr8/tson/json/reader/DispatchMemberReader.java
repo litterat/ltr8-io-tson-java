@@ -6,6 +6,7 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
+import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
@@ -40,20 +41,23 @@ import java.util.Set;
  * same parser before either is compared, so a document writing {@code 0xFF}'s value as {@code 255} selects
  * the member pinned {@code 0xFF}.
  *
- * <p><b>One scan, not two.</b> §6.1.6 gives member order no meaning, so the selectors may sit anywhere and
- * the opening brace settles nothing -- and §8.1 admits a tag beside them. {@link ReservedMembers#scanFor}
- * answers both in the pass this position was going to make anyway.
+ * <p><b>It reads the leading members and no others.</b> §6.1.5 puts the discriminators first, after any
+ * reserved members (§3.3), in any order among themselves, so {@link ReservedMembers#lead} answers both the tag
+ * and the selectors from as many members as the family declares discriminators -- a count the schema fixes,
+ * whatever the document holds (§10.1).
  *
  * <p><b>Every reader it can select was wired when the schema compiled</b> ({@link Route}), and so was every
  * name a tag may carry to reach one -- the members and, for each, the deeper names it admits. It builds
- * nothing itself, so one class serves every mode, and it hands its scan to the reader it selects.
+ * nothing itself, so one class serves every mode.
  *
- * <p><b>The tag can only assert.</b> {@code $type} MAY be present and MUST name the dispatched member or a
- * subtype of it; there is one selector per position, and the pin's own FIXED check is what makes the dispatch
- * read and the validation read agree by construction -- the selected member re-reads the whole object,
- * including the member that selected it.
+ * <p><b>The tag can only assert, and the selected reader is what holds it to that.</b> {@code $type} MAY be
+ * present and MUST name the dispatched member or a subtype of it. The discriminators are still required with
+ * it, and the value goes where the tag names; the selected reader re-reads the whole object and re-verifies
+ * each pin as an ordinary FIXED check, so a tag disagreeing with the discriminator meets a pinned field the
+ * document contradicts. One selector per position, and the dispatch read and the validation read agree by
+ * construction.
  */
-final class DispatchMemberReader implements JsonTypeReader<Object>, ScannedReader {
+final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader {
 
     /** One discriminator field of the base: the member name, and the parser its declared type gives. */
     private record Selector(String name, AtomType<?> parser, AtomForm form) {
@@ -72,9 +76,6 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ScannedReade
 
     /** The pins, as they compare, to the member that states them -- §5.7's mapping, derived and never declared. */
     private final Map<List<Object>, String> members;
-
-    /** What each dispatched member admits a deeper tag to name: itself and its own subtypes (§6.1.5). */
-    private final Map<String, Set<String>> deeper;
 
     /** Where a value goes once selected, by every name a member or a deeper tag may reach it under. */
     private final Map<String, Route> routes;
@@ -103,7 +104,8 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ScannedReade
         this.selectorNames = selectors.stream().map(Selector::name).collect(LinkedHashSet::new,
                 Set::add, Set::addAll);
         this.members = new LinkedHashMap<>();
-        this.deeper = new LinkedHashMap<>();
+        // What each dispatched member admits a deeper tag to name: itself and its own subtypes (§6.1.5).
+        Map<String, Set<String>> deeper = new LinkedHashMap<>();
         Map<String, Route> table = new LinkedHashMap<>();
         for (String subtype : subtypes) {
             TypeDefinition definition = entries.get(subtype);
@@ -167,21 +169,17 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ScannedReade
             EventSkip.value(ctx, found);
             return null;
         }
-        return dispatch(ctx, ReservedMembers.scanFor(ctx, selectorNames));
+        return dispatch(ctx, ReservedMembers.lead(ctx, selectorNames));
     }
 
-    /**
-     * Scans again, for the selectors: the scan an outer dispatcher hands on answers only for the reserved
-     * members, and a sealed position selects on members of its own.
-     */
+    /** Reached by a tag naming this base from an enclosing position: placed again, from the leading members. */
     @Override
-    public Object readScanned(JsonReadContext ctx, ReservedMembers.Tag tag) {
+    public Object readExact(JsonReadContext ctx, JsonTypeReader<?> wrapped) {
         return read(ctx);
     }
 
-    private Object dispatch(JsonReadContext ctx, ReservedMembers.Scan scan) {
-        ReservedMembers.Tag tag = scan.tag();
-        if (Tags.refusesMisuse(ctx, tag, displayName, Tags.RECORD)) {
+    private Object dispatch(JsonReadContext ctx, ReservedMembers.Lead tag) {
+        if (Tags.refusesScope(ctx, tag, displayName, Tags.RECORD)) {
             return null;
         }
         // §3.3's wrapper puts the record inside `$value`, so the selectors are not at this level to read and
@@ -191,12 +189,12 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ScannedReade
         }
         List<Object> key = new ArrayList<>(selectors.size());
         for (Selector selector : selectors) {
-            JsonEvent value = scan.selectors().get(selector.name());
+            JsonEvent value = tag.selectors().get(selector.name());
             if (value == null) {
                 // Never a fallback to the tag: the selector is a REQUIRED field of the base, so a value
                 // without it is invalid on §5.2's ordinary terms, and reading the tag instead would make one
-                // family dispatch two ways.
-                ctx.field(selector.name()).report(extension.discriminatorMissing(selector.name()));
+                // family dispatch two ways. Not leading is not there, for the purpose of placing the value.
+                ctx.field(selector.name()).report(notLeading(selector.name()));
                 EventSkip.nextValue(ctx);
                 return null;
             }
@@ -222,41 +220,51 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ScannedReade
             EventSkip.nextValue(ctx);
             return null;
         }
-        if (tag.type() != null && !deeper.getOrDefault(selected, Set.of()).contains(tag.type())) {
-            // Located at the value and not at `/$type`, though the member is right there. §9.4 holds both
-            // encodings to one pointer for a rule, and TSON's tag is an annotation with no pointer step of
-            // its own -- so a rule they share can only be located where they both have a location. §3.3's
-            // reserved members are apparatus rather than data in any case, which is the same conclusion.
-            ctx.report(extension.tagContradictsDiscriminator(ReservedMembers.TYPE, tag.type(), selected));
-            EventSkip.nextValue(ctx);
-            return null;
+        if (tag.type() == null) {
+            return routes.get(selected).read(ctx, tag);
         }
-        // A deeper tag wins over the dispatched member, which is §6.1.5's "deeper than one level": the pins
-        // are inherited and §5.7 forbids changing them, so a family dispatches one level by member and every
-        // level below it by tag. The selected reader re-reads the whole object and re-verifies each pin as an
-        // ordinary FIXED check, which is what makes the two reads agree by construction.
-        return routes.get(tag.type() != null ? tag.type() : selected).read(ctx, tag);
+        // A tag goes where it names, which is §6.1.5's "deeper than one level": the pins are inherited and
+        // §5.7 forbids changing them, so a family dispatches one level by member and every level below it by
+        // tag. Whether the tag agrees with the discriminator is the selected reader's to say -- it re-reads
+        // the whole object and re-verifies each pin as an ordinary FIXED check, so a tag naming anything but
+        // the dispatched member or a subtype of it meets a pinned field the document contradicts.
+        Route route = routes.get(tag.type());
+        return route != null ? route.read(ctx, tag) : notAMember(ctx, tag.type());
+    }
+
+    /**
+     * A discriminator the leading members did not supply. JSON's own wording of {@code discriminatorMissing}:
+     * §6.1.5 puts the discriminators first, so one written after another member is missing to the reader, and
+     * the message says where it has to be rather than only that it was not found.
+     */
+    private Refusal notLeading(String field) {
+        Refusal missing = extension.discriminatorMissing(field);
+        return new Refusal(missing.code(), "missing discriminator '%s' for '%s' -- a sealed family selects its "
+                .formatted(field, displayName) + "member by reading it, so its discriminators lead the object, "
+                + "after any '$type' (§6.1.5), and '" + field + "' is absent or follows another member",
+                "'" + field + "' as a leading member", missing.actual());
+    }
+
+    /** A tag naming a type outside the family -- nothing here admits it, whatever the discriminator says. */
+    private Object notAMember(JsonReadContext ctx, String type) {
+        if (!NameHygiene.refuses(ctx, type)) {
+            ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+                    "'$type' names '%s', which is not a member of the sealed '%s'".formatted(type, displayName),
+                    extension.members(), type);
+        }
+        EventSkip.nextValue(ctx);
+        return null;
     }
 
     /** §3.3's wrapper form at a sealed position: `$type` places the value and `$value` holds it. */
-    private Object wrapped(JsonReadContext ctx, ReservedMembers.Tag tag) {
+    private Object wrapped(JsonReadContext ctx, ReservedMembers.Lead tag) {
         if (tag.type() == null) {
             ctx.report(extension.tagRequired(ReservedMembers.TYPE));
             EventSkip.nextValue(ctx);
             return null;
         }
         Route route = routes.get(tag.type());
-        if (route == null) {
-            if (!NameHygiene.refuses(ctx, tag.type())) {
-                ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'$type' names '%s', which is not a member of the sealed '%s'"
-                                .formatted(tag.type(), displayName),
-                        extension.members(), tag.type());
-            }
-            EventSkip.nextValue(ctx);
-            return null;
-        }
-        return route.read(ctx, tag);
+        return route != null ? route.read(ctx, tag) : notAMember(ctx, tag.type());
     }
 
     private Object decode(Selector selector, JsonEvent value) {
