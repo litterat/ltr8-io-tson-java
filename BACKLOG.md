@@ -141,21 +141,82 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
   name — so this is a decision to take deliberately, not a gap to close by reflex.
 
-- [ ] **Every schema-directed record read scans its object twice.** Recognising [TSON-JSON] §3.3's
-  annotation object means seeing member names, and §6.1.6 gives member order no meaning — so
-  `TreeRecordReader` runs `ReservedMembers.scan` before every record, and the events it looked past
-  are replayed from a buffer rather than re-lexed. Correct, and unmeasured: `JsonAllocationHarnessTest` reads
-  schemalessly, so nothing says what the second pass costs per bound record. No shortcut is sound — peeking
-  the first member concludes nothing when order is free, and a redundant tag is admissible at any typed
-  position (§8.1) — so what is owed is the measurement first, and only then a decision about whether the
-  common case deserves a different shape.
+- [ ] **Every position that selects a type becomes a dispatch reader of its own, wired at compile.** Selection
+  lives inside the `Tree*` readers today: `TreeRecordReader` branches on a `$type` naming a subtype, the family
+  readers and `TreeChoiceReader` reach the chosen reader by name through `CompiledReaders` on every read, and
+  every record read runs `ReservedMembers.scan` first because any of them might redirect. The shape owed:
+  - **A dispatcher only selects; the selected reader validates in full** — its type, a tag restating it, and
+    each discriminator pin as an ordinary FIXED check. A dispatcher builds nothing, so one set serves tree and
+    bind mode.
+  - **One dispatcher per kind of lookahead:** the value's kind (a disjoint, class-stable choice — only an object
+    is scanned, for §8.2 step 1's reserved members); `$type` alone (ABSTRACT, a family-base template, a choice
+    that needs the tag, an OPEN record with subtypes, whose untagged value goes to the base's own reader); one
+    discriminator member; several discriminator members.
+  - **Every option is resolved at compile.** A base's `subtypes` is the whole family, so each name any level
+    admits, aliases included (`namesMeaning`), maps straight to the concrete reader, and a choice over an
+    abstract family costs one scan rather than one per level. A sealed dispatcher stops scanning at its
+    selectors when no member has subtypes of its own, and otherwise also needs `$type`. An OPEN record with no
+    subtypes is FINAL in the loaded schema and gets no dispatcher. Dispatch edges are object references
+    (`DeferredTypeReader` closes a cycle), so the per-read name lookup goes.
+  - **The wrapper form** (`{"$type": …, "$value": …}`): the dispatcher reads `$type` only and hands the object to
+    the selected type's reader, which reads `$value` at its own type; a `$value` type with subtypes has its own
+    dispatcher.
+  - **A concrete reader never looks ahead.** Reached only for its own type, it judges `$type` (a restatement),
+    `$value`, `$schema` and unknown `$`-names inside its member loop, so a record with no subtypes reads in one
+    pass.
+  - **Refusals the selected reader now makes change their diagnostic** — a `$type` contradicting a discriminator
+    becomes a FIXED contradiction on the pin. `CrossEncodingParityTest` pins each one as a divergence until the
+    TSON side catches up (entry below).
+  - `JsonSchemaCompiler.build` stops calling `TreeTemplateAbstractReader.of` directly; a family-base template
+    reaches its dispatcher through the registry like every other constructor.
+  - What is left unmeasured is the dispatcher's own scan: `JsonAllocationHarnessTest` reads schemalessly, so a
+    bound-record case is owed with the change.
+
+- [ ] **The container readers split into a shared base and a tree subclass before bind mode is written.**
+  `tson-compiler`'s `RecordAbstractReader`/`RecordTreeReader`/`RecordBindReader` split, applied to record, array,
+  tuple and both map forms: the base carries the event walk, the field-state rules, size facets, groups,
+  duplicate detection and the diagnostics; the subclass carries assembly and what a refused value leaves
+  behind. Owed with it:
+  - One contract for a partial result. A refused array element leaves `JsonNull`, while a malformed pair, a
+    refused object-form key and a wrongly valued `OPTIONAL_FIXED` member are dropped; atoms return `null` where
+    containers return `JsonNull`.
+  - The refusal pattern (report, `EventSkip`, return a placeholder) as one helper, repeated about twenty times
+    today, with `Tags.refuseMisuse` and `TreeMapReader.wrongShape` returning a verdict rather than a tree node.
+    The `$schema` refusal and the "reserved members but no `$type`" message are each written twice, once for a
+    record and once for a choice; one parameterised helper each. `ABSENT = "null"` is declared four times.
+  - Failure detected by `ctx.reported() > before` (`TreeAtomReader`, `verifyFixed`, the pairs reader) replaced
+    by what the reader returns.
+
+- [ ] **The JSON factory layer takes a mode's parts rather than a hand-written table.** Built the way
+  `tson-compiler`'s `baseFactories` is, so every mode registers the same constructors and one added later
+  (`scoped`, §8.5) cannot be missed in one of them. Factories become instances built per registry, since a bind
+  factory holds a `DataBindContext` and a `static final FACTORY` lambda cannot. Each factory is handed one
+  per-entry record (name, display name, definition, schema location, the names that mean it) in place of each
+  recomputing `EntryDisplayName.of`, `locationOf` and `admitting(List.of(name))` —
+  `TreeRecordReader.FACTORY` builds `RecordDiagnostics` for the dispatchers and the concrete reader builds it
+  again.
+
+- [ ] **Tree mode judges set and compound-key uniqueness by spelling, not value.** `TreeAtomReader` keeps the node
+  and discards the parsed value, so `TreeArrayReader`'s unique-items check and `TreeMapPairsReader`'s duplicate-key
+  check reduce a string to its NFC text: a `set<datetime>` holding `"2026-01-01T00:00Z"` and
+  `"2026-01-01T01:00+01:00"` is not refused, where TSON's tree mode (`TsonAtom` keeps the value) refuses it as
+  [TSON-SCHEMA] §5.5 requires. Same cause as `verifyFixed` parsing the member twice. A parity case first; the fix
+  is duplicate detection over the parsed value in the shared container base above, in both modes.
 
 - [ ] **Bind mode has no schema-directed reader.** Tree mode validates and hands back the JSON; the other door
   — an HTTP service accepting both encodings and getting a Java object back — needs the same containers over a
   `DataBindContext`, with the bind-agreement machinery `tson-compiler` carries (`BindMismatchException` at
-  compile, `MissingBindingException` deferred to first read). The factory registry already takes a mode
-  (`ValueReaderFactoryRegistry.tree()` beside `atoms()`); what is owed is the second set of container
-  factories and the front-door surface that selects it.
+  compile, `MissingBindingException` deferred to first read). It follows the three entries above: the
+  dispatchers are shared, and what is owed here is the bind subclasses of the container bases, their factories,
+  and the front-door surface that selects the mode.
+
+- [ ] **`tson-compiler`'s readers adopt the JSON dispatch design once it settles.** `RecordTagDispatchReader`,
+  `RecordMemberDispatchReader`, `Subsumption.dispatching`, `AbstractTemplateReader` and the choice's
+  `NamedDispatchReader` still select by name at read time, and a concrete record reader still accepts a tag
+  naming a subtype. The port: dispatchers wrapping object references resolved at compile, chains flattened
+  through the family, concrete readers that only accept a tag restating themselves. Its diagnostics are the
+  drift to close: every divergence the JSON restructure pins in `CrossEncodingParityTest` comes out of that
+  test as the TSON side matches.
 
 - [ ] **`@rest` still has no consumer, and the JSON record reader is the one that will judge it.** §6.2's
   flatten is deliberately unbuilt: an undeclared member is §6.1.1's closure error and lands nowhere, which is
