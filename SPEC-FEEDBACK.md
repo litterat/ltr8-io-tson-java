@@ -1506,10 +1506,10 @@ is declared, so its identity is its name, and the use site's `[text]` has no dec
 one. The application row is the odd one — a declaration with a perfectly good name is given neither identity
 but an indirection to something else's.
 
-**What the indirection buys, and it is cross-schema.** Three properties hold today: a direct definition and a
-field use of one application reach one entry; two declarations naming one application are two aliases over one
-entry, neither privileged; and **a schema writing `box<text>` that has never seen the schema declaring `a`
-names that same entry**, so an import merge unifies the two rather than splitting them. The third is the load-
+**What the indirection bought, and it was cross-schema.** Three properties held before the change: a direct
+definition and a field use of one application reach one entry; two declarations naming one application are two
+aliases over one entry, neither privileged; and **a schema writing `box<text>` that has never seen the schema
+declaring `a` names that same entry**, so an import merge unifies the two rather than splitting them. The third is the load-
 bearing one, and §8.2 says so where it makes determinism a SHOULD: content-derived names "are what makes
 independently-resolved namespaces agree on their internal names wherever their structures agree — which is
 what lets the import merge unify rather than collide". A use site in another schema cannot name what it has
@@ -1517,28 +1517,35 @@ not heard of (§3.3.4), so an author's name cannot carry that property.
 
 **What is running.** A declaration whose body is a fully-bound application **is** the instantiation entry:
 `bx => box<text>` resolves to `bx => !record { … }` with `source` the canonical application, and no
-`box_text_…` is minted beside it. Identity stays one-per-application rather than becoming two structurally
-identical entries: a use site writing `box<text>` resolves **to the declaration**, so §8.2's "two fully-bound
-applications denote the same entry" still holds within the schema, and a second declaration of one
-application becomes an ordinary bare-name alias of the first — lossless, and composable since §4.3's chain
-walk is now applied (the operand fix that made an alias of a record admissible). A **synthetic** is never
-adopted this way: §8.2 shares one synthetic per distinct form schema-wide, so binding one to a single
-declared name would make a shared entry answer to one namer.
+`box_text_…` is minted beside it — **not minted and then collapsed, but never created**. The close runs
+*into* the declared name: it derives no internal name, claims none, and publishes nothing, recording only
+that this declaration owns that canonical application. A use site writing `box<text>` resolves to a
+declaration that owns it rather than minting a parallel entry, so §8.2's "two fully-bound applications
+denote the same entry" still holds within the schema — and it composes, since §4.3's chain walk is now
+applied (the operand fix that made an alias of a record admissible). A **synthetic** is untouched by any of
+this: a use-site sugar form has no author-written name for identity to key on, so it keeps its
+content-derived one, which is §8.2's own split doing what it says.
 
 What the change buys is visible where it was owed. `pet.subtypes` now reads `[dogs, cats]`; a colliding-pin
 refusal names `'a'` and `'b'` rather than rendering `pet_of<cat, int32>` through `EntryDisplayName`; and a
 read's `typeRef` reports `dogs` where it used to report `pet_dog_type_8b4b2b5c` — the hash reached the *data*
 model, not only the schema.
 
-**The tie-break is order, and that is a real divergence from §8.2.** Where two declarations name one
-application the first in document order is the entry. §8.2 says two such declarations are "two aliases over
-one entry, **neither privileged**", and this privileges one. The alternative — two entries — was measured
-against §5.2's pin rule and is worse: `dogs` and `hounds` over one application would be two members pinning
-`"dog"`, which `twoSubtypesPinningOneValueAreRefused` refuses, so it would need that rule relaxed to "pins
-distinct unless the members are structurally identical" plus a rule for which name an untagged pin-dispatched
-read reports in bind mode. Privileging the first needs none of that, and the second name keeps working as an
-alias. **An earlier draft of this entry argued the duplicate was inert; it is not, and the tie-break is what
-avoids needing it to be.**
+**Two declarations of one application are two entries, and no tie-break is needed.** §8.2 says two such
+declarations are "two aliases over one entry, **neither privileged**"; each closing into its own name keeps
+that promise literally, where privileging the first in document order would break it. The pair is two entries
+with one structure — which is exactly what `a => { v: text }` beside `b => { v: text }` already is, and
+therefore what `t => <T> { v: T }` with `a => t<text>` and `b => t<text>` has to be as well: duplicate
+definitions *by choice*, with the same structure. Nothing dedups the hand-written pair, and nothing should
+dedup this one.
+
+**Where the duplicate is not inert, the rule that catches it is already there.** `dogs` and `hounds` over one
+`pet<"dog", dog_type>` are two family members pinning `"dog"`, which §5.2's pin-distinctness rule refuses —
+the identical verdict `dogs => pet & { type: ="dog" }` beside `hounds => pet & { type: ="dog" }` gets. That
+is the whole of it: the same thing has been authored twice, which is no part of naming or deduplication and
+is a pin-distinctness catch. Outside a discriminated family the duplicate is ordinary — two entries with one
+structure, as two records with one field list are — and both names stay usable as dispatch identifiers in
+data, which is what the collapsing shape took away.
 
 **What is not running, and is the half still open.** A sugar form still duplicates: `text_list => [text]`
 beside a use-site `[text]` is two entries with one content, because §8.2 gives a declared entry its name as
@@ -1552,19 +1559,22 @@ has never seen this one mints the content name while this one calls it `bx`, so 
 for one form. Nothing in the implementation depends on it today, and no bundled schema or corpus vector
 exercises it, but it is a property traded away rather than preserved.
 
-**The conformance corpus encodes the old shape**, which is how visible this change is: two `class2/link`
-vectors assert the minted entry exists — one `binds: [box text_box box_text_xxhash]`, the other a `subtypes`
-table keyed on `result_text_xxhash` — with descriptions stating that closing an application "mints an entry
-keyed on the application, which the declaration naming it aliases". Under this design those become
-`text_box` and `result_of_text`, which is the readability the change exists for, but they are assertions in a
-shared language-agnostic corpus and cannot move until the rule does.
+**The conformance corpus carries the new shape already.** Two `class2/link` vectors used to assert the minted
+entry exists — one `binds: [box text_box box_text_xxhash]`, the other a `subtypes` table keyed on
+`result_text_xxhash`, with descriptions stating that closing an application "mints an entry keyed on the
+application, which the declaration naming it aliases". They now read `binds: [box text_box]` and index `box`
+as exactly `[text_box]`, where **the absence of the second name is what states the rule**. Those are
+assertions in a shared language-agnostic corpus rather than this implementation's own tests, and the
+corrective change here satisfies them unchanged — which is the evidence that *never minting* and *minting
+then collapsing* agree on everything observable from outside the resolver.
 
 **Suggested resolution.** State in §8.2 that a declaration whose body denotes a type **is** that type's
 entry, in both lift channels, and that a use-site application resolves to such a declaration rather than
-minting a parallel entry. Two things need saying with it. **Which declaration wins** when two name one
-application: either privilege one (document order is what is running, and is the cheaper answer) or admit two
-entries and relax §5.2's pin rule as above — but the section cannot keep "neither privileged" and also make
-each declaration its own entry. And **how cross-schema unification survives**: most simply by keeping the
+minting a parallel entry. Two things need saying with it. **That two declarations naming one application are
+two entries**, neither privileged and neither collapsed — the section already says "neither privileged", and
+this is what honouring it looks like. Where the pair is a discriminated family §5.2's pin-distinctness rule
+refuses it, exactly as it refuses the hand-written pair; no relaxation of that rule is wanted, and none is
+needed. And **how cross-schema unification survives**: most simply by keeping the
 content-addressed name as a merge key alongside the declared entry, so §8.2's determinism SHOULD still has a
 subject. The sugar channel should then be brought to the same rule, or §5.3 should say why a use-site sugar
 form mints where a use-site application does not.

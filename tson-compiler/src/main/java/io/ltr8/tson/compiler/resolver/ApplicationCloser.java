@@ -38,4 +38,29 @@ interface ApplicationCloser {
             List<String> parameters, List<TypeArgument> arguments) {
         return arguments;
     }
+
+    /**
+     * The entry a <b>declaration</b> naming a fully-bound application <em>is</em> ({@code SPEC-FEEDBACK.md}
+     * #15): the application closed into this declaration's own name, rather than minted under a
+     * content-derived one for the declaration to reference.
+     *
+     * <p>§8.2 gives a declared entry its name as its identity and a minted one its content, "since it has no
+     * declared name to be its identity" -- so an application a declaration names needs no derived name, and
+     * one no declaration names still gets one. Two declarations of one application are therefore two entries
+     * with one structure, exactly as two hand-written records with the same fields are; nothing dedupes them,
+     * and a rule that cares (§5.2's pin distinctness over a family's members) catches them downstream on its
+     * own terms.
+     *
+     * <p>Returns {@code null} where this declaration cannot own an entry, and the caller falls back to the
+     * reference form: an unresolved or non-template head, an arity mismatch (both the ordinary path's to
+     * report), and §5.10's <b>partial application</b>, which mints no entry at all -- the composed
+     * application's entry belongs to whoever names it.
+     *
+     * <p>A {@code default} for {@link #byParameterKind}'s reason: this stays a functional interface, so the
+     * meta-kernel bootstrap and the tests over hand-built namespaces keep passing a lambda and keep the
+     * reference shape.
+     */
+    default TypeDefinition closeApplicationInto(String declaredName, TypeRef application) {
+        return null;
+    }
 }

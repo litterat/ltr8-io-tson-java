@@ -110,14 +110,19 @@ class OperandFollowsReferenceChainTest {
 
     // ── Refused: the chain ends at something finished ────────────────────
 
-    /** §4.3 names a template instantiation as finished, and an alias resolving to one with it. */
+    /**
+     * §4.3 names a template instantiation as finished, and an alias resolving to one with it. Since #15 the
+     * declaration <em>is</em> that instantiation and carries a {@code !record} body, so what tells it apart
+     * from a hand-written record is an argument-bearing {@code source} rather than the body's shape -- and
+     * the message says so.
+     */
     @Test
     void aCompositionThroughAnAliasToAnInstantiationIsRefused() {
         assertTrue(refusal("ofc5", """
                   box => <V> { item: V }
                   bx  => box<text>
                   sub => bx & { extra: text }
-                """).contains("has no fields to contribute"));
+                """).contains("is a template instantiation"));
     }
 
     /** A top-level constructor application is a binding record: its bindings are set (§5.6). */
@@ -140,12 +145,17 @@ class OperandFollowsReferenceChainTest {
                 """).contains("has no fields to contribute"));
     }
 
+    /**
+     * The refinement half, and the line §5.7 draws: refining the <em>application</em> is admitted ({@code
+     * pinned => box<text> ^ { … }}, which is what the {@code refined-def} head's optional {@code <type-args>}
+     * slot is for), while refining a <b>name</b> that resolves to an instantiation is not.
+     */
     @Test
     void aRefinementThroughAnAliasToAnInstantiationIsRefused() {
         assertTrue(refusal("ofc8", """
                   box => <V> { item: V }
                   bx  => box<text>
                   sub => bx ^ { item: text = "x" }
-                """).contains("no vocabulary to tighten"));
+                """).contains("is a template instantiation"));
     }
 }
