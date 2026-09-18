@@ -1285,34 +1285,29 @@ final class DefinitionResolver {
             }
             // §4.3 judges an operand at the end of its reference chain (§8.3), never at the name written: a
             // reference is the same type under another name (§5.7's table), so an alias of a record has that
-            // record's fields to contribute. The walk stops at an argument-bearing target, so an alias of an
-            // instantiation still arrives as a binding record and is refused below -- §4.3's "an alias
-            // resolving to either is finished", reached for the terminal's reason rather than by testing
-            // whichever body the written name happened to have.
+            // record's fields to contribute. The walk stops at an argument-bearing target, which is the entry
+            // that application denotes -- so the test below sees that entry's own body, and an alias is
+            // judged for the terminal's reason rather than by whichever body the written name happened to
+            // have.
             String supertypeTerminal = ReferenceChain.terminal(supertypeName,
                     namespaceDefinitions::getTypeDefinition);
             boolean supertypeHops = !supertypeTerminal.equals(supertypeName);
             TypeDefinition terminalSupertype = supertypeHops
                     ? namespaceDefinitions.getTypeDefinition(supertypeTerminal) : supertypeDef;
-            // §4.3 names a *template instantiation* as finished alongside a binding record, and since #15 a
-            // declaration that names an application is one -- with a `!record` body indistinguishable from a
-            // hand-written record. So the discriminator is `source`: an argument-bearing one is an
-            // instantiation, whatever its body looks like. The remedy §5.7 gives is unchanged -- write the
-            // application again with a trailing body, `method<order, order> & { … }`.
-            boolean terminalIsInstantiation = terminalSupertype != null
-                    && terminalSupertype.source().filter(from -> !from.arguments().isEmpty()).isPresent();
-            if (terminalSupertype == null || terminalIsInstantiation
+            // §4.3's rule is the body test and nothing beside it: an operand MUST be a definition whose body
+            // is a `!record`. A record template's instantiation satisfies that -- `box<text>` closes to a
+            // `!record` carrying fields -- so it composes exactly as the hand-written record of the same
+            // shape does, and how the author spelled it is no part of the question (§8.2: what is
+            // canonicalised is identity, not provenance). Every other instantiation fails this same test on
+            // its own body: an array, a map or a choice has no fields to contribute (`SPEC-FEEDBACK.md` #16).
+            if (terminalSupertype == null
                     || !(terminalSupertype.body() instanceof RecordBody supertypeBody)) {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName + "'"
                         + (supertypeHops ? " resolves through its reference chain to '" + supertypeTerminal
                                 + "', which" : "")
-                        + (terminalIsInstantiation
-                                ? " is a template instantiation, whose bindings are already set, so it is "
-                                        + "finished and '&' on it is a resolver error (§4.3, §5.8). Compose "
-                                        + "with the application itself and a trailing body"
-                                : " has no fields to contribute -- its body is a binding record, not a "
-                                        + "vocabulary, so there is nothing for '&' to compose with (§4.3, "
-                                        + "§5.8). Compose with the head it derives from"));
+                        + " has no fields to contribute -- its body is a binding record, not a "
+                        + "vocabulary, so there is nothing for '&' to compose with (§4.3, "
+                        + "§5.8). Compose with the head it derives from");
             }
 
             directSupertypes.add(new io.ltr8.tson.schema.meta.TypeRef(supertypeName, List.of()));
@@ -1522,38 +1517,28 @@ final class DefinitionResolver {
                     + "' names no type this schema declares or imports");
         }
         // §5.7 states the walk explicitly -- "the source of `^`, after following its reference chain (§8.3)"
-        // -- and §4.3 states it for both operator families. A binding record is *finished*, its bindings set:
-        // a top-level constructor application, a template instantiation, a choice, or an alias resolving to
-        // any of them. What the walk adds is the case that is not finished: an alias of a record, which has
-        // that record's vocabulary to tighten.
+        // -- and §4.3 states it for both operator families. What is *finished* is a body with no vocabulary
+        // to tighten: a top-level constructor application (§5.6), a choice, or an alias resolving to either.
+        // What the walk adds is the case that is not finished: an alias of a record, which has that record's
+        // vocabulary to tighten -- a record template's instantiation included (`SPEC-FEEDBACK.md` #16).
         String sourceTerminal = ReferenceChain.terminal(sourceName, namespaceDefinitions::getTypeDefinition);
         boolean sourceHops = !sourceTerminal.equals(sourceName);
         TypeDefinition terminalSource = sourceHops
                 ? namespaceDefinitions.getTypeDefinition(sourceTerminal) : sourceDef;
-        // §4.3's "finished" test, with the same discriminator the composition operand uses: since #15 a
-        // declaration naming an application *is* the instantiation and carries a `!record` body, so what
-        // tells one apart from a hand-written record is an argument-bearing `source`, not the body shape.
-        //
-        // <b>Only where the author wrote a bare name.</b> §5.7 admits refining an application directly --
-        // `pinned => box<text> ^ { … }`, whose `refined-def` head is what the optional `<type-args>` slot is
-        // for -- and `resolveRefinementSource` has already flattened both spellings to a name by here, so
-        // testing the terminal alone would refuse the spelling the section permits. What §4.3 forbids is an
-        // *alias* resolving to an instantiation, which is the bare-name case and only that.
-        boolean sourceIsInstantiation = refined.target() instanceof SimpleRef && terminalSource != null
-                && terminalSource.source().filter(from -> !from.arguments().isEmpty()).isPresent();
-        if (terminalSource == null || sourceIsInstantiation
-                || !(terminalSource.body() instanceof RecordBody sourceBody)) {
+        // §4.3's test is the body and nothing beside it, and §5.7 states the same of its own source: a
+        // definition whose body is a `!record` has a vocabulary to tighten. A record template's
+        // instantiation has one -- `box<text>` closes to a `!record` carrying fields -- so it refines like
+        // the hand-written record of the same shape, and what polices a value the substitution already fixed
+        // is §5.7's own per-field rule, which refuses re-fixing a REQUIRED_FIXED field to a different value
+        // whoever wrote it. Every other instantiation fails on its own body (`SPEC-FEEDBACK.md` #16).
+        if (terminalSource == null || !(terminalSource.body() instanceof RecordBody sourceBody)) {
             throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName + "'"
                     + (sourceHops ? " resolves through its reference chain to '" + sourceTerminal
                             + "', which" : "")
-                    + (sourceIsInstantiation
-                            ? " is a template instantiation, whose bindings are already set, so it is "
-                                    + "finished and '^' on it is a resolver error (§4.3, §5.7). Refine the "
-                                    + "application itself, or the head it derives from"
-                            : " has no vocabulary to tighten -- its body is a binding record, so it is "
-                                    + "finished and '^' on it is a resolver error (§4.3, §5.7). Refine the "
-                                    + "head it derives from, or, for an atom instance, use atom refinement "
-                                    + "('!" + sourceName + " ^ { ... }', §5.5)"));
+                    + " has no vocabulary to tighten -- its body is a binding record, so it is "
+                    + "finished and '^' on it is a resolver error (§4.3, §5.7). Refine the "
+                    + "head it derives from, or, for an atom instance, use atom refinement "
+                    + "('!" + sourceName + " ^ { ... }', §5.5)");
         }
 
         List<String> transitiveSupertypes = new ArrayList<>();

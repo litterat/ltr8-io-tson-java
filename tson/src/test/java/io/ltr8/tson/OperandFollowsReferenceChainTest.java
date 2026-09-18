@@ -3,6 +3,8 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -18,8 +20,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Both halves of that rule matter, and only the second was applied. A reference is the same type under
  * another name (§5.7's table), so an alias of a record has a field set to merge or tighten and MUST be
- * admitted; an alias whose chain ends at a <em>binding</em> record -- a top-level constructor application
- * (§5.6), a template instantiation (§8.2), or a choice -- is finished and admits neither operator.
+ * admitted; an alias whose chain ends at a body with no fields -- a top-level constructor application
+ * (§5.6) or a choice -- is finished and admits neither operator.
+ *
+ * <p><b>The body is the whole test</b> ({@code SPEC-FEEDBACK.md} #16). A record template's instantiation
+ * closes to a {@code !record} carrying fields, so it merges and tightens like the hand-written record of the
+ * same shape; §8.2 makes identity the question rather than provenance, so which of the two an author wrote
+ * cannot decide it. Every other instantiation is refused by that same body test, having no fields of its own.
  *
  * <p><b>Subtraction shares the composition operand path</b>, so it is governed by the same walk; §5.9 then
  * empties the contract index as it does for any subtraction.
@@ -108,22 +115,43 @@ class OperandFollowsReferenceChainTest {
                 "subtraction revokes IS-A for every parent (§5.9)");
     }
 
-    // ── Refused: the chain ends at something finished ────────────────────
+    // ── Admitted: the chain ends at an instantiation that is a record ────
 
     /**
-     * §4.3 names a template instantiation as finished, and an alias resolving to one with it. Since #15 the
-     * declaration <em>is</em> that instantiation and carries a {@code !record} body, so what tells it apart
-     * from a hand-written record is an argument-bearing {@code source} rather than the body's shape -- and
-     * the message says so.
+     * <b>A record template's instantiation composes like the record it is</b> ({@code SPEC-FEEDBACK.md}
+     * #16). {@code bx} closes to {@code !record { item: text }}, which is what §4.3's MUST asks for, so
+     * there is a field set to merge. Refusing it would make composition depend on whether an application or
+     * a pen produced those fields, which §8.2 rules out: what is canonicalised is identity, not provenance.
      */
     @Test
-    void aCompositionThroughAnAliasToAnInstantiationIsRefused() {
-        assertTrue(refusal("ofc5", """
+    void aCompositionThroughAnAliasToARecordInstantiationIsAdmitted() {
+        TsonLinkedSchema linked = resolve("ofc5", """
                   box => <V> { item: V }
                   bx  => box<text>
                   sub => bx & { extra: text }
-                """).contains("is a template instantiation"));
+                """);
+
+        assertEquals(List.of("item", "extra"), fieldNames(linked, "sub"),
+                "the operand's own field, then the composition's");
+        assertTrue(linked.schema().entries().get("sub").supertypes().contains("bx"),
+                () -> "and IS-A the operand: " + linked.schema().entries().get("sub").supertypes());
     }
+
+    /** The refinement half: a vocabulary to tighten is a vocabulary however the entry came by it. */
+    @Test
+    void aRefinementThroughAnAliasToARecordInstantiationIsAdmitted() {
+        TsonLinkedSchema linked = resolve("ofc8", """
+                  box => <V> { item: V }
+                  bx  => box<text>
+                  sub => bx ^ { item: text = "x" }
+                """);
+
+        assertEquals(List.of("item"), fieldNames(linked, "sub"), "refinement adds no field (§5.7)");
+        assertTrue(linked.schema().entries().get("sub").supertypes().contains("bx"),
+                () -> "and preserves IS-A: " + linked.schema().entries().get("sub").supertypes());
+    }
+
+    // ── Refused: the chain ends at a body with no fields ─────────────────
 
     /** A top-level constructor application is a binding record: its bindings are set (§5.6). */
     @Test
@@ -146,16 +174,22 @@ class OperandFollowsReferenceChainTest {
     }
 
     /**
-     * The refinement half, and the line §5.7 draws: refining the <em>application</em> is admitted ({@code
-     * pinned => box<text> ^ { … }}, which is what the {@code refined-def} head's optional {@code <type-args>}
-     * slot is for), while refining a <b>name</b> that resolves to an instantiation is not.
+     * The same body test refuses an instantiation that is <em>not</em> a record: {@code vector<text, 3>}
+     * closes to an {@code !array}, which has elements rather than fields. This is what keeps §4.3's
+     * "finished" idea intact where it was always doing the work.
      */
     @Test
-    void aRefinementThroughAnAliasToAnInstantiationIsRefused() {
-        assertTrue(refusal("ofc8", """
-                  box => <V> { item: V }
-                  bx  => box<text>
-                  sub => bx ^ { item: text = "x" }
-                """).contains("is a template instantiation"));
+    void aCompositionThroughAnAliasToANonRecordInstantiationIsRefused() {
+        assertTrue(refusal("ofc9", """
+                  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
+                  triple => vector<text, 3>
+                  sub    => triple & { extra: text }
+                """).contains("has no fields to contribute"));
+    }
+
+    /** The field names of an entry's record body, in declaration order. */
+    private static List<String> fieldNames(TsonLinkedSchema linked, String entry) {
+        return ((RecordBody) linked.schema().entries().get(entry).body()).fields().stream()
+                .map(RecordField::name).toList();
     }
 }
