@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -160,13 +161,10 @@ class TsonTreeReaderTest {
 
     /** The failed leaf keeps its place and its wire type-ref; only its value is gone. */
     @Test
-    void aRejectedTokenLeavesAnAbsentPlaceholderInTheTree() {
-        TsonValue node = STRICT.withDiagnostics(DiagnosticsReceiver.collecting())
-                .read("{ a: !uuid nope  b: 2 }");
-
-        assertTrue(node.at("/a").isAbsent());
-        assertEquals(Optional.of("uuid"), node.at("/a").typeRef());
-        assertEquals(BigInteger.TWO, node.at("/b").asBigInteger().orElseThrow());
+    void aRejectedTokenLeavesNoTree() {
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
+        assertNull(STRICT.withDiagnostics(problems).read("{ a: !uuid nope  b: 2 }"));
+        assertEquals(Optional.of("/a"), problems.diagnostics().getFirst().path());
     }
 
     @Test
@@ -215,8 +213,7 @@ class TsonTreeReaderTest {
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
                 keyProblems.stream().map(Diagnostic::code).toList(), keyProblems.toString());
 
-        TsonValue node = STRICT.withDiagnostics(DiagnosticsReceiver.collecting()).read("{ a: 1  a: 2 }");
-        assertEquals(BigInteger.TWO, node.at("/a").asBigInteger().orElseThrow());
+        assertNull(STRICT.withDiagnostics(DiagnosticsReceiver.collecting()).read("{ a: 1  a: 2 }"));
     }
 
     /**

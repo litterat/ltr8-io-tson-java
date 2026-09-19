@@ -7,6 +7,7 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.CountingReceiver;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -17,6 +18,7 @@ import io.ltr8.tson.json.stream.JsonStream;
 import java.io.InputStream;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 
 /**
@@ -128,14 +130,21 @@ public final class JsonObjectReader {
 
     private JsonObjectReader(DataBindContext context, boolean ignoreUnknownMembers, DiagnosticsReceiver receiver,
                              ProcessorPolicy policy, JsonCompiledSchemaRegistry schemas, String schemaUri) {
+        this(context, ignoreUnknownMembers, receiver, policy, schemas, schemaUri,
+                new DataClassObjectReader(context, ignoreUnknownMembers, policy.identifierPolicy()));
+    }
+
+    /** Sharing {@code engine}, for a copy that differs from its original only in its receiver. */
+    private JsonObjectReader(DataBindContext context, boolean ignoreUnknownMembers, DiagnosticsReceiver receiver,
+                             ProcessorPolicy policy, JsonCompiledSchemaRegistry schemas, String schemaUri,
+                             DataClassObjectReader engine) {
         this.context = context;
         this.ignoreUnknownMembers = ignoreUnknownMembers;
         this.receiver = receiver;
         this.policy = policy;
         this.schemas = schemas;
         this.schemaUri = schemaUri;
-        this.engine = new DataClassObjectReader(context, ignoreUnknownMembers,
-                policy.identifierPolicy());
+        this.engine = engine;
     }
 
 
@@ -175,8 +184,7 @@ public final class JsonObjectReader {
      * <p>The peer of {@code TsonObjectReader.withDiagnostics}, and what makes a one-pass read possible:
      * {@code DiagnosticsReceiver.collecting()} gathers every problem and lets the read run to the end,
      * where the default {@code throwing()} raises {@code ReadException} at the first. A collecting read
-     * hands back {@code null} rather than a half-built object -- see {@code DataClassObjectReader} on why
-     * bind mode is all-or-nothing where a tree keeps what it built.
+     * that reported anything hands back {@code null} rather than a half-built object, as every read does.
      */
     public JsonObjectReader withDiagnostics(DiagnosticsReceiver receiver) {
         return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy, schemas, schemaUri);
@@ -264,24 +272,43 @@ public final class JsonObjectReader {
      * above adapt to. A source already in memory is read without a copy.
      */
     public <T> T read(ByteSource source, Class<T> type) {
-        return read(new JsonStream(source, policy, receiver), type);
+        return counted(r -> r.readEvents(new JsonStream(source, policy, r.receiver), type));
     }
 
     /** Off UTF-8 bytes, where §3.1's rules bite. {@code source} is not closed here. */
     public <T> T read(InputStream source, Class<T> type) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return read(new JsonStream(bytes, policy, receiver), type);
+            return counted(r -> r.readEvents(new JsonStream(bytes, policy, r.receiver), type));
         }
     }
 
 
-    /** Off an event source, which is the seam the two families above come through. */
+    /**
+     * Off an event source, which is the seam the two families above come through. A problem the source reports
+     * to a receiver of its own is not this read's to count.
+     */
     public <T> T read(JsonEventSource events, Class<T> type) {
+        return counted(r -> r.readEvents(events, type));
+    }
+
+    private <T> T readEvents(JsonEventSource events, Class<T> type) {
         try {
             return readDocument(events, type);
         } catch (RuntimeException e) {
             return readFailure(e);
         }
+    }
+
+    /**
+     * One whole-document read, run on a copy of this reader whose receiver counts: a document that reported
+     * anything binds to nothing, whatever was assembled beneath ({@link CountingReceiver}), and the rule holds
+     * over every route a problem takes, the root's framing and the stream's own refusals among them.
+     */
+    private <T> T counted(Function<JsonObjectReader, T> read) {
+        CountingReceiver counting = new CountingReceiver(receiver);
+        T value = read.apply(new JsonObjectReader(context, ignoreUnknownMembers, counting, policy, schemas,
+                schemaUri, engine));
+        return counting.reported() ? null : value;
     }
 
     /**
@@ -296,6 +323,7 @@ public final class JsonObjectReader {
      * limit refusal is classified apart ({@link Diagnostic#ofLimitExceeded}) because it says this processor
      * declined rather than that the document is malformed.
      */
+
     private <T> T readFailure(RuntimeException e) {
         receiver.report(e instanceof LimitExceededException limit
                 ? Diagnostic.ofLimitExceeded(limit)
@@ -339,6 +367,10 @@ public final class JsonObjectReader {
      * application's own wiring, in every mode.
      */
     public <T> T readAs(ByteSource source, String typeName, Class<T> type) {
+        return counted(r -> r.readRootAs(source, typeName, type));
+    }
+
+    private <T> T readRootAs(ByteSource source, String typeName, Class<T> type) {
         if (schemaUri == null) {
             throw new IllegalStateException("no schema named -- readAs reads against one, so name it with "
                     + "withSchema(uri); a class-directed read is read(...)");
@@ -363,7 +395,7 @@ public final class JsonObjectReader {
             if (!(events.next() instanceof JsonEvent.EndOfDocument)) {
                 throw new IllegalStateException("the stream produced events after the document's root value");
             }
-            return ctx.reported() > 0 ? null : type.cast(value);
+            return type.cast(value);
         } catch (RuntimeException e) {
             return readFailure(e);
         }

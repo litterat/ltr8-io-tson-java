@@ -3,19 +3,19 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonReadContext;
 
 /**
- * <b>Object-binding mode is all-or-nothing:</b> a value whose read reported anything is not assembled, and
- * binds to {@code null} instead. Shared by every bind-mode reader that builds something -- {@link
- * RecordBindReader}, {@link TupleBindReader}, {@link ArrayBindReader}, {@link MapBindReader} and {@link
- * DataClassObjectReader}'s own four -- so the policy has one statement rather than nine, and one place to
- * change if it ever moves. {@code TsonObjectReader} applies the same rule once more at the document boundary,
- * for the root value's own framing, which no enclosing read brackets.
+ * <b>A read is all-or-nothing, in both modes:</b> a value whose read reported anything is not assembled, and
+ * reads to {@code null} instead. Shared by every reader that builds something -- the tree readers ({@link
+ * RecordTreeReader}, {@link ArrayTreeReader}, {@link MapTreeReader}, {@link TupleTreeReader}, {@link
+ * AtomTreeReader}, {@link AbsentTreeReader}) and the bind readers ({@link RecordBindReader}, {@link
+ * TupleBindReader}, {@link ArrayBindReader}, {@link MapBindReader} and {@link DataClassObjectReader}'s own
+ * four) -- so the policy has one statement. The facades apply it once more at the document boundary, over
+ * every route a problem takes ({@code CountingReceiver}).
  *
- * <p><b>Why bind mode differs from tree mode here.</b> A tree read hands back structure: a {@code TsonRecord}
- * missing a field is a coherent value a caller can inspect alongside the diagnostics, and both tree readers
- * therefore keep everything they built. A bound object is the opposite -- it is real, typed application data,
- * and the whole point of binding is that reaching it means the document was good. Assembling one out of a
- * document already known to be wrong hands a caller data that looks trustworthy and is not, which is a worse
- * outcome than {@code null} plus the diagnostics explaining why.
+ * <p><b>Why a partial value is worse than none.</b> A bound object is real, typed application data, and the
+ * whole point of binding is that reaching it means the document was good. A tree is no different in the end:
+ * its placeholder for a refused value is the same node as a real absent one, so a partial tree cannot say
+ * which of its parts to trust, and a caller holding one has to consult the diagnostics before using any of it.
+ * The diagnostics -- each with a path into the document the caller already holds -- are the answer.
  *
  * <p>A second reason applies where a failed child is carried as {@code null}: a Java constructor cannot take
  * {@code null} for a primitive-typed parameter, and neither can a primitive-component array's own {@code

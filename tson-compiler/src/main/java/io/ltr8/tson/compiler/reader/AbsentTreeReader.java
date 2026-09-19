@@ -26,7 +26,11 @@ final class AbsentTreeReader implements TsonTypeReader<TsonValue> {
     @Override
     public TsonValue read(TsonReadContext ctx) {
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
+        int mark = ConstructionGuard.mark(ctx);
         delegate.read(ctx); // consume the `_` (and let the delegate report any shape mismatch)
+        if (ConstructionGuard.abandoned(ctx, mark)) {
+            return null;
+        }
         return annotations.isEmpty() ? TsonAbsent.instance() : new TsonAbsent(Optional.empty(), annotations);
     }
 }

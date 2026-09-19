@@ -234,10 +234,11 @@ markers carry what a value cannot: stated-as-absent, null kept at `OPTIONAL_FIXE
 Each builder decides what they become. The rules are methods on the plan and in the loop, not a superclass, so the
 loop is the whole of what a record read does.
 
-**Bind mode is all-or-nothing, and says so in one place.** A tree keeps what it built — a record missing a field is
-a coherent value beside the diagnostics — but a bound object is application data whose promise is that the
-document was good. The loop tells the builder whether anything was reported while the record was read, and
-`BindRecordBuilder` constructs nothing where it was: the same rule `tson-compiler`'s bind mode keeps.
+**Every mode is all-or-nothing, and says so in one place.** The loop tells the builder whether anything was
+reported while the record was read, and neither builder builds where it was: a bound object is application data
+whose promise is that the document was good, and a tree's placeholder for a refused value would be the same node
+as a real `null`, so a partial tree could not say which of its parts to trust. The same rule `tson-compiler`
+keeps in both modes; each facade applies it once more to the whole document (`CountingReceiver`).
 
 **The class is checked against the schema when the reader is built.** A non-FIXED field with no component, a
 component no field fills (unless `@Unbound`), an atom field whose component binds structurally, and an atom field
@@ -276,16 +277,15 @@ shape would multiply by the modes, so a split waits for a timing benchmark that 
 ### Every container reads on the record's terms, and a position binds to what a component holds
 
 Arrays and sets, tuples and maps read as records do: a plan of what the schema fixes (`ArrayPlan`, `TuplePlan`,
-`MapPlan`), one mode-free loop per form (`ArrayReader`, `TupleReader`, `MapObjectReader`, `MapPairsReader`), and
-the mode's builder called once — the tree builders a `JsonArray` or `JsonObject` with a placeholder in a refused or
-absent slot (tree mode keeps what it built), the bind builders the target's class, or nothing where anything was
-reported. The `Slots` markers are the loops' shared vocabulary for what a value cannot carry. A set's
-duplicates are judged on the element's value through `ValueIdentity`, so bind mode, whose elements are host
-values, compares what they decode to. Tree mode's node keeps only a spelling, so a set's atom element is read at
-`TreeAtomKeyedReader` (chosen by `TreeAtomReader.keyed`), which answers the node with the parsed value's identity beside it
-(`ValueIdentity.Identified`) and the loop unwraps it — two spellings of one instant are one element. A compound
-element or key compares by host equality over what the mode built, which is all any mode can promise
-(`SPEC-FEEDBACK.md` #18).
+`MapPlan`), one mode-free loop per form (`ArrayReader`, `TupleReader`, `MapObjectReader`, `MapPairsReader`), and the
+mode's builder called once — the tree builders a `JsonArray` or `JsonObject` with `JsonNull` in an absent slot, the bind
+builders the target's class, and either nothing where anything was reported. The `Slots` markers are the loops' shared
+vocabulary for what a value cannot carry. A set's duplicates are judged on the element's value through `ValueIdentity`,
+so bind mode, whose elements are host values, compares what they decode to. Tree mode's node keeps only a spelling, so a
+set's atom element is read at `TreeAtomKeyedReader` (chosen by `TreeAtomReader.keyed`), which answers the node with the
+parsed value's identity beside it (`ValueIdentity.Identified`) and the loop unwraps it — two spellings of one instant
+are one element. A compound element or key compares by host equality over what the mode built, which is all any mode can
+promise (`SPEC-FEEDBACK.md` #18).
 
 **Bind mode compiles each type to its natural reading, and a component declares something more specific.** A
 standalone array or tuple binds to an unmodifiable `List` of its values' natural host values and a map to an

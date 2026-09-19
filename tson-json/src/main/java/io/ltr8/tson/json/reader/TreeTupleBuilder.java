@@ -8,8 +8,9 @@ import io.ltr8.tson.json.tree.JsonValue;
 import java.util.List;
 
 /**
- * Tree mode's tuple: a {@link JsonArray} of the positions the document stated, an absent or refused position --
- * and an element past the arity -- standing as {@link JsonNull} in its slot. Tree mode keeps what it built.
+ * Tree mode's tuple: a {@link JsonArray} of the positions the document stated, an absent position standing as
+ * {@link JsonNull} in its slot. A tuple whose read reported anything builds nothing -- all-or-nothing, as bind
+ * mode is.
  */
 final class TreeTupleBuilder implements TupleBuilder {
 
@@ -26,19 +27,21 @@ final class TreeTupleBuilder implements TupleBuilder {
 
     @Override
     public Object build(JsonReadContext ctx, List<Object> positions, boolean clean) {
+        if (!clean) {
+            return null;
+        }
         for (int i = 0; i < positions.size(); i++) {
-            Object position = positions.get(i);
-            if (position == Slots.ABSENT || position == Slots.REFUSED) {
+            if (positions.get(i) == Slots.ABSENT) {
                 positions.set(i, JsonNull.INSTANCE);
             }
         }
-        @SuppressWarnings("unchecked")   // every slot now holds a node: a child's, or the placeholder just set
+        @SuppressWarnings("unchecked")   // every slot now holds a node: a child's, or the absence just set
         List<JsonValue> nodes = (List<JsonValue>) (List<?>) positions;
         return new JsonArray(nodes);
     }
 
     @Override
     public Object refused() {
-        return JsonNull.INSTANCE;
+        return null;
     }
 }

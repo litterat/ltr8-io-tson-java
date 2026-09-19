@@ -59,6 +59,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
     public TsonValue read(TsonReadContext ctx) {
         ctx = ctx.inRecord(schemaLocation);
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
+        int mark = ConstructionGuard.mark(ctx);
         ShapeResult shapeResult = expectRecordShape(ctx);
         if (shapeResult.shape() == Shape.MISMATCH) {
             return null;
@@ -78,6 +79,9 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
             }
         }
         validateGroups(anchoredCtx, seen);
+        if (ConstructionGuard.abandoned(ctx, mark)) {
+            return null;   // tree mode is all-or-nothing too: no partial record to mistake for a valid one
+        }
         return new TsonRecord(result, Optional.of(name), annotations);
     }
 

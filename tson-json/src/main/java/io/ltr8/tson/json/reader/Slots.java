@@ -2,8 +2,8 @@ package io.ltr8.tson.json.reader;
 
 /**
  * What a container's mode-free loop puts where a value cannot say what the document did -- read by the mode's
- * builder, which decides what each becomes. A tree keeps a placeholder; a bound object builds nothing where a
- * value was refused, and holds {@code null} where one was absent.
+ * builder, which decides what each becomes. Neither mode builds anything where a value was refused; an absent
+ * one becomes {@code JsonNull} in a tree and {@code null} in a bound object.
  */
 final class Slots {
 

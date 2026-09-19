@@ -91,9 +91,8 @@ class RecordClosureTest {
         assertEquals(3, byPath.get("/address/nested_bogus").dataPosition().orElseThrow().line());
         assertEquals(4, byPath.get("/top_bogus").dataPosition().orElseThrow().line());
 
-        // Continuation policy: the value still comes back whole, with every field the schema *does* declare.
-        assertEquals("a", person.get("name").asString().orElseThrow());
-        assertEquals("x", person.get("address").get("city").asString().orElseThrow());
+        // Reading continues past each, which is how both surface; the value is all-or-nothing.
+        assertNull(person);
     }
 
     /**

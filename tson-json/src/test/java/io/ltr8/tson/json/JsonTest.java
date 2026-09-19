@@ -23,6 +23,7 @@ import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -80,9 +81,9 @@ class JsonTest {
         }
 
         @Test
-        void a_collecting_tree_read_finds_every_duplicate_and_still_hands_back_the_tree() {
-            // The reason the rule moved off ParseException. Tree mode keeps what it built, where a bound
-            // read hands back nothing: a JsonObject has somewhere to put a partial answer.
+        void a_collecting_tree_read_finds_every_duplicate_and_hands_back_no_tree() {
+            // The reason the rule moved off ParseException: every duplicate is found in one pass. The tree is
+            // all-or-nothing, as a bound read is.
             DiagnosticsCollector problems = new DiagnosticsCollector();
             JsonValue tree = JsonTreeReader.standard().withDiagnostics(problems)
                     .read("{\"a\": 1, \"a\": 2, \"b\": 3, \"b\": 4}");
@@ -90,9 +91,7 @@ class JsonTest {
                     problems.diagnostics().stream().map(Diagnostic::code).toList());
             assertEquals(List.of("/a", "/b"),
                     problems.diagnostics().stream().map(d -> d.path().orElseThrow()).toList());
-            // Last value wins, which is what a reader that carries on has to do with the earlier one.
-            assertEquals(2, tree.get("a").asInt());
-            assertEquals(4, tree.get("b").asInt());
+            assertNull(tree);
         }
 
         @Test

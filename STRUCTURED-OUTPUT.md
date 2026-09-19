@@ -36,9 +36,11 @@ backend.
   plus `DiagnosticsReceiver`, the seam deciding where each one goes — `throwing()` (fail-fast),
   `collecting()` (a `DiagnosticsCollector`), or a caller's own `void report(Diagnostic)`. Both
   library-level entry points exist: `Tson.validate(...)` returns every problem and never throws for a bad
-  document, and `tson.treeReader()/objectReader().withDiagnostics(collector).read(...)` returns the
-  (possibly partial) **value alongside** them — the shape a repair loop actually needs, which for a while
-  no route offered. `tson-cli`'s `ValidateCommand` is now just a caller of the former. See
+  document, and `tson.treeReader()/objectReader().withDiagnostics(collector).read(...)` returns the value
+  for a clean document and `null` beside every problem for one that is not — all-or-nothing in every mode
+  and both encodings, since a partial value cannot say which of its parts to trust. A repair loop holds the
+  document it sent, and each diagnostic's path points into it. `tson-cli`'s `ValidateCommand` is a caller of
+  the former. See
   `design/diagnostic-model.md` for the full design. Field by field, against the
   shape sketched below:
   - `path` — landed exactly as described, an RFC 6901 JSON Pointer accumulated by
@@ -98,9 +100,9 @@ backend.
   **what was expected**, concretely (`expected`) — turns "too large" into "must be ≤ 100"; (5) a
   single ready-to-paste `message`, which is what actually gets dropped into a retry prompt in practice.
   - **All five are present today.** (1)–(4) are structured fields; `expected` carries the violated
-    constraint itself, so "too large" does read as `<= 100` without parsing prose. Note what is *not* a gap
-    any more: a repair loop can obtain the diagnostics without giving up the value, so a retry can be built
-    from the partial result rather than from scratch.
+    constraint itself, so "too large" does read as `<= 100` without parsing prose. A retry is built from the
+    document the model sent and the diagnostics' paths into it, not from a partial result: an invalid
+    document reads to no value.
   - **(5) originally asked for `message` to be a *rendering* of 1–4 rather than hand-authored per site. That
     was reconsidered and dropped**, and should not be re-derived from this list. The premise was that the
     sentence and the structured fields say the same thing twice and can therefore drift; they don't. The

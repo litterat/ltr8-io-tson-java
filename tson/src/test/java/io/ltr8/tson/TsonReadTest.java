@@ -270,8 +270,8 @@ class TsonReadTest {
         assertEquals(Optional.of("/x"), problems.diagnostics().get(0).path());
         assertEquals(Optional.of("/y"), problems.diagnostics().get(1).path());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.diagnostics().get(0).code());
-        // The tree still comes back, so a caller has the partial value alongside what was wrong with it.
-        assertTrue(node.isRecord());
+        // Every problem, and no value: the diagnostics are the answer for an invalid document.
+        assertNull(node);
     }
 
     @Test

@@ -33,15 +33,6 @@ final class Nodes {
         return value instanceof JsonString string ? string.value() : String.valueOf(value);
     }
 
-    /**
-     * What a child reader produced, as the node tree mode puts in its place. A reader that places a value and
-     * builds nothing -- a dispatcher, which serves every mode -- answers null where it refused one, and tree
-     * mode's placeholder for a refused value is {@link JsonNull}, the diagnostic beside it saying what was wrong.
-     */
-    static JsonValue node(Object read) {
-        return read == null ? JsonNull.INSTANCE : (JsonValue) read;
-    }
-
     /** The node {@code event} carries, or null when {@code event} opens a composite or ends one. */
     static JsonValue scalar(JsonEvent event) {
         return switch (event) {

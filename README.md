@@ -250,15 +250,17 @@ try (var in = Files.newInputStream(Path.of("server.tn"))) {
 ```
 
 On a mismatch it throws `ReadException` (fail-fast). To collect *every* problem in one pass instead
-of stopping at the first, derive a reader with a collecting `DiagnosticsReceiver` — you get the
-(possibly partial) value back *alongside* the full list, rather than one or the other:
+of stopping at the first, derive a reader with a collecting `DiagnosticsReceiver`. The read runs to the
+end and hands every problem to the receiver; a document that had any comes back as `null`, in tree and
+bind mode alike, because a partial value cannot say which of its parts to trust. The diagnostics, each with
+a path into the document you already hold, are the answer:
 
 ```java
 var problems = DiagnosticsReceiver.collecting();
 
 Server server = new TsonObjectReader()
         .withDiagnostics(problems)
-        .read("{ hostname: 1  address: nope }", Server.class);
+        .read("{ hostname: 1  address: nope }", Server.class);   // null
 
 for (Diagnostic d : problems.diagnostics()) {
     System.out.println(d.path().orElse("") + ": " + d.message());   // /hostname: …, /address: …

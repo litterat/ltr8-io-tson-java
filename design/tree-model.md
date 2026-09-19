@@ -101,13 +101,12 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   cast via `TsonValue.missingPath()`. The first failure sticks — stepping on past a missing returns the
   same node rather than extending its pointer. "Missing" (not in the tree) and "absent" (written, but
   holding no value) stay distinct kinds.
-- **There is one no-value node, `TsonAbsent`, because there is one no-value spelling.** Two things land on
-  it: the `_` sentinel, and the placeholder a tree reader leaves where a read failed in collecting mode,
-  whose story is carried by its diagnostic rather than by the node standing in for it. `null` is not one of
-  them — §4 resolves boolean, number and string, so the unquoted token is a `TsonAtom` holding the string
-  `null`, schemaless and under a schema alike, and it round-trips through `TsonTreeWriter` as the string it
-  is. A JSON document's `null` reaches absence through a JSON reader, which maps it in the model, where the
-  position's own state decides whether absence is admitted at all.
+- **There is one no-value node, `TsonAbsent`, because there is one no-value spelling**: the `_` sentinel. A read that
+  failed leaves no node at all — every read is all-or-nothing — so a `TsonAbsent` in a tree always means the document
+  wrote `_`. `null` is not one — §4 resolves boolean, number and string, so the unquoted token is a `TsonAtom` holding
+  the string `null`, schemaless and under a schema alike, and it round-trips through `TsonTreeWriter` as the string it
+  is. A JSON document's `null` reaches absence through a JSON reader, which maps it in the model, where the position's
+  own state decides whether absence is admitted at all.
 - **A `void` position admits `_` and nothing else** (`VoidReader`), which is where a second spelling would
   be cheapest to admit — the type has one inhabitant, so conceding loses no distinction — and it is refused
   there too. Conceding would make absence's spelling depend on the position's type, a rule an author

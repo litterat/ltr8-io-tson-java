@@ -46,10 +46,11 @@ import java.util.Set;
  *
  * <p><b>Every problem goes through {@code ctx.report}</b>, so the read's own {@code DiagnosticsReceiver}
  * decides its fate exactly as it does for the schema-driven readers: fail-fast throws {@code
- * ReadException} at the first, a collector gathers them all and still hands back a tree. Reporting never
- * abandons the value -- the node is still built and its children are still read, so one pass finds
- * everything; a leaf whose atom rejected the token becomes a {@link TsonAbsent}, the placeholder {@code
- * AtomTreeReader} uses for the same situation.
+ * ReadException} at the first, a collector gathers them all. Reporting never stops the read -- the node is
+ * still built and its children are still read, so one pass finds everything, and a leaf whose atom rejected
+ * the token stands as a {@link TsonAbsent} -- and the facade then hands back no tree for a document that
+ * reported anything ({@code CountingReceiver}), so the placeholder reaches only a caller reading one value
+ * through a context it owns.
  *
  * <p><b>Wire annotations are captured</b> onto each node's own {@code annotations()}, at every position §3.1
  * permits one: the root value, a record field's value, an array element, either side of a map entry (a
@@ -223,9 +224,9 @@ public final class SchemalessTreeReader {
      *
      * <p>A token is always a value: §4 resolves every one of them to boolean, number or string, {@code null}
      * included, which is the string {@code null}. The one no-value outcome here is a token the atom rejected,
-     * kept as a {@link TsonAbsent} placeholder -- reporting never abandons the surrounding value, and the
-     * diagnostic rather than the placeholder carries what went wrong. Absence proper is {@code _}, which is
-     * never a token and reaches the tree through its own event.
+     * kept as a {@link TsonAbsent} so the read carries on -- the facade discards a document that reported
+     * anything, so the diagnostic rather than the placeholder is what a caller sees. Absence proper is
+     * {@code _}, which is never a token and reaches the tree through its own event.
      */
     private TsonValue leaf(TsonReadContext ctx, TokenEvent token, Optional<String> typeRef,
                            Optional<AtomType<?>> atom, List<TsonAnnotation> annotations) {

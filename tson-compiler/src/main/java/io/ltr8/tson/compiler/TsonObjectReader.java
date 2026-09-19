@@ -17,6 +17,7 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 
 import java.io.InputStream;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.Optional;
 
 /**
@@ -202,7 +203,7 @@ public final class TsonObjectReader {
      * <pre>{@code
      * var problems = DiagnosticsReceiver.collecting();
      * Server server = tson.objectReader().withDiagnostics(problems).read(source, Server.class);
-     * problems.diagnostics();      // every problem, alongside a possibly-partial object
+     * problems.diagnostics();      // every problem; server is null if there was any
      * }</pre>
      *
      * <p>Applies to the whole-document entry points only. {@link #read(TsonReadContext, Class)} takes a context
@@ -304,7 +305,7 @@ public final class TsonObjectReader {
      * copy ({@code ByteSource.resident()}).
      */
     public <T> T read(ByteSource source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, policy, receiver), targetClass, false);
+        return counted(r -> r.readDocument(new TsonDataStream(source, policy, r.receiver), targetClass, false));
     }
 
     /**
@@ -313,20 +314,20 @@ public final class TsonObjectReader {
      */
     public <T> T read(String source, Class<T> targetClass) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass, false);
+            return counted(r -> r.readDocument(new TsonDataStream(bytes, policy, r.receiver), targetClass, false));
         }
     }
 
     /** {@link #read(String, Class)} straight off a stream -- binds {@code source}'s bytes (UTF-8) genuinely, never buffering the whole document into a {@code String} first; {@code source} is not closed here. */
     public <T> T read(InputStream source, Class<T> targetClass) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass, false);
+            return counted(r -> r.readDocument(new TsonDataStream(bytes, policy, r.receiver), targetClass, false));
         }
     }
 
     /** {@link #read(ByteSource, Class)} with the header and root type kept -- see {@link #readDocument(String, Class)}. */
     public <T> TsonObjectDocument<T> readDocument(ByteSource source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, policy, receiver), targetClass);
+        return counted(r -> r.readDocument(new TsonDataStream(source, policy, r.receiver), targetClass));
     }
 
     /**
@@ -346,34 +347,35 @@ public final class TsonObjectReader {
      */
     public <T> TsonObjectDocument<T> readDocument(String source, Class<T> targetClass) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass);
+            return counted(r -> r.readDocument(new TsonDataStream(bytes, policy, r.receiver), targetClass));
         }
     }
 
     /** {@link #readDocument(String, Class)} straight off a stream; {@code source} is not closed here. */
     public <T> TsonObjectDocument<T> readDocument(InputStream source, Class<T> targetClass) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass);
+            return counted(r -> r.readDocument(new TsonDataStream(bytes, policy, r.receiver), targetClass));
         }
     }
 
     /** Like {@link #read(String, Class)} but always schemaless -- binds to {@code targetClass} without validating, even when the document declares a {@code !!schema}. (A schemaless reader's {@link #read} already does this.) */
     public <T> T readWithoutSchema(String source, Class<T> targetClass) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass, true);
+            return counted(r -> r.readDocument(new TsonDataStream(bytes, policy, r.receiver), targetClass, true));
         }
     }
 
     /** {@link #readWithoutSchema(String, Class)} straight off a stream. */
     public <T> T readWithoutSchema(InputStream source, Class<T> targetClass) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass, true);
+            return counted(r -> r.readDocument(new TsonDataStream(bytes, policy, r.receiver), targetClass, true));
         }
     }
 
     /** {@link #read(ByteSource, Class)} against {@code typeName} -- see {@link #readAs(String, String, Class)}. */
     public <T> T readAs(ByteSource source, String typeName, Class<T> targetClass) {
-        return readDocumentAs(new TsonDataStream(source, policy, receiver), typeName, targetClass);
+        return counted(r -> r.readDocumentAs(new TsonDataStream(source, policy, r.receiver), typeName,
+                    targetClass));
     }
 
     /**
@@ -384,14 +386,16 @@ public final class TsonObjectReader {
      */
     public <T> T readAs(String source, String typeName, Class<T> targetClass) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readDocumentAs(new TsonDataStream(bytes, policy, receiver), typeName, targetClass);
+            return counted(r -> r.readDocumentAs(new TsonDataStream(bytes, policy, r.receiver), typeName,
+                    targetClass));
         }
     }
 
     /** {@link #readAs(String, String, Class)} straight off a stream. */
     public <T> T readAs(InputStream source, String typeName, Class<T> targetClass) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readDocumentAs(new TsonDataStream(bytes, policy, receiver), typeName, targetClass);
+            return counted(r -> r.readDocumentAs(new TsonDataStream(bytes, policy, r.receiver), typeName,
+                    targetClass));
         }
     }
 
@@ -426,12 +430,12 @@ public final class TsonObjectReader {
      *                                  opened under -- the header's tokens were already read under that one
      */
     public <T> T read(TsonDocumentPeek peek, Class<T> targetClass) {
-        return readPeeked(peek, targetClass, false);
+        return counted(r -> r.readPeeked(peek, targetClass, false));
     }
 
     /** {@link #read(TsonDocumentPeek, Class)}, ignoring any {@code !!schema} the document declares. */
     public <T> T readWithoutSchema(TsonDocumentPeek peek, Class<T> targetClass) {
-        return readPeeked(peek, targetClass, true);
+        return counted(r -> r.readPeeked(peek, targetClass, true));
     }
 
     /**
@@ -439,6 +443,10 @@ public final class TsonObjectReader {
      * {@link #readDocument(String, Class)}.
      */
     public <T> TsonObjectDocument<T> readDocument(TsonDocumentPeek peek, Class<T> targetClass) {
+        return counted(r -> r.readDocumentPeeked(peek, targetClass));
+    }
+
+    private <T> TsonObjectDocument<T> readDocumentPeeked(TsonDocumentPeek peek, Class<T> targetClass) {
         Objects.requireNonNull(targetClass, "targetClass");
         if (peek.failure() != null) {
             readFailure(peek.failure());
@@ -537,9 +545,7 @@ public final class TsonObjectReader {
             rootType = bound == null ? Optional.empty() : Optional.of(bound.typeName());
         }
         requireDocumentEnd(ctx);
-        T checked = valid(ctx, value);
-        return checked == null ? null
-                : new TsonObjectDocument<>(start.id(), start.schema(), rootType, checked);
+        return value == null ? null : new TsonObjectDocument<>(start.id(), start.schema(), rootType, value);
     }
 
     private <T> T readDocument(TsonDataStream stream, Class<T> type, boolean ignoreSchema) {
@@ -558,7 +564,7 @@ public final class TsonObjectReader {
                 ? schemaless.read(ctx, type)
                 : valueOf(readAgainstSchema(start.schema().get(), ctx, type, null));
         requireDocumentEnd(ctx);
-        return valid(ctx, result);
+        return result;
     }
 
     private <T> T readDocumentAs(TsonDataStream stream, String typeName, Class<T> type) {
@@ -571,7 +577,7 @@ public final class TsonObjectReader {
             requireDataDocument(ctx); // any !!schema it declares is overridden by withSchema
             T result = valueOf(readAgainstSchema(schemaUri, ctx, type, typeName));
             requireDocumentEnd(ctx);
-            return valid(ctx, result);
+            return result;
         } catch (RuntimeException e) {
             return readFailure(e);
         }
@@ -591,24 +597,23 @@ public final class TsonObjectReader {
     }
 
     /**
-     * The all-or-nothing rule at the document boundary: a document that reported anything binds to {@code
-     * null}, whatever the readers underneath managed to assemble. Fail-fast never reaches here (the first
-     * problem already threw), so this is what a collecting reader's caller sees.
+     * One whole-document read, run on a copy of this reader whose receiver counts: a document that reported
+     * anything binds to {@code null}, whatever the readers underneath assembled ({@link CountingReceiver}).
+     * Fail-fast never gets this far (the first problem already threw), so this is what a collecting reader's
+     * caller sees.
      *
      * <p>The per-value guard in the reader stack ({@code ConstructionGuard}) already propagates a failure up
-     * through every enclosing record and tuple, so for most documents this changes nothing. It exists for the
-     * positions that guard structurally cannot cover: the <b>root value's own framing</b>, whose diagnostics
-     * belong to no enclosing read, and a <b>root array or map</b>, which builds around a failed child rather
-     * than abandoning itself (a collection tolerates a {@code null} element where a constructor does not).
-     * Both would otherwise hand back real-looking application data for a document already known to be bad,
-     * which is the outcome binding exists to prevent.
+     * through every enclosing value, so for most documents this changes nothing. It is the one place the rule
+     * is certain: the root value's own framing belongs to no enclosing read, and a token refusal reaches the
+     * receiver from the stream without passing through any read context.
      *
      * <p>Deliberately not applied to {@link #read(TsonReadContext, Class)}: that reads one value at a cursor
-     * in a context the caller owns, where {@code reported()} may already count problems from before the call
-     * and the caller is the one framing the document.
+     * in a context the caller owns, and the caller is the one framing the document.
      */
-    private static <T> T valid(TsonReadContext ctx, T result) {
-        return ctx.reported() > 0 ? null : result;
+    private <T> T counted(Function<TsonObjectReader, T> read) {
+        CountingReceiver counting = new CountingReceiver(receiver);
+        T value = read.apply(new TsonObjectReader(dataBindContext, schemaless, bind, counting, schemaUri, policy));
+        return counting.reported() ? null : value;
     }
 
     /**

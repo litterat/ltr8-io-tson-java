@@ -64,12 +64,12 @@ import java.util.Optional;
  * {@link #position()} to a value captured earlier (the record's own opening position) rather than
  * whatever the live cursor has drifted to since.
  *
- * <p><b>Placeholder-on-failure, not skip-on-failure</b>: after a call to {@link #report} returns
+ * <p><b>Continue-on-failure, not stop-on-failure</b>: after a call to {@link #report} returns
  * (collecting mode -- in fail-fast mode it never returns), the caller continues with {@code null} as
- * that field's/element's/entry's own value and keeps reading its siblings. An array/tuple element is
- * never dropped from the read on failure -- a {@code null} placeholder is kept at that index
- * specifically so later elements' own {@link #index} positions stay accurate against the original
- * data, not shifted by a removed element.
+ * that field's/element's/entry's own value and keeps reading its siblings, so one pass finds every
+ * problem. An array/tuple element is never dropped from the read on failure -- its index still counts,
+ * so later elements' own {@link #index} positions stay accurate against the original data. The value
+ * those reads were building is then abandoned: every read is all-or-nothing ({@code ConstructionGuard}).
  */
 public interface TsonReadContext {
 

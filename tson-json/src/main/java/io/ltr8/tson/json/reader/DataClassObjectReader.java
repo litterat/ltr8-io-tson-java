@@ -248,9 +248,8 @@ public final class DataClassObjectReader {
         if (ctx.reported() > mark) {
             // Bind mode is all-or-nothing: a record whose members failed is not constructed, because a
             // constructor handed nulls for components that never arrived would either throw out of the
-            // collecting read or hand back an object nobody wrote. Tree mode keeps what it built; this
-            // cannot, having nowhere to put a hole. The same asymmetry ConstructionGuard draws on the TSON
-            // side, and for the same reason.
+            // collecting read or hand back an object nobody wrote. The rule every read keeps, and
+            // ConstructionGuard's on the TSON side.
             return null;
         }
         return construct(ctx, target.constructor(), construct, target.typeClass());
