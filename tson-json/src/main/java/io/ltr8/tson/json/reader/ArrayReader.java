@@ -20,7 +20,8 @@ import java.util.Set;
  *
  * <p><b>A set's duplicates are judged on the element's value</b>, through {@link ValueIdentity}: what a
  * duplicate is depends on what the element reader produced, so bind mode compares the host values its elements
- * decode to.
+ * decode to, and tree mode the identity its atom elements carry beside their nodes
+ * ({@link ValueIdentity.Identified}).
  */
 final class ArrayReader implements JsonTypeReader<Object> {
 
@@ -79,8 +80,14 @@ final class ArrayReader implements JsonTypeReader<Object> {
                 elements.add(Slots.REFUSED);
                 continue;
             }
-            if (seen != null && !seen.add(ValueIdentity.of(value))) {
-                at.report(plan.rules().repeatedElement(Nodes.rendered(value)));
+            if (seen != null) {
+                Object identity = ValueIdentity.of(value);
+                if (value instanceof ValueIdentity.Identified identified) {
+                    value = identified.value();
+                }
+                if (!seen.add(identity)) {
+                    at.report(plan.rules().repeatedElement(Nodes.rendered(value)));
+                }
             }
             elements.add(value);
         }

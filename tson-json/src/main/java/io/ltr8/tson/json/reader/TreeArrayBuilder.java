@@ -1,6 +1,7 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.json.JsonReadContext;
+import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.tree.JsonArray;
 import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonValue;
@@ -16,10 +17,14 @@ final class TreeArrayBuilder implements ArrayBuilder {
 
     static final TreeArrayBuilder INSTANCE = new TreeArrayBuilder();
 
-    /** Tree mode's array and set reader: elements read at the element type's own reader. */
+    /**
+     * Tree mode's array and set reader: elements read at the element type's own reader, a set's atom elements
+     * carrying the identity its duplicates are judged on ({@link TreeAtomReader#keyed}).
+     */
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         ArrayPlan plan = ArrayPlan.of(name, definition, context);
-        return new ArrayReader(plan, plan.schemaElement(), INSTANCE);
+        JsonTypeReader<?> element = plan.unique() ? TreeAtomReader.keyed(plan.schemaElement()) : plan.schemaElement();
+        return new ArrayReader(plan, element, INSTANCE);
     };
 
     private TreeArrayBuilder() {

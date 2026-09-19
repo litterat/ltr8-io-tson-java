@@ -54,6 +54,7 @@ class CrossEncodingParityTest {
               }
               sized  => [text; 2..3]
               unique => set<text>
+              stamps => set<datetime>
               pair   => [text, int32]
               bounded => {
                 value: int32
@@ -238,6 +239,16 @@ class CrossEncodingParityTest {
         bothAccept("kennel", "{ p: { pet_type: cat  name: Tom  indoor: true } }",
                 """
                         {"p": {"pet_type": "cat", "name": "Tom", "indoor": true}}""");
+    }
+
+    /**
+     * Set identity is over the element's value space ([TSON-SCHEMA] §5.5): an instant's offset is a spelling, so
+     * two spellings of one instant are one element, and the second is refused in both encodings.
+     */
+    @Test
+    void twoSpellingsOfOneInstantAreOneSetElementInBoth() {
+        sameRule("stamps", "[ \"2026-01-01T00:00:30Z\" \"2026-01-01T01:00:30+01:00\" ]", """
+                ["2026-01-01T00:00:30Z", "2026-01-01T01:00:30+01:00"]""");
     }
 
     /**
