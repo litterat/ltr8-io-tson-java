@@ -176,13 +176,8 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   compiles records, atoms and the dispatchers into a bound class, checked against the schema at compile
   (`BindMismatchException`) with a missing binding deferred to first read. Measured against `tson-compiler`'s bind
   mode, what is owed:
-  - **An OPEN record with subtypes bound to a sealed interface — the first to close.** `tson-compiler` reads it
-    through `VariantBindReader` over a `DataClassUnion`: untagged is refused as having no data of its own, tagged
-    binds the subtype. Here `DispatchFactories` asks for the parent's concrete reader, `BindRecordBuilder` finds a
-    class that is not record-shaped, and the compile fails — so a record family bound the natural Java way is
-    refused outright.
-  - **A single-group record bound to a sealed interface of labelled alternatives** (`GroupUnionBindReader`),
-    refused the same way today.
+  - **A single-group record bound to a sealed interface of labelled alternatives** (`GroupUnionBindReader`): the
+    compile refuses the interface today as not record-shaped.
   - **A bridge on a structured component** (`ElementBridging.wrap`): only an atom component's bridge is applied.
   - **The `value` slot**, which reads to its own host types and is not bound to a component (`rebindValueIfNeeded`).
   - **The containers** (entry above), each bound to its component — `List` or an array, a map type.
