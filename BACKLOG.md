@@ -165,16 +165,14 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   the element or key reader in one that also answers the parsed value, and every other position pays nothing.
   `RecordReader.verifyFixed` parsing a member twice has the same cause and the same fix.
 
-- [ ] **Bind mode reads every container, and has no front door.** `ValueReaderFactoryRegistry.bind` compiles
-  every container, the atoms and the dispatchers into bound classes, checked against the schema at compile
-  (`BindMismatchException`) with a missing binding deferred to first read. Measured against `tson-compiler`'s bind
-  mode, what is owed:
+- [ ] **Bind mode reads every container through its front door, and three `tson-compiler` cases remain.**
+  `JsonObjectReader.withSchema(uri).readAs(...)` reads every container, the atoms and the dispatchers into bound
+  classes, checked against the schema at compile (`BIND_MISMATCH`) with a missing binding deferred to first read.
+  Measured against `tson-compiler`'s bind mode, what is owed:
   - **A single-group record bound to a sealed interface of labelled alternatives** (`GroupUnionBindReader`): the
     compile refuses the interface today as not record-shaped.
   - **A bridge on a structured component** (`ElementBridging.wrap`): only an atom component's bridge is applied.
   - **The `value` slot**, which reads to its own host types and is not bound to a component (`rebindValueIfNeeded`).
-  - **The front-door surface** — a `JsonObjectReader` read against a schema and a root type, and a
-    per-`DataBindContext` cache beside `JsonCompiledSchemaRegistry`'s tree one.
 
 - [ ] **`tson-compiler`'s readers adopt the JSON dispatch design once it settles.** `RecordTagDispatchReader`,
   `RecordMemberDispatchReader`, `Subsumption.dispatching`, `AbstractTemplateReader` and the choice's

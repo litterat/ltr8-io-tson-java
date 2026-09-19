@@ -462,13 +462,15 @@ String out = Json.standard().objectWriter().toJson(p);
 // Validated against a TSON schema: the schema is resolved by Tson, the JSON read by Json.
 Json json = Json.of(config).withSchemas(tson.schemaRegistry());
 JsonValue order = json.treeReader().withSchema(uri).readAs(body, "order");
+Order bound = json.objectReader().withSchema(uri).readAs(body, "order", Order.class);   // validated, then bound
 List<Diagnostic> problems = json.validate(body, uri, "order");
 ```
 
 **A JSON document binds out of band**: it names neither its schema nor its root type, so both are
 arguments (`withSchema` + `readAs`, or `validate(source, uri, type)`). `JsonValue` is a sealed tree
 (`JsonObject`, `JsonArray`, `JsonString`, `JsonNumber`, `JsonBoolean`, `JsonNull`) whose model follows JEP
-540. A schema-directed read returns a `JsonValue`, never a `TsonValue`. Built from the same
+540. A schema-directed tree read returns a `JsonValue`, never a `TsonValue`; a schema-directed object read
+validates in full and builds the classes the binding resolves, all-or-nothing like TSON's. Built from the same
 `ProcessorConfig`, `Json.of(config)` and `Tson.of(config)` judge under the same policy and bind the same
 classes.
 

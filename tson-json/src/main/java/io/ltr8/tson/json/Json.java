@@ -49,9 +49,13 @@ public final class Json {
     /** Where a named schema comes from, or null for an instance that can name none. */
     private final JsonCompiledSchemaRegistry schemas;
 
-    private Json(ProcessorConfig config, JsonCompiledSchemaRegistry schemas) {
+    /** The same schemas compiled in bind mode, over this instance's bind context; null where {@link #schemas} is. */
+    private final JsonCompiledSchemaRegistry objects;
+
+    private Json(ProcessorConfig config, JsonCompiledSchemaRegistry schemas, JsonCompiledSchemaRegistry objects) {
         this.config = config;
         this.schemas = schemas;
+        this.objects = objects;
     }
 
     // ── The front door ───────────────────────────────────────────────────
@@ -85,7 +89,7 @@ public final class Json {
      * document is TSON text whichever encoding the data arrives in.
      */
     public static Json of(ProcessorConfig config) {
-        return new Json(Objects.requireNonNull(config, "config"), null);
+        return new Json(Objects.requireNonNull(config, "config"), null, null);
     }
 
     /**
@@ -103,7 +107,9 @@ public final class Json {
      * its schemas at startup pays the compile once and every read after is a lookup.
      */
     public Json withSchemas(TsonSchemaLoader loader) {
-        return new Json(config, JsonCompiledSchemaRegistry.tree(Objects.requireNonNull(loader, "loader")));
+        Objects.requireNonNull(loader, "loader");
+        return new Json(config, JsonCompiledSchemaRegistry.tree(loader),
+                JsonCompiledSchemaRegistry.bind(loader, config.dataBindContext()));
     }
 
     /**
@@ -166,9 +172,16 @@ public final class Json {
         return List.copyOf(problems);
     }
 
-    /** A reader producing a bound Java object, carrying this instance's binding, policy and receiver. */
+    /**
+     * A reader producing a bound Java object, carrying this instance's binding and policy. With schemas ({@link
+     * #withSchemas}) it can also read against one: {@code objectReader().withSchema(uri).readAs(source, type,
+     * Target.class)} validates the document in full and builds the classes the binding resolves.
+     */
     public JsonObjectReader objectReader() {
-        return JsonObjectReader.using(config.dataBindContext()).withProcessorPolicy(config.processorPolicy());
+        JsonObjectReader reader = objects == null
+                ? JsonObjectReader.using(config.dataBindContext())
+                : JsonObjectReader.over(objects, config.dataBindContext());
+        return reader.withProcessorPolicy(config.processorPolicy());
     }
 
     /** A {@link JsonTreeWriter} -- the inverse of {@link #treeReader()}, and total over a tree this reads. */

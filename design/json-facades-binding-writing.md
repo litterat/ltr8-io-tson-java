@@ -25,8 +25,10 @@ facades these mirror).
 `Json` is the configuration a read is judged under — the `ProcessorPolicy`, the binding, and where problems
 go — and hands out the two readers that apply it: `treeReader()` producing a `JsonValue`, `objectReader()`
 producing a bound Java object. That is the shape `Tson` takes over `TsonTreeReader`/`TsonObjectReader`. It
-holds a schema registry only once one is named: `withSchemas(TsonSchemaLoader)` returns an instance holding a
-`JsonCompiledSchemaRegistry`, which its tree readers share (`design/json-schema-directed-reading.md`).
+holds schema registries only once one is named: `withSchemas(TsonSchemaLoader)` returns an instance holding two
+`JsonCompiledSchemaRegistry`s over the one loader — tree mode, which its tree readers share, and bind mode over its
+own `DataBindContext`, which its object readers share (`design/json-schema-directed-reading.md`). The two are
+separate caches because the readers differ all the way down.
 
 **JEP 540's entry points stay static on it** — `Json.parse(text)`, `Json.toDisplayString(value)` — over a
 default configuration. They are the zero-ceremony path the API is named for, and what a consumer moving from
@@ -159,8 +161,19 @@ which is the same rendering reached from a value instead of from a writer.
 `TsonObjectReader` makes over the reader of that name in `tson-compiler`, and for the same reason: **a front
 door owns the document** (entry points, framing, and the configuration a read is judged under) where **an
 engine owns one value at one descriptor and stops**. The schema-directed decode of §5–§8 takes the same shape
-on the tree side — the compiled readers are a second engine under `JsonTreeReader` rather than a second door —
-and a schema-directed bind reader, which is not built (`BACKLOG.md`), lands under this one on those terms.
+on both sides: the compiled readers are a second engine under each facade rather than a second door —
+`JsonTreeReader.withSchema(uri).readAs(source, type)` in tree mode, and `JsonObjectReader.withSchema(uri)
+.readAs(source, type, Target.class)` in bind mode, the peer of `TsonObjectReader.readAs`. `read(source, Class)`
+stays class-directed: a JSON document names no schema of its own (§3.4's in-band route is not built), so reading
+against one is always the caller's statement, made with `withSchema` and a root type.
+
+**`readAs` in bind mode mirrors `TsonObjectReader`'s**, and is all-or-nothing at the document as every bind read
+is: a document that reported anything binds to `null`. What stands in the way of a read is reported before any of
+the document is touched, each with the code a consumer routes on — `SCHEMA_NOT_FOUND`, `UNKNOWN_TYPE`,
+`BIND_MISMATCH` for a schema whose types the bound classes do not match (`JsonCompiledSchemaRegistry.get` compiles
+it and the compile refuses), and `TYPE_MISMATCH` for a root type bound to a class the caller cannot hold. A schema
+type with no bound class at all reaches the caller as `MissingBindingException`, the reading application's own
+wiring, as it does on the TSON side.
 
 **The engine is named for both axes every reader in this family is named for** — what drives the read, and
 what it produces. A `DataClass` descriptor drives this one and an object comes out. That has to stay in the

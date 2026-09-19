@@ -618,8 +618,10 @@ public final class JsonTreeReader {         // withProcessorPolicy, withDiagnost
     public JsonValue read(String|InputStream|ByteSource source);
     public JsonValue readAs(String|InputStream|ByteSource source, String rootType);   // schema-directed
 }
-public final class JsonObjectReader {       // withProcessorPolicy, withDiagnostics, ignoringUnknownFields
-    public <T> T read(String|InputStream|ByteSource source, Class<T> type);
+public final class JsonObjectReader {       // withProcessorPolicy, withDiagnostics, ignoringUnknownFields,
+                                            // withSchema(uri) -- from Json.withSchemas(loader).objectReader()
+    public <T> T read(String|InputStream|ByteSource source, Class<T> type);                  // the class is the schema
+    public <T> T readAs(String|InputStream|ByteSource source, String typeName, Class<T> type);  // schema-directed
 }
 public final class JsonTreeWriter {          // indented(), indented(indent)
     public String toJson(JsonValue v);  public void write(JsonValue v, OutputStream|Appendable|ByteSink out); }
@@ -632,8 +634,9 @@ public sealed interface JsonValue           // io.ltr8.tson.json.tree
 
 **A JSON document binds out of band** — it names neither its schema nor its root type, so both are
 arguments. Obtaining the schema is the TSON engine's job: resolve through `Tson` and hand
-`tson.schemaRegistry()` to `withSchemas`. A schema-directed read returns a `JsonValue`, never a `TsonValue`,
-and reports in the same `Diagnostic` vocabulary through `ReadException` — there is no `JsonParseException`.
+`tson.schemaRegistry()` to `withSchemas`. A schema-directed tree read returns a `JsonValue`, never a `TsonValue`;
+`JsonObjectReader.readAs` validates in full and binds, all-or-nothing, the peer of `TsonObjectReader.readAs`. Both
+report in the same `Diagnostic` vocabulary through `ReadException` — there is no `JsonParseException`.
 
 ---
 
