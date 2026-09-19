@@ -325,6 +325,18 @@ final class DefinitionResolver {
     private TypeDefinition withExtension(SchemaMap.Declaration declaration, TypeDefinition resolved) {
         Optional<RecordExtensionType> extension = DefinitionMarks.extension(declaration.name(),
                 declaration.nameAnnotations(), declaration.typeDefAnnotations());
+        boolean selectors = resolved.body() instanceof RecordBody body && !body.discriminators().isEmpty();
+        if (selectors) {
+            // A selector says the members pin it, so the record is the base they are selected from and has
+            // no values of its own -- ABSTRACT, derived. `@abstract` beside it asserts what the body already
+            // says and is admitted; `@final` claims the opposite and is refused.
+            if (extension.orElse(RecordExtensionType.ABSTRACT) != RecordExtensionType.ABSTRACT) {
+                throw new SchemaValidationException("'" + declaration.name() + "': '@final' says nothing may"
+                        + " extend this record, and a field written '=?' says its members pin that field --"
+                        + " so the members the selector selects could never exist ([TSON-SCHEMA] §5.2)");
+            }
+            extension = Optional.of(RecordExtensionType.ABSTRACT);
+        }
         if (extension.isEmpty()) {
             return resolved;
         }
@@ -332,8 +344,8 @@ final class DefinitionResolver {
             if (extension.get() == RecordExtensionType.FINAL) {
                 // FINAL forbids anything composing onto the marked type, and every application of a template
                 // is a subtype of it by construction -- so the claim is false of a template before an author
-                // writes a second declaration. ABSTRACT and SEALED both have a subject: `subtypes` holds the
-                // template's own instantiations ({@code SPEC-FEEDBACK.md} #13).
+                // writes a second declaration. ABSTRACT has a subject: `subtypes` holds the template's own
+                // instantiations ({@code SPEC-FEEDBACK.md} #13).
                 throw new SchemaValidationException("'" + declaration.name() + "': '@final' forbids anything "
                         + "composing onto this type, and every application of a template is a subtype of it by "
                         + "construction -- so the claim is false of '" + declaration.name() + "' whatever else "

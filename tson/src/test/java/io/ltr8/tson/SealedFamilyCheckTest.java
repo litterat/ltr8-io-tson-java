@@ -116,10 +116,21 @@ class SealedFamilyCheckTest {
     }
 
     @Test
-    void anOpenRecordWithADiscriminatorIsRefused() {
-        assertTrue(problems(Tson.standard(), "opendisc",
-                "{ pet => { pet_type: text =?  name: text } }")
-                .contains("Mark the declaration '@abstract'"));
+    void aSelectorImpliesAbstractAndTheMarkIsAnAssertion() {
+        // The record's members pin the selector, so it is the base they are selected from and has no values
+        // of its own: ABSTRACT is derived, and '@abstract' beside it asserts what the body already says.
+        isClean(Tson.standard(), "opendisc",
+                "{ pet => { pet_type: text =?  name: text }  dog => pet & { pet_type: = \"dog\" } }");
+        isClean(Tson.standard(), "markeddisc",
+                "{ pet => @abstract { pet_type: text =?  name: text }  dog => pet & { pet_type: = \"dog\" } }");
+    }
+
+    /** `@final` says nothing may extend it, where a selector says its members do. */
+    @Test
+    void aFinalRecordWithASelectorIsRefused() {
+        assertTrue(problems(Tson.standard(), "finaldisc",
+                "{ pet => @final { pet_type: text =?  name: text } }")
+                .contains("could never exist"));
     }
 
     // ── FINAL, and the one operation it does not constrain ───────────────
