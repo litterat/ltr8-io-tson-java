@@ -1464,6 +1464,32 @@ class DefinitionResolverTest {
     }
 
     /**
+     * {@code template} is resolver vocabulary (§8.1): an open entry's body, derived from a {@code <…>}
+     * declaration and never written by hand. Applied directly, it would mint an open entry that skipped every
+     * check §5.10 makes of a template's declaration, so it is refused -- closed and open alike, since both are
+     * a source declaration applying it.
+     */
+    @Test
+    void aSourceDeclarationApplyingTemplateDirectlyIsRejected() {
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
+                {
+                  sneaky => !template { parameters: [T]  template: "!array { element_type: T }" }
+                  open_sneaky => <U> !template { parameters: [U]  template: "!array { element_type: U }" }
+                }""").parseSchemaDocument().body();
+
+        for (String declaration : List.of("sneaky", "open_sneaky")) {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> instanceResolver.resolve(schemaMap.declarations().get(declaration)), declaration);
+            assertTrue(thrown.getMessage().contains("resolver vocabulary"), thrown.getMessage());
+            assertTrue(thrown.getMessage().contains("<"), "names the authored spelling: " + thrown.getMessage());
+        }
+    }
+
+    /**
      * The other side of the split: a failure that is <em>not</em> the reader reporting on the body keeps the
      * {@code UnsupportedOperationException} gap wrapper. {@link #NEVER_CALLED} stands in for any such
      * mechanical failure -- the classification turns on which exception the meta reader raised, not on which

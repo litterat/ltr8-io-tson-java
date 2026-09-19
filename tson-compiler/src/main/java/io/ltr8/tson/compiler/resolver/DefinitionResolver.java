@@ -194,6 +194,9 @@ final class DefinitionResolver {
     /** [TSON-SCHEMA] §4.1's structural root -- the name {@link #requireApplicable} tests IS-A against. */
     private static final String TOP = "top";
 
+    /** The kernel's open-entry body constructor -- resolver vocabulary, see {@link #requireAuthorable}. */
+    private static final String TEMPLATE = "template";
+
     /**
      * Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see
      * {@link #resolveAtomRefinement}. Structural, not incidental: the merge has to happen on the wire
@@ -621,6 +624,24 @@ final class DefinitionResolver {
     }
 
     /**
+     * Refuses {@code template} as a construction head, closed or open: it is resolver vocabulary (§8.1).
+     * An open entry's body is derived from a declaration's parameter list, and nothing is ever typed by it, so
+     * a source declaration applying it directly is a resolver error. It passes {@link #requireApplicable} --
+     * it is IS-A {@code top}, since resolved output is typed by it -- which is why it needs a check of its own:
+     * admitted, it would mint an open entry whose held body was hand-written, skipping every check §5.10 makes
+     * of a template's declaration. Tested at the end of the head's reference chain (§8.3), so an alias of
+     * {@code template} is refused as well.
+     */
+    private static void requireAuthorable(String name, String target, ConstructorHead head) {
+        if (head.name().equals(TEMPLATE)) {
+            throw new SchemaValidationException("'" + name + "': '!" + target + "' is resolver vocabulary -- "
+                    + "the body of an open entry, which the resolver derives from a declaration's parameter "
+                    + "list, and a source declaration never applies it directly (§8.1). Name the parameters on "
+                    + "the declaration instead: '" + name + " => <T> !C { ... }' (§5.10)");
+        }
+    }
+
+    /**
      * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance filled
      * with {@code value}.
      *
@@ -647,6 +668,7 @@ final class DefinitionResolver {
     private TypeDefinition resolveInstance(String name, Instance instance) {
         String target = instance.target();
         ConstructorHead head = resolveConstructorTarget(name, target);
+        requireAuthorable(name, target, head);
         TypeDefinition constructor = head.definition();
         if (!constructor.parameters().isEmpty()) {
             int declared = constructor.parameters().size();
@@ -701,6 +723,7 @@ final class DefinitionResolver {
     private TypeDefinition resolveInstanceTemplate(String name, Instance template) {
         String target = template.target();
         ConstructorHead head = resolveConstructorTarget(name, target);
+        requireAuthorable(name, target, head);
         TypeDefinition constructor = head.definition();
         // `reference` needs no exception here: it IS-A `top`, so the generic rule admits it, which is what
         // makes the open and closed spellings of one construction agree. Nor does its kind need one any
