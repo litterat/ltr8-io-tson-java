@@ -142,42 +142,56 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
   name — so this is a decision to take deliberately, not a gap to close by reflex.
 
-- [ ] **The container readers split into a shared base and a tree subclass before bind mode is written.**
-  `tson-compiler`'s `RecordAbstractReader`/`RecordTreeReader`/`RecordBindReader` split, applied to record, array,
-  tuple and both map forms: the base carries the event walk, the field-state rules, size facets, groups,
-  duplicate detection and the diagnostics; the subclass carries assembly and what a refused value leaves
-  behind. Owed with it:
-  - One contract for a partial result. A refused array element leaves `JsonNull`, while a malformed pair, a
+- [ ] **The JSON container factories plan up front and return trimmed readers, one loop per shape.** The hot read
+  path has to be easy to follow, so the factory does the thinking and the reader is a flat loop over what it
+  decided — not a shared base with hooks, which is `tson-compiler`'s shape and puts every feature's branch in
+  every record's path. JSON only, as the proof of concept; bind mode and the TSON side follow if the shape holds.
+  - **A plan, then the smallest reader that covers it.** The factory resolves field readers, pins, defaults and
+    the name index, builds the diagnostics objects, and picks a reader by what the schema uses. Records, as a
+    first cut: *plain* (no groups, no FIXED or defaulted field — slots, then the required check), *stated*
+    (carries the pin and default table), *grouped* (adds the group count). Arrays and maps split where the branch
+    runs per element: unique or not, element-optional or not. A specialisation earns its place by moving the
+    allocation harness or visibly simplifying its loop; the harness gets a case per shape, and the 3.9 KB a
+    three-field record costs today is looked into first — per-field data and schema-pointer contexts are the
+    first suspect, and they shape the plain reader more than any split.
+  - **One loop per shape, the mode behind a result builder.** The loop fills slots and makes one call at the end
+    that turns them into the mode's value — a `JsonObject` in tree mode — through a small interface the factory
+    chooses: one indirect call per record, none per field, so the loop carries no mode. Child readers are the
+    mode's own, as now. Bind mode is then a builder per shape (a Java record's constructor wants every argument
+    at once, which the slots already are) rather than a copy of each loop.
+  - **Shared code is helpers, not a superclass.** The absent-field rule, the size checks and the duplicate rule
+    become static helpers or values the plan holds; a specialised reader decides which rules it calls, never how
+    they are worded, which is what keeps several loops from drifting. The refusal pattern (report, `EventSkip`,
+    return a placeholder), repeated about twenty times, becomes one of them; `TreeMapReader.wrongShape` returns a
+    verdict rather than a node; the "reserved members but no `$type`" message is written once for record and
+    choice; `ABSENT = "null"` is declared once; and failure detected by `ctx.reported() > before`
+    (`TreeAtomReader`, `verifyFixed`, the pairs reader) comes from what the child returns.
+  - **One contract for a partial result.** A refused array element leaves `JsonNull`, while a malformed pair, a
     refused object-form key and a wrongly valued `OPTIONAL_FIXED` member are dropped; a dispatcher answers `null`
-    and a tree container substitutes `JsonNull` for it (`Nodes.node`).
-  - The refusal pattern (report, `EventSkip`, return a placeholder) as one helper, repeated about twenty times
-    today, with `TreeMapReader.wrongShape` returning a verdict rather than a tree node. The "reserved members but
-    no `$type`" message is written twice, once for a record and once for a choice. `ABSENT = "null"` is declared
-    four times.
-  - Failure detected by `ctx.reported() > before` (`TreeAtomReader`, `verifyFixed`, the pairs reader) replaced
-    by what the reader returns.
-
-- [ ] **The JSON factory layer takes a mode's parts rather than a hand-written table.** Built the way
-  `tson-compiler`'s `baseFactories` is, so every mode registers the same constructors and one added later
-  (`scoped`, §8.5) cannot be missed in one of them. Factories become instances built per registry, since a bind
-  factory holds a `DataBindContext` and a `static final FACTORY` lambda cannot. Each factory is handed one
-  per-entry record (name, display name, definition, schema location, the names that mean it) in place of each
-  recomputing `EntryDisplayName.of`, `locationOf` and `admitting(List.of(name))` — for an OPEN record with
-  subtypes, `DispatchFactories` and the concrete reader each build the display name and `RecordDiagnostics`.
+    and a tree container substitutes `JsonNull` (`Nodes.node`). The builders make this a single decision.
+  - **The factory layer itself.** Every mode registers the same constructors from one list of parts, so one added
+    later (`scoped`, §8.5) cannot be missed in one of them; factories are instances built per registry, a bind
+    builder needing a `DataBindContext`; and each factory is handed one per-entry record (name, display name,
+    definition, schema location, the names that mean it) in place of recomputing `EntryDisplayName.of`,
+    `locationOf` and `admitting(List.of(name))` — `DispatchFactories` and the concrete record reader each build
+    the display name and `RecordDiagnostics` for one OPEN record with subtypes today.
+  - **A test per shape** showing the factory chose it, beside the behaviour tests, since the choice is now logic.
 
 - [ ] **Tree mode judges set and compound-key uniqueness by spelling, not value.** `TreeAtomReader` keeps the node
   and discards the parsed value, so `TreeArrayReader`'s unique-items check and `TreeMapPairsReader`'s duplicate-key
   check reduce a string to its NFC text: a `set<datetime>` holding `"2026-01-01T00:00Z"` and
   `"2026-01-01T01:00+01:00"` is not refused, where TSON's tree mode (`TsonAtom` keeps the value) refuses it as
-  [TSON-SCHEMA] §5.5 requires. Same cause as `verifyFixed` parsing the member twice. A parity case first; the fix
-  is duplicate detection over the parsed value in the shared container base above, in both modes.
+  [TSON-SCHEMA] §5.5 requires. A parity case first. The fix belongs to the factory plan above: only a unique array
+  and a pairs-form map need a value's identity, so only there does the factory wrap the element or key reader in
+  one that also answers the parsed value, and every other position pays nothing. `verifyFixed` parsing a member
+  twice has the same cause and the same fix.
 
 - [ ] **Bind mode has no schema-directed reader.** Tree mode validates and hands back the JSON; the other door
   — an HTTP service accepting both encodings and getting a Java object back — needs the same containers over a
   `DataBindContext`, with the bind-agreement machinery `tson-compiler` carries (`BindMismatchException` at
-  compile, `MissingBindingException` deferred to first read). It follows the container split and the factory
-  layer above: the dispatchers are already shared, and what is owed here is the bind subclasses of the container
-  bases, their factories, and the front-door surface that selects the mode.
+  compile, `MissingBindingException` deferred to first read). It follows the factory plan above: the dispatchers
+  are already shared and the loops are mode-free, so what is owed is a result builder per shape, the bind
+  factories that choose them, and the front-door surface that selects the mode.
 
 - [ ] **`tson-compiler`'s readers adopt the JSON dispatch design once it settles.** `RecordTagDispatchReader`,
   `RecordMemberDispatchReader`, `Subsumption.dispatching`, `AbstractTemplateReader` and the choice's
