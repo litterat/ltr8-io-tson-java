@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * [TSON-JSON] §8.2's discrimination predicate and §8.3's class stability.
  *
- * <p>Two routes and no third. Route 1 is a declared {@code @discriminator} (§8.4) and is unbuilt, so every
+ * <p>Two routes and no third. Route 1 is a declared discriminator (§8.4) and is unbuilt, so every
  * case here is the untagged route — {@code disjoint: true} with class-stable variants, dispatching on the JSON value
  * kind — or the tagged form, or the refusal that follows when neither recovers the variant.
  */

@@ -2238,7 +2238,7 @@ class DefinitionResolverTest {
     // ── The four marks lower into the body (§5.2, SPEC-FEEDBACK #10/#11) ──
 
     /**
-     * Both marks reach the body: {@code @abstract} into {@code record.extension}, {@code @discriminator} into
+     * Both facts reach the body: {@code @abstract} into {@code record.extension}, the selector into
      * {@code record.discriminators} -- the enclosing record's statement, not the field's.
      *
      * <p>That they lower <em>without</em> the governing meta declaring them is a different property and is

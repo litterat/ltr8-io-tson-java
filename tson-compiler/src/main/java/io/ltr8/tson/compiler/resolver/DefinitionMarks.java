@@ -15,9 +15,7 @@ import java.util.Optional;
  * <p><b>There is no mark for member dispatch and none on a field.</b> A record dispatched on its own members
  * is ABSTRACT with a non-empty {@code record.discriminators}, derived from the body in the manner of {@code
  * choice.disjoint}, and the fields it dispatches on are written {@code =?} ({@link FieldModifiers}) -- field
- * syntax rather than an annotation. {@code @sealed} and {@code @discriminator} were the earlier spelling of
- * both facts and are refused wherever they are written: a meta-schema declaring either name would otherwise
- * make it an ordinary annotation that lands in output and dispatches nothing.
+ * syntax rather than an annotation.
  *
  * <p><b>They are recognised by name, unconditionally, and that is what "reserved" means.</b> An ordinary
  * annotation resolves one hop against the governing meta (§3.3.3) and means whatever that meta says; these are
@@ -38,12 +36,6 @@ final class DefinitionMarks {
 
     /** Direct instances and no subtypes: nothing may compose or refine onto it. */
     private static final String FINAL = "final";
-
-    /** Retired: the derivation ABSTRACT-plus-discriminators states it. */
-    private static final String SEALED = "sealed";
-
-    /** Retired: the field spelling {@code =?} states it. */
-    private static final String DISCRIMINATOR = "discriminator";
 
     private DefinitionMarks() {
     }
@@ -78,37 +70,15 @@ final class DefinitionMarks {
 
     /**
      * {@code written} with every mark removed -- what reaches the annotation channel. Returns the list itself
-     * where nothing is marked, which is every declaration and field but the few that carry one. Every
-     * annotation position passes through here, which is what makes it the place a retired mark is refused.
+     * where nothing is marked, which is every declaration and field but the few that carry one.
      */
-    static List<Annotation> consumed(String where, List<Annotation> written) {
-        requireNoRetiredMark(where, written);
+    static List<Annotation> consumed(List<Annotation> written) {
         for (Annotation annotation : written) {
             if (isMark(annotation.name())) {
                 return written.stream().filter(a -> !isMark(a.name())).toList();
             }
         }
         return written;
-    }
-
-    /**
-     * Refuses a retired mark, naming what states the fact now. Refusing beats ignoring: a meta declaring
-     * either name makes it an ordinary annotation, which lands in output and dispatches nothing.
-     */
-    private static void requireNoRetiredMark(String where, List<Annotation> written) {
-        for (Annotation annotation : written) {
-            if (SEALED.equals(annotation.name())) {
-                throw new SchemaValidationException("'" + where + "': '@sealed' is not a mark -- a record"
-                        + " dispatched on its own members is '@abstract' with at least one field written"
-                        + " '=?', and that the family is member-dispatched is read from the body"
-                        + " ([TSON-SCHEMA] §5.2)");
-            }
-            if (DISCRIMINATOR.equals(annotation.name())) {
-                throw new SchemaValidationException("'" + where + "': '@discriminator' is not a mark -- write"
-                        + " the field as '" + where + ": <type> =?' to say that the members pin it"
-                        + " ([TSON-SCHEMA] §5.2)");
-            }
-        }
     }
 
     private static boolean isMark(String name) {

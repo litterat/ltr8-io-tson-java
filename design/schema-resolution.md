@@ -70,8 +70,8 @@ are kept in step deliberately.
   which is what reserves them: an ordinary annotation means whatever the governing meta says, and these are
   taken before the meta is consulted, so a meta-schema cannot give them another meaning — meta.tn declares
   both anyway, which documents them and reserves the names there too. Each is refused a value, being declared
-  `void`. `@sealed` and `@discriminator` were the earlier spelling of two facts the body now carries and are
-  refused wherever they are written.
+  `void`. Nothing in the resolver knows the names `sealed` or `discriminator`: meta.tn declares neither, so
+  either one written in a schema is the ordinary unknown-annotation error (§3.3.3).
 - **A selector is field syntax, `=?`** (`FieldModifiers`), and the record it is written in is the family base:
   the field stays REQUIRED and unpinned — §5.7's identity diagonal forbids a base pinning what its members
   each pin differently — and its name lowers into the enclosing `record.discriminators`. **ABSTRACT is derived
