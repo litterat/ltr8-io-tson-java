@@ -171,13 +171,13 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue>, ExactReader {
      * everything the document happened to state.
      */
     private JsonObject assemble(JsonValue[] values) {
-        Map<String, JsonValue> members = new LinkedHashMap<>();
-        for (int i = 0; i < fields.size(); i++) {
+        JsonObject.Builder members = JsonObject.builder(values.length);
+        for (int i = 0; i < values.length; i++) {
             if (values[i] != null) {
                 members.put(names[i], values[i]);
             }
         }
-        return new JsonObject(members);
+        return members.build();
     }
 
     /**

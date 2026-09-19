@@ -160,9 +160,9 @@ class JsonAllocationHarnessTest {
      *
      * <p>[TSON-JSON] §3.3 and §6.1.5 put every selector at the front of its object, so a record with no
      * subtypes decides nothing ahead of its members and this figure holds no lookahead buffer. Scanning each
-     * object for reserved members, which is what the rule removed, cost about a tenth of it for this
-     * three-field record -- too little for a ceiling to catch without becoming a budget, so the assertion is
-     * the harness's usual ratchet against work that returns per field rather than per record.
+     * object for reserved members, which is what the rule removed, cost about 350 bytes for this three-field
+     * record -- too little for a ceiling to catch without becoming a budget, so the assertion is the harness's
+     * usual ratchet against work that returns per field rather than per record.
      */
     @Test
     void aSchemaDirectedRecordReadsWithoutLookingAhead() {

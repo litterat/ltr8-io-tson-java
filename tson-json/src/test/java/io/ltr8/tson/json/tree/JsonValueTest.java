@@ -171,4 +171,30 @@ class JsonValueTest {
                     () -> JsonObject.empty().members().put("a", JsonNull.INSTANCE));
         }
     }
+
+    @Nested
+    class Builder {
+
+        @Test
+        void builds_its_members_in_order_and_answers_what_a_put_replaced() {
+            JsonObject.Builder builder = JsonObject.builder(2);
+            assertEquals(null, builder.put("b", JsonNumber.of(2)));
+            builder.put("a", JsonNumber.of(1));
+            assertEquals(JsonNumber.of(1), builder.put("a", JsonNumber.of(3)));
+            JsonObject built = builder.build();
+            assertEquals(List.of("b", "a"), List.copyOf(built.members().keySet()));
+            assertEquals(JsonNumber.of(3), built.get("a"));
+        }
+
+        @Test
+        void is_single_use_so_nothing_can_reach_the_map_it_handed_over() {
+            JsonObject.Builder builder = JsonObject.builder(1);
+            builder.put("a", JsonNumber.of(1));
+            JsonObject built = builder.build();
+            assertThrows(IllegalStateException.class, () -> builder.put("b", JsonNumber.of(2)));
+            assertThrows(IllegalStateException.class, builder::build);
+            assertThrows(UnsupportedOperationException.class, () -> built.members().put("c", JsonNumber.of(3)));
+            assertEquals(1, built.members().size());
+        }
+    }
 }

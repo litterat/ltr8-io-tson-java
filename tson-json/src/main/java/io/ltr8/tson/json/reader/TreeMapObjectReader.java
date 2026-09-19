@@ -13,7 +13,6 @@ import io.ltr8.tson.json.tree.JsonValue;
 import io.ltr8.tson.schema.meta.MapBody;
 
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -43,7 +42,7 @@ final class TreeMapObjectReader extends TreeMapReader {
         if (!(first instanceof JsonEvent.ObjectStart)) {
             return wrongShape(ctx, first);
         }
-        Map<String, JsonValue> entries = new LinkedHashMap<>();
+        JsonObject.Builder entries = JsonObject.builder(8);
         Map<Object, String> byIdentity = new HashMap<>();
         // Counted separately from `entries`, which drops a member whose key the contract refused: the size
         // facets judge what the document stated, and a member nothing could file is still an entry it wrote.
@@ -73,7 +72,7 @@ final class TreeMapObjectReader extends TreeMapReader {
             entries.put(slot != null ? slot : member.name(), entry);
         }
         checkSize(ctx, count);
-        return new JsonObject(entries);
+        return entries.build();
     }
 
     /** §6.5: the member name's string content faces {@code K}'s contract. Null where the contract refused it. */

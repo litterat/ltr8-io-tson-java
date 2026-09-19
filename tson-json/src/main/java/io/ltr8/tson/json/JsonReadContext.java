@@ -27,10 +27,11 @@ import java.util.function.Function;
  * collecting()} accumulates and lets the read continue -- which is the whole point, and the thing a
  * reader that threw could not offer.
  *
- * <p><b>The path is built by stepping, not by concatenating.</b> {@link #field}/{@link #index} return a
- * context one step deeper, each holding a link to its parent; the RFC 6901 pointer is rendered only when
- * a diagnostic is actually built. Concatenating per step is quadratic in depth and thrown away by every
- * read that reports nothing, which is nearly all of them.
+ * <p><b>The path is built by stepping, not by concatenating</b> -- at both ends. {@link #field}/{@link #index}
+ * return a context one step deeper, each holding a link to its parent, and {@link #schemaField} steps the schema
+ * pointer the same way; each RFC 6901 pointer is rendered only when a diagnostic is actually built.
+ * Concatenating per step is quadratic in depth and thrown away by every read that reports nothing, which is
+ * nearly all of them -- and a schema-directed read steps both pointers for every field of every record.
  *
  * <p><b>The schema end is present only when a schema is.</b> A schemaless read -- a tree, or a class's own
  * {@code tson-bind} descriptor playing the schema's part ([TSON-JSON] §4.1) -- has no document to point
@@ -38,10 +39,6 @@ import java.util.function.Function;
  * it builds stay empty with it. A schema-directed read ([TSON-JSON] §5-§8) offers each declaration as it
  * descends ({@link #underDeclaration}), and those components are filled from that.
  *
- * <p><b>Simpler than its TSON peer in two ways, each because this read has less to say.</b> There is no
- * lookahead or rewind, because the JSON engine pulls a value's opening event and passes it down rather than
- * peeking and putting back. And no name policy runs here yet; when it does it will run where the TSON side
- * runs it, on the event as it is pulled.
  *
  * <p>Not thread-safe, and single-use over one read: every derived context shares one cursor, so the
  * position and the reported count are the read's rather than any one step's.
@@ -78,6 +75,56 @@ public final class JsonReadContext {
     private record PathStep(PathStep parent, String name, int index) {
     }
 
+    /**
+     * Where in the schema a context is, stepped rather than rendered: a declaration's own pointer at the root
+     * of the chain, a field name at each step below it, and the identity and line in force at this one.
+     */
+    private record SchemaAt(SchemaAt parent, String name, String rootPointer, String schemaId,
+                            Optional<SourcePosition> position) {
+
+        static SchemaAt of(JsonSchemaLocation declaration) {
+            return new SchemaAt(null, null, declaration.pointer(), declaration.schemaId(), declaration.position());
+        }
+
+        /**
+         * One declared member deeper, taking the field's own line where it has one -- so a diagnostic against
+         * {@code /person/age} is located at {@code age} rather than at {@code person}'s line. A field with no
+         * position of its own leaves the enclosing one in place.
+         */
+        SchemaAt field(String field, Optional<SourcePosition> at) {
+            return new SchemaAt(this, field, null, schemaId, at.isPresent() ? at : position);
+        }
+
+        /**
+         * The same pointer over {@code declaration}'s identity and line -- what a record offers as it begins
+         * reading, so the pointer keeps the path the read took while the id and line follow the declaration
+         * that owns the members. A declaration with no position leaves the enclosing one's in place.
+         */
+        SchemaAt anchoredOn(JsonSchemaLocation declaration) {
+            return new SchemaAt(parent, name, rootPointer, declaration.schemaId(),
+                    declaration.position().isPresent() ? declaration.position() : position);
+        }
+
+        String pointer() {
+            StringBuilder out = new StringBuilder();
+            appendPointer(out);
+            return out.toString();
+        }
+
+        private void appendPointer(StringBuilder out) {
+            if (parent == null) {
+                out.append(rootPointer);
+                return;
+            }
+            parent.appendPointer(out);
+            out.append('/').append(escape(name));
+        }
+
+        JsonSchemaLocation location() {
+            return new JsonSchemaLocation(schemaId, pointer(), position);
+        }
+    }
+
     private final Cursor cursor;
 
     /** The step this context sits at; {@code null} at the root, whose pointer is {@code ""}. */
@@ -88,7 +135,7 @@ public final class JsonReadContext {
      * than on the {@link Cursor}, because unlike the position it is not one live value the whole read shares:
      * a sibling that has finished reading must not leave its own declaration behind for the next one.
      */
-    private final JsonSchemaLocation schemaLocation;
+    private final SchemaAt schemaLocation;
 
     /**
      * A position pinned by {@link #withPosition}, or null to follow the shared cursor. Per-context for the
@@ -96,7 +143,7 @@ public final class JsonReadContext {
      */
     private final SourcePosition pinnedPosition;
 
-    private JsonReadContext(Cursor cursor, PathStep tail, JsonSchemaLocation schemaLocation,
+    private JsonReadContext(Cursor cursor, PathStep tail, SchemaAt schemaLocation,
                             SourcePosition pinnedPosition) {
         this.cursor = cursor;
         this.tail = tail;
@@ -226,7 +273,7 @@ public final class JsonReadContext {
 
     /** Where in the schema this read currently is -- absent for a read with no schema behind it at all. */
     public Optional<JsonSchemaLocation> schemaLocation() {
-        return Optional.ofNullable(schemaLocation);
+        return Optional.ofNullable(schemaLocation).map(SchemaAt::location);
     }
 
     /**
@@ -239,7 +286,8 @@ public final class JsonReadContext {
      * the container that reached it owns the pointer.
      */
     public JsonReadContext underDeclaration(JsonSchemaLocation declaration) {
-        return schemaLocation != null ? this : new JsonReadContext(cursor, tail, declaration, pinnedPosition);
+        return schemaLocation != null ? this
+                : new JsonReadContext(cursor, tail, SchemaAt.of(declaration), pinnedPosition);
     }
 
     /**
@@ -253,7 +301,8 @@ public final class JsonReadContext {
      */
     public JsonReadContext inRecord(JsonSchemaLocation declaration) {
         return new JsonReadContext(cursor, tail,
-                schemaLocation == null ? declaration : schemaLocation.anchoredOn(declaration), pinnedPosition);
+                schemaLocation == null ? SchemaAt.of(declaration) : schemaLocation.anchoredOn(declaration),
+                pinnedPosition);
     }
 
     /**
@@ -284,15 +333,6 @@ public final class JsonReadContext {
     // ── Reporting ────────────────────────────────────────────────────────
 
     /**
-     * Hands one problem to this read's receiver, located at this context's pointer and the cursor's position,
-     * and at its schema location where the read has one.
-     *
-     * <p>{@code Diagnostic} spells a missing schema identity {@code ""} and a missing pointer as an absence,
-     * since for a pointer {@code ""} is the root and a real location -- so the two are read back through
-     * {@code schemaIdIfKnown()} and the {@code Optional} rather than by remembering which convention each
-     * component uses.
-     */
-    /**
      * Hands one of a family's rules to this read's receiver, located here.
      *
      * <p>The rule states four of a {@link Diagnostic}'s nine components and this context supplies the other
@@ -303,12 +343,21 @@ public final class JsonReadContext {
         report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
     }
 
+    /**
+     * Hands one problem to this read's receiver, located at this context's pointer and the cursor's position,
+     * and at its schema location where the read has one.
+     *
+     * <p>{@code Diagnostic} spells a missing schema identity {@code ""} and a missing pointer as an absence,
+     * since for a pointer {@code ""} is the root and a real location -- so the two are read back through
+     * {@code schemaIdIfKnown()} and the {@code Optional} rather than by remembering which convention each
+     * component uses.
+     */
     public void report(Diagnostic.Code code, String message, String expected, String actual) {
         cursor.reported++;
         cursor.receiver.report(new Diagnostic(Optional.of(path()),
-                Optional.ofNullable(schemaLocation).map(JsonSchemaLocation::pointer),
+                Optional.ofNullable(schemaLocation).map(SchemaAt::pointer),
                 schemaLocation == null ? "" : schemaLocation.schemaId(), code, message, expected, actual,
-                position(), Optional.ofNullable(schemaLocation).flatMap(JsonSchemaLocation::position)));
+                position(), schemaLocation == null ? Optional.empty() : schemaLocation.position()));
     }
 
     /**
