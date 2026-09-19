@@ -11,6 +11,8 @@ What `!C { … }` may apply, how its head resolves, and why a template is never 
   of the entry at the end, while `source` records the name the author wrote.
 - What `!C { … }` may apply is IS-A `top` (§4.1) — there is no constructor marker — and
   `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so a head the gate admits has a reader.
+- `template` is resolver vocabulary (§8.1): IS-A `top`, yet a source declaration applying it, closed or open, is an
+  author error (`requireAuthorable`).
 - An atom instance is **ATOM-kinded and not itself applicable**; both halves are needed, and IS-A `atom` alone runs
   backwards (true of the constructor, false of every instance).
 - `!reference { target: X }` resolves to the alias's own entry — `kind: REFERENCE`, `X` as source and body — the same
@@ -65,6 +67,11 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `name => X` denotes (§8.3), where a construction of any other head takes the head's kind and names the head
   as its source. The closed path dispatches on the *body* being a `Reference`, having already read it;
   `resolveInstanceTemplate` holds its body unread and so goes by the head's name.
+  **`template` is admitted by the predicate and refused by name** (`requireAuthorable`, on both paths). It is IS-A
+  `top` because resolved output is typed by it, but it is resolver vocabulary (§8.1): an open entry's body, derived
+  from a declaration's `<…>` and never applied by a source declaration. Admitted, `!template { parameters: [T]
+  template: "…" }` would mint an open entry with a hand-written held body, skipping every declaration-time check
+  §5.10 makes of a template. Tested at the chain's end, so an alias of it is refused too.
   **Two more questions are asked in the same terms.** Atom refinement asks §5.5's question — *is this an atom instance?* —
   as **ATOM-kinded and not itself applicable**,
   which is exactly what an instance is: §4.1's "IS-A does not extend below construction" is what separates the
