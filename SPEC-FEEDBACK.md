@@ -751,7 +751,8 @@ family's discriminator, written `=?`"), which is what this implementation's mess
 reading as "optional", so §5.2 should state the reading outright; an optional type with `=?`
 (`pet_type: text? =?`) is a resolver error, a selector that may be absent selecting nothing.
 
-**The check list, restated for the family.** At the base: the declaration carries `@abstract`, below; the
+**The check list, restated for the family.** At the base: the declaration is ABSTRACT, derived from the
+selector and optionally asserted, below; the
 marked field's declared type resolves, after its
 reference chain, to an atom-family instance or an enum — *not* free here, because §5.2 grants that only to a field
 carrying a value and the base's field carries none; its state is exactly REQUIRED, neither OPTIONAL (the base
@@ -805,9 +806,10 @@ subtype inherits its parent's pin and §5.7 forbids changing it, so it dispatche
 variants. And a second selector on an intermediate type is the nesting escape hatch, which this proposal
 deliberately leaves out of the first design.
 
-**What is running:** the proposal, in both encodings, as #11 and #13 describe — `=?` on a base field,
-`@abstract` on the declaration, the closure checks with pins compared as values, and member dispatch at such a
-position. `@discriminator` and `@sealed` are **refused** where written, each message naming what states the
+**What is running:** the proposal, in both encodings, as #11 and #13 describe — `=?` on a base field, which
+derives ABSTRACT and admits `@abstract` as an assertion beside it, the closure checks with pins compared as
+values, and member dispatch at such a position. `@discriminator` and `@sealed` are **refused** where written, each
+message naming what states the
 fact now; ignoring them would let a meta-schema make them ordinary annotations that dispatch nothing. The
 group-member check is now two rules: §5.11 makes a value modifier a parse error on a member, so the spelling
 cannot reach one, and the linker still refuses a member that acquires the mark by refinement. The [TSON-JSON]
@@ -1059,9 +1061,10 @@ identically. They are matched by name and never resolved against the governing m
 them: they lower under a meta declaring neither, where an ordinary unknown name is the author's error. `=?` is
 never an annotation at all — it is §12.1 syntax, and `FieldModifiers` lowers it into `discriminators` while
 leaving the field REQUIRED and unpinned. Refused while lowering: two definition marks on one declaration, a
-mark carrying a value, a definition mark on a non-record, and `=?` on an optional field. A template carrying one is
-lowered into its held body and read back when that body closes (#13),
-`@final` alone being refused there.
+mark carrying a value, a definition mark on a non-record, `=?` on an optional field, and `@final` on a record
+carrying one. **ABSTRACT is derived where a selector is present** (`withExtension`), `@abstract` written
+beside one being an assertion that agrees rather than a requirement. A template carrying a mark is lowered
+into its held body and read back when that body closes (#13), `@final` alone being refused there.
 
 **The load-time checks run too**, one pass in the linker beside the disjointness derivation: nothing may compose
 or refine onto a FINAL record while §5.9 subtraction stays admissible; a sealed record's selectors are REQUIRED,
@@ -1106,7 +1109,7 @@ state #10's checks over the selector, the FINAL check over composition and refin
 exemption and why it is not one, the reason inhabitance gains no case for it, the absence of any transition
 table, and the identity consequence; state that a template may be abstract and may not be final, with #13's
 reasons; state that the marks are consumed rather than preserved and that their names are
-reserved; state that a selector requires `@abstract`, and that nothing marks the dispatch itself; correct
+reserved; correct
 §6's validity claim; and settle the field and enum names, which is the
 one part this entry does not.
 
