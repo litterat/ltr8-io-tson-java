@@ -244,14 +244,22 @@ the two, ordered so the gap catch comes first.
 
 ## JSON inputs (`--schema`, `--type`)
 
-**A `.json` input is validated too**, against a schema supplied out of band: `--schema <uri> --type <name>` are one
+**A `.json` input is validated too**, against a schema supplied out of band: `--schema <file|uri> --type <name>` are one
 statement binding every JSON input in the run ([TSON-JSON] §3.4, since a JSON document names neither for itself), and
 the encoding is read off the extension on §3.1's own authority — the one filename this CLI reads, the axis being the
 encoding where the `!!id` rule is about schema-versus-data. Half a binding, a `.json` with none, a binding with no JSON
-to bind, and a `--type` the schema does not declare are all **usage errors** (exit 2) rather than verdicts: each is the
-command line's mistake, and the last is checked before any document is read so one typo prints once instead of once per
-file. Stdin takes the binding as its marker, having no name to classify by. One envelope, one exit-code ranking, one
-policy field across both encodings.
+to bind, a `--schema` naming a file that is not a schema document, one that is neither a file nor an identifying URI
+(a mistyped path, typically) or an identity no schema file declares, and a `--type` the schema does not declare are all
+**usage errors** (exit 2) rather than verdicts: each is the command line's mistake, and the binding is checked before
+any document is read so one typo prints once instead of once per file. Stdin takes the binding as its marker, having
+no name to classify by. One envelope, one exit-code ranking, one policy field across both encodings.
+
+**`--schema` takes a file or an identity, and binds by identity either way.** A file joins the run's schemas and
+contributes the `!!id` it declares, so a local draft or a downloaded copy binds wherever it sits — its location was
+never what matched. Asking for the identity alone made the author restate a string the file already holds, and invited
+the path in its place. A value naming an existing regular file is a path and anything else an identity; the test is
+the file system, not the value's shape, since `C:\x.tn` parses as a URI with a scheme. The identity form stays for a
+run whose schema files are already listed, and its failures list the `!!id`s those files do declare.
 
 ## Default bind contexts (`tson-base`'s `base.bind`, `tson-compiler/.../config/`)
 

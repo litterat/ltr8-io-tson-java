@@ -26,7 +26,7 @@ options, exit codes and description — including the policy options for the thr
 |                       |                                                                                                     |
 | --------------------- | --------------------------------------------------------------------------------------------------- |
 | Arguments             | **a flat file list** — each `.tn` auto-classified as schema (its header carries `!!meta`) or data, by content, never by filename; a `.json` file is JSON data |
-| Schema selection      | a `.tn` data document's own: its `!!schema` names the schema, its root type-ref (`!person`) the type. JSON names neither, so `--schema <uri> --type <name>`, given together, bind every JSON input in the run |
+| Schema selection      | a `.tn` data document's own: its `!!schema` names the schema, its root type-ref (`!person`) the type. JSON names neither, so `--schema <file|uri> --type <name>`, given together, bind every JSON input in the run |
 | `-`                   | reads one data document from stdin, at most once, always data (a file really named `-` is `./-`); JSON when `--schema`/`--type` are given |
 | `--output`            | `text` (default), `json`, `tson`                                                                    |
 | Exit codes            | `0` checked, nothing reported · `1` checked and rejected, or a §9.1 limit refusal · `2` usage · `69` a schema nothing would supply · `75` a schema that could not be reached · `78` a type with no Java class here · `70` library gap or fault |
@@ -49,11 +49,12 @@ tson validate --output json person.tn bad-data.tn
 printf '!person { name: "Ada" }' | tson validate person.tn -
 tson compile person.tn                                # does the schema itself resolve and compile?
 tson hash person.tn                                   # stamp ?sha256=… onto its own !!id, in place
-tson validate --schema <uri> --type order order.tn a.json b.json   # JSON inputs, bound out of band
+tson validate --schema order.tn --type order a.json b.json          # JSON inputs, bound out of band
 ```
 
-The schema a JSON input is bound to must still be one of the `.tn` files on the command line. A `.json` file
-without `--schema`/`--type`, or the two flags with no JSON input, is a usage error (exit `2`).
+`--schema` takes a schema file, which joins the run and binds by the `!!id` it declares — so a local draft or a
+cached copy binds wherever it sits — or the `!!id` of a schema file on the command line. A `.json` file without
+`--schema`/`--type`, or the two flags with no JSON input, is a usage error (exit `2`).
 
 ## The Unicode policy, and configuring it
 

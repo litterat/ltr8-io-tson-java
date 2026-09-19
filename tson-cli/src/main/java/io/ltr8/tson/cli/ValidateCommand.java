@@ -6,6 +6,7 @@ import io.ltr8.tson.Tson;
 import io.ltr8.tson.json.Json;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.TsonDocumentPeek;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -91,6 +92,33 @@ final class ValidateCommand {
         Tson tson = Tson.of(policies.applyTo(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))));
         CliPolicy policy = CliPolicy.from(tson.processorPolicy());
 
+        // A --schema naming a file joins the run's schemas first and binds by the !!id it declares, so the
+        // rest of the run sees an identity whichever way the binding was given.
+        Path schemaFile = binding == null ? null : binding.schemaFile().orElse(null);
+        if (schemaFile != null) {
+            boolean schema;
+            try {
+                schema = isSchemaDocument(schemaFile);
+            } catch (IOException e) {
+                System.out.println(format.render(ValidationRun.failed(policy,
+                        Diagnostic.Code.VALIDATION_ERROR, cannotRead(new ValidateInput.OfFile(schemaFile), e))));
+                return 2;
+            }
+            if (!schema) {
+                System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_NOT_FOUND,
+                        "--schema \"" + schemaFile + "\" is a file but not a schema document -- its header "
+                                + "carries no !!meta, and schemas are TSON text whatever encoding their data is")));
+                return 2;
+            }
+            try {
+                binding = new JsonBinding(register(schemaFile, schemas, declaredIds), binding.rootType());
+            } catch (RuntimeException e) {
+                System.out.println(format.render(ValidationRun.failed(policy,
+                        Diagnostic.Code.SCHEMA_ERROR, schemaFile + ": " + e.getMessage())));
+                return 2;
+            }
+        }
+
         for (ValidateInput input : inputs) {
             // Standard input is a data document by definition -- classification opens the document a second
             // time, and a stream has nothing to reopen. See ValidateInput.
@@ -110,19 +138,11 @@ final class ValidateCommand {
                 return 2;
             }
             if (schema) {
+                if (schemaFile != null && isSameFile(file, schemaFile)) {
+                    continue;   // named by --schema as well, and already loaded
+                }
                 try {
-                    String text = Io.readFile(file);
-                    String id = new TsonSchemaParser(text).parseSchemaDocument().id().orElseThrow(() ->
-                            new IllegalArgumentException("schema " + file + " has no !!id"));
-                    if (isBundledId(id)) {
-                        System.err.println("note: " + file + " declares the built-in schema id \"" + id
-                                + "\" -- overriding meta-kernel/meta/core is not supported; ignoring this file");
-                    } else {
-                        // Key by canonical identity so a data file's plain !!schema resolves against a
-                        // schema whose !!id carries a ?sha256= pin (the hash is not identity, §2.2.1).
-                        schemas.put(CanonicalIdentity.canonicalize(id), text);
-                        declaredIds.add(id);
-                    }
+                    register(file, schemas, declaredIds);
                 } catch (RuntimeException e) {
                     System.out.println(format.render(ValidationRun.failed(policy,
                             Diagnostic.Code.SCHEMA_ERROR, file + ": " + e.getMessage())));
@@ -147,7 +167,7 @@ final class ValidateCommand {
             // The binding is checked before any document is read, so a mistyped --schema or --type is a
             // usage error where the person who typed it can act, rather than an identical-looking verdict
             // per file. `Tson.resolve` registers, so the registry is what the JSON side then loads through.
-            int refused = bind(tson, json, binding, schemas, format, policy);
+            int refused = bind(tson, json, binding, schemas, declaredIds, format, policy);
             if (refused != 0) {
                 return refused;
             }
@@ -163,7 +183,7 @@ final class ValidateCommand {
             // it went out of its way to avoid. It propagates to TsonCli's fault handler instead.
             try (InputStream in = dataInput.open()) {
                 errors = (isJson(dataInput, binding)
-                        ? json.validate(in, binding.schemaUri(), binding.rootType())
+                        ? json.validate(in, binding.schema(), binding.rootType())
                         : tson.validate(in)).stream().map(CliDiagnostic::from).toList();
             } catch (IOException e) {
                 errors = List.of(CliDiagnostic.minimal(Diagnostic.Code.VALIDATION_ERROR,
@@ -206,19 +226,30 @@ final class ValidateCommand {
     /**
      * Resolves the bound schema and checks the root type, before any document is read.
      *
-     * <p>Both failures are the command line's rather than a document's, and each prints as a run-level
-     * failure and exits 2: a schema identity no file on the command line declares, and a root type that
-     * schema does not declare. Reporting them per file instead would say the documents were invalid, which
-     * is a verdict on the wrong thing -- and would say it once per file for one typo.
+     * <p>By here a {@code --schema} file has been loaded and replaced by the identity it declares, so a value
+     * that is still not an identifying URI names no file either -- a mistyped path, most often. Every failure
+     * is the command line's rather than a document's, and each prints as a run-level failure and exits 2: that
+     * value, a schema identity no file on the command line declares, and a root type that schema does not
+     * declare. Reporting them per file instead would say the documents were invalid, which
+     * is a verdict on the wrong thing -- and would say it once per file for one typo. The first two list the
+     * identities the schema files do declare, which is usually the value that was meant.
      */
     private static int bind(Tson tson, Json json, JsonBinding binding, Map<String, String> schemas,
-                            OutputFormat format, CliPolicy policy) {
-        String identity = CanonicalIdentity.canonicalize(binding.schemaUri());
+                            List<String> declaredIds, OutputFormat format, CliPolicy policy) {
+        String identity;
+        try {
+            identity = CanonicalIdentity.canonicalize(binding.schema());
+        } catch (SchemaValidationException e) {
+            System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_NOT_FOUND,
+                    "--schema \"" + binding.schema() + "\" is neither a file nor a schema identity ("
+                            + e.getMessage() + ")" + supplied(declaredIds))));
+            return 2;
+        }
         String text = schemas.get(identity);
         if (text == null) {
             System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_NOT_FOUND,
-                    "--schema \"" + binding.schemaUri() + "\": no schema file on the command line declares "
-                            + "that !!id")));
+                    "--schema \"" + binding.schema() + "\": no schema file on the command line declares "
+                            + "that !!id" + supplied(declaredIds))));
             return 2;
         }
         try {
@@ -227,10 +258,10 @@ final class ValidateCommand {
             }
         } catch (RuntimeException e) {
             System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_ERROR,
-                    binding.schemaUri() + ": " + e.getMessage())));
+                    binding.schema() + ": " + e.getMessage())));
             return 2;
         }
-        List<Diagnostic> named = json.validate("", binding.schemaUri(), binding.rootType());
+        List<Diagnostic> named = json.validate("", binding.schema(), binding.rootType());
         if (named.stream().anyMatch(d -> d.code() == Diagnostic.Code.UNKNOWN_TYPE)) {
             System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.UNKNOWN_TYPE,
                     "--type \"" + binding.rootType() + "\": " + named.stream()
@@ -264,6 +295,35 @@ final class ValidateCommand {
         return id.equals(TsonBundledSchemas.META_KERNEL_ID)
                 || id.equals(TsonBundledSchemas.META_ID)
                 || id.equals(TsonBundledSchemas.CORE_ID);
+    }
+
+    /**
+     * Loads one schema file into the run and returns the {@code !!id} it declares. A file declaring a bundled
+     * schema's identity is noted and left out, since the standard library is always served underneath.
+     */
+    private static String register(Path file, Map<String, String> schemas, List<String> declaredIds) {
+        String text = Io.readFile(file);
+        String id = new TsonSchemaParser(text).parseSchemaDocument().id().orElseThrow(() ->
+                new IllegalArgumentException("schema " + file + " has no !!id"));
+        if (isBundledId(id)) {
+            System.err.println("note: " + file + " declares the built-in schema id \"" + id
+                    + "\" -- overriding meta-kernel/meta/core is not supported; ignoring this file");
+        } else {
+            // Key by canonical identity so a data file's plain !!schema resolves against a schema whose
+            // !!id carries a ?sha256= pin (the hash is not identity, §2.2.1).
+            schemas.put(CanonicalIdentity.canonicalize(id), text);
+            declaredIds.add(id);
+        }
+        return id;
+    }
+
+    /** Whether two paths are one file, however each was spelled; false when either cannot be checked. */
+    private static boolean isSameFile(Path a, Path b) {
+        try {
+            return Files.isSameFile(a, b);
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /** A file whose header carries {@code !!meta} is a schema document ([TSON-SCHEMA] §12.1 requires one). */

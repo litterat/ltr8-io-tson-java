@@ -137,6 +137,55 @@ class JsonValidateTest {
                 "validate", "--schema", "https://example.test/absent.tn", "--type", "person",
                 schema.toString(), json.toString()})));
         assertTrue(out.contains("SCHEMA_NOT_FOUND"), out);
+        assertTrue(out.contains(ID), "the identities the files do declare are listed: " + out);
+    }
+
+    /**
+     * A schema file binds by the {@code !!id} it declares, wherever it sits -- the path is how the file reaches
+     * the run, never what matches -- so it need not be listed again, nor its identity restated.
+     */
+    @Test
+    void aSchemaFileBindsByTheIdentityItDeclares(@TempDir Path dir) throws IOException {
+        Path schema = write(dir, "local-draft.tn", SCHEMA);
+        Path json = write(dir, "good.json", """
+                {"name": "Ada"}""");
+        String out = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {
+                "validate", "--schema", schema.toString(), "--type", "person", json.toString()})));
+        assertEquals("OK", out.strip());
+    }
+
+    /** Named by {@code --schema} and listed as well, it is one schema and loads once. */
+    @Test
+    void aSchemaFileMayAlsoBeListed(@TempDir Path dir) throws IOException {
+        Path schema = write(dir, "person.tn", SCHEMA);
+        Path json = write(dir, "bad.json", "{}");
+        String out = captureStdout(() -> assertEquals(1, TsonCli.run(new String[] {
+                "validate", "--output", "json", "--schema", schema.toString(), "--type", "person",
+                schema.toString(), json.toString()})));
+        assertTrue(out.contains("FIELD_REQUIRED"), out);
+    }
+
+    @Test
+    void aFileThatIsNotASchemaDocumentIsAUsageError(@TempDir Path dir) throws IOException {
+        Path json = write(dir, "good.json", "{}");
+        String out = captureStdout(() -> assertEquals(2, TsonCli.run(new String[] {
+                "validate", "--schema", json.toString(), "--type", "person", json.toString()})));
+        assertTrue(out.contains("not a schema document"), out);
+    }
+
+    /**
+     * A value naming no file and no identity -- a mistyped path, most often -- is the binding's problem, not a
+     * fault in this command, and the identities the schema files do declare are named beside it.
+     */
+    @Test
+    void aValueThatIsNeitherAFileNorAnIdentityIsAUsageError(@TempDir Path dir) throws IOException {
+        Path schema = write(dir, "person.tn", SCHEMA);
+        Path json = write(dir, "good.json", "{}");
+        String out = captureStdout(() -> assertEquals(2, TsonCli.run(new String[] {
+                "validate", "--schema", "persno.tn", "--type", "person", schema.toString(), json.toString()})));
+        assertTrue(out.contains("SCHEMA_NOT_FOUND"), out);
+        assertTrue(out.contains("neither a file nor a schema identity"), out);
+        assertTrue(out.contains(ID), "the identities the files do declare are listed: " + out);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────

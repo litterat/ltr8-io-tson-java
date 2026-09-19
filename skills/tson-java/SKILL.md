@@ -425,13 +425,14 @@ tson validate person.tn data.tn         # also --output json|tson; `-` reads std
 tson compile person.tn                  # does the schema itself resolve and compile?
 tson policy                             # the §8.2 Unicode policy and §9.1 limits this run would apply
 tson hash person.tn                     # stamp ?sha256=… onto its own !!id, in place
-tson validate --schema <uri> --type order order.tn data.json   # JSON data, bound out of band
+tson validate --schema order.tn --type order data.json        # JSON data, bound out of band
 ```
 
 **A flat file list**. Each `.tn` is auto-classified as schema or data by content and never by filename, and
 a data document's own `!!schema` plus its root type-ref select what it is checked against. A `.json` file
 is JSON data — the one place the tool reads an extension — and, naming neither its schema nor its type,
-takes `--schema <uri> --type <name>` together; they bind every JSON input in the run. Nothing is fetched
+takes `--schema <file|uri> --type <name>` together; they bind every JSON input in the run. A schema file given
+to `--schema` joins the run and binds by the `!!id` it declares, wherever it sits. Nothing is fetched
 over the network. Exit codes: `0` checked and nothing reported · `1` checked and rejected, or refused by a
 §9.1 limit · `2` usage · `69` a schema not obtained and a rerun will not help · `75` a schema not reached,
 where a rerun may · `78` a type with no Java class in this tool · `70` a library gap or fault — a mixed run

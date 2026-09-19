@@ -89,12 +89,12 @@ public final class TsonCli {
             everywhere else. `tson policy` with the same flags prints what they would apply.""";
 
     private static final String VALIDATE_USAGE =
-            "usage: tson validate [--output text|json|tson] [--schema <uri> --type <name>] [<policy options>]"
+            "usage: tson validate [--output text|json|tson] [--schema <file|uri> --type <name>] [<policy options>]"
                     + " <file|->...   (`-` reads one"
                     + " data document from stdin)";
 
     private static final String VALIDATE_HELP = """
-            usage: tson validate [--output text|json|tson] [--schema <uri> --type <name>]
+            usage: tson validate [--output text|json|tson] [--schema <file|uri> --type <name>]
                                  [<policy options>] <file|->...
 
             Validates data documents. Each .tn file is auto-classified as a schema document (its header
@@ -109,7 +109,8 @@ public final class TsonCli {
             and the !!id rule above says nothing about it). A JSON document names neither its schema nor
             its root type, so --schema and --type supply both, out of band ([TSON-JSON] §3.4). They are
             one statement and are given together; they bind every JSON input in the run, so two bindings
-            mean two runs. The schema must still be one of the .tn schema files on the command line.
+            mean two runs. --schema takes a schema file, which joins the run's schemas and binds by the
+            !!id it declares wherever the file sits, or the !!id of a schema file on the command line.
 
             `-` reads one data document from standard input, at most once, always data, and is reported
             under the name "-" (a file really named - is reachable as ./-). It is read as JSON when
@@ -118,7 +119,7 @@ public final class TsonCli {
 
             options:
               --output text|json|tson    output format (default: text)
-              --schema <uri>             schema identity for the JSON inputs (with --type)
+              --schema <file|uri>        schema file or identity for the JSON inputs (with --type)
               --type <name>              root type for the JSON inputs (with --schema)
 
             """ + POLICY_OPTIONS + """
@@ -403,14 +404,14 @@ public final class TsonCli {
         OutputFormat format = OutputFormat.TEXT;
         List<ValidateInput> inputs = new ArrayList<>();
         int stdin = 0;
-        String schemaUri = null;
+        String schema = null;
         String rootType = null;
 
         for (int i = 0; i < args.size(); i++) {
             String arg = args.get(i);
             switch (arg) {
                 case "--output" -> format = OutputFormat.parse(requireValue(args, ++i, "--output"));
-                case "--schema" -> schemaUri = requireValue(args, ++i, "--schema");
+                case "--schema" -> schema = requireValue(args, ++i, "--schema");
                 case "--type" -> rootType = requireValue(args, ++i, "--type");
                 case "-" -> {
                     stdin++;
@@ -429,7 +430,7 @@ public final class TsonCli {
         if (inputs.isEmpty()) {
             throw new UsageException(VALIDATE_USAGE);
         }
-        return ValidateCommand.run(inputs, format, policies, jsonBinding(schemaUri, rootType, inputs));
+        return ValidateCommand.run(inputs, format, policies, jsonBinding(schema, rootType, inputs));
     }
 
     /**
@@ -442,17 +443,17 @@ public final class TsonCli {
      * JSON input to bind is a flag that changes nothing, which this CLI refuses rather than ignores -- the
      * same habit {@code PolicyOptions} applies to a relaxation that scans nothing.
      */
-    private static JsonBinding jsonBinding(String schemaUri, String rootType, List<ValidateInput> inputs) {
-        boolean stated = schemaUri != null || rootType != null;
-        if (stated && (schemaUri == null || rootType == null)) {
+    private static JsonBinding jsonBinding(String schema, String rootType, List<ValidateInput> inputs) {
+        boolean stated = schema != null || rootType != null;
+        if (stated && (schema == null || rootType == null)) {
             throw new UsageException("--schema and --type are one binding and are given together: "
-                    + (schemaUri == null ? "--schema" : "--type") + " is missing");
+                    + (schema == null ? "--schema" : "--type") + " is missing");
         }
         boolean anyJson = inputs.stream().anyMatch(input -> JsonBinding.isJsonFile(input.name()));
         if (!stated) {
             if (anyJson) {
                 throw new UsageException("a .json input is read against a schema supplied out of band "
-                        + "([TSON-JSON] §3.4) -- give --schema <uri> and --type <name>, which a JSON document "
+                        + "([TSON-JSON] §3.4) -- give --schema <file|uri> and --type <name>, which a JSON document "
                         + "cannot name for itself the way a .tn document does");
             }
             return null;
@@ -464,7 +465,7 @@ public final class TsonCli {
             throw new UsageException("--schema and --type bind JSON inputs, and this run has none -- a .tn "
                     + "document names its own schema and root type");
         }
-        return new JsonBinding(schemaUri, rootType);
+        return new JsonBinding(schema, rootType);
     }
 
     private static int runCompile(List<String> args) {
