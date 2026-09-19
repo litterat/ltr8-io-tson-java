@@ -207,16 +207,6 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   corpus cannot express. Needs the upstream decision on whether that is a layer, a further conformance class, or a
   per-vector encoding axis, before any vectors are owed; `RUNNER.md` is normative for whichever shape it takes.
 
-- [ ] **`STRUCTURED-OUTPUT.md`'s JSON section predates `@discriminator` and the void-variant rule, and holds items
-  belonging here.** It asks what a position typed `(T | void)` does with JSON `null`, which
-  `TsonSchemaLinker.checkVariantsAreNotVoid` answers by refusing that position outright (§5.4). It also records
-  untagged-union dispatch as undesigned and wanting a new meta.tn vocabulary addition — which the sealed record
-  family answers, and the section should say so: the mechanism is a discriminator field on an abstract base
-  (`SPEC-FEEDBACK.md` #10, #11), not a choice-level mark, so the section's own dependent-typing proposal (an enum
-  member carrying a per-member type association) is the shape that was *not* taken and the reason belongs beside
-  it — a sibling tag needs the value of one field to type another. The engineering items above
-  stay only here.
-
 ## Module structure
 
 - [ ] **The encoding-neutral reader parts move into a module both stacks share — `tson-encoding` or similar, not
