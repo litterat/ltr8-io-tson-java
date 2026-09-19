@@ -225,7 +225,8 @@ is small and parsed once.)
   (`statedAbsentValue`, per subclass) because bind mode has nowhere to put it — a Java component has no third
   state between "set to nothing" and "never set", so both readings arrive as `null` there. A limit of the
   target rather than a reading of §2.9, and the reason the tree's answer is not aligned down to it. An array
-  element and a tuple slot keep the same distinction, so the containers agree.
+  element and a tuple slot keep the same distinction, so the containers agree, and so does an
+  `OPTIONAL_FIXED` field, valued or `= _`.
 - **A written `_` at a `REQUIRED_DEFAULT` field is an error**, where plain omission still injects the
   default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 makes an explicit `_` a
   validation error at every REQUIRED-family field — "`_` asserts absence at a position the schema always

@@ -476,7 +476,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 fieldCtx.report(rules.fixedFieldAbsent(fieldName, String.valueOf(check.value()), ABSENT));
                 return;
             }
-            return; // OPTIONAL_FIXED, valued or `= _`: absence is exactly what it permits
+            // OPTIONAL_FIXED: absence is exactly what it permits, and [TSON-DATA] §2.9 makes a field written `_`
+            // present with an absent value -- kept, as at an OPTIONAL field.
+            sink.accept(schemaIndex, statedAbsentValue());
+            return;
         }
         if (check.mustBeAbsent()) {
             EventSkip.scopedValue(ctx);
