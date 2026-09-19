@@ -6,6 +6,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassAtom;
+import io.ltr8.bind.DataClassBridge;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
@@ -45,14 +46,18 @@ final class BindRecordBuilder implements RecordBuilder {
     /**
      * Bind mode's concrete record reader over {@code binding}: the bound class resolved from the schema type's
      * names, each atom field's reader bound to what its component holds, and each schema-stated value made the
-     * component's own class. {@link DispatchFactories} decides whether a record position gets this or a
+     * component's own class. A record with no subtypes bound to a union is a labelled choice
+     * ({@link BindGroupUnionBuilder}). {@link DispatchFactories} decides whether a record position gets this or a
      * dispatcher in front of it.
      */
     static ValueReaderFactory factory(DataBindContext binding) {
         return (name, definition, context) -> {
             DataClass boundClass = boundClass(name, context, binding);
-            if (boundClass instanceof DataClassUnion union && !definition.subtypes().isEmpty()) {
-                return ownDataOfUnion(name, definition, context, binding, union);
+            if (boundClass instanceof DataClassUnion union) {
+                if (!definition.subtypes().isEmpty()) {
+                    return ownDataOfUnion(name, definition, context, binding, union);
+                }
+                return BindGroupUnionBuilder.reader(name, definition, context, binding, union);
             }
             if (!(boundClass instanceof DataClassRecord descriptor)) {
                 throw new BindMismatchException("'" + name + "' is a record, and " + boundClass.typeClass().getName()
@@ -112,10 +117,14 @@ final class BindRecordBuilder implements RecordBuilder {
     /** The component §4.3 leaves empty -- JSON carries no annotations -- or null where the class has none. */
     private final DataClassField carrier;
 
+    /** What makes the bound class of the constructed data form, or null where the class is its own. */
+    private final DataClassBridge bridge;
+
     private BindRecordBuilder(DataClassRecord descriptor, int[] argument) {
         this.descriptor = descriptor;
         this.argument = argument;
         this.carrier = descriptor.annotationsCarrier().orElse(null);
+        this.bridge = descriptor.bridge().orElse(null);
     }
 
     /** The class this builds, for a caller checking a component against it. */
@@ -139,15 +148,24 @@ final class BindRecordBuilder implements RecordBuilder {
             }
         }
         try {
-            return descriptor.constructor().invoke(arguments);
+            // A bridged class (`ToData`, `@Transparent` over a record) constructs its data form, which the bridge
+            // makes the class of: what this builds is always the bound class itself.
+            Object built = descriptor.constructor().invoke(arguments);
+            return bridge == null ? built : bridge.toObject().invoke(built);
         } catch (Throwable e) {
-            // The class's own rule refusing the values -- a compact constructor's check, most often -- which is
-            // a fact about this document and not a fault in this library.
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "%s rejected the value read for it: %s"
-                    .formatted(descriptor.typeClass().getSimpleName(), e), "a value "
-                    + descriptor.typeClass().getSimpleName() + " accepts", String.valueOf(e.getMessage()));
+            rejected(ctx, descriptor.typeClass(), e);
             return null;
         }
+    }
+
+    /**
+     * A bound class's own rule refusing the values read for it -- a compact constructor's check, most often, or a
+     * bridge's -- which is a fact about this document and not a fault in this library.
+     */
+    static void rejected(JsonReadContext ctx, Class<?> type, Throwable e) {
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "%s rejected the value read for it: %s"
+                .formatted(type.getSimpleName(), e), "a value " + type.getSimpleName() + " accepts",
+                String.valueOf(e.getMessage()));
     }
 
     @Override

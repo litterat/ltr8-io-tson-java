@@ -163,15 +163,6 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   second parse. Bind mode's bridged components (an enum class) answer the component's class, not the wire value,
   so the comparison needs the wire value there.
 
-- [ ] **Bind mode reads every container through its front door, and three `tson-compiler` cases remain.**
-  `JsonObjectReader.withSchema(uri).readAs(...)` reads every container, the atoms and the dispatchers into bound
-  classes, checked against the schema at compile (`BIND_MISMATCH`) with a missing binding deferred to first read.
-  Measured against `tson-compiler`'s bind mode, what is owed:
-  - **A single-group record bound to a sealed interface of labelled alternatives** (`GroupUnionBindReader`): the
-    compile refuses the interface today as not record-shaped.
-  - **A bridge on a structured component** (`ElementBridging.wrap`): only an atom component's bridge is applied.
-  - **The `value` slot**, which reads to its own host types and is not bound to a component (`rebindValueIfNeeded`).
-
 - [ ] **`tson-compiler`'s readers adopt the JSON dispatch design once it settles.** `RecordTagDispatchReader`,
   `RecordMemberDispatchReader`, `Subsumption.dispatching`, `AbstractTemplateReader` and the choice's
   `NamedDispatchReader` still select by name at read time, and a concrete record reader still accepts a tag

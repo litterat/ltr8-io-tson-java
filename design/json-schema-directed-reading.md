@@ -256,6 +256,19 @@ also admits an implementation of an open member), so a tag the dispatcher follow
 position can hold. `tson-compiler` checks membership on every read instead; with the subtype's class known at
 compile, the check can be made once.
 
+**A record with no subtypes binds to a union only as a labelled choice** (`BindGroupUnionBuilder`): one REQUIRED
+group over every field, each member of the sealed interface a record whose one component's wire name is the field
+it labels — the kernel's `type_argument`, `{ ( name: type_ref | value: value ) }`, is the shape. The present field
+is the discriminator, so the record is read by the ordinary loop, the group rule admits exactly one member, and the
+builder constructs the member whose field arrived. Every part of the match is checked at compile; a near-miss is a
+`BindMismatchException` naming it rather than a guess.
+
+**A bound class is always what a record reader builds.** A class with a bridge over a record — `ToData`, or
+`@Transparent` over one — constructs its data form, and `BindRecordBuilder` passes it through the bridge. A
+component whose class is such a wrapper over the class a field's record builds is met in `BindTargets`, which
+carries the record's value through the component's bridge (`BridgedReader.ofRecord`). Bridges exist only on records
+and atoms, so these two cases are the whole of a structured bridge.
+
 **One loop, not one per shape.** A plain loop for records with no default, pin or group was built and measured, and
 cost the same per record; the per-field branch it saved is a predictable switch on the field state. A loop per
 shape would multiply by the modes, so a split waits for a timing benchmark that shows it pays.
@@ -280,13 +293,15 @@ unmodifiable `Map`; a record field declaring `long[]`, `List<Long>`, `Set<UUID>`
 `Map<LocalDate, BigDecimal>` reads the same position again for that class. A tuple binds by its component and not
 by its schema name for a reason: an inline tuple's entry name is minted, and no binding map can hold it.
 `BindTargets` is the one place that meets a component: an atom is bound to the component's class
-(`AtomReader.boundTo`, through its bridge); an array, tuple or map is rebuilt over the component's own class with
-each element, position, key and value bound in turn; and a record — bound by its own schema name — is checked
-against the component's class. Every disagreement is collected into the record's one `BindMismatchException`: a
-container bound to a component of another shape, an element, key or value the family cannot produce, a tuple class
-of another arity, an optional element `[T?]` bound to a primitive array with nowhere to put the absence. So
-`tson-compiler`'s gap is closed here rather than copied: there an element is bridged but read at its family's
-natural class, so a `List<Long>` over `[int32]` would hold `Integer`s.
+(`AtomReader.boundTo`, through its bridge); a `value` slot is read as the component's class
+(`ValuePositionReader.boundTo`: the natural boolean, number or string where the class holds it, a numeric
+narrowing, else the built-in atom producing that class, whose refusal is the verdict); an array, tuple or map is
+rebuilt over the component's own class with each element, position, key and value bound in turn; and a record —
+bound by its own schema name — is checked against the component's class. Every disagreement is collected into the
+record's one `BindMismatchException`: a container bound to a component of another shape, an element, key or value
+the family cannot produce, a tuple class of another arity, an optional element `[T?]` bound to a primitive array
+with nowhere to put the absence. So `tson-compiler`'s gap is closed here rather than copied: there an element is
+bridged but read at its family's natural class, so a `List<Long>` over `[int32]` would hold `Integer`s.
 
 ### Discrimination: one condition, and the table is built at schema load
 

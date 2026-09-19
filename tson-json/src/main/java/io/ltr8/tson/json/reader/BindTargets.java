@@ -26,7 +26,10 @@ import java.util.Optional;
  *   <li><b>A map</b> is read again for the target's own map class, its keys and values bound to the class's.</li>
  *   <li><b>A tuple</b> is read again for the target's own tuple class, each position bound to its element.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
- *       nothing is rebuilt.</li>
+ *       nothing is rebuilt -- except where the target is a bridged wrapper over that class ({@code ToData}, or
+ *       {@code @Transparent} over a record), which the record's value is carried through.</li>
+ *   <li><b>A {@code value} slot</b> is read as the target's wire class ({@link ValuePositionReader#boundTo}),
+ *       and through its bridge where it has one.</li>
  * </ul>
  * Anything else -- a dispatcher, a choice, a gap -- is read as it is.
  */
@@ -56,8 +59,16 @@ final class BindTargets {
                 return reader;
             }
             return bound.bridge().isPresent()
-                    ? new BridgedReader(atTarget.get(), bound.bridge().get(), bound.typeClass())
+                    ? BridgedReader.ofAtom(atTarget.get(), bound.bridge().get(), bound.typeClass())
                     : atTarget.get();
+        }
+        if (reader instanceof ValuePositionReader value) {
+            // What `value` decodes to is the component's own choice, so there is nothing for it to disagree with:
+            // a class no built-in produces takes the natural value and its constructor decides.
+            ValuePositionReader bound = value.boundTo(target.dataClass());
+            return target.bridge().isPresent()
+                    ? BridgedReader.ofAtom(bound, target.bridge().get(), target.typeClass())
+                    : bound;
         }
         if (reader instanceof ArrayReader array) {
             if (!(target instanceof DataClassArray collection)) {
@@ -81,9 +92,15 @@ final class BindTargets {
             }
             return BindTupleBuilder.forTarget(tuple, positional, what, mismatches);
         }
-        if (reader instanceof RecordReader record && record.builder() instanceof BindRecordBuilder bound
-                && !target.typeClass().isAssignableFrom(bound.typeClass())) {
-            mismatches.add(what + " binds " + bound.typeClass().getName() + ", which " + where + " ("
+        if (reader instanceof RecordReader record && record.builder() instanceof BindRecordBuilder bound) {
+            Class<?> built = bound.typeClass();
+            if (target.typeClass().isAssignableFrom(built)) {
+                return reader;
+            }
+            if (target.bridge().isPresent() && target.dataClass().isAssignableFrom(built)) {
+                return BridgedReader.ofRecord(reader, target.bridge().get(), target.typeClass());
+            }
+            mismatches.add(what + " binds " + built.getName() + ", which " + where + " ("
                     + target.typeClass().getName() + ") cannot hold");
         }
         return reader;
