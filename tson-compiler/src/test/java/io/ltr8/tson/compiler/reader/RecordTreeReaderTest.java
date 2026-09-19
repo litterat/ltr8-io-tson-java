@@ -18,6 +18,8 @@ import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonRecord;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -28,6 +30,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -280,6 +284,28 @@ class RecordTreeReaderTest {
 
         ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: 7 }"));
         assertTrue(thrown.getMessage().contains("fixed to absent"), thrown.getMessage());
+    }
+
+    /**
+     * At {@code = _} a written {@code _} is the field's one value, and [TSON-DATA] §2.9 makes it present with an
+     * absent value, distinct from omission -- so the tree keeps it, as it does at an OPTIONAL field. So does a
+     * valued OPTIONAL_FIXED, which admits {@code _} as its absence.
+     */
+    @Test
+    void anOptionalFixedFieldWrittenAsTheSentinelIsPresent() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.OPTIONAL_FIXED, null)));
+
+        assertFalse(record(compiled, "{}").fields().containsKey("value"));
+        assertInstanceOf(TsonAbsent.class, record(compiled, "{ value: _ }").get("value"));
+
+        TsonCompiledSchema valued = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.OPTIONAL_FIXED, "7")));
+        assertInstanceOf(TsonAbsent.class, record(valued, "{ value: _ }").get("value"));
+    }
+
+    private static TsonRecord record(TsonCompiledSchema compiled, String source) {
+        return (TsonRecord) compiled.get("point").read(TestDocuments.document(source, DiagnosticsReceiver.throwing()));
     }
 
     @Test

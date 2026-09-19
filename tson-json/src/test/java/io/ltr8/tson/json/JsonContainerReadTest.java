@@ -35,6 +35,7 @@ class JsonContainerReadTest {
                 tries:    int32 ~ 0
                 kind:     text = "person"
                 badge:    text? = "gold"
+                retired:  text? = _
               }
 
               bounded => {
@@ -182,6 +183,13 @@ class JsonContainerReadTest {
     void anOmittedOptionalFixedMemberStaysAbsent() {
         assertTrue(json(read("person", """
                 {"name": "Ada"}""").accepted()).indexOf("badge") < 0, "OPTIONAL_FIXED is not injected");
+    }
+
+    /** {@code = _}: null is the member's one value and presence is what it carries, so it is kept. */
+    @Test
+    void anAbsentFixedMemberWrittenNullIsKept() {
+        assertTrue(json(read("person", """
+                {"name": "Ada", "retired": null}""").accepted()).contains("\"retired\":null"));
     }
 
     /** §6.1.2: at REQUIRED_DEFAULT the fix is omission -- writing null disclaims a value the schema always fills. */
