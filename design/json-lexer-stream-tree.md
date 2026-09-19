@@ -187,6 +187,12 @@ conversions (`asString`/`asInt`/`asLong`/`asDouble`/`asBoolean`/`asMap`/`asList`
 `Json.parse`/`Json.toDisplayString`. `Json.parse` reduces a `JsonEventSource` and holds no grammar; both
 `String` and `InputStream` overloads exist, and the `InputStream` one is where §3.1's rules actually bite.
 
+**A `JsonObject` copies the map it is given, except a `JsonObject.Builder`'s.** The record's constructor is its
+only way in, so it takes a defensive copy — and a reader building a tree would pay for two maps per object. The
+builder's map is of a private type only the builder creates, and the builder refuses use after `build()`, so
+the constructor can take that one as it is without anything else being able to reach it. Every reader that
+assembles objects uses it.
+
 **Three divergences from JEP 540, each with a reason.**
 
 1. **No source position on a node.** JEP 540 reports a navigation failure with "Location: line 13,

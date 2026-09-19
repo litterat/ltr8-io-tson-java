@@ -12,9 +12,7 @@ import io.ltr8.tson.json.tree.JsonString;
 import io.ltr8.tson.json.tree.JsonValue;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Reduces an event source into a {@link JsonValue} tree -- the engine {@code JsonTreeReader} is a facade
@@ -73,11 +71,11 @@ public final class SchemalessTreeReader {
      * category. JEP 540 calls it a parse error for want of anywhere else to put it; this has somewhere.
      */
     private JsonValue readObject(JsonReadContext ctx) {
-        Map<String, JsonValue> members = new LinkedHashMap<>();
+        JsonObject.Builder members = JsonObject.builder(8);
         while (true) {
             JsonEvent event = ctx.next();
             if (event instanceof JsonEvent.ObjectEnd) {
-                return new JsonObject(members);
+                return members.build();
             }
             if (!(event instanceof JsonEvent.MemberName name)) {
                 throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);

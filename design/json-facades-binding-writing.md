@@ -278,13 +278,14 @@ finding everything is the point**: a reader that threw could only report the fir
 sender fixing a document one round trip per mistake is the failure mode diagnostics exist to avoid.
 
 `JsonReadContext` is what carries it — the peer of `TsonReadContext`, holding no error policy of its own.
-It tracks the position and builds the RFC 6901 pointer by *stepping* (`field(name)`/`index(i)` return a
-context one link deeper) rather than concatenating, since concatenating per step is quadratic in depth and
-thrown away by every read that reports nothing. One context serves both engines, and the schemaless bind read
-uses the smaller half of it: no schema end (the class is the schema, and a class has no document to
-point into; a schema-directed read carries a `JsonSchemaLocation`), and no lookahead (the engine pulls a value's
-opening event and passes it down, where a schema-directed record read rewinds through `lookingAhead` to recognise
-an annotation object). The context also carries the read's identifier policy (`identifierPolicy()`), which
+It tracks the position and builds both RFC 6901 pointers by *stepping* (`field(name)`/`index(i)`, and
+`schemaField` for the schema end, return a context one link deeper) rather than concatenating, since
+concatenating per step is quadratic in depth and thrown away by every read that reports nothing — and a
+schema-directed read steps both for every field of every record. A `JsonSchemaLocation` is rendered only when a
+diagnostic is built. One context serves both engines, and the schemaless bind read uses the smaller half of it:
+no schema end (the class is the schema, and a class has no document to point into), and no lookahead (the engine
+pulls a value's opening event and passes it down, where a schema-directed dispatcher peeks at an object's leading
+members through `lookingAhead`). The context also carries the read's identifier policy (`identifierPolicy()`), which
 `DataClassObjectReader.checkNameHygiene` and `reader.NameHygiene` judge names under
 (`design/json-unicode-policies.md`).
 
