@@ -36,8 +36,9 @@
  * writer -- never a token, a parser or an engine. <b>Their types carry no {@code Json} prefix</b>, which is
  * the same rule as the exported packages' rather than an exception to it: a prefix earns its keep
  * disambiguating a name a consumer writes, and nothing here is reachable from outside this module. The
- * schema-directed readers are named mode first ({@code TreeRecordReader}, {@code TreeMapObjectReader}), so a
- * second read mode lands beside its peer rather than at the other end of a listing.
+ * schema-directed readers that differ by mode are named mode first ({@code TreeMapObjectReader},
+ * {@code TreeRecordBuilder}), so a second read mode lands beside its peer rather than at the other end of a
+ * listing; the ones that do not ({@code RecordReader}, {@code DispatchTagReader}) carry no mode.
  */
 module io.ltr8.tson.json {
     exports io.ltr8.tson.json;

@@ -3,6 +3,8 @@ package io.ltr8.tson.json;
 import io.ltr8.tson.json.reader.*;
 import io.ltr8.tson.json.reader.ValueReaderFactory;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.base.BindMismatchException;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
@@ -90,6 +92,15 @@ public final class JsonSchemaCompiler {
                 JsonTypeReader<?> built;
                 try {
                     built = build(name, definition);
+                } catch (MissingBindingException e) {
+                    // A type with no class at all is deferred, not fatal: a schema declares types a given consumer
+                    // never binds, and failing the compile for those would make bind mode unusable. It reaches
+                    // the first read of this type still saying what it is (ErrorReader rethrows it).
+                    built = new ErrorReader(name, e);
+                } catch (BindMismatchException e) {
+                    // Not a gap: a wiring mistake between the schema and the caller's own classes, and deferring
+                    // it to the first document that happens to have this type is what makes it expensive to find.
+                    throw e;
                 } catch (RuntimeException e) {
                     built = new ErrorReader(name, e);
                 }

@@ -1,6 +1,7 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 
@@ -27,8 +28,18 @@ public final class ErrorReader implements JsonTypeReader<Object> {
         this.cause = cause;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p><b>A missing binding passes through as itself, and throws.</b> A type the caller never mapped to a class
+     * is the reading application's own wiring -- neither this library's gap nor a problem with the document --
+     * so it reaches that application as itself in every mode, as {@code tson-compiler}'s bind mode does.
+     */
     @Override
     public Object read(JsonReadContext ctx) {
+        if (cause instanceof MissingBindingException missing) {
+            throw missing;
+        }
         ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, "'" + name + "' has no usable compiled reader -- the schema "
                 + "itself compiled fine, but nothing here can read a JSON value against this type: "
                 + cause.getMessage(), "a type this encoding can read", "");

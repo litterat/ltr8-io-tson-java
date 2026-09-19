@@ -1,23 +1,25 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.bind.DataBindContext;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 
 /**
- * A {@code constructor name -> ValueReaderFactory} table, one per read mode. {@link #tree()} is the one
- * instance today; bind mode joins it over the same containers.
+ * A {@code constructor name -> ValueReaderFactory} table, one per read mode: {@link #tree()} and
+ * {@link #bind(DataBindContext)}.
  *
  * <p><b>The atom factories are shared and only the wrapper differs.</b> An atom reader produces its family's
  * natural host value whichever mode is compiling, so tree mode wraps each leaf to yield the node the document
- * carried instead ({@link TreeAtomReader}) and changes nothing about what was parsed or refused. The modes
- * genuinely diverge at the containers, which is why the split arrives with [TSON-JSON] §6.
+ * carried instead ({@link TreeAtomReader}) and changes nothing about what was parsed or refused, and bind mode
+ * leaves it bare for a record to bind to a component.
  *
  * <p><b>What places a value is shared too.</b> A record family's dispatchers ({@link DispatchFactories}), a
  * family-base template's, and the choice's ({@link DispatchChoiceReader}) select a reader and build nothing,
- * so every mode registers the same ones; only the concrete record reader under {@link DispatchFactories} is the
- * mode's own.
+ * so every mode registers the same ones. So does a concrete record's loop ({@link RecordReader}); what is the
+ * mode's own is the factory that builds it and the {@link RecordBuilder} it hands its slots to.
  *
  * <p><b>An unregistered constructor is a gap, not a fault.</b> {@link #resolve} raises, {@code
  * JsonSchemaCompiler} catches, and the entry becomes a {@link ErrorReader} -- so a schema whose types this
@@ -66,13 +68,30 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      */
     public static ValueReaderFactoryRegistry tree() {
         Map<String, ValueReaderFactory> factories = vocabulary(TreeAtomReader::over);
-        factories.put("record", DispatchFactories.over(TreeRecordReader.FACTORY));
+        factories.put("record", DispatchFactories.over(TreeRecordBuilder.FACTORY));
         factories.put("array", TreeArrayReader.FACTORY);
         // A `set` resolves to an ArrayBody like `array` itself -- refinement never adds or removes a field --
         // so the same factory serves it and the body's own `unique_items` is what separates them.
         factories.put("set_type", TreeArrayReader.FACTORY);
         factories.put("tuple", TreeTupleReader.FACTORY);
         factories.put("map", TreeMapReader.FACTORY);
+        factories.put("choice", DispatchChoiceReader.FACTORY);
+        factories.put("template", DispatchFactories.TEMPLATE);
+        return new ValueReaderFactoryRegistry(Map.copyOf(factories));
+    }
+
+    /**
+     * Bind mode over {@code binding}: a record reads into the class {@code binding} resolves for its schema type,
+     * and an atom into the host value its component holds -- the atom factories unwrapped, each family reading
+     * to its natural host value until a record binds it to a component. The dispatchers are the same as tree
+     * mode's, placing a value and building nothing.
+     *
+     * <p>Records only, so far: an array, tuple or map position has no bind reader yet and compiles to a gap
+     * ({@link ErrorReader}), so a bound record with a container field reads that field as {@code NOT_IMPLEMENTED}.
+     */
+    public static ValueReaderFactoryRegistry bind(DataBindContext binding) {
+        Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
+        factories.put("record", DispatchFactories.over(BindRecordBuilder.factory(binding)));
         factories.put("choice", DispatchChoiceReader.FACTORY);
         factories.put("template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));

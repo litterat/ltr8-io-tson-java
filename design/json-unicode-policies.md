@@ -42,9 +42,9 @@ in a schema-directed JSON read, and it is why the check cannot simply be dropped
 **A rest key is a map key, not a name.** §6.2 collects unmatched members into the rest map, parsed by its key
 type; §9.4 puts map keys under the *token* policy, which defaults to `unrestricted()`. So the order matters —
 declared fields, then rest collection, then hygiene; §6.2's flatten is not built (`BACKLOG.md`), so
-`TreeRecordReader` goes from declared fields straight to hygiene — and a converted schema's `@rest` tail is what keeps
-ordinary foreign JSON from meeting an identifier rule at all. That is the on-ramp working as intended, not a
-hole: the names in a rest map were never declared, so nothing about them is a name.
+the record loops go from declared fields straight to hygiene (`RecordPlan.unmatched`) — and a converted schema's
+`@rest` tail is what keeps ordinary foreign JSON from meeting an identifier rule at all. That is the on-ramp
+working as intended, not a hole: the names in a rest map were never declared, so nothing about them is a name.
 
 **A JSON tree read with no schema applies neither policy.** There is no Class 1 in this encoding (§1.3
 principle 1, §1.5) — a JSON document with no binding is just JSON, and its member names are data. Judging

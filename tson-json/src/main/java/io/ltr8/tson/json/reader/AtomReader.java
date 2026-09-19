@@ -13,6 +13,8 @@ import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
+import java.util.Optional;
+
 /**
  * Reads one atom-typed position: [TSON-JSON] §5, which is one rule and a per-family table of admitted JSON
  * kinds. The kind is checked, its content handed to the family's own {@link AtomType} from {@code tson-atom},
@@ -77,6 +79,15 @@ final class AtomReader<T> implements JsonTypeReader<T> {
         AtomType<?> parser = AtomParsers.forType(name, definition.body()).orElseThrow(() -> new IllegalStateException(
                 "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
         return new AtomReader<>(name, parser, AtomForm.of(definition.body()), context.locationOf(name, definition));
+    }
+
+    /**
+     * This position reading into {@code target} -- the same family, form and diagnostics, with the family's
+     * parser bound to what a component holds ({@link AtomType#boundTo}). Empty where the family never produces
+     * that class, which is a disagreement between a schema and a bound class, found before any document.
+     */
+    Optional<AtomReader<?>> boundTo(Class<?> target) {
+        return parser.boundTo(target).map(bound -> new AtomReader<>(name, bound, form, schemaLocation));
     }
 
     @Override
