@@ -53,6 +53,10 @@ class JsonBindRecordReadTest {
               shape   => @abstract { area: int32 }
               square  => shape & { side: int32 }
               unbound => { value: text }
+              animal  => { name: text }
+              dog     => animal & { breed: text }
+              cat     => animal & { indoor: boolean }
+              owner   => { pet: animal }
             }
             """;
 
@@ -68,10 +72,23 @@ class JsonBindRecordReadTest {
     public record Square(int area, int side) implements Shape {
     }
 
+    public sealed interface Animal permits Dog, Cat {
+    }
+
+    public record Dog(String name, String breed) implements Animal {
+    }
+
+    public record Cat(String name, boolean indoor) implements Animal {
+    }
+
+    public record Owner(Animal pet) {
+    }
+
     private static final TsonLinkedSchema LINKED = Tson.standard().resolve(SCHEMA);
 
     private static final Map<String, Class<?>> BINDINGS = Map.of(
-            "address", Address.class, "person", Person.class, "square", Square.class);
+            "address", Address.class, "person", Person.class, "square", Square.class,
+            "animal", Animal.class, "dog", Dog.class, "cat", Cat.class, "owner", Owner.class);
 
     private static JsonCompiledSchema compile(Map<String, Class<?>> bindings) {
         DataBindContext binding = DataBindContext.builder().nameBinder(DataNameBinder.ofMap(bindings))
@@ -191,5 +208,50 @@ class JsonBindRecordReadTest {
     void aTypeWithNoBoundClassCompilesAndThrowsWhenRead() {
         assertThrows(MissingBindingException.class, () -> read("unbound", """
                 {"value": "x"}"""));
+    }
+
+    // ── An OPEN record family bound to a sealed interface ───────────────
+
+    /** The record has no class of its own to build: a tag places the value at a subtype's class. */
+    @Test
+    void aTaggedValueAtARecordBoundToAUnionBindsTheSubtype() {
+        Read read = read("animal", """
+                {"$type": "dog", "name": "Rex", "breed": "corgi"}""");
+        assertEquals(List.of(), read.problems());
+        assertEquals(new Dog("Rex", "corgi"), read.value());
+    }
+
+    @Test
+    void aFieldTypedByTheRecordHoldsTheSubtype() {
+        Read read = read("owner", """
+                {"pet": {"$type": "cat", "name": "Tom", "indoor": true}}""");
+        assertEquals(List.of(), read.problems());
+        assertEquals(new Owner(new Cat("Tom", true)), read.value());
+    }
+
+    /** Untagged, or tagged with the record itself, the value is the record's own -- and it has none. */
+    @Test
+    void anUntaggedValueHasNothingToBindTo() {
+        for (String json : List.of("""
+                {"name": "Rex"}""", """
+                {"$type": "animal", "name": "Rex"}""")) {
+            Read read = read("animal", json);
+            assertNull(read.value());
+            assertEquals(Diagnostic.Code.TYPE_MISMATCH, read.problems().getFirst().code());
+            assertTrue(read.problems().getFirst().message().contains("no data of its own"),
+                    read.problems().getFirst().message());
+        }
+    }
+
+    public record Stray(String name, boolean indoor) {
+    }
+
+    /** A subtype's class that is not a member of the union is found at compile, not by the document that tags it. */
+    @Test
+    void aSubtypeWhoseClassIsNotAMemberFailsTheCompile() {
+        Map<String, Class<?>> bindings = new java.util.HashMap<>(BINDINGS);
+        bindings.put("cat", Stray.class);
+        BindMismatchException e = assertThrows(BindMismatchException.class, () -> compile(bindings));
+        assertTrue(e.getMessage().contains("subtype 'cat' binds"), e.getMessage());
     }
 }

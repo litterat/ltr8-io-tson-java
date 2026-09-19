@@ -248,6 +248,15 @@ deferred (`MissingBindingException`), since a schema declares types a given cons
 rethrows it when that type is first read. JSON carries no annotations (§4.3), so an annotations carrier component
 is filled with none.
 
+**An OPEN record with subtypes may bind to a union** — a sealed interface whose implementations are the subtypes'
+classes, the natural Java shape for a family. The record has no class of its own to build, so the bind factory
+returns, in place of a concrete reader, one that refuses an untagged value (or one tagged with the record itself) as
+having no data of its own; the dispatcher in front of it sends every tag naming a subtype to that subtype's class.
+Each subtype's class is checked against the union when the reader is built (`DataClassUnion.isMemberType`, which
+also admits an implementation of an open member), so a tag the dispatcher follows always lands on a class the
+position can hold. `tson-compiler` checks membership on every read instead; with the subtype's class known at
+compile, the check can be made once.
+
 **One loop, not one per shape.** A plain loop for records with no default, pin or group was built and measured, and
 cost the same per record; the per-field branch it saved is a predictable switch on the field state. A loop per
 shape would multiply by the modes, so a split waits for a timing benchmark that shows it pays.
