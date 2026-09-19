@@ -70,7 +70,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aSealedRecordTemplateMayBeNamedToo() {
         assertEquals(List.of(), validate("t3", """
-                  pet    => <T, V> { @discriminator type: text = T  value: V }
+                  pet    => <T, V> { type: text = T  value: V }
                   holder => { p: pet }
                 """));
     }

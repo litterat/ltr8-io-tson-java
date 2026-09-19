@@ -42,7 +42,7 @@ class JsonAliasTagReadTest {
               square => shape & { side: int32 }
               sq_of  => square
 
-              pet    => @sealed { @discriminator pet_type: text }
+              pet    => @abstract { pet_type: text =? }
               dog    => pet & { pet_type: = "dog"  bark: text }
               dog_of => dog
 

@@ -61,7 +61,7 @@ class TemplateParentExtensionTest {
     @Test
     void aLabelledSumIsSealed() {
         assertEquals(Optional.of(RecordExtensionType.SEALED),
-                parentOf("p2", "  pet => <T, V> { @discriminator type: text = T  value: V }\n", "pet"));
+                parentOf("p2", "  pet => <T, V> { type: text = T  value: V }\n", "pet"));
     }
 
     /** A composition template holds its flattened body, and the parent is derived over that. */
@@ -99,7 +99,7 @@ class TemplateParentExtensionTest {
      */
     @Test
     void aDiscriminatorTypedByAParameterIsRefused() {
-        String refusal = refusal("p7", "  bad => <K, V> { @discriminator kind: K  v: V }\n");
+        String refusal = refusal("p7", "  bad => <K, V> { kind: K =?  v: V }\n");
 
         assertTrue(refusal.contains("discriminator field 'kind'"), refusal);
         assertTrue(refusal.contains("typed by the type parameter 'K'"), refusal);

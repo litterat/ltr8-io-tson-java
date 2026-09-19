@@ -263,9 +263,10 @@ final class WireForm {
      * instances (nothing can write a value whose type is the template rather than one of its applications)
      * and its applications being subtypes by construction.
      *
-     * <p><b>Derived rather than stated</b>, in the manner of {@code choice.disjoint}, which is what keeps it
-     * clear of the author's {@code @abstract} mark: that mark is the <em>instantiation's</em> fact and rides
-     * inside this same payload as {@code extension}, so the two levels never collide.
+     * <p><b>Derived rather than stated</b>, in the manner of {@code choice.disjoint}: SEALED is ABSTRACT with
+     * at least one discriminator, which is a fact of the body. The author's {@code @abstract} mark is the
+     * <em>instantiation's</em> and rides inside this same payload as {@code extension}, so the two levels
+     * never collide.
      *
      * <p><b>Read from the structure the resolver just built, never from the text.</b> The payload is in hand
      * before it is written out, so this parses nothing -- which is the property §1.3 rests on, a
@@ -280,16 +281,13 @@ final class WireForm {
                 || !(application.coreValue() instanceof RecordValue binding)) {
             return Optional.empty();
         }
-        // An `extension` member already in the payload is the author's own mark, spliced by
-        // `heldWithExtension` -- so it wins over the derivation below. The two agree for every coherent
-        // declaration; where they differ the author has claimed something the body does not support
-        // (`@sealed` with nothing marked, `@abstract` with a discriminator), and recording the claim is what
-        // lets `RecordExtension` refuse it against the fields. Deriving over the top would silently correct
-        // the author instead, which is how `@sealed <T>` came to load clean with no family check at all.
-        String stated = memberToken(binding, EXTENSION);
+        // Derived, and the author's own `@abstract` does not override it: the mark says the base has no
+        // direct instances, which every record template's base has anyway, and whether the members are
+        // selected by a tag or by their pins is the body's own fact. An `extension` member in the payload is
+        // the *instantiation's* (spliced by `heldWithExtension`), and only FINAL could disagree with the
+        // derivation -- which `withExtension` refuses on a template before it reaches here.
         boolean sealed = !parentDiscriminators(binding, parameters).isEmpty();
-        return Optional.of(stated != null ? RecordExtensionType.valueOf(stated)
-                : sealed ? RecordExtensionType.SEALED : RecordExtensionType.ABSTRACT);
+        return Optional.of(sealed ? RecordExtensionType.SEALED : RecordExtensionType.ABSTRACT);
     }
 
     /**

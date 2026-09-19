@@ -521,6 +521,11 @@ public final class TsonSchemaParser extends TsonDataParser {
         advance();
 
         FieldDef.Modifier.Value value;
+        if (kind == FieldDef.Modifier.Kind.FIXED && check(TokenType.QUESTION)) {
+            // `=?`: pinned by the members rather than here -- the discriminator spelling (§5.2).
+            advance();
+            return new FieldDef.Modifier(kind, new FieldDef.Modifier.Value.Deferred());
+        }
         if (check(TokenType.ABSENT)) {
             advance();
             value = new FieldDef.Modifier.Value.Absent();
@@ -530,8 +535,9 @@ public final class TsonSchemaParser extends TsonDataParser {
                 case UNQUOTED -> TokenForm.UNQUOTED;
                 case SINGLE_LINE_STRING -> TokenForm.SINGLE_LINE_QUOTED;
                 case MULTI_LINE_STRING -> TokenForm.MULTI_LINE_QUOTED;
-                default -> throw mismatch("a scalar token or the absent sentinel '_' after '"
-                        + (kind == FieldDef.Modifier.Kind.DEFAULT ? "~" : "=") + "'");
+                default -> throw mismatch(kind == FieldDef.Modifier.Kind.DEFAULT
+                        ? "a scalar token or the absent sentinel '_' after '~'"
+                        : "a scalar token, the absent sentinel '_', or '?' after '='");
             };
             advance();
             value = new FieldDef.Modifier.Value.Literal(recordPosition(new TokenValue(t.text(), form), t.start()));
@@ -560,7 +566,16 @@ public final class TsonSchemaParser extends TsonDataParser {
         List<Annotation> annotations = parseAnnotationList();
         Token name = expectFieldNameToken("a field group member's name");
         expect(TokenType.COLON, "a field group member's ':'");
-        return new GroupDef.Member(annotations, name.text(), parseTypeRef());
+        TypeRef type = parseTypeRef();
+        if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
+            // §5.11: a member is uniformly OPTIONAL and carries no value modifier, so `~`, `=` and `=?` are
+            // parse errors here. Said plainly, because the next token to be read is `|` or `)` and the
+            // failure would otherwise be reported as a malformed group.
+            throw parseError("a field group member takes no value modifier -- §5.11 makes every member "
+                    + "OPTIONAL and gives none of them a default, a pin, or the discriminator mark '=?', "
+                    + "whose field must be REQUIRED");
+        }
+        return new GroupDef.Member(annotations, name.text(), type);
     }
 
     // ── Type References (§5.3, §12.1) ────────────────────────────────────

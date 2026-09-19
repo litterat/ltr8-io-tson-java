@@ -8,7 +8,7 @@ field states, groups, subtraction, and the exception boundary. Current form only
 
 - An annotation on a declaration resolves one hop against the governing meta and nowhere else (§3.3.3); a name that
   misses is a resolver error, the valueless form included. Only the meta-kernel bootstrap skips the check.
-- `@abstract`/`@sealed`/`@final`/`@discriminator` are matched by name and never resolved, and the definition mark is
+- `@abstract`/`@final` are matched by name and never resolved, `=?` is field syntax, and the definition mark is
   applied once, in `resolve`, not inside whichever `resolve*` built the body.
 - A restated field's annotations concatenate over the inherited ones, restatement first — never replacement by name.
 - A modifier-only tightening moves only the mutability axis (`= 0` on an inherited-OPTIONAL field is `OPTIONAL_FIXED`);
@@ -64,26 +64,40 @@ are kept in step deliberately.
   `=>` that land on the `TypeDefinition`, and the ones before the name that land on the entry's key — and
   `SchemaResolver` catches the second set's failures itself, since that loop runs outside the memoized getter
   that catches the first set's.
-- **Four marks are consumed before any of that runs** (`DefinitionMarks`). `@abstract`, `@sealed` and `@final`
-  at a declaration lower into `record.extension`; `@discriminator` on a field lowers into the enclosing
-  `record.discriminators`. None reaches the annotation channel, so one carrier holds each fact and §6's
-  no-hoisting question does not arise. **They are matched by name and never resolved**, which is what reserves
-  them: an ordinary annotation means whatever the governing meta says, and these are taken before the meta is
-  consulted, so a meta-schema cannot give them another meaning — meta.tn declares all four anyway, which is
-  what documents them and reserves the names there too. Each is refused a value, being declared `void`. The
+- **Two marks are consumed before any of that runs** (`DefinitionMarks`). `@abstract` and `@final` at a
+  declaration lower into `record.extension`, and neither reaches the annotation channel, so one carrier holds
+  the fact and §6's no-hoisting question does not arise. **They are matched by name and never resolved**,
+  which is what reserves them: an ordinary annotation means whatever the governing meta says, and these are
+  taken before the meta is consulted, so a meta-schema cannot give them another meaning — meta.tn declares
+  both anyway, which documents them and reserves the names there too. Each is refused a value, being declared
+  `void`. `@sealed` and `@discriminator` were the earlier spelling of two facts the body now carries and are
+  refused wherever they are written.
+- **A selector is field syntax, `=?`** (`FieldModifiers`), and the record it is written in is the family base:
+  the field stays REQUIRED and unpinned — §5.7's identity diagonal forbids a base pinning what its members
+  each pin differently — and its name lowers into the enclosing `record.discriminators`. **The declaration
+  must carry `@abstract`**, since instantiability is not derivable from a field; that the family is
+  member-dispatched rather than tag-dispatched *is* derived, being whether any field carries the spelling.
+  SEALED is that derivation (ABSTRACT plus a non-empty `discriminators`), in the manner of `choice.disjoint`.
+  A group member cannot be a selector: §5.11 makes a value modifier a parse error there.
+- **A template derives its selectors from parametric pins too** (`SchemaDesugarer.parametricallyPinned`). In
+  a *fresh* record template a field pinned to a value parameter takes one value per application, which is one
+  per member, so `<T, V> { type: text = T  value: V }` is a labelled sum with no mark written. A field whose
+  declared *type* is a parameter is passed over — nothing could read it before dispatch — and a refinement or
+  composition template derives none: `array ^ { element_type: = T }` pins a constructor's own facet and
+  states nothing about a family. The
   definition mark is applied in `resolve`, after the body is built and not inside whichever `resolve*` built
   it: a fresh record, a composition and a refinement each mint their own `RecordBody`, and a mark read three
   times is a mark two of them can disagree about — applying it once is also what makes "extensibility is never
   inherited" fall out rather than need stating, a composition's body arriving OPEN from its operands. A mark on
-  a non-record is the author's error. A **template** takes two of the three: `@abstract` and `@sealed` both
-  have a subject — the template's own instantiations, which its `subtypes` holds (next bullet) — while
-  `@final` is a schema error, every application being a subtype of the template by construction, so the claim
+  a non-record is the author's error. A **template** takes `@abstract`, whose subject is the template's own
+  instantiations (its `subtypes`, next bullet), while `@final` is a schema error, every application being a subtype of
+  the template by construction, so the claim
   is false before the author writes anything else. **The mark is spliced into the held body rather than set
   on a `RecordBody`** (`WireForm.heldWithExtension`), because by the time a declaration's annotations are read the body is
   text:
   §5.2's `{ x: T }` is rewritten to `!record { … }` at desugar and a composition or refinement template is held
-  by `holdIfOpen` one phase later, so neither producer has the mark in hand. Stating `extension: ABSTRACT` (or
-  `SEALED`) in that text is enough — materialisation reads the closed body back through the `record` constructor's own
+  by `holdIfOpen` one phase later, so neither producer has the mark in hand. Stating `extension: ABSTRACT` in that text
+  is enough — materialisation reads the closed body back through the `record` constructor's own
   reader, so nothing in the closing path knows the member exists. An open body applying anything but `record`
   has no such member and is refused, named by the constructor it applies. A restated field keeps a
   discriminator it does not repeat, on the annotation-merge rule's own logic below.
@@ -95,9 +109,8 @@ are kept in step deliberately.
   makes that safe is *elimination*: no value is read against the template — a value there is a value of some
   member, selected by a tag or by the discriminators, each member closed with its arguments fixed. A
   container, a reference and a constructor-application template have no such dispatch, carry no `extension`,
-  and stay "not a type until applied". **`@sealed` on a template is accepted** on the same reasoning — the
-  claim's subject is the instantiation set — and lowers into the held body beside `@abstract`; only `@final`
-  is refused, its applications being subtypes by construction. **SEALED does not travel to a member**
+  and stay "not a type until applied". Only `@final` is refused there, its applications being
+  subtypes by construction. **SEALED does not travel to a member**
   (`TemplateMaterialiser.closedExtension`): §5.7 fixation pins the selectors and clears their marks, so a
   member is an ordinary concrete record, where ABSTRACT does travel and is how `@abstract` reaches every
   instantiation. One dispatcher serves both kinds of base — `RecordMemberDispatchReader` takes the selector
@@ -250,10 +263,11 @@ keeps the application itself, so closing mints the edge to `box<text>` and not t
 that is itself an application (`box<inner<T>>` — substitution writes a bound reference through `WireForm.refValue`,
 which spells one carrying arguments in `type_ref`'s record form). **A template may be `@abstract`**, the mark being
 stated in the held body's own text (`extension: ABSTRACT`) and read back by the `record` constructor's reader when the
-body closes, so every instantiation is abstract over the family the edge above builds. **`@sealed` is accepted too** — a
-template carrying `extension` takes part in IS-A and its `subtypes` holds its own instantiations, which is the set the
-claim ranges over — and SEALED does not travel to a member, §5.7 fixation having pinned the selectors and cleared their
-marks. Only `@final` stays a resolver error there: every application is a subtype of the template by construction, so
+body closes, so every instantiation is abstract over the family the edge above builds. **A template is SEALED by
+derivation** where a selector survives
+erasure — a `=?` field, or one pinned to a value parameter — its `subtypes` holding the instantiations the dispatch
+ranges over; and SEALED does not travel to a member, §5.7 fixation having pinned the selectors and cleared them. Only
+`@final` stays a resolver error there: every application is a subtype of the template by construction, so
 the claim is false before an author writes anything else (`SPEC-FEEDBACK.md` #13, correcting #11).
 `OpenOperandCompositionTest` pins the substitutability table, `SubtypeTemplateFamilyTest` the family a base template and
 its subtype templates close into, and `AbstractTemplateFamilyTest` the mark over that family. `DefinitionResolver`'s

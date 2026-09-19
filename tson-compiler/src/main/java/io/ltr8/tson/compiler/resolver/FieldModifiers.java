@@ -39,12 +39,23 @@ final class FieldModifiers {
     }
 
     /**
+     * Whether this field is written {@code =?} -- a discriminator, whose name the enclosing record collects
+     * into {@code record.discriminators}. A group member cannot be one: §5.11 makes a value modifier a parse
+     * error on a member, so the spelling does not reach one, and a member reached by refinement is the
+     * linker's to refuse.
+     */
+    static boolean discriminates(FieldDef field) {
+        return field.modifier().filter(m -> m.value() instanceof FieldDef.Modifier.Value.Deferred).isPresent();
+    }
+
+    /**
      * §5.2's table for one field. {@code optional} is the presence axis -- the entry's own {@code ?}, or
      * (for a tightening entry that restates only a modifier) the state it inherits. {@code parameters} is
      * the enclosing declaration's type-parameter list, empty outside a template.
      *
-     * @throws SchemaValidationException for the three spellings §5.2 rules out: {@code ~ _} on any
-     *     field, {@code = _} on a required one, and a default on an optional one.
+     * @throws SchemaValidationException for the four spellings §5.2 rules out: {@code ~ _} on any
+     *     field, {@code = _} on a required one, a default on an optional one, and {@code =?} on an
+     *     optional one.
      */
     static Resolved of(String fieldName, boolean optional, Optional<FieldDef.Modifier> modifier,
             List<String> parameters) {
@@ -52,6 +63,18 @@ final class FieldModifiers {
             return new Resolved(optional ? FieldState.OPTIONAL : FieldState.REQUIRED, Optional.empty());
         }
         boolean fixed = modifier.get().kind() == FieldDef.Modifier.Kind.FIXED;
+
+        if (modifier.get().value() instanceof FieldDef.Modifier.Value.Deferred) {
+            // `=?`: a discriminator. The field is REQUIRED and unpinned here -- §5.7's identity diagonal
+            // forbids the base pinning what each member pins differently -- and the name is collected into
+            // the enclosing `record.discriminators` by the phase that holds the record.
+            if (optional) {
+                throw new SchemaValidationException("field '" + fieldName + "' is a discriminator ('=?') and "
+                        + "optional -- a selector that may be absent selects nothing, so a discriminator is "
+                        + "REQUIRED (§5.2). Drop the '?'");
+            }
+            return new Resolved(FieldState.REQUIRED, Optional.empty());
+        }
 
         if (modifier.get().value() instanceof FieldDef.Modifier.Value.Absent) {
             // §5.2's sixth spelling, `field: type? = _`: OPTIONAL_FIXED carrying no value at all, so the

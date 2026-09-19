@@ -29,8 +29,9 @@ public record FieldDef(List<Annotation> annotations, String name, Optional<Field
     }
 
     /**
-     * {@code field-modifier = ws ("~" / "=") ws (token / absent)} -- {@code ~} is {@link
-     * Kind#DEFAULT}, {@code =} is {@link Kind#FIXED} (§5.2). The value is a bare token or the
+     * {@code field-modifier = ws ("~" / "=") ws (token / absent) / ws "=" ws "?"} -- {@code ~} is {@link
+     * Kind#DEFAULT}, {@code =} is {@link Kind#FIXED} (§5.2), and {@code =?} is {@link Value.Deferred},
+     * the discriminator spelling. The value is a bare token or the
      * absent sentinel only -- never annotated, never typed, never a container; §12.1 states that no
      * production of the schema grammar uses the full {@code data-value}, and §5.2 restricts modifier values
      * to scalar tokens.
@@ -48,6 +49,15 @@ public record FieldDef(List<Annotation> annotations, String name, Optional<Field
 
             /** {@code = _} -- valid only on an OPTIONAL field (§5.2); {@code ~ _} is always a resolver error. */
             record Absent() implements Value {
+            }
+
+            /**
+             * {@code =?} -- pinned, but not here: this field is a **discriminator**, and each member of the
+             * family pins it (§5.2). The field itself stays REQUIRED and carries no value, §5.7's identity
+             * diagonal forbidding a base from pinning what its subtypes each pin differently; the name
+             * lowers into the enclosing {@code record.discriminators}.
+             */
+            record Deferred() implements Value {
             }
         }
     }

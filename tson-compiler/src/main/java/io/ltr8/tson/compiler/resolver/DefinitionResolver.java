@@ -286,7 +286,7 @@ final class DefinitionResolver {
         }
         resolved = withExtension(declaration, resolved);
         Annotations annotations = annotationsOf(declaration.name(),
-                DefinitionMarks.consumed(declaration.typeDefAnnotations()));
+                DefinitionMarks.consumed(declaration.name(), declaration.typeDefAnnotations()));
         return annotations.isEmpty() ? resolved : resolved.withAnnotations(annotations);
     }
 
@@ -346,9 +346,15 @@ final class DefinitionResolver {
                     + "': only a record states how it may be realised -- this entry's body is "
                     + resolved.body().getClass().getSimpleName() + " ([TSON-SCHEMA] §5.2)");
         }
+        // ABSTRACT with at least one discriminator is SEALED, derived here rather than marked: `@sealed` was
+        // the earlier spelling of a fact the body already carries (§5.2).
+        RecordExtensionType member = extension.get() == RecordExtensionType.ABSTRACT
+                && !record.discriminators().isEmpty()
+                        ? RecordExtensionType.SEALED
+                        : extension.get();
         return new TypeDefinition(resolved.source(), resolved.kind(), resolved.supertypes(),
                 resolved.subtypes(), new RecordBody(record.supertypes(), record.fields(), record.groups(),
-                        extension.get(), record.discriminators()), resolved.position(), resolved.annotations());
+                        member, record.discriminators()), resolved.position(), resolved.annotations());
     }
 
     /**
@@ -1775,24 +1781,21 @@ final class DefinitionResolver {
      * {@link SchemaDesugarer} collects the same names for a
      * declaration-position body, which reaches this resolver as a {@code record} payload rather than here.
      *
-     * <p>A mark on a group member is collected rather than dropped, so the linker can refuse it: §5.11 makes a
-     * member uniformly OPTIONAL, and a selector that may be absent selects nothing.
+     * <p>A group member cannot be written one: §5.11 makes a value modifier a parse error on a member, and
+     * {@code =?} is one. A member that acquires the mark by refinement is the linker's to refuse.
      */
     private static List<String> markedNames(List<RecordEntry> entries) {
         List<String> marked = new ArrayList<>();
         for (RecordEntry entry : entries) {
             switch (entry) {
                 case FieldDef field -> {
-                    if (DefinitionMarks.discriminates(field.name(), field.annotations())) {
+                    if (FieldModifiers.discriminates(field)) {
                         marked.add(field.name());
                     }
                 }
-                case GroupDef group -> {
-                    for (GroupDef.Member member : group.members()) {
-                        if (DefinitionMarks.discriminates(member.name(), member.annotations())) {
-                            marked.add(member.name());
-                        }
-                    }
+                case GroupDef ignored -> {
+                    // §5.11 makes a value modifier a parse error on a group member, so `=?` never reaches
+                    // one; a member that acquires the mark by refinement is the linker's to refuse.
                 }
             }
         }
@@ -1956,7 +1959,7 @@ final class DefinitionResolver {
      * erase what it does not mention.
      */
     private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
-        Annotations own = annotationsOf(field.name(), DefinitionMarks.consumed(field.annotations()));
+        Annotations own = annotationsOf(field.name(), DefinitionMarks.consumed(field.name(), field.annotations()));
         // No mark to inherit: which fields a family dispatches on is the *record's* statement
         // (`record.discriminators`), and a member states none of its own.
         return resolveFieldEntry(field, parameters, inherited)
@@ -2198,7 +2201,7 @@ final class DefinitionResolver {
     private RecordField resolveGroupMember(GroupDef.Member member) {
         return new RecordField(member.name(), resolveTypeRef(member.typeRef()), FieldState.OPTIONAL,
                 Optional.empty(),
-                annotationsOf(member.name(), DefinitionMarks.consumed(member.annotations())),
+                annotationsOf(member.name(), DefinitionMarks.consumed(member.name(), member.annotations())),
                 Optional.empty());
     }
 
