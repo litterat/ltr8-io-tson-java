@@ -269,7 +269,7 @@ absent slot (tree mode keeps what it built), the bind builders the target's clas
 reported. The `Slots` markers are the loops' shared vocabulary for what a value cannot carry. A set's
 duplicates are judged on the element's value through `ValueIdentity`, so bind mode, whose elements are host
 values, compares what they decode to. Tree mode's node keeps only a spelling, so a set's atom element is read at
-`TreeAtomReader.keyed`, which answers the node with the parsed value's identity beside it
+`TreeAtomKeyedReader` (chosen by `TreeAtomReader.keyed`), which answers the node with the parsed value's identity beside it
 (`ValueIdentity.Identified`) and the loop unwraps it — two spellings of one instant are one element. A compound
 element or key compares by host equality over what the mode built, which is all any mode can promise
 (`SPEC-FEEDBACK.md` #18).
