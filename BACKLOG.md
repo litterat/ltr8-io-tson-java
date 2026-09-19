@@ -142,15 +142,11 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
   name — so this is a decision to take deliberately, not a gap to close by reflex.
 
-- [ ] **A schema-directed JSON record costs twice a schemaless one, and four fixes outside the readers close most of
-  it.** Measured on the allocation harness's order document: 3,481 bytes per three-field record read against its
-  schema, 1,622 for the schemaless tree read of the same JSON. Each fix below is its own change, measured before
-  and after (`JsonAllocationHarnessTest.aSchemaDirectedRecordReadsWithoutLookingAhead`); the first two sit in
-  shared modules, so the TSON reader gains too.
-  - **`Nfc.of` allocates on every call, ASCII included** (~530 B/record). `Normalizer.isNormalized` builds a
-    buffer whatever the input; an ASCII string is NFC by construction and needs no check. And
-    `TreeRecordReader.assemble` re-normalises the *declared* field names on every record, which the factory can
-    do once.
+- [ ] **A schema-directed JSON record costs twice a schemaless one, and three fixes outside the readers close much
+  of it.** Measured on the allocation harness's order document: about 3,300 bytes per three-field record read
+  against its schema, 1,650 for the schemaless tree read of the same JSON. Each fix below is its own change,
+  measured before and after (`JsonAllocationHarnessTest.aSchemaDirectedRecordReadsWithoutLookingAhead`); the first
+  sits in a shared module, so the TSON reader gains too.
   - **`IntegerParser.read` recomputes its width bounds per value** (~350 B/record with the lambdas).
     `read` calls `hostType(size)`, which rebuilds both bounds with `BigInteger.pow`; `STANDARD_BOUNDS` serves only
     `validate` and `boundTo`, so tree mode's path pays what bind's was fixed for. `validate` also allocates a

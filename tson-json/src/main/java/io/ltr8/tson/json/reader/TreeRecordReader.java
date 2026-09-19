@@ -62,10 +62,17 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue>, ExactReader {
     private final Set<String> selfNames;
 
     private final List<RecordField> fields;
+
+    /** Each field's name as a member name compares and is written -- NFC, computed once rather than per record. */
+    private final String[] names;
+
     private final Map<String, Integer> index;
     private final List<JsonTypeReader<?>> readers;
     private final List<FieldValue> stated;
     private final List<FieldGroup> groups;
+
+    /** Each group's members as field slots, resolved once; a member naming no field of this record is -1. */
+    private final int[][] groupSlots;
 
     /**
      * Whether this record has any field group at all, decided when the schema compiles. §5.11's groups are
@@ -99,18 +106,22 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue>, ExactReader {
         this.hasGroups = !this.groups.isEmpty();
         this.schemaLocation = schemaLocation;
         Map<String, Integer> byName = new LinkedHashMap<>();
+        this.names = new String[fields.size()];
         List<JsonTypeReader<?>> built = new ArrayList<>(fields.size());
         List<FieldValue> values = new ArrayList<>(fields.size());
         for (int i = 0; i < fields.size(); i++) {
             RecordField field = fields.get(i);
             // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule.
-            byName.put(Nfc.of(field.name()), i);
+            names[i] = Nfc.of(field.name());
+            byName.put(names[i], i);
             built.add(context.readers().resolve(field.type().name()));
             values.add(field.value()
                     .map(token -> FieldValue.of(context.schema(), field.type().name(), token))
                     .orElse(null));
         }
         this.index = Map.copyOf(byName);
+        this.groupSlots = groups.stream().map(group -> group.members().stream()
+                .mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray()).toArray(int[][]::new);
         this.readers = List.copyOf(built);
         this.stated = new ArrayList<>(values);
         this.declaredFields = fields.stream().map(RecordField::name).reduce((a, b) -> a + " | " + b).orElse("");
@@ -163,7 +174,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue>, ExactReader {
         Map<String, JsonValue> members = new LinkedHashMap<>();
         for (int i = 0; i < fields.size(); i++) {
             if (values[i] != null) {
-                members.put(Nfc.of(fields.get(i).name()), values[i]);
+                members.put(names[i], values[i]);
             }
         }
         return new JsonObject(members);
@@ -418,19 +429,18 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue>, ExactReader {
      * is enforced. A member written null still counts as present: presence is what a group counts.
      */
     private void validateGroups(JsonReadContext ctx, boolean[] seen) {
-        for (FieldGroup group : groups) {
+        for (int g = 0; g < groupSlots.length; g++) {
             int present = 0;
-            for (String member : group.members()) {
-                Integer at = index.get(Nfc.of(member));
-                if (at != null && seen[at]) {
+            for (int at : groupSlots[g]) {
+                if (at >= 0 && seen[at]) {
                     present++;
                 }
             }
-            String members = String.join(" | ", group.members());
+            FieldGroup group = groups.get(g);
             if (present > 1) {
-                ctx.report(rules.groupAdmitsAtMostOne(members, present));
+                ctx.report(rules.groupAdmitsAtMostOne(String.join(" | ", group.members()), present));
             } else if (group.state() == ElementState.REQUIRED && present == 0) {
-                ctx.report(rules.groupRequiresOne(members));
+                ctx.report(rules.groupRequiresOne(String.join(" | ", group.members())));
             }
         }
     }
