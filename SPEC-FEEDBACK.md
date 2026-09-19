@@ -1748,3 +1748,52 @@ pairs that relates is implementation-defined: a processor detects at least the t
 §7.7 and [TSON-DATA] §2.6's "under a schema" sentence take the same qualifier for compound key types. A schema
 author who needs portable duplicate detection over a compound key then knows to key by an atom — a derived
 identifier or a canonical string — which is the only identity every encoding and every host can agree on.
+
+## 19. A schema the processor cannot obtain has no outcome, and the one the category rule gives it is a verdict
+
+**Documents:** [TSON-DATA] §8.1 (the four categories, "one severity", the fifth outcome); [TSON-SCHEMA] §10.1 (the
+schema library, "the resolver reports an error"), §10.2 (a pin mismatch "is a resolver error"), §11.2 (fetch
+policy); [TSON-JSON] §9.4.
+**Kind:** underspecification — a common processing result that §8.1's closed set of outcomes does not name, so
+the category rule assigns it one that says the wrong thing. **The interpretation is running; the resolution is a
+proposal.**
+
+**What the spec says.** §10.1: when a `!!schema`, `!!meta` or `!!import` reference is not in the library, "the
+resolver reports an error — it does not attempt to fetch". No category is named, so §8.1's rule applies — "the
+layer that detects the violation determines the category" — and the resolver detected it. §8.1 also closes the
+set: a conforming processor "has one severity", every required diagnostic is one of four categories, and the only
+exception is the fifth outcome, a refusal. So a document whose schema this processor does not hold is, read
+literally, a document with a resolver error: **invalid**.
+
+**That verdict is false, and §8.1's own reasoning for refusals says why.** A refusal is a fifth outcome because
+"the same document may be well-formed, valid, and accepted in full by the next processor along". A missing schema
+is exactly that case, more plainly than a name-hygiene refusal is: nothing has read the schema, so nothing is
+known about whether the document conforms to it, and a processor whose library holds it will accept the document
+unchanged. A consumer routing on the category — "resolver error: repair the document and resend" — repairs a
+document that is not wrong. The same holds when fetching is enabled (§11.2) and fails: the host is not on the
+allow-list, the location has nothing there, the network is down, the response is too large.
+
+**The case the spec does settle shows where the line is.** §10.2 makes a pin mismatch a resolver error, and that
+one is right: the schema *was* obtained, its bytes were read, and they are not the bytes the document's reference
+commits to. That is a finding about the reference the document carries. What is unsettled is only the case where
+nothing was obtained to find anything about.
+
+**Interpretation chosen:** not obtaining a schema is **not a verdict**. Each fetch outcome has its own code —
+`SCHEMA_NOT_PERMITTED` (§11.2's policy said no), `SCHEMA_NOT_FOUND`, `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT`,
+`SCHEMA_TOO_LARGE` — and `Diagnostic.Code.verdict()` answers `false` for all five, beside `LIMIT_EXCEEDED`,
+the §9.1 refusal. They ride in the same report as everything else, located at the reference, so a document with
+both a missing import and an ordinary error reports both. The `tson` command maps them to exits that say "not
+checked" rather than "invalid": 69 where a rerun cannot help (not permitted, not found, too large) and 75 where it
+may (unreachable, timeout). A pin mismatch stays `SCHEMA_ERROR`, a verdict, per §10.2. The codes are one per
+reason rather than one permanent/transient pair because consumers partition them differently — a command line by
+whether a rerun could help, an HTTP surface by whose doing it was.
+
+**Suggested resolution.** Widen §8.1's fifth outcome from "refused" to **"not judged"**, with two members: a
+*refusal* (§8.2, §9.1 — the processor declined under its policy) and an *unavailable schema* (§10.1, §11.2 — the
+processor could not obtain what it would judge against). Both are distinguishable from the four categories, both
+share the property that makes the outcome a separate one — the next processor may accept the document in full —
+and both are reported in the same report. §10.1's "the resolver reports an error" becomes "reports the schema as
+unavailable". Keep §10.2 as it is and say why it differs: a mismatch is a finding about obtained bytes. The
+alternative — state outright that a missing schema is a resolver error — is simpler and costs every consumer the
+ability to tell "your document is wrong" from "I could not look", which is the one distinction a sender acting on
+a report needs.

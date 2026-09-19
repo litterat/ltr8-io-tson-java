@@ -321,11 +321,10 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   the whole check is ~1,300 bytes per read of the harness document even after `Confusables.skeleton` stopped
   allocating for a name that maps nothing. A cache would take most of that, and the design question is its
   bound: names are attacker-controlled, so a per-read cache is the safe shape and a process-wide one is not.
-  Separately, the check consults **no policy** -- a deployment that stated
+  Separately, the check consults **no policy**, which is a conformance gap: a deployment that stated
   `withIdentifierPolicy(unrestricted())` still gets `CONFUSABLE_NAMES`, where the two per-name rules honour
-  it. §8.2 requires a deployment be able to relax any of the three rules, so either that is a conformance
-  gap or the rule is deliberately unconditional and should say so; the two per-name rules gate themselves,
-  which makes the silence here look like an oversight rather than a decision.
+  it, and [TSON-DATA] §8.2 says a processor "MUST allow a deployment to relax any of the three". What is
+  left to decide is the policy's shape for the set rule -- a switch of its own, or implied by the level.
 
 - [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
   in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a
@@ -336,8 +335,9 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   wrong pin is portable without pinning any fixture's bytes, since no conforming processor may accept it.
   What is *not* expressible is which registration route recorded the hash — a corpus subject always reaches
   its schema through the runner's `SchemaSource`, where a host application registering a schema from text it
-  holds is the case this repo covers in `TsonValidateTest`. Adding the vectors needs a `refused`-style
-  decision on §8.1's category for a pin failure, which the corpus does not yet state.
+  holds is the case this repo covers in `TsonValidateTest`. The category is settled for all three: [TSON-SCHEMA]
+  §10.2 makes a mismatch a resolver error, and the other two are §2.2.1 errors with no category of their own, which
+  [TSON-DATA] §8.1 gives to the layer that detects them -- the resolver, following the reference.
 
 - [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is
   the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one
