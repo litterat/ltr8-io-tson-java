@@ -405,8 +405,9 @@ still describing a freedom no producer takes.
 **Documents:** [TSON-JSON] §6.1, §6.2; [TSON-DATA] §7.7; [TSON-SCHEMA] §6, §12.1.
 **Kind:** underspecification, against a goal the document states for itself.
 
-**This entry is a proposal, not a report.** Nothing here is running: `tson-json` has its lexer and no record
-reader yet. What is evidenced is the gap, which is a reading of the published documents rather than a finding
+**This entry is a proposal, not a report.** Nothing here is running: `tson-json` reads records in tree and
+bind mode, and a member name that is not an identifier is refused where it is read, with no projection to
+declare. What is evidenced is the gap, which is a reading of the published documents rather than a finding
 from a build.
 
 [TSON-JSON] §1.2 makes this document "the normative JSON interoperability surface of the series", and §1.3's
@@ -791,12 +792,11 @@ subtype inherits its parent's pin and §5.7 forbids changing it, so it dispatche
 variants. And a second `@discriminator` on an intermediate type is the nesting escape hatch, which this proposal
 deliberately leaves out of the first design.
 
-**What is running:** nothing. This implementation has built [TSON-JSON] §8.2's route 2 (kind disjointness over
-class stability) and §6.1.5's `$type` subtype selection in tree mode, and the load-time checks §6 states
-have never had a consumer — which is what surfaced the scoping question before any of it was built. The
-[TSON-JSON] half of the change is made: §6.1.5 now reads the untagged object by the position's own extension
-fact, §8.2 is one condition rather than two, §8.4 states why a choice has no discriminator, and §1.6 records
-the Part 2 dependency as proposed rather than landed.
+**What is running:** the proposal, in both encodings, as #11 and #13 describe — `@discriminator` on a base
+field, `@sealed` on the declaration, the closure checks with pins compared as values and the group-member
+check, and member dispatch at a sealed position. The [TSON-JSON] half of the change is made: §6.1.5 now reads
+the untagged object by the position's own extension fact, §8.2 is one condition rather than two, §8.4 states why
+a choice has no discriminator, and §1.6 records the Part 2 dependency as proposed rather than landed.
 
 **Suggested resolution.** Retarget §6's `@discriminator` from a choice declaration to a record field, as a bare
 `void` marker beside `@rest`, with the check list above and the §5.7 arrangement stated; name the equality
@@ -1424,15 +1424,9 @@ implementation must pick something and a wrong pick is invisible until someone t
 
 **What §8.2 states.** A synthetic or instantiation entry's name is resolver-chosen, fresh by construction,
 disjoint from declared names and unreachable from source; identity is keyed on the form, an instantiation's on
-the application recorded in `source`. All of that is about the *resolver*. Three questions a consumer asks are
-left open, and they are not hypothetical — this implementation answered each one wrongly first.
+the application recorded in `source`. All of that is about the *resolver*. Two questions a consumer asks are
+left open, and they are not hypothetical — this implementation answered both wrongly first.
 
-- **May a document name one?** A minted name is a valid `identifier` and is present in the namespace a
-  processor resolves against, so nothing in the series refuses `!box_text_04117bb4` in text. The name is
-  implementation-chosen, so such a document is portable to no other processor. **The [TSON-JSON] half is
-  now stated** — §3.3 makes `$type` name a declared type and requires a decoder to reject a materialised
-  entry's name rather than resolve it for being present — and the text encoding needs the same sentence,
-  which is §8.2's to give since the fact it turns on is §8.2's.
 - **May a consumer contract be keyed on one?** A binding map, a generated class table, a configuration file.
   It must not: the spelling is not stable across implementations, and within one it moves whenever the form's
   content does. What a contract keys on is a name some declaration gave the application — §8.3's alias — and
@@ -1451,19 +1445,24 @@ schema-load diagnostic printed minted names, pointing an author at declarations 
 as ordinary bugs rather than as one missing rule, which is the signature of an underspecification: each surface
 that shows or accepts a name picks for itself, and they disagree.
 
-**What is running:** the three answers above. A lookup and a message both resolve under the name the author
+**What is running:** both answers above. A lookup and a message both resolve under the name the author
 wrote, falling back to the entry's own, and only for a *derived* entry — an entry with a source position was
 declared, so an alias never redirects it. `source` grouping is what the measurements in #13 rest on: within one
 schema a direct definition and a field use of one application reach one entry, and across schemas two documents
 that never meet reach the same one, which is the property a content-addressed name exists for and the reason it
 must stay internal rather than becoming a consumer's key.
 
-**Suggested resolution.** In §8.2, after the internal-name rules, state the three consequences: a derived name
-is not nameable from data in any encoding (with [TSON-JSON] §3.3 as the worked case, and the same rule for
-text's type-ref); no consumer contract may require one, the declared alias being what a processor shows and
-accepts where both exist; and the applications of one template are recoverable from `source`, which is the
-provenance a generator needs. None of the three changes what a resolver produces — they say what may be done
-with what it produces, which is the half §8.2 currently leaves to be guessed.
+**Suggested resolution.** In §8.2, after the internal-name rules, state the two consequences: no consumer
+contract may require a derived name, the declared alias being what a processor shows and accepts where both
+exist; and the applications of one template are recoverable from `source`, which is the provenance a generator
+needs. Neither changes what a resolver produces — they say what may be done with what it produces, which is the
+half §8.2 currently leaves to be guessed.
+
+**Not proposed: refusing a derived name written in data.** A minted name is a valid `identifier` present in the
+namespace a processor resolves against, so `!box_text_04117bb4` in text and `"$type": "box_text_04117bb4"` in
+JSON both read, and this implementation accepts them. A rule forbidding it would buy little: such a document can
+only have been written by reading one processor's output, which is a debugging act, and it fails as soon as it
+meets another processor, whose spelling differs. [TSON-JSON] §3.3 states the non-portability and does not refuse.
 
 ---
 
@@ -1473,9 +1472,8 @@ with what it produces, which is the half §8.2 currently leaves to be guessed.
 (templates and materialisation), §8.1 (resolved output), §8.3 (a reference is a hop), §3.3.4 (`subtypes` open
 across schemas), §4.3 (both operator families), §5.2 (a discriminator and its pins); [TSON-JSON] §6.1.5
 (`$type`). Reads with #13 and #14.
-**Kind:** design report — one lift channel corrected, an asymmetry narrowed rather than closed, and one
-cross-schema property knowingly given up. **The application half is running; what is still open is named as
-such at the point it is made.**
+**Kind:** design report — one lift channel corrected, an asymmetry kept on purpose, and one cross-schema
+property knowingly given up. **All of it is running except the merge key the resolution proposes.**
 
 **The axis is construction against reference, not sugar against application.** That correction matters
 because it locates the defect. `resolveTemplateApplication` ends by calling the *same* function a bare-name
@@ -1547,10 +1545,16 @@ is a pin-distinctness catch. Outside a discriminated family the duplicate is ord
 structure, as two records with one field list are — and both names stay usable as dispatch identifiers in
 data, which is what the collapsing shape took away.
 
-**What is not running, and is the half still open.** A sugar form still duplicates: `text_list => [text]`
-beside a use-site `[text]` is two entries with one content, because §8.2 gives a declared entry its name as
-identity and a minted one its content and nothing makes those meet. So the asymmetry **moved** rather than
-closing — it is now "an application unifies, a sugar form duplicates" instead of "a hop versus an entry".
+**A sugar form keeps minting, and that asymmetry is the design rather than a remainder.** `text_list =>
+[text]` beside a use-site `[text]` is two entries with one content: the declaration is its own entry, and the
+use site mints a synthetic keyed on its content. The two channels differ because the types differ in what their
+identity has to carry. A non-record sugar form — an array, set, map or tuple — is the same definition wherever
+it is written: nothing subtypes it, no tag dispatches to it, and a content-keyed synthetic is exactly the entry
+every location writing `[text]` should reach, and a useful one to redirect to. A **record** is different: it
+takes part in IS-A, a family's `subtypes` index and a tag both key on its entry, and so the declared name has to
+*be* the entry for `pet.subtypes` to read `[dogs, cats]` and for `!dogs` to select it. Unifying the sugar
+channel with the application one would buy nothing a consumer observes and would cost the shared,
+content-identified target.
 
 **What was given up, stated plainly.** A content-addressed name is a function of the form alone, which is
 what lets two independently-resolved namespaces agree on it — §8.2's determinism SHOULD, and what "lets the
@@ -1576,8 +1580,9 @@ this is what honouring it looks like. Where the pair is a discriminated family �
 refuses it, exactly as it refuses the hand-written pair; no relaxation of that rule is wanted, and none is
 needed. And **how cross-schema unification survives**: most simply by keeping the
 content-addressed name as a merge key alongside the declared entry, so §8.2's determinism SHOULD still has a
-subject. The sugar channel should then be brought to the same rule, or §5.3 should say why a use-site sugar
-form mints where a use-site application does not.
+subject. §5.3 should then say why a use-site sugar form mints where a declared record application does not: a
+non-record form is the same definition at every location and carries no IS-A, so a content-keyed entry is the
+right one to share, where a record's declared name must be its entry for subtyping and tags to reach it.
 
 ---
 
