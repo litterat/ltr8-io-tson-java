@@ -34,16 +34,15 @@ The schema-directed reader stack — `JsonTypeReader`/`JsonCompiledSchema`/`Json
 atoms, the whole of §6's containers, §7's absence, §3.2's reserved namespace and §3.3's annotation object (so §6.1.5's
 `$type` selects a subtype — the JSON spelling of `!employee` at a `person` field), and §8.2's discrimination predicate over
 §8.3's class stability, all compiled in **tree mode**; §8.5's scoped positions reach a `NOT_IMPLEMENTED` reader.
-**Bind mode** (`ValueReaderFactoryRegistry.bind`) compiles records, atoms and the dispatchers; its containers are
-not built yet and compile to gaps.
+**Bind mode** (`ValueReaderFactoryRegistry.bind`) compiles every container, the atoms and the dispatchers.
 
 ## Naming inside `reader`: mode first, and no prefix
 
-The schema-directed readers that differ by mode are named **mode, then family, then form** —
-`TreeMapObjectReader`, `TreeMapPairsReader`, `TreeRecordBuilder` — so that bind mode lands as
-`BindRecordBuilder` beside its peer and a reader's mode is the first thing about it. **A mode-free loop carries no
-mode**: the record loop (`RecordReader`) fills slots and hands them to the mode's builder, so it is named family,
-then form. That is the axis someone scans when adding a mode, and it is
+The schema-directed classes that differ by mode are named **mode, then family, then form** —
+`TreeRecordBuilder`, `TreeArrayBuilder`, `TreeMapBuilder` — so that bind mode lands as `BindRecordBuilder` beside
+its peer and a class's mode is the first thing about it. **A mode-free loop carries no mode**: the container loops
+(`RecordReader`, `ArrayReader`, `TupleReader`, `MapObjectReader`, `MapPairsReader`) fill slots and hand them to the
+mode's builder, so they are named family, then form. That is the axis someone scans when adding a mode, and it is
 the axis a file listing then sorts by. **A dispatcher has no mode to lead with** — it selects and builds nothing
 — so it leads with what it is and then how it selects, and the family sorts together: `DispatchTagReader`,
 `DispatchMemberReader`, `DispatchChoiceReader`, and `DispatchFactories` over them. `tson-compiler`'s peers keep
@@ -144,12 +143,12 @@ edge, a dispatcher's included, is an object reference wired at compile, and a cy
 ### The map form is chosen by the factory, not re-asked per value
 
 §6.5 selects between the object and pairs forms **by `K`, never by inspecting the value**, and that selection
-is therefore made once: `TreeMapReader` is a sealed base over `TreeMapObjectReader` and
-`TreeMapPairsReader`, and the factory returns whichever the key type names. Neither subclass carries the
-other's state or a branch it never takes, and §4.1's "nothing is read speculatively" is structural rather than
-a thing the read remembers to honour. What stays on the base is what both forms share and nothing else: §6.5's
-entry-value rule, the size facets, and the test that picks between them — which §8.3 also asks, to judge
-whether a map is class-stable.
+is therefore made once: `MapPlan` records which form the key type names, and the factory returns that form's loop,
+`MapObjectReader` or `MapPairsReader`. Neither carries the other's state or a branch it never takes, and §4.1's
+"nothing is read speculatively" is structural rather than a thing the read remembers to honour. What both forms
+share is `MapEntries` — §6.5's entry-value rule, the size facets, and the wrong-shape refusal — and the form test
+itself is `MapPlan.isObjectForm`, which §8.3 also asks to judge whether a map is class-stable. Both loops resolve a
+repeated key the same way in every mode: reported, and the value filed under the first spelling.
 
 ### A record position gets the reader its extension fact earns
 
@@ -260,6 +259,30 @@ compile, the check can be made once.
 **One loop, not one per shape.** A plain loop for records with no default, pin or group was built and measured, and
 cost the same per record; the per-field branch it saved is a predictable switch on the field state. A loop per
 shape would multiply by the modes, so a split waits for a timing benchmark that shows it pays.
+
+### Every container reads on the record's terms, and a position binds to what a component holds
+
+Arrays and sets, tuples and maps read as records do: a plan of what the schema fixes (`ArrayPlan`, `TuplePlan`,
+`MapPlan`), one mode-free loop per form (`ArrayReader`, `TupleReader`, `MapObjectReader`, `MapPairsReader`), and
+the mode's builder called once — the tree builders a `JsonArray` or `JsonObject` with a placeholder in a refused or
+absent slot (tree mode keeps what it built), the bind builders the target's class, or nothing where anything was
+reported. The `Slots` markers are the loops' shared vocabulary for what a value cannot carry. A set's
+duplicates are judged on the element's value through `ValueIdentity`, so bind mode, whose elements are host
+values, compares what they decode to.
+
+**Bind mode compiles each type to its natural reading, and a component declares something more specific.** A
+standalone array or tuple binds to an unmodifiable `List` of its values' natural host values and a map to an
+unmodifiable `Map`; a record field declaring `long[]`, `List<Long>`, `Set<UUID>`, an `@Tuple` class or
+`Map<LocalDate, BigDecimal>` reads the same position again for that class. A tuple binds by its component and not
+by its schema name for a reason: an inline tuple's entry name is minted, and no binding map can hold it.
+`BindTargets` is the one place that meets a component: an atom is bound to the component's class
+(`AtomReader.boundTo`, through its bridge); an array, tuple or map is rebuilt over the component's own class with
+each element, position, key and value bound in turn; and a record — bound by its own schema name — is checked
+against the component's class. Every disagreement is collected into the record's one `BindMismatchException`: a
+container bound to a component of another shape, an element, key or value the family cannot produce, a tuple class
+of another arity, an optional element `[T?]` bound to a primitive array with nowhere to put the absence. So
+`tson-compiler`'s gap is closed here rather than copied: there an element is bridged but read at its family's
+natural class, so a `List<Long>` over `[int32]` would hold `Integer`s.
 
 ### Discrimination: one condition, and the table is built at schema load
 

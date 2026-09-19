@@ -69,12 +69,12 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry tree() {
         Map<String, ValueReaderFactory> factories = vocabulary(TreeAtomReader::over);
         factories.put("record", DispatchFactories.over(TreeRecordBuilder.FACTORY));
-        factories.put("array", TreeArrayReader.FACTORY);
+        factories.put("array", TreeArrayBuilder.FACTORY);
         // A `set` resolves to an ArrayBody like `array` itself -- refinement never adds or removes a field --
         // so the same factory serves it and the body's own `unique_items` is what separates them.
-        factories.put("set_type", TreeArrayReader.FACTORY);
-        factories.put("tuple", TreeTupleReader.FACTORY);
-        factories.put("map", TreeMapReader.FACTORY);
+        factories.put("set_type", TreeArrayBuilder.FACTORY);
+        factories.put("tuple", TreeTupleBuilder.FACTORY);
+        factories.put("map", TreeMapBuilder.FACTORY);
         factories.put("choice", DispatchChoiceReader.FACTORY);
         factories.put("template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
@@ -86,12 +86,17 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      * to its natural host value until a record binds it to a component. The dispatchers are the same as tree
      * mode's, placing a value and building nothing.
      *
-     * <p>Records only, so far: an array, tuple or map position has no bind reader yet and compiles to a gap
-     * ({@link ErrorReader}), so a bound record with a container field reads that field as {@code NOT_IMPLEMENTED}.
+     * <p>Every container binds: a record into the class bound to its schema type, and an array, set, tuple or map
+     * into its natural {@code List} or {@code Map} -- or, at a record component, into the class the component
+     * declares ({@link BindTargets}).
      */
     public static ValueReaderFactoryRegistry bind(DataBindContext binding) {
         Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
         factories.put("record", DispatchFactories.over(BindRecordBuilder.factory(binding)));
+        factories.put("array", BindArrayBuilder.FACTORY);
+        factories.put("set_type", BindArrayBuilder.FACTORY);
+        factories.put("tuple", BindTupleBuilder.FACTORY);
+        factories.put("map", BindMapBuilder.FACTORY);
         factories.put("choice", DispatchChoiceReader.FACTORY);
         factories.put("template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));

@@ -14,8 +14,7 @@ interface RecordBuilder {
 
     /**
      * The record, from one slot per field in declaration order: null where the document did not state the field
-     * and nothing was injected, otherwise a child's value, an injected one, or one of {@link RecordReader}'s
-     * markers.
+     * and nothing was injected, otherwise a child's value, an injected one, or a {@link Slots} marker.
      *
      * @param ctx   where the record was read, for a mode whose building can itself be refused -- a bound
      *              class's constructor rejecting the values
