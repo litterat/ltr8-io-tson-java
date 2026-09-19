@@ -40,13 +40,18 @@ final class RecordDispatch {
             String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
             Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
             return switch (body.extension()) {
-                case ABSTRACT -> new RecordTagDispatchReader(selfNames, displayName,
-                        Subsumption.admitting(definition.subtypes(), context.namesMeaning()), context.readers());
-                // The sealed reader takes its subtypes raw: it maps each member's pins to that member, so an
-                // alias is not a second member. Where it compares a written tag it admits aliases (`deeper`).
-                case SEALED -> new RecordMemberDispatchReader(selfNames, displayName,
-                        FamilySelectors.of(definition, context.schema().entries()),
-                        Set.copyOf(definition.subtypes()), context, context.readers());
+                // ABSTRACT says the record has no values of its own; whether its members are placed by the
+                // tag or by reading their pins is the body's own `discriminators` and never a second member
+                // of the enum. The member reader takes its subtypes raw: it maps each member's pins to that
+                // member, so an alias is not a second member. Where it compares a written tag it admits
+                // aliases (`deeper`).
+                case ABSTRACT -> FamilySelectors.dispatchesOnMembers(definition)
+                        ? new RecordMemberDispatchReader(selfNames, displayName,
+                                FamilySelectors.of(definition, context.schema().entries()),
+                                Set.copyOf(definition.subtypes()), context, context.readers())
+                        : new RecordTagDispatchReader(selfNames, displayName,
+                                Subsumption.admitting(definition.subtypes(), context.namesMeaning()),
+                                context.readers());
                 case OPEN, FINAL -> concrete.create(name, definition, context);
             };
         };

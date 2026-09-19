@@ -166,7 +166,8 @@ recorded open form, and replacing the application with a reference to the entry 
       `record.supertypes` and no instantiation ever arrives to carry the edge — which is the same "no later
       materialisation of this body" that makes §5.7's fixation run here rather than at closing. So the edge is
       stated where the composition resolves, and to the *family base* rather than to the application: a
-      record-bodied template carries `extension` — SEALED where a discriminator survives, ABSTRACT otherwise —
+      record-bodied template carries `extension` — always ABSTRACT, with `discriminators` beside it where a
+      selector survives —
       which is what makes it a type a member can be IS-A (`SPEC-FEEDBACK.md` #13). That is what puts the member
       in the base's `subtypes` and lets a position typed `pet` dispatch to it, by the discriminators or by a
       tag. The application in between still mints nothing, and §5.9 is untouched: a removal empties the

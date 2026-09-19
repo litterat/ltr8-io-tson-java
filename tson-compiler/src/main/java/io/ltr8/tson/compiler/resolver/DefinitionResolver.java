@@ -346,15 +346,9 @@ final class DefinitionResolver {
                     + "': only a record states how it may be realised -- this entry's body is "
                     + resolved.body().getClass().getSimpleName() + " ([TSON-SCHEMA] §5.2)");
         }
-        // ABSTRACT with at least one discriminator is SEALED, derived here rather than marked: `@sealed` was
-        // the earlier spelling of a fact the body already carries (§5.2).
-        RecordExtensionType member = extension.get() == RecordExtensionType.ABSTRACT
-                && !record.discriminators().isEmpty()
-                        ? RecordExtensionType.SEALED
-                        : extension.get();
         return new TypeDefinition(resolved.source(), resolved.kind(), resolved.supertypes(),
                 resolved.subtypes(), new RecordBody(record.supertypes(), record.fields(), record.groups(),
-                        member, record.discriminators()), resolved.position(), resolved.annotations());
+                        extension.get(), record.discriminators()), resolved.position(), resolved.annotations());
     }
 
     /**

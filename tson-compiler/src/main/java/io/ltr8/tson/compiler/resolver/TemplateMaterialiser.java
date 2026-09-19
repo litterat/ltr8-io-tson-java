@@ -800,15 +800,14 @@ final class TemplateMaterialiser {
      *
      * <p>ABSTRACT is a claim about the marked type alone and holds of every instantiation identically, which
      * is how {@code @abstract} on a template reaches them all (#504, and {@code AbstractTemplateFamilyTest}
-     * pins it). SEALED is the different claim that this record <em>has discriminator fields to dispatch
-     * on</em> -- and the lines above have just pinned those fields and left the member naming none, because
-     * the selectors belong to the base that declares them unpinned ({@code SPEC-FEEDBACK.md} #10). So a member
-     * of a sealed family is an ordinary concrete record, exactly as it is in a hand-written family, and
-     * inheriting the word would make every member fail the "is @sealed but names no discriminator" rule its
-     * own closing created.
+     * pins it). <b>Dispatching on members does not travel.</b> The lines above have just pinned those
+     * fields and left the member naming no selectors of its own, the selectors belonging to the base that
+     * declares them unpinned ({@code SPEC-FEEDBACK.md} #10) -- so a member of a sealed family is an ordinary
+     * concrete record, exactly as in a hand-written family, and a base that dispatches on members closes to
+     * OPEN rather than carrying its abstractness into every one of them.
      */
     private static RecordExtensionType closedExtension(RecordBody record) {
-        return record.extension() == RecordExtensionType.SEALED
+        return record.extension() == RecordExtensionType.ABSTRACT && !record.discriminators().isEmpty()
                 ? RecordExtensionType.OPEN : record.extension();
     }
 

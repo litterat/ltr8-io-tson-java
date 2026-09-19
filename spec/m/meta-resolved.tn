@@ -377,32 +377,18 @@
     body: !reference { target: void }
   }
 
-  @doc:"Declares a record ABSTRACT. A consumed mark: lowered into record.extension."
-  abstract => @annotation !type_definition {
-    source: void
-    body: !reference { target: void }
-  }
-
   @doc:"""
-    Declares a record SEALED. A consumed mark: at least one field
-    MUST carry @discriminator, and @abstract forbids one.
+    Declares a record ABSTRACT. A consumed mark: lowered into
+    record.extension, and required of a record whose fields carry the
+    selector spelling `=?`.
     """
-  sealed => @annotation !type_definition {
+  abstract => @annotation !type_definition {
     source: void
     body: !reference { target: void }
   }
 
   @doc:"Declares a record FINAL. A consumed mark, on @abstract's terms."
   final => @annotation !type_definition {
-    source: void
-    body: !reference { target: void }
-  }
-
-  @doc:"""
-    Marks the field a sealed family dispatches on. A consumed mark:
-    lowered into record.discriminators, with load-time checks.
-    """
-  discriminator => @annotation !type_definition {
     source: void
     body: !reference { target: void }
   }
