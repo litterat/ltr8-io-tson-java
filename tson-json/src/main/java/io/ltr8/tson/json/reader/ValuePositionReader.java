@@ -1,5 +1,10 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.atom.AtomRefusal;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.atom.HostAtoms;
+import io.ltr8.tson.atom.number.NumberNarrowing;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
@@ -26,6 +31,14 @@ import java.math.BigInteger;
  * this REQUIRED position, §7 having spent it as the absent sentinel. A {@code value} position is a single
  * token and not a scope, so {@code $schema} at one is a resolver error ([TSON-SCHEMA] §7.8); nothing here
  * admits an object at all, which is that rule already met.
+ *
+ * <p><b>Bound to a component, the component's host type says what the value was</b> ({@link #boundTo}). The four
+ * cases are how the value is decoded, not what it means: {@code min: "PT30M"} on {@code duration_type} is the
+ * string {@code PT30M}, and only the component holding a {@code Duration} says it was a duration. A value the
+ * component already holds is returned untouched; a number a narrowing reaches is narrowed; anything else is read
+ * again under the built-in atom that produces the component's class ({@link HostAtoms}), and gets that atom's
+ * verdict. A class no built-in produces receives the natural value, and its own constructor decides. The same
+ * rule the TSON reader's {@code value} applies at a bound slot.
  */
 final class ValuePositionReader implements JsonTypeReader<Object> {
 
@@ -34,9 +47,22 @@ final class ValuePositionReader implements JsonTypeReader<Object> {
     private final String name;
     private final JsonSchemaLocation schemaLocation;
 
+    /** The host type the value is read as, or null for the natural reading. */
+    private final Class<?> target;
+
     ValuePositionReader(String name, JsonSchemaLocation schemaLocation) {
+        this(name, schemaLocation, null);
+    }
+
+    private ValuePositionReader(String name, JsonSchemaLocation schemaLocation, Class<?> target) {
         this.name = name;
         this.schemaLocation = schemaLocation;
+        this.target = target;
+    }
+
+    /** This position read as {@code target} holds it: a bound component's wire class. */
+    ValuePositionReader boundTo(Class<?> target) {
+        return target == Object.class ? this : new ValuePositionReader(name, schemaLocation, target);
     }
 
     @Override
@@ -45,15 +71,15 @@ final class ValuePositionReader implements JsonTypeReader<Object> {
         JsonEvent event = ctx.next();
         switch (event) {
             case JsonEvent.BooleanValue bool -> {
-                return bool.value();
+                return at(ctx, bool.value(), String.valueOf(bool.value()));
             }
             case JsonEvent.StringValue string -> {
-                return string.value();
+                return at(ctx, string.value(), string.value());
             }
             case JsonEvent.NumberValue number -> {
-                return integral(number.literal())
+                return at(ctx, integral(number.literal())
                         ? new BigInteger(number.literal())
-                        : new BigDecimal(number.literal());
+                        : new BigDecimal(number.literal()), number.literal());
             }
             default -> {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' is a value, which takes %s, and this is %s"
@@ -61,6 +87,45 @@ final class ValuePositionReader implements JsonTypeReader<Object> {
                 EventSkip.value(ctx, event);
                 return null;
             }
+        }
+    }
+
+    /** {@code natural} as {@link #target} holds it, or null where the atom producing that class refused it. */
+    private Object at(JsonReadContext ctx, Object natural, String content) {
+        if (target == null || AtomType.wrap(target).isInstance(natural)) {
+            return natural;
+        }
+        Object narrowed = narrowed(natural);
+        if (narrowed != null) {
+            return narrowed;
+        }
+        AtomType<?> atom = HostAtoms.forHostType(target).orElse(null);
+        if (atom == null) {
+            return natural;
+        }
+        try {
+            return atom.read(content);
+        } catch (AtomTypeException e) {
+            AtomRefusal refusal = AtomRefusal.of(e, content, target).named(name);
+            ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
+            return null;
+        }
+    }
+
+    /**
+     * A number as {@link #target} holds it, or null where no numeric narrowing reaches it -- the signal to try
+     * the atom producing that class, not a refusal.
+     */
+    private Object narrowed(Object natural) {
+        try {
+            Object narrowed = switch (natural) {
+                case BigInteger integer -> NumberNarrowing.narrowIntegral(integer, target);
+                case BigDecimal decimal -> NumberNarrowing.narrowDecimal(decimal, target);
+                default -> null;
+            };
+            return narrowed != null && AtomType.wrap(target).isInstance(narrowed) ? narrowed : null;
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
