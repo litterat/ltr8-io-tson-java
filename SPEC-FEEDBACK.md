@@ -1683,3 +1683,63 @@ and a choice's untagged values are the same set in every encoding. Part 3's §8.
 why those two have no class, and §8.2's predicate to `disjoint` alone. The cost is on the text side:
 `( float64 | text )` and a choice over a compound-keyed map need a tag there too, where today they do not — the
 price of one answer across encodings, payable by narrowing `allow_nan`/`allow_infinity` or by tagging.
+
+## 18. Value-space identity is defined for atoms, and a compound key or set element can only have the host's
+
+**Documents:** [TSON-SCHEMA] §7.5 (set duplicates), §7.7 (type-aware duplicate keys), §5.5 (value spaces);
+[TSON-DATA] §2.6 (key identity, layered).
+**Kind:** underspecification — the rule is stated for every key and element type and is only implementable for
+atoms. **The Suggested resolution is a proposal; what is running is described below it.**
+
+**The sentences.** §7.5:
+
+> Two values are duplicates if the element type's equality contract considers them equal, and that contract is
+> the type's **value space** (§5.5)
+
+and [TSON-DATA] §2.6, for a map key under a schema:
+
+> under a schema identity is over the key type's *value space*, never its lexical space
+
+**For an atom this is well defined and implemented.** §5.5 fixes each family's value space, and a processor
+reduces a decoded atom to it: text under NFC, `number` by value (`199.90` is `199.9`), `bytes` by octets,
+`datetime` as an instant (`2026-01-01T00:00:00Z` and `2026-01-01T01:00:00+01:00` are one member of a
+`set<datetime>`).
+
+**For a compound value — a record, array, map or choice as a map key or set element — it is not.** Nothing in
+Part 2 defines a record's value space beyond its fields'. The natural reading is "structurally, each position by
+its own value space", but no processor that hands values to a program can promise it. Identity at a compound
+position is whatever the host language's equality and set implementation say about the value the processor
+built:
+
+- *A bound class decides for itself.* A Java `record` compares an `OffsetDateTime` component by offset and a
+  `BigDecimal` by scale, so `{ at: "…T00:00:00Z" }` and `{ at: "…T01:00:00+01:00" }` are two keys. A `byte[]`
+  component compares by reference, so two *identical* spellings are two keys — below even §2.6's textual floor.
+  A class with a hand-written `equals` can make any pair equal or unequal. The processor cannot see inside it,
+  and replacing its equality with one of the spec's would make a set of the program's own values disagree with
+  the program.
+- *A tree has only what its node model keeps.* A tree that keeps spellings compares compound nodes by spelling
+  unless it re-derives every atom's value inside every key it compares.
+
+TSON can reduce to a value space only the atoms it implements on the host. Past an atom, identity belongs to
+the host.
+
+**What is running.** Atom elements and atom keys compare by value space in every mode and both encodings — a
+`set<datetime>` holding one instant spelled two ways is refused in TSON and JSON, tree and bind. Compound keys
+and elements compare by host equality over what the mode built:
+
+- TSON tree mode compares a record key by the tree's structural equality, whose atoms keep their decoded host
+  values — so a `datetime` inside a key compares by offset and the two-spellings pair above is two keys.
+- JSON tree mode reduces a compound node recursively: numbers by value, strings by NFC spelling, member order
+  dropped — so a `datetime` inside a key compares by spelling.
+- Bind mode, in both encodings, compares by the bound class's `equals`.
+
+Every mode detects §2.6's textual identity for tree reads; a bound class's `equals` can fall below it.
+
+**Suggested resolution.** Confine value-space identity to what the spec can define, and hand the rest to the
+host explicitly. In §7.5, after the atom examples: *For an element type that is not an atom — a record, array,
+map, or choice — two elements are duplicates if the processor's host representation of them is equal. Which
+pairs that relates is implementation-defined: a processor detects at least the textual identity of [TSON-DATA]
+§2.6 in a tree it builds itself, and where elements are bound to host types, those types' equality decides.*
+§7.7 and [TSON-DATA] §2.6's "under a schema" sentence take the same qualifier for compound key types. A schema
+author who needs portable duplicate detection over a compound key then knows to key by an atom — a derived
+identifier or a canonical string — which is the only identity every encoding and every host can agree on.

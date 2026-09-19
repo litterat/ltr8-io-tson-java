@@ -156,14 +156,12 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
     (`RecordPlan`, `ArrayReader`, `TupleReader`, `MapEntries`); and failure detected by `ctx.reported() > before`
     (`TreeAtomReader`, `RecordReader.verifyFixed`, `MapPairsReader`) taken from what the child returns.
 
-- [ ] **Tree mode judges set and compound-key uniqueness by spelling, not value.** `TreeAtomReader` keeps the node
-  and discards the parsed value, so `ArrayReader`'s unique-items check and `MapPairsReader`'s duplicate-key
-  check reduce a string to its NFC text in tree mode (bind mode compares the host values, and is right): a
-  `set<datetime>` holding `"2026-01-01T00:00Z"` and `"2026-01-01T01:00+01:00"` is not refused, where TSON's tree
-  mode (`TsonAtom` keeps the value) refuses it as [TSON-SCHEMA] §5.5 requires. A parity case first. The fix belongs
-  to the tree factory: only a unique array and a pairs-form map need a value's identity, so only there does it wrap
-  the element or key reader in one that also answers the parsed value, and every other position pays nothing.
-  `RecordReader.verifyFixed` parsing a member twice has the same cause and the same fix.
+- [ ] **`RecordReader.verifyFixed` parses a FIXED member twice.** The field's reader parses it, then the pin's
+  parser parses the same content again for the comparison, because tree mode's atom reader answers only the node.
+  `TreeAtomReader.keyed` already answers a set element's node with its parsed value's identity; the tree record
+  factory reading a FIXED field at that reader lets `verifyFixed` compare `ValueIdentity.of(written)` and drop the
+  second parse. Bind mode's bridged components (an enum class) answer the component's class, not the wire value,
+  so the comparison needs the wire value there.
 
 - [ ] **Bind mode reads every container through its front door, and three `tson-compiler` cases remain.**
   `JsonObjectReader.withSchema(uri).readAs(...)` reads every container, the atoms and the dispatchers into bound

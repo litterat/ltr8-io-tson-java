@@ -268,7 +268,11 @@ the mode's builder called once — the tree builders a `JsonArray` or `JsonObjec
 absent slot (tree mode keeps what it built), the bind builders the target's class, or nothing where anything was
 reported. The `Slots` markers are the loops' shared vocabulary for what a value cannot carry. A set's
 duplicates are judged on the element's value through `ValueIdentity`, so bind mode, whose elements are host
-values, compares what they decode to.
+values, compares what they decode to. Tree mode's node keeps only a spelling, so a set's atom element is read at
+`TreeAtomKeyedReader` (chosen by `TreeAtomReader.keyed`), which answers the node with the parsed value's identity beside it
+(`ValueIdentity.Identified`) and the loop unwraps it — two spellings of one instant are one element. A compound
+element or key compares by host equality over what the mode built, which is all any mode can promise
+(`SPEC-FEEDBACK.md` #18).
 
 **Bind mode compiles each type to its natural reading, and a component declares something more specific.** A
 standalone array or tuple binds to an unmodifiable `List` of its values' natural host values and a map to an
