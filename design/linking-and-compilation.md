@@ -59,8 +59,8 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   total and two-valued, detailed in `design/choice-disjointness.md`, so a linked choice always
   carries the fact;
   (3a) **check what `record.extension` obliges** (`RecordExtension`, §5.2) — that nothing composes onto a
-  FINAL record, that a sealed family's selectors are usable and its members pin them distinctly, and that a
-  record carrying selectors is `@abstract`; detailed below. It is listed here for what it reads, and runs later:
+  FINAL record, and that a sealed family's selectors are usable and its members pin them distinctly;
+  detailed below. It is listed here for what it reads, and runs later:
   `link` goes subtypes → disjointness → `checkNames` → validate → inhabitance → `checkRecordExtension` →
   `withNameAnnotations` → the `@disjoint` check;
   (4) **validate** every reference
@@ -222,8 +222,8 @@ rest of the closure agrees with it.
   that reason.
 - **A marked field is the declaration's own only if no sealed supertype declares it.** §5.8 flattens an
   inherited field whole, the mark included, so a subtype's copy of its base's selector is indistinguishable
-  here from one the subtype wrote. Without the distinction the rule "a record carrying a selector is
-  `@abstract`" refuses every subtype of every sealed family.
+  here from one the subtype wrote. Without the distinction every subtype of every sealed family would be read
+  as declaring a family of its own.
 - **A family is re-judged whenever any part of it is local**, base or subtype, which is not the same as
   judging local entries. §3.3.4 makes `subtypes` open across schemas, so an importer really can add a
   member: the new sibling can collide with an imported one, and only a closure holding both can see it.

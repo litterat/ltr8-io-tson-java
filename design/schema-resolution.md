@@ -74,10 +74,11 @@ are kept in step deliberately.
   refused wherever they are written.
 - **A selector is field syntax, `=?`** (`FieldModifiers`), and the record it is written in is the family base:
   the field stays REQUIRED and unpinned — §5.7's identity diagonal forbids a base pinning what its members
-  each pin differently — and its name lowers into the enclosing `record.discriminators`. **The declaration
-  must carry `@abstract`**, since instantiability is not derivable from a field; that the family is
-  member-dispatched rather than tag-dispatched *is* derived, being whether any field carries the spelling.
-  Member dispatch is that derivation (ABSTRACT plus a non-empty `discriminators`), read where it is needed
+  each pin differently — and its name lowers into the enclosing `record.discriminators`. **ABSTRACT is derived
+  from it** (`withExtension`): the members pin the selector, so the record is the base they are selected from
+  and has no values of its own. `@abstract` beside it asserts what the body says and is admitted, `@final`
+  claims the opposite and is refused. That the family is member-dispatched rather than tag-dispatched is the
+  second derivation (ABSTRACT plus a non-empty `discriminators`), read where it is needed
   (`FamilySelectors.dispatchesOnMembers`) in the manner of `choice.disjoint` and never stored as a second fact.
   A group member cannot be a selector: §5.11 makes a value modifier a parse error there.
 - **A template derives its selectors from parametric pins too** (`SchemaDesugarer.parametricallyPinned`). In

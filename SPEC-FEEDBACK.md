@@ -761,11 +761,12 @@ already argues for `@rest` — what differs is that `@rest` admits one such fiel
 tuple case below. Over the linked closure: every entry in `subtypes`, transitively, pins each marked field
 `REQUIRED_FIXED`; and the pins are pairwise distinct.
 
-**`=?` requires `@abstract`, and nothing states the dispatch twice.** A selector says the members pin it, so
-the record is the base they are selected from and has no values of its own — which the declaration must state,
-instantiability not being derivable from a field. That the family is *member*-dispatched rather than
-tag-dispatched is **not** a second mark: it is whether any field carries the spelling, read off the body as
-`choice.disjoint` is (#11).
+**`=?` implies `@abstract`, and nothing states the dispatch twice.** A selector says the members pin it, so
+the record is the base they are selected from and has no values of its own — a total consequence, there being
+no reading in which such a record has direct instances, so ABSTRACT is derived rather than required.
+`@abstract` beside a selector asserts what the body says and is admitted on `@disjoint`'s terms; `@final`
+claims the opposite and is refused. That the family is *member*-dispatched rather than tag-dispatched is
+likewise no mark: it is whether any field carries the spelling, read off the body (#11).
 
 **What that gives up, stated rather than glossed.** An earlier draft of this entry paired the field mark with a
 declaration mark so that neither could drift: removing a base's last selector would fail at the schema that
@@ -818,7 +819,7 @@ dependency as proposed rather than landed.
 `field-modifier` alternative, `ws "=" ws "?"`, needing no lexical change — with the check list above and the
 §5.7 arrangement stated; keep the word "discriminator" in the prose and the index, since the symbol is not
 searchable; name the equality relation for pin distinctness and add the group-member check; state that `=?`
-requires `@abstract`, and say what the shape is for — a sealed hierarchy in a host language — since that is what makes
+implies `@abstract`, and say what the shape is for — a sealed hierarchy in a host language — since that is what makes
 totality
 and abstractness rules rather than preferences. Leave §5.4 untouched but add a pointer from it, since an author
 reaching for member dispatch at a choice is an author who wants the composed family or the labelled form of §5.11.
@@ -1098,6 +1099,9 @@ cost nothing where nothing uses them.
 the kernel's `record`, and `discriminators: [field_name]?` to `record` and `template` (#13), stating the three
 members' meanings; state that **how a subtype is selected is `discriminators` and not a member of the enum** —
 tag where it is empty, the marked fields where it is not — and that the two reading rules follow from it;
+state that a selector implies ABSTRACT, that the mark beside one is an admitted assertion and `@final` a
+refusal, and that **a family is open across schemas** (§3.3.4) — so a host language's own closed-set
+construct, generated from one, is relative to a closure and not a promise the schema makes;
 state #10's checks over the selector, the FINAL check over composition and refinement, the subtraction
 exemption and why it is not one, the reason inhabitance gains no case for it, the absence of any transition
 table, and the identity consequence; state that a template may be abstract and may not be final, with #13's

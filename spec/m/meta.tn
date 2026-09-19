@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta.tn?sha256=62800c25c54a914cfe9394fb0dad4cb87a63a531987080d4d86e74727a0e7935"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=29d880ad9e8401d9e58678227092ae34ca4f64d43128221678f1c1efa0f736f8"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=c4c3da2e2f866a2238e34565736dd23f0b330690252d4038d6b5f253400c98d4"
 !!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=c4c3da2e2f866a2238e34565736dd23f0b330690252d4038d6b5f253400c98d4"
 @doc:"""
@@ -641,15 +641,24 @@
     ([TSON-SCHEMA] §5.2). A bare presence marker like `@numeric`,
     consumed into `record.extension` and gone from resolved output.
 
-    **A field written `=?` requires it**, that field saying the
+    **A field written `=?` implies it**, that field saying the
     record's members pin it and so that the record is the base they
-    are selected from. Whether the members are then recovered from
-    those fields or from a tag is the body's own `discriminators`
-    and needs no second mark ([TSON-SCHEMA] §5.2).
+    are selected from — which has no values of its own. The mark is
+    then an assertion, admitted and verified in the manner of
+    `@disjoint`, where `@final` beside a selector is refused. Whether
+    the members are recovered from those fields or from a tag is the
+    body's own `discriminators` and needs no mark at all
+    ([TSON-SCHEMA] §5.2).
     Abstractness is never inherited: a subtype is OPEN unless it says
     otherwise, since carrying the mark downward would leave a family
     with no concrete member at all. `@abstract` with `@final` on one
     declaration is a schema-load error.
+
+    **A family is open across schemas.** [TSON-SCHEMA] §3.3.4 makes
+    `subtypes` open, so an importing schema may declare a further
+    member; a host language's own closed-set construct, generated
+    from a family, is therefore relative to one closure and not a
+    promise the schema makes.
     """
   abstract => @annotation void
 
