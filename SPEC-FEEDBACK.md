@@ -573,13 +573,14 @@ position is.
 
 ---
 
-## 10. `@discriminator` is scoped to choices, where its mechanism cannot reach; it belongs to subtype families
+## 10. The discriminator belongs to a subtype family, and it is field syntax rather than an annotation
 
 **Documents:** [TSON-SCHEMA] §6 (`@discriminator`, `@rest`), §5.4 (choices, `@disjoint`), §5.7 (the refinement
 transition table), §5.8 (composition), §5.11 (field groups), §7.2 (subsumption); [TSON-JSON] §6.1.5
 (subsumption), §8.2 (the discrimination predicate), §8.4 (discriminated choices). Also OpenAPI 3.1's
 `discriminator`, which the proposal is a conversion target for.
-**Kind:** design proposal, plus two underspecifications in the check list §6 does state.
+**Kind:** design proposal, plus two underspecifications in the check list §6 does state. **All of it is
+running**, in both encodings.
 
 **What §6 already states, so that what is proposed against it is visible.** `discriminator => @annotation
 field_name` stands on a **choice** declaration and names the field a member-dispatching encoding selects the
@@ -592,11 +593,12 @@ does not reopen it** — the coupling is concrete, [TSON-JSON] §8.4 making the 
 pin an author fixed as a version marker would silently become mandatory on the wire. What follows is a
 proposal about the annotation's *target*, not about deriving it.
 
-**The proposal: the target is a subtype family, not a choice.** The annotation moves to the field, in the base
-type of a composed family, and is bare:
+**The proposal: the target is a subtype family, and the spelling is a field modifier.** The mark leaves the
+annotation channel entirely: the base's selector is written **`=?`**, beside §5.2's own `~` and `=`, and reads
+as *pinned, but not here — the members pin it*:
 
 ```
-pet      => @sealed { @discriminator pet_type: text  name: text }
+pet      => @abstract { pet_type: text =?  name: text }
 dog_type => pet & { pet_type: = "dog"  breed: text }
 cat_type => pet & { pet_type: = "cat"  indoor: boolean }
 ```
@@ -604,7 +606,7 @@ cat_type => pet & { pet_type: = "cat"  indoor: boolean }
 A position typed `pet` — or `[pet]` — then admits any subtype under §7.2, and the `pet_type` member recovers
 which. An explicit choice `( dog_type | cat_type )` is **out of scope** and keeps the variant tag it has today.
 
-**The reason is structural, not a simplification.** `@discriminator` marks a *field*, so it can only exist where
+**The reason is structural, not a simplification.** The mark is on a *field*, so it can only exist where
 the position has an expected record type whose fields a decoder knows before it dispatches. At a choice position
 there is no such type: recovering one would mean computing the variants' common supertype, a derivation the
 language does not have and should not gain. §6's present spelling works around the absence by naming the field
@@ -635,11 +637,12 @@ resolver error of consequence 3.
 
 **Five consequences, each an improvement on the present shape.**
 
-1. **The mark becomes a bare marker on a field**, `@rest`'s shape rather than `@rest`'s standing — the
-   `field_name` parameter disappears, and with it the only place in the series where an annotation names a field
-   by string. Where the fact then *lives* is #11's question, and its answer is `record.discriminators`: the
-   spelling is annotation-shaped and the resolver consumes it into the body, so the two marks §6 introduces
-   together end up in different places, `@rest` genuinely an annotation and this one not.
+1. **The mark becomes field syntax**, and with it the only place in the series where an annotation names a
+   field by string disappears. `=` and `?` are both already in [TSON-DATA] §7.2.5's closed special-token set,
+   so the frozen Class 1 lexer is untouched and §12.1 gains one alternative:
+   `field-modifier = ws ("~" / "=") ws ( token / absent ) / ws "=" ws "?"`. Where the fact then *lives* is
+   #11's question, and its answer is `record.discriminators` — so of the two marks §6 introduces together,
+   `@rest` stays an annotation and this one is not one at all.
 2. **It is the shape converted contracts arrive in.** OpenAPI's `discriminator` sits on the *base* schema with
    subtypes composing it, which is this arrangement and not the choice one. A converted contract lands on the
    mechanism directly.
@@ -649,12 +652,12 @@ resolver error of consequence 3.
    discriminator would let that import silently flip the family from discriminated to not, breaking every
    existing producer with no diagnostic anywhere. Declared on the base, the mark is an obligation that
    propagates: a new subtype failing to pin the field is a resolver error **in the importing schema**, which is
-   the schema that broke it. This makes `@discriminator` unlike `@disjoint` — it is not an assertion about a fact
+   the schema that broke it. This makes the selector unlike `@disjoint` — it is not an assertion about a fact
    the resolver derives anyway, it is the declaration that creates the obligation.
 4. **The mechanism is encoding-neutral, and both encodings claim it.** At a `pet`-typed field in text a value is
    likewise exactly `pet` without `!dog_type`, so structural recovery of the subtype is available to both
    encodings from one rule, and §6's "neither needed by TSON text" holds only for the choice framing. **In text
-   the tag is not required at a SEALED position and must agree where it is written** — the same standing
+   the tag is not required at a member-dispatched position and must agree where it is written** — the same standing
    [TSON-JSON] §8.4 gives `$type`, so one rule serves both and the discriminator field is not a field the
    reference encoding declares and never reads. At an ABSTRACT position, which has no discriminator to dispatch
    on, the tag is required in both encodings. The dispatch mode is therefore a property of the type (#11), not a
@@ -671,7 +674,7 @@ contract, and its inheritance-style usage maps onto this proposal mechanically:
 
 | OpenAPI | TSON |
 |---|---|
-| `discriminator.propertyName: petType` on the base | `@discriminator pet_type: text` on the base record |
+| `discriminator.propertyName: petType` on the base | `pet_type: text =?` on the base record |
 | a subtype's `allOf: [$ref base, {…}]` | `dog_type => pet & { … }` |
 | `mapping: { dog: '#/…/Dog' }` | `dog_type => pet & { pet_type: = "dog" }` |
 | no `mapping` — the implicit value is the schema name | `pet_type: = "Dog"`, the name as written |
@@ -693,7 +696,7 @@ the problem — and one base serves the *adjacently* tagged layout just as well,
 tag and a single payload field:
 
 ```
-msg    => @sealed { @discriminator kind: text }
+msg    => @abstract { kind: text =? }
 msg_of => <T, V> msg & { kind: = T  body: V }
 ping   => msg_of<"ping", ping_body>
 pong   => msg_of<"pong", [pong_body]>
@@ -712,7 +715,7 @@ relax.
 
 **One shape does not convert, and the gap is worth stating.** OpenAPI also admits a `discriminator` on a schema whose
 composition is `oneOf` with no shared base. There is no base record for the mark to stand on, so a converter must
-either synthesise one — mint `pet => @sealed { @discriminator pet_type: text }` and compose each variant onto it, making
+either synthesise one — mint `pet => @abstract { pet_type: text =? }` and compose each variant onto it, making
 explicit a relationship the contract left implicit — or fall back to `$type` and lose member dispatch. Synthesis is
 the better answer and is mechanical, but a converter taking it should say so, since it adds a type the author did not
 write. Two further contracts are refused rather than converted: a `mapping` not covering every variant (the pins must
@@ -734,18 +737,22 @@ contract expects it; and the value of member dispatch is largely the diagnostic 
 the tag wrong. The alternative was to read an unmatched value as a plain `pet`, which needs no new concept and is
 usually caught downstream by record closure (§7.2) — but the diagnostic then names `breed` where the fault is one
 character in `pet_type`, and a subtype adding no fields of its own is not caught at all. **The fact cannot ride
-the annotation**, so taking it forces a kernel change; #11 is that change, and the base is SEALED there.
+the annotation**, so taking it forces a kernel change; #11 is that change, and the base is ABSTRACT there, its
+selectors named beside it.
 
-**On the name.** The field mark is not `@sealed`. It stands on a *field* — it is `@rest`'s shape, which is
-consequence 1 — and `@sealed pet_type: text` describes the field rather than the family; moving it to the
-declaration to fix that reintroduces either the field-name string this proposal removes or the derivation §6
-refused. The two facts are separable in any case: a family may want the closed-set claim while its wire form stays
-`$type`, which is why #11 carries them as distinct members of one enum, ABSTRACT and SEALED. `discriminator` is
-also the word an author converting a contract will search for. The name is not idle: #11 spends it at the
-*declaration*, where `@sealed` is the member's own mark and requires that this one appear in the body.
+**On the spelling, and what it costs.** `=?` is a *field* modifier because the fact is a field's: `~` says
+defaulted here, `=` says pinned here, and `=?` says pinned, by the members. A declaration-level mark would
+reintroduce either the field-name string this proposal removes or the derivation §6 refused. The precedent for
+deriving a type-level property from a member-level mark is C++'s pure-virtual `= 0`, which makes its class
+abstract without a keyword; what TSON borrows is the direction, not the symbol. **The cost is the word.**
+`discriminator` is what an author converting an OpenAPI contract searches for, and punctuation is not
+searchable — so the spec's index and every diagnostic should carry the word ("field `pet_type` is this
+family's discriminator, written `=?`"), which is what this implementation's messages do. `?` also risks
+reading as "optional", so §5.2 should state the reading outright; an optional type with `=?`
+(`pet_type: text? =?`) is a resolver error, a selector that may be absent selecting nothing.
 
-**The check list, restated for the family.** At the base: the declaration carries `@sealed` — the mark and the
-mark on the field are each other's condition, below; the annotated field's declared type resolves, after its
+**The check list, restated for the family.** At the base: the declaration carries `@abstract`, below; the
+marked field's declared type resolves, after its
 reference chain, to an atom-family instance or an enum — *not* free here, because §5.2 grants that only to a field
 carrying a value and the base's field carries none; its state is exactly REQUIRED, neither OPTIONAL (the base
 could omit it), FIXED (nothing could override it) nor DEFAULT (a document could); and it is not a group member.
@@ -754,14 +761,19 @@ already argues for `@rest` — what differs is that `@rest` admits one such fiel
 tuple case below. Over the linked closure: every entry in `subtypes`, transitively, pins each marked field
 `REQUIRED_FIXED`; and the pins are pairwise distinct.
 
-**The two marks are each other's condition, and that is a deliberate redundancy.** `@discriminator` on a field
-requires `@sealed` on the declaration, and `@abstract` on a declaration forbids `@discriminator` anywhere in its
-body. Neither check is load-bearing for the resolver — with one rule the other fact follows — and that is the
-point: it is the author who is being checked, not the schema. A family is either tag-dispatched or
-member-dispatched, the two admit different documents, and the difference is one word at the top of a declaration
-and one word deep inside it. Requiring both means the two words cannot drift apart silently, in either direction:
-adding the field to an `@abstract` base fails, and removing it from a `@sealed` one fails. The cost is a word an
-author must write twice; what it buys is that the intent is stated where each half of it is read.
+**`=?` requires `@abstract`, and nothing states the dispatch twice.** A selector says the members pin it, so
+the record is the base they are selected from and has no values of its own — which the declaration must state,
+instantiability not being derivable from a field. That the family is *member*-dispatched rather than
+tag-dispatched is **not** a second mark: it is whether any field carries the spelling, read off the body as
+`choice.disjoint` is (#11).
+
+**What that gives up, stated rather than glossed.** An earlier draft of this entry paired the field mark with a
+declaration mark so that neither could drift: removing a base's last selector would fail at the schema that
+changed. Without the pair it does not — the family silently degrades to tag dispatch, the tag turns REQUIRED at
+every position typed by the base, and every untagged document in the world stops validating. That is accepted:
+an author deleting a discriminator is editing the family deliberately, and a redundant mark is a word written
+twice on every base to catch one edit. An optional `@disjoint`-style assertion would buy the check back if the
+case ever bites.
 
 **Two underspecifications in the list §6 states today, which survive the move.**
 
@@ -789,19 +801,25 @@ pattern or a flattening step. Both are properties of those consumers and neither
 **Two consequences to state in prose rather than check.** A family discriminates **one level**: a subtype of a
 subtype inherits its parent's pin and §5.7 forbids changing it, so it dispatches to its parent and relies on
 §7.2 plus the encoding's tag for the rest — the same conclusion [TSON-JSON] §8.4 already reaches for subtypes of
-variants. And a second `@discriminator` on an intermediate type is the nesting escape hatch, which this proposal
+variants. And a second selector on an intermediate type is the nesting escape hatch, which this proposal
 deliberately leaves out of the first design.
 
-**What is running:** the proposal, in both encodings, as #11 and #13 describe — `@discriminator` on a base
-field, `@sealed` on the declaration, the closure checks with pins compared as values and the group-member
-check, and member dispatch at a sealed position. The [TSON-JSON] half of the change is made: §6.1.5 now reads
-the untagged object by the position's own extension fact, §8.2 is one condition rather than two, §8.4 states why
-a choice has no discriminator, and §1.6 records the Part 2 dependency as proposed rather than landed.
+**What is running:** the proposal, in both encodings, as #11 and #13 describe — `=?` on a base field,
+`@abstract` on the declaration, the closure checks with pins compared as values, and member dispatch at such a
+position. `@discriminator` and `@sealed` are **refused** where written, each message naming what states the
+fact now; ignoring them would let a meta-schema make them ordinary annotations that dispatch nothing. The
+group-member check is now two rules: §5.11 makes a value modifier a parse error on a member, so the spelling
+cannot reach one, and the linker still refuses a member that acquires the mark by refinement. The [TSON-JSON]
+half of the change is made: §6.1.5 now reads the untagged object by the position's own extension fact, §8.2 is
+one condition rather than two, §8.4 states why a choice has no discriminator, and §1.6 records the Part 2
+dependency as proposed rather than landed.
 
-**Suggested resolution.** Retarget §6's `@discriminator` from a choice declaration to a record field, as a bare
-`void` marker beside `@rest`, with the check list above and the §5.7 arrangement stated; name the equality
-relation for pin distinctness and add the group-member check; state the abstract-base rule as a consequence of
-the mark, and say what the shape is for — a sealed hierarchy in a host language — since that is what makes totality
+**Suggested resolution.** Retire §6's `@discriminator` and spell the selector in §12.1 instead — one
+`field-modifier` alternative, `ws "=" ws "?"`, needing no lexical change — with the check list above and the
+§5.7 arrangement stated; keep the word "discriminator" in the prose and the index, since the symbol is not
+searchable; name the equality relation for pin distinctness and add the group-member check; state that `=?`
+requires `@abstract`, and say what the shape is for — a sealed hierarchy in a host language — since that is what makes
+totality
 and abstractness rules rather than preferences. Leave §5.4 untouched but add a pointer from it, since an author
 reaching for member dispatch at a choice is an author who wants the composed family or the labelled form of §5.11.
 
@@ -813,7 +831,8 @@ reaching for member dispatch at a choice is an author who wants the composed fam
 (composition), §5.9 (removal), §5.10.1 (productivity and inhabitance), §6 (what an annotation may do), §7.2
 (subsumption), §8.1 (resolved output), §8.2 (identity), §12.1 (the schema grammar); [TSON-JSON] §6.1.5, §8.4.
 Reads with #10, and is useful without it.
-**Kind:** design proposal — one kernel field and the enum it takes; one naming choice left open.
+**Kind:** design proposal — two kernel fields and the enum one of them takes; one naming choice left open.
+**All of it is running.**
 
 **What forces it.** §6 gives the criterion for annotation-hood in its own words: "a schema with every annotation
 erased admits exactly the same values." Run that erasure separately on the two halves of #10's mark and they come
@@ -842,10 +861,10 @@ position, and once text dispatches on the member too there is no encoding in whi
 should be deleted rather than repaired: the mark's force is not in either of the two categories §6 admits, which
 is the finding, and the fact belongs in the kernel where erasure cannot reach it.
 
-**The proposal.** `record` gains one field, `record_field` gains one, and the kernel one enum:
+**The proposal.** `record` gains two fields and the kernel one enum:
 
 ```
-record_extension_type => [ABSTRACT SEALED FINAL OPEN]
+record_extension_type => [ABSTRACT FINAL OPEN]
 
 record => product & {
   access_pattern:  product_access_type = NAMED
@@ -853,6 +872,7 @@ record => product & {
   fields:          [record_field]
   groups:          [field_group]?
   extension:       record_extension_type ~ OPEN
+  discriminators:  [field_name]?
   supertypes:      [type_name]?
 }
 
@@ -867,63 +887,51 @@ record_field => {
 **`record.discriminators` and not an annotation, on three arguments that converge.** The erasure test above
 is the first. The second is compilation: a discriminator field is read as a dispatch key rather than as an
 ordinary field, and is non-elidable on the wire, in *both* encodings — a property of the field in the type
-system, not of one encoding's projection of it. The third is the one the design forces on itself: `extension` is
-SEALED exactly when the record is abstract and some field is a discriminator, so a kernel body field's value
-would otherwise be a function of the annotation channel. Beyond the layering inversion, §6 resolves an annotation
-one hop against the governing meta — so a schema whose meta does not declare `discriminator` could never reach
-SEALED, making a kernel member's reachable values depend on which meta-schema governs the document. With the
-field in the body the derivation reads the body alone, and every schema can express it exactly as every schema
-can already express `state` and `value`.
+system, not of one encoding's projection of it. The third is the one the design forces on itself: whether a
+position is placed by its members is read off `discriminators`, so with the names in the annotation channel a
+kernel-level reading would depend on it. Beyond the layering inversion, §6 resolves an annotation one hop
+against the governing meta — so a schema whose meta did not declare the name could never dispatch on members at
+all, making a kernel-level fact depend on which meta-schema governs the document. With the names in the body
+the reading is of the body alone, and every schema can express it exactly as every schema can already express
+`state` and `value`.
 
 **`@rest` stays an annotation, and the contrast is now sharp.** §6 introduced the two together as checked
 annotations; the erasure test separates them. Erase `@rest` and the text and CBOR encodings are untouched — they
 write the map nested — so its force really is confined to the encodings that claim it, which is §6's bullet
-working as written. `@discriminator` had that standing only while text declined the directive.
+working as written. The selector had that standing only while text declined the directive.
 
-**The four members.**
+**The three members, and the fact that is not one of them.**
 
 - **OPEN** — direct instances, and any schema in the closure may compose or refine onto it. Every record's
   behaviour today, and the default.
-- **ABSTRACT** — no direct instances: no value's effective type is this record, and a position typed by it admits
-  exactly its subtypes, each selected by the tag (`$type` in JSON, `!dog_type` in text), which is therefore
-  REQUIRED at the position. No field of it may be a discriminator: that is SEALED's case, and the two marks are
-  each other's condition (#10).
-- **SEALED** — ABSTRACT plus member dispatch: the record carries one or more discriminator fields (#10) and a
-  position typed by it selects the subtype by reading them. **The tag is optional at a SEALED position and MUST
-  agree where written** — in both encodings, which is the standing [TSON-JSON] §8.4 already gives `$type`.
+- **ABSTRACT** — no direct instances: no value's effective type is this record, and a position typed by it
+  admits exactly its subtypes.
 - **FINAL** — direct instances, and nothing may be a subtype: composition or refinement naming it is a resolver
   error, in the declaring schema and in any schema that imports it.
 
-**Four marks in, two kernel fields out.** The author writes exactly one of `@abstract`, `@sealed` and `@final` at
-the definition (`pet => @sealed { … }`; §6 honours a checked annotation at either position, so the key spelling
-lowers identically), or none, and `@discriminator` on a field. Each mark names its member, and `extension` is a
-function of which mark was written — OPEN where none was. Two definition marks on one declaration is a load error,
-whichever two.
+**How a subtype is selected is `discriminators`, not a fourth member.** An ABSTRACT record naming none is
+selected by the tag (`$type` in JSON, `!dog_type` in text), which is therefore REQUIRED at the position; one
+naming selectors is selected by reading them, and **the tag is then optional and MUST agree where written** —
+in both encodings, the standing [TSON-JSON] §8.4 already gives `$type`. An earlier draft spent an enum member
+(SEALED) on this. It said a second time what the body carries, which is the one arrangement in which the two
+can disagree; the derivation is `choice.disjoint`'s shape and is read where it is needed.
 
-**The member is written and the body must agree, which is not where this started.** An earlier draft derived
-SEALED — ABSTRACT with at least one discriminator field, both facts of the body — in the manner of
-`choice.disjoint` (§5.4). The two marks make that redundant, and deliberately: `@discriminator` on a field
-**requires** `@sealed` on the declaration, and `@abstract` **forbids** a discriminator anywhere in its body, so
-the mark and the body condition imply each other and either could be dropped. Neither is, and the reason is not
-the resolver's. A family is tag-dispatched or member-dispatched, the two admit different documents, and under a
-derivation the whole difference is one word buried in a field list. Requiring the pair means the two halves cannot
-drift apart in either direction: adding the field to an `@abstract` base fails, and removing it from a `@sealed`
-one fails. The cost is a word written twice.
+**Two marks in, two kernel fields out.** The author writes exactly one of `@abstract` and `@final` at the
+definition (`pet => @abstract { … }`; §6 honours a checked annotation at either position, so the key spelling
+lowers identically), or neither, and `=?` on each field the members pin. The mark names its member and
+`extension` is a function of which was written — OPEN where none was; the field spelling fills
+`discriminators`. Two definition marks on one declaration is a load error.
 
-`@disjoint` is the nearest precedent and the analogy is now partial, which is worth stating rather than glossing.
-`disjoint` is genuinely computed and the assertion is pure — absent, present-and-verified, present-and-refuted, and
-the fact is the same in all three. `@sealed` carries ABSTRACT as well as asserting, and its absence is not silent:
-a discriminator field without it is an error, where a non-disjoint choice without `@disjoint` is ordinary. What the
-two share is the shape of the value — the check can only agree or fire, and what it buys is that someone else's
-later edit cannot quietly invalidate the intent.
+**The marks are stated and the selectors are derived, and the split is not arbitrary.** Instantiability is not
+a fact of any field: nothing in a body says whether the author meant this record to have values of its own, so
+`@abstract` is written and `=?` requires it (#10). How the members are then *selected* is a fact of the body —
+whether any field carries the spelling — so deriving it adds no claim an author could have made differently.
 
-What the pair catches that a derivation could not is the **base** losing its `@discriminator`. Under a derivation
-the family would degrade SEALED → ABSTRACT: the tag turns REQUIRED at every position typed by it, every untagged
-document in the world stops validating, and nothing fails in the schema that changed. The marks make that edit
-fail where it is made. A subtype that forgets its pin needs no mark to be caught — the closure rule is
-unconditional — so this is the one failure the redundancy is actually for.
+`@disjoint` is the nearest precedent for the derived half and the analogy is close: `disjoint` is computed from
+the variants, and member dispatch is computed from the selectors. What differs is that `@disjoint` has an
+optional assertion spelling and this has none, which is the redundancy #10 records as given up.
 
-**A template may be abstract or sealed and may not be final, and the asymmetry is the marks' own.** §5.10 makes
+**A template may be abstract and may not be final, and the asymmetry is the marks' own.** §5.10 makes
 a template not a type: only an application is, and each application mints its own entry. ABSTRACT constrains the
 marked type alone — no direct instances — which is true of every instantiation identically and needs nothing else
 known, so `result => @abstract <T> { … }` with `ok => <T> result<T> & { … }` is meaningful and is the shape a host
@@ -932,32 +940,29 @@ application written out, so the mark is stated inside that text and materialisat
 `record` constructor's own reader: closing `result<text>` yields an ABSTRACT entry, and the family it is abstract
 over is the one §5.8's reference-valued `supertypes` builds — `ok<text>` is a member of `result<text>`'s and not
 of `result<int32>`'s. The mark is written **before** the parameter list, §12.1 putting a declaration's
-annotations ahead of the type-def that the parameters open. SEALED and FINAL are claims about *other*
-declarations — that every subtype pins distinctly, that nothing composes onto this one — and a template has no
-set for such a claim to range
-over. `subtypes` is an index over entries (§8.2), and an instantiation entry exists only where some schema writes
+annotations ahead of the type-def that the parameters open. FINAL is a claim about *other* declarations —
+that nothing composes onto this one — and a template has no set for such a claim to range over. `subtypes` is an index
+over entries (§8.2), and an instantiation entry exists only where some schema writes
 that application, so the claim's subject would be assembled from whichever applications a closure happens to
 contain: `ok<T>` composing onto `result<T>` puts nothing in `result<text>`'s index unless someone also writes
-`ok<text>`, and writing it in a fourth schema would change the family without touching its declaration. **Both
-marks were therefore a resolver error on a template**, and `@abstract` was not. **#13 has since settled this,
-and the correction is running**: the argument above holds where a type parameter multiplies the families, and
-does not reach a family whose members *are* the applications, which is one family with one index. So SEALED is
-admissible there under one condition — a discriminator's declared type must contain no type parameter — and
-only FINAL stays refused, for the reason #13 gives rather than the set-membership one above: every application
-is a subtype of the base by construction, so the mark would forbid the applications it exists alongside.
+`ok<text>`, and writing it in a fourth schema would change the family without touching its declaration. FINAL
+therefore stays a resolver error on a template, and for the sharper reason #13 gives rather than the
+set-membership one above: every application is a subtype of the base by construction, so the mark would forbid
+the applications it exists alongside. **Member dispatch reaches a template, and #13 settles how**: a family
+whose members *are* the applications is one family with one index, and its selectors are derived — a `=?`
+field, or one pinned to a value parameter — under one condition, that a selector's declared type contain no
+type parameter.
 
 The disanalogy with the host language is worth stating, because the host language is where the intuition comes
 from: Java's `sealed abstract class Result<T> permits Ok, Err` has one class carrying one permits list, and its
 sealing is over classes rather than parameterisations. A TSON template has no such single carrier — there is no
-entry for "the generic type", only one per application — which is the same fact from the other end. An author
-wanting a sealed generic family seals a closed declaration and parameterises below it.
+entry for "the generic type", only one per application — which is the same fact from the other end.
 
-**Why the member carries it rather than the derivation.** ABSTRACT and SEALED differ in the *reading rule* and not
-only in bookkeeping — at ABSTRACT the tag is required, at SEALED it is optional and asserting — so a compiler
-reads one member and knows which reader to build, where a three-member enum would leave that difference to be
-recomputed at every position from the presence of a marked field. The fourth combination the two underlying
-questions admit, no direct instances and no subtypes, has no member and is therefore unrepresentable, which is
-§5.4's move with `disjoint` and not a rule a document could break.
+**Why the enum carries instantiability and nothing else.** The two reading rules — tag required, or selectors
+read and the tag optional — differ by whether `discriminators` is empty, which a compiler reads once when the
+schema compiles and turns into the reader it builds. A member for it would be a second copy of that answer.
+The combination the underlying questions admit but no member spells, no direct instances and no subtypes, is
+therefore unrepresentable, which is §5.4's move with `disjoint` and not a rule a document could break.
 
 **`~ OPEN` is the required state, not the optional one.** REQUIRED_DEFAULT injects (§5.2), so a consumer of
 resolved output never meets an absent `extension` — the guarantee that asking for a required field is asking for
@@ -979,7 +984,7 @@ every permitted subtype of a `sealed` interface to declare `final`, `sealed` or 
 emitting #10's hierarchy has to know which of those a leaf is and today has nowhere to read it from.
 
 **Inhabitance must be left alone, and the tempting rule is wrong.** It reads well: a FINAL or OPEN record is
-inhabited as any record is, an ABSTRACT or SEALED one exactly when one of its subtypes is, and §5.10.1's least
+inhabited as any record is, an ABSTRACT one exactly when one of its subtypes is, and §5.10.1's least
 fixed point then rejects an abstract base with no subtypes as it rejects any other uninhabited entry. **Do not
 adopt it.** The case it refuses is the one an abstract base most exists for: a library schema declaring
 `response => @abstract { … }` and a field typed `response`, with every subtype supplied by the schemas that
@@ -995,7 +1000,7 @@ replaced offered "one of ()", an empty list presented as a choice, which is an i
 follow.
 
 **The member is never inherited, and there is no transition table.** A subtype states its own: `dog_type => pet &
-{ … }` is OPEN by default whether `pet` is SEALED or OPEN, and it must be — otherwise no concrete subtype of an
+{ … }` is OPEN by default whether `pet` is ABSTRACT or OPEN, and it must be — otherwise no concrete subtype of an
 abstract base could exist, which is every subtype there is. §5.7's transition table governs *field states*, whose
 values a refinement inherits and may only tighten; `extension` is a property of the declaration and nothing
 propagates it. The whole of the rule is two lines: composing or refining onto a FINAL record is a resolver error,
@@ -1005,52 +1010,56 @@ and every other declaration states its own member, defaulting to OPEN.
 one and a final one admit different values and are different types — and in resolved output follows §8.1's
 convention, omitted at its default.
 
-**On the member names.** ABSTRACT, FINAL and SEALED are Java's words in Java's senses: `abstract class`, `final`,
-and `sealed` for the closed set with exhaustive dispatch. **C# spells FINAL's concept `sealed`**, so the two words
-collide across major languages; this picks one language and uses it throughout rather than splitting the
-difference. SEALED carries #10's caveat — the family is sealed relative to a governing namespace and extensible
-by an importing schema under the pinning obligation — which is written down there rather than implied here.
+**On the member names.** ABSTRACT and FINAL are Java's words in Java's senses: `abstract class` and `final`.
+**C# spells FINAL's concept `sealed`**, so those two words collide across major languages; this picks one
+language and uses it throughout rather than splitting the difference — one reason less to want a SEALED member,
+the word meaning the opposite thing to half the audience. "Sealed family" survives as prose for the shape #10
+describes, with its caveat: the family is sealed relative to a governing namespace and extensible by an
+importing schema under the pinning obligation.
 
 **The naming left open — the field and the enum type.** Proposed: `extension: record_extension_type ~ OPEN`,
 matching `access_pattern: product_access_type` in shape (a short field name beside an `<owner>_<concept>_type`
-enum). "Extension" covers all four members: ABSTRACT and SEALED make extension mandatory and differ in how the
-extension is selected, OPEN permits it, FINAL forbids it. Considered and not taken: `extensibility`, the same
+enum). "Extension" covers all three members: ABSTRACT makes extension mandatory, OPEN permits it, FINAL
+forbids it. Considered and not taken: `extensibility`, the same
 sense but reading badly under the `_type` suffix; `derivation`, accurate but less current in the surrounding
 vocabulary; `instantiation`, which names the ABSTRACT axis and says nothing about FINAL; and `record_kind`,
 refused outright because §4.1 has already given "kind" to the four base kinds.
 
-**The spelling is provisional, and deliberately so.** The four marks are annotation-shaped for now — `@abstract`,
-`@sealed` and `@final` at the definition, `@discriminator` on a field — and all four are **consumed by the resolver
-into the body** rather than preserved in §8.1's author-annotation channel: the first three into `record.extension`,
-the last into `record.discriminators`. Consumption is the whole of what makes the interim legitimate — a mark
-that lowers into the type is syntax wearing annotation clothing, and none of the four is an annotation in §6's sense
-once it lands. One of these *preserved* would be the erasure violation twice over. It is also what makes the
-arrangement temporary, since a construct that the resolver reads, that is absent from output, and that no schema may
-redefine is a construct §12.1 should eventually spell. Two things the interim needs stated: the four names are
-**reserved** at their positions, so a schema cannot mean something else by them; and resolved output carries the body
-member and not the mark, so there is one carrier for the fact and §8.1's no-hoisting question does not arise.
+**One spelling has already moved, and the other two are provisional.** The selector is §12.1 syntax, `=?`
+(#10), which is where this arrangement was always heading. The two definition marks are annotation-shaped for
+now — `@abstract` and `@final` — and both are **consumed by the resolver into `record.extension`** rather than
+preserved in §8.1's author-annotation channel. Consumption is the whole of what makes the interim legitimate:
+a mark that lowers into the type is syntax wearing annotation clothing, and neither is an annotation in §6's
+sense once it lands. One of them *preserved* would be the erasure violation twice over. It is also what makes
+the arrangement temporary, since a construct that the resolver reads, that is absent from output, and that no
+schema may redefine is a construct §12.1 should spell — as it now does for the selector. Two things the interim
+needs stated: both names are **reserved** at their positions, so a schema cannot mean something else by them;
+and resolved output carries the body member and not the mark, so there is one carrier for the fact and §8.1's
+no-hoisting question does not arise.
 
 **The interim splits the fact across two layers, which syntax is what resolves.** `record_extension_type` and the
-two fields are the kernel's, since the body they sit in is; the four marks are declared in the meta-schema, beside
-`@discriminator`'s old home and on `@doc`'s reachability terms. So the enum a mark names lives one layer below the
+two fields are the kernel's, since the body they sit in is; the two marks are declared in the meta-schema, on
+`@doc`'s reachability terms. So the enum a mark names lives one layer below the
 mark. Nothing breaks — an annotation resolves one hop against the governing meta (§3.3.3) and the meta imports the
-kernel, so a schema governed by either finds all four — but a reader is entitled to ask why a kernel fact is spelled
+kernel, so a schema governed by either finds both — but a reader is entitled to ask why a kernel fact is spelled
 by a meta-schema name. The answer is that the spelling is the part that moves: §12.1 spelling the marks puts the
 notation in the same document as the fields, and the split closes with the annotations rather than being repaired
 where it stands. Moving the declarations into the kernel meanwhile would put author-written vocabulary beside
 `synthetic`, which is the resolver's own, and buy nothing a reader can observe.
 
-**What is running:** the two kernel fields, the four marks, and the lowering.
-`record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
+**What is running:** the two kernel fields, the two marks, the field spelling, and the lowering.
+`record_extension_type => !enum [ABSTRACT FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
 and `record.discriminators: [field_name]?` are in this implementation's meta-kernel and bound by its value
-model. meta.tn declares `abstract`, `sealed`, `final` and `discriminator`, all four `@annotation void`;
-`@discriminator` has moved off `field_name`, so its old choice-level spelling is refused at the annotation's own
-type. **The resolver consumes all four into the body** — the definition mark once, after the body is built, so a
-fresh record, a composition and a refinement cannot disagree about it, and both annotation positions lower
-identically. They are matched by name and never resolved against the governing meta, which is what reserves them:
-they lower under a meta declaring none of them, where an ordinary unknown name is the author's error. Refused
-while lowering: two definition marks on one declaration, a mark carrying a value, and a definition mark on a
-non-record. A template carrying one is lowered into its held body and read back when that body closes (#13),
+model. meta.tn declares `abstract` and `final`, both `@annotation void`, and declares neither `sealed` nor
+`discriminator`: both names are refused wherever they are written, each message naming what states the fact
+now. **The resolver consumes both marks into the body** — the definition mark once, after the body is built, so
+a fresh record, a composition and a refinement cannot disagree about it, and both annotation positions lower
+identically. They are matched by name and never resolved against the governing meta, which is what reserves
+them: they lower under a meta declaring neither, where an ordinary unknown name is the author's error. `=?` is
+never an annotation at all — it is §12.1 syntax, and `FieldModifiers` lowers it into `discriminators` while
+leaving the field REQUIRED and unpinned. Refused while lowering: two definition marks on one declaration, a
+mark carrying a value, a definition mark on a non-record, and `=?` on an optional field. A template carrying one is
+lowered into its held body and read back when that body closes (#13),
 `@final` alone being refused there.
 
 **The load-time checks run too**, one pass in the linker beside the disjointness derivation: nothing may compose
@@ -1061,8 +1070,9 @@ and `= 1.0`. A family is re-judged whenever any part of it is local, so an impor
 one colliding with an imported pin, is refused by the schema that added it.
 
 **JSON reads a family**, which is the half this design exists for: `record.extension` picks the reader when the
-schema compiles, so an ABSTRACT position requires its tag and decodes no member, a SEALED one places the value by
-reading its discriminators, and OPEN and FINAL share the concrete reader — a FINAL record's admissible tag set is
+schema compiles, so an ABSTRACT position naming no selector requires its tag and decodes no member, one naming
+selectors places the value by reading them, and OPEN and FINAL share the concrete reader — a FINAL record's admissible
+tag set is
 empty by construction rather than by a check. The mapping is derived once at compile time and keyed by what the
 pins compare as, so a schema pinning `= 0xFF` selects on a document writing `255`; a table keyed on tokens reads
 that as unmatched. The selected member then re-reads the whole object, which re-verifies the pin as an ordinary
@@ -1084,15 +1094,15 @@ for the earlier one that a mark on a template is refused. The kernel's own three
 compile unchanged — every record OPEN, none naming a discriminator — which is the evidence that the fields
 cost nothing where nothing uses them.
 
-**Suggested resolution.** Add `extension: record_extension_type ~ OPEN` over `[ABSTRACT SEALED FINAL OPEN]` to
-the kernel's `record`, and `discriminators: [field_name]?` to `record` and `template` (#13), stating the four
-members' meanings and their two reading rules, the derivation of SEALED and the two load errors it yields,
-#10's checks over the discriminator field, the FINAL check over composition and refinement, the subtraction
+**Suggested resolution.** Add `extension: record_extension_type ~ OPEN` over `[ABSTRACT FINAL OPEN]` to
+the kernel's `record`, and `discriminators: [field_name]?` to `record` and `template` (#13), stating the three
+members' meanings; state that **how a subtype is selected is `discriminators` and not a member of the enum** —
+tag where it is empty, the marked fields where it is not — and that the two reading rules follow from it;
+state #10's checks over the selector, the FINAL check over composition and refinement, the subtraction
 exemption and why it is not one, the reason inhabitance gains no case for it, the absence of any transition
-table, and the identity consequence; state that a template may be abstract or sealed and may not be final,
-with #13's reasons; state that the marks are consumed rather than preserved and that their names are
-reserved; state the two marks as each other's condition — `@discriminator` requiring `@sealed`, `@abstract`
-forbidding a discriminator — and say that the redundancy is for the author rather than the resolver; correct
+table, and the identity consequence; state that a template may be abstract and may not be final, with #13's
+reasons; state that the marks are consumed rather than preserved and that their names are
+reserved; state that a selector requires `@abstract`, and that nothing marks the dispatch itself; correct
 §6's validity claim; and settle the field and enum names, which is the
 one part this entry does not.
 
@@ -1202,8 +1212,10 @@ pet => @abstract <N, T> {               type: text = N  pet: T }    ; loaded cle
 dog => pet<"dog", dog_type> & { … }
 ```
 
-The first was refused because "`@sealed` states a closed set of subtypes, which a template has none of". The
-second loaded and could not be used: no position could be typed `pet` at all, so `holder => { a: pet }` was
+(Written in the marks of the day; both spell `pet => <N, T> { type: text = N  pet: T }` now, the selector
+being derived from the parametric pin.) The first was refused because "`@sealed` states a closed set of
+subtypes, which a template has none of". The second loaded and could not be used: no position could be typed `pet` at
+all, so `holder => { a: pet }` was
 refused by the same rule that refuses `holder => { a: box }`. One mark was refused loudly and the other was
 accepted and useless. Both now do what the author meant.
 
@@ -1211,8 +1223,8 @@ accepted and useless. Both now do what the author meant.
 *elimination*: a position typed `box` would have to read a value against an element type nothing has fixed,
 leaving a reader to infer arguments from the payload — not underspecified but ill-defined, since `[]`
 determines nothing and two instantiations can accept one document. **None of that reaches an ABSTRACT or
-SEALED base, because no value is ever read against it.** A value there is a value of some member, selected by
-a tag (ABSTRACT) or by reading the discriminator fields (SEALED), and every member is a closed entry with
+family base, because no value is ever read against it.** A value there is a value of some member, selected by
+a tag or by reading the selector fields, and every member is a closed entry with
 every argument already fixed. The existential is eliminated by dispatch, never by inference. This is the
 host-language shape the marks were taken from: `Pet<?>` is a declarable variable type and `new Pet<T>()` is
 not, and §5.2 already forbids the second for an abstract record.
@@ -1227,7 +1239,7 @@ the base's own entry is an artifact nothing else references. So a template carry
 the IS-A chain directly — it is what a type position names, what `subtypes` indexes, and what a host sealed
 type binds to.
 
-**The condition: the pre-dispatch contract must be parameter-free.** A decoder at a SEALED position parses the
+**The condition: the pre-dispatch contract must be parameter-free.** A decoder at a member-dispatched position parses the
 discriminator fields *before* it knows the member, so their declared types cannot be parameters — while their
 pins are exactly what the parameters supply. `type: text = N` satisfies this: the declared type is `text` and
 only the pinned value is parametric. `pet: T` is unconstrained, because nothing reads it until the member is
@@ -1263,12 +1275,12 @@ obstacle, which is what the labelled sum shows. What a base needs is a record bo
 instantiations, and conflating their `extension` is what made this entry's earlier drafts read as though one
 mark governed both.
 
-- **The template's own `extension` is the base's**, derived in the manner of `choice.disjoint` — ABSTRACT, or
-  SEALED where a discriminator survives erasure; never OPEN (nothing can write a value whose type is `pet`
-  rather than some `pet<…>`) and never FINAL (its applications are subtypes by construction). **A stated mark
-  wins over the derivation**, and must: deriving over the top silently corrects the author, which is how
-  `@sealed <T>` once loaded clean with no family check at all. Recording the claim is what lets the linker
-  refuse it against the fields — `@sealed` with nothing marked, `@abstract` with a discriminator.
+- **The template's own `extension` is the base's**, and is always ABSTRACT: never OPEN (nothing can write a
+  value whose type is `pet` rather than some `pet<…>`) and never FINAL (its applications are subtypes by
+  construction). Beside it, `template.discriminators` holds whichever selectors survive erasure, which is what
+  makes the base member-dispatched rather than tag-dispatched. Both are derived in the manner of
+  `choice.disjoint`: there is no claim for an author to state here and so nothing for a stated mark to
+  contradict.
 - **An instantiation's `extension` is stated**, by `@abstract` *inside* the held text, and is OPEN unless the
   template says otherwise. That is how a **second-level** base is spelled: `result<text>` abstract over
   `ok<text>` and `err<text>`.
@@ -1277,18 +1289,18 @@ The two shapes this entry concerns use the levels differently, which is why one 
 labelled sum's members *are* its instantiations, so they must stay concrete and the mark is simply not
 written. `result`/`ok`/`err` puts a base at every argument, so the mark is exactly what makes `result<text>`
 abstract. Measured: marked, `result<text>` closes ABSTRACT and a bare `{ payload: … }` there is refused,
-naming the members; unmarked, it closes OPEN and the same document is accepted. **SEALED does not travel to a
-member and ABSTRACT does**, which is not an inconsistency but the two claims' own scopes: ABSTRACT constrains
-the marked type alone and holds of every application identically, where SEALED asserts *this record has
-discriminator fields to dispatch on* — and closing has just pinned those fields, so a member inheriting the
-word would fail the very rule its own closing created.
+naming the members; unmarked, it closes OPEN and the same document is accepted. **The selectors do not travel
+to a member and ABSTRACT does**, which is not an inconsistency but the two facts' own scopes: ABSTRACT
+constrains the marked type alone and holds of every application identically, where the selectors say *this
+record's members are placed by reading these fields* — and closing has just pinned them, so a member naming
+them would claim a family of its own that it does not have.
 
 **What the base carries: whatever survives erasure.** Drop a value parameter's pin and the field stays
 (`type: text = N` becomes `type: text`); omit a field whose type mentions a type parameter (`value: V`), since
 nothing before dispatch reads it and the member's own entry types it. A base may therefore be **empty** —
 `@abstract { }` is legal and dispatches by tag — so erasure governs what a base holds rather than whether it
-exists. SEALED is the one member with a floor: at least one discriminator must survive, which is the
-condition above, and `@sealed { }` is refused for precisely that reason.
+exists. Member dispatch is what has a floor: at least one selector must survive erasure, which is the
+condition above, and a base claiming dispatch with none is refused for precisely that reason.
 
 Faithful erasure is not required, and that is the point. The natural objection is that `<N, T> { type: text =
 N  pet: T }` has no erasure: drop the parameters and `pet:` has no type. It needs none. What a base must carry
@@ -1296,8 +1308,8 @@ is the part read before dispatch plus the fact that it has no instances, and bot
 list is smaller than its members' is the ordinary case for an abstract record; a base whose field list omits
 what it cannot type is the same thing one step further.
 
-**Which fields dispatch is the record's own statement, not the field's.** `@discriminator` lowers into
-`record.discriminators` on the enclosing record and `template.discriminators` on a template, and
+**Which fields dispatch is the record's own statement, not the field's.** The field spelling `=?` (#10)
+lowers into `record.discriminators` on the enclosing record and `template.discriminators` on a template, and
 `record_field.discriminator` is gone. §5.8 is the reason: it flattens a base's fields into every member, so a
 per-field carrier arrives on each subtype's copy of the selector and has to be cleared there, where a member's
 own declaration simply names none. The list is also what makes the next paragraph possible.
@@ -1337,8 +1349,8 @@ it, and a bind-mode compile never asked for it. An entry with one subtype, no re
 derivation step wearing an entry's clothes.
 
 **Minting is keyed on naming, not on the mark.** An instantiation entry is minted where an application is
-*named at a type position*, and nowhere else. Keying it on the mark instead — ABSTRACT and SEALED templates
-subsume, plain ones instantiate — reads simpler and costs a shape people want: `result => @abstract <T> { … }`
+*named at a type position*, and nowhere else. Keying it on the mark instead — a marked template subsumes,
+a plain one instantiates — reads simpler and costs a shape people want: `result => @abstract <T> { … }`
 with `ok => <T> result<T> & { … }` would leave `ok<text>` and `ok<int32>` both IS-A a flat `result`, and
 `result<text>` would stop being writable at a position at all. Keyed on naming, the two coexist with no regime
 flag: `pet<"dog", dog_type>` is only ever an operand and gets no entry, `result<text>` is written at positions
@@ -1355,13 +1367,15 @@ schema cannot name what it has not heard of (§3.3.4). What moves is which name 
 keyed on the name the author wrote and a diagnostic prints it, the alias being collapsed when readers are
 compiled (§8.3) so a read pays nothing for it.
 
-**The correction to #11.** #11 refuses SEALED on a template because "a template has no set for such a claim to
-range over … the claim's subject would be assembled from whichever applications a closure happens to contain".
-That argument is sound where a *type* parameter multiplies the families — `ok<T>` composing onto `result<T>`
-puts nothing in `result<text>`'s index unless someone writes `ok<text>` — and it does not reach a family whose
-members *are* the applications, which is one family with one index. Nor does openness separate the two cases:
-a plain `@sealed` base is already open across schemas (§3.3.4), and #10 answers that with the pinning
-obligation rather than by refusing the mark. **FINAL stays refused, and now for a better reason**: its only
+**The correction to #11.** #11 refused member dispatch on a template because "a template has no set for such
+a claim to range over … the claim's subject would be assembled from whichever applications a closure happens
+to contain". That argument is sound where a *type* parameter multiplies the families — `ok<T>` composing onto
+`result<T>` puts nothing in `result<text>`'s index unless someone writes `ok<text>` — and it does not reach a
+family whose members *are* the applications, which is one family with one index. Nor does openness separate
+the two cases: a closed base's family is already open across schemas (§3.3.4), and #10 answers that with the
+pinning obligation. The argument has lost its target in any case: with the claim derived rather than marked,
+there is no assertion to refuse — the selectors are there or they are not. **FINAL stays refused, and now for a better
+reason**: its only
 coherent reading on a template would forbid composition onto the base, and every application is a subtype of
 that base, so the mark would forbid the applications it exists alongside — the claim is false of the
 declaration before an author writes a second one.
@@ -1376,15 +1390,18 @@ say and leaves the binding contract where it is.
 **What is running:** all of it, in both encodings. A template carrying `extension` is a family base: it is
 named at a field or element position, it indexes its applications in `subtypes`, and it compiles to a
 dispatching reader — `AbstractTemplateReader` in the text stack and `TreeTemplateAbstractReader` in the JSON
-one, each delegating to the same abstract or sealed record reader a closed base uses, so one rule gets one
+one, each delegating to the same record reader a closed base of the same shape uses, so one rule gets one
 verdict in both (§9.4). Measured: `!holder { p: { type: "dog"  value: { breed: "lab" } } }` selects the dog
 member by its pin, the cat member is selected by its own, and a pin no member states is refused naming the
 base and offering the pins a document could write; an ABSTRACT base dispatches by tag over the aliases a
-document can write. `@sealed` on a template is accepted, `@sealed` with no discriminator is still refused,
-`@final` is still refused, and a discriminator typed by a parameter is refused. The base's `extension` is
-derived — ABSTRACT for a record template with no discriminator, SEALED for a labelled sum, ABSTRACT for a
-composition template — and absent for a container, a constructor application and a reference template, each of
-which is still refused at a type position along with a wrong argument count. The parent-entry design is
+document can write. `@final` is still refused on a template, and a selector typed by a parameter is refused
+where it is written `=?` and passed over where it would only have been derived. The base's `extension` is
+derived and is ABSTRACT for every record template — a labelled sum, a composition template, one with no
+selector at all — and absent for a container, a constructor application and a reference template, each of
+which is still refused at a type position along with a wrong argument count. Its `discriminators` is derived
+too: a `=?` field, or, in a *fresh* record template, a field pinned to a value parameter, one value per
+application being one per member. A refinement or composition template derives none — `array ^ {
+element_type: = T }` pins a constructor's own facet and states nothing about a family. The parent-entry design is
 withdrawn and nothing is minted for a composition operand. `record.discriminators` and `template.discriminators`
 are in the meta-kernel and `record_field.discriminator` is gone; `FamilySelectors` is the one derivation both
 encodings read, recovering a template base's selector *types* from any member — exact rather than a best
@@ -1395,13 +1412,14 @@ tightening table governs a field's state and never its type.
 at a type position, with the reason — the position is never read against the template, only against the member
 dispatch selects — and that a reference template and every non-record body are not, on the four grounds above.
 State the two levels of `extension`, since one mark used to appear to govern both: the base's is **derived**
-(ABSTRACT, or SEALED where a discriminator survives erasure; never OPEN, never FINAL) with a stated mark
-winning over the derivation so that an incoherent claim is refused rather than silently corrected, and an
-instantiation's is **stated** (OPEN unless the template carries `@abstract`). State that SEALED does not
-travel to a member and ABSTRACT does, with the scopes that make that consistent. State what a base carries —
-the fields that survive erasure, a field whose type mentions a type parameter omitted, an empty base legal —
-and the SEALED condition: a discriminator's declared type MUST contain no type parameter, its pin being what a
-parameter supplies. State that an application at a composition operand is subsumed where it stands and mints
+and always ABSTRACT — never OPEN, never FINAL — with `template.discriminators` beside it holding whatever
+selectors survive erasure, and an instantiation's is **stated** (OPEN unless the template carries
+`@abstract`). State that the selectors do not travel to a member and ABSTRACT does, with the scopes that make
+that consistent. State what a base carries — the fields that survive erasure, a field whose type mentions a
+type parameter omitted, an empty base legal — and the condition on a selector: its declared type MUST contain
+no type parameter, its pin being what a parameter supplies. State that a field pinned to a value parameter in
+a fresh record template **is** a selector, one value per application being one per member, so a labelled sum
+needs no spelling of its own. State that an application at a composition operand is subsumed where it stands and mints
 nothing, that an instantiation entry is minted only where an application is named at a type position, and that
 both rules are keyed on the position rather than on the mark. State that the member's body records the
 application as written (§5.8's `[type_ref]` channel, #12) while the derived index records the base, and that
@@ -1409,9 +1427,9 @@ application as written (§5.8's `[type_ref]` channel, #12) while the derived ind
 `record` and `template`, with §5.8's flattening as the reason. **Amend §1.3**: a resolved-output consumer must
 support naming a template entry at a type position and dispatching on its `extension` and `discriminators`,
 and must never need to read a held body — which is what stating the discriminators on the entry buys, and the
-one observable change this entry asks for. Correct #11's blanket refusal: SEALED is admissible on a template
-whose members are its applications, FINAL is not, and the reason FINAL is not should be the one above rather
-than the set-membership argument, which does not apply.
+one observable change this entry asks for. Correct #11's blanket refusal: member dispatch is admissible on a
+template whose members are its applications, FINAL is not, and the reason FINAL is not should be the one above
+rather than the set-membership argument, which does not apply.
 
 ---
 
