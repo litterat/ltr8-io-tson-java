@@ -51,7 +51,7 @@ class SealedFamilyCheckTest {
     void aWellFormedSealedFamilyLoads() {
         isClean(Tson.standard(), "happy", """
                 {
-                  pet => @sealed { @discriminator pet_type: text  name: text }
+                  pet => @abstract { pet_type: text =?  name: text }
                   dog => pet & { pet_type: = "dog"  breed: text }
                   cat => pet & { pet_type: = "cat"  indoor: boolean }
                 }""");
@@ -61,7 +61,7 @@ class SealedFamilyCheckTest {
      * <b>A member does not carry the mark at all.</b> The mark says which field a family dispatches
      * <em>on</em>, which is the base's statement; a member restates the selector to pin it, and what it
      * carries is the value. So the subtype resolves clean without needing an exemption from "a discriminator
-     * requires {@code @sealed}" -- that rule now reads exactly as written, because every mark it sees is one
+     * requires {@code @abstract}" -- that rule now reads exactly as written, because every mark it sees is one
      * the declaration made.
      */
     @Test
@@ -69,7 +69,7 @@ class SealedFamilyCheckTest {
         Tson tson = Tson.standard();
         String schema = schema("inherit", """
                 {
-                  pet => @sealed { @discriminator pet_type: text  name: text }
+                  pet => @abstract { pet_type: text =?  name: text }
                   dog => pet & { pet_type: = "dog" }
                 }""");
         // validateSchema registers a schema that reports nothing, so asking for it again would be a second
@@ -92,7 +92,7 @@ class SealedFamilyCheckTest {
     void aMatrixFamilyIsDistinctAsTuples() {
         isClean(Tson.standard(), "matrix", """
                 {
-                  cell => @sealed { @discriminator row: text  @discriminator col: text  v: int32 }
+                  cell => @abstract { row: text =?  col: text =?  v: int32 }
                   a1 => cell & { row: = "a"  col: = "1" }
                   a2 => cell & { row: = "a"  col: = "2" }
                   b1 => cell & { row: = "b"  col: = "1" }
@@ -102,23 +102,24 @@ class SealedFamilyCheckTest {
     // ── The two marks are each other's condition ─────────────────────────
 
     @Test
-    void aSealedRecordWithNoDiscriminatorIsRefused() {
-        assertTrue(problems(Tson.standard(), "nodisc", "{ pet => @sealed { name: text } }")
-                .contains("is @sealed but no field of it carries @discriminator"));
+    void anAbstractRecordWithNoDiscriminatorIsTagDispatched() {
+        // No selector is no defect: the members are selected by the tag, which is ABSTRACT's own reading.
+        isClean(Tson.standard(), "nodisc", "{ pet => @abstract { name: text } }");
     }
 
     @Test
-    void anAbstractRecordWithADiscriminatorIsRefused() {
-        assertTrue(problems(Tson.standard(), "absdisc",
-                "{ pet => @abstract { @discriminator pet_type: text  name: text } }")
-                .contains("@abstract is the tag-dispatched case and admits no discriminator"));
+    void anAbstractRecordWithADiscriminatorIsTheFamilyBase() {
+        // The spelling the design settles on: '@abstract' states that the record has no values of its own,
+        // and the '=?' field states what its members are selected by. There is no second mark.
+        isClean(Tson.standard(), "absdisc", "{ pet => @abstract { pet_type: text =?  name: text }"
+                + "  dog => pet & { pet_type: = \"dog\" } }");
     }
 
     @Test
     void anOpenRecordWithADiscriminatorIsRefused() {
         assertTrue(problems(Tson.standard(), "opendisc",
-                "{ pet => { @discriminator pet_type: text  name: text } }")
-                .contains("must be @sealed"));
+                "{ pet => { pet_type: text =?  name: text } }")
+                .contains("Mark the declaration '@abstract'"));
     }
 
     // ── FINAL, and the one operation it does not constrain ───────────────
@@ -160,8 +161,8 @@ class SealedFamilyCheckTest {
     @Test
     void aSelectorMustBeRequired() {
         assertTrue(problems(Tson.standard(), "optsel",
-                "{ pet => @sealed { @discriminator pet_type: text?  name: text } }")
-                .contains("is OPTIONAL, and must be REQUIRED"));
+                "{ pet => @abstract { pet_type: text? =?  name: text } }")
+                .contains("is a discriminator ('=?') and optional"));
     }
 
     /**
@@ -174,7 +175,7 @@ class SealedFamilyCheckTest {
         assertTrue(problems(Tson.standard(), "recsel", """
                 {
                   inner => { q: text }
-                  pet => @sealed { @discriminator pet_type: inner  name: text }
+                  pet => @abstract { pet_type: inner =?  name: text }
                 }""").contains("which is not an atom or an enum"));
     }
 
@@ -187,8 +188,8 @@ class SealedFamilyCheckTest {
     @Test
     void aSelectorMayNotBeAGroupMember() {
         assertTrue(problems(Tson.standard(), "grpsel",
-                "{ pet => @sealed { name: text  ( @discriminator pet_type: text | other: text ) } }")
-                .contains("is a member of a field group"));
+                "{ pet => @abstract { name: text  ( pet_type: text =? | other: text ) } }")
+                .contains("a field group member takes no value modifier"));
     }
 
     // ── The closure ──────────────────────────────────────────────────────
@@ -197,7 +198,7 @@ class SealedFamilyCheckTest {
     void aSubtypeThatDoesNotPinTheSelectorIsRefused() {
         assertTrue(problems(Tson.standard(), "nopin", """
                 {
-                  pet => @sealed { @discriminator pet_type: text  name: text }
+                  pet => @abstract { pet_type: text =?  name: text }
                   bird => pet & { wings: int32 }
                 }""").contains("does not pin its discriminator 'pet_type'"));
     }
@@ -207,7 +208,7 @@ class SealedFamilyCheckTest {
     void aDefaultIsNotAPin() {
         assertTrue(problems(Tson.standard(), "defpin", """
                 {
-                  pet => @sealed { @discriminator pet_type: text  name: text }
+                  pet => @abstract { pet_type: text =?  name: text }
                   dog => pet & { pet_type: text ~ "dog" }
                 }""").contains("It is REQUIRED_DEFAULT here"));
     }
@@ -216,7 +217,7 @@ class SealedFamilyCheckTest {
     void twoSubtypesPinningOneValueAreRefused() {
         assertTrue(problems(Tson.standard(), "dup", """
                 {
-                  pet => @sealed { @discriminator pet_type: text  name: text }
+                  pet => @abstract { pet_type: text =?  name: text }
                   dog => pet & { pet_type: = "dog"  breed: text }
                   hound => pet & { pet_type: = "dog"  scent: text }
                 }""").contains("to the same value"));
@@ -236,7 +237,7 @@ class SealedFamilyCheckTest {
     void collidingMembersAreNamedByTheDeclarationsThatCollide() {
         String refusal = problems(Tson.standard(), "displayed", """
                 {
-                  pet => @sealed { @discriminator pet_type: text }
+                  pet => @abstract { pet_type: text =? }
                   pet_of => <T, V> pet & { pet_type: = T  pet: V }
                   a => pet_of<"cat", text>
                   b => pet_of<"cat", int32>
@@ -258,7 +259,7 @@ class SealedFamilyCheckTest {
     void pinsThatDifferOnlyInRadixCollide() {
         assertTrue(problems(Tson.standard(), "radix", """
                 {
-                  code => @sealed { @discriminator id: int32  name: text }
+                  code => @abstract { id: int32 =?  name: text }
                   a => code & { id: = 255  x: text }
                   b => code & { id: = 0xFF  y: text }
                 }""").contains("to the same value"));
@@ -269,7 +270,7 @@ class SealedFamilyCheckTest {
     void pinsThatDifferOnlyInScaleCollide() {
         assertTrue(problems(Tson.standard(), "scale", """
                 {
-                  code => @sealed { @discriminator id: number  name: text }
+                  code => @abstract { id: number =?  name: text }
                   a => code & { id: = 1  x: text }
                   b => code & { id: = 1.0  y: text }
                 }""").contains("to the same value"));
@@ -282,7 +283,7 @@ class SealedFamilyCheckTest {
             !!meta:"%s"
             !!import:"%s"
             {
-              pet => @sealed { @discriminator pet_type: text  name: text }
+              pet => @abstract { pet_type: text =?  name: text }
               dog => pet & { pet_type: = "dog"  breed: text }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 

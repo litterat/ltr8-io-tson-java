@@ -39,12 +39,11 @@ import java.util.Set;
  * end of its reference chain. What <em>is</em> local -- two definition marks on one declaration, a mark
  * carrying a value, a mark on a non-record -- the resolver already refused while lowering.
  *
- * <p><b>The two marks are each other's condition, and the redundancy is for the author.</b> {@code
- * @discriminator} on a field requires {@code @sealed} on the declaration and {@code @abstract} forbids one, so
- * either rule alone would settle the other fact. Both are kept because a family is tag-dispatched or
- * member-dispatched, the two admit different documents, and the difference would otherwise be one word buried
- * in a field list: requiring the pair means removing a base's last discriminator fails at the schema that
- * changed rather than at every reader of an untagged document.
+ * <p><b>A discriminator requires {@code @abstract}, and states the dispatch by itself.</b> A field written
+ * {@code =?} says its members pin it, so the record is the base they are selected from and has no values of
+ * its own -- which the declaration must say, since instantiability is not derivable from a field. Whether the
+ * family is tag-dispatched or member-dispatched is *not* a second mark: it is whether any field carries the
+ * spelling, read off the body the way {@code choice.disjoint} is.
  */
 final class RecordExtension {
 
@@ -92,27 +91,23 @@ final class RecordExtension {
 
         // The *names* this declaration states, never fields resolved from its members: which fields a family
         // dispatches on is the base's own statement (§5.2), and a template nobody has applied yet has no
-        // members to resolve against -- asking for fields here refused a correct `@sealed <T>` for having no
-        // instantiations. It needs no inherited-selector exemption either: a member states no discriminators
+        // members to resolve against -- asking for fields here refused a correct marked template for having
+        // no instantiations. It needs no inherited-selector exemption either: a member states no discriminators
         // of its own, where the per-field mark had to be cleared at each one to say the same thing.
         List<String> declared = FamilySelectors.namesOf(def);
         List<RecordField> marked = declared.stream()
                 .map(selector -> record.fields().stream().filter(f -> f.name().equals(selector)).findFirst())
                 .flatMap(Optional::stream)
                 .toList();
-        if (record.extension() == RecordExtensionType.SEALED && declared.isEmpty()) {
-            violations.add(new Violation(name, "'" + name + "' is @sealed but no field of it carries "
-                    + "@discriminator -- a sealed family is dispatched on its own members, so there is nothing "
-                    + "here to dispatch on. Mark the field subtypes pin, or write @abstract, whose subtypes are "
-                    + "selected by the tag instead (§5.2)"));
-        }
+        // A discriminator makes this record a family base, which has no instances of its own -- so the
+        // declaration must say so. The mark is the author's; that the family is member-dispatched rather
+        // than tag-dispatched is derived from the field (§5.2), and needs no second mark.
         if (!declared.isEmpty() && record.extension() != RecordExtensionType.SEALED) {
-            violations.add(new Violation(name, "'" + name + "': field '" + declared.get(0) + "' carries "
-                    + "@discriminator, so '" + name + "' must be @sealed"
-                    + (record.extension() == RecordExtensionType.ABSTRACT
-                            ? " -- @abstract is the tag-dispatched case and admits no discriminator, and the two"
-                                    + " marks are each other's condition so that neither drifts from the other"
-                            : ", which is the mark for a record dispatched on its own members")
+            violations.add(new Violation(name, "'" + name + "': field '" + declared.get(0) + "' is written "
+                    + "'=?', so its members pin it and '" + name + "' is the base they are selected from -- "
+                    + "which has no values of its own. Mark the declaration '@abstract'"
+                    + (record.extension() == RecordExtensionType.FINAL
+                            ? "; '@final' says the opposite, that nothing may extend it" : "")
                     + " (§5.2)"));
         }
         if (record.extension() != RecordExtensionType.SEALED) {
@@ -289,8 +284,8 @@ final class RecordExtension {
      * <p><b>A marked template is a family base and is judged as one</b> ({@code SPEC-FEEDBACK.md} #13). Its
      * body is held text, so the body checked here is assembled from the two facts the entry states
      * structurally: the derived {@code extension}, and the {@code discriminators} it names. Skipping it
-     * instead -- a guard on {@code parameters().isEmpty()} alone -- would accept
-     * {@code @sealed <T>} with no family check at all: no rule that every member pins every selector, and no
+     * instead -- a guard on {@code parameters().isEmpty()} alone -- would accept a marked template with no
+     * family check at all: no rule that every member pins every selector, and no
      * rule that the pins are pairwise distinct. An unchecked family is worse than a refused one.
      *
      * <p><b>The selector derivation is the reader's own</b> ({@code FamilySelectors}), so the check and the

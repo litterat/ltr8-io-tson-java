@@ -692,6 +692,10 @@ class DefinitionResolverTest {
      * <p>{@code state} is the unmarked {@code REQUIRED} and so is not written: nothing is fixed at
      * declaration, because the value does not exist yet. §5.7's fixation to {@code REQUIRED_FIXED} happens at
      * materialisation, where the value is concrete -- {@code ValueParamFixedFieldTest} pins both ends.
+     *
+     * <p><b>The pin also makes the field this template's selector</b>, which is the derivation and not an
+     * extra claim: one value per application is one value per member, so the base is SEALED over
+     * {@code [value]} with no {@code =?} written (§5.2, {@code SPEC-FEEDBACK.md} #13).
      */
     @Test
     void aParametricFixedValueRidesTheValueSlotAndFixesNothingYet() throws DataBindException {
@@ -702,8 +706,9 @@ class DefinitionResolverTest {
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { fields: [ "
-                        + "{ name: value type: type_ref value: T } ] }\" "
-                        + "extension: \"ABSTRACT\" discriminators: [] } }",
+                        + "{ name: value type: type_ref value: T } ] "
+                        + "discriminators: [ value ] }\" "
+                        + "extension: \"SEALED\" discriminators: [ \"value\" ] } }",
                 write(sized));
     }
 
@@ -2233,7 +2238,7 @@ class DefinitionResolverTest {
     // ── The four marks lower into the body (§5.2, SPEC-FEEDBACK #10/#11) ──
 
     /**
-     * Both marks reach the body: {@code @sealed} into {@code record.extension}, {@code @discriminator} into
+     * Both marks reach the body: {@code @abstract} into {@code record.extension}, {@code @discriminator} into
      * {@code record.discriminators} -- the enclosing record's statement, not the field's.
      *
      * <p>That they lower <em>without</em> the governing meta declaring them is a different property and is
@@ -2245,7 +2250,7 @@ class DefinitionResolverTest {
     @Test
     void aSealedRecordLowersBothMarksIntoTheBody() {
         RecordBody body = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel(
-                "pet => @sealed { @discriminator pet_type: text  name: text }").body());
+                "pet => @abstract { pet_type: text =?  name: text }").body());
 
         assertEquals(RecordExtensionType.SEALED, body.extension());
         assertEquals(List.of("pet_type"), body.discriminators(),
@@ -2256,7 +2261,7 @@ class DefinitionResolverTest {
     @Test
     void aLoweredMarkLeavesNothingInTheAnnotationChannel() {
         TypeDefinition pet = resolveSnippetsAgainstMetaKernel(
-                "pet => @sealed { @discriminator pet_type: text  name: text }");
+                "pet => @abstract { pet_type: text =?  name: text }");
         RecordBody body = assertInstanceOf(RecordBody.class, pet.body());
 
         assertTrue(pet.annotations().isEmpty(), "the definition mark is gone from the channel");
@@ -2293,7 +2298,7 @@ class DefinitionResolverTest {
     @Test
     void aSubtypeOfASealedBaseIsOpenUnlessItSaysOtherwise() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
-                pet => @sealed { @discriminator pet_type: text  name: text }
+                pet => @abstract { pet_type: text =?  name: text }
                 dog => pet & { pet_type: = "dog"  breed: text }""").body());
 
         assertEquals(RecordExtensionType.OPEN, dog.extension());
@@ -2313,7 +2318,7 @@ class DefinitionResolverTest {
     @Test
     void aRestatedFieldPinsTheSelectorAndCarriesNoMark() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
-                pet => @sealed { @discriminator pet_type: text  name: text }
+                pet => @abstract { pet_type: text =?  name: text }
                 dog => pet & { pet_type: = "dog"  breed: text }""").body());
 
         RecordField pinned = dog.fields().stream().filter(f -> f.name().equals("pet_type")).findFirst()
@@ -2334,12 +2339,12 @@ class DefinitionResolverTest {
     @Test
     void aMarkTakesNoValue() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("x => @sealed:\"yes\" { a: text }"));
+                () -> resolveSnippetsAgainstMetaKernel("x => @abstract:\"yes\" { a: text }"));
         assertTrue(thrown.getMessage().contains("takes no value"), thrown.getMessage());
     }
 
     /**
-     * <b>{@code @sealed} is a claim with a subject on a template</b> ({@code SPEC-FEEDBACK.md} #13): a
+     * <b>{@code @abstract} is a claim with a subject on a template</b> ({@code SPEC-FEEDBACK.md} #13): a
      * template carrying {@code extension} takes part in IS-A, and {@code subtypes} holds its own
      * instantiations -- which is exactly the set the claim ranges over. So the mark lowers into the held body
      * like {@code @abstract}, and {@code RecordExtension} judges it against the fields the way it does for a
@@ -2348,11 +2353,13 @@ class DefinitionResolverTest {
     @Test
     void aTemplateMayBeSealed() {
         TypeDefinition box = resolveSnippetsAgainstMetaKernel(
-                "box => @sealed <T> { @discriminator kind: text  v: T }");
+                "box => <T> { kind: text =?  v: T }");
 
         assertInstanceOf(TemplateBody.class, box.body());
-        assertTrue(((TemplateBody) box.body()).template().contains("extension: SEALED"),
-                ((TemplateBody) box.body()).template());
+        // The base's own extension, derived and stated on the entry -- never read back out of the held text,
+        // whose `extension` member is an instantiation's mark (§1.3, SPEC-FEEDBACK.md #13).
+        assertEquals(Optional.of(RecordExtensionType.SEALED), ((TemplateBody) box.body()).extension());
+        assertEquals(List.of("kind"), ((TemplateBody) box.body()).discriminators());
     }
 
     /**
@@ -2364,7 +2371,7 @@ class DefinitionResolverTest {
     void aTemplateCannotBeFinal() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel(
-                        "box => @final <T> { @discriminator kind: text  v: T }"));
+                        "box => @final <T> { kind: text =?  v: T }"));
 
         assertTrue(thrown.getMessage().contains("subtype of it by construction"), thrown.getMessage());
     }

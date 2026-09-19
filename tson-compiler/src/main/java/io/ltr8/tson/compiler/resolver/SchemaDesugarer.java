@@ -760,7 +760,12 @@ final class SchemaDesugarer {
                 case FieldDef field -> {
                     requireFieldNameUnseen(field.name(), seen, "this body declares it twice");
                     fields.add(recordField(field));
-                    if (DefinitionMarks.discriminates(field.name(), field.annotations())) {
+                    // `=?`, or -- in a template -- a pin taken from a value parameter, which supplies one
+                    // value per application and so one per member ({@code SPEC-FEEDBACK.md} #13). Only a
+                    // *fresh* record body derives: this is the declaration that states the selector, where a
+                    // refinement template pinning a constructor's own facet (`array ^ { element_type: = T }`)
+                    // states nothing about a family and flattens through another path.
+                    if (FieldModifiers.discriminates(field) || parametricallyPinned(field)) {
                         discriminators.add(WireForm.scoped(
                                 new TokenValue(field.name(), TokenForm.UNQUOTED)));
                     }
@@ -770,13 +775,6 @@ final class SchemaDesugarer {
                     for (GroupDef.Member member : group.members()) {
                         requireFieldNameUnseen(member.name(), seen, "a group member repeats it -- member "
                                 + "labels share the enclosing record's field namespace");
-                        // A mark on a group member is collected rather than dropped, so the linker can refuse
-                        // it (§5.11 makes a member uniformly OPTIONAL, and a selector that may be absent
-                        // selects nothing). Dropping it here would make the mistake vanish instead.
-                        if (DefinitionMarks.discriminates(member.name(), member.annotations())) {
-                            discriminators.add(WireForm.scoped(
-                                    new TokenValue(member.name(), TokenForm.UNQUOTED)));
-                        }
                         // A group's members are ordinary OPTIONAL fields of the record, and the group records
                         // only their names and its own state (§5.11) -- the same shape the resolver builds.
                         fields.add(WireForm.scoped(new RecordValue(List.of(
@@ -836,6 +834,26 @@ final class SchemaDesugarer {
      * cannot appear in the fresh record body this builds -- {@link FieldModifiers} has no view of an
      * inherited field, and neither does this phase.
      */
+    /**
+     * Whether this field's value is pinned to one of the enclosing template's own value parameters -- a
+     * selector by derivation. A field whose declared <em>type</em> is a parameter is passed over: a position
+     * typed by the template reads a selector before it knows the member, so a type that varies per
+     * application is one it cannot read, and `<T, N> { v: T = N }` is an ordinary template rather than a
+     * family.
+     */
+    private boolean parametricallyPinned(FieldDef field) {
+        if (field.type().isEmpty()
+                || (field.type().get().typeRef() instanceof SimpleRef simple
+                        && currentParameters.contains(simple.name()))) {
+            return false;
+        }
+        return field.modifier()
+                .filter(m -> m.kind() == FieldDef.Modifier.Kind.FIXED)
+                .filter(m -> m.value() instanceof FieldDef.Modifier.Value.Literal literal
+                        && currentParameters.contains(literal.token().text()))
+                .isPresent();
+    }
+
     private ScopedValue recordField(FieldDef field) {
         if (field.type().isEmpty()) {
             throw new SchemaValidationException("field '" + field.name() + "' states only a modifier and no "
@@ -856,7 +874,7 @@ final class SchemaDesugarer {
         // Consumed, not carried: a mark that lowers into the body must not also survive in the annotation
         // channel, or a closed member would state one fact twice and §8.1's output would preserve a mark
         // §6 says is never an annotation.
-        return WireForm.scoped(new RecordValue(members), DefinitionMarks.consumed(field.annotations()));
+        return WireForm.scoped(new RecordValue(members), DefinitionMarks.consumed(field.name(), field.annotations()));
     }
 
     /**

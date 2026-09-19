@@ -8,41 +8,42 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The four marks a resolver reads and consumes: {@code @abstract}, {@code @sealed} and {@code @final} at a
- * declaration, {@code @discriminator} on a field. Each lowers into the body -- the first three into {@code
- * record.extension}, the last into the enclosing {@code record.discriminators} ([TSON-SCHEMA] §5.2, §8.1) --
- * and none survives into §8.1's author-annotation channel, so one carrier holds each fact and §6's no-hoisting
- * question does not arise.
+ * The two marks a resolver reads and consumes: {@code @abstract} and {@code @final} at a declaration. Each
+ * lowers into {@code record.extension} ([TSON-SCHEMA] §5.2, §8.1) and neither survives into §8.1's
+ * author-annotation channel, so one carrier holds the fact and §6's no-hoisting question does not arise.
  *
- * <p><b>The mark is written on a field and lands on the record</b>, because §5.8 flattens a base's fields into
- * every member: a per-field carrier would arrive on each subtype's copy of the selector and have to be cleared
- * there, where a member's own declaration simply names none.
+ * <p><b>There is no mark for member dispatch and none on a field.</b> A record dispatched on its own members
+ * is ABSTRACT with a non-empty {@code record.discriminators}, derived from the body in the manner of {@code
+ * choice.disjoint}, and the fields it dispatches on are written {@code =?} ({@link FieldModifiers}) -- field
+ * syntax rather than an annotation. {@code @sealed} and {@code @discriminator} were the earlier spelling of
+ * both facts and are refused wherever they are written: a meta-schema declaring either name would otherwise
+ * make it an ordinary annotation that lands in output and dispatches nothing.
  *
  * <p><b>They are recognised by name, unconditionally, and that is what "reserved" means.</b> An ordinary
  * annotation resolves one hop against the governing meta (§3.3.3) and means whatever that meta says; these are
  * consumed before the meta is consulted, so a meta-schema cannot give them another meaning and a schema cannot
- * mean something else by them. The meta declares all four anyway ({@code @annotation void}), which is what
- * documents them in the vocabulary an author reads and reserves the names against a meta-schema that would
- * otherwise declare its own. The annotation shape is the interim: §12.1 should spell the four as syntax, and
- * recognising them here rather than through the meta is the arrangement closest to that.
+ * mean something else by them. The meta declares both anyway ({@code @annotation void}), which documents them
+ * in the vocabulary an author reads and reserves the names. The annotation shape is the interim: §12.1 should
+ * spell both as syntax, and recognising them here rather than through the meta is the arrangement closest to
+ * that -- the move {@code =?} has already made for the field half.
  *
- * <p><b>A mark takes no value.</b> Each is declared {@code void}, so {@code @sealed:"..."} states a value for a
- * type that admits none; refusing it here rather than at the annotation's own type is what keeps the reading
- * uniform whether or not the governing meta declares the name.
+ * <p><b>A mark takes no value.</b> Each is declared {@code void}, so {@code @abstract:"..."} states a value
+ * for a type that admits none; refusing it here rather than at the annotation's own type is what keeps the
+ * reading uniform whether or not the governing meta declares the name.
  */
 final class DefinitionMarks {
 
-    /** No instances at a record's own field position -- the record has direct instances of its own. */
+    /** No instances of its own: a value at a position typed by it is a value of some subtype. */
     private static final String ABSTRACT = "abstract";
-
-    /** Abstract and dispatched on its own members: at least one field carries {@link #DISCRIMINATOR}. */
-    private static final String SEALED = "sealed";
 
     /** Direct instances and no subtypes: nothing may compose or refine onto it. */
     private static final String FINAL = "final";
 
-    /** On a field: the member a sealed family dispatches on. */
-    static final String DISCRIMINATOR = "discriminator";
+    /** Retired: the derivation ABSTRACT-plus-discriminators states it. */
+    private static final String SEALED = "sealed";
+
+    /** Retired: the field spelling {@code =?} states it. */
+    private static final String DISCRIMINATOR = "discriminator";
 
     private DefinitionMarks() {
     }
@@ -66,7 +67,7 @@ final class DefinitionMarks {
             if (found != null) {
                 throw new SchemaValidationException("'" + declaration + "': '@" + foundName + "' and '@"
                         + annotation.name() + "' on one declaration -- a record states how it may be realised"
-                        + " once, and the three marks are alternatives rather than companions ([TSON-SCHEMA]"
+                        + " once, and the two marks are alternatives rather than companions ([TSON-SCHEMA]"
                         + " §5.2)");
             }
             found = member;
@@ -75,23 +76,13 @@ final class DefinitionMarks {
         return Optional.ofNullable(found);
     }
 
-    /** Whether a field's written annotations mark it a discriminator, refusing a value on the mark. */
-    static boolean discriminates(String field, List<Annotation> written) {
-        boolean marked = false;
-        for (Annotation annotation : written) {
-            if (DISCRIMINATOR.equals(annotation.name())) {
-                requireBare(field, annotation);
-                marked = true;
-            }
-        }
-        return marked;
-    }
-
     /**
      * {@code written} with every mark removed -- what reaches the annotation channel. Returns the list itself
-     * where nothing is marked, which is every declaration and field but the few that carry one.
+     * where nothing is marked, which is every declaration and field but the few that carry one. Every
+     * annotation position passes through here, which is what makes it the place a retired mark is refused.
      */
-    static List<Annotation> consumed(List<Annotation> written) {
+    static List<Annotation> consumed(String where, List<Annotation> written) {
+        requireNoRetiredMark(where, written);
         for (Annotation annotation : written) {
             if (isMark(annotation.name())) {
                 return written.stream().filter(a -> !isMark(a.name())).toList();
@@ -100,14 +91,33 @@ final class DefinitionMarks {
         return written;
     }
 
+    /**
+     * Refuses a retired mark, naming what states the fact now. Refusing beats ignoring: a meta declaring
+     * either name makes it an ordinary annotation, which lands in output and dispatches nothing.
+     */
+    private static void requireNoRetiredMark(String where, List<Annotation> written) {
+        for (Annotation annotation : written) {
+            if (SEALED.equals(annotation.name())) {
+                throw new SchemaValidationException("'" + where + "': '@sealed' is not a mark -- a record"
+                        + " dispatched on its own members is '@abstract' with at least one field written"
+                        + " '=?', and that the family is member-dispatched is read from the body"
+                        + " ([TSON-SCHEMA] §5.2)");
+            }
+            if (DISCRIMINATOR.equals(annotation.name())) {
+                throw new SchemaValidationException("'" + where + "': '@discriminator' is not a mark -- write"
+                        + " the field as '" + where + ": <type> =?' to say that the members pin it"
+                        + " ([TSON-SCHEMA] §5.2)");
+            }
+        }
+    }
+
     private static boolean isMark(String name) {
-        return memberOf(name) != null || DISCRIMINATOR.equals(name);
+        return memberOf(name) != null;
     }
 
     private static RecordExtensionType memberOf(String name) {
         return switch (name) {
             case ABSTRACT -> RecordExtensionType.ABSTRACT;
-            case SEALED -> RecordExtensionType.SEALED;
             case FINAL -> RecordExtensionType.FINAL;
             default -> null;
         };

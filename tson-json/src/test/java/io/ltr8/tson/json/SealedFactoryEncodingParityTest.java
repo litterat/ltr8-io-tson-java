@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * <p><b>The shape is distinct from the two parity tests beside it, which is why it has its own.</b> {@link
  * CrossEncodingParityTest}'s factory sits over an {@code @abstract} base, so it dispatches by tag and its
  * payload is flat; {@link TemplateFamilyEncodingParityTest}'s base is the template itself. Here the base is a
- * closed {@code @sealed} record and every member is minted, which is what puts [TSON-SCHEMA] §5.7's fixation
+ * closed {@code @abstract} record and every member is minted, which is what puts [TSON-SCHEMA] §5.7's fixation
  * on the dispatch path: {@code kind: = T} is an ordinary REQUIRED_FIXED field of the closed member by the time
  * either encoding reads it, and {@code FamilySelectors} states the selector on the entry, so neither stack
  * parses held text to find what selects.
@@ -43,7 +43,7 @@ class SealedFactoryEncodingParityTest {
             !!meta:"%s"
             !!import:"%s"
             {
-              msg    => @sealed { @discriminator kind: text }
+              msg    => @abstract { kind: text =? }
               msg_of => <T, V> msg & { kind: = T  body: V }
 
               ping_body => { seq: int32 }

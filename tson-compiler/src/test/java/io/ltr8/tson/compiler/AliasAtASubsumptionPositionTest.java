@@ -144,7 +144,7 @@ class AliasAtASubsumptionPositionTest {
      * selected member says what the members already said.
      */
     private static final String SEALED = """
-              pet    => @sealed { @discriminator kind: text  name: text }
+              pet    => @abstract { kind: text =?  name: text }
               dog    => pet & { kind: = "dog"  breed: text }
               d_of   => dog
               p_of   => pet

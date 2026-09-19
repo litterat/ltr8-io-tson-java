@@ -27,14 +27,14 @@ class TsonSealedFamilyReadTest {
             !!meta:"https://tson.io/2026/36/m/meta.tn"
             !!import:"https://tson.io/2026/36/m/core.tn"
             {
-              pet => @sealed { @discriminator pet_type: text  name: text }
+              pet => @abstract { pet_type: text =?  name: text }
               dog => pet & { pet_type: = "dog"  breed: text }
               cat => pet & { pet_type: = "cat"  indoor: boolean }
 
               shape => @abstract { area: int32 }
               square => shape & { side: int32 }
 
-              frame => @sealed { @discriminator opcode: int32  payload: text }
+              frame => @abstract { opcode: int32 =?  payload: text }
               ping => frame & { opcode: = 0xFF  seq: int32 }
 
               holder => { p: pet  s: shape?  u: unpeopled? }

@@ -74,7 +74,7 @@ class CrossEncodingParityTest {
               shape     => ( circle | square )
               picked    => { pick: scalars }
               shaped    => { outline: shape }
-              pet       => @sealed { @discriminator pet_type: text  name: text }
+              pet       => @abstract { pet_type: text =?  name: text }
               dog       => pet & { pet_type: = "dog"  breed: text }
               cat       => pet & { pet_type: = "cat"  indoor: boolean }
               figure    => @abstract { area: int32 }

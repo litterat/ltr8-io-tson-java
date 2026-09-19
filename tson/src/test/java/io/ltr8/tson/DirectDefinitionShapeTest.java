@@ -84,7 +84,7 @@ class DirectDefinitionShapeTest {
     void twoNamesForOneFamilyMemberCollideOnTheirPin() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> resolve("dd5", """
                   dog_type => { breed: text }
-                  pet      => <T, V> { @discriminator type: text = T  value: V }
+                  pet      => <T, V> { type: text = T  value: V }
                   dogs     => pet<"dog", dog_type>
                   hounds   => pet<"dog", dog_type>
                   holder   => { p: pet }

@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * { payload: T }} makes every instantiation abstract, so a value at a {@code result<text>} position is a
  * value of one of that instantiation's own subtypes and must name which.
  *
- * <p><b>Why the mark can be carried where {@code @sealed} and {@code @final} cannot.</b> {@code @abstract}
+ * <p><b>Why the mark can be carried where {@code @abstract} and {@code @final} cannot.</b> {@code @abstract}
  * constrains the marked type alone -- it has no direct instances -- which is true of every instantiation
  * identically, so closing an abstract template yields an abstract entry and nothing has to be recomputed.
  * The other two are claims over a <em>set of subtypes</em>, and a template has none: an instantiation entry
@@ -201,7 +201,7 @@ class AbstractTemplateFamilyTest {
     // ── What is still refused ───────────────────────────────────────────────
 
     /**
-     * {@code @sealed} <b>is</b> a claim with a subject on a template ({@code SPEC-FEEDBACK.md} #13): a
+     * {@code @abstract} <b>is</b> a claim with a subject on a template ({@code SPEC-FEEDBACK.md} #13): a
      * template carrying {@code extension} takes part in IS-A and {@code subtypes} holds its own
      * instantiations, which is the set the claim ranges over. Only {@code @final} still cannot hold --
      * every application is a subtype of the template by construction, so the claim is false before an
@@ -209,11 +209,11 @@ class AbstractTemplateFamilyTest {
      */
     @Test
     void aTemplateMayBeSealedButNeverFinal() {
-        assertNotNull(compile("      box => @sealed <T> { @discriminator kind: text  v: T }\n"),
-                "@sealed states the fact the derivation reaches anyway");
+        assertNotNull(compile("      box => @abstract <T> { kind: text =?  v: T }\n"),
+                "@abstract states the fact the derivation reaches anyway");
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> compile("      box => @final <T> { @discriminator kind: text  v: T }\n"));
+                () -> compile("      box => @final <T> { kind: text =?  v: T }\n"));
         assertTrue(thrown.getMessage().contains("subtype of it by construction"), thrown.getMessage());
     }
 }

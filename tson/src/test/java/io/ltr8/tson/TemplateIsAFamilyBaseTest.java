@@ -65,7 +65,7 @@ class TemplateIsAFamilyBaseTest {
     private static final String SEALED_FAMILY = """
               dog_type => { breed: text }
               cat_type => { indoor: boolean }
-              pet      => <T, V> { @discriminator type: text = T  value: V }
+              pet      => <T, V> { type: text = T  value: V }
               dogpet   => pet<"dog", dog_type>
               catpet   => pet<"cat", cat_type>
               holder   => { p: pet }
@@ -81,7 +81,7 @@ class TemplateIsAFamilyBaseTest {
     @Test
     void aMarkedTemplateIsIndexedUnderItsBase() {
         TsonLinkedSchema schema = linked("f1", """
-                  pet_base => @sealed { @discriminator type: text }
+                  pet_base => @abstract { type: text =? }
                   pet      => <T, V> pet_base & { type: = T  value: V }
                   dog_type => { breed: text }
                   dogpet   => pet<"dog", dog_type>
@@ -101,34 +101,36 @@ class TemplateIsAFamilyBaseTest {
                 schema.schema().entries().get("pet").subtypes());
     }
 
-    // ── Gap 2: @sealed on a template is a claim with a subject ───────────
+    // ── Gap 2: @abstract on a template is a claim with a subject ───────────
 
-    /** The shape the design exists for: an author states the mark the derivation would have reached anyway. */
+    /** The shape the design exists for: the pin is a parameter, so the field is the selector by derivation. */
     @Test
-    void sealedIsAcceptedOnATemplate() {
+    void aParametricPinMakesATemplateAFamilyBase() {
         assertEquals(List.of(), load("f3", """
                   dog_type => { breed: text }
-                  pet      => @sealed <T, V> { @discriminator type: text = T  value: V }
+                  pet      => @abstract <T, V> { type: text = T  value: V }
                   dogpet   => pet<"dog", dog_type>
                 """));
     }
 
-    /** Stated against the derived fact, as {@code @disjoint} is: no discriminator, no sealed family. */
+    /**
+     * No parametric pin and no {@code =?} is no family: the base is ABSTRACT, its members are selected by the
+     * tag, and nothing here is refused for having nothing to dispatch on.
+     */
     @Test
-    void sealedWithoutADiscriminatorIsStillRefused() {
-        assertTrue(load("f4", """
+    void aTemplateWithNoSelectorIsMerelyAbstract() {
+        assertEquals(List.of(), load("f4", """
                   dog_type => { breed: text }
-                  pet      => @sealed <T, V> { type: text = T  value: V }
-                  dogpet   => pet<"dog", dog_type>
-                """).stream().anyMatch(d -> d.message().contains("@discriminator")),
-                "a sealed family needs something to dispatch on");
+                  pet      => <V> { value: V }
+                  dogpet   => pet<dog_type>
+                """));
     }
 
     /** {@code @final} stays refused: every application is a subtype by construction, so it cannot hold. */
     @Test
     void finalIsStillRefusedOnATemplate() {
         assertTrue(!load("f5", """
-                  pet => @final <T> { @discriminator type: text = T }
+                  pet => @final <T> { type: text = T }
                 """).isEmpty());
     }
 
