@@ -142,6 +142,25 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
   name — so this is a decision to take deliberately, not a gap to close by reflex.
 
+- [ ] **A schema-directed JSON record costs twice a schemaless one, and four fixes outside the readers close most of
+  it.** Measured on the allocation harness's order document: 3,481 bytes per three-field record read against its
+  schema, 1,622 for the schemaless tree read of the same JSON. Each fix below is its own change, measured before
+  and after (`JsonAllocationHarnessTest.aSchemaDirectedRecordReadsWithoutLookingAhead`); the first two sit in
+  shared modules, so the TSON reader gains too.
+  - **`Nfc.of` allocates on every call, ASCII included** (~530 B/record). `Normalizer.isNormalized` builds a
+    buffer whatever the input; an ASCII string is NFC by construction and needs no check. And
+    `TreeRecordReader.assemble` re-normalises the *declared* field names on every record, which the factory can
+    do once.
+  - **`IntegerParser.read` recomputes its width bounds per value** (~350 B/record with the lambdas).
+    `read` calls `hostType(size)`, which rebuilds both bounds with `BigInteger.pow`; `STANDARD_BOUNDS` serves only
+    `validate` and `boundTo`, so tree mode's path pays what bind's was fixed for. `validate` also allocates a
+    capturing lambda per constraint per value. `FloatParser` allocates an `Optional` and parse buffers per value.
+  - **A record's `JsonObject` is built twice** (~350 B/record). `assemble` fills a `LinkedHashMap` and
+    `JsonObject`'s compact constructor copies it into another and wraps that; the tree package needs a way to
+    hand over a map nothing else holds.
+  - **Schema pointers are built eagerly** (~250–300 B/record). `JsonSchemaLocation.field` concatenates a pointer
+    string for every field of every record, though one is read only when a diagnostic is reported.
+
 - [ ] **The JSON container factories plan up front and return trimmed readers, one loop per shape.** The hot read
   path has to be easy to follow, so the factory does the thinking and the reader is a flat loop over what it
   decided — not a shared base with hooks, which is `tson-compiler`'s shape and puts every feature's branch in
@@ -151,9 +170,9 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
     first cut: *plain* (no groups, no FIXED or defaulted field — slots, then the required check), *stated*
     (carries the pin and default table), *grouped* (adds the group count). Arrays and maps split where the branch
     runs per element: unique or not, element-optional or not. A specialisation earns its place by moving the
-    allocation harness or visibly simplifying its loop; the harness gets a case per shape, and the 3.9 KB a
-    three-field record costs today is looked into first — per-field data and schema-pointer contexts are the
-    first suspect, and they shape the plain reader more than any split.
+    allocation harness or visibly simplifying its loop; the harness gets a case per shape. The fixes in the entry
+    above come first: they are most of what a record costs, and after them the split is chiefly about a loop
+    that reads plainly rather than about bytes.
   - **One loop per shape, the mode behind a result builder.** The loop fills slots and makes one call at the end
     that turns them into the mode's value — a `JsonObject` in tree mode — through a small interface the factory
     chooses: one indirect call per record, none per field, so the loop carries no mode. Child readers are the
