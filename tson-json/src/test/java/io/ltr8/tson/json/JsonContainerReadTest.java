@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -113,19 +114,20 @@ class JsonContainerReadTest {
      * member lands anywhere. This pins the strict reading that the annotation would later relax.
      */
     @Test
-    void nothingCollectsAnUndeclaredMemberBecauseThereIsNoRestField() {
-        assertTrue(json(read("person", """
-                {"name": "Ada", "shoe_size": 9}""").value()).indexOf("shoe_size") < 0,
-                "an undeclared member reaches the decoded output nowhere");
+    void anUndeclaredMemberIsRefusedBecauseThereIsNoRestField() {
+        Read read = read("person", """
+                {"name": "Ada", "shoe_size": 9}""");
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, read.refusal().code());
+        assertNull(read.value());
     }
 
     /** §3.1: a repeated member name is an error at the repeated occurrence; the later value still wins. */
     @Test
-    void aRepeatedMemberIsRefusedAndTheLaterValueWins() {
+    void aRepeatedMemberIsRefused() {
         Read read = read("person", """
                 {"name": "Ada", "name": "Grace"}""");
         assertEquals(Diagnostic.Code.DUPLICATE_FIELD, read.problems().getFirst().code());
-        assertTrue(json(read.value()).contains("\"name\":\"Grace\""), "the repeat wins: " + json(read.value()));
+        assertNull(read.value());
     }
 
     /** §6.1.6: member order carries no meaning, and a decoder that required one would invent a rule. */
@@ -190,7 +192,7 @@ class JsonContainerReadTest {
         Read read = read("person", """
                 {"name": "Ada", "tries": null}""");
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, read.problems().getFirst().code());
-        assertTrue(json(read.value()).contains("\"tries\":0"), "the default is still what the field decodes to");
+        assertNull(read.value());
     }
 
     /** §6.1.3: a present member at a FIXED field is verified against the pin, never silently overwritten. */

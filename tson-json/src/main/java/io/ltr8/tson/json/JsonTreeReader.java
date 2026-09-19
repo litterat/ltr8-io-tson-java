@@ -2,6 +2,7 @@ package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.CountingReceiver;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -14,6 +15,7 @@ import io.ltr8.tson.json.tree.JsonValue;
 import java.io.InputStream;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Reads a JSON document into a {@link JsonValue} tree -- the peer of {@link JsonObjectReader}, and what
@@ -26,8 +28,8 @@ import java.util.Optional;
  * <p><b>Every problem goes through a {@link DiagnosticsReceiver}</b>, so a read's own receiver decides its
  * fate: {@link DiagnosticsReceiver#throwing()} -- the default -- raises {@code ReadException} at the first,
  * and {@link #withDiagnostics} with {@link DiagnosticsReceiver#collecting()} gathers every problem in one
- * pass. A collecting read <b>still hands back the tree</b>, where {@link JsonObjectReader} hands back
- * nothing: a {@code JsonObject} has somewhere to put a partial answer and a Java record does not.
+ * pass. A collecting read that reported anything hands back no tree, as {@link JsonObjectReader} hands back
+ * no object: the diagnostics, each with a path into the document, are the answer.
  *
  * <p><b>What a tree read is not.</b> It is a JSON document, not a TSON value: no schema has been consulted,
  * {@code null} is a value, and no member name has been read as a field name. [TSON-JSON] §1.3's first
@@ -120,13 +122,13 @@ public final class JsonTreeReader {
      * and a mapped file besides, and a source already in memory is read without a copy.
      */
     public JsonValue read(ByteSource source) {
-        return read(new JsonStream(source, policy, receiver));
+        return counted(r -> r.readEvents(new JsonStream(source, policy, r.receiver)));
     }
 
     /** {@code source} is not closed here. */
     public JsonValue read(InputStream source) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return read(new JsonStream(bytes, policy, receiver));
+            return counted(r -> r.readEvents(new JsonStream(bytes, policy, r.receiver)));
         }
     }
 
@@ -135,9 +137,13 @@ public final class JsonTreeReader {
      *
      * <p>The source is drained through {@link JsonEvent.EndOfDocument} -- the pull past the root value is
      * what rejects trailing content, so a read that stopped at the root's last event would accept
-     * {@code "[1] 2"}.
+     * {@code "[1] 2"}. A problem the source reports to a receiver of its own is not this read's to count.
      */
     public JsonValue read(JsonEventSource events) {
+        return counted(r -> r.readEvents(events));
+    }
+
+    private JsonValue readEvents(JsonEventSource events) {
         try {
             JsonReadContext ctx = JsonReadContext.of(events, receiver);
             JsonValue root = ENGINE.read(ctx);
@@ -180,6 +186,10 @@ public final class JsonTreeReader {
      * on the code cannot mistake either for the document being wrong.
      */
     public JsonValue readAs(ByteSource source, String rootType) {
+        return counted(r -> r.readRootAs(source, rootType));
+    }
+
+    private JsonValue readRootAs(ByteSource source, String rootType) {
         if (schemaUri == null) {
             throw new IllegalStateException("no schema named -- readAs reads against one, so name it with "
                     + "withSchema(uri); a schemaless read is read(...)");
@@ -227,6 +237,17 @@ public final class JsonTreeReader {
     }
 
     /**
+     * One whole-document read, run on a copy of this reader whose receiver counts: a read that reported anything
+     * returns no tree ({@link CountingReceiver}) -- all-or-nothing, as bind mode is. A placeholder for a refused
+     * value would be the same node as a real absent one, so a partial tree could not say which parts to trust.
+     */
+    private <T> T counted(Function<JsonTreeReader, T> read) {
+        CountingReceiver counting = new CountingReceiver(receiver);
+        T value = read.apply(new JsonTreeReader(policy, counting, schemas, schemaUri));
+        return counting.reported() ? null : value;
+    }
+
+    /**
      * A document that will not parse, reported through this read's own receiver rather than thrown past it
      * -- so a collecting read never throws for a bad <i>document</i>, and a fail-fast one still throws,
      * because its receiver does when handed this.
@@ -246,6 +267,7 @@ public final class JsonTreeReader {
      * this encoding [TSON-DATA] §9.1's bounds): the read ends the same way -- report once, hand back nothing
      * -- but what is reported says this processor declined rather than that the document is malformed.
      */
+
     private JsonValue readFailure(RuntimeException e) {
         receiver.report(e instanceof LimitExceededException limit
                 ? Diagnostic.ofLimitExceeded(limit)

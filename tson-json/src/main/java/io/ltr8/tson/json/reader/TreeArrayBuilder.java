@@ -9,9 +9,9 @@ import io.ltr8.tson.json.tree.JsonValue;
 import java.util.List;
 
 /**
- * Tree mode's array: a {@link JsonArray} of the elements the document stated, an absent or refused element
- * standing as {@link JsonNull} in its slot -- the first being the value itself (§7), the second the placeholder a
- * diagnostic beside it explains. Tree mode keeps what it built.
+ * Tree mode's array: a {@link JsonArray} of the elements the document stated, an absent element standing as
+ * {@link JsonNull} in its slot, the value itself (§7). An array whose read reported anything builds nothing --
+ * all-or-nothing, as bind mode is.
  */
 final class TreeArrayBuilder implements ArrayBuilder {
 
@@ -32,19 +32,21 @@ final class TreeArrayBuilder implements ArrayBuilder {
 
     @Override
     public Object build(JsonReadContext ctx, List<Object> elements, boolean clean) {
+        if (!clean) {
+            return null;
+        }
         for (int i = 0; i < elements.size(); i++) {
-            Object element = elements.get(i);
-            if (element == Slots.ABSENT || element == Slots.REFUSED) {
+            if (elements.get(i) == Slots.ABSENT) {
                 elements.set(i, JsonNull.INSTANCE);
             }
         }
-        @SuppressWarnings("unchecked")   // every slot now holds a node: a child's, or the placeholder just set
+        @SuppressWarnings("unchecked")   // every slot now holds a node: a child's, or the absence just set
         List<JsonValue> nodes = (List<JsonValue>) (List<?>) elements;
         return new JsonArray(nodes);
     }
 
     @Override
     public Object refused() {
-        return JsonNull.INSTANCE;
+        return null;
     }
 }

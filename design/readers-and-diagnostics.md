@@ -12,8 +12,8 @@ git.
   it, is the point.
 - A stated FIXED value is checked, not obeyed, with the **pre-rebind** parser (`FixedCheck`); an omitted
   `OPTIONAL_FIXED` field stays absent while an omitted `REQUIRED_FIXED` one is injected.
-- Collecting mode always keeps reading, a placeholder kept in place; bind mode is all-or-nothing (`ConstructionGuard`)
-  while tree mode keeps everything it built.
+- Collecting mode always keeps reading, so every problem surfaces; the value is all-or-nothing in both modes
+  (`ConstructionGuard` per value, `CountingReceiver` at each facade) — a read that reported anything returns `null`.
 - Reporting instead of throwing obliges a reader to skip (`EventSkip`), or the enclosing frame's next pull sees the
   value it declined.
 - One `ValueIdentity` answers §7.5's duplicate rule, §5.2's FIXED check and §2.6's key identity: a `String` compares
@@ -117,39 +117,37 @@ is small and parsed once.)
   TSON text preserve the offset as written, so this is an identity and never what a reader hands back.
   `Rendered` is the other half: `byte[]` inherits `Object.toString`, so a diagnostic naming one renders it
   through `Rendered` rather than as `[B@6d06d69c`.
-- **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody`
-  carries an `ElementState` governing the value — `{K => V?}`, §5.3's own row and the `state` field the
-  kernel gives `map` — so `MapAbstractReader.decodedValue` gives the array element's
-  two answers: the sentinel under `OPTIONAL`, `FIELD_REQUIRED` under the default `REQUIRED`. It answers
-  above the value's own reader, which is right to refuse the sentinel (`_` is a value of no atom type) —
-  absence is the container's question, the same place `ArrayAbstractReader` asks it. The entry is present
-  with an absent value (§2.9) whichever answer it gets, so it counts toward `min_items`/`max_items` and the
-  refusal costs the value its verdict, not the entry its place; both subclasses already had the no-value
-  form to put there — a `TsonAbsent` in tree mode, a `null` the bound `Map` really holds in bind mode. The
-  **key** is the opposite and unconditional: §2.9 forbids the sentinel there whatever a declaration says,
-  and the parser refuses a `?` on that side for the same reason. **The schemaless reader enforces it too**,
-  which is where the rule most needs enforcing: §2.9 is a Part 1 rule, so Class 1 data is exactly the case
-  it governs, and the map-entry production accepts any data-value in key position — no tier below the reader
-  can refuse one. The tree read reports and keeps the entry (tree mode keeps what it built) and leaves the
-  key out of the duplicate set, a second `_` being this same problem again rather than a repeat of a key the
-  document meaningfully stated. §7.6's table states the same rule from the data side: a map entry value is
-  `_` only when the map type's value state is OPTIONAL, and the entry counts toward the size bounds.
-- **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and
-  a placeholder kept in place (so later indices stay accurate) — Java `null` in bind mode, `TsonAbsent` in
-  tree mode, where the diagnostic, not the node, carries what went wrong; a shape mismatch reports
-  `TYPE_MISMATCH`/`WRONG_ARITY` and returns `null` so a caller doesn't also report every child as missing.
-- **Bind mode is all-or-nothing; tree mode is not** (`ConstructionGuard`, which states the rule once for all
-  nine bind-mode assembly sites). A value whose read reported *anything* — its own field's problem or a
-  descendant's, whether or not it left an argument unfilled — is not assembled and binds to `null`, which
-  propagates to the root. A tree read is the opposite: a `TsonValue` is inspectable structure a caller can
-  hold beside the diagnostics, so both tree readers keep everything they built. The asymmetry is the point,
-  not an inconsistency — a bound object is typed application data whose *existence* is the claim that the
-  document was good, so handing one back for a document already known to be wrong is the failure binding
-  exists to prevent. A stray field (`UNRECOGNIZED_FIELD`) or a repeat (`DUPLICATE_FIELD`) counts like any
-  other diagnostic: the only question the rule asks is whether the document is wrong. `TsonObjectReader`
-  applies the same rule once more at the **document boundary**, covering the two positions the per-value
-  guard structurally cannot — the root value's own framing (no enclosing read brackets it) and a root
-  array/map (a collection tolerates a `null` child where a constructor doesn't). **The mark goes after the
+- **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody` carries an
+  `ElementState` governing the value — `{K => V?}`, §5.3's own row and the `state` field the kernel gives `map` — so
+  `MapAbstractReader.decodedValue` gives the array element's two answers: the sentinel under `OPTIONAL`,
+  `FIELD_REQUIRED` under the default `REQUIRED`. It answers above the value's own reader, which is right to refuse the
+  sentinel (`_` is a value of no atom type) — absence is the container's question, the same place `ArrayAbstractReader`
+  asks it. The entry is present with an absent value (§2.9) whichever answer it gets, so it counts toward
+  `min_items`/`max_items` and the refusal costs the value its verdict, not the entry its place; both subclasses already
+  had the no-value form to put there — a `TsonAbsent` in tree mode, a `null` the bound `Map` really holds in bind mode.
+  The **key** is the opposite and unconditional: §2.9 forbids the sentinel there whatever a declaration says, and the
+  parser refuses a `?` on that side for the same reason. **The schemaless reader enforces it too**, which is where the
+  rule most needs enforcing: §2.9 is a Part 1 rule, so Class 1 data is exactly the case it governs, and the map-entry
+  production accepts any data-value in key position — no tier below the reader can refuse one. The read reports it and
+  leaves the key out of the duplicate set, a second `_` being this same problem again rather than a repeat of a key the
+  document meaningfully stated. §7.6's table states the same rule from the data side: a map entry value is `_` only when
+  the map type's value state is OPTIONAL, and the entry counts toward the size bounds.
+- **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and the
+  read goes on, so every problem in the document surfaces in one pass and later indices stay accurate; a shape
+  mismatch reports `TYPE_MISMATCH`/`WRONG_ARITY` and returns `null` so a caller doesn't also report every child
+  as missing.
+- **Every read is all-or-nothing, in both modes and both encodings** (`ConstructionGuard`, which states the
+  rule once for every assembly site, tree and bind). A value whose read reported *anything* — its own
+  problem or a descendant's — is not assembled and reads to `null`, which propagates to the root. A bound
+  object is typed application data whose existence is the claim that the document was good; a tree is no
+  different in the end, since its placeholder for a refused value would be the same node as a real `_`, so a
+  partial tree cannot say which of its parts to trust. The diagnostics, each with a path into the document
+  the caller holds, are the answer. A stray field (`UNRECOGNIZED_FIELD`) or a repeat (`DUPLICATE_FIELD`)
+  counts like any other diagnostic: the only question the rule asks is whether the document is wrong. Each
+  facade applies the rule once more at the **document boundary**, through a per-read `CountingReceiver`,
+  covering what the per-value guard structurally cannot — the root value's own framing (no enclosing read
+  brackets it), a schemaless read, and a token refusal the stream reports straight to the receiver, past
+  every read context. **The mark goes after the
   framing, before the fields**, so a container type-ref's `UNKNOWN_TYPE_REF` belongs to the enclosing read
   that chose to look there. Narrower uses of the same `ctx.reported()` idiom are unrelated and stay put:
   `MapAbstractReader`/`DataClassObjectReader` asking whether one key bound, `verifyFixed` asking whether one

@@ -150,7 +150,7 @@ class DispatchedAnnotationTest {
         // TYPE_MISMATCH: the name resolves and the type it names is not admissible here. UNKNOWN_TYPE_REF
         // means a name denoting nothing, which this is not.
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.diagnostics().getFirst().code());
-        assertNull(root.get("thing").asString().orElse(null));
+        assertNull(root);
     }
 
     /** The same, in bind mode, where the union bounds the candidates instead of the schema's subtypes. */

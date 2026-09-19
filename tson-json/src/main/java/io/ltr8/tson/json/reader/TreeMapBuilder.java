@@ -11,8 +11,8 @@ import java.util.List;
 
 /**
  * Tree mode's map, in the form the document was written in: a {@link JsonObject} keyed by the member names for the
- * object form, a {@link JsonArray} of two-element arrays for the pairs form. An absent or refused value stands as
- * {@link JsonNull}, as does a refused compound key; tree mode keeps what it built.
+ * object form, a {@link JsonArray} of two-element arrays for the pairs form, an absent value standing as
+ * {@link JsonNull}. A map whose read reported anything builds nothing -- all-or-nothing, as bind mode is.
  */
 final class TreeMapBuilder implements MapBuilder {
 
@@ -32,6 +32,9 @@ final class TreeMapBuilder implements MapBuilder {
     @Override
     public Object build(JsonReadContext ctx, List<String> names, List<Object> keys, List<Object> values,
                         boolean clean) {
+        if (!clean) {
+            return null;
+        }
         if (names != null) {
             JsonObject.Builder members = JsonObject.builder(names.size());
             for (int i = 0; i < names.size(); i++) {
@@ -48,10 +51,11 @@ final class TreeMapBuilder implements MapBuilder {
 
     @Override
     public Object refused() {
-        return JsonNull.INSTANCE;
+        return null;
     }
 
+    /** A clean read's slot as a node: a value, or the absence {@code {K => V?}} admits. */
     private static JsonValue node(Object slot) {
-        return slot == Slots.ABSENT || slot == Slots.REFUSED ? JsonNull.INSTANCE : (JsonValue) slot;
+        return slot == Slots.ABSENT ? JsonNull.INSTANCE : (JsonValue) slot;
     }
 }

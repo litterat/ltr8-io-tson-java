@@ -30,10 +30,9 @@ import java.util.List;
  * <p><b>Frame-free.</b> Draining the source through {@link JsonEvent.EndOfDocument} -- which is what
  * rejects trailing content -- belongs to whoever owns the document, which is the facade.
  *
- * <p><b>Tree mode keeps what it built.</b> A collecting read that found problems still hands back the tree,
- * where {@code DataClassObjectReader} hands back nothing: a {@code JsonObject} has somewhere to put a
- * partial answer and a Java record does not. That asymmetry is deliberate and is the one
- * {@code tson-compiler} already draws between its own two readers.
+ * <p><b>The engine builds; the facade decides.</b> A collecting read carries on past every problem so one pass
+ * finds them all, and the facade hands back no tree for a document that reported anything
+ * ({@code CountingReceiver}) -- every read is all-or-nothing, as {@code DataClassObjectReader}'s is.
  */
 public final class SchemalessTreeReader {
 

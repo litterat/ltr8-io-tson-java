@@ -2,7 +2,6 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
-import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonValue;
 
 /**
@@ -27,9 +26,9 @@ final class TreeAtomKeyedReader implements JsonTypeReader<Object> {
         JsonValue node = Nodes.scalar(ctx.peek());
         int before = ctx.reported();
         Object value = delegate.read(ctx);
-        // As TreeAtomReader: a refused or composite value has only the placeholder, and no identity to judge.
+        // As TreeAtomReader: a refused value is no node, and no identity to judge.
         if (node == null || ctx.reported() > before) {
-            return JsonNull.INSTANCE;
+            return null;
         }
         return new ValueIdentity.Identified(node, ValueIdentity.of(value));
     }

@@ -51,6 +51,7 @@ final class MapTreeReader extends MapAbstractReader<TsonValue> {
     public TsonValue read(TsonReadContext ctx) {
         ctx = ctx.underDeclaration(schemaLocation);
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
+        int mark = ConstructionGuard.mark(ctx);
         Shape shape = expectMapShape(ctx);
         if (shape == Shape.MISMATCH) {
             return null;
@@ -58,6 +59,9 @@ final class MapTreeReader extends MapAbstractReader<TsonValue> {
         List<TsonMap.Entry> entries = new ArrayList<>();
         if (shape == Shape.ENTRIES) {
             readInto(ctx, (key, value) -> entries.add(new TsonMap.Entry(node(key), node(value))));
+        }
+        if (ConstructionGuard.abandoned(ctx, mark)) {
+            return null;
         }
         return new TsonMap(entries, Optional.of(name), annotations);
     }

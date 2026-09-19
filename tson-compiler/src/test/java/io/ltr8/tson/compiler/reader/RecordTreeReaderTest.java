@@ -313,7 +313,7 @@ class RecordTreeReaderTest {
         assertEquals("_", thrown.diagnostic().actual());
 
         DiagnosticsCollector problems = new DiagnosticsCollector();
-        assertEquals(BigInteger.valueOf(7), read(compiled, "{ value: _ }", problems).get("value"));
+        assertNull(compiled.get("point").read(TestDocuments.document("{ value: _ }", problems)));
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
     }
 }

@@ -16,9 +16,10 @@ import io.ltr8.tson.json.tree.JsonValue;
  * an encoder for, so a tree written straight back out is already in it, and an injected default lands where its
  * field is declared instead of appended after everything the document happened to state.
  *
- * <p><b>Tree mode keeps what it built.</b> A refused member, and an {@code OPTIONAL_FIXED = _} member written
- * null, both stand as {@link JsonNull}: the first is the placeholder a diagnostic beside it explains, the second
- * the value itself, presence being the information ([TSON-SCHEMA] §5.2). An absent member is left out.
+ * <p><b>All-or-nothing, as bind mode is.</b> A record whose read reported anything builds nothing: a placeholder
+ * for a refused member would be the same node as a real absent one, and the diagnostics are the answer. Of a
+ * clean read, an {@code OPTIONAL_FIXED = _} member written null stands as {@link JsonNull}, presence being the
+ * information ([TSON-SCHEMA] §5.2), and an absent member is left out.
  */
 final class TreeRecordBuilder implements RecordBuilder {
 
@@ -44,21 +45,22 @@ final class TreeRecordBuilder implements RecordBuilder {
 
     @Override
     public Object build(JsonReadContext ctx, Object[] slots, boolean clean) {
+        if (!clean) {
+            return null;
+        }
         JsonObject.Builder members = JsonObject.builder(slots.length);
         for (int i = 0; i < slots.length; i++) {
             Object slot = slots[i];
             if (slot == null || slot == Slots.ABSENT) {
                 continue;
             }
-            members.put(names[i], slot == Slots.REFUSED || slot == Slots.NULL_KEPT
-                    ? JsonNull.INSTANCE
-                    : (JsonValue) slot);
+            members.put(names[i], slot == Slots.NULL_KEPT ? JsonNull.INSTANCE : (JsonValue) slot);
         }
         return members.build();
     }
 
     @Override
     public Object refused() {
-        return JsonNull.INSTANCE;
+        return null;
     }
 }

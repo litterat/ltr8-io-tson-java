@@ -165,9 +165,11 @@ admit UTS #39's own `Toys-Я-Us`.
   `TypeRefCheck.declares` (`@Typename` only), because the loose match would accept a `UUID`-targeted
   `!Uuid` on the strength of the class being *called* `UUID`. Consequence worth knowing: a collection
   target answers to no wire name, so `!tags [ "a" ]` into a `List<String>` is `UNKNOWN_TYPE_REF`.
-- **Reporting never abandons the value.** A reported type-ref still yields its node/object and its children
-  are still read, so one collecting pass finds everything; a leaf whose atom rejected the token becomes a
-  `TsonAbsent` keeping its wire type-ref (the placeholder `AtomTreeReader` already uses). `SchemalessTreeReader`
+- **Reporting never stops the read, and the facade returns nothing for a document that reported.** A
+  reported type-ref's children are still read, so one collecting pass finds everything; the engine keeps
+  building (a leaf whose atom rejected the token stands as a `TsonAbsent`), and the facade's per-read
+  `CountingReceiver` discards the result — every read is all-or-nothing. The engine's placeholder is seen
+  only by a caller reading one value through a context it owns (`read(TsonReadContext)`). `SchemalessTreeReader`
   scopes `ctx.field`/`ctx.index` as it descends, so a diagnostic carries a real RFC 6901 path.
 - **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
   already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`

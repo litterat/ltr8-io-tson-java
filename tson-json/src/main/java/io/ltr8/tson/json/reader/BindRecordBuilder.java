@@ -30,11 +30,10 @@ import java.util.Set;
  * Bind mode's record: the bound class, constructed from the filled slots -- or nothing, where anything under the
  * record was reported.
  *
- * <p><b>Bind mode is all-or-nothing.</b> A tree keeps what it built, a record missing a field being a coherent
- * value to inspect beside the diagnostics. A bound object is the opposite -- real, typed application data whose
- * whole promise is that the document was good -- and a constructor handed nulls for components that never
- * arrived would either throw on the caller's stack or produce an object nobody wrote. So a record whose read
- * reported anything binds to {@code null}, the same rule {@code tson-compiler}'s bind mode keeps.
+ * <p><b>All-or-nothing, as every mode is.</b> A bound object is real, typed application data whose whole promise
+ * is that the document was good, and a constructor handed nulls for components that never arrived would either
+ * throw on the caller's stack or produce an object nobody wrote. So a record whose read reported anything binds
+ * to {@code null}, the same rule tree mode and {@code tson-compiler} keep.
  *
  * <p><b>The class is checked against the schema when the reader is built</b> ({@link #factory}'s
  * {@link BindMismatchException}, each field bound to its component through {@link BindTargets}), not on the first

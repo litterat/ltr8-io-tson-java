@@ -6,6 +6,7 @@ import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 
+import java.util.function.Function;
 import java.util.Objects;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.reader.SchemalessTreeReader;
@@ -40,9 +41,9 @@ import java.io.InputStream;
  * as events arrive without an intermediate {@code DataValue} AST. A read is fail-fast by default: a malformed
  * document or an out-of-range typed value throws {@link ReadException} at the first problem. {@link
  * #withDiagnostics} swaps that for any other {@link DiagnosticsReceiver} -- a collector gathers every
- * problem in one pass and still hands back the (possibly partial) tree, in schema-aware and schemaless mode
- * alike. That is what makes this reader, with a collecting receiver, exactly what {@code Tson#validate}
- * delegates to.
+ * problem in one pass, in schema-aware and schemaless mode alike, and a read that reported anything hands
+ * back no tree: a partial one could not say which of its parts to trust ({@link CountingReceiver}). That is
+ * what makes this reader, with a collecting receiver, exactly what {@code Tson#validate} delegates to.
  *
  * <p><b>Every problem with the document goes to the receiver, base syntax included.</b> A document that does
  * not lex or parse is reported like any other failure rather than thrown past the receiver, so a collecting
@@ -227,7 +228,7 @@ public final class TsonTreeReader {
      * <pre>{@code
      * var problems = DiagnosticsReceiver.collecting();
      * TsonValue tree = tson.treeReader().withDiagnostics(problems).read(source);
-     * problems.diagnostics();      // every problem, alongside a possibly-partial tree
+     * problems.diagnostics();      // every problem; tree is null if there was any
      * }</pre>
      *
      * <p>Applies to the whole-document entry points only. {@link #read(TsonReadContext)} takes a context that
@@ -292,7 +293,7 @@ public final class TsonTreeReader {
      * copy ({@code ByteSource.resident()}).
      */
     public TsonValue read(ByteSource source) {
-        return readRoot(new TsonDataStream(source, policy, receiver), false);
+        return counted(r -> r.readRoot(new TsonDataStream(source, policy, r.receiver), false));
     }
 
     /**
@@ -302,20 +303,20 @@ public final class TsonTreeReader {
      */
     public TsonValue read(String source) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readRoot(new TsonDataStream(bytes, policy, receiver), false);
+            return counted(r -> r.readRoot(new TsonDataStream(bytes, policy, r.receiver), false));
         }
     }
 
     /** {@link #read(String)} straight off a stream -- reads {@code source}'s bytes (UTF-8) incrementally, never buffering the whole document into a {@code String} first; {@code source} is not closed here. */
     public TsonValue read(InputStream source) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readRoot(new TsonDataStream(bytes, policy, receiver), false);
+            return counted(r -> r.readRoot(new TsonDataStream(bytes, policy, r.receiver), false));
         }
     }
 
     /** {@link #read(ByteSource)} with the header kept -- see {@link #readDocument(String)}. */
     public TsonDocument readDocument(ByteSource source) {
-        return readDocument(new TsonDataStream(source, policy, receiver));
+        return counted(r -> r.readDocument(new TsonDataStream(source, policy, r.receiver)));
     }
 
     /**
@@ -338,34 +339,34 @@ public final class TsonTreeReader {
      */
     public TsonDocument readDocument(String source) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readDocument(new TsonDataStream(bytes, policy, receiver));
+            return counted(r -> r.readDocument(new TsonDataStream(bytes, policy, r.receiver)));
         }
     }
 
     /** {@link #readDocument(String)} straight off a stream; {@code source} is not closed here. */
     public TsonDocument readDocument(InputStream source) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readDocument(new TsonDataStream(bytes, policy, receiver));
+            return counted(r -> r.readDocument(new TsonDataStream(bytes, policy, r.receiver)));
         }
     }
 
     /** Like {@link #read(String)} but always schemaless -- reads the wire structure, even when the document declares a {@code !!schema}. (A schemaless reader's {@link #read} already does this.) */
     public TsonValue readWithoutSchema(String source) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readRoot(new TsonDataStream(bytes, policy, receiver), true);
+            return counted(r -> r.readRoot(new TsonDataStream(bytes, policy, r.receiver), true));
         }
     }
 
     /** {@link #readWithoutSchema(String)} straight off a stream. */
     public TsonValue readWithoutSchema(InputStream source) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readRoot(new TsonDataStream(bytes, policy, receiver), true);
+            return counted(r -> r.readRoot(new TsonDataStream(bytes, policy, r.receiver), true));
         }
     }
 
     /** {@link #read(ByteSource)} against {@code typeName} -- see {@link #readAs(String, String)}. */
     public TsonValue readAs(ByteSource source, String typeName) {
-        return readRootAs(new TsonDataStream(source, policy, receiver), typeName);
+        return counted(r -> r.readRootAs(new TsonDataStream(source, policy, r.receiver), typeName));
     }
 
     /**
@@ -376,14 +377,14 @@ public final class TsonTreeReader {
      */
     public TsonValue readAs(String source, String typeName) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readRootAs(new TsonDataStream(bytes, policy, receiver), typeName);
+            return counted(r -> r.readRootAs(new TsonDataStream(bytes, policy, r.receiver), typeName));
         }
     }
 
     /** {@link #readAs(String, String)} straight off a stream. */
     public TsonValue readAs(InputStream source, String typeName) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return readRootAs(new TsonDataStream(bytes, policy, receiver), typeName);
+            return counted(r -> r.readRootAs(new TsonDataStream(bytes, policy, r.receiver), typeName));
         }
     }
 
@@ -410,16 +411,20 @@ public final class TsonTreeReader {
      *                                  opened under -- the header's tokens were already read under that one
      */
     public TsonValue read(TsonDocumentPeek peek) {
-        return readPeeked(peek, false);
+        return counted(r -> r.readPeeked(peek, false));
     }
 
     /** {@link #read(TsonDocumentPeek)}, ignoring any {@code !!schema} the document declares. */
     public TsonValue readWithoutSchema(TsonDocumentPeek peek) {
-        return readPeeked(peek, true);
+        return counted(r -> r.readPeeked(peek, true));
     }
 
     /** {@link #read(TsonDocumentPeek)} with the header kept -- see {@link #readDocument(String)}. */
     public TsonDocument readDocument(TsonDocumentPeek peek) {
+        return counted(r -> r.readDocumentPeeked(peek));
+    }
+
+    private TsonDocument readDocumentPeeked(TsonDocumentPeek peek) {
         if (peek.failure() != null) {
             readFailure(peek.failure());
             return null;
@@ -434,6 +439,10 @@ public final class TsonTreeReader {
 
     /** {@link #read(TsonDocumentPeek)} against {@code typeName} -- see {@link #readAs(String, String)}. */
     public TsonValue readAs(TsonDocumentPeek peek, String typeName) {
+        return counted(r -> r.readPeekedAs(peek, typeName));
+    }
+
+    private TsonValue readPeekedAs(TsonDocumentPeek peek, String typeName) {
         if (schemaUri == null) {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
@@ -463,6 +472,17 @@ public final class TsonTreeReader {
     }
 
     // ── Internals ────────────────────────────────────────────────────────
+
+    /**
+     * One whole-document read, run on a copy of this reader whose receiver counts: a read that reported
+     * anything returns no value ({@link CountingReceiver}). Every whole-document entry point comes through here,
+     * so the rule is stated once rather than at each of them.
+     */
+    private <T> T counted(Function<TsonTreeReader, T> read) {
+        CountingReceiver counting = new CountingReceiver(receiver);
+        T value = read.apply(new TsonTreeReader(tree, counting, schemaUri, schemaless, policy));
+        return counting.reported() ? null : value;
+    }
 
     /**
      * The document's header, refused if it opens a <em>schema</em> document ([TSON-SCHEMA] §12.1's {@code

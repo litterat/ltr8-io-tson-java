@@ -79,9 +79,10 @@ stops at the first. That is more faithful to §3.1 than a `ParseException` would
 the document, and §3.1 puts a repeat in the categories that follow the position's type rather than in the
 parse category. JEP 540 calls it a parse error for want of anywhere else to put it; this has somewhere.
 
-**A collecting tree read hands back the tree**, where a bound read hands back nothing: a `JsonObject` has
-somewhere to put a partial answer and a Java record does not. Same asymmetry `tson-compiler` draws between
-its own two readers.
+**A collecting read that reported anything hands back nothing**, tree and bound alike, as on the TSON side:
+a partial tree's placeholder is the same node as a real `null`, so it cannot say which of its parts to trust.
+Each facade enforces it once per read through a `CountingReceiver`, which also catches a token refusal the
+stream reports straight to the receiver.
 
 ## Writing: the two readers, inverted
 
@@ -311,9 +312,8 @@ is what a caller routing on `Code.verdict()` needs to be able to tell.
 
 **Bind mode is all-or-nothing.** A record, array, tuple or map whose contents reported is not constructed:
 a Java record has nowhere to put a hole, so a collecting read hands back `null` rather than an object
-nobody wrote. Tree mode keeps what it built and this cannot — the same deliberate asymmetry
-`ConstructionGuard` draws on the TSON side, reached here by checkpointing `ctx.reported()` across the
-container's own contents.
+nobody wrote — the rule tree mode keeps too, and `ConstructionGuard` on the TSON side, reached here by
+checkpointing `ctx.reported()` across the container's own contents.
 
 **What this reader is not** is validation against a TSON schema. Nothing here consults facets, field
 states, defaults, fixed values, groups or the discrimination predicate, because a Java class declares
