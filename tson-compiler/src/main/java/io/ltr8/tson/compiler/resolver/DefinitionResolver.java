@@ -286,14 +286,14 @@ final class DefinitionResolver {
         }
         resolved = withExtension(declaration, resolved);
         Annotations annotations = annotationsOf(declaration.name(),
-                DefinitionMarks.consumed(declaration.name(), declaration.typeDefAnnotations()));
+                DefinitionMarks.consumed(declaration.typeDefAnnotations()));
         return annotations.isEmpty() ? resolved : resolved.withAnnotations(annotations);
     }
 
     /**
-     * A declaration's own {@code @abstract}/{@code @sealed}/{@code @final} lowered into {@code
-     * record.extension} ({@link DefinitionMarks}) -- the resolved definition unchanged where none is written,
-     * every record being OPEN by default.
+     * A declaration's own {@code @abstract}/{@code @final} lowered into {@code record.extension} ({@link
+     * DefinitionMarks}), and ABSTRACT derived where the body names selectors -- the resolved definition
+     * unchanged where neither applies, every record being OPEN by default.
      *
      * <p><b>Applied here rather than where the body is built</b>, because every route to a record body reaches
      * this method and none of them owns the mark: a fresh record, a composition and a refinement each build
@@ -305,8 +305,8 @@ final class DefinitionResolver {
      * marked type alone -- no direct instances, true of every instantiation identically -- so it is stated in
      * the held body and closing carries it through: every application of {@code result} mints an abstract
      * entry, and the family it is abstract over is the one the closed applications of its subtype templates
-     * join (§5.8, {@code SubtypeTemplateFamilyTest}). {@code @sealed} and {@code @final} are claims about
-     * <em>other</em> declarations -- that every subtype pins distinctly, that nothing composes onto it -- and
+     * join (§5.8, {@code SubtypeTemplateFamilyTest}). {@code @final} is a claim about <em>other</em>
+     * declarations -- that nothing composes onto it -- and
      * a template has no set for such a claim to range over: {@code subtypes} indexes entries, an instantiation
      * entry exists only where some schema wrote that application, so the claim's subject would be assembled
      * from whichever applications happen to have been written and a new one elsewhere would silently change
@@ -369,11 +369,10 @@ final class DefinitionResolver {
      * an alias states nothing of its own -- {@code @abstract <B> pair<uuid, B>} would be a claim about
      * {@code pair}, made by a declaration that merely names it.
      *
-     * <p><b>The mark is stated, not merely permitted.</b> {@code extension} is otherwise derived from the
-     * body -- SEALED where a discriminator survives, ABSTRACT otherwise -- so an author writing {@code
-     * @sealed} is asserting the fact the derivation reaches anyway, and {@code RecordExtension} judges the
-     * two against each other the way it does for a closed record: {@code @sealed} with nothing marked is
-     * refused there, naming the field that is missing.
+     * <p><b>The mark states the instantiation's fact, not the base's.</b> A record template's base is
+     * ABSTRACT by derivation whatever is written here ({@code WireForm.parentExtension}); {@code @abstract}
+     * spliced into the held text is what makes each <em>application</em> abstract in turn, which is how a
+     * second-level base is spelled ({@code SPEC-FEEDBACK.md} #13).
      */
     private static TypeDefinition markedTemplate(String name, TypeDefinition resolved, TemplateBody open,
                                                   RecordExtensionType extension) {
@@ -1776,7 +1775,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * The fields this declaration's own entries mark {@code @discriminator} -- {@code record.discriminators},
+     * The fields this declaration's own entries write {@code =?} -- {@code record.discriminators},
      * in the order they are written, which is the order §5.2 compares their pins as a tuple.
      *
      * <p><b>Read from the entries and never from the resolved fields.</b> Which fields a family dispatches on
@@ -1965,7 +1964,7 @@ final class DefinitionResolver {
      * erase what it does not mention.
      */
     private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
-        Annotations own = annotationsOf(field.name(), DefinitionMarks.consumed(field.name(), field.annotations()));
+        Annotations own = annotationsOf(field.name(), DefinitionMarks.consumed(field.annotations()));
         // No mark to inherit: which fields a family dispatches on is the *record's* statement
         // (`record.discriminators`), and a member states none of its own.
         return resolveFieldEntry(field, parameters, inherited)
@@ -2199,15 +2198,15 @@ final class DefinitionResolver {
      * §12.1 gives a group member its own annotation position ({@code group-member = *annotation field-name ws
      * ":" ws type-ref}), and it is read here on {@link #resolveField}'s terms: the marks are consumed and
      * everything else reaches the annotation channel -- which is what keeps the member's {@code @doc}. A
-     * {@code @discriminator} here is collected by {@link SchemaDesugarer} into the enclosing record's own
-     * {@code discriminators}, where the linker refuses it: §5.11 makes a member uniformly OPTIONAL, and a
-     * selector that may be absent selects nothing. Dropping the mark at this point would make that mistake
-     * vanish instead of being reported. The state is §5.11's own, presence governed by the group.
+     * selector cannot be written here at all: §5.11 makes a value modifier a parse error on a member, and
+     * {@code =?} is one -- a member is uniformly OPTIONAL, and a selector that may be absent selects
+     * nothing. One reached by refinement is the linker's to refuse. The state is §5.11's own, presence
+     * governed by the group.
      */
     private RecordField resolveGroupMember(GroupDef.Member member) {
         return new RecordField(member.name(), resolveTypeRef(member.typeRef()), FieldState.OPTIONAL,
                 Optional.empty(),
-                annotationsOf(member.name(), DefinitionMarks.consumed(member.name(), member.annotations())),
+                annotationsOf(member.name(), DefinitionMarks.consumed(member.annotations())),
                 Optional.empty());
     }
 

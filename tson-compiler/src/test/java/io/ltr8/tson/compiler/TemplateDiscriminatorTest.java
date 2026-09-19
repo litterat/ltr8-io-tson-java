@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A {@code @discriminator} written inside a <b>template</b> body survives being held and closed.
+ * A selector inside a <b>template</b> body survives being held and closed.
  *
  * <p>§5.10 holds an open entry's body as the application written out, and {@code WireForm} is the one
  * spelling of that text. A record's fields travel through it, and so does the enclosing statement of which of

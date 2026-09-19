@@ -874,7 +874,7 @@ final class SchemaDesugarer {
         // Consumed, not carried: a mark that lowers into the body must not also survive in the annotation
         // channel, or a closed member would state one fact twice and §8.1's output would preserve a mark
         // §6 says is never an annotation.
-        return WireForm.scoped(new RecordValue(members), DefinitionMarks.consumed(field.name(), field.annotations()));
+        return WireForm.scoped(new RecordValue(members), DefinitionMarks.consumed(field.annotations()));
     }
 
     /**

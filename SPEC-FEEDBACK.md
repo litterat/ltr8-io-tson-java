@@ -808,9 +808,9 @@ deliberately leaves out of the first design.
 
 **What is running:** the proposal, in both encodings, as #11 and #13 describe — `=?` on a base field, which
 derives ABSTRACT and admits `@abstract` as an assertion beside it, the closure checks with pins compared as
-values, and member dispatch at such a position. `@discriminator` and `@sealed` are **refused** where written, each
-message naming what states the
-fact now; ignoring them would let a meta-schema make them ordinary annotations that dispatch nothing. The
+values, and member dispatch at such a position. Neither `@discriminator` nor `@sealed` is known to the
+resolver at all: meta.tn declares neither, so either name written in a schema is the ordinary
+unknown-annotation error (§3.3.3). The
 group-member check is now two rules: §5.11 makes a value modifier a parse error on a member, so the spelling
 cannot reach one, and the linker still refuses a member that acquires the mark by refinement. The [TSON-JSON]
 half of the change is made: §6.1.5 now reads the untagged object by the position's own extension fact, §8.2 is
@@ -1054,8 +1054,9 @@ where it stands. Moving the declarations into the kernel meanwhile would put aut
 `record_extension_type => !enum [ABSTRACT FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
 and `record.discriminators: [field_name]?` are in this implementation's meta-kernel and bound by its value
 model. meta.tn declares `abstract` and `final`, both `@annotation void`, and declares neither `sealed` nor
-`discriminator`: both names are refused wherever they are written, each message naming what states the fact
-now. **The resolver consumes both marks into the body** — the definition mark once, after the body is built, so
+`discriminator` -- which is the whole of their removal: an annotation resolves one hop against the governing
+meta (§3.3.3), so a schema writing either gets the unknown-name error any other undeclared annotation gets. **The
+resolver consumes both marks into the body** — the definition mark once, after the body is built, so
 a fresh record, a composition and a refinement cannot disagree about it, and both annotation positions lower
 identically. They are matched by name and never resolved against the governing meta, which is what reserves
 them: they lower under a meta declaring neither, where an ordinary unknown name is the author's error. `=?` is
