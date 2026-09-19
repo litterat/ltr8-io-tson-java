@@ -142,56 +142,53 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
   name — so this is a decision to take deliberately, not a gap to close by reflex.
 
-- [ ] **The JSON container factories plan up front and return trimmed readers, one loop per shape.** The hot read
-  path has to be easy to follow, so the factory does the thinking and the reader is a flat loop over what it
-  decided — not a shared base with hooks, which is `tson-compiler`'s shape and puts every feature's branch in
-  every record's path. JSON only, as the proof of concept; bind mode and the TSON side follow if the shape holds.
-  - **A plan, then the smallest reader that covers it.** The factory resolves field readers, pins, defaults and
-    the name index, builds the diagnostics objects, and picks a reader by what the schema uses. Records, as a
-    first cut: *plain* (no groups, no FIXED or defaulted field — slots, then the required check), *stated*
-    (carries the pin and default table), *grouped* (adds the group count). Arrays and maps split where the branch
-    runs per element: unique or not, element-optional or not. A specialisation earns its place by moving the
-    allocation harness or visibly simplifying its loop; the harness gets a case per shape. A three-field record
-    read against its schema costs about 2,170 bytes against 1,400 for the schemaless read of the same JSON, so
-    the split is chiefly about a loop that reads plainly rather than about bytes.
-  - **One loop per shape, the mode behind a result builder.** The loop fills slots and makes one call at the end
-    that turns them into the mode's value — a `JsonObject` in tree mode — through a small interface the factory
-    chooses: one indirect call per record, none per field, so the loop carries no mode. Child readers are the
-    mode's own, as now. Bind mode is then a builder per shape (a Java record's constructor wants every argument
-    at once, which the slots already are) rather than a copy of each loop.
-  - **Shared code is helpers, not a superclass.** The absent-field rule, the size checks and the duplicate rule
-    become static helpers or values the plan holds; a specialised reader decides which rules it calls, never how
-    they are worded, which is what keeps several loops from drifting. The refusal pattern (report, `EventSkip`,
-    return a placeholder), repeated about twenty times, becomes one of them; `TreeMapReader.wrongShape` returns a
-    verdict rather than a node; the "reserved members but no `$type`" message is written once for record and
-    choice; `ABSENT = "null"` is declared once; and failure detected by `ctx.reported() > before`
-    (`TreeAtomReader`, `verifyFixed`, the pairs reader) comes from what the child returns.
-  - **One contract for a partial result.** A refused array element leaves `JsonNull`, while a malformed pair, a
-    refused object-form key and a wrongly valued `OPTIONAL_FIXED` member are dropped; a dispatcher answers `null`
-    and a tree container substitutes `JsonNull` (`Nodes.node`). The builders make this a single decision.
+- [ ] **Arrays, tuples and maps get the record's shape: one mode-free loop, a factory and a builder per mode.**
+  A record reads through `RecordReader` over a `RecordPlan`, with the mode's factory choosing each field's reader
+  and the mode's `RecordBuilder` building the value (`design/json-schema-directed-reading.md`). The other
+  containers still carry their mode in one class (`TreeArrayReader`, `TreeTupleReader`, `TreeMapObjectReader`,
+  `TreeMapPairsReader`), and bind mode has none of them. Owed, per family, alongside its bind reader:
+  - **The loop once, the mode in a factory and a builder.** Bind's factory binds each element, entry value or
+    object-form key reader to what the target holds — `List`, an array, a `Map`, a bridged element class — and
+    checks the target against the schema when the reader is built, as the record factory does.
+  - **Shared rules as helpers, not repeated per reader.** The refusal pattern (report, `EventSkip`, return a
+    placeholder), repeated about twenty times; `TreeMapReader.wrongShape` returning a verdict rather than a node; the
+    "reserved members but no `$type`" message written twice (`RecordPlan.admitsTag`, `DispatchChoiceReader`); the
+    absence spelling `"null"` declared once per family; and failure detected by `ctx.reported() > before`
+    (`TreeAtomReader`, `RecordReader.verifyFixed`, the pairs reader) taken from what the child returns.
+  - **One contract for a partial result**, decided by each family's builder: tree mode keeps a placeholder where a
+    record keeps one, and bind mode builds nothing, as the record builder does.
   - **The factory layer itself.** Every mode registers the same constructors from one list of parts, so one added
-    later (`scoped`, §8.5) cannot be missed in one of them; factories are instances built per registry, a bind
-    builder needing a `DataBindContext`; and each factory is handed one per-entry record (name, display name,
-    definition, schema location, the names that mean it) in place of recomputing `EntryDisplayName.of`,
-    `locationOf` and `admitting(List.of(name))` — `DispatchFactories` and the concrete record reader each build
-    the display name and `RecordDiagnostics` for one OPEN record with subtypes today.
-  - **A test per shape** showing the factory chose it, beside the behaviour tests, since the choice is now logic.
+    later (`scoped`, §8.5) cannot be missed in one of them; and each factory is handed one per-entry record (name,
+    display name, definition, schema location, the names that mean it) in place of recomputing
+    `EntryDisplayName.of`, `locationOf` and `admitting(List.of(name))` — `DispatchFactories` and `RecordPlan` each
+    build the display name for one OPEN record with subtypes today.
 
 - [ ] **Tree mode judges set and compound-key uniqueness by spelling, not value.** `TreeAtomReader` keeps the node
   and discards the parsed value, so `TreeArrayReader`'s unique-items check and `TreeMapPairsReader`'s duplicate-key
   check reduce a string to its NFC text: a `set<datetime>` holding `"2026-01-01T00:00Z"` and
   `"2026-01-01T01:00+01:00"` is not refused, where TSON's tree mode (`TsonAtom` keeps the value) refuses it as
-  [TSON-SCHEMA] §5.5 requires. A parity case first. The fix belongs to the factory plan above: only a unique array
+  [TSON-SCHEMA] §5.5 requires. A parity case first. The fix belongs to the array and map plans above: only a unique array
   and a pairs-form map need a value's identity, so only there does the factory wrap the element or key reader in
   one that also answers the parsed value, and every other position pays nothing. `verifyFixed` parsing a member
   twice has the same cause and the same fix.
 
-- [ ] **Bind mode has no schema-directed reader.** Tree mode validates and hands back the JSON; the other door
-  — an HTTP service accepting both encodings and getting a Java object back — needs the same containers over a
-  `DataBindContext`, with the bind-agreement machinery `tson-compiler` carries (`BindMismatchException` at
-  compile, `MissingBindingException` deferred to first read). It follows the factory plan above: the dispatchers
-  are already shared and the loops are mode-free, so what is owed is a result builder per shape, the bind
-  factories that choose them, and the front-door surface that selects the mode.
+- [ ] **Bind mode reads records but not containers, and has no front door.** `ValueReaderFactoryRegistry.bind`
+  compiles records, atoms and the dispatchers into a bound class, checked against the schema at compile
+  (`BindMismatchException`) with a missing binding deferred to first read. Measured against `tson-compiler`'s bind
+  mode, what is owed:
+  - **An OPEN record with subtypes bound to a sealed interface — the first to close.** `tson-compiler` reads it
+    through `VariantBindReader` over a `DataClassUnion`: untagged is refused as having no data of its own, tagged
+    binds the subtype. Here `DispatchFactories` asks for the parent's concrete reader, `BindRecordBuilder` finds a
+    class that is not record-shaped, and the compile fails — so a record family bound the natural Java way is
+    refused outright.
+  - **A single-group record bound to a sealed interface of labelled alternatives** (`GroupUnionBindReader`),
+    refused the same way today.
+  - **A bridge on a structured component** (`ElementBridging.wrap`): only an atom component's bridge is applied.
+  - **The `value` slot**, which reads to its own host types and is not bound to a component (`rebindValueIfNeeded`).
+  - **The containers** (entry above), each bound to its component — `List` or an array, a map type.
+  - **The front-door surface** — a `JsonObjectReader` read against a schema and a root type, and a
+    per-`DataBindContext` cache beside `JsonCompiledSchemaRegistry`'s tree one — and a schema-directed bind case in
+    the allocation harness once the order document's `lines` array can bind.
 
 - [ ] **`tson-compiler`'s readers adopt the JSON dispatch design once it settles.** `RecordTagDispatchReader`,
   `RecordMemberDispatchReader`, `Subsumption.dispatching`, `AbstractTemplateReader` and the choice's
@@ -245,6 +242,43 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   member carrying a per-member type association) is the shape that was *not* taken and the reason belongs beside
   it — a sibling tag needs the value of one field to type another. The engineering items above
   stay only here.
+
+## Module structure
+
+- [ ] **The encoding-neutral reader parts move into a module both stacks share — `tson-encoding` or similar, not
+  `tson-base`.** With two working stacks the seam is visible (`design/json-encoding.md` deferred this until there
+  were two to find it from): everything above the event level is encoding-neutral, and today it exists twice,
+  guarded by `CrossEncodingParityTest` rather than by being one thing. `tson-base` is the wrong home — it is already
+  the shared bottom of everything and is at risk of becoming a miscellany — so this is a module of its own, below
+  `tson-json` and the TSON reader and above `tson-schema`, `tson-atom` and `tson-bind`. The JSON shape (a plan, one
+  loop per encoding, a builder per mode) is what shares; `tson-compiler`'s base class with hooks shares only by
+  making both stacks extend it. In order of value:
+  - **The bind plan** — field-to-component matching, the FIXED exemption, `@Unbound`, the atom checks and
+    `boundTo`, stated-value conversion, the argument map, and the union and labelled-group cases. The largest
+    duplicated logic and the most correctness-sensitive, and the JSON gaps above close by moving across rather than
+    by being written again.
+  - **The bind builder** — construct from slots, fill a carrier, all-or-nothing, report a constructor's refusal.
+  - **The field-state decisions** — what a stated absence, an omitted field and a FIXED member become per state.
+    The wording is already one (`base.diagnostics`); the decisions are two copies.
+  - **The dispatch tables built at compile** — a sealed family's pin table keyed by `ValueIdentity`, the deeper
+    names, the alias index (`ReferenceChain.namesMeaning` beside `Subsumption.admitting`), and
+    `DiscriminationClass`. The lookahead that reads them stays with each encoding.
+  - **The same-named pairs** — `ValueIdentity`, `ReferenceChain`, `DeferredTypeReader`, `ErrorReader`,
+    `CompiledReaders`, and the compile loop itself (resolve, cycle, gap reader, the bind-exception order), which is
+    one algorithm over two reader types.
+  What stays per encoding is the event loop — TSON's positional records, `_`, annotations and scope pushes have no
+  JSON counterpart — the tree builders, and the tag carriers.
+
+- [ ] **The TSON encoding moves out of `tson-compiler` into `tson`, and `tson-compiler` imports it.** `tson-json`
+  holds its whole encoding — lexer, stream, readers, writers — and depends on no schema engine; the TSON encoding is
+  instead part of `tson-compiler`, beside the schema pipeline that parses, resolves and links. The end state mirrors
+  JSON: the TSON lexer, event stream, readers and writers live in `tson`, and `tson-compiler` — the schema engine —
+  depends on `tson` for the lexer and data parsing a schema document needs, rather than `tson` depending on
+  `tson-compiler`. What constrains it: the `Tson` front door resolves schemas and so needs the engine, which puts it
+  above both rather than in `tson`; the schema grammar parses TSON text and has to reach the lexer without the
+  readers reaching the resolver; and `design/modules.md`'s boundaries are rewritten with it. Best done after the
+  TSON records adopt the JSON shape and the shared module exists, so the move carries code already in its final
+  form.
 
 ## Write side
 

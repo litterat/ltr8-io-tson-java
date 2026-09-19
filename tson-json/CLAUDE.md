@@ -21,6 +21,7 @@ Rules that bite here:
 - A schema-directed read returns a `JsonValue`, never a `TsonValue`.
 - The field-state rules exist twice; `CrossEncodingParityTest` is the guard. A rule changed here or in
   `tson-compiler`'s readers gets a parity case. Shared refusals are stated once in `tson-base`'s `base.diagnostics`.
-- `Json` prefixes exported types only; `reader` types are bare and named mode first (`TreeRecordReader`). A dispatcher
-  selects and builds nothing, so it has no mode and one set serves every mode (`DispatchTagReader`).
+- `Json` prefixes exported types only; `reader` types are bare, and named mode first where they differ by mode
+  (`TreeRecordBuilder`). A dispatcher or a record loop builds nothing of its own, so it has no mode and one serves every
+  mode (`DispatchTagReader`, `RecordReader`).
 - The look-alike (confusable) rule reaches no JSON position — settled, not owed.

@@ -34,12 +34,16 @@ The schema-directed reader stack — `JsonTypeReader`/`JsonCompiledSchema`/`Json
 atoms, the whole of §6's containers, §7's absence, §3.2's reserved namespace and §3.3's annotation object (so §6.1.5's
 `$type` selects a subtype — the JSON spelling of `!employee` at a `person` field), and §8.2's discrimination predicate over
 §8.3's class stability, all compiled in **tree mode**; §8.5's scoped positions reach a `NOT_IMPLEMENTED` reader.
+**Bind mode** (`ValueReaderFactoryRegistry.bind`) compiles records, atoms and the dispatchers; its containers are
+not built yet and compile to gaps.
 
 ## Naming inside `reader`: mode first, and no prefix
 
-The schema-directed readers are named **mode, then family, then form** — `TreeRecordReader`,
-`TreeMapObjectReader`, `TreeMapPairsReader` — so that bind mode lands as `BindRecordReader` beside its peer
-and a reader's mode is the first thing about it. That is the axis someone scans when adding a mode, and it is
+The schema-directed readers that differ by mode are named **mode, then family, then form** —
+`TreeMapObjectReader`, `TreeMapPairsReader`, `TreeRecordBuilder` — so that bind mode lands as
+`BindRecordBuilder` beside its peer and a reader's mode is the first thing about it. **A mode-free loop carries no
+mode**: the record loop (`RecordReader`) fills slots and hands them to the mode's builder, so it is named family,
+then form. That is the axis someone scans when adding a mode, and it is
 the axis a file listing then sorts by. **A dispatcher has no mode to lead with** — it selects and builds nothing
 — so it leads with what it is and then how it selects, and the family sorts together: `DispatchTagReader`,
 `DispatchMemberReader`, `DispatchChoiceReader`, and `DispatchFactories` over them. `tson-compiler`'s peers keep
@@ -154,7 +158,7 @@ whether a map is class-stable.
 pays for a branch it will never take. It decorates a mode's concrete record factory, because the concrete
 reading is the only one that differs by mode: every other reading places the value and hands it on.
 
-- **A record with no subtypes** gets the concrete reader (`TreeRecordReader` in tree mode) and nothing else.
+- **A record with no subtypes** gets the concrete reader (below) and nothing else.
   That is every FINAL record, by construction, and every OPEN one without subtypes, which the loaded schema
   cannot grow. The concrete reader is reached only for its own type, so a `$type` it sees can only restate it;
   it never redirects to another reader partway through a value.
@@ -209,6 +213,44 @@ dispatched member in the dispatcher; the parity test pins that divergence until 
 **What is specialised beyond the dispatch** is what the compiler already knows and the reader was re-deriving:
 a record with no field group skips the group pass entirely (§5.11's groups are the exception, and the pass
 indexes every member of every group).
+
+### A concrete record: one loop for every mode, and a mode's factory and builder
+
+§6.1's rules do not depend on what a read builds, so they are stated once, in `RecordReader`, and read by every
+mode. What differs by mode is decided in two places, neither of them on the per-field path:
+
+- **The factory**, once, when the schema compiles. It builds a `RecordPlan` — what the schema fixes: the NFC field
+  names and the name index, each field's state and schema reader, the stated values, the group slots, the
+  diagnostics — then decides the mode's own two things: the reader each field is read at, and the form a stated
+  value takes. Tree mode (`TreeRecordBuilder.FACTORY`) keeps the schema readers and injects a stated value as the
+  JSON node that spells it. Bind mode (`BindRecordBuilder.factory`) resolves the bound class, binds each atom field's
+  reader to what its component holds (`AtomReader.boundTo`, through the component's bridge where it has one),
+  converts each stated value to the component's class, and checks the class against the schema.
+- **The builder**, once per record: the loop fills one slot per field and hands the slots over. `TreeRecordBuilder`
+  builds a `JsonObject` in declaration order; `BindRecordBuilder` calls the class's constructor.
+
+**A slot says what the document did.** Null is unstated and non-null is stated — which is what the duplicate
+check, the group count and the absent-field pass ask, so there is no second array — and three `RecordReader`
+markers carry what a value cannot: stated-as-absent, null kept at `OPTIONAL_FIXED = _`, and a child's refusal.
+Each builder decides what they become. The rules are methods on the plan and in the loop, not a superclass, so the
+loop is the whole of what a record read does.
+
+**Bind mode is all-or-nothing, and says so in one place.** A tree keeps what it built — a record missing a field is
+a coherent value beside the diagnostics — but a bound object is application data whose promise is that the
+document was good. The loop tells the builder whether anything was reported while the record was read, and
+`BindRecordBuilder` constructs nothing where it was: the same rule `tson-compiler`'s bind mode keeps.
+
+**The class is checked against the schema when the reader is built.** A non-FIXED field with no component, a
+component no field fills (unless `@Unbound`), an atom field whose component binds structurally, and an atom field
+whose family cannot produce the component's class each fail the compile with one `BindMismatchException` naming
+them all — a wiring mistake is cheapest found before any document. A schema type with no bound class at all is
+deferred (`MissingBindingException`), since a schema declares types a given consumer never binds; `ErrorReader`
+rethrows it when that type is first read. JSON carries no annotations (§4.3), so an annotations carrier component
+is filled with none.
+
+**One loop, not one per shape.** A plain loop for records with no default, pin or group was built and measured, and
+cost the same per record; the per-field branch it saved is a predictable switch on the field state. A loop per
+shape would multiply by the modes, so a split waits for a timing benchmark that shows it pays.
 
 ### Discrimination: one condition, and the table is built at schema load
 
