@@ -154,7 +154,8 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
     out in each loop and dispatcher; the "reserved members but no `$type`" message written twice
     (`RecordPlan.admitsTag`, `DispatchChoiceReader`); the absence spelling `"null"` declared once per family
     (`RecordPlan`, `ArrayReader`, `TupleReader`, `MapEntries`); and failure detected by `ctx.reported() > before`
-    (`TreeAtomReader`, `RecordReader.verifyFixed`, `MapPairsReader`) taken from what the child returns.
+    (`TreeAtomReader`, `TreeAtomKeyedReader`, `RecordReader.verifyFixed`, `MapPairsReader`) taken from what the
+    child returns -- a tree-mode child returns null only when it was refused.
 
 - [ ] **`RecordReader.verifyFixed` parses a FIXED member twice.** The field's reader parses it, then the pin's
   parser parses the same content again for the comparison, because tree mode's atom reader answers only the node.
