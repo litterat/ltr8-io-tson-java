@@ -134,7 +134,7 @@ enum DiscriminationClass {
     static boolean stable(TsonSchema schema, String name) {
         return ReferenceChain.terminal(schema, name).map(resolved -> switch (resolved.definition().body()) {
             case FloatType floats -> !floats.allowNan() && !floats.allowInfinity();
-            case MapBody map -> TreeMapReader.isObjectForm(schema, map);
+            case MapBody map -> MapPlan.isObjectForm(schema, map);
             default -> true;
         }).orElse(true);
     }

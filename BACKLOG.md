@@ -142,48 +142,39 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
   name — so this is a decision to take deliberately, not a gap to close by reflex.
 
-- [ ] **Arrays, tuples and maps get the record's shape: one mode-free loop, a factory and a builder per mode.**
-  A record reads through `RecordReader` over a `RecordPlan`, with the mode's factory choosing each field's reader
-  and the mode's `RecordBuilder` building the value (`design/json-schema-directed-reading.md`). The other
-  containers still carry their mode in one class (`TreeArrayReader`, `TreeTupleReader`, `TreeMapObjectReader`,
-  `TreeMapPairsReader`), and bind mode has none of them. Owed, per family, alongside its bind reader:
-  - **The loop once, the mode in a factory and a builder.** Bind's factory binds each element, entry value or
-    object-form key reader to what the target holds — `List`, an array, a `Map`, a bridged element class — and
-    checks the target against the schema when the reader is built, as the record factory does.
-  - **Shared rules as helpers, not repeated per reader.** The refusal pattern (report, `EventSkip`, return a
-    placeholder), repeated about twenty times; `TreeMapReader.wrongShape` returning a verdict rather than a node; the
-    "reserved members but no `$type`" message written twice (`RecordPlan.admitsTag`, `DispatchChoiceReader`); the
-    absence spelling `"null"` declared once per family; and failure detected by `ctx.reported() > before`
-    (`TreeAtomReader`, `RecordReader.verifyFixed`, the pairs reader) taken from what the child returns.
-  - **One contract for a partial result**, decided by each family's builder: tree mode keeps a placeholder where a
-    record keeps one, and bind mode builds nothing, as the record builder does.
-  - **The factory layer itself.** Every mode registers the same constructors from one list of parts, so one added
-    later (`scoped`, §8.5) cannot be missed in one of them; and each factory is handed one per-entry record (name,
-    display name, definition, schema location, the names that mean it) in place of recomputing
-    `EntryDisplayName.of`, `locationOf` and `admitting(List.of(name))` — `DispatchFactories` and `RecordPlan` each
-    build the display name for one OPEN record with subtypes today.
+- [ ] **The JSON reader factories share their per-entry work, and the container loops their remaining rules.**
+  Every container reads through a plan, one mode-free loop and a builder per mode
+  (`design/json-schema-directed-reading.md`). What is left of that restructure:
+  - **The factory layer.** Every mode registers the same constructors from one list of parts, so one added later
+    (`scoped`, §8.5) cannot be missed in one of them; and each factory is handed one per-entry record (name,
+    display name, definition, schema location, the names that mean it) in place of each plan recomputing
+    `EntryDisplayName.of` and `locationOf` — `DispatchFactories` and `RecordPlan` both build the display name for
+    one OPEN record with subtypes today.
+  - **Shared rules as helpers.** The refusal pattern (report, `EventSkip`, return the placeholder), still written
+    out in each loop and dispatcher; the "reserved members but no `$type`" message written twice
+    (`RecordPlan.admitsTag`, `DispatchChoiceReader`); the absence spelling `"null"` declared once per family
+    (`RecordPlan`, `ArrayReader`, `TupleReader`, `MapEntries`); and failure detected by `ctx.reported() > before`
+    (`TreeAtomReader`, `RecordReader.verifyFixed`, `MapPairsReader`) taken from what the child returns.
 
 - [ ] **Tree mode judges set and compound-key uniqueness by spelling, not value.** `TreeAtomReader` keeps the node
-  and discards the parsed value, so `TreeArrayReader`'s unique-items check and `TreeMapPairsReader`'s duplicate-key
-  check reduce a string to its NFC text: a `set<datetime>` holding `"2026-01-01T00:00Z"` and
-  `"2026-01-01T01:00+01:00"` is not refused, where TSON's tree mode (`TsonAtom` keeps the value) refuses it as
-  [TSON-SCHEMA] §5.5 requires. A parity case first. The fix belongs to the array and map plans above: only a unique array
-  and a pairs-form map need a value's identity, so only there does the factory wrap the element or key reader in
-  one that also answers the parsed value, and every other position pays nothing. `verifyFixed` parsing a member
-  twice has the same cause and the same fix.
+  and discards the parsed value, so `ArrayReader`'s unique-items check and `MapPairsReader`'s duplicate-key
+  check reduce a string to its NFC text in tree mode (bind mode compares the host values, and is right): a
+  `set<datetime>` holding `"2026-01-01T00:00Z"` and `"2026-01-01T01:00+01:00"` is not refused, where TSON's tree
+  mode (`TsonAtom` keeps the value) refuses it as [TSON-SCHEMA] §5.5 requires. A parity case first. The fix belongs
+  to the tree factory: only a unique array and a pairs-form map need a value's identity, so only there does it wrap
+  the element or key reader in one that also answers the parsed value, and every other position pays nothing.
+  `RecordReader.verifyFixed` parsing a member twice has the same cause and the same fix.
 
-- [ ] **Bind mode reads records but not containers, and has no front door.** `ValueReaderFactoryRegistry.bind`
-  compiles records, atoms and the dispatchers into a bound class, checked against the schema at compile
+- [ ] **Bind mode reads every container, and has no front door.** `ValueReaderFactoryRegistry.bind` compiles
+  every container, the atoms and the dispatchers into bound classes, checked against the schema at compile
   (`BindMismatchException`) with a missing binding deferred to first read. Measured against `tson-compiler`'s bind
   mode, what is owed:
   - **A single-group record bound to a sealed interface of labelled alternatives** (`GroupUnionBindReader`): the
     compile refuses the interface today as not record-shaped.
   - **A bridge on a structured component** (`ElementBridging.wrap`): only an atom component's bridge is applied.
   - **The `value` slot**, which reads to its own host types and is not bound to a component (`rebindValueIfNeeded`).
-  - **The containers** (entry above), each bound to its component — `List` or an array, a map type.
   - **The front-door surface** — a `JsonObjectReader` read against a schema and a root type, and a
-    per-`DataBindContext` cache beside `JsonCompiledSchemaRegistry`'s tree one — and a schema-directed bind case in
-    the allocation harness once the order document's `lines` array can bind.
+    per-`DataBindContext` cache beside `JsonCompiledSchemaRegistry`'s tree one.
 
 - [ ] **`tson-compiler`'s readers adopt the JSON dispatch design once it settles.** `RecordTagDispatchReader`,
   `RecordMemberDispatchReader`, `Subsumption.dispatching`, `AbstractTemplateReader` and the choice's

@@ -1,14 +1,22 @@
 package io.ltr8.tson.json.perf;
 
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.Json;
 import io.ltr8.tson.json.JsonObjectReader;
+import io.ltr8.tson.json.JsonReadContext;
+import io.ltr8.tson.json.JsonSchemaCompiler;
+import io.ltr8.tson.json.JsonTypeReader;
+import io.ltr8.tson.json.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.json.JsonTreeReader;
 import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.perf.AllocationProbe;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -16,6 +24,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -74,6 +83,9 @@ class JsonAllocationHarnessTest {
 
     private static JsonTreeReader schemaReader;
 
+    /** The schema compiled in bind mode, over the harness's own {@code Order} and {@code Line}. */
+    private static JsonTypeReader<?> boundOrder;
+
     @BeforeAll
     static void startUp() {
         assumeTrue(AllocationProbe.supported(), "needs HotSpot's per-thread allocation counter");
@@ -85,10 +97,16 @@ class JsonAllocationHarnessTest {
             AllocationProbe.sink = reader.read(DOCUMENT, Order.class);
         }
         Tson tson = Tson.standard();
-        tson.resolve(SCHEMA);
+        TsonLinkedSchema linked = tson.resolve(SCHEMA);
         schemaReader = Json.standard().withSchemas(tson.schemaRegistry()).treeReader().withSchema(SCHEMA_ID);
+        DataBindContext binding = DataBindContext.builder()
+                .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "line", Line.class)))
+                .registerAtoms(AtomContext.hostTypes()).build();
+        boundOrder = JsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.bind(binding))
+                .get("order");
         for (int i = 0; i < 2_000; i++) {
             AllocationProbe.sink = schemaReader.readAs(DOCUMENT, "order");
+            AllocationProbe.sink = bindAgainstSchema(DOCUMENT);
         }
         AllocationProbe.sink = null;
     }
@@ -171,6 +189,33 @@ class JsonAllocationHarnessTest {
         report("allocated per record, schema-directed tree", perLine, "bytes");
         assertTrue(perLine < 8_000, "reading one three-field record against its schema allocated " + perLine
                 + " bytes, which is not the shape of three values and the node that holds them");
+    }
+
+    /**
+     * What one record costs a schema-directed bind read: the tree read's walk, with the record built as the class
+     * and each atom bound to its component rather than kept as a node. The same document the schemaless bind
+     * case reads, so the two figures compare a schema-directed read of a class with a class-directed one.
+     */
+    @Test
+    void aSchemaDirectedBindReadCostsItsValuesAndLittleElse() {
+        assertEquals(new Order(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09"), "Ada Lovelace",
+                OffsetDateTime.parse("2026-08-24T10:00:00Z"), List.of(new Line("A-1", 2, 9.99),
+                new Line("A-1", 2, 9.99), new Line("A-1", 12, 9.99)), "leave with the neighbour"),
+                bindAgainstSchema(DOCUMENT));
+        double perLine = perLine(order(4), order(64), JsonAllocationHarnessTest::bindAgainstSchema);
+
+        report("allocated per record bound, schema-directed", perLine, "bytes");
+        assertTrue(perLine < 8_000, "binding one three-field record against its schema allocated " + perLine
+                + " bytes, which is not the shape of three values and the object that holds them");
+    }
+
+    private static Object bindAgainstSchema(String document) {
+        try (ByteSource bytes = ByteSource.of(document)) {
+            DiagnosticsReceiver receiver = DiagnosticsReceiver.throwing();
+            JsonReadContext ctx = JsonReadContext.of(new JsonStream(bytes, ProcessorPolicy.defaults(), receiver),
+                    receiver);
+            return boundOrder.read(ctx);
+        }
     }
 
     /** Bytes per line of the order, the flat per-read cost cancelling out. */

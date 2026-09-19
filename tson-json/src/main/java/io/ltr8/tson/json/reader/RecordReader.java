@@ -17,10 +17,9 @@ import java.util.Objects;
  * RecordBuilder} once per record.
  *
  * <p><b>A slot says what the document did with its field.</b> Null means the document did not state it; non-null
- * means it did, which is what the duplicate check, the group count and the absent-field pass all ask. Three
- * markers carry the cases a value cannot: {@link #ABSENT} (stated as null where the field decodes to absence),
- * {@link #NULL_KEPT} (null kept at {@code OPTIONAL_FIXED = _}, where presence is the information) and {@link
- * #REFUSED} (a child that refused its value). Each builder decides what they become.
+ * means it did, which is what the duplicate check, the group count and the absent-field pass all ask. The
+ * {@link Slots} markers carry the cases a value cannot -- stated as absent, null kept at {@code OPTIONAL_FIXED = _},
+ * and a child's refusal -- and each builder decides what they become.
  *
  * <p><b>Member order carries no meaning</b> (§6.1.6), so presence is settled once the object has closed: the
  * groups over what the document stated, then the fields it never mentioned -- refused, or injected with their
@@ -30,15 +29,6 @@ import java.util.Objects;
  * declared field is §6.1.1's closure error, full stop.
  */
 final class RecordReader implements JsonTypeReader<Object>, ExactReader {
-
-    /** Stated as null where the field decodes to absence: seen, and absent in the value built. */
-    static final Object ABSENT = marker("ABSENT");
-
-    /** Null kept at {@code OPTIONAL_FIXED = _}, where presence is the information ([TSON-SCHEMA] §5.2). */
-    static final Object NULL_KEPT = marker("NULL_KEPT");
-
-    /** A child that refused its value. */
-    static final Object REFUSED = marker("REFUSED");
 
     private final RecordPlan plan;
 
@@ -143,10 +133,10 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         return readValue(ctx, at);
     }
 
-    /** A child's value for its slot: what it read, or {@link #REFUSED} where it refused. */
+    /** A child's value for its slot: what it read, or {@link Slots#REFUSED} where it refused. */
     private Object readValue(JsonReadContext ctx, int at) {
         Object value = readers[at].read(plan.field(ctx, at));
-        return value == null ? REFUSED : value;
+        return value == null ? Slots.REFUSED : value;
     }
 
     /**
@@ -157,12 +147,12 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
     private Object fixedToAbsent(JsonReadContext ctx, int at, String memberName) {
         JsonEvent event = ctx.next();
         if (event instanceof JsonEvent.NullValue) {
-            return NULL_KEPT;
+            return Slots.NULL_KEPT;
         }
         plan.field(ctx, at).report(plan.rules.fixedToAbsentFieldValued(memberName, RecordPlan.NULL,
                 JsonAtoms.describe(event)));
         EventSkip.value(ctx, event);
-        return ABSENT;
+        return Slots.ABSENT;
     }
 
     /**
@@ -173,10 +163,10 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
     private Object statedNull(JsonReadContext ctx, int at, String memberName) {
         ctx.next();
         return switch (plan.states[at]) {
-            case OPTIONAL, OPTIONAL_FIXED -> ABSENT;
+            case OPTIONAL, OPTIONAL_FIXED -> Slots.ABSENT;
             case REQUIRED, REQUIRED_FIXED -> {
                 plan.field(ctx, at).report(plan.rules.absenceAtRequiredField(memberName, RecordPlan.NULL));
-                yield ABSENT;
+                yield Slots.ABSENT;
             }
             // §6.1.2: "at REQUIRED_DEFAULT the fix is omission, which injects the default". Injecting here
             // anyway would substitute a value the document explicitly disclaimed, so the default is still what
@@ -209,7 +199,7 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
                 plan.field(ctx, at).report(plan.rules.fixedFieldAbsent(memberName, String.valueOf(pin.pinned()),
                         RecordPlan.NULL));
             }
-            return ABSENT;   // OPTIONAL_FIXED: absence is exactly what it permits
+            return Slots.ABSENT;   // OPTIONAL_FIXED: absence is exactly what it permits
         }
         String content = pin.form().contentOf(event);
         if (content == null) {
@@ -251,14 +241,5 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
                 case OPTIONAL, OPTIONAL_FIXED -> { }
             }
         }
-    }
-
-    private static Object marker(String name) {
-        return new Object() {
-            @Override
-            public String toString() {
-                return name;
-            }
-        };
     }
 }

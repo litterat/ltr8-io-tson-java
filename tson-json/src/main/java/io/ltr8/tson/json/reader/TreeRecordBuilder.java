@@ -47,10 +47,10 @@ final class TreeRecordBuilder implements RecordBuilder {
         JsonObject.Builder members = JsonObject.builder(slots.length);
         for (int i = 0; i < slots.length; i++) {
             Object slot = slots[i];
-            if (slot == null || slot == RecordReader.ABSENT) {
+            if (slot == null || slot == Slots.ABSENT) {
                 continue;
             }
-            members.put(names[i], slot == RecordReader.REFUSED || slot == RecordReader.NULL_KEPT
+            members.put(names[i], slot == Slots.REFUSED || slot == Slots.NULL_KEPT
                     ? JsonNull.INSTANCE
                     : (JsonValue) slot);
         }

@@ -23,7 +23,6 @@ import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -36,9 +35,10 @@ import java.util.Set;
  * arrived would either throw on the caller's stack or produce an object nobody wrote. So a record whose read
  * reported anything binds to {@code null}, the same rule {@code tson-compiler}'s bind mode keeps.
  *
- * <p><b>The class is checked against the schema when the reader is built</b> ({@link #FACTORY}'s
- * {@link BindMismatchException}), not on the first document that reaches the position -- a wiring mistake
- * between a schema and the caller's own classes is cheapest found before any document exists.
+ * <p><b>The class is checked against the schema when the reader is built</b> ({@link #factory}'s
+ * {@link BindMismatchException}, each field bound to its component through {@link BindTargets}), not on the first
+ * document that reaches the position -- a wiring mistake between a schema and the caller's own classes is cheapest
+ * found before any document exists.
  */
 final class BindRecordBuilder implements RecordBuilder {
 
@@ -80,25 +80,9 @@ final class BindRecordBuilder implements RecordBuilder {
                 DataClassField component = descriptor.fields()[at];
                 argument[i] = component.index();
                 filled[at] = true;
-                if (!(readers[i] instanceof AtomReader<?> atom)) {
-                    continue;
-                }
-                if (!(component.dataClass() instanceof DataClassAtom bound)) {
-                    mismatches.add("field '" + plan.fields[i].name() + "' is an atom, and component '"
-                            + component.name() + "' binds " + component.type().getName() + " structurally");
-                    continue;
-                }
-                Optional<AtomReader<?>> atTarget = atom.boundTo(bound.dataClass());
-                if (atTarget.isEmpty()) {
-                    mismatches.add("field '" + plan.fields[i].name() + "' cannot produce "
-                            + bound.dataClass().getName() + ", which is what component '" + component.name()
-                            + "' binds");
-                    continue;
-                }
-                readers[i] = bound.bridge().isPresent()
-                        ? new BridgedReader(atTarget.get(), bound.bridge().get(), bound.typeClass())
-                        : atTarget.get();
-                if (plan.stated[i] != null) {
+                readers[i] = BindTargets.to(readers[i], component.dataClass(), "field '" + plan.fields[i].name()
+                        + "'", "component '" + component.name() + "'", mismatches);
+                if (plan.stated[i] != null && component.dataClass() instanceof DataClassAtom bound) {
                     injected[i] = statedValue(plan.stated[i], bound, plan.fields[i].name(), mismatches);
                 }
             }
@@ -150,7 +134,7 @@ final class BindRecordBuilder implements RecordBuilder {
         }
         for (int i = 0; i < slots.length; i++) {
             Object slot = slots[i];
-            if (argument[i] >= 0 && slot != RecordReader.ABSENT && slot != RecordReader.NULL_KEPT) {
+            if (argument[i] >= 0 && slot != Slots.ABSENT && slot != Slots.NULL_KEPT) {
                 arguments[argument[i]] = slot;
             }
         }
