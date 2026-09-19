@@ -4,7 +4,6 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.FamilySelectors;
-import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
@@ -48,7 +47,7 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
     public AbstractTemplateReader(String name, TypeDefinition definition, ValueReaderContext context,
                                    TsonTypeReaderResolver readers) {
         TemplateBody held = (TemplateBody) definition.body();
-        RecordExtensionType extension = held.extension().orElseThrow(() -> new IllegalStateException(
+        held.extension().orElseThrow(() -> new IllegalStateException(
                 "'" + name + "' is not a family base: only a template carrying `extension` dispatches, and "
                         + "OpenTemplateReader is what every other template compiles to (§5.10)"));
         // Reported under the template's own name, never the application its `source` records: a marked
@@ -57,7 +56,7 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
         // the template being the base -- naming `pet_base<…>` would name something the schema never declares.
         Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
 
-        this.dispatcher = (TsonTypeReader<Object>) (extension == RecordExtensionType.SEALED
+        this.dispatcher = (TsonTypeReader<Object>) (FamilySelectors.dispatchesOnMembers(definition)
                 // The selectors are the base's, at the types the base declares -- the one set known before a
                 // member is selected, which is what the pins are compared in. Named on the entry and typed
                 // from any member, and handed to the same dispatcher a closed base uses: one dispatch, two

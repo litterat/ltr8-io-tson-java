@@ -6,7 +6,6 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -52,8 +51,8 @@ final class DispatchFactories {
                                 context.admitting(List.of(name)), context.admitting(definition.subtypes()),
                                 concrete.create(name, definition, context), context,
                                 context.locationOf(name, definition), rules(name, definition, body, context));
-                case ABSTRACT, SEALED -> family(name, displayName(name, definition, context), definition,
-                        body.extension(), context, rules(name, definition, body, context));
+                case ABSTRACT -> family(name, displayName(name, definition, context), definition,
+                        context, rules(name, definition, body, context));
             };
         };
     }
@@ -84,16 +83,18 @@ final class DispatchFactories {
         TemplateBody held = (TemplateBody) definition.body();
         return held.extension().isEmpty()
                 ? new OpenTemplateReader(name, definition.parameters(), context.locationOf(name, definition))
-                : family(name, name, definition, held.extension().get(), context, new RecordDiagnostics(name, ""));
+                : family(name, name, definition, context, new RecordDiagnostics(name, ""));
     };
 
-    /** An ABSTRACT or SEALED base, closed or a template: the family's dispatcher, with no concrete reading. */
+    /**
+     * An ABSTRACT base, closed or a template: the family's dispatcher, with no concrete reading. Which
+     * dispatcher is the body's own statement -- selectors named, or none and the tag decides.
+     */
     private static JsonTypeReader<?> family(String name, String displayName, TypeDefinition definition,
-                                            RecordExtensionType extension, ValueReaderContext context,
-                                            RecordDiagnostics rules) {
+                                            ValueReaderContext context, RecordDiagnostics rules) {
         JsonSchemaLocation location = context.locationOf(name, definition);
         Set<String> selfNames = context.admitting(List.of(name));
-        return extension == RecordExtensionType.SEALED
+        return FamilySelectors.dispatchesOnMembers(definition)
                 // The sealed reader takes its subtypes raw: it maps each member's pins to that member, so an
                 // alias is not a second member. Where it compares a written tag it admits aliases (`deeper`).
                 ? new DispatchMemberReader(selfNames, displayName,

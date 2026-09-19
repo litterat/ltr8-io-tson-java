@@ -77,7 +77,8 @@ are kept in step deliberately.
   each pin differently — and its name lowers into the enclosing `record.discriminators`. **The declaration
   must carry `@abstract`**, since instantiability is not derivable from a field; that the family is
   member-dispatched rather than tag-dispatched *is* derived, being whether any field carries the spelling.
-  SEALED is that derivation (ABSTRACT plus a non-empty `discriminators`), in the manner of `choice.disjoint`.
+  Member dispatch is that derivation (ABSTRACT plus a non-empty `discriminators`), read where it is needed
+  (`FamilySelectors.dispatchesOnMembers`) in the manner of `choice.disjoint` and never stored as a second fact.
   A group member cannot be a selector: §5.11 makes a value modifier a parse error there.
 - **A template derives its selectors from parametric pins too** (`SchemaDesugarer.parametricallyPinned`). In
   a *fresh* record template a field pinned to a value parameter takes one value per application, which is one
@@ -102,7 +103,7 @@ are kept in step deliberately.
   has no such member and is refused, named by the constructor it applies. A restated field keeps a
   discriminator it does not repeat, on the annotation-merge rule's own logic below.
 - **A template carrying `extension` is a family base, and takes part in IS-A as one** (`SPEC-FEEDBACK.md`
-  #13). `template.extension` is derived — SEALED where a discriminator survives, ABSTRACT otherwise — and its
+  #13). `template.extension` is derived and is always ABSTRACT — a parent has no direct instances — and its
   presence is the test: `TsonSchemaLinker.isFamilyBase`. Such a template is credited under its own supertypes
   (so `base.subtypes` holds `box` beside `box<text>`), its `subtypes` holds its instantiations, and a type
   position naming it compiles to `AbstractTemplateReader` rather than to `OpenTemplateReader`'s refusal. What
@@ -110,7 +111,7 @@ are kept in step deliberately.
   member, selected by a tag or by the discriminators, each member closed with its arguments fixed. A
   container, a reference and a constructor-application template have no such dispatch, carry no `extension`,
   and stay "not a type until applied". Only `@final` is refused there, its applications being
-  subtypes by construction. **SEALED does not travel to a member**
+  subtypes by construction. **Member dispatch does not travel to a member**
   (`TemplateMaterialiser.closedExtension`): §5.7 fixation pins the selectors and clears their marks, so a
   member is an ordinary concrete record, where ABSTRACT does travel and is how `@abstract` reaches every
   instantiation. One dispatcher serves both kinds of base — `RecordMemberDispatchReader` takes the selector
@@ -263,10 +264,10 @@ keeps the application itself, so closing mints the edge to `box<text>` and not t
 that is itself an application (`box<inner<T>>` — substitution writes a bound reference through `WireForm.refValue`,
 which spells one carrying arguments in `type_ref`'s record form). **A template may be `@abstract`**, the mark being
 stated in the held body's own text (`extension: ABSTRACT`) and read back by the `record` constructor's reader when the
-body closes, so every instantiation is abstract over the family the edge above builds. **A template is SEALED by
-derivation** where a selector survives
-erasure — a `=?` field, or one pinned to a value parameter — its `subtypes` holding the instantiations the dispatch
-ranges over; and SEALED does not travel to a member, §5.7 fixation having pinned the selectors and cleared them. Only
+body closes, so every instantiation is abstract over the family the edge above builds. **A template dispatches on
+members** where a selector survives erasure — a `=?` field, or one pinned to a value parameter — its `subtypes`
+holding the instantiations the dispatch ranges over; that does not travel to a member, §5.7 fixation having pinned
+the selectors and cleared them. Only
 `@final` stays a resolver error there: every application is a subtype of the template by construction, so
 the claim is false before an author writes anything else (`SPEC-FEEDBACK.md` #13, correcting #11).
 `OpenOperandCompositionTest` pins the substitutability table, `SubtypeTemplateFamilyTest` the family a base template and

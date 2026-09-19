@@ -42,6 +42,14 @@ class TemplateParentExtensionTest {
         return ((TemplateBody) definition.body()).extension();
     }
 
+    /** The selector names the same parent states -- what makes the family member-dispatched. */
+    private static List<String> selectorsOf(String id, String declarations, String entry) {
+        TypeDefinition definition = Tson.standard()
+                .resolve(HEADER.formatted(id) + "{\n" + declarations + "}")
+                .schema().entries().get(entry);
+        return ((TemplateBody) definition.body()).discriminators();
+    }
+
     private static String refusal(String id, String declarations) {
         List<Diagnostic> diagnostics = Tson.standard()
                 .validateSchema(HEADER.formatted(id) + "{\n" + declarations + "}");
@@ -57,11 +65,16 @@ class TemplateParentExtensionTest {
                 parentOf("p1", "  box => <V> { item: V }\n", "box"));
     }
 
-    /** The labelled sum: `type: text = T` survives erasure, so the parent dispatches on it. */
+    /**
+     * The labelled sum: `type: text = T` survives erasure, so the parent dispatches on it. The extension is
+     * ABSTRACT like any other base -- what says the members are placed by their pins is `discriminators`.
+     */
     @Test
-    void aLabelledSumIsSealed() {
-        assertEquals(Optional.of(RecordExtensionType.SEALED),
+    void aLabelledSumDispatchesOnItsSurvivingSelector() {
+        assertEquals(Optional.of(RecordExtensionType.ABSTRACT),
                 parentOf("p2", "  pet => <T, V> { type: text = T  value: V }\n", "pet"));
+        assertEquals(List.of("type"),
+                selectorsOf("p2b", "  pet => <T, V> { type: text = T  value: V }\n", "pet"));
     }
 
     /** A composition template holds its flattened body, and the parent is derived over that. */

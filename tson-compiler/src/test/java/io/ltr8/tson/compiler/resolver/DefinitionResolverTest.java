@@ -694,7 +694,7 @@ class DefinitionResolverTest {
      * materialisation, where the value is concrete -- {@code ValueParamFixedFieldTest} pins both ends.
      *
      * <p><b>The pin also makes the field this template's selector</b>, which is the derivation and not an
-     * extra claim: one value per application is one value per member, so the base is SEALED over
+     * extra claim: one value per application is one value per member, so the base dispatches on
      * {@code [value]} with no {@code =?} written (§5.2, {@code SPEC-FEEDBACK.md} #13).
      */
     @Test
@@ -708,7 +708,7 @@ class DefinitionResolverTest {
                         + "template: \"!record { fields: [ "
                         + "{ name: value type: type_ref value: T } ] "
                         + "discriminators: [ value ] }\" "
-                        + "extension: \"SEALED\" discriminators: [ \"value\" ] } }",
+                        + "extension: \"ABSTRACT\" discriminators: [ \"value\" ] } }",
                 write(sized));
     }
 
@@ -2252,7 +2252,7 @@ class DefinitionResolverTest {
         RecordBody body = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel(
                 "pet => @abstract { pet_type: text =?  name: text }").body());
 
-        assertEquals(RecordExtensionType.SEALED, body.extension());
+        assertEquals(RecordExtensionType.ABSTRACT, body.extension());
         assertEquals(List.of("pet_type"), body.discriminators(),
                 "the record names the field the mark stood on, and names no other");
     }
@@ -2358,7 +2358,7 @@ class DefinitionResolverTest {
         assertInstanceOf(TemplateBody.class, box.body());
         // The base's own extension, derived and stated on the entry -- never read back out of the held text,
         // whose `extension` member is an instantiation's mark (§1.3, SPEC-FEEDBACK.md #13).
-        assertEquals(Optional.of(RecordExtensionType.SEALED), ((TemplateBody) box.body()).extension());
+        assertEquals(Optional.of(RecordExtensionType.ABSTRACT), ((TemplateBody) box.body()).extension());
         assertEquals(List.of("kind"), ((TemplateBody) box.body()).discriminators());
     }
 

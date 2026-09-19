@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=0c32377b35b0380025b6f836ff2faf16a4c2df11925a8b8a4f44a533dd51b530"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=c4c3da2e2f866a2238e34565736dd23f0b330690252d4038d6b5f253400c98d4"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -89,13 +89,12 @@
     `extension` is the **parent's**, and only a record-bodied
     template has one: absent means this template is no type, so
     naming it at a type position is an error. Present, it is
-    ABSTRACT or SEALED and never OPEN or FINAL — a parent has no
+    always ABSTRACT and never OPEN or FINAL — a parent has no
     direct instances, nothing being able to write a value whose
     type is the template rather than one of its applications, and
     its applications are subtypes by construction. It is derived
-    rather than stated, in the manner of `choice.disjoint`; the
-    author's own `@abstract` mark is the *instantiation's* fact and
-    travels inside the held text above.
+    rather than stated; the author's own `@abstract` mark is the
+    *instantiation's* fact and travels inside the held text above.
 
     Optional with no default, because absence is a fact no member
     spells. A default would be omitted from output at its own value
@@ -106,17 +105,19 @@
     thing §1.3 promises a resolved-output consumer never has to do.
 
     `discriminators` is the same statement one step further, and
-    for the same reason. `extension` says a SEALED base dispatches
-    on its members' pins; this says which fields carry them, in the
-    order the pins are compared as a tuple. Without it a consumer
-    holding only resolved output knows a template family is sealed
-    and cannot place a value in it — the selector names live in the
-    held text, and reading them there is the parse §1.3 rules out.
-    It is `record.discriminators` for a base that is a template, so
-    a dispatcher reads one field whichever kind of base it has.
+    for the same reason: it says which fields the members are
+    selected by, in the order the pins are compared as a tuple, and
+    **whether it is empty is what says how they are selected** — by
+    the tag where it is, by reading those fields where it is not.
+    Without it a consumer holding only resolved output could not
+    place a value in a template family at all: the selector names
+    live in the held text, and reading them there is the parse §1.3
+    rules out. It is `record.discriminators` for a base that is a
+    template, so a dispatcher reads one field whichever kind of
+    base it has.
 
-    Present exactly when `extension` is SEALED, and then non-empty:
-    a sealed family with nothing to dispatch on is not a family.
+    Optional, and non-empty where present: a family with nothing to
+    dispatch on is dispatched by the tag and states none.
     """
   template => top & {
     parameters:      [param_name]
@@ -415,21 +416,24 @@
     ordinary case and the default: the record has instances of its own
     and may be composed onto or refined. ABSTRACT has no instances of
     its own, so a value at a position typed by it is a value of some
-    subtype. SEALED is ABSTRACT with at least one discriminator field,
-    which makes the subtype recoverable from the value's own members;
-    it is derived from the body rather than stated, in the manner of
-    `choice.disjoint`. FINAL has instances and admits no subtype: no
-    composition or refinement may name it as a source. Subtraction
-    stays admissible against a FINAL record — §5.9 empties
-    `supertypes` and mints no IS-A edge, which is the only thing FINAL
-    constrains.
+    subtype. FINAL has instances and admits no subtype: no composition
+    or refinement may name it as a source. Subtraction stays
+    admissible against a FINAL record — §5.9 empties `supertypes` and
+    mints no IS-A edge, which is the only thing FINAL constrains.
 
-    Extensibility is never inherited. A subtype of an ABSTRACT or
-    SEALED record is OPEN unless it says otherwise, since a rule
-    carrying abstractness downward would leave the family with no
-    concrete member at all.
+    **How a subtype is selected is no part of this enum.** An ABSTRACT
+    record naming no `discriminators` is selected by the tag; one
+    naming them is selected by reading those fields. That is a fact of
+    the body, derived where it is needed in the manner of
+    `choice.disjoint`, and a member here would state it a second time
+    for the two to disagree about.
+
+    Extensibility is never inherited. A subtype of an ABSTRACT record
+    is OPEN unless it says otherwise, since a rule carrying
+    abstractness downward would leave the family with no concrete
+    member at all.
     """
-  record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]
+  record_extension_type => !enum [ABSTRACT FINAL OPEN]
 
   @doc:"""
     Annotation type markers. `synthetic` is resolver-attached and derived:
@@ -531,16 +535,19 @@
     type_name: it is computed once every parent is a type, and a
     template never is ([TSON-SCHEMA] §5.10).
 
-    `record.discriminators` names the fields a SEALED family
-    dispatches on, in the order their pins are compared as a tuple.
-    It is the base's own statement rather than a mark on each field:
-    which fields select is a property of the family, and §5.8
-    flattens a base's fields into every member, so a per-field mark
-    has to be cleared again at each member and in each phase that
-    builds one. Naming them here instead makes that structural — a
-    member's record simply states none. Every name must name a field
-    the enclosing record declares; the list is present exactly when
-    `extension` is SEALED, and is then non-empty.
+    `record.discriminators` names the fields this record's members
+    are selected by, in the order their pins are compared as a tuple,
+    and a non-empty list is what makes the family member-dispatched
+    rather than tag-dispatched. It is the base's own statement rather
+    than a mark on each field: which fields select is a property of
+    the family, and §5.8 flattens a base's fields into every member,
+    so a per-field mark has to be cleared again at each member and in
+    each phase that builds one. Naming them here instead makes that
+    structural — a member's record simply states none. Every name
+    must name a field the enclosing record declares, and the record
+    must be ABSTRACT: a record its members are selected from has no
+    values of its own. The author writes `=?` on the field, which is
+    what lowers into this list ([TSON-SCHEMA] §5.2).
     """
   record => product & {
     access_pattern:  product_access_type = NAMED

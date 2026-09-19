@@ -7,7 +7,8 @@ history lives in git.
 **Invariants**
 
 - The reader is decided once, when the schema compiles: `RecordDispatch.over` decorates the mode's record factory.
-- ABSTRACT requires the `!name` tag and fails before the record's shape is consulted; SEALED reads the discriminator
+- ABSTRACT with no selector requires the `!name` tag and fails before the record's shape is consulted; a base
+  naming selectors reads the discriminator
   fields and looks the value up.
 - Both dispatchers are `Subsumption.Applied`; without the marker `Subsumption.guard` puts a second dispatcher in front,
   which wins.
@@ -27,13 +28,13 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 
 `record.extension` ([TSON-SCHEMA] §5.2) decides how a position typed by a record is read, and it is decided
 **once, when the schema compiles** — `RecordDispatch.over` decorates whichever mode's record factory is in
-play, so ABSTRACT and SEALED positions never reach it.
+play, so no family-base position reaches it.
 
 - **OPEN and FINAL** are the mode's own reader, unchanged. They read identically; the difference is which
   names a tag may carry, and a FINAL record's subtype set is empty by construction rather than by a check.
 - **ABSTRACT** is `RecordTagDispatchReader`: the `!name` annotation is the only selector and is required, and
   the failure lands before the record's shape is consulted.
-- **SEALED** is `RecordMemberDispatchReader`: the discriminator fields are read and the value looked up.
+- **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up.
 
 **One reader for both modes**, on `ChoiceReader`'s reasoning — dispatch reads the type-ref without consuming
 it, so the member's own reader takes the whole data-value and does with it whatever that mode does everywhere

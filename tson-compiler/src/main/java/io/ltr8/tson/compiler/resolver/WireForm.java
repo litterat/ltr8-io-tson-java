@@ -281,13 +281,14 @@ final class WireForm {
                 || !(application.coreValue() instanceof RecordValue binding)) {
             return Optional.empty();
         }
-        // Derived, and the author's own `@abstract` does not override it: the mark says the base has no
-        // direct instances, which every record template's base has anyway, and whether the members are
-        // selected by a tag or by their pins is the body's own fact. An `extension` member in the payload is
-        // the *instantiation's* (spliced by `heldWithExtension`), and only FINAL could disagree with the
-        // derivation -- which `withExtension` refuses on a template before it reaches here.
-        boolean sealed = !parentDiscriminators(binding, parameters).isEmpty();
-        return Optional.of(sealed ? RecordExtensionType.SEALED : RecordExtensionType.ABSTRACT);
+        // Always ABSTRACT: nothing writes a value whose type is the template rather than one of its
+        // applications, and its applications are subtypes by construction, so OPEN and FINAL are both false
+        // of a base. Whether its members are placed by a tag or by their pins is `discriminators` beside
+        // this, never a second member here. An `extension` member in the payload is the *instantiation's*
+        // (spliced by `heldWithExtension`), and only FINAL could disagree -- which `withExtension` refuses on
+        // a template before it reaches here.
+        parentDiscriminators(binding, parameters);   // the same pass refuses a parameter-typed selector
+        return Optional.of(RecordExtensionType.ABSTRACT);
     }
 
     /**

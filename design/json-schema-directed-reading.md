@@ -166,15 +166,15 @@ reading is the only one that differs by mode: every other reading places the val
 - **ABSTRACT** gets `DispatchTagReader` with no concrete reader behind it: `$type` is REQUIRED, the failure
   lands before the object's shape is consulted, and the base itself is not admissible — a tag naming it is an
   error where a concrete position would take one as a redundant restatement.
-- **SEALED** gets `DispatchMemberReader`, which reads the discriminator members and looks the value up.
-- **A family-base template** gets the ABSTRACT or SEALED dispatcher over the template itself, through the
+- **ABSTRACT naming selectors** gets `DispatchMemberReader`, which reads those members and looks the value up.
+- **A family-base template** gets whichever dispatcher its own body asks for, over the template itself, through the
   registry's `template` constructor like any other entry. A template carrying `extension` is a type by the only
   test that matters — a value can stand at it, being a value of one of its instantiations (`SPEC-FEEDBACK.md`
   #13) — so `{ b: box }` admits
   `{"$type": "int_box", "v": 1}` and refuses an untagged object, exactly as TSON text does. Every member of
   such a family is minted, so the alias is the only name a document has for one, which is what makes the
   flattening above load-bearing here rather than merely consistent.
-  - **Both readings, on the terms a closed base gets them.** ABSTRACT dispatches on `$type`; a SEALED template
+  - **Both readings, on the terms a closed base gets them.** A base naming no selector dispatches on `$type`; one naming them
     base hands its value to `DispatchMemberReader`. The discriminator names are stated structurally on the entry
     (`template.discriminators`, read through `tson-schema`'s `FamilySelectors`) rather than only in the held body's
     *text*, which `tson-compiler`'s `HeldBody` parses: this module depends on the schema pipeline's output and

@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/36/m/core.tn?sha256=842da8ac938bf4d3071596bfaacfd517cb64c5735feb6005ca384b9605de957c"
-!!meta:"https://tson.io/2026/36/m/meta.tn?sha256=711876037cfd3ebc8136d13218c28b40580ab8528423f9b4f2abe82380f737bb"
+!!id:"https://tson.io/2026/36/m/core.tn?sha256=5c31ef38bae7e324171f7096f7e3201a83c83405ee2e769be79a61fe6c29f712"
+!!meta:"https://tson.io/2026/36/m/meta.tn?sha256=62800c25c54a914cfe9394fb0dad4cb87a63a531987080d4d86e74727a0e7935"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 36 draft).
@@ -21,8 +21,7 @@
   meta-kernel.tn's note.
 
   Annotation types (`@ordered`, `@bounded`, `@exact`, `@numeric`,
-  `@disjoint`, `@rest`, `@abstract`, `@sealed`, `@final`,
-  `@discriminator`,
+  `@disjoint`, `@rest`, `@abstract`, `@final`,
   `@deprecated`, `@since`, `@todo`, `@lang`, `@title`, `@examples`,
   `@read_only`, `@write_only`) live in meta.tn — annotations resolve one hop
   against the governing target's namespace (Part 2 §3.3.3, §6), so

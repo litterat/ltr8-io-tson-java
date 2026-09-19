@@ -54,6 +54,25 @@ public final class FamilySelectors {
         };
     }
 
+    /**
+     * Whether a value at a position typed by {@code definition} is placed by <b>reading its members</b>
+     * rather than by its tag: ABSTRACT with at least one selector. The two facts are read together and
+     * nowhere stated as one, so a base cannot claim a dispatch its body does not carry.
+     */
+    public static boolean dispatchesOnMembers(TypeDefinition definition) {
+        return extensionOf(definition).filter(RecordExtensionType.ABSTRACT::equals).isPresent()
+                && !namesOf(definition).isEmpty();
+    }
+
+    /** The {@code extension} a base states, whichever kind of body holds it. */
+    public static Optional<RecordExtensionType> extensionOf(TypeDefinition definition) {
+        return switch (definition.body()) {
+            case RecordBody record -> Optional.of(record.extension());
+            case TemplateBody held -> held.extension();
+            default -> Optional.empty();
+        };
+    }
+
     /** The names a base states, whatever kind of base it is -- empty where it dispatches by tag or not at all. */
     public static List<String> namesOf(TypeDefinition definition) {
         return switch (definition.body()) {

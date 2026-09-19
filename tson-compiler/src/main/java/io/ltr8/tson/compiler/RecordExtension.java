@@ -75,7 +75,7 @@ final class RecordExtension {
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             TypeDefinition def = entry.getValue();
             RecordBody base = familyBodyOf(def, merged);
-            if (base != null && base.extension() == RecordExtensionType.SEALED
+            if (base != null && FamilySelectors.dispatchesOnMembers(def)
                     && touchesLocally(entry.getKey(), def, localNames)) {
                 checkFamily(entry.getKey(), def, merged, localNames, violations);
             }
@@ -102,7 +102,7 @@ final class RecordExtension {
         // A discriminator makes this record a family base, which has no instances of its own -- so the
         // declaration must say so. The mark is the author's; that the family is member-dispatched rather
         // than tag-dispatched is derived from the field (§5.2), and needs no second mark.
-        if (!declared.isEmpty() && record.extension() != RecordExtensionType.SEALED) {
+        if (!declared.isEmpty() && record.extension() != RecordExtensionType.ABSTRACT) {
             violations.add(new Violation(name, "'" + name + "': field '" + declared.get(0) + "' is written "
                     + "'=?', so its members pin it and '" + name + "' is the base they are selected from -- "
                     + "which has no values of its own. Mark the declaration '@abstract'"
@@ -110,7 +110,7 @@ final class RecordExtension {
                             ? "; '@final' says the opposite, that nothing may extend it" : "")
                     + " (§5.2)"));
         }
-        if (record.extension() != RecordExtensionType.SEALED) {
+        if (declared.isEmpty() || record.extension() != RecordExtensionType.ABSTRACT) {
             return;
         }
         for (RecordField field : marked) {

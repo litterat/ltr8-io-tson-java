@@ -248,7 +248,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
                 .parseSchemaDocument());
 
         RecordBody pet = assertInstanceOf(RecordBody.class, resolved.entries().get("pet").body());
-        assertEquals(RecordExtensionType.SEALED, pet.extension());
+        assertEquals(RecordExtensionType.ABSTRACT, pet.extension());
+        assertEquals(List.of("pet_type"), pet.discriminators());
         assertEquals(List.of("pet_type"), pet.discriminators());
         assertTrue(resolved.entries().get("pet").annotations().isEmpty(), "consumed, not preserved");
     }
