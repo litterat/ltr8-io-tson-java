@@ -280,8 +280,6 @@ final class DefinitionResolver {
      * {@code resolve*} method actually built the result.
      */
     TypeDefinition resolve(SchemaMap.Declaration declaration, Optional<SourcePosition> declarationPosition) {
-        DefinitionMarks.requireNoMarkAnnotation(declaration.name(), declaration.nameAnnotations());
-        DefinitionMarks.requireNoMarkAnnotation(declaration.name(), declaration.typeDefAnnotations());
         TypeDefinition resolved = resolveTypeDef(declaration.name(), declaration.typeDef());
         if (declarationPosition.isPresent()) {
             resolved = resolved.withPosition(declarationPosition);
@@ -1964,7 +1962,6 @@ final class DefinitionResolver {
      * erase what it does not mention.
      */
     private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
-        DefinitionMarks.requireNoMarkAnnotation(field.name(), field.annotations());
         Annotations own = annotationsOf(field.name(), field.annotations());
         // No mark to inherit: which fields a family dispatches on is the *record's* statement
         // (`record.discriminators`), and a member states none of its own.
@@ -2205,7 +2202,6 @@ final class DefinitionResolver {
      * governed by the group.
      */
     private RecordField resolveGroupMember(GroupDef.Member member) {
-        DefinitionMarks.requireNoMarkAnnotation(member.name(), member.annotations());
         return new RecordField(member.name(), resolveTypeRef(member.typeRef()), FieldState.OPTIONAL,
                 Optional.empty(), annotationsOf(member.name(), member.annotations()), Optional.empty());
     }

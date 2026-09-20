@@ -1074,10 +1074,11 @@ reachability terms, so the enum a mark named lived one layer below the mark. Not
 resolves one hop against the governing meta (§3.3.3) and the meta imports the kernel — but a reader was
 entitled to ask why a kernel fact was spelled by a meta-schema name, and worse, a schema whose meta omitted the
 name could not have stated the fact at all. Grammar answers to no namespace, so the question stops arising.
-The meta-schema's two annotation declarations go with the spelling they served.
+The meta-schema's two annotation declarations went with the spelling they served.
 
-**What is running:** the two kernel fields, the grammar slot and its two words, the field spelling, the
-lowering, and the refusal of the annotation spelling by name.
+**What is running:** the two kernel fields, the grammar slot and its two words, the field spelling, and the
+lowering. The meta-schema declares neither name, so either written as an annotation is §3.3.3's ordinary
+unresolved-name error — the footing `@sealed` and `@discriminator` are already on.
 `record_extension_type => !enum [ABSTRACT FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
 and `record.discriminators: [field_name]?` are in this implementation's meta-kernel and bound by its value
 model. meta.tn declares `abstract` and `final`, both `@annotation void`, and declares neither `sealed` nor

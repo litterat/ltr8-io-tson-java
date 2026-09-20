@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=c4c3da2e2f866a2238e34565736dd23f0b330690252d4038d6b5f253400c98d4"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=2e23da2dbb6ab99b5b227e0c7ba4a7403dd25b3a0404f7f0b399fdd73221283f"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -93,7 +93,7 @@
     direct instances, nothing being able to write a value whose
     type is the template rather than one of its applications, and
     its applications are subtypes by construction. It is derived
-    rather than stated; the author's own `@abstract` mark is the
+    rather than stated; the author's own `abstract` mark is the
     *instantiation's* fact and travels inside the held text above.
 
     Optional with no default, because absence is a fact no member
@@ -432,6 +432,26 @@
     is OPEN unless it says otherwise, since a rule carrying
     abstractness downward would leave the family with no concrete
     member at all.
+
+    **A field written `=?` implies ABSTRACT**, that field saying the
+    record's members pin it and so that the record is the base they
+    are selected from — which has no values of its own. Writing
+    `abstract` beside a selector asserts what the body already says
+    and is admitted, in the manner of `choice.disjoint`; `final`
+    beside one is refused, the members it selects being subtypes
+    that could then never exist.
+
+    **A family is open across schemas.** [TSON-SCHEMA] §3.3.4 makes
+    `subtypes` open, so an importing schema may declare a further
+    member. A host language's own closed-set construct, generated
+    from a family, is therefore relative to one closure and not a
+    promise the schema makes.
+
+    The member is written as a word at the declaration —
+    `pet => abstract { … }`, [TSON-SCHEMA] §12.1 — and OPEN is the
+    absence of one. It is grammar rather than an annotation because
+    it changes which values conform, which §6 says no annotation
+    may do.
     """
   record_extension_type => !enum [ABSTRACT FINAL OPEN]
 
