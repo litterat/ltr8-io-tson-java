@@ -46,7 +46,7 @@ import java.util.Optional;
  * template rather than one of its applications) and its applications being subtypes by construction.
  *
  * <p>It is <em>derived</em> rather than stated, in the manner of {@code choice.disjoint} -- which is what
- * keeps it apart from the author's {@code @abstract} mark. That mark is the <em>instantiation's</em> fact and
+ * keeps it apart from the author's {@code abstract} mark. That mark is the <em>instantiation's</em> fact and
  * travels inside {@link #template}'s own text, so the two levels have one carrier each and never collide.
  * Optional with no default, because absence is a fact no member of the enum spells: a default would be
  * omitted from output at its own value (§8.1), and deriving the answer from the body shape instead would

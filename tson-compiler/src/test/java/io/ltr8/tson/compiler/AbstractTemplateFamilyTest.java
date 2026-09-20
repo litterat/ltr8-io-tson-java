@@ -19,16 +19,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code @abstract} on a <b>template</b> ([TSON-SCHEMA] §5.2, §5.10): {@code result => @abstract <T>
+ * {@code abstract} on a <b>template</b> ([TSON-SCHEMA] §5.2, §5.10): {@code result => abstract <T>
  * { payload: T }} makes every instantiation abstract, so a value at a {@code result<text>} position is a
  * value of one of that instantiation's own subtypes and must name which.
  *
- * <p><b>Why the mark can be carried where {@code @abstract} and {@code @final} cannot.</b> {@code @abstract}
- * constrains the marked type alone -- it has no direct instances -- which is true of every instantiation
- * identically, so closing an abstract template yields an abstract entry and nothing has to be recomputed.
- * The other two are claims over a <em>set of subtypes</em>, and a template has none: an instantiation entry
- * exists only where some schema wrote that application, so the claim's subject would be assembled from
- * whichever applications a closure happens to contain ({@code SPEC-FEEDBACK.md} #11).
+ * <p><b>Why this mark can be carried where {@code final} cannot.</b> {@code abstract} constrains the marked
+ * type alone -- it has no direct instances -- which is true of every instantiation identically, so closing an
+ * abstract template yields an abstract entry and nothing has to be recomputed. {@code final} is a claim over a
+ * <em>set of subtypes</em>, and a template has none: an instantiation entry exists only where some schema
+ * wrote that application, so the claim's subject would be assembled from whichever applications a closure
+ * happens to contain ({@code SPEC-FEEDBACK.md} #11).
  *
  * <p><b>The mark travels as text, because the body does.</b> §5.10 holds an open entry's body as the
  * application written out, so the mark is stated <em>in</em> that text ({@code extension: ABSTRACT}) rather
@@ -49,7 +49,7 @@ class AbstractTemplateFamilyTest {
     private static final String ID = "https://example.test/abstract-template.tn";
 
     private static final String FAMILY = """
-              result    => @abstract <T> { payload: T }
+              result    => abstract <T> { payload: T }
               ok        => <T> result<T> & { note: text }
               err       => <T> result<T> & { reason: text }
               result_of => result<text>
@@ -201,19 +201,19 @@ class AbstractTemplateFamilyTest {
     // ── What is still refused ───────────────────────────────────────────────
 
     /**
-     * {@code @abstract} <b>is</b> a claim with a subject on a template ({@code SPEC-FEEDBACK.md} #13): a
+     * {@code abstract} <b>is</b> a claim with a subject on a template ({@code SPEC-FEEDBACK.md} #13): a
      * template carrying {@code extension} takes part in IS-A and {@code subtypes} holds its own
-     * instantiations, which is the set the claim ranges over. Only {@code @final} still cannot hold --
+     * instantiations, which is the set the claim ranges over. Only {@code final} still cannot hold --
      * every application is a subtype of the template by construction, so the claim is false before an
      * author writes anything else.
      */
     @Test
     void aTemplateMayBeSealedButNeverFinal() {
-        assertNotNull(compile("      box => @abstract <T> { kind: text =?  v: T }\n"),
-                "@abstract states the fact the derivation reaches anyway");
+        assertNotNull(compile("      box => abstract <T> { kind: text =?  v: T }\n"),
+                "abstract states the fact the derivation reaches anyway");
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> compile("      box => @final <T> { kind: text =?  v: T }\n"));
+                () -> compile("      box => final <T> { kind: text =?  v: T }\n"));
         assertTrue(thrown.getMessage().contains("subtype of it by construction"), thrown.getMessage());
     }
 }

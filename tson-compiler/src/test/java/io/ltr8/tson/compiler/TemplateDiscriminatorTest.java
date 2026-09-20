@@ -95,7 +95,7 @@ class TemplateDiscriminatorTest {
      * <b>And the instantiation names none, because it has pinned the selector.</b> Which field a family
      * dispatches on is the base's statement; a member restates the selector to pin it and carries the value
      * instead, so fixation is where the statement stops (§5.2). A member naming one would fail the rule its
-     * own closing created -- {@code @abstract} does not travel either.
+     * own closing created -- {@code abstract} does not travel either.
      */
     @Test
     void theClosedMemberCarriesThePinAndNamesNoSelector() {

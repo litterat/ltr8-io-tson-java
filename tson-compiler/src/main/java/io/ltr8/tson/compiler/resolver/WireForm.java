@@ -264,7 +264,7 @@ final class WireForm {
      * and its applications being subtypes by construction.
      *
      * <p><b>Derived rather than stated</b>, in the manner of {@code choice.disjoint}: SEALED is ABSTRACT with
-     * at least one discriminator, which is a fact of the body. The author's {@code @abstract} mark is the
+     * at least one discriminator, which is a fact of the body. The author's {@code abstract} mark is the
      * <em>instantiation's</em> and rides inside this same payload as {@code extension}, so the two levels
      * never collide.
      *

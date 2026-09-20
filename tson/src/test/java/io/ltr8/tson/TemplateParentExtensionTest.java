@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>Two levels, and this is the upper one.</b> A parent has no direct instances whatever anyone writes --
  * nothing can name the template itself at a value position, only one of its applications -- and its
  * applications are subtypes by construction, so OPEN and FINAL are not available to it and no mark could add
- * anything. The author's {@code @abstract} is the <em>instantiation's</em> fact and lives inside the held
+ * anything. The author's {@code abstract} is the <em>instantiation's</em> fact and lives inside the held
  * text, which is what {@code AbstractTemplateFamilyTest} pins; the two never collide.
  *
  * <p><b>Absent means "no type".</b> Only a record body has fields for a parent to carry, an {@code extension}

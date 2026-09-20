@@ -36,7 +36,7 @@ class TsonSealedFamilyBindTest {
             !!meta:"%s"
             !!import:"%s"
             {
-              msg  => @abstract { kind: text =?  id: int32 }
+              msg  => abstract { kind: text =?  id: int32 }
               ping => msg & { kind: = "ping"  seq: int32 }
               pong => msg & { kind: = "pong"  latency: int32 }
 

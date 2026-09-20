@@ -15,6 +15,8 @@ history lives in git.
   braced `record-def`.
 - `{` at a type position dispatches on one consumed token plus one of lookahead (§12.2); everywhere except type-def
   position a `{` is a map and only a map.
+- `abstract` and `final` are marks at the type-def head and ordinary identifiers everywhere else — the parser decides
+  on the word alone, never on what follows it.
 - A mismatch names the construct the position admits, in the author's voice, not the token class.
 
 Related: `design/schema-grammar-and-desugaring.md` (the desugaring phase that runs next),
@@ -70,6 +72,20 @@ materialization, no validation (those are the resolver's/linker's jobs).
   - A parameterized **atom refinement** is no form at all: §12.1 gives `atom-refinement` no parameter
     list, a refinement of an atom instance having no parameter to take, and the parser says so where the
     `^` is read.
+- **`[definition-mark]` at the type-def head** (§12.1) — `abstract` or `final`, the words that say how the type may
+  be realised, read by `parseDefinitionMarkOpt` before the parameter list and lowered by the resolver into
+  `record.extension`. An unmarked declaration is OPEN, so the slot is optional and OPEN has no spelling.
+  - **One slot, not two flags.** The three ways a record may be realised are alternatives, so `x => abstract final
+    { … }` is ungrammatical rather than a rule the resolver has to state and diagnose.
+  - **The words are marks here unconditionally, and that is the whole of the reservation.** They stay ordinary
+    identifiers at every other position — a declaration name, a field name, a field's type, an annotation name, a type
+    argument — so no name leaves the namespace and [TSON-DATA] §7.4's "no reserved words" holds. What a schema
+    declaring `abstract => { … }` gives up is naming it as a whole declaration body: `pet => abstract` is a
+    declaration missing its definition, and `parseDefinitionMarkOpt` says so rather than leaving the type-ref parse to
+    fail two tokens later.
+  - **Deciding on the word alone is what keeps the marked composition writable.** `mid => abstract base & { … }` and
+    `pet => abstract` differ only in what follows the head, so a conditional reading would have to give one of them
+    up, and an abstract link in a chain is worth more than an alias to a type called `abstract`.
 - **Two entry points, one grammar.** `parseSchemaDocument()` is fail-fast; `parseSchemaDocument(receiver)`
   reports each *declaration's* syntax error and resynchronises to the next, handing back no document at all
   if it reported anything. The mechanics, the resync rule and the two failures that stay fail-fast are in

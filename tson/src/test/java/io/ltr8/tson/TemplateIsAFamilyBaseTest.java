@@ -81,7 +81,7 @@ class TemplateIsAFamilyBaseTest {
     @Test
     void aMarkedTemplateIsIndexedUnderItsBase() {
         TsonLinkedSchema schema = linked("f1", """
-                  pet_base => @abstract { type: text =? }
+                  pet_base => abstract { type: text =? }
                   pet      => <T, V> pet_base & { type: = T  value: V }
                   dog_type => { breed: text }
                   dogpet   => pet<"dog", dog_type>
@@ -101,14 +101,14 @@ class TemplateIsAFamilyBaseTest {
                 schema.schema().entries().get("pet").subtypes());
     }
 
-    // ── Gap 2: @abstract on a template is a claim with a subject ───────────
+    // ── Gap 2: abstract on a template is a claim with a subject ───────────
 
     /** The shape the design exists for: the pin is a parameter, so the field is the selector by derivation. */
     @Test
     void aParametricPinMakesATemplateAFamilyBase() {
         assertEquals(List.of(), load("f3", """
                   dog_type => { breed: text }
-                  pet      => @abstract <T, V> { type: text = T  value: V }
+                  pet      => abstract <T, V> { type: text = T  value: V }
                   dogpet   => pet<"dog", dog_type>
                 """));
     }
@@ -126,11 +126,11 @@ class TemplateIsAFamilyBaseTest {
                 """));
     }
 
-    /** {@code @final} stays refused: every application is a subtype by construction, so it cannot hold. */
+    /** {@code final} stays refused: every application is a subtype by construction, so it cannot hold. */
     @Test
     void finalIsStillRefusedOnATemplate() {
         assertTrue(!load("f5", """
-                  pet => @final <T> { type: text = T }
+                  pet => final <T> { type: text = T }
                 """).isEmpty());
     }
 
@@ -169,7 +169,7 @@ class TemplateIsAFamilyBaseTest {
      *
      * <p><b>Unmarked, deliberately.</b> The template's own {@code extension} is derived ABSTRACT -- a record
      * body with no discriminator -- while each instantiation closes OPEN and so has direct instances for the
-     * tag to select. Writing {@code @abstract} here would state the <em>instantiation's</em> fact instead
+     * tag to select. Writing {@code abstract} here would state the <em>instantiation's</em> fact instead
      * (#504: the mark travels to every application identically), leaving {@code pet<dog_type>} abstract over
      * an empty family and nothing able to stand at it. The two levels are what {@code
      * AbstractTemplateFamilyTest} covers from the other side.

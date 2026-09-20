@@ -322,7 +322,7 @@ final class SchemaDesugarer {
             }
             reporter.reportFailedDeclaration(declaration, e);
             return new SchemaMap.Declaration(declaration.nameAnnotations(), declaration.name(),
-                    declaration.typeDefAnnotations(), absorbed(declaration));
+                    declaration.typeDefAnnotations(), declaration.mark(), absorbed(declaration));
         }
     }
 
@@ -332,7 +332,7 @@ final class SchemaDesugarer {
             TypeDef typeDef = typeDef(declaration.typeDef());
             return typeDef == declaration.typeDef() ? declaration
                     : new SchemaMap.Declaration(declaration.nameAnnotations(), declaration.name(),
-                            declaration.typeDefAnnotations(), typeDef);
+                            declaration.typeDefAnnotations(), declaration.mark(), typeDef);
         } finally {
             currentParameters = List.of();
         }
@@ -827,14 +827,6 @@ final class SchemaDesugarer {
     }
 
     /**
-     * One {@code record_field}, with {@code state} and {@code value} written only where the author's marks
-     * say something the constructor's own defaults do not.
-     *
-     * <p>A field with no type-ref is a §5.7 tightening entry, which needs a source to elide toward and so
-     * cannot appear in the fresh record body this builds -- {@link FieldModifiers} has no view of an
-     * inherited field, and neither does this phase.
-     */
-    /**
      * Whether this field's value is pinned to one of the enclosing template's own value parameters -- a
      * selector by derivation. A field whose declared <em>type</em> is a parameter is passed over: a position
      * typed by the template reads a selector before it knows the member, so a type that varies per
@@ -854,6 +846,14 @@ final class SchemaDesugarer {
                 .isPresent();
     }
 
+    /**
+     * One {@code record_field}, with {@code state} and {@code value} written only where the author's marks
+     * say something the constructor's own defaults do not.
+     *
+     * <p>A field with no type-ref is a §5.7 tightening entry, which needs a source to elide toward and so
+     * cannot appear in the fresh record body this builds -- {@link FieldModifiers} has no view of an
+     * inherited field, and neither does this phase.
+     */
     private ScopedValue recordField(FieldDef field) {
         if (field.type().isEmpty()) {
             throw new SchemaValidationException("field '" + field.name() + "' states only a modifier and no "
@@ -871,10 +871,8 @@ final class SchemaDesugarer {
             members.add(WireForm.nameField(WireForm.STATE, resolved.state().name()));
         }
         resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.scoped(token))));
-        // Consumed, not carried: a mark that lowers into the body must not also survive in the annotation
-        // channel, or a closed member would state one fact twice and §8.1's output would preserve a mark
-        // §6 says is never an annotation.
-        return WireForm.scoped(new RecordValue(members), DefinitionMarks.consumed(field.annotations()));
+        DefinitionMarks.requireNoMarkAnnotation(field.name(), field.annotations());
+        return WireForm.scoped(new RecordValue(members), field.annotations());
     }
 
     /**
@@ -962,7 +960,7 @@ final class SchemaDesugarer {
             String name = bindingName(binding);
             if (!imported.contains(name)) {
                 claim(name, binding, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
-                        instance(binding)));
+                        Optional.empty(), instance(binding)));
             }
             return new SimpleRef(name);
         }
@@ -971,7 +969,7 @@ final class SchemaDesugarer {
         String name = bindingName(normalised);
         if (!imported.contains(name)) {
             claim(name, normalised, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
-                    instance(normalised, renamed)));
+                    Optional.empty(), instance(normalised, renamed)));
         }
         return new GenericRef(name, parameters.stream()
                 .<TypeArg>map(parameter -> new TypeArg.Ref(new SimpleRef(parameter))).toList());

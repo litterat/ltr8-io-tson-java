@@ -799,7 +799,7 @@ final class TemplateMaterialiser {
      * A closed member's own {@code extension}: the template's, except that <b>SEALED does not travel</b>.
      *
      * <p>ABSTRACT is a claim about the marked type alone and holds of every instantiation identically, which
-     * is how {@code @abstract} on a template reaches them all (#504, and {@code AbstractTemplateFamilyTest}
+     * is how {@code abstract} on a template reaches them all (#504, and {@code AbstractTemplateFamilyTest}
      * pins it). <b>Dispatching on members does not travel.</b> The lines above have just pinned those
      * fields and left the member naming no selectors of its own, the selectors belonging to the base that
      * declares them unpinned ({@code SPEC-FEEDBACK.md} #10) -- so a member of a sealed family is an ordinary

@@ -598,7 +598,7 @@ annotation channel entirely: the base's selector is written **`=?`**, beside §5
 as *pinned, but not here — the members pin it*:
 
 ```
-pet      => @abstract { pet_type: text =?  name: text }
+pet      => abstract { pet_type: text =?  name: text }
 dog_type => pet & { pet_type: = "dog"  breed: text }
 cat_type => pet & { pet_type: = "cat"  indoor: boolean }
 ```
@@ -696,7 +696,7 @@ the problem — and one base serves the *adjacently* tagged layout just as well,
 tag and a single payload field:
 
 ```
-msg    => @abstract { kind: text =? }
+msg    => abstract { kind: text =? }
 msg_of => <T, V> msg & { kind: = T  body: V }
 ping   => msg_of<"ping", ping_body>
 pong   => msg_of<"pong", [pong_body]>
@@ -715,7 +715,7 @@ relax.
 
 **One shape does not convert, and the gap is worth stating.** OpenAPI also admits a `discriminator` on a schema whose
 composition is `oneOf` with no shared base. There is no base record for the mark to stand on, so a converter must
-either synthesise one — mint `pet => @abstract { pet_type: text =? }` and compose each variant onto it, making
+either synthesise one — mint `pet => abstract { pet_type: text =? }` and compose each variant onto it, making
 explicit a relationship the contract left implicit — or fall back to `$type` and lose member dispatch. Synthesis is
 the better answer and is mechanical, but a converter taking it should say so, since it adds a type the author did not
 write. Two further contracts are refused rather than converted: a `mapping` not covering every variant (the pins must
@@ -762,10 +762,10 @@ already argues for `@rest` — what differs is that `@rest` admits one such fiel
 tuple case below. Over the linked closure: every entry in `subtypes`, transitively, pins each marked field
 `REQUIRED_FIXED`; and the pins are pairwise distinct.
 
-**`=?` implies `@abstract`, and nothing states the dispatch twice.** A selector says the members pin it, so
+**`=?` implies `abstract`, and nothing states the dispatch twice.** A selector says the members pin it, so
 the record is the base they are selected from and has no values of its own — a total consequence, there being
 no reading in which such a record has direct instances, so ABSTRACT is derived rather than required.
-`@abstract` beside a selector asserts what the body says and is admitted on `@disjoint`'s terms; `@final`
+`abstract` beside a selector asserts what the body says and is admitted on `@disjoint`'s terms; `final`
 claims the opposite and is refused. That the family is *member*-dispatched rather than tag-dispatched is
 likewise no mark: it is whether any field carries the spelling, read off the body (#11).
 
@@ -807,7 +807,7 @@ variants. And a second selector on an intermediate type is the nesting escape ha
 deliberately leaves out of the first design.
 
 **What is running:** the proposal, in both encodings, as #11 and #13 describe — `=?` on a base field, which
-derives ABSTRACT and admits `@abstract` as an assertion beside it, the closure checks with pins compared as
+derives ABSTRACT and admits `abstract` as an assertion beside it, the closure checks with pins compared as
 values, and member dispatch at such a position. Neither `@discriminator` nor `@sealed` is known to the
 resolver at all: meta.tn declares neither, so either name written in a schema is the ordinary
 unknown-annotation error (§3.3.3). The
@@ -821,7 +821,7 @@ dependency as proposed rather than landed.
 `field-modifier` alternative, `ws "=" ws "?"`, needing no lexical change — with the check list above and the
 §5.7 arrangement stated; keep the word "discriminator" in the prose and the index, since the symbol is not
 searchable; name the equality relation for pin distinctness and add the group-member check; state that `=?`
-implies `@abstract`, and say what the shape is for — a sealed hierarchy in a host language — since that is what makes
+implies `abstract`, and say what the shape is for — a sealed hierarchy in a host language — since that is what makes
 totality
 and abstractness rules rather than preferences. Leave §5.4 untouched but add a pointer from it, since an author
 reaching for member dispatch at a choice is an author who wants the composed family or the labelled form of §5.11.
@@ -834,8 +834,8 @@ reaching for member dispatch at a choice is an author who wants the composed fam
 (composition), §5.9 (removal), §5.10.1 (productivity and inhabitance), §6 (what an annotation may do), §7.2
 (subsumption), §8.1 (resolved output), §8.2 (identity), §12.1 (the schema grammar); [TSON-JSON] §6.1.5, §8.4.
 Reads with #10, and is useful without it.
-**Kind:** design proposal — two kernel fields and the enum one of them takes; one naming choice left open.
-**All of it is running.**
+**Kind:** design proposal — two kernel fields, the enum one of them takes, and the grammar slot the author
+writes it with. **All of it is running.**
 
 **What forces it.** §6 gives the criterion for annotation-hood in its own words: "a schema with every annotation
 erased admits exactly the same values." Run that erasure separately on the two halves of #10's mark and they come
@@ -867,6 +867,11 @@ is the finding, and the fact belongs in the kernel where erasure cannot reach it
 **The proposal.** `record` gains two fields and the kernel one enum:
 
 ```
+definition-mark = "abstract" / "final"
+
+schema-map-entry = *( annotation ws ) type-name ws "=>" ws
+                   *( annotation ws ) [ definition-mark ws ] type-def
+
 record_extension_type => [ABSTRACT FINAL OPEN]
 
 record => product & {
@@ -919,16 +924,43 @@ in both encodings, the standing [TSON-JSON] §8.4 already gives `$type`. An earl
 (SEALED) on this. It said a second time what the body carries, which is the one arrangement in which the two
 can disagree; the derivation is `choice.disjoint`'s shape and is read where it is needed.
 
-**Two marks in, two kernel fields out.** The author writes exactly one of `@abstract` and `@final` at the
-definition (`pet => @abstract { … }`; §6 honours a checked annotation at either position, so the key spelling
-lowers identically), or neither, and `=?` on each field the members pin. The mark names its member and
-`extension` is a function of which was written — OPEN where none was; the field spelling fills
-`discriminators`. Two definition marks on one declaration is a load error.
+**Two marks in, two kernel fields out.** The author writes exactly one of the words `abstract` and `final`
+between `=>` and the type definition (`pet => abstract { … }`), or neither, and `=?` on each field the members
+pin. The mark names its member and `extension` is a function of which was written — OPEN where none was; the
+field spelling fills `discriminators`. One optional slot rather than two flags makes two marks on one
+declaration *ungrammatical*, which is a rule the resolver no longer has to state or diagnose.
+
+**The mark is grammar rather than an annotation, on §6's own criterion.** §6 fixes the home of a fact in as
+many words — "an annotation is the right home exactly when the mark changes no value's validity" — and both
+marks change it. Erase `abstract` and a direct instance becomes readable at every position typed by the record;
+erase `final` and an importing schema may compose a subtype whose values that position then admits. The
+annotation spelling an earlier draft used had to be carved out of §6 as an exception, and an exception to the
+criterion §6 exists to state is a sign the fact is in the wrong channel rather than a sign the criterion needs
+softening. Nothing about the kernel changes: `record.extension` was always the carrier, and the marks never
+survived into §8.1's annotation channel. What changes is that the surface now agrees with the model.
+
+**The words are marks at one position and ordinary identifiers everywhere else, so [TSON-DATA] §7.4 stands.**
+"No reserved words. The grammar excludes nothing by name" holds unchanged: `abstract => { … }` still declares a
+type of that name, `f: abstract` still references it, `abstract` is still available as an annotation name in a
+meta that declares one. The sole reservation is that a type so named cannot be written as a *whole declaration
+body* — `pet => abstract` is a declaration missing its definition. Reading the word unconditionally is what
+buys that narrowness: a marked composition (`mid => abstract base & { … }`) and an alias differ only in what
+follows the head, so a conditional reading would have to give one of them up, and an abstract link in a chain is
+worth more than an alias to a type called `abstract`. §12.2's disambiguation summary gains the one line.
+
+**Why a word and not a character.** `=?` earned its terseness by density — a field modifier is written on every
+field, so the reader meets it constantly and the cost of learning it is paid once. A definition mark is written
+once per family and appears nowhere in the meta-kernel, meta or core. The survey argues the same way: every
+language that names this axis names it with words (`abstract`/`final`, `sealed`/`non-sealed`, Kotlin's
+`open`/`abstract`/`final`), and the closed special-token set ([TSON-DATA] §7.2.5) has no character left that is
+not already spoken for. Taking one back from §7.2.6's deliberately-unused list would spend the value of that
+list being absolute on a mark used this rarely.
 
 **The marks are stated and the selectors are derived, and the split is not arbitrary.** Instantiability is not
-a fact of any field: nothing in a body says whether the author meant this record to have values of its own, so
-`@abstract` is written and `=?` requires it (#10). How the members are then *selected* is a fact of the body —
-whether any field carries the spelling — so deriving it adds no claim an author could have made differently.
+a fact of any field: nothing in an ordinary body says whether the author meant this record to have values of its
+own, so `abstract` is written — except where a selector settles it, which is the one body that does say
+(below). How the members are then *selected* is a fact of the body — whether any field carries the spelling —
+so deriving it adds no claim an author could have made differently.
 
 `@disjoint` is the nearest precedent for the derived half and the analogy is close: `disjoint` is computed from
 the variants, and member dispatch is computed from the selectors. What differs is that `@disjoint` has an
@@ -937,13 +969,13 @@ optional assertion spelling and this has none, which is the redundancy #10 recor
 **A template may be abstract and may not be final, and the asymmetry is the marks' own.** §5.10 makes
 a template not a type: only an application is, and each application mints its own entry. ABSTRACT constrains the
 marked type alone — no direct instances — which is true of every instantiation identically and needs nothing else
-known, so `result => @abstract <T> { … }` with `ok => <T> result<T> & { … }` is meaningful and is the shape a host
+known, so `result => abstract <T> { … }` with `ok => <T> result<T> & { … }` is meaningful and is the shape a host
 language spells `abstract class Result<T>`. **This is running.** §5.10 holds an open entry's body as the
 application written out, so the mark is stated inside that text and materialisation reads it back through the
 `record` constructor's own reader: closing `result<text>` yields an ABSTRACT entry, and the family it is abstract
 over is the one §5.8's reference-valued `supertypes` builds — `ok<text>` is a member of `result<text>`'s and not
-of `result<int32>`'s. The mark is written **before** the parameter list, §12.1 putting a declaration's
-annotations ahead of the type-def that the parameters open. FINAL is a claim about *other* declarations —
+of `result<int32>`'s. The mark is written **before** the parameter list, the slot sitting
+between `=>` and the type-def that the parameters open. FINAL is a claim about *other* declarations —
 that nothing composes onto this one — and a template has no set for such a claim to range over. `subtypes` is an index
 over entries (§8.2), and an instantiation entry exists only where some schema writes
 that application, so the claim's subject would be assembled from whichever applications a closure happens to
@@ -990,7 +1022,7 @@ emitting #10's hierarchy has to know which of those a leaf is and today has nowh
 inhabited as any record is, an ABSTRACT one exactly when one of its subtypes is, and §5.10.1's least
 fixed point then rejects an abstract base with no subtypes as it rejects any other uninhabited entry. **Do not
 adopt it.** The case it refuses is the one an abstract base most exists for: a library schema declaring
-`response => @abstract { … }` and a field typed `response`, with every subtype supplied by the schemas that
+`response => abstract { … }` and a field typed `response`, with every subtype supplied by the schemas that
 import it. §3.3.4 makes `subtypes` open across schemas, so that family is empty in the declaring schema's own
 closure and complete in each consumer's — and it is the *consumer's* documents that are written, never the
 library's. Rejecting at load would make the library unpublishable for having deferred exactly what it meant to
@@ -1028,29 +1060,24 @@ sense but reading badly under the `_type` suffix; `derivation`, accurate but les
 vocabulary; `instantiation`, which names the ABSTRACT axis and says nothing about FINAL; and `record_kind`,
 refused outright because §4.1 has already given "kind" to the four base kinds.
 
-**One spelling has already moved, and the other two are provisional.** The selector is §12.1 syntax, `=?`
-(#10), which is where this arrangement was always heading. The two definition marks are annotation-shaped for
-now — `@abstract` and `@final` — and both are **consumed by the resolver into `record.extension`** rather than
-preserved in §8.1's author-annotation channel. Consumption is the whole of what makes the interim legitimate:
-a mark that lowers into the type is syntax wearing annotation clothing, and neither is an annotation in §6's
-sense once it lands. One of them *preserved* would be the erasure violation twice over. It is also what makes
-the arrangement temporary, since a construct that the resolver reads, that is absent from output, and that no
-schema may redefine is a construct §12.1 should spell — as it now does for the selector. Two things the interim
-needs stated: both names are **reserved** at their positions, so a schema cannot mean something else by them;
-and resolved output carries the body member and not the mark, so there is one carrier for the fact and §8.1's
-no-hoisting question does not arise.
+**All three spellings are §12.1 syntax, and the layer split that forced it is closed.** The selector is `=?`
+(#10) and the definition marks are the words `abstract` and `final` at the type-def head. The annotation
+spelling both marks passed through was legitimate only because the resolver *consumed* them — a mark that
+lowers into the type is syntax wearing annotation clothing, and one left preserved in §8.1's author-annotation
+channel would have been the erasure violation twice over. But consumption is also what made the arrangement
+temporary: a construct the resolver reads, that is absent from output, and that no schema may redefine is a
+construct §12.1 should spell. It now does.
 
-**The interim splits the fact across two layers, which syntax is what resolves.** `record_extension_type` and the
-two fields are the kernel's, since the body they sit in is; the two marks are declared in the meta-schema, on
-`@doc`'s reachability terms. So the enum a mark names lives one layer below the
-mark. Nothing breaks — an annotation resolves one hop against the governing meta (§3.3.3) and the meta imports the
-kernel, so a schema governed by either finds both — but a reader is entitled to ask why a kernel fact is spelled
-by a meta-schema name. The answer is that the spelling is the part that moves: §12.1 spelling the marks puts the
-notation in the same document as the fields, and the split closes with the annotations rather than being repaired
-where it stands. Moving the declarations into the kernel meanwhile would put author-written vocabulary beside
-`synthetic`, which is the resolver's own, and buy nothing a reader can observe.
+What the move fixes beyond tidiness is a split across two layers. `record_extension_type` and the two fields
+are the kernel's, since the body they sit in is; the marks were declared in the meta-schema, on `@doc`'s
+reachability terms, so the enum a mark named lived one layer below the mark. Nothing broke — an annotation
+resolves one hop against the governing meta (§3.3.3) and the meta imports the kernel — but a reader was
+entitled to ask why a kernel fact was spelled by a meta-schema name, and worse, a schema whose meta omitted the
+name could not have stated the fact at all. Grammar answers to no namespace, so the question stops arising.
+The meta-schema's two annotation declarations go with the spelling they served.
 
-**What is running:** the two kernel fields, the two marks, the field spelling, and the lowering.
+**What is running:** the two kernel fields, the grammar slot and its two words, the field spelling, the
+lowering, and the refusal of the annotation spelling by name.
 `record_extension_type => !enum [ABSTRACT FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
 and `record.discriminators: [field_name]?` are in this implementation's meta-kernel and bound by its value
 model. meta.tn declares `abstract` and `final`, both `@annotation void`, and declares neither `sealed` nor
@@ -1062,10 +1089,10 @@ identically. They are matched by name and never resolved against the governing m
 them: they lower under a meta declaring neither, where an ordinary unknown name is the author's error. `=?` is
 never an annotation at all — it is §12.1 syntax, and `FieldModifiers` lowers it into `discriminators` while
 leaving the field REQUIRED and unpinned. Refused while lowering: two definition marks on one declaration, a
-mark carrying a value, a definition mark on a non-record, `=?` on an optional field, and `@final` on a record
-carrying one. **ABSTRACT is derived where a selector is present** (`withExtension`), `@abstract` written
+mark carrying a value, a definition mark on a non-record, `=?` on an optional field, and `final` on a record
+carrying one. **ABSTRACT is derived where a selector is present** (`withExtension`), `abstract` written
 beside one being an assertion that agrees rather than a requirement. A template carrying a mark is lowered
-into its held body and read back when that body closes (#13), `@final` alone being refused there.
+into its held body and read back when that body closes (#13), `final` alone being refused there.
 
 **The load-time checks run too**, one pass in the linker beside the disjointness derivation: nothing may compose
 or refine onto a FINAL record while §5.9 subtraction stays admissible; a sealed record's selectors are REQUIRED,
@@ -1092,7 +1119,7 @@ design. §8.2 identity does not carry `extension`, and needs not: only a templat
 entry holding a non-OPEN one — no synthetic is ever a record — and an instantiation is named from the
 template and its arguments, never from the closed record's fields, so one template contributes one
 `extension` and two entries differing only in that member cannot be minted. Measured, now that #13 admits the
-mark on a template: `a => @abstract <T> { v: T }` and `b => <T> { v: T }` applied to `text` mint
+mark on a template: `a => abstract <T> { v: T }` and `b => <T> { v: T }` applied to `text` mint
 `a_text_d07d3ec8` (ABSTRACT) and `b_text_bf004549` (OPEN) — distinct because their heads are, not because the
 member is weighed. The collision the rule prevents therefore stays unreachable, for this reason rather than
 for the earlier one that a mark on a template is refused. The kernel's own three schemas resolve, link and
@@ -1103,7 +1130,7 @@ cost nothing where nothing uses them.
 the kernel's `record`, and `discriminators: [field_name]?` to `record` and `template` (#13), stating the three
 members' meanings; state that **how a subtype is selected is `discriminators` and not a member of the enum** —
 tag where it is empty, the marked fields where it is not — and that the two reading rules follow from it;
-state that a selector implies ABSTRACT, that the mark beside one is an admitted assertion and `@final` a
+state that a selector implies ABSTRACT, that the mark beside one is an admitted assertion and `final` a
 refusal, and that **a family is open across schemas** (§3.3.4) — so a host language's own closed-set
 construct, generated from one, is relative to a closure and not a promise the schema makes;
 state #10's checks over the selector, the FINAL check over composition and refinement, the subtraction
@@ -1216,7 +1243,7 @@ opposite verdicts, and neither verdict was the useful one:
 
 ```
 pet => @sealed   <N, T> { @discriminator type: text = N  pet: T }    ; refused at load
-pet => @abstract <N, T> {               type: text = N  pet: T }    ; loaded clean, and was inert
+pet => abstract <N, T> {               type: text = N  pet: T }    ; loaded clean, and was inert
 dog => pet<"dog", dog_type> & { … }
 ```
 
@@ -1266,7 +1293,7 @@ other shapes each fail for a reason the series already enforces:
   rather than a base of its own — a host language spells that as a wildcard use (`Pair<UUID, ?>`), never as a
   named supertype.
 - **A container template** — `arr => <T> [T]`, `<K, V> {K => V}`. Abstractness has nowhere to live:
-  `record.extension` is the only such field, which §5.2 says in as many words, so `@abstract <T> [T]` is
+  `record.extension` is the only such field, which §5.2 says in as many words, so `abstract <T> [T]` is
   refused with "only a record states how it may be realised". Putting `extension` on array, map and tuple
   bodies is a kernel change well past this entry, and it would buy a base whose members no host type
   distinguishes.
@@ -1289,7 +1316,7 @@ mark governed both.
   makes the base member-dispatched rather than tag-dispatched. Both are derived in the manner of
   `choice.disjoint`: there is no claim for an author to state here and so nothing for a stated mark to
   contradict.
-- **An instantiation's `extension` is stated**, by `@abstract` *inside* the held text, and is OPEN unless the
+- **An instantiation's `extension` is stated**, by `abstract` *inside* the held text, and is OPEN unless the
   template says otherwise. That is how a **second-level** base is spelled: `result<text>` abstract over
   `ok<text>` and `err<text>`.
 
@@ -1306,7 +1333,7 @@ them would claim a family of its own that it does not have.
 **What the base carries: whatever survives erasure.** Drop a value parameter's pin and the field stays
 (`type: text = N` becomes `type: text`); omit a field whose type mentions a type parameter (`value: V`), since
 nothing before dispatch reads it and the member's own entry types it. A base may therefore be **empty** —
-`@abstract { }` is legal and dispatches by tag — so erasure governs what a base holds rather than whether it
+`abstract { }` is legal and dispatches by tag — so erasure governs what a base holds rather than whether it
 exists. Member dispatch is what has a floor: at least one selector must survive erasure, which is the
 condition above, and a base claiming dispatch with none is refused for precisely that reason.
 
@@ -1358,7 +1385,7 @@ derivation step wearing an entry's clothes.
 
 **Minting is keyed on naming, not on the mark.** An instantiation entry is minted where an application is
 *named at a type position*, and nowhere else. Keying it on the mark instead — a marked template subsumes,
-a plain one instantiates — reads simpler and costs a shape people want: `result => @abstract <T> { … }`
+a plain one instantiates — reads simpler and costs a shape people want: `result => abstract <T> { … }`
 with `ok => <T> result<T> & { … }` would leave `ok<text>` and `ok<int32>` both IS-A a flat `result`, and
 `result<text>` would stop being writable at a position at all. Keyed on naming, the two coexist with no regime
 flag: `pet<"dog", dog_type>` is only ever an operand and gets no entry, `result<text>` is written at positions
@@ -1402,7 +1429,7 @@ one, each delegating to the same record reader a closed base of the same shape u
 verdict in both (§9.4). Measured: `!holder { p: { type: "dog"  value: { breed: "lab" } } }` selects the dog
 member by its pin, the cat member is selected by its own, and a pin no member states is refused naming the
 base and offering the pins a document could write; an ABSTRACT base dispatches by tag over the aliases a
-document can write. `@final` is still refused on a template, and a selector typed by a parameter is refused
+document can write. `final` is still refused on a template, and a selector typed by a parameter is refused
 where it is written `=?` and passed over where it would only have been derived. The base's `extension` is
 derived and is ABSTRACT for every record template — a labelled sum, a composition template, one with no
 selector at all — and absent for a container, a constructor application and a reference template, each of
@@ -1422,7 +1449,7 @@ dispatch selects — and that a reference template and every non-record body are
 State the two levels of `extension`, since one mark used to appear to govern both: the base's is **derived**
 and always ABSTRACT — never OPEN, never FINAL — with `template.discriminators` beside it holding whatever
 selectors survive erasure, and an instantiation's is **stated** (OPEN unless the template carries
-`@abstract`). State that the selectors do not travel to a member and ABSTRACT does, with the scopes that make
+`abstract`). State that the selectors do not travel to a member and ABSTRACT does, with the scopes that make
 that consistent. State what a base carries — the fields that survive erasure, a field whose type mentions a
 type parameter omitted, an empty base legal — and the condition on a selector: its declared type MUST contain
 no type parameter, its pin being what a parameter supplies. State that a field pinned to a value parameter in
