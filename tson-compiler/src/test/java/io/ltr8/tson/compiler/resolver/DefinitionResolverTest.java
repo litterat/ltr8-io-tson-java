@@ -27,6 +27,7 @@ import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -2238,7 +2239,7 @@ class DefinitionResolverTest {
     // ── The four marks lower into the body (§5.2, SPEC-FEEDBACK #10/#11) ──
 
     /**
-     * Both facts reach the body: {@code @abstract} into {@code record.extension}, the selector into
+     * Both facts reach the body: {@code abstract} into {@code record.extension}, the selector into
      * {@code record.discriminators} -- the enclosing record's statement, not the field's.
      *
      * <p>That they lower <em>without</em> the governing meta declaring them is a different property and is
@@ -2250,7 +2251,7 @@ class DefinitionResolverTest {
     @Test
     void aSealedRecordLowersBothMarksIntoTheBody() {
         RecordBody body = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel(
-                "pet => @abstract { pet_type: text =?  name: text }").body());
+                "pet => abstract { pet_type: text =?  name: text }").body());
 
         assertEquals(RecordExtensionType.ABSTRACT, body.extension());
         assertEquals(List.of("pet_type"), body.discriminators(),
@@ -2261,23 +2262,26 @@ class DefinitionResolverTest {
     @Test
     void aLoweredMarkLeavesNothingInTheAnnotationChannel() {
         TypeDefinition pet = resolveSnippetsAgainstMetaKernel(
-                "pet => @abstract { pet_type: text =?  name: text }");
+                "pet => abstract { pet_type: text =?  name: text }");
         RecordBody body = assertInstanceOf(RecordBody.class, pet.body());
 
         assertTrue(pet.annotations().isEmpty(), "the definition mark is gone from the channel");
         assertTrue(body.fields().get(0).annotations().isEmpty(), "and so is the field mark");
     }
 
-    /** §6 honours a checked annotation at either declaration position, so the two spellings must agree. */
+    /**
+     * The mark has one position, and the words are ordinary identifiers at every other -- which is what keeps
+     * [TSON-DATA] §7.4's "no reserved words" true: the grammar still excludes nothing by name.
+     */
     @Test
-    void theKeySpellingLowersLikeTheValueSpelling() {
-        RecordBody beforeTheName = assertInstanceOf(RecordBody.class,
-                resolveSnippetsAgainstMetaKernel("@abstract shape => { kind: text }").body());
-        RecordBody afterTheArrow = assertInstanceOf(RecordBody.class,
-                resolveSnippetsAgainstMetaKernel("shape => @abstract { kind: text }").body());
+    void aMarkWordIsAnOrdinaryNameElsewhere() {
+        RecordBody holder = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
+                abstract => { a: text }
+                final => { b: text }
+                holder => { f: abstract  g: final }""").body());
 
-        assertEquals(RecordExtensionType.ABSTRACT, beforeTheName.extension());
-        assertEquals(beforeTheName.extension(), afterTheArrow.extension());
+        assertEquals(RecordExtensionType.OPEN, holder.extension(),
+                "the words are field types here, not marks");
     }
 
     /** The default, and the overwhelming majority: a record that says nothing is OPEN. */
@@ -2298,7 +2302,7 @@ class DefinitionResolverTest {
     @Test
     void aSubtypeOfASealedBaseIsOpenUnlessItSaysOtherwise() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
-                pet => @abstract { pet_type: text =?  name: text }
+                pet => abstract { pet_type: text =?  name: text }
                 dog => pet & { pet_type: = "dog"  breed: text }""").body());
 
         assertEquals(RecordExtensionType.OPEN, dog.extension());
@@ -2318,7 +2322,7 @@ class DefinitionResolverTest {
     @Test
     void aRestatedFieldPinsTheSelectorAndCarriesNoMark() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
-                pet => @abstract { pet_type: text =?  name: text }
+                pet => abstract { pet_type: text =?  name: text }
                 dog => pet & { pet_type: = "dog"  breed: text }""").body());
 
         RecordField pinned = dog.fields().stream().filter(f -> f.name().equals("pet_type")).findFirst()
@@ -2327,27 +2331,34 @@ class DefinitionResolverTest {
         assertTrue(dog.discriminators().isEmpty(), "and the mark stays with the base that declared it");
     }
 
-    /** Three alternatives, never companions: a record states how it may be realised once. */
+    /**
+     * Three alternatives, never companions: a record states how it may be realised once. One optional slot
+     * rather than two flags is what makes this ungrammatical instead of a rule the resolver has to state.
+     */
     @Test
     void twoDefinitionMarksOnOneDeclarationAreRefused() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("@abstract x => @final { a: text }"));
+        ParseException thrown = assertThrows(ParseException.class,
+                () -> resolveSnippetsAgainstMetaKernel("x => abstract final { a: text }"));
         assertTrue(thrown.getMessage().contains("on one declaration"), thrown.getMessage());
     }
 
-    /** Each mark is declared {@code void}: a value states one for a type that admits none. */
+    /**
+     * The annotation spelling is refused rather than ignored. Left to fall through it would resolve against
+     * the governing meta and sit in the author-annotation channel saying nothing, leaving the record OPEN --
+     * silently admitting the values the mark exists to exclude.
+     */
     @Test
-    void aMarkTakesNoValue() {
+    void theAnnotationSpellingIsRefused() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("x => @abstract:\"yes\" { a: text }"));
-        assertTrue(thrown.getMessage().contains("takes no value"), thrown.getMessage());
+                () -> resolveSnippetsAgainstMetaKernel("x => @abstract { a: text }"));
+        assertTrue(thrown.getMessage().contains("is not an annotation"), thrown.getMessage());
     }
 
     /**
-     * <b>{@code @abstract} is a claim with a subject on a template</b> ({@code SPEC-FEEDBACK.md} #13): a
+     * <b>{@code abstract} is a claim with a subject on a template</b> ({@code SPEC-FEEDBACK.md} #13): a
      * template carrying {@code extension} takes part in IS-A, and {@code subtypes} holds its own
      * instantiations -- which is exactly the set the claim ranges over. So the mark lowers into the held body
-     * like {@code @abstract}, and {@code RecordExtension} judges it against the fields the way it does for a
+     * like {@code abstract}, and {@code RecordExtension} judges it against the fields the way it does for a
      * closed record.
      */
     @Test
@@ -2363,7 +2374,7 @@ class DefinitionResolverTest {
     }
 
     /**
-     * <b>{@code @final} still cannot hold of a template.</b> It forbids anything composing onto the marked
+     * <b>{@code final} still cannot hold of a template.</b> It forbids anything composing onto the marked
      * type, and every application of a template is a subtype of it by construction -- so the claim is false
      * of the declaration before an author writes a second one.
      */
@@ -2371,21 +2382,21 @@ class DefinitionResolverTest {
     void aTemplateCannotBeFinal() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel(
-                        "box => @final <T> { kind: text =?  v: T }"));
+                        "box => final <T> { kind: text =?  v: T }"));
 
         assertTrue(thrown.getMessage().contains("subtype of it by construction"), thrown.getMessage());
     }
 
     /**
-     * <b>{@code @abstract} is the one mark a template takes</b>, the asymmetry being the marks' own: it
+     * <b>{@code abstract} is the one mark a template takes</b>, the asymmetry being the marks' own: it
      * constrains the marked type alone -- no direct instances -- which holds of every instantiation
-     * identically, so {@code result => @abstract <T> { … }} is meaningful and is what a host language spells
+     * identically, so {@code result => abstract <T> { … }} is meaningful and is what a host language spells
      * {@code abstract class Result<T>}. §5.10 holds the body as text, so the mark is stated <em>in</em> that
      * text and travels with it; {@code SubtypeTemplateFamilyTest} is where the closed end is checked.
      */
     @Test
     void aTemplateIsAbstractByStatingTheMarkInItsHeldBody() {
-        TypeDefinition box = resolveSnippetsAgainstMetaKernel("box => @abstract <T> { v: T }");
+        TypeDefinition box = resolveSnippetsAgainstMetaKernel("box => abstract <T> { v: T }");
 
         assertInstanceOf(TemplateBody.class, box.body());
         assertTrue(((TemplateBody) box.body()).template().contains("extension:"),
@@ -2399,7 +2410,7 @@ class DefinitionResolverTest {
     @Test
     void aDefinitionMarkOnANonRecordIsRefused() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("x => @abstract !enum [A B]"));
+                () -> resolveSnippetsAgainstMetaKernel("x => abstract !enum [A B]"));
         assertTrue(thrown.getMessage().contains("only a record states how it may be realised"),
                 thrown.getMessage());
     }
@@ -2411,7 +2422,7 @@ class DefinitionResolverTest {
     @Test
     void aDefinitionMarkOnANonRecordTemplateIsRefused() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("x => @abstract <T> !array { element_type: T }"));
+                () -> resolveSnippetsAgainstMetaKernel("x => abstract <T> !array { element_type: T }"));
         assertTrue(thrown.getMessage().contains("only a record states how it may be realised"),
                 thrown.getMessage());
         assertTrue(thrown.getMessage().contains("applies '!array'"), thrown.getMessage());

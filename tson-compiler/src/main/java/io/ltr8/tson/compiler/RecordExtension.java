@@ -39,7 +39,7 @@ import java.util.Set;
  * end of its reference chain. What <em>is</em> local -- two definition marks on one declaration, a mark
  * carrying a value, a mark on a non-record -- the resolver already refused while lowering.
  *
- * <p><b>A discriminator requires {@code @abstract}, and states the dispatch by itself.</b> A field written
+ * <p><b>A selector implies {@code abstract}, and states the dispatch by itself.</b> A field written
  * {@code =?} says its members pin it, so the record is the base they are selected from and has no values of
  * its own -- which the declaration must say, since instantiability is not derivable from a field. Whether the
  * family is tag-dispatched or member-dispatched is *not* a second mark: it is whether any field carries the
@@ -120,10 +120,10 @@ final class RecordExtension {
             if (target != null && target.body() instanceof RecordBody parent
                     && parent.extension() == RecordExtensionType.FINAL) {
                 violations.add(new Violation(name, "'" + name + "' names '" + supertype + "' as a supertype, "
-                        + "but '" + supertype + "' is @final and admits none -- composition and refinement are "
+                        + "but '" + supertype + "' is final and admits none -- composition and refinement are "
                         + "both refused, in the declaring schema and in any that imports it. Subtraction is "
                         + "not: §5.9 empties the contract index and mints no IS-A edge, which is the only "
-                        + "thing @final constrains (§5.2, §5.9)"));
+                        + "thing final constrains (§5.2, §5.9)"));
             }
         }
     }

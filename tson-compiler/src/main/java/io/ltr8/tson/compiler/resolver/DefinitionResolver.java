@@ -280,18 +280,19 @@ final class DefinitionResolver {
      * {@code resolve*} method actually built the result.
      */
     TypeDefinition resolve(SchemaMap.Declaration declaration, Optional<SourcePosition> declarationPosition) {
+        DefinitionMarks.requireNoMarkAnnotation(declaration.name(), declaration.nameAnnotations());
+        DefinitionMarks.requireNoMarkAnnotation(declaration.name(), declaration.typeDefAnnotations());
         TypeDefinition resolved = resolveTypeDef(declaration.name(), declaration.typeDef());
         if (declarationPosition.isPresent()) {
             resolved = resolved.withPosition(declarationPosition);
         }
         resolved = withExtension(declaration, resolved);
-        Annotations annotations = annotationsOf(declaration.name(),
-                DefinitionMarks.consumed(declaration.typeDefAnnotations()));
+        Annotations annotations = annotationsOf(declaration.name(), declaration.typeDefAnnotations());
         return annotations.isEmpty() ? resolved : resolved.withAnnotations(annotations);
     }
 
     /**
-     * A declaration's own {@code @abstract}/{@code @final} lowered into {@code record.extension} ({@link
+     * A declaration's own {@code abstract}/{@code final} mark lowered into {@code record.extension} ({@link
      * DefinitionMarks}), and ABSTRACT derived where the body names selectors -- the resolved definition
      * unchanged where neither applies, every record being OPEN by default.
      *
@@ -301,11 +302,11 @@ final class DefinitionResolver {
      * is also what makes the rule that extensibility is never inherited fall out rather than need stating --
      * a composition's body is built OPEN from its operands and the mark, if any, is this declaration's own.
      *
-     * <p><b>A template takes {@code @abstract} and refuses the other two.</b> {@code @abstract} constrains the
+     * <p><b>A template takes {@code abstract} and refuses {@code final}.</b> {@code abstract} constrains the
      * marked type alone -- no direct instances, true of every instantiation identically -- so it is stated in
      * the held body and closing carries it through: every application of {@code result} mints an abstract
      * entry, and the family it is abstract over is the one the closed applications of its subtype templates
-     * join (§5.8, {@code SubtypeTemplateFamilyTest}). {@code @final} is a claim about <em>other</em>
+     * join (§5.8, {@code SubtypeTemplateFamilyTest}). {@code final} is a claim about <em>other</em>
      * declarations -- that nothing composes onto it -- and
      * a template has no set for such a claim to range over: {@code subtypes} indexes entries, an instantiation
      * entry exists only where some schema wrote that application, so the claim's subject would be assembled
@@ -323,15 +324,14 @@ final class DefinitionResolver {
      * applies: {@code TemplateBody} is the Java shape of every open form alike and would name none of them.
      */
     private TypeDefinition withExtension(SchemaMap.Declaration declaration, TypeDefinition resolved) {
-        Optional<RecordExtensionType> extension = DefinitionMarks.extension(declaration.name(),
-                declaration.nameAnnotations(), declaration.typeDefAnnotations());
+        Optional<RecordExtensionType> extension = DefinitionMarks.extension(declaration.mark());
         boolean selectors = resolved.body() instanceof RecordBody body && !body.discriminators().isEmpty();
         if (selectors) {
             // A selector says the members pin it, so the record is the base they are selected from and has
-            // no values of its own -- ABSTRACT, derived. `@abstract` beside it asserts what the body already
-            // says and is admitted; `@final` claims the opposite and is refused.
+            // no values of its own -- ABSTRACT, derived. `abstract` beside it asserts what the body already
+            // says and is admitted; `final` claims the opposite and is refused.
             if (extension.orElse(RecordExtensionType.ABSTRACT) != RecordExtensionType.ABSTRACT) {
-                throw new SchemaValidationException("'" + declaration.name() + "': '@final' says nothing may"
+                throw new SchemaValidationException("'" + declaration.name() + "': 'final' says nothing may"
                         + " extend this record, and a field written '=?' says its members pin that field --"
                         + " so the members the selector selects could never exist ([TSON-SCHEMA] §5.2)");
             }
@@ -346,7 +346,7 @@ final class DefinitionResolver {
                 // is a subtype of it by construction -- so the claim is false of a template before an author
                 // writes a second declaration. ABSTRACT has a subject: `subtypes` holds the template's own
                 // instantiations ({@code SPEC-FEEDBACK.md} #13).
-                throw new SchemaValidationException("'" + declaration.name() + "': '@final' forbids anything "
+                throw new SchemaValidationException("'" + declaration.name() + "': 'final' forbids anything "
                         + "composing onto this type, and every application of a template is a subtype of it by "
                         + "construction -- so the claim is false of '" + declaration.name() + "' whatever else "
                         + "the schema says. Mark a closed declaration instead ([TSON-SCHEMA] §5.2, §5.10)");
@@ -366,11 +366,11 @@ final class DefinitionResolver {
     /**
      * {@code resolved} with the author's mark stated in its held body. Refused where the body applies
      * anything but {@code record}: an array or a choice has no {@code extension} member to state it in, and
-     * an alias states nothing of its own -- {@code @abstract <B> pair<uuid, B>} would be a claim about
+     * an alias states nothing of its own -- {@code abstract <B> pair<uuid, B>} would be a claim about
      * {@code pair}, made by a declaration that merely names it.
      *
      * <p><b>The mark states the instantiation's fact, not the base's.</b> A record template's base is
-     * ABSTRACT by derivation whatever is written here ({@code WireForm.parentExtension}); {@code @abstract}
+     * ABSTRACT by derivation whatever is written here ({@code WireForm.parentExtension}); {@code abstract}
      * spliced into the held text is what makes each <em>application</em> abstract in turn, which is how a
      * second-level base is spelled ({@code SPEC-FEEDBACK.md} #13).
      */
@@ -1964,7 +1964,8 @@ final class DefinitionResolver {
      * erase what it does not mention.
      */
     private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
-        Annotations own = annotationsOf(field.name(), DefinitionMarks.consumed(field.annotations()));
+        DefinitionMarks.requireNoMarkAnnotation(field.name(), field.annotations());
+        Annotations own = annotationsOf(field.name(), field.annotations());
         // No mark to inherit: which fields a family dispatches on is the *record's* statement
         // (`record.discriminators`), and a member states none of its own.
         return resolveFieldEntry(field, parameters, inherited)
@@ -2204,10 +2205,9 @@ final class DefinitionResolver {
      * governed by the group.
      */
     private RecordField resolveGroupMember(GroupDef.Member member) {
+        DefinitionMarks.requireNoMarkAnnotation(member.name(), member.annotations());
         return new RecordField(member.name(), resolveTypeRef(member.typeRef()), FieldState.OPTIONAL,
-                Optional.empty(),
-                annotationsOf(member.name(), DefinitionMarks.consumed(member.annotations())),
-                Optional.empty());
+                Optional.empty(), annotationsOf(member.name(), member.annotations()), Optional.empty());
     }
 
     /**

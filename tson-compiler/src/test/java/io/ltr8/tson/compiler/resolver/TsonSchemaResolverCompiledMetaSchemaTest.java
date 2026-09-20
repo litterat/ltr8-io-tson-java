@@ -271,7 +271,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
             {
-              pet => @abstract { pet_type: identifier =?  nick: identifier }
+              pet => abstract { pet_type: identifier =?  nick: identifier }
             }
             """;
 

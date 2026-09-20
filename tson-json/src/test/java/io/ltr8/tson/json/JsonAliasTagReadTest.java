@@ -38,11 +38,11 @@ class JsonAliasTagReadTest {
               s_of   => sub
               b_of   => base
 
-              shape  => @abstract { area: int32 }
+              shape  => abstract { area: int32 }
               square => shape & { side: int32 }
               sq_of  => square
 
-              pet    => @abstract { pet_type: text =? }
+              pet    => abstract { pet_type: text =? }
               dog    => pet & { pet_type: = "dog"  bark: text }
               dog_of => dog
 

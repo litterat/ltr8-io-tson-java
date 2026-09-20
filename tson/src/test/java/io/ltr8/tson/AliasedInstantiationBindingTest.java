@@ -39,7 +39,7 @@ class AliasedInstantiationBindingTest {
             !!meta:"%s"
             !!import:"%s"
             {
-              msg    => @abstract { kind: text =? }
+              msg    => abstract { kind: text =? }
               msg_of => <T, V> msg & { kind: = T  body: V }
 
               ping_body => { seq: int32 }

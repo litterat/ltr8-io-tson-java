@@ -50,7 +50,7 @@ class JsonBindRecordReadTest {
                 level: int32 ~ 1
                 kind: text = "person"
               }
-              shape   => @abstract { area: int32 }
+              shape   => abstract { area: int32 }
               square  => shape & { side: int32 }
               unbound => { value: text }
               animal  => { name: text }

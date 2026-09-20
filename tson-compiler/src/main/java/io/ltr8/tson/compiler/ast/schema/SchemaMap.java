@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * {@code schema-map = *(annotation ws) "{" ws schema-map-entry *(separator schema-map-entry) ws
@@ -35,13 +36,15 @@ public record SchemaMap(List<Annotation> annotations, Map<String, Declaration> d
     }
 
     /**
-     * {@code schema-map-entry = *(annotation ws) type-name ws "=>" ws *(annotation ws) type-def}
-     * -- {@code nameAnnotations} bind to the key (the {@code type_name} token itself, §2.1: "the
-     * resolver does not hoist annotations from key to value"); {@code typeDefAnnotations} bind to
-     * the type definition.
+     * {@code schema-map-entry = *(annotation ws) type-name ws "=>" ws *(annotation ws)
+     * [definition-mark ws] type-def} -- {@code nameAnnotations} bind to the key (the {@code type_name} token
+     * itself, §2.1: "the resolver does not hoist annotations from key to value"); {@code typeDefAnnotations}
+     * bind to the type definition; {@code mark} is the optional {@link DefinitionMark}, empty where the
+     * declaration writes none and the type is OPEN.
      */
     public record Declaration(List<Annotation> nameAnnotations, String name,
-                               List<Annotation> typeDefAnnotations, TypeDef typeDef) {
+                               List<Annotation> typeDefAnnotations, Optional<DefinitionMark> mark,
+                               TypeDef typeDef) {
 
         public Declaration {
             nameAnnotations = List.copyOf(nameAnnotations);
