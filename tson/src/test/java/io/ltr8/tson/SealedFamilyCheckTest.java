@@ -45,6 +45,26 @@ class SealedFamilyCheckTest {
         assertEquals(List.of(), tson.validateSchema(schema(name, body)), name);
     }
 
+    // ── The retired spelling ─────────────────────────────────────────────
+
+    /**
+     * Nothing knows the names. meta.tn declares neither {@code abstract} nor {@code final}, so the annotation
+     * spelling is the ordinary unresolved-name error of §3.3.3 -- the footing {@code @sealed} and {@code
+     * @discriminator} are already on, and the reason there is no name left to reserve once the mark is a word
+     * the grammar reads.
+     *
+     * <p>Asserted here rather than against the meta-kernel, whose bootstrap resolves no annotation at all: a
+     * schema governed by the kernel would ignore the name instead, and the kernel governs only the three
+     * bundled schemas.
+     */
+    @Test
+    void theAnnotationSpellingNamesNoType() {
+        assertTrue(problems(Tson.standard(), "retired", """
+                {
+                  pet => @abstract { name: text }
+                }""").contains("does not name a type"));
+    }
+
     // ── The shape the design exists for ──────────────────────────────────
 
     @Test

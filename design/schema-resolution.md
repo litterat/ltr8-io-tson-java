@@ -70,13 +70,11 @@ are kept in step deliberately.
   of a fact — an annotation is the right home exactly when the mark changes no value's validity — and both
   marks change it: erase `abstract` and a direct instance becomes readable at that position, erase `final` and
   an importing schema may compose a subtype whose values that position then admits.
-  - **The annotation spelling is refused rather than ignored** (`requireNoMarkAnnotation`). Left to fall
-    through, `@abstract` would resolve against the governing meta, land in the author-annotation channel
-    saying nothing, and leave the record OPEN — silently admitting the values the mark exists to exclude.
-    The refusal is by name, before the meta is consulted, so no meta-schema can give either name a second
-    meaning at a declaration.
-  - Nothing in the resolver knows the names `sealed` or `discriminator`: meta.tn declares neither, so either
-    one written in a schema is the ordinary unknown-annotation error (§3.3.3).
+  - Nothing in the resolver knows the names `abstract`, `final`, `sealed` or `discriminator` as annotations:
+    meta.tn declares none of them, so any of the four written as one is the ordinary unknown-annotation
+    error (§3.3.3). There is no name to reserve once the spelling is a word the grammar reads. The one place
+    that is not true is a schema governed by the **meta-kernel**, whose bootstrap resolves no annotation at
+    all and so ignores the name — which reaches the three bundled schemas and nothing else.
 - **A selector is field syntax, `=?`** (`FieldModifiers`), and the record it is written in is the family base:
   the field stays REQUIRED and unpinned — §5.7's identity diagonal forbids a base pinning what its members
   each pin differently — and its name lowers into the enclosing `record.discriminators`. **ABSTRACT is derived

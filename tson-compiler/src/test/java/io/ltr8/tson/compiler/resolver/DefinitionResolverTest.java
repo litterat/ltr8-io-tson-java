@@ -2342,17 +2342,6 @@ class DefinitionResolverTest {
         assertTrue(thrown.getMessage().contains("on one declaration"), thrown.getMessage());
     }
 
-    /**
-     * The annotation spelling is refused rather than ignored. Left to fall through it would resolve against
-     * the governing meta and sit in the author-annotation channel saying nothing, leaving the record OPEN --
-     * silently admitting the values the mark exists to exclude.
-     */
-    @Test
-    void theAnnotationSpellingIsRefused() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("x => @abstract { a: text }"));
-        assertTrue(thrown.getMessage().contains("is not an annotation"), thrown.getMessage());
-    }
 
     /**
      * <b>{@code abstract} is a claim with a subject on a template</b> ({@code SPEC-FEEDBACK.md} #13): a

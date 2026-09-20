@@ -378,22 +378,6 @@
   }
 
   @doc:"""
-    Declares a record ABSTRACT. A consumed mark: lowered into
-    record.extension, and required of a record whose fields carry the
-    selector spelling `=?`.
-    """
-  abstract => @annotation !type_definition {
-    source: void
-    body: !reference { target: void }
-  }
-
-  @doc:"Declares a record FINAL. A consumed mark, on @abstract's terms."
-  final => @annotation !type_definition {
-    source: void
-    body: !reference { target: void }
-  }
-
-  @doc:"""
     Designates the field an encoding that flattens is meant to flatten.
     A representation directive: no decode force in the model, load-time
     force.

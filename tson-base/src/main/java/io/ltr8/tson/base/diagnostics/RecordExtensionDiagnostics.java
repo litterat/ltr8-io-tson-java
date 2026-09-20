@@ -49,7 +49,7 @@ public record RecordExtensionDiagnostics(String typeName, String members) {
      * instances and no schema here declares a subtype, so nothing can stand at the position.
      *
      * <p><b>Not a defect in the schema that declared the base.</b> §3.3.4 makes {@code subtypes} open across
-     * schemas, and a library declaring {@code response => @abstract { … }} for its importers to extend is the
+     * schemas, and a library declaring {@code response => abstract { … }} for its importers to extend is the
      * shape an abstract base most exists for -- empty in its own closure and complete in each consumer's. So
      * this is a read-time diagnostic and never a load-time refusal, and it names the remedy accordingly: the
      * document is being read against a closure that is missing an import, not against a broken schema.

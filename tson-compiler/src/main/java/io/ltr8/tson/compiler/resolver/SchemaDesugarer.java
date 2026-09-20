@@ -871,7 +871,6 @@ final class SchemaDesugarer {
             members.add(WireForm.nameField(WireForm.STATE, resolved.state().name()));
         }
         resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.scoped(token))));
-        DefinitionMarks.requireNoMarkAnnotation(field.name(), field.annotations());
         return WireForm.scoped(new RecordValue(members), field.annotations());
     }
 
