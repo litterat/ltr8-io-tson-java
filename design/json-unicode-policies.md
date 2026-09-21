@@ -9,8 +9,8 @@ git.
 - The identifier policy reaches member names read as field names and every `$type`; the token policy reaches map keys and
   string values.
 - Under a schema only an **unmatched** name is judged, and it is judged before it is reported as `UNRECOGNIZED_FIELD`:
-  declared fields, then rest collection, then hygiene.
-- A rest key is a map key, not a name.
+  declared fields, then hygiene. Nothing collects between them -- a record absorbs no member it does not declare.
+- A map key is not a name, so open-ended data in a declared map-typed field meets no identifier rule.
 - `JsonObjectReader` holds a position and `JsonTreeReader`'s schemaless read does not: that read applies no identifier
   policy (a schema-directed tree read does, through `JsonReadContext`), and `bindMap` applies nothing to keys.
 - The look-alike rule reaches no JSON position; a deployment that will not accept look-alike keys raises the token policy.
@@ -33,18 +33,17 @@ every `$type`; the **token policy**, when a deployment sets one, reaches map key
 declared names are judged once, when the schema links (`TsonSchemaLinker.checkNames`, §11.4's scopes) — so a
 member name matching a declared field has already inherited that verdict and needs no second test, which is
 what §9.4's parenthetical means. The one name that reaches the policy fresh is a member matching **no**
-declared field in a record with **no** rest field, and it must be tested before it is reported: a homoglyph
+declared field, and it must be tested before it is reported: a homoglyph
 (`pаssword`, Cyrillic а) would otherwise get `UNRECOGNIZED_FIELD` — a *verdict* — where §8.2 requires a
 refusal reported in none of the four categories. That case — and its twin at a tag, a `$type` naming no
 declared type — is the whole of the identifier policy's job
 in a schema-directed JSON read, and it is why the check cannot simply be dropped as redundant.
 
-**A rest key is a map key, not a name.** §6.2 collects unmatched members into the rest map, parsed by its key
-type; §9.4 puts map keys under the *token* policy, which defaults to `unrestricted()`. So the order matters —
-declared fields, then rest collection, then hygiene; §6.2's flatten is not built (`BACKLOG.md`), so
-the record loops go from declared fields straight to hygiene (`RecordPlan.unmatched`) — and a converted schema's
-`@rest` tail is what keeps ordinary foreign JSON from meeting an identifier rule at all. That is the on-ramp
-working as intended, not a hole: the names in a rest map were never declared, so nothing about them is a name.
+**A map key is not a name, and that is where foreign material goes.** §9.4 puts map keys under the *token*
+policy, which defaults to `unrestricted()`, so a schema carrying open-ended data in a declared map-typed field
+(§6.1.1) meets no identifier rule at all — the keys were never declared, so nothing about them is a name.
+Nothing flattens into a record, so the record loops go from declared fields straight to hygiene
+(`RecordPlan.unmatched`) with no collection step between.
 
 **A JSON tree read with no schema applies neither policy.** There is no Class 1 in this encoding (§1.3
 principle 1, §1.5) — a JSON document with no binding is just JSON, and its member names are data. Judging

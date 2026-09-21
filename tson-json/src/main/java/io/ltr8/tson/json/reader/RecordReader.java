@@ -25,8 +25,8 @@ import java.util.Objects;
  * groups over what the document stated, then the fields it never mentioned -- refused, or injected with their
  * default or pin. The object's opening position is pinned for those, having no event of their own.
  *
- * <p><b>No rest field.</b> §6.2's {@code @rest} flatten is deliberately not implemented: a member matching no
- * declared field is §6.1.1's closure error, full stop.
+ * <p><b>Closure is the whole answer.</b> A record absorbs nothing: a member matching no declared field is
+ * §6.1.1's closure error, and open-ended data is carried by a declared map-typed field instead.
  */
 final class RecordReader implements JsonTypeReader<Object>, ExactReader {
 

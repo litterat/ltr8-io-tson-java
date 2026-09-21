@@ -233,13 +233,13 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     /**
-     * The four marks are consumed before the governing meta is consulted, so they lower under a meta that
-     * declares none of them -- meta-kernel here, where {@code sealed} and {@code discriminator} are meta.tn's.
-     * That is what "reserved" means in the interim (SPEC-FEEDBACK #11): a meta-schema cannot give the names
-     * another meaning, and §12.1 spelling the four as syntax is the arrangement this approximates.
+     * The definition mark and the selector are grammar ([TSON-SCHEMA] §5.2, §12.1), so they are read before
+     * the governing meta is consulted and lower under a meta that declares no annotation at all -- the
+     * meta-kernel here. Nothing resolves them against a namespace, which is why no meta-schema can give the
+     * words another meaning and why no name has to be reserved to keep them.
      *
      * <p>Non-vacuous, and {@link #anOrdinaryUnknownAnnotationIsStillTheAuthorsError} is why: the same document
-     * shape with a name that is <em>not</em> a mark fails at exactly the check these bypass.
+     * shape with a name the grammar does not read fails at exactly the check these bypass.
      */
     @Test
     void theMarksLowerUnderAMetaThatDeclaresNoneOfThem() {

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta.tn?sha256=f9dd87bb933025600ef378955d871ee2cfe61ea1e122d830dc7721a41731de50"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=eefb6051e3a3c1f9b0366e781562c1462dd19d32f59cc6b2122869d4506c3a0c"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=2e23da2dbb6ab99b5b227e0c7ba4a7403dd25b3a0404f7f0b399fdd73221283f"
 !!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=2e23da2dbb6ab99b5b227e0c7ba4a7403dd25b3a0404f7f0b399fdd73221283f"
 @doc:"""
@@ -46,8 +46,7 @@
 
   Plus annotation types — the classifying markers `ordered`,
   `bounded`, `exact`, `numeric`; the checked assertion `disjoint`;
-  the representation directive `rest`; and the documentary
-  `deprecated`, `since`, `todo`,
+  and the documentary `deprecated`, `since`, `todo`,
   `lang`, `title`, `examples`, `read_only`, `write_only`. Annotation
   types must reside in the governing target's namespace (per Part 2
   §6); placing them in meta makes them reachable from core and from
@@ -55,18 +54,24 @@
 
   An annotation never changes a value, its type, or whether it is
   valid: validation is over values, and a schema with every
-  annotation erased admits exactly the same values. An annotation
-  may add a load-time check, and it may direct how a class of
-  encodings represents a value. No encoding is privileged — TSON
-  text is one member of the text class, beside JSON — so a directive
-  binds every encoding in its class, and a document in a directed
-  encoding may not be readable without it. That is a directive's
-  force, and it is the only force an annotation has over data. The
-  same stance governs the type docs: a value space is described
-  without reference to any encoding, and where a doc mentions how
-  TSON text spells a value it says so by name.
+  annotation erased admits exactly the same values. Part 2 §6 admits
+  two further things within that rule — a load-time check, and a
+  directive over how a class of encodings represents a value — and
+  the annotations declared here use the first alone. The same stance
+  governs the type docs: a value space is described without
+  reference to any encoding, and where a doc mentions how TSON text
+  spells a value it says so by name.
 
-  That rule holds here without exception. How a record may be
+  No directive is declared, and the one that was is why. `rest`
+  designated the field a flattening encoding should flatten, which
+  gave it force in JSON and none in TSON text — so its class was the
+  encodings that claimed it, which defines nothing, and what it
+  carried was a wire spelling rather than a fact the model holds. A
+  record is closed under its type (Part 2 §7.2) and open-ended data
+  is a map-typed field, written the same way in every encoding. The
+  category stands in §6; nothing here needs it.
+
+  The erasure rule holds here without exception. How a record may be
   realised once had two annotation spellings, and each stated a fact
   about the type — which values a position typed by the record
   admits — so erasing one changed what conforms. Both are now
@@ -628,16 +633,4 @@
     A bare presence marker, on `@read_only`'s terms.
     """
   write_only => @annotation void
-
-  @doc:"""
-    Designates the field an encoding that flattens is meant to flatten
-    — the map-typed field a record's undeclared entries live in, a
-    record being closed under its type ([TSON-SCHEMA] §7.2). A
-    representation directive: force in the class of encodings that
-    flatten, none in the model, and a schema with it erased admits
-    exactly the same values. Checked at schema load: the field's type
-    resolves to a text-keyed map, and at most one field per composed
-    chain carries the mark.
-    """
-  rest => @annotation void
 }

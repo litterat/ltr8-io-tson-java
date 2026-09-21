@@ -378,16 +378,6 @@
   }
 
   @doc:"""
-    Designates the field an encoding that flattens is meant to flatten.
-    A representation directive: no decode force in the model, load-time
-    force.
-    """
-  rest => @annotation !type_definition {
-    source: void
-    body: !reference { target: void }
-  }
-
-  @doc:"""
     Synthetic entries — the closed forms the sugar lifts to; see
     meta-kernel-resolved.tn's own note. Each key carries the derived
     `@synthetic` marker (Part 2 Sections 6, 8.2). `xxhash` stands for
