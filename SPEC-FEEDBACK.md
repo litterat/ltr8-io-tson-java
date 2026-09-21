@@ -17,7 +17,7 @@ survives; #5 onward were raised against Revision 35 itself. The closed entries a
 spec now carries their rules, and that is where the answer belongs — the JSON-superset cluster (`null`, the
 escape table, field names as identifiers, the trailing comma, and the four decisions kept with better
 reasons), the `scoped` constructor, the `bytes` value space, the temporal split and its exclusive bounds,
-`members` on the exact numeric tiers, the checked `@discriminator` and `@rest`, the value-space clause, the
+`members` on the exact numeric tiers, the value-space clause, the
 reference-is-a-hop change, the `~` marker's removal, the network emptiness rule, the one limits policy, and
 the name-hygiene reporting shape all landed as proposed or better. **This file is the as-built record**, not a
 pointer to one: where an entry proposes a design this implementation has built, the entry states the design,
@@ -400,9 +400,9 @@ a conforming comparison has to carry is now four rows long, still read out of §
 still describing a freedom no producer takes.
 
 
-## 5. A JSON member name that is not an identifier has no home, and it is the commonest shape in real JSON
+## 5. A JSON member name that is not an identifier has no home
 
-**Documents:** [TSON-JSON] §6.1, §6.2; [TSON-DATA] §7.7; [TSON-SCHEMA] §6, §12.1.
+**Documents:** [TSON-JSON] §1.3, §6.1, §6.1.1; [TSON-DATA] §7.7, §7.2.5; [TSON-SCHEMA] §6, §12.1.
 **Kind:** underspecification, against a goal the document states for itself.
 
 **This entry is a proposal, not a report.** Nothing here is running: `tson-json` reads records in tree and
@@ -410,40 +410,47 @@ bind mode, and a member name that is not an identifier is refused where it is re
 declare. What is evidenced is the gap, which is a reading of the published documents rather than a finding
 from a build.
 
-[TSON-JSON] §1.2 makes this document "the normative JSON interoperability surface of the series", and §1.3's
-principle 2 promises that the common case reaches the wire as plain JSON a consumer with no knowledge of TSON
-reads as ordinary JSON. The conversion path both sentences imply — a JSON Schema or OpenAPI contract becomes a
-TSON schema, and the documents already in flight validate against it unchanged — meets a wall the documents do
-not address.
+[TSON-JSON] §1.2 makes this document "the normative JSON interoperability surface of the series", and the
+conversion path that implies — a JSON Schema or OpenAPI contract becomes a TSON schema, and the documents
+already in flight validate against it unchanged — meets a wall the documents do not address.
 
-**A JSON member name is an arbitrary string; a TSON field name is an identifier.** Revision 35 settled the
-second half deliberately (`field-name` is an identifier at every layer, [TSON-DATA] §7.7, §2.5), and §3.2's
-reserved-namespace argument depends on it. But `user-name`, `2fa_enabled`, `@type`, `first name` and `""` are
-all ordinary JSON member names and none is an identifier. This is §7.7's **grammar**, not §8.2's policy, so no
-processor configuration reaches it and no relaxation exists — which is correct, and is exactly why the gap
-needs an answer somewhere else.
+**No principle promises that path, and the document should say which way it means it.** §1.3's principle 2
+("Plain JSON out") governs the *encode* direction: a TSON schema's documents reach the wire as ordinary JSON
+that an OpenAPI-style contract describes. It says nothing about reading foreign JSON, and no other principle
+does either. So the on-ramp is a goal the document is read as having and never states. Either it owes a
+principle or it owes a sentence putting the on-ramp out of scope; the present silence is what lets each
+reader assume the answer they need.
 
-Kebab-case is pervasive; JSON-LD's `@context`/`@type` and OpenAPI's own `x-` extensions are `@`- and
-`-`-bearing by specification. A converter meeting one has two options today and both are bad:
+**A JSON member name is an arbitrary string; a TSON field name is an identifier — but the gap is narrower
+than it looks.** Revision 35 settled the second half deliberately (`field-name` is an identifier at every
+layer, [TSON-DATA] §7.7, §2.5), and §3.2's reserved-namespace argument depends on it. What that excludes is
+less than it first appears: §7.7's `identifier-continue = XID_Continue / "-"` admits the hyphen, so
+**kebab-case is unaffected** — `user-name`, `Content-Type` and OpenAPI's `x-` extensions are all valid TSON
+field names, and §7.2.5 confirms the intent ("negative numbers and hyphenated names are unaffected").
 
-- **Collect them into an `@rest` map** (§6.2). The members read, and lose every declared type, facet and
-  field state — discarding the validation that was the reason to convert. A contract whose ten fields are
-  kebab-case converts to a record with no fields.
-- **Refuse.** The producer changes their wire format, which is the outcome §1.3's principle 2 exists to
-  prevent, and the on-ramp ends.
+What remains outside the grammar is the name that is `@`-initial (JSON-LD's `@context` and `@type`),
+digit-initial (`2fa_enabled`), underscore-initial (`_id`, pervasive in MongoDB-derived documents),
+space-bearing, or empty. This is §7.7's **grammar**, not §8.2's policy, so no processor configuration
+reaches it and no relaxation exists — which is correct, and is exactly why the gap needs an answer somewhere
+else.
 
-Neither is a decision an encoding-rules document should leave to each converter, because the two produce
-schemas that disagree about what the same JSON means.
+A converter meeting one has a single option today: refuse, and the producer changes their wire format. The
+second option the register used to record — collect the members into an `@rest` map — is gone with the
+annotation (#20), and it was the worse of the two anyway: the members read, and lose every declared type,
+facet and field state, so a contract whose ten fields are `@`-initial converted to a record with no fields.
+The remaining answer is [TSON-JSON] §6.1.1's: type the position as a map throughout and forgo per-field
+validation, which is honest and total but is not a conversion.
 
-**Suggested resolution — a projection annotation, on `@rest`'s own precedent.** [TSON-SCHEMA] §6 already
-carries the licence: "An encoding-rules document MAY bind projection behaviour to a schema-side annotation
-declared for it." `@rest` and `@discriminator` both walked through that door in this revision, and a wire-name
-projection is the same shape — force in the encodings that carry it, none in the model, the declared field
-keeping its identifier name everywhere the name is a name.
+**Suggested resolution — a projection annotation.** [TSON-SCHEMA] §6 already carries the licence: "An
+encoding-rules document MAY bind projection behaviour to a schema-side annotation declared for it." Nothing
+uses it — #11 put the discriminator in the kernel and #20 retired `@rest` — so this would be the first
+instance of §6's representation-directive category, and it is the shape the licence was written for: force
+in the encodings that carry it, none in the model, the declared field keeping its identifier name everywhere
+the name is a name.
 
 ```
 web_hook => {
-  @json_name:"user-name"     user_name:     text
+  @json_name:"@context"      context:        text
   @json_name:"2fa_enabled"   two_fa_enabled: boolean
 }
 ```
@@ -451,13 +458,19 @@ web_hook => {
 The load checks follow the established pattern and are few: the argument is a non-empty string that is a
 well-formed member name under §3.1's profile; it does not begin with `$` (§3.2's namespace is not spellable
 from data); and it collides with no other declared field's own name or projection within one composed record.
-Decode's binding order in §6.2 gains one step — reserved names, declared names, **declared projections**,
-rest collection — and the encoder writes the projection where it has one.
+Decode's binding order at §6.1.1 gains one step — reserved names, declared names, **declared projections** —
+and the encoder writes the projection where it has one.
 
-Three alternatives were considered and are worse. **Relaxing §7.7** to admit `-` and `@` in field names
+**If it lands, §6 owes a definition of a directive's class.** §6 says a directive "binds every encoding in
+its class" and offers the text class — TSON text beside JSON — as the example, which is the one class a
+JSON-only projection is not in. That was already the flaw that retired `@rest` (#20); a projection annotation
+walks into it a second time, and this time the category would have a member, so the definition cannot be
+deferred again.
+
+Three alternatives were considered and are worse. **Relaxing §7.7** to admit `@` and a digit-initial form
 undoes a Revision 35 decision, breaks §3.2's collision-free argument, and changes the *model* to serve one
 encoding. **A `patternProperties`-style key map** types the values but not the names, so `user-name` and
-`usr-name` validate alike. And **leaving it to `@rest`** is the status quo, whose cost is stated above.
+`usr-name` validate alike. And **the map-typed position** is the status quo, whose cost is stated above.
 
 The narrower question, if the annotation is not wanted: §6.1.1 should at least *say* what a member name that
 is not an identifier does, since a reader today has to derive it from §7.7 and it is not obvious that the
@@ -575,7 +588,7 @@ position is.
 
 ## 10. The discriminator belongs to a subtype family, and it is field syntax rather than an annotation
 
-**Documents:** [TSON-SCHEMA] §6 (`@discriminator`, `@rest`), §5.4 (choices, `@disjoint`), §5.7 (the refinement
+**Documents:** [TSON-SCHEMA] §6 (`@discriminator`), §5.4 (choices, `@disjoint`), §5.7 (the refinement
 transition table), §5.8 (composition), §5.11 (field groups), §7.2 (subsumption); [TSON-JSON] §6.1.5
 (subsumption), §8.2 (the discrimination predicate), §8.4 (discriminated choices). Also OpenAPI 3.1's
 `discriminator`, which the proposal is a conversion target for.
@@ -642,7 +655,7 @@ resolver error of consequence 3.
    so the frozen Class 1 lexer is untouched and §12.1 gains one alternative:
    `field-modifier = ws ("~" / "=") ws ( token / absent ) / ws "=" ws "?"`. Where the fact then *lives* is
    #11's question, and its answer is `record.discriminators` — so of the two marks §6 introduces together,
-   `@rest` stays an annotation and this one is not one at all.
+   neither survives as one: this becomes syntax and `@rest` is retired outright (#20).
 2. **It is the shape converted contracts arrive in.** OpenAPI's `discriminator` sits on the *base* schema with
    subtypes composing it, which is this arrangement and not the choice one. A converted contract lands on the
    mechanism directly.
@@ -757,10 +770,10 @@ marked field's declared type resolves, after its
 reference chain, to an atom-family instance or an enum — *not* free here, because §5.2 grants that only to a field
 carrying a value and the base's field carries none; its state is exactly REQUIRED, neither OPTIONAL (the base
 could omit it), FIXED (nothing could override it) nor DEFAULT (a document could); and it is not a group member.
-Which fields carry the mark is well defined over a composed chain by §5.8's restated-field rule, exactly as §6
-already argues for `@rest` — what differs is that `@rest` admits one such field and a family admits several, the
-tuple case below. Over the linked closure: every entry in `subtypes`, transitively, pins each marked field
-`REQUIRED_FIXED`; and the pins are pairwise distinct.
+Which fields carry the mark is well defined over a composed chain by §5.8's restated-field rule, which §6 states
+for exactly this purpose; a family admits several marked fields, the tuple case below. Over the linked
+closure: every entry in `subtypes`, transitively, pins each marked field `REQUIRED_FIXED`; and the pins are
+pairwise distinct.
 
 **`=?` implies `abstract`, and nothing states the dispatch twice.** A selector says the members pin it, so
 the record is the base they are selected from and has no values of its own — a total consequence, there being
@@ -903,10 +916,10 @@ all, making a kernel-level fact depend on which meta-schema governs the document
 the reading is of the body alone, and every schema can express it exactly as every schema can already express
 `state` and `value`.
 
-**`@rest` stays an annotation, and the contrast is now sharp.** §6 introduced the two together as checked
-annotations; the erasure test separates them. Erase `@rest` and the text and CBOR encodings are untouched — they
-write the map nested — so its force really is confined to the encodings that claim it, which is §6's bullet
-working as written. The selector had that standing only while text declined the directive.
+**`@rest` was the other mark §6 introduced, and it does not survive either.** The erasure test separates the
+two — erase `@rest` and the text and CBOR encodings are untouched, so its force really was confined to the
+encodings claiming it — but a directive whose class is "the encodings that claim it" defines nothing, and the
+fact it carried was a wire spelling rather than one the model holds. #20 retires it rather than relocating it.
 
 **The three members, and the fact that is not one of them.**
 
@@ -1851,3 +1864,76 @@ unavailable". Keep §10.2 as it is and say why it differs: a mismatch is a findi
 alternative — state outright that a missing schema is a resolver error — is simpler and costs every consumer the
 ability to tell "your document is wrong" from "I could not look", which is the one distinction a sender acting on
 a report needs.
+
+
+## 20. `@rest` is a representation directive whose class cannot be defined, and the capability it names is a map
+
+**Documents:** [TSON-SCHEMA] §6 (the annotation rules and `@rest`), §7.2 (records are closed under their type),
+§5.8 (the restated-field rule the per-chain count relies on), §8.1 (ingest re-checks); [TSON-JSON] §1.3
+principle 6, §6.1.1, and the §6.2 this entry deletes; [TSON-DATA] §2.5, §2.6, §7.7.
+**Kind:** internal inconsistency, and a directive with no definable scope.
+
+**What is running.** `rest => @annotation void` is gone from `meta.tn`, `core.tn` and `meta-resolved.tn`, with
+no replacement: a member matching no declared field is a closure error in both encodings, and open-ended data is
+carried by a declared map-typed field. [TSON-JSON] §6.2 is deleted and §6.1.1 states the answer and the
+migration. This is the as-built state, not a proposal — what is proposed is that [TSON-SCHEMA] §6 drop the
+declaration and the paragraph introducing it.
+
+**§6 cannot say what encoding class `@rest` binds.** §6's directive bullet reads: "it directs how a *class* of
+encodings represents a value, and force is confined to the encodings that claim it. No encoding is privileged —
+TSON text is one member of the text class, beside JSON — so a directive binds every encoding in its class."
+`meta.tn` declared `@rest` for "an encoding that flattens". The two readings of *class* are both unusable:
+
+- **The text class**, which is the only class §6 names and which names TSON text and JSON as co-members. Then
+  `@rest` binds TSON text, text must flatten, and `{name: "x"  a: 1}` is a legal `config` — which contradicts
+  §7.2's closure and the encoding rules as drafted.
+- **The encodings that flatten**, which is what `meta.tn` wrote. Then the class is defined by the behaviour the
+  directive directs, "binds every encoding in its class" reduces to "binds the encodings it binds", and the
+  clause does no work in the one case it applies to. The class had exactly one member.
+
+`@rest` was the category's only instance, so the definition was never tested against a second. It failed against
+the first.
+
+**[TSON-JSON] already forbids it in its own words.** §1.3 principle 6: "The wire rules consume what the resolver
+derives — the `disjoint` fact in each choice body, a record's own extension fact, the value→variant mapping of a
+sealed family reconstructed from its `REQUIRED_FIXED` pins — and never introduce wire-only declarations that
+could drift from the schema." `@rest` is a wire-only declaration, and the principle's three examples are exactly
+the three facts that stayed in the body. The document forbade it and then defined it.
+
+**Relocating it into the kernel was considered and is worse than removal.** A `record.tail: field_name?`
+naming an absorbing field — the shape `record.discriminators` takes, and spelled `extras => {text => value}` at
+a record entry to match `=?`'s one-token dispatch — would satisfy principle 6 and the meta-hop argument of #11.
+It buys nothing else. The value space is identical either way: `extras: {text => value}` already expresses
+"declared structure plus an open tail", so the whole feature is one *spelling* for one encoding. Against that:
+§7.2's closure would need a carve-out, the reference encoding would need a leading-selectors rule it has never
+had (§5.8 lets a subtype tighten the tail, so an entry arriving before the selectors cannot be typed), and the
+flatten cannot be made uniform anyway — a flat member is a field name and must be an identifier (§7.7), while a
+map key is a value and need not be, so text could absorb `@context` nested and never flat.
+
+**And the capability is one the ecosystem already declines.** Systems that genuinely carry an open tail nest it:
+Stripe's `metadata`, Segment's and Mixpanel's `properties`, Kubernetes' `labels` and `annotations`. Each nests
+for the same reason — a producer with reserved names beside custom ones needs to tell them apart — and each is
+exactly the map-typed field TSON already has. The counter-pressure runs the same way: Kubernetes' structural
+schemas prune unknown fields, with `x-kubernetes-preserve-unknown-fields` an explicit and discouraged opt-out.
+Host-language support tells the same story, and tells it against the feature: Jackson's `@JsonAnySetter`,
+C#'s `[JsonExtensionData]` and Go's hand-written two-pass `UnmarshalJSON` are each their platform's awkward
+corner, and `serde(flatten)` forces the deserializer into a buffered representation, breaking zero-copy and
+`deny_unknown_fields`. That is not a platform accident — a member whose type is unknown until the object closes
+cannot be streamed into a typed slot, so something must hold it. This implementation's allocation harness pins
+flat zero bytes retained per read, which a tail field cannot honour.
+
+**What removal costs, stated plainly.** A producer that cannot be changed and sends declared and undeclared
+members at one level cannot be validated field-by-field. JSON Schema's `additionalProperties` defaults to *open*,
+so a contract converted without attention describes documents this encoding refuses — which is why §6.1.1 now
+states the boundary rather than leaving it to inference. The remaining answer is a map-typed position, which
+validates any JSON object and forgoes per-field types. That is a visible author decision rather than a
+half-mechanism making it silently, and it is where [TSON-SCHEMA] §2.5 already points: *a key that is not a name
+belongs in a map*.
+
+**Suggested resolution.** Delete `rest => @annotation void` and §6's paragraph introducing it, leaving
+`@disjoint` as the checked category's only member and the representation-directive category with none. State in
+§7.2 that closure has no exception. If a projection annotation later lands (#5), §6 owes the class definition
+this entry found missing before that category has a member again. The alternative — keep the declaration and
+define the class as a property an encoding-rules document claims — preserves a feature with no consumer, no
+modelling gain and a load-time check nobody has written, at the price of the closure carve-out and the ordering
+rule above.

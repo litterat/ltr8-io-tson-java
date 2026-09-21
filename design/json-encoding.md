@@ -139,17 +139,18 @@ defaulted member reads. Neither is friction.
 These are the ones that cost a producer a change, ordered by how often real JSON hits them. They are the
 work, and the first is the largest single obstacle to the stated goal.
 
-1. **A member name that is not an identifier.** `user-name`, `2fa_enabled`, `@type`, `first name`, `""` — all
+1. **A member name that is not an identifier.** `@type`, `2fa_enabled`, `_id`, `first name`, `""` — all
    ordinary JSON, none a TSON field name. This is [TSON-DATA] §7.7's **grammar**, not §8.2's policy, so no
-   configuration reaches it and no relaxation exists: kebab-case, JSON-LD's `@`-prefixed keys and OpenAPI's
-   own `x-` extensions are simply unspellable as declared fields. The two available answers are both bad —
-   collect them into an `@rest` map, which discards the typing that was the point of converting, or refuse.
-   A projection annotation binding a wire spelling to a declared field would fit [TSON-SCHEMA] §6's licence
-   exactly, on `@rest`'s own precedent; `SPEC-FEEDBACK.md` #5 states it.
+   configuration reaches it and no relaxation exists. Kebab-case is *not* affected — §7.7 admits `-` in
+   `identifier-continue`, so `user-name` and OpenAPI's `x-` extensions are declarable — which leaves
+   JSON-LD's `@`-prefixed keys and digit- or underscore-initial names as what cannot be spelled. The only
+   answer today is to refuse, or to type the position as a map and forgo per-field validation. A projection
+   annotation binding a wire spelling to a declared field would fit [TSON-SCHEMA] §6's licence exactly;
+   `SPEC-FEEDBACK.md` #5 states it.
 2. **Records are closed and JSON Schema's are open.** `additionalProperties` defaults to *true*, so a
-   converted record with no `@rest` field fails §6.1.1 on the first document carrying an extra member.
-   **`@rest` is the default shape of a converted record**, not an optional refinement — which makes this
-   encoding the annotation's first real consumer, as `BACKLOG.md` says.
+   converted record fails §6.1.1 on the first document carrying an extra member. There is no flattened tail
+   to relax it (`SPEC-FEEDBACK.md` #20): open-ended data is a declared map-typed field, which the producer
+   must nest. This is the largest producer-visible cost of a conversion and §6.1.1 states it outright.
 3. **An untagged `oneOf` over object schemas.** All brace class, so non-disjoint; with no OpenAPI
    `discriminator` there is no in-band selector, and §8.2 requires the tag. JSON Schema validates such a union
    by *trying each branch*, which §8.2 forbids in as many words ("no trying variants in order"). Existing
@@ -207,9 +208,9 @@ It is not taken now because it is an abstraction designed from one implementatio
 encodings genuinely share and what each owns is worth **finding** from two working stacks, not guessed at
 from one and then discovered wrong through the one consumer that has to bend around it. Consolidating two
 implementations that both pass their tests is cheap and safe; unpicking a shared contract that was wrong is
-neither. The same discipline governs `@rest`, which stays unbuilt until a consumer has shown what the
-directive's stated shape has to survive (`BACKLOG.md`): a member matching no declared field is §6.1.1's closure
-error. Member dispatch over a sealed record family is built (`DispatchMemberReader`), reading the
+neither. The same discipline settled `@rest`: rather than build a directive no consumer had shaped, it was
+retired (`SPEC-FEEDBACK.md` #20), and a member matching no declared field is §6.1.1's closure error in both
+encodings. Member dispatch over a sealed record family is built (`DispatchMemberReader`), reading the
 discriminator fields the base record declares (`SPEC-FEEDBACK.md` #10, #11).
 
 **It also costs nothing structurally, which is what makes the deferral free.** `TsonLinkedSchema` is a record

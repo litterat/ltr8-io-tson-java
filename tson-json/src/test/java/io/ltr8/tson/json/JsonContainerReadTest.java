@@ -111,11 +111,11 @@ class JsonContainerReadTest {
     }
 
     /**
-     * §6.2's {@code @rest} flatten is deliberately unbuilt, so there is no route by which an undeclared
-     * member lands anywhere. This pins the strict reading that the annotation would later relax.
+     * Nothing flattens into a record, so there is no route by which an undeclared member lands anywhere:
+     * §6.1.1's closure is total, and open-ended data belongs in a declared map-typed field.
      */
     @Test
-    void anUndeclaredMemberIsRefusedBecauseThereIsNoRestField() {
+    void anUndeclaredMemberIsRefusedBecauseNothingAbsorbsIt() {
         Read read = read("person", """
                 {"name": "Ada", "shoe_size": 9}""");
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, read.refusal().code());

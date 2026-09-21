@@ -53,14 +53,8 @@ own prose (which had gone stale on it):
 **no** decode force and load-time force, verified against a fact the resolver derives, two outcomes and no
 third — verified silently, or a resolver error at schema load. §6 also settles what this implementation had to
 guess at: a checked annotation is an assertion in *either* declaration position and a processor MUST consult
-both spellings, which is what `@disjoint` already does. `@rest` is declared in meta.tn and is not checked, so
-it is advisory today where §6 says it carries force; it is also re-checked on ingest (§8.1), which is a second
-call site for whatever the load-time check becomes. `@discriminator` is **not** in this category — the erasure
-test puts its fact in the kernel rather than in an annotation a processor checks.
-
-- [ ] **`@rest` is not checked.** Two checks: the annotated field's type resolves to a text-keyed map, and at
-  most one field per composed chain carries the mark — the chain being countable since §5.8's restated-field
-  rule merges annotations rather than dropping them, which this implementation already applies.
+both spellings, which is what `@disjoint` already does. `@disjoint` is the category's only member, and the one
+thing outstanding under it is unrelated to the check itself.
 
 - [ ] **`ResolvedForm` normalises the `position` component away by regex over rendered text.** The pattern is
   `position=Optional\[Position\[[^\]]*\]\]`, which matches the record's *default* `toString()` -- so giving
@@ -71,13 +65,10 @@ test puts its fact in the kernel rather than in an annotation a processor checks
 
 ## JSON encoding
 
-[TSON-SCHEMA] §6 makes this a spec obligation rather than an interop nicety, and `meta.tn` states it directly: "No
-encoding is privileged — TSON text is one member of the text class, beside JSON — so a directive binds every encoding
-in its class, and a document in a directed encoding may not be readable without it." `@rest` is declared on those
-terms and has no consumer, because TSON text never flattens — so it cannot exercise the directive at all, and a JSON
-front end is what puts that half of §6 under test. Expect it to move: a directive with no consumer has never had its
-shape checked against one. `@discriminator` was declared beside it and left the category — the same test showed its
-force reaches every encoding, which is what put the fact in the kernel instead (`SPEC-FEEDBACK.md` #11).
+[TSON-SCHEMA] §6 defines a representation directive — a mark whose force is confined to the encodings that claim
+it — and no schema declares one, so nothing in this stack reads a schema-side annotation to decide how a value is
+written. A record is closed under its type and open-ended data is a declared map-typed field, identically in both
+encodings ([TSON-JSON] §6.1.1).
 
 - [ ] **A JSON document has no in-band way to name its schema — §3.4's second route.** The out-of-band route
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
@@ -162,13 +153,6 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   `Dispatch*Reader` names. Its diagnostics are the drift to close: every divergence the JSON restructure pins in
   `CrossEncodingParityTest` comes out of that test as the TSON side matches.
 
-- [ ] **`@rest` still has no consumer, and the JSON record reader is the one that will judge it.** §6.2's
-  flatten is deliberately unbuilt: an undeclared member is §6.1.1's closure error and lands nowhere, which is
-  the strict reading the annotation would later relax. Now that a JSON record reader exists, the question the
-  directive was always waiting on can be asked — whether a rest field's stated shape (`{text => X}`, one field
-  per composed chain, declared names winning, `$`-initial names never collected, one source per field) survives
-  a consumer. Its three load-time checks are tracked under "Checked annotations".
-
 - [ ] **A JSON diagnostic names the type at the end of a reference chain, not the alias the author wrote.**
   `JsonSchemaCompiler` collapses a `REFERENCE` entry onto its target's reader ([TSON-SCHEMA] §8.3 permits
   exactly that when compiling for reading), and the target's reader carries the target's name — so a refusal at
@@ -177,12 +161,6 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   it with `UseSite.named` over `EntryDisplayName`, which also renders a minted entry as the sugar or application
   that produced it; this stack has no counterpart. Owed with the facade, which is what will seed the root for a
   real read rather than a test doing it.
-
-- [ ] **Nothing flattens on `@rest`, unexercised for the same reason.** meta.tn declares it for "an encoding that
-  flattens" — the map-typed field a record's undeclared entries live in, a record being closed under its type
-  ([TSON-SCHEMA] §7.2) — which TSON text never is. A JSON reader is where an undeclared member either lands in the
-  marked field or stays `UNRECOGNIZED_FIELD`, and is the first thing able to say whether the directive's stated shape
-  survives a consumer. Its load-time check is likewise tracked under "Checked annotations".
 
 - [ ] **No "can this type receive JSON" answer for a schema author.** Which of an author's types a JSON document can
   validate against is discoverable only by sending one and reading the failure. The facts that decide it are all
