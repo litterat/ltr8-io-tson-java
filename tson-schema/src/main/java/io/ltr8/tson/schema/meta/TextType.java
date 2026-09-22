@@ -43,12 +43,15 @@ public record TextType(
      * against, and a refined {@code length} is itself checked against that range from both sides --
      * which is what rejects re-fixing an exactly-5 text to exactly 7.
      *
-     * <p><b>{@link #pattern} is deliberately unchecked.</b> Deciding whether one I-Regexp accepts a
-     * subset of another's language is regular-language containment, and {@code tson-schema} has no
-     * dependency on {@code tson-regex} to decide it with (the same boundary the linker's own
-     * pattern-disjointness gap sits behind). A refinement may therefore replace a pattern with an
-     * unrelated one and pass -- a known hole, not an oversight, and the natural place an injected
-     * containment oracle would plug in.
+     * <p><b>{@link #pattern} is settable once.</b> A refinement may set it where the source left it
+     * unset, or restate the source's own verbatim, and may never change it. The rule is what it is
+     * because the narrowing question is undecided here: whether one I-Regexp accepts a subset of
+     * another's language is regular-language containment, and {@code tson-schema} has no dependency on
+     * {@code tson-regex} to decide it with (the same boundary the linker's own pattern-disjointness gap
+     * sits behind). Refusing the change is the total rule available without that oracle -- an
+     * undecidable narrowing is not waved through -- and it is the natural place an injected containment
+     * oracle would relax. [TSON-SCHEMA] §5.7's facet-kind table states no rule for {@code pattern}; see
+     * {@code SPEC-FEEDBACK.md} #22, which proposes this one.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {

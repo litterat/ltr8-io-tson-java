@@ -574,7 +574,9 @@ registered in the built-in vocabulary, reading `true`/`false` to a host boolean 
 the enum-member violation it is (a validation error, as every other enum's member set gives). The two tokens
 are case-sensitive and lowercase-only, per §4.2. A typed position does not consult the form, so `!boolean
 "true"` and `!boolean true` are one value — §4.2's special status being a base-resolution rule, which a typed
-position never reaches.
+position never reaches. **#21 disputes that last sentence** and would make the form decide, on the ground
+that `boolean` is an enum and an enum's members are values; if it is adopted, the table row proposed below
+reads "the unquoted tokens `true` and `false`" and this paragraph goes.
 
 **Suggested resolution.** Add `boolean` to §5's table, in the same row group as `text`, with the parsing
 contract "the tokens `true` and `false`, case-sensitive; any other token is a validation error". If the
@@ -1937,3 +1939,291 @@ this entry found missing before that category has a member again. The alternativ
 define the class as a property an encoding-rules document claims — preserves a feature with no consumer, no
 modelling gain and a load-time check nobody has written, at the price of the closure carve-out and the ordering
 rule above.
+
+---
+
+## 21. An enum models a vocabulary and a value set, and `enum_set` admits only the vocabulary
+
+**Documents:** [TSON-SCHEMA] §7.4, §9, §5.4, §5.7, §11.4; [TSON-DATA] §7.7, §8.2.
+**Kind:** limitation — a construct that spells one of the two things it models, with no way to say which was
+meant. **This entry is a proposal: nothing below is built.** What is running is §7.4 as written.
+
+### The two things an enum is
+
+`!enum [OPEN ACTIVE DONE]` is a **vocabulary**: its members are names, they are written unquoted, they
+generate host enum constants, and [TSON-SCHEMA] §11.4 makes them a named scope so [TSON-DATA] §8.2's
+spoofing checks reach them.
+
+`{"sedentary", "lightly active"}` is a **value set**: two values a document may carry. Nothing about it is a
+name. It has no host-safe spelling, it is written quoted, and script-policing it would be a category error.
+
+Both are enumerations, and §7.4 spells only the first: `enum_set => !set_type { element_type: identifier }`
+(§9) makes every member a name, so the second has no spelling at all. The section says as much and treats it
+as settled — "a display string is mapped at the boundary, as every comparable schema language requires" —
+which holds for languages that generate code from a schema (protobuf, Avro, GraphQL and Thrift all require
+identifier symbols) and not for languages that validate documents, which `xs:enumeration` and JSON Schema's
+`enum` are and which is the use this implementation is built for. There is no boundary to map at when the
+document is somebody else's.
+
+### What it costs, measured
+
+In a conversion of 150 real schemas to TSON (2,351 tool-calling contracts, 4,171 enum declarations):
+**33.9% of enum declarations cannot be an `!enum`**. 6,141 individual members fail, 99% of them for two
+mundane reasons — **57.5% contain a space** (`lightly active`, `Personal Info`, `Job History`) and **41.6%
+start with a digit** (`2D`, `3D`, `24 hours`). The share is worse in the real-world half of that pool
+(34.4%) than in the hand-authored half (25.8%), and the real-world half holds 94% of the enums.
+
+Those declarations fall back to a pattern alternation. Accept/reject is exactly equivalent — TSON patterns
+are implicitly anchored — so what is lost is the diagnostic, which is the reason to have the construct at
+all:
+
+```
+!enum     'wizard' is not a member of this enum -- expected one of [admin, member, guest]
+pattern   'sedentary' does not match the required pattern lightly active|moderately active|very active
+```
+
+The second asks a consumer to infer a member list from a regex. It also requires the converter to
+regex-escape every member, a step that can silently go wrong.
+
+### Proposed resolution: type the member set by `text`, and declare which kind of enumeration it is
+
+```
+enum_member_profile => !enum [IDENTIFIER TEXT]
+
+enum_set => !set_type { element_type: text }
+
+enum => atom & {
+  members:         enum_set
+  member_profile:  enum_member_profile ~ IDENTIFIER
+}
+```
+
+`text` rather than `value`, and the distinction matters: `text` is the declaration type of the member
+*list*, exactly as `integer_member_set` is typed by `integer` — it does not make the enum a text refinement,
+and the enum's value space is still its member set. Typing the set by `value` was considered and rejected:
+it makes an enum's **kind a derived fact**, so that `!enum [a b]` is a text type, `!enum [1 2]` a numeric
+one and `!enum [1 a]` neither, and a consumer cannot know what an enum binds to without inspecting its
+members and computing a shared class. It also leaves an identity question with no good answer (`!enum
+[1 1.0]` — one member or two?) and puts `value` to a use its own kernel doc rules out: "the token,
+uninterpreted, **read by the type the position hands it to**", where an enum has no other type to hand it
+to. `text` makes the kind declared: every enum is a text value set, binds to text, always.
+
+**Numbers are therefore never enums**, and that is the point rather than a gap: integer and decimal value
+sets are `integer_type.members` and `decimal_type.members`, which Revision 36 already added. The partition
+is clean and no rule is needed for choosing between two spellings of one thing.
+
+### Why the profile is an enum and not a boolean, and why it defaults to IDENTIFIER
+
+**"Profile" is [TSON-DATA]'s own word** for which lexical class a thing must lie in — §7.1's unquoted-token
+profile, §7.7's identifier profile — so `member_profile: IDENTIFIER` reads in established vocabulary, and
+does not spend `form`, which §2.4 has already committed to quoted-versus-unquoted.
+
+**An enum rather than a boolean, because there is a real third point already named in the series.**
+`IDENTIFIER ⊂ TOKEN ⊂ TEXT`, where TOKEN is §7.1's unquoted-token profile: it admits `2D`, `3D`, `007`,
+`192.168.0.1` — everything writable without quotes — which is **41.6% of the failing members above**, and it
+preserves the terse unquoted spelling. This entry does not propose shipping TOKEN: it buys spelling, not
+binding (`2D` is no more a host constant than `lightly active`) and not hygiene, and there is no measured
+demand for the middle. Its existence is the argument for the shape. A boolean forecloses it; an enum slots
+into §5.7's **selector facet** category, whose rule already reads "may move under refinement only along the
+narrowing relation its members carry, which each family states" — and the relation here is that chain,
+stated in one line. It also matches the kernel's existing internal enums (`product_access_type`,
+`field_state`, `record_extension_type`, `scope_kind`), where the kernel's three booleans (`signed`,
+`unordered`, `disjoint`) are all intrinsically two-valued facts and this is not.
+
+**IDENTIFIER by default**, for four reasons in order of weight:
+
+1. **The kernel already defaults strict and makes latitude explicit.** `field_state` is REQUIRED until a `?`
+   is written, `element_state` likewise, and `set_type` defaults `min_items` to 1 "so a set is non-empty
+   unless a body writes `min_items: 0`". A TEXT default would be the first facet in the kernel where the
+   safe reading costs a keystroke.
+2. **Every existing enum survives untouched, in source and in resolved output.** §5.6: "a pin or default
+   whose value is concrete in the head's own declaration comes from the vocabulary and **does not appear in
+   the binding record**" — so `~ IDENTIFIER` is omitted at its own value and no resolved form moves. With a
+   TEXT default, every internal enum in the kernel, meta and core would have to start declaring IDENTIFIER
+   to keep what it has.
+3. **Name hygiene stays on by default.** A TEXT default would silently drop §8.2's restricted-character and
+   restricted-script checks from every enum in existence. Turning a spoofing check off should be written
+   down.
+4. **The binding guarantee is the default** (below), and an author who writes TEXT has recorded that they
+   took the trade.
+
+The diagnostic carries the cost and nearly does already — today a non-identifier member fails with
+`'lightly active': U+0020 at index 7 cannot appear in an identifier`, which needs only to end by naming
+`member_profile: TEXT` for the fix to be obvious where the failure is.
+
+### What the profile gates, and what it does not touch
+
+Three rules follow from the declaration instead of from inspecting members:
+
+| | `IDENTIFIER` | `TEXT` |
+|---|---|---|
+| Hygiene | §11.4's scope and all three of §8.2's mechanisms, unchanged | mechanism 1 only — two members that read alike is still the hazard; the per-*name* restricted-character and restricted-script rules lapse, a value set carrying whatever its domain carries |
+| Binding | every member is a host-safe name; host enum generation is guaranteed | host text, and the author declared it |
+| Spelling | every member writable unquoted | quoted where the content requires it |
+
+**What does not change, and this is most of §7.4.** §5.4's derivation stands verbatim — "an enum's class is
+its members' shared class… read off each member's own token by [TSON-DATA] §4". §7.4's host-value rule
+stands — "the resolved host value is determined by natural parsing of the matched token" — which is one
+rule, not a carve-out, giving a host boolean at `boolean` and host text at `[OPEN ACTIVE]`. **`boolean`
+stays `!enum [true false]`**: it is as much an enum as any other, and §7.4's sentence that "the member rule
+constrains only how a member is *written*" becomes literally what `member_profile` controls. Matching stays
+decoded-text identity at every enum. Uniqueness, the at-least-one-member rule, and the member-set
+tightening of §5.7 are untouched.
+
+**What changes** is §7.4's "Members are identifiers" sentence and the three replacements it sends numeric
+and mixed enums to; `enum_set`'s element type in §9; [TSON-DATA] §7.7's identifier profile, whose list of
+governed positions ("a field name, type name, annotation name, parameter name, or enum member") makes the
+last conditional on the profile; and §11.4's enum-member scope, which gains the same condition.
+
+### How an enum binds
+
+A reviewer will ask this first, so §7.4 should answer it rather than leaving today's "or a host-language
+enum value where the implementation provides a mapping". **An enum binds to the host type of the natural
+parse of its members** — a host boolean at `boolean`, host text everywhere else — and `member_profile`
+declares whether host *enum* generation is available. That is the contract this implementation already
+runs: its enum atom binds to `String`, and a Java enum is reached through a replaceable bridge whose default
+is name identity (`Enum.valueOf`), which is exactly the thing IDENTIFIER guarantees and TEXT withdraws.
+
+The ecosystem answer for the TEXT case is settled and uniform — a name beside the value, never a restriction
+on the value: `@XmlEnumValue("lightly active")` from `xs:enumeration`, `@JsonValue`/`@JsonCreator` from
+jsonschema2pojo and openapi-generator, `#[serde(rename = "lightly active")]`, and OpenAPI's de-facto
+`x-enum-varnames`. TypeScript and Python need no name at all (`type A = "sedentary" | "lightly active"`,
+`Literal[...]`). So if TSON ever wants a codegen story, the additive move is a naming annotation in §6's
+documentation category beside `title` and `deprecated` — which this proposal leaves open and the present
+rule forecloses. **Names can be added to values later; values cannot be added to names.**
+
+### The resulting three-way split, worth stating in §7.4 as one sentence each
+
+| Intent | Spelling |
+|---|---|
+| a vocabulary of names | `!enum [OPEN ACTIVE DONE]` |
+| a text value set | `!enum ["sedentary" "lightly active"]` with `member_profile: TEXT` |
+| a value set on a type needed for its other facets | `!text ^ { length: 2  members: ["AU" "NZ"] }`, `!int16 ^ { members: [80 443] }` |
+
+**The third row's text half is #22**, and it is a separate ask that stands whether or not this entry does.
+With `enum` generalised it is no longer the answer to the 33.9% above — it becomes the narrower case of a
+value set on a *constrained* text family, where the family's own parsing still applies.
+
+### One question this entry does not settle
+
+Under `TEXT`, what class does an *unquoted* numeric member carry — `!enum [80 443]`? The member is the text
+`80`, but §5.4 reads the class off the token and gets number-class, which would make the enum number-class
+while its members are text. The cleanest answer is that members under `TEXT` are written quoted, being text,
+so the class is string and the case cannot arise; the spec should say which, since today the question has no
+way to come up.
+
+### A related Part 3 defect, already fixed
+
+[TSON-JSON] §5.2 refused a JSON string at a `boolean` position, matching "booleans against their literals"
+and strings only against identifier members. That contradicts §7.4 as published: a typed position is read by
+its declared type and never by base type resolution, so `true` and `"true"` are one value at a `boolean`
+field, and the form's special status is a §4.2 base-resolution rule "which a typed position never reaches".
+The two encodings really did disagree — TSON text accepted `{ b: "true" }` where the JSON reader returned
+TYPE_MISMATCH. Part 3 is drafted in this repository and has been corrected there; it is noted here because
+the divergence is evidence that `enum` is under-specified at the seam this entry is about, and because the
+JSON reader in this implementation still enforces the old rule and now needs the change.
+
+---
+
+## 22. `text_type` is the only tier with well-defined value identity and no member set
+
+**Documents:** [TSON-SCHEMA] §7.4, §9, §5.7, §5.11.
+**Kind:** omission — an asymmetry in the constraint vocabulary. **Proposal: not built.**
+
+### The asymmetry
+
+Revision 36 put `members` on both exact numeric tiers — `integer_type` in the kernel, `decimal_type` in meta
+— and correctly on neither approximate one, `float_type` and `rational_type` having no safe member equality.
+So `members` sits on exactly the tiers where value identity is well defined. **Text identity is as well
+defined as integer identity** — [TSON-DATA] §2.5's decoded-text equality, the same relation map keys and set
+elements already use — and `text_type` carries `min_length`, `max_length`, `length` and `pattern` and no
+member set. It is the only such tier without one.
+
+The cost is the pattern fallback documented in #21: converting real schemas, a finite set of admitted
+strings has to be written as an alternation, which is accept/reject-equivalent and diagnostically much
+worse (`does not match the required pattern lightly active|moderately active|very active` against
+`is not a member of this type -- expected one of […]`), and which obliges a converter to regex-escape every
+member.
+
+With `enum` generalised as #21 proposes, this is **not** the spelling for a bare text value set — that is
+`!enum […]` with `member_profile: TEXT`. What it is for is a value set **on a type whose other facets are
+also needed**, where the family's own parsing contract still applies: `!uri ^ { members: […] }` is three
+admitted URIs that are still parsed as URIs, exactly as `!int16 ^ { members: [80 443] }` is a sixteen-bit
+integer that happens to be sparse. The two entries are independent and either may land without the other.
+
+
+### Proposed shape
+
+```
+text_member_set => !set_type { element_type: text }
+
+text_type => atom & {
+  min_length:  non_negative_integer?
+  max_length:  non_negative_integer?
+  length:      non_negative_integer?
+  pattern:     regex?
+  members:     text_member_set?
+}
+```
+
+**A set, not an array**, for the three reasons the kernel already states for `integer_member_set`:
+uniqueness comes from `set_type`'s own contract, non-emptiness from its `min_items` default (an empty member
+set admits no value at all), and member identity is the family's own — "an array spelling … loses all
+three".
+
+**A plain field beside `pattern`, not a field group excluding it**, so that the shape mirrors
+`integer_type`, where `members` composes with `size`, both bound groups and `multiple_of` and is checked
+against them. Making text the one tier where a member set excludes a co-facet would be a line the
+vocabulary does not otherwise draw — and it would draw it in the wrong place, because **a pattern is two
+different things and nothing can tell them apart**. `a|b|c` is a value set, and beside `members` it is the
+same statement twice; `[A-Z]{2}` is a *shape*, and beside `members` it composes exactly as a numeric range
+does — narrow the space, then enumerate within it. Deciding which kind a given pattern is would be
+regular-language containment, which the series decides nowhere. Excluding the pair would forbid the second
+case to prevent the first; admitting it costs a reader one check that the coherence rule below has already
+made for them.
+
+**Coherence: the pattern MUST admit every member.** This is meta.tn's uniform `members` rule — "every
+member satisfies the other facets on the same body or the schema fails to load" — applied, and the three
+length facets take it unchanged. It is called out because it is the only member coherence check in the
+series that needs a **regex engine**: the others are comparisons. That has a placement consequence an
+implementation should be told about rather than left to discover — `tson-schema` deliberately carries no
+dependency on a regex engine (the same boundary the linker's pattern-disjointness gap sits behind), so this
+one check cannot sit beside the other atom coherence checks and belongs where the engine already is.
+
+**Refinement: `pattern` and `members` are each settable once** — written in one body, thereafter restated
+verbatim or left alone, never changed. A facet not yet set may still be set by a refinement, so the
+narrowing case survives:
+
+```
+country_code => !text ^ { pattern: "[A-Z]{2}" }
+nordic       => !country_code ^ { members: ["SE" "NO" "DK"] }     ; members set once, each matching [A-Z]{2}
+
+nordic_core  => !nordic ^ { members: ["SE"] }                     ; resolver error -- members already set
+latin_code   => !country_code ^ { pattern: "[a-z]+" }             ; resolver error -- pattern already set
+```
+
+The reason the pair shares one rule is that they occupy one logical position: both specify the admitted
+value set, and `pattern` cannot be narrowed at all without a containment oracle. Giving the position two
+refinement rules depending on which spelling the author reached for would make the narrowing relation an
+artifact of notation.
+
+### What this changes in §5.7, and the one asymmetry it introduces
+
+**§5.7's facet-kind table has no category that covers `pattern` today.** It declares an ordered bound, a
+step, a permission, a member set, a selector, and a fixed value, and `pattern` is none of them — so
+"refinement can only restrict" currently has nothing to say about the one text facet that is not a count.
+This entry proposes the missing kind: **settable once** — a facet a refinement may set if unset, restate
+verbatim, or leave, and may never change. It sits one step looser than the relation §5.7 already states for
+`bytes_type.encoding`, which "a refinement may neither set nor change". This implementation already runs
+exactly this rule for `pattern` (`AtomNarrowing.checkSettableOnce`, whose diagnostic reads "whether one
+narrows the other is not decided here, so a set pattern may be restated but not changed"), so the proposal
+is to state what the gap was already being filled with.
+
+**The asymmetry, stated plainly so a reviewer can refuse it if they disagree:** `text_type.members` would
+be settable-once where `integer_type.members` and `decimal_type.members` shrink, under §5.7's member-set
+rule that "a member set … may shrink to a subset, never grow or replace". §5.7 declares that rule once for
+every family, and this would be the first family to depart from it. The reason it departs is local and does
+not generalise: text is the only tier whose member set shares its position with a pattern, and the pattern
+is the half that cannot be narrowed. A reviewer preferring uniformity would let `text_type.members` shrink
+like the others — nothing breaks if it does, since a subset of a set whose members all matched the pattern
+still does — at the price of the pair having two refinement rules.
