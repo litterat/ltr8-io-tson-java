@@ -33,7 +33,7 @@ class JsonObjectReaderSchemaTest {
             !!import:"https://tson.io/2026/36/m/core.tn"
             {
               line    => { sku: text  quantity: int32  price: float64 }
-              order   => { customer: text  lines: [line]  note: text ~ "none" }
+              order   => { customer: text  lines: [line]  note?: text ~ "none" }
               orphan  => { value: text }
               at_least_one => !integer ^ { min: 1  max: 100 }
               positive => { count: at_least_one }

@@ -40,8 +40,8 @@ class AbsenceHasOneSpellingTest {
             {
               person => {
                 name: text
-                nickname: text?
-                deleted: void?
+                nickname?: text?
+                deleted?: void?
               }
             }
             """;

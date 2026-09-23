@@ -65,7 +65,7 @@ class TemplateIsAFamilyBaseTest {
     private static final String SEALED_FAMILY = """
               dog_type => { breed: text }
               cat_type => { indoor: boolean }
-              pet      => <T, V> { type: text = T  value: V }
+              pet      => <T, V> { type?: text = T  value: V }
               dogpet   => pet<"dog", dog_type>
               catpet   => pet<"cat", cat_type>
               holder   => { p: pet }
@@ -82,7 +82,7 @@ class TemplateIsAFamilyBaseTest {
     void aMarkedTemplateIsIndexedUnderItsBase() {
         TsonLinkedSchema schema = linked("f1", """
                   pet_base => abstract { type: text =? }
-                  pet      => <T, V> pet_base & { type: = T  value: V }
+                  pet      => <T, V> pet_base & { type?: = T  value: V }
                   dog_type => { breed: text }
                   dogpet   => pet<"dog", dog_type>
                 """);
@@ -108,7 +108,7 @@ class TemplateIsAFamilyBaseTest {
     void aParametricPinMakesATemplateAFamilyBase() {
         assertEquals(List.of(), load("f3", """
                   dog_type => { breed: text }
-                  pet      => abstract <T, V> { type: text = T  value: V }
+                  pet      => abstract <T, V> { type?: text = T  value: V }
                   dogpet   => pet<"dog", dog_type>
                 """));
     }
@@ -130,7 +130,7 @@ class TemplateIsAFamilyBaseTest {
     @Test
     void finalIsStillRefusedOnATemplate() {
         assertTrue(!load("f5", """
-                  pet => final <T> { type: text = T }
+                  pet => final <T> { type?: text = T }
                 """).isEmpty());
     }
 

@@ -174,9 +174,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * <p>{@code FIELD_REQUIRED} and {@code FIELD_FIXED} are the two [TSON-SCHEMA] §5.2 field-state rules a
      * document can break, and they sit together deliberately: neither is anything to do with the field's
      * <em>type</em>. A {@code FIELD_FIXED} value satisfied its atom's grammar and every facet -- it simply
-     * isn't the one value the schema permits, whether that is a stated value contradicting {@code = value},
-     * a field pinned to a value written {@code _}, or a value written where {@code = _} fixes the field to
-     * absent.
+     * isn't the one value the schema permits, whether that is a stated value contradicting {@code = value}
+     * or a pinned field written {@code _}.
      *
      * <p>{@code DUPLICATE_MAP_KEY} and {@code DUPLICATE_FIELD} are the same mistake at the two container
      * shapes TSON keeps apart -- a key stated twice in one map ([TSON-DATA] §2.6), a field name stated

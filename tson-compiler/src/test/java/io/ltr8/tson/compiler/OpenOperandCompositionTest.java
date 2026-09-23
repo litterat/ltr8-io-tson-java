@@ -209,7 +209,7 @@ class OpenOperandCompositionTest {
         TsonCompiledSchema compiled = compile("""
                   base => { tag: text  note: text }
                   box  => <T> base & { value: T }
-                  vip  => <T> box<T> ^ { note: text = "fixed" }
+                  vip  => <T> box<T> ^ { note?: text = "fixed" }
                   use  => vip<text>
                 """);
 

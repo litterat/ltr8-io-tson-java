@@ -75,12 +75,12 @@ class TemplateRegularityTest {
     @Test
     void mutualRecursionIsCheckedAcrossTheCycle() {
         assertNotNull(compile("""
-                  ma => <T> { b: mb<T>? }
-                  mb => <U> { a: ma<U>? }"""), "regular across the cycle");
+                  ma => <T> { b?: mb<T>? }
+                  mb => <U> { a?: ma<U>? }"""), "regular across the cycle");
 
         String message = rejected("""
-                  na => <T> { b: nb<box<T>>? }
-                  nb => <U> { a: na<U>? }""");
+                  na => <T> { b?: nb<box<T>>? }
+                  nb => <U> { a?: na<U>? }""");
         assertTrue(message.contains("'na' applies 'nb' recursively"), message);
     }
 
@@ -88,7 +88,7 @@ class TemplateRegularityTest {
     @Test
     void aNonRecursiveApplicationMayGrowItsArgumentFreely() {
         assertNotNull(compile("""
-                  holder => <T> { b: box<box<T>>? }"""));
+                  holder => <T> { b?: box<box<T>>? }"""));
     }
 
     // ── The other §5.10 declaration-time rules ───────────────────────────
@@ -139,7 +139,7 @@ class TemplateRegularityTest {
                 "unapplied, it gets no verdict");
 
         assertNotNull(compile("""
-                  chain => <T> { head: T  tail: chain? }
+                  chain => <T> { head: T  tail?: chain? }
                   use   => { c: chain<text> }"""),
                 "applied, the bare `chain` names the parent every record template has");
     }

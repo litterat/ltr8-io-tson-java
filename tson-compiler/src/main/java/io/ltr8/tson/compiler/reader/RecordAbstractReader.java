@@ -90,10 +90,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * comparable in either read mode. {@code value} is likewise the <em>raw</em> parsed value, not the
      * {@link #precomputedValue} entry that {@link RecordBindReader} narrows in place -- comparing a
      * raw-parsed token against a narrowed one would report a contradiction between two spellings of the same
-     * number. {@code mustBeAbsent} is §5.2's {@code type? = _}: no value exists to compare against, and only
-     * omission or {@code _} conforms.
+     * number.
      */
-    private record FixedCheck(boolean mustBeAbsent, Object value, TsonTypeReader<?> parser) {
+    private record FixedCheck(Object value, TsonTypeReader<?> parser) {
     }
 
     /** Called once per recognized, non-fixed field {@link #readFields}/{@link #readPositional} decode -- may be called more than once for the same {@code schemaIndex} on a duplicate field name; the last call wins. */
@@ -161,9 +160,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
             omitted[i] = schema.omitted(groups.stream().anyMatch(group -> group.members().contains(schema.name())));
             if (schema.role() == FieldRole.FIXED) {
-                // `type? = _` is FIXED with no value at all: nothing to parse, and the only conforming document
-                // is one that omits the field or writes `_`.
-                fixedChecks[i] = new FixedCheck(schema.pinnedToAbsent(), precomputedValue[i], field.parser());
+                fixedChecks[i] = new FixedCheck(precomputedValue[i], field.parser());
             }
             if (!schema.optional()) {
                 requiredCount++;
@@ -330,10 +327,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     /**
      * Field-group presence check (§5.11): a bare (REQUIRED) group must have exactly one member
      * present, a {@code ?} (OPTIONAL) group at most one -- the group's members flatten into ordinary
-     * OPTIONAL fields (§5.11's own resolution), so this is the only place the group's own
+     * optional fields (§5.11's own resolution), so this is the only place the group's own
      * "at most/exactly one" multiplicity is actually enforced at read time. "Present" means the
-     * member's field name appeared in the data ({@code seen}); a member written as the absent
-     * sentinel {@code _} still counts as appearing, an edge this doesn't distinguish. Reported
+     * member's field name appeared in the data ({@code seen}); a voidable member written as the absent
+     * sentinel {@code _} counts as appearing, which is what selects its alternative. Reported
      * through {@code ctx} like any other problem, so both readers gain it by calling this once after
      * their own field pass, and collecting mode surfaces a group violation alongside sibling ones.
      */
@@ -428,9 +425,6 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
             // §5.2's Default injection: "the decoder injects the default (or fixed) value".
             case VALUE -> precomputedValue[schemaIndex];
-            // Pinned to `_`: the pin's value is absence, and it is injected as any pin's is -- in a tree, the
-            // same node a written `_` gives.
-            case ABSENCE -> statedAbsentValue();
             case NOTHING -> null;
         };
     }
@@ -440,11 +434,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * (§5.2: a fixed field "may be provided with a value matching the fixed value, or omitted"). The
      * document's token decides only whether the document is valid; it never becomes the field's value.
      *
-     * <p>Three outcomes are wrong and each is reported: a value contradicting the fixed one, any value at a
-     * {@code = _} field (§5.2: "the field MUST either be omitted or be the absent sentinel"), and {@code _}
-     * at a field pinned to a value, which is not voidable ("at a plain REQUIRED or a REQUIRED_FIXED field,
-     * `_` is a validation error"). {@code _} at a {@code = _} field is fine -- the field is voidable, and
-     * absence is what it asserts.
+     * <p>Two outcomes are wrong and each is reported: a value contradicting the fixed one, and {@code _}, since
+     * a pinned field is never voidable ("at a plain REQUIRED or a REQUIRED_FIXED field, `_` is a validation
+     * error").
      *
      * <p><b>One wrong token yields one diagnostic.</b> The stated token is decoded through the field's own
      * parser, which reports for its own reasons (an out-of-range integer, an enum non-member) and then hands
@@ -463,19 +455,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             ScopePush.refuse(fieldCtx, schema.type().name(), push);
         }
         if (ctx.peek() instanceof AbsentEvent) {
+            // A pinned field is never voidable -- `_` is not the pin -- so absence here is always the refusal.
             ctx.next();
-            if (!schema.voidable()) {
-                fieldCtx.report(rules.fixedFieldAbsent(fieldName, String.valueOf(check.value()), ABSENT));
-                return;
-            }
-            // Pinned to `_`: absence is exactly what it permits, and [TSON-DATA] §2.9 makes a field written `_`
-            // present with an absent value -- kept, as at any voidable field.
-            sink.accept(schemaIndex, statedAbsentValue());
-            return;
-        }
-        if (check.mustBeAbsent()) {
-            EventSkip.scopedValue(ctx);
-            fieldCtx.report(rules.fixedToAbsentFieldValued(fieldName, ABSENT, "a value"));
+            fieldCtx.report(rules.fixedFieldAbsent(fieldName, String.valueOf(check.value()), ABSENT));
             return;
         }
         int before = ctx.reported();

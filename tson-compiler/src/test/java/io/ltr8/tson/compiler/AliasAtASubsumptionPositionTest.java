@@ -145,7 +145,7 @@ class AliasAtASubsumptionPositionTest {
      */
     private static final String SEALED = """
               pet    => abstract { kind: text =?  name: text }
-              dog    => pet & { kind: = "dog"  breed: text }
+              dog    => pet & { kind?: = "dog"  breed: text }
               d_of   => dog
               p_of   => pet
               kennel => { p: pet }

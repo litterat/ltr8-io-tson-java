@@ -24,6 +24,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -391,25 +392,25 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
                         + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"min\" type: { name: \"integer\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"max\" type: { name: \"integer\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} ] "
                         + "groups: [ "
                         + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "
@@ -691,9 +692,9 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesAnOrdinaryLiteralFixedValue() throws DataBindException {
-        // Mirrors array's own "access_pattern: product_access_type = INDEX" without the surrounding
+        // Mirrors array's own "access_pattern?: product_access_type = INDEX" without the surrounding
         // composition, so it isn't also blocked by tightening -- an ordinary (non-parameter) fixed value.
-        TypeDefinition pinned = resolveSnippet("pinned => { access_pattern: product_access_type = INDEX }");
+        TypeDefinition pinned = resolveSnippet("pinned => { access_pattern?: product_access_type = INDEX }");
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
@@ -738,7 +739,7 @@ class DefinitionResolverTest {
      */
     @Test
     void aParametricDefaultValueIsPromotedToRequiredDefault() throws DataBindException {
-        TypeDefinition retry = resolveSnippet("retry_policy => <N> { attempts: integer ~ N }");
+        TypeDefinition retry = resolveSnippet("retry_policy => <N> { attempts?: integer ~ N }");
 
         assertEquals("{ source: { name: \"record\" arguments: [] } "
                         + "supertypes: [] subtypes: [] "
@@ -783,10 +784,10 @@ class DefinitionResolverTest {
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } "
                         + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(array));
@@ -819,10 +820,10 @@ class DefinitionResolverTest {
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" value: REQUIRED } "
                         + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(map));
@@ -836,7 +837,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   base => { count: integer }
-                  loosened => base & { count: integer? }
+                  loosened => base & { count?: integer? }
                 }""").parseSchemaDocument().body();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
@@ -853,7 +854,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   config => { host: text  port: integer }
-                  production => config & { host: = "prod.example.com" }
+                  production => config & { host?: = "prod.example.com" }
                 }""").parseSchemaDocument().body();
         resolved.put("config", resolver.resolve(schemaMap.declarations().get("config")));
 
@@ -893,7 +894,7 @@ class DefinitionResolverTest {
         SchemaValidationException composed = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
                         config => { host: text }
-                        production => config & { port: = 8080 }
+                        production => config & { port?: = 8080 }
                         """));
         assertTrue(composed.getMessage().contains("'port'"), composed.getMessage());
     }
@@ -936,7 +937,7 @@ class DefinitionResolverTest {
                         + "optional: true voidable: false role: \"DEFAULT\" "
                         + "value: 1 } "
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: true role: \"FREE\" "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(set));
@@ -1787,16 +1788,19 @@ class DefinitionResolverTest {
 
     // ── The field spellings (§5.2) ────────────────────────────────────────
 
-    /** §5.2's spellings, end to end, in one record, each landing on its facts. */
+    /** §5.2's spellings, end to end, in one record: each mark lands on the one fact it answers. */
     @Test
     void resolvesEveryFieldSpelling() {
         RecordBody body = bodyOf(resolveAll("""
                 config => {
-                  host:   text
-                  port:   integer ~ 8080
-                  debug:  boolean = false
-                  label:  text?
-                  extra:  text? = _
+                  host:     text
+                  port?:    integer ~ 8080
+                  debug?:   boolean = false
+                  label?:   text?
+                  version:  text = "2.0"
+                  note:     text?
+                  timeout?: integer? ~ 30
+                  extra?:   void?
                 }
                 """).get("config"));
 
@@ -1805,85 +1809,70 @@ class DefinitionResolverTest {
                 body.fields().get(1));
         assertEquals(RecordField.fixed("debug", TypeRef.of("boolean"), new Token("false", Token.Form.UNQUOTED)),
                 body.fields().get(2));
-        assertEquals(RecordField.optional("label", TypeRef.of("text")), body.fields().get(3));
-        // pinned to `_`: FIXED with no value at all, so §8.1 writes a record_field *without* a `value` member
-        // -- the field must be omitted or written as `_`
-        assertEquals(RecordField.fixedAbsent("extra", TypeRef.of("text")), body.fields().get(4));
+        assertEquals(RecordField.optionalVoidable("label", TypeRef.of("text")), body.fields().get(3));
+        assertEquals(RecordField.marker("version", TypeRef.of("text"), new Token("2.0", Token.Form.SINGLE_LINE_QUOTED)),
+                body.fields().get(4));
+        assertEquals(RecordField.voidable("note", TypeRef.of("text")), body.fields().get(5));
+        assertEquals(new RecordField("timeout", TypeRef.of("integer"), true, true, FieldRole.DEFAULT,
+                Optional.of(new Token("30", Token.Form.UNQUOTED))), body.fields().get(6));
+        assertEquals(RecordField.optionalVoidable("extra", TypeRef.of("void")), body.fields().get(7));
     }
 
     /**
-     * {@code type? = value} pins a voidable field, and the facts a field stores cannot say it: a written
-     * {@code _} is decided before the pin is consulted, so the field would admit {@code _} where the pin
-     * refuses it.
+     * The spellings the three slots can form and §5.2 refuses, each for its own reason: a pin on a voidable
+     * type admits {@code _} beside the pin; a default on an unmarked name is a value omission never reaches;
+     * {@code = _} pins the field to something that is not a value of its type, in either reading; and a
+     * discriminator that may be absent selects nothing.
      */
     @Test
-    void aPinOnAnOptionalFieldIsRefused() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("config => { format: text? = json }"));
-        assertTrue(thrown.getMessage().contains("pins an optional field to a value"), thrown.getMessage());
+    void theRefusedSpellings() {
+        assertRefused("config => { format?: text? = json }", "pins a voidable type");
+        assertRefused("config => { format: text? = json }", "pins a voidable type");
+        assertRefused("config => { port: integer ~ 8080 }", "always written");
+        assertRefused("config => { extra?: text = _ }", "'_' is none of them");
+        assertRefused("config => { extra?: text? = _ }", "'_' is none of them");
+        assertRefused("config => { extra?: text ~ _ }", "'_' is none of them");
+        assertRefused("pet => { kind?: text =? }", "discriminator");
+        assertRefused("pet => { kind: text? =? }", "discriminator");
+    }
+
+    private void assertRefused(String schema, String fragment) {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> resolveAll(schema));
+        assertTrue(thrown.getMessage().contains(fragment), thrown.getMessage());
     }
 
     /**
-     * §5.2 makes {@code = _} valid on a field "declared with {@code ?} <b>or inherited as OPTIONAL</b>", and
-     * a modifier-only tightening entry has no {@code ?} of its own -- so presence has to be read off the
-     * field being tightened. This is §5.9's IS-A-preserving counterpart to removal: the field stays in the
-     * contract, its value is forbidden.
+     * "May be omitted, and if written is {@code _}" is spelled by the type, {@code void?}, not by a pin: a
+     * restatement narrowing an inherited field to {@code void} keeps it in the contract with its value
+     * forbidden -- §5.9's IS-A-preserving counterpart to removal.
      */
     @Test
-    void fixesAnInheritedOptionalFieldToAbsent() {
+    void restatesAnInheritedFieldAsVoid() {
         Map<String, TypeDefinition> entries = resolveAll("""
-                base => { name: text  nickname: text? }
-                anonymous => base ^ { nickname: = _ }
+                base => { name: text  nickname?: text? }
+                anonymous => base ^ { nickname?: void? }
                 """);
 
         RecordField nickname = bodyOf(entries.get("anonymous")).fields().get(1);
-        assertEquals("fixed to absent", nickname.describe());
-        assertEquals(Optional.empty(), nickname.value());
+        assertEquals(RecordField.optionalVoidable("nickname", TypeRef.of("void")), nickname);
         // unlike removal (§5.9), IS-A survives -- the field is still in the contract
         assertEquals(List.of("base"), entries.get("anonymous").supertypes());
         assertEquals(List.of("name", "nickname"), fieldNames(entries.get("anonymous")));
     }
 
-    /** §5.2: "`~ _` (any field) -- a required field cannot fall back to not-being-filled." */
+    /** A modifier-only {@code = _} is a pin to {@code _}, refused whatever the field it restates. */
     @Test
-    void rejectsAnAbsentDefault() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("config => { label: text? ~ _ }"));
-        assertTrue(thrown.getMessage().contains("'~ _'"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("§5.2"), thrown.getMessage());
-    }
-
-    /** §5.2: "`= _` on a REQUIRED field -- a field cannot be required and fixed to not-being-present." */
-    @Test
-    void rejectsFixingARequiredFieldToAbsent() {
-        SchemaValidationException fresh = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("config => { label: text = _ }"));
-        assertTrue(fresh.getMessage().contains("required"), fresh.getMessage());
-
-        // and through inheritance: the source declares it REQUIRED, so the tightening entry inherits that
-        SchemaValidationException inherited = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("""
-                        base => { name: text }
-                        odd => base ^ { name: = _ }
-                        """));
-        assertTrue(inherited.getMessage().contains("required"), inherited.getMessage());
-    }
-
-    /** §5.2: "`type? ~ value` -- a default implies the field is always present, contradicting optional." */
-    @Test
-    void rejectsADefaultOnAnOptionalField() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("config => { label: text? ~ none }"));
-        assertTrue(thrown.getMessage().contains("contradicts optional"), thrown.getMessage());
-        // the message offers all three spellings the author might have meant
-        assertTrue(thrown.getMessage().contains("'type ~ value'"), thrown.getMessage());
+    void rejectsAModifierOnlyPinToAbsent() {
+        assertRefused("""
+                base => { name: text  nickname?: text? }
+                anonymous => base ^ { nickname?: = _ }
+                """, "'_' is none of them");
     }
 
     /**
-     * A parametric modifier lands in a REQUIRED-family state whatever the presence axis says (§5.7's "Open
-     * modifiers": "a parametric `= P` places the field in REQUIRED -- from OPTIONAL this is the table's
-     * ordinary OPTIONAL → REQUIRED tightening"). A parametric {@code = P} over an inherited OPTIONAL field
-     * is the shape, so the parameter branch has to sit ahead of the OPTIONAL_FIXED one.
+     * A parametric {@code = P} is FREE until materialisation closes it (§5.7's "Open modifiers"), and pins
+     * the field there. Its type slot is elided, so it inherits the source's voidability -- here none, the
+     * source being {@code bound?: integer}.
      *
      * <p>A refinement <b>template</b> holds its body, so the state is read off the wire record it holds. The
      * body is the <em>flattened</em> form -- the refinement is resolved against its source first, which is
@@ -1893,7 +1882,7 @@ class DefinitionResolverTest {
     @Test
     void aParametricModifierOnAnInheritedOptionalFieldStillLandsInRequired() {
         Map<String, TypeDefinition> entries = resolveAll("""
-                base => { bound: integer? }
+                base => { bound?: integer }
                 bounded => <MIN> base ^ { bound: = MIN }
                 """);
 
@@ -1907,71 +1896,31 @@ class DefinitionResolverTest {
         assertFalse(names.contains("FIXED"), names::toString);
     }
 
-    // ── Group presence under tightening (§5.11) ───────────────────────────
-    //    "Group presence rules are checked against the refined states at schema
-    //    load: a refinement under which two members of one group are always
-    //    present (both in a REQUIRED-family state) is a resolver error."
+    // ── Restating a group member (§5.11) ──────────────────────────────────
 
     /**
-     * The rule earns its keep: without it the declaration resolves, compiles, and then rejects every value
-     * ever written against it -- a group admits at most one member, so two that must always be there is a
-     * contract nothing can satisfy. Caught where it is written instead.
+     * A restated member stays a member: optional whatever the restatement writes, since its presence is the
+     * group's, and a pin on it is checked where written and never supplied -- an injected member would be
+     * present, and presence is what selects the alternative. So two members may both be pinned, which no
+     * value contradicts: at most one is written.
      */
     @Test
-    void rejectsARefinementMakingTwoGroupMembersAlwaysPresent() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(BOUNDS
-                        + "  impossible => bounds ^ { min: integer = 0  exclusive_min: integer = 1 }"));
-        assertTrue(thrown.getMessage().contains("min and exclusive_min"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("at most one"), thrown.getMessage());
+    void aRestatedMemberMayBePinnedAndIsNeverSupplied() {
+        RecordBody body = bodyOf(resolveAll(BOUNDS
+                + "  pinned => bounds ^ { min: = 0  exclusive_min: integer = 1 }").get("pinned"));
+
+        RecordField min = body.fields().get(1);
+        assertEquals(RecordField.fixed("min", TypeRef.of("integer"), new Token("0", Token.Form.UNQUOTED)), min);
+        assertEquals(RecordField.Omitted.NOTHING, min.omitted(true));
+        assertEquals("fixed", body.fields().get(2).describe());
+        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.OPTIONAL)), body.groups());
     }
 
-    /**
-     * §5.11's sentence says "a refinement", but it sits in a paragraph headed "Refinement and composition"
-     * that puts both bodies under §5.7's tightening rules -- and a composition body produces the identical
-     * unsatisfiable type, so reading it as refinement-only would leave the same defect legal by the other
-     * spelling.
-     */
+    /** A member's omission is the group's, so the name takes no {@code ?} and the member takes no default. */
     @Test
-    void rejectsACompositionBodyMakingTwoGroupMembersAlwaysPresent() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(BOUNDS
-                        + "  impossible => bounds & { min: integer = 0  exclusive_min: integer = 1 }"));
-        assertTrue(thrown.getMessage().contains("at most one"), thrown.getMessage());
-    }
-
-    /** REQUIRED_DEFAULT counts too: a default supplies the value, so the field is there in every value. */
-    @Test
-    void aDefaultCountsAsAlwaysPresentForTheGroupRule() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(BOUNDS
-                        + "  impossible => bounds ^ { min: integer ~ 0  exclusive_min: integer = 1 }"));
-        assertTrue(thrown.getMessage().contains("min and exclusive_min"), thrown.getMessage());
-    }
-
-    /**
-     * A modifier-only entry keeps the presence marker it inherits (§5.7's "only the value state changes"), so
-     * {@code = 0} on an inherited-optional member spells {@code min: integer? = 0}: a pin on a voidable field,
-     * which the stored facts cannot hold -- {@code _} would be admitted where the pin refuses it.
-     */
-    @Test
-    void pinningAnInheritedOptionalFieldToAValueIsRefused() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(BOUNDS + "  pinned => bounds ^ { min: = 0 }"));
-        assertTrue(thrown.getMessage().contains("pins an optional field to a value"), thrown.getMessage());
-    }
-
-    /** The rule is per group -- one always-present member in each of two groups is not a conflict. */
-    @Test
-    void oneAlwaysPresentMemberInEachOfTwoGroupsIsFine() {
-        Map<String, TypeDefinition> entries = resolveAll("""
-                ranged => { ( min: integer | exclusive_min: integer )? ( max: integer | exclusive_max: integer )? }
-                pinned => ranged ^ { min: integer = 0  max: integer = 9 }
-                """);
-
-        assertEquals(2, bodyOf(entries.get("pinned")).groups().size());
-        assertEquals("fixed", bodyOf(entries.get("pinned")).fields().get(0).describe());
-        assertEquals("fixed", bodyOf(entries.get("pinned")).fields().get(2).describe());
+    void aRestatedMemberTakesNoNameMarkAndNoDefault() {
+        assertRefused(BOUNDS + "  pinned => bounds ^ { min?: integer = 0 }", "without the '?' on its name");
+        assertRefused(BOUNDS + "  pinned => bounds ^ { min: integer ~ 0 }", "takes no default");
     }
 
     // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
@@ -2021,7 +1970,7 @@ class DefinitionResolverTest {
     void rejectsRefiningADefinitionWhoseBodyIsABindingRecord() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel("""
-                        bounded => integer ^ { min: = 0 }
+                        bounded => integer ^ { min?: = 0 }
                         """));
         assertTrue(thrown.getMessage().contains("finished"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("!integer ^"), thrown.getMessage());
@@ -2155,7 +2104,7 @@ class DefinitionResolverTest {
     @Test
     void aRemovalCoexistsWithATighteningOfADifferentField() {
         Map<String, TypeDefinition> entries = resolveAll(ACCOUNT
-                + "  account_view => account & { email: text ~ \"n/a\" } - { password }");
+                + "  account_view => account & { email?: text ~ \"n/a\" } - { password }");
 
         TypeDefinition view = entries.get("account_view");
         assertEquals(List.of("name", "email"), fieldNames(view));
@@ -2180,7 +2129,7 @@ class DefinitionResolverTest {
     @Test
     void rejectsARemovalNamingAFieldTheBodyTightens() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(ACCOUNT + "  odd => account & { password: text ~ \"x\" } - { password }"));
+                () -> resolveAll(ACCOUNT + "  odd => account & { password?: text ~ \"x\" } - { password }"));
         assertTrue(thrown.getMessage().contains("own body also declares"), thrown.getMessage());
     }
 
@@ -2339,7 +2288,7 @@ class DefinitionResolverTest {
     void aSubtypeOfASealedBaseIsOpenUnlessItSaysOtherwise() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
                 pet => abstract { pet_type: text =?  name: text }
-                dog => pet & { pet_type: = "dog"  breed: text }""").body());
+                dog => pet & { pet_type?: = "dog"  breed: text }""").body());
 
         assertEquals(RecordExtensionType.OPEN, dog.extension());
     }
@@ -2359,7 +2308,7 @@ class DefinitionResolverTest {
     void aRestatedFieldPinsTheSelectorAndCarriesNoMark() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
                 pet => abstract { pet_type: text =?  name: text }
-                dog => pet & { pet_type: = "dog"  breed: text }""").body());
+                dog => pet & { pet_type?: = "dog"  breed: text }""").body());
 
         RecordField pinned = dog.fields().stream().filter(f -> f.name().equals("pet_type")).findFirst()
                 .orElseThrow();

@@ -94,7 +94,7 @@ recorded open form, and replacing the application with a reference to the entry 
   declaration ("nothing is fixed at declaration — the value does not exist yet") and defers the rest to one
   sentence, *fixation happens downstream, where values are concrete*. `fixRoutedValues` is that downstream: a bound
   field arriving required and FREE becomes optional and FIXED with the argument as its value, so
-  `response<order, 201>` lands on exactly what the literal `status: int32 = 201` beside it lands on. Carried
+  `response<order, 201>` lands on exactly what the literal `status?: int32 = 201` beside it lands on. Carried
   through unchanged instead, the closed entry held the right value on a field that did not enforce it — a
   constraint the author wrote, silently absent from the type it governs, with no diagnostic anywhere because
   nothing was wrong. **The two spellings are told apart by the role they arrive in**, which is the only

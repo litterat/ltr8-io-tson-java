@@ -28,16 +28,16 @@ class TsonSealedFamilyReadTest {
             !!import:"https://tson.io/2026/36/m/core.tn"
             {
               pet => abstract { pet_type: text =?  name: text }
-              dog => pet & { pet_type: = "dog"  breed: text }
-              cat => pet & { pet_type: = "cat"  indoor: boolean }
+              dog => pet & { pet_type?: = "dog"  breed: text }
+              cat => pet & { pet_type?: = "cat"  indoor: boolean }
 
               shape => abstract { area: int32 }
               square => shape & { side: int32 }
 
               frame => abstract { opcode: int32 =?  payload: text }
-              ping => frame & { opcode: = 0xFF  seq: int32 }
+              ping => frame & { opcode?: = 0xFF  seq: int32 }
 
-              holder => { p: pet  s: shape?  u: unpeopled? }
+              holder => { p: pet  s?: shape?  u?: unpeopled? }
               unpeopled => abstract { a: int32 }
               frame_holder => { f: frame }
             }

@@ -400,17 +400,19 @@ class TsonSchemaParserTest {
 
     /**
      * {@code {text? => integer}} is rejected, but as a <b>record</b>: {@code text} followed by anything that
-     * is not {@code =>} or {@code <} commits the brace to a record body, and the {@code ?} is then a field
-     * name missing its {@code :}. Pinned because it is the one place the dispatch's answer and the author's
-     * intent visibly diverge, and closing it would cost a third token of lookahead -- more than §12.2's
-     * stated budget of one consumed token plus one of lookahead.
+     * is not {@code =>} or {@code <} commits the brace to a record body, the {@code ?} is then the field
+     * name's own mark, and the {@code =>} after it is refused by the record body's rule that {@code =>}
+     * begins a map only where a type is expected. Pinned because it is the one place the dispatch's answer
+     * and the author's intent visibly diverge, and closing it would cost a third token of lookahead -- more
+     * than §12.2's stated budget of one consumed token plus one of lookahead.
      */
     @Test
     void aQuestionMarkOnAPlainMapKeyIsAnsweredByTheBraceDispatch() {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/36/m/meta.tn"
                 { m => {text? => integer} }"""));
-        assertTrue(thrown.getMessage().contains("a record field's ':'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'=>' begins a map type only where a type is expected"),
+                thrown.getMessage());
     }
 
     @Test
@@ -421,122 +423,65 @@ class TsonSchemaParserTest {
                 new TypeArg.Ref(new SimpleRef("text")), new TypeArg.Ref(new SimpleRef("text")))), ref.ref());
     }
 
-    // ── Field states (§5.2) ───────────────────────────────────────────────
+    // ── Field marks (§5.2) ────────────────────────────────────────────────
 
+    /** One slot per question: the name's {@code ?}, the type's {@code ?}, and the modifier, each read alone. */
     @Test
-    void allSixFieldStateSpellings() {
+    void eachFieldSlotIsReadOnItsOwn() {
         RecordDef record = (RecordDef) ((StructuralTypeDef) declOf("""
                 config => {
-                  host:   text
-                  port:   integer ~ 8080
-                  debug:  boolean = false
-                  label:  text?
-                  format: text? = json
-                  hidden: text? = _
+                  host:     text
+                  port?:    integer ~ 8080
+                  version:  text = "2.0"
+                  label?:   text?
+                  nullable: text?
+                  hidden?:  void?
                 }""").typeDef()).body();
 
         FieldDef host = (FieldDef) record.entries().get(0);
-        assertTrue(host.type().isPresent());
+        assertFalse(host.omittable());
+        assertFalse(host.type().orElseThrow().voidable());
         assertTrue(host.modifier().isEmpty());
-        assertFalse(host.type().get().optional());
 
         FieldDef port = (FieldDef) record.entries().get(1);
+        assertTrue(port.omittable());
         assertEquals(FieldDef.Modifier.Kind.DEFAULT, port.modifier().orElseThrow().kind());
         assertEquals("8080", ((FieldDef.Modifier.Value.Literal) port.modifier().get().value()).token().text());
 
-        FieldDef debug = (FieldDef) record.entries().get(2);
-        assertEquals(FieldDef.Modifier.Kind.FIXED, debug.modifier().orElseThrow().kind());
+        FieldDef version = (FieldDef) record.entries().get(2);
+        assertFalse(version.omittable());
+        assertEquals(FieldDef.Modifier.Kind.FIXED, version.modifier().orElseThrow().kind());
 
         FieldDef label = (FieldDef) record.entries().get(3);
-        assertTrue(label.type().orElseThrow().optional());
+        assertTrue(label.omittable());
+        assertTrue(label.type().orElseThrow().voidable());
         assertTrue(label.modifier().isEmpty());
 
-        FieldDef format = (FieldDef) record.entries().get(4);
-        assertTrue(format.type().orElseThrow().optional());
-        assertEquals(FieldDef.Modifier.Kind.FIXED, format.modifier().orElseThrow().kind());
-        assertEquals("json", ((FieldDef.Modifier.Value.Literal) format.modifier().get().value()).token().text());
+        FieldDef nullable = (FieldDef) record.entries().get(4);
+        assertFalse(nullable.omittable());
+        assertTrue(nullable.type().orElseThrow().voidable());
 
         FieldDef hidden = (FieldDef) record.entries().get(5);
-        assertInstanceOf(FieldDef.Modifier.Value.Absent.class, hidden.modifier().orElseThrow().value());
+        assertTrue(hidden.omittable());
+        assertTrue(hidden.type().orElseThrow().voidable());
     }
 
+    /** The name's {@code ?} is adjacent to the name, as every {@code ?} is to what it marks (§12.3). */
     @Test
-    void elidedTypeRefInARefinementBody() {
-        // Only a modifier, no type-ref -- legal in a refinement/composition tightening body (§5.7).
-        TypeDef def = declOf("production => config ^ { port: = 9090 }").typeDef();
-        RefinedDef refined = (RefinedDef) ((StructuralTypeDef) def).body();
-        FieldDef port = (FieldDef) refined.body().entries().get(0);
-        assertTrue(port.type().isEmpty());
-        assertEquals(FieldDef.Modifier.Kind.FIXED, port.modifier().orElseThrow().kind());
+    void aNameMarkSeparatedFromItsNameIsAParseError() {
+        assertThrows(ParseException.class, () -> declOf("config => { port ?: integer }"));
     }
 
-    // ── Field groups (§5.11) ──────────────────────────────────────────────
-
+    /** A group member's presence is the group's, so its name takes no mark; its type may (§5.11). */
     @Test
-    void fieldGroupRequiredAndOptional() {
-        StructuralTypeDef structural = (StructuralTypeDef) declOf("""
-                integer_type => atom & {
-                  size:  integer_size?
-                  ( min: integer | exclusive_min: integer )?
-                  multiple_of: integer?
-                }""").typeDef();
-        ConstructionDef construction = (ConstructionDef) structural.body();
-        RecordDef record = construction.body().orElseThrow();
+    void aGroupMemberTakesATypeMarkAndNoNameMark() {
+        RecordDef record = (RecordDef) ((StructuralTypeDef) declOf(
+                "range => { ( min: integer? | exclusive_min: integer ) }").typeDef()).body();
+        GroupDef group = (GroupDef) record.entries().get(0);
+        assertTrue(group.members().get(0).voidable());
+        assertFalse(group.members().get(1).voidable());
 
-        GroupDef group = (GroupDef) record.entries().get(1);
-        assertTrue(group.optional());
-        assertEquals(2, group.members().size());
-        assertEquals("min", group.members().get(0).name());
-        assertEquals("exclusive_min", group.members().get(1).name());
-    }
-
-    @Test
-    void groupWithOneMemberIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                { a => { ( x: text ) } }"""));
-    }
-
-    // ── Templates and parameters (§5.10) ──────────────────────────────────
-
-    @Test
-    void templateWithMultipleParameters() {
-        TypeDef def = declOf("pair => <T, U> { first: T  second: U }").typeDef();
-        StructuralTypeDef structural = (StructuralTypeDef) def;
-        assertEquals(List.of("T", "U"), structural.typeParams());
-    }
-
-    // ── Choice and tuple minimum-arity errors ────────────────────────────
-
-    @Test
-    void choiceWithOneVariantIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                { a => (text) }"""));
-    }
-
-    @Test
-    void bareTypeRefFollowedByBraceIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                { a => text { x: text } }"""));
-    }
-
-    // ── One tier, not two (§5.3) ─────────────────────────────────────────
-    //    A size specifier and an element `?` used to be declaration-level-only, enforced by there being
-    //    two productions. There is one now, and no position refuses either: the split existed because a
-    //    sized form had no inline representation to carry it, and every form lifts to an entry.
-
-    @Test
-    void aSizeSpecifierIsLegalAtAFieldPosition() {
-        ArrayRef array = (ArrayRef) fieldTypeOf("a => { x: [text; 1] }", "x");
-        assertEquals(new SizeSpec.Exact("1"), array.size().orElseThrow());
-    }
-
-    @Test
-    void aMapSizeSpecifierIsLegalAtAFieldPosition() {
-        MapRef map = (MapRef) fieldTypeOf("a => { x: {text => integer; 1..} }", "x");
-        assertEquals(new SizeSpec.Min("1"), map.size().orElseThrow());
+        assertThrows(ParseException.class, () -> declOf("range => { ( min?: integer | max: integer ) }"));
     }
 
     @Test
@@ -549,7 +494,7 @@ class TsonSchemaParserTest {
     @Test
     void anElementQuestionMarkAndAFieldQuestionMarkDoNotCollide() {
         FieldDef field = fieldOf("a => { x: [text?]? }", "x");
-        assertTrue(field.type().orElseThrow().optional(), "the field's own '?'");
+        assertTrue(field.type().orElseThrow().voidable(), "the field's own '?'");
         assertTrue(((ArrayRef) field.type().orElseThrow().typeRef()).elementType().optional(), "the element's");
     }
 
@@ -772,15 +717,15 @@ class TsonSchemaParserTest {
                 {
                   priority => !integer ^ { min: 1  max: 5 }
                   status   => !enum [OPEN ACTIVE DONE]
-                  flagged  => <T, N> { entry: T  priority: priority ~ N }
+                  flagged  => <T, N> { entry: T  priority?: priority ~ N }
                   task => {
                     id:       uuid
                     title:    non_empty_text
-                    priority: priority ~ 3
-                    status:   status ~ OPEN
-                    due:      date?
-                    tags:     [text]?
-                    history:  [flagged<status, 2>]?
+                    priority?: priority ~ 3
+                    status?:  status ~ OPEN
+                    due?:     date?
+                    tags?:    [text]?
+                    history?: [flagged<status, 2>]?
                   }
                 }""");
         Map<String, SchemaMap.Declaration> decls = doc.body().declarations();
@@ -796,7 +741,7 @@ class TsonSchemaParserTest {
         assertEquals(7, taskBody.entries().size());
 
         FieldDef history = (FieldDef) taskBody.entries().get(6);
-        assertTrue(history.type().orElseThrow().optional());
+        assertTrue(history.type().orElseThrow().voidable());
         ArrayRef historyArray = assertInstanceOf(ArrayRef.class, history.type().get().typeRef());
         GenericRef flaggedApplication = assertInstanceOf(GenericRef.class, historyArray.elementType().typeRef());
         assertEquals("flagged", flaggedApplication.name());

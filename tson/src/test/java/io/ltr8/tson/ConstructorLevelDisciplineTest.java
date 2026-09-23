@@ -56,7 +56,7 @@ class ConstructorLevelDisciplineTest {
     /** Refining a kernel constructor is the same case. */
     @Test
     void aMetaSchemaMayRefineAConstructor() {
-        assertEquals(List.of(), problems(KERNEL, "  refined => array ^ { unordered: = true }"));
+        assertEquals(List.of(), problems(KERNEL, "  refined => array ^ { unordered?: = true }"));
     }
 
     /**

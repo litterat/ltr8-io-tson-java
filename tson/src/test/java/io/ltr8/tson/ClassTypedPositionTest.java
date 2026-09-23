@@ -47,7 +47,7 @@ class ClassTypedPositionTest {
             !!meta:"https://tson.io/2026/36/m/meta.tn"
             !!import:"https://tson.io/2026/36/m/core.tn"
             {
-              box => { i: int32?  b: int8?  s: text?  d: float64?  flag: boolean? }
+              box => { i?: int32?  b?: int8?  s?: text?  d?: float64?  flag?: boolean? }
             }
             """;
 

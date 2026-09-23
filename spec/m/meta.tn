@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/36/m/meta.tn?sha256=3be22eab98fd8cb743bdfa053005646640104fb8c177945101cd2e53c821e909"
-!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=4da7dd93579530430b73dc09027a1ac5a58865828047dbd60e6d39ccfb7e5b4b"
-!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=4da7dd93579530430b73dc09027a1ac5a58865828047dbd60e6d39ccfb7e5b4b"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=329affb265d9ff17cbfea5e9afec5622add8c3e147424f063e5594897804bec9"
+!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=93c62422a70500afc03383d3e908c87a4f0cf481dfd18b58f8787ea559d6319a"
+!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=93c62422a70500afc03383d3e908c87a4f0cf481dfd18b58f8787ea559d6319a"
 @doc:"""
   TSON meta-schema (2026 Revision 36 draft).
 
@@ -179,10 +179,10 @@
     No spec pin: RFC 4648 governs spellings, not octets.
     """
   bytes_type => atom & {
-    encoding:    bytes_encoding ~ BASE64
-    length:      non_negative_integer?
-    min_length:  non_negative_integer?
-    max_length:  non_negative_integer?
+    encoding?:   bytes_encoding ~ BASE64
+    length?:     non_negative_integer
+    min_length?: non_negative_integer
+    max_length?: non_negative_integer
   }
 
   @doc:"""
@@ -224,7 +224,7 @@
     """
   scoped => sum & {
     scope:    set<scope_kind>
-    schemas:  {uri => [type_name; 1..]?; 1..}?
+    schemas?: {uri => [type_name; 1..]?; 1..}
   }
 
   @doc:"""
@@ -271,14 +271,14 @@
     directly and rounds nothing.
     """
   float_type => atom & atom_specification & {
-    spec:                 = "https://ieeexplore.ieee.org/document/8766229"
+    spec?:                = "https://ieeexplore.ieee.org/document/8766229"
     format:               ieee_format
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    allow_nan:            boolean ~ true
-    allow_infinity:       boolean ~ true
-    allow_subnormal:      boolean ~ true
-    allow_negative_zero:  boolean ~ true
+    allow_nan?:           boolean ~ true
+    allow_infinity?:      boolean ~ true
+    allow_subnormal?:     boolean ~ true
+    allow_negative_zero?: boolean ~ true
   }
 
   @doc:"""
@@ -317,10 +317,10 @@
   decimal_type => atom & {
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    multiple_of:      value?
-    total_digits:     non_negative_integer?
-    fraction_digits:  non_negative_integer?
-    members:          set<value>?
+    multiple_of?:     value
+    total_digits?:    non_negative_integer
+    fraction_digits?: non_negative_integer
+    members?:         set<value>
   }
 
   @doc:"""
@@ -336,7 +336,7 @@
   rational_type => atom & {
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    multiple_of:  value?
+    multiple_of?: value
   }
 
   @doc:"""
@@ -377,12 +377,12 @@
     one — which is why `complex` carries no `@exact` marker of its own.
     """
   complex_type => atom & {
-    component:  complex_component ~ NUMBER
+    component?: complex_component ~ NUMBER
   }
 
   @doc:"Date constraint vocabulary. Instance is `date` in core."
   date_type => atom & atom_specification & {
-    spec:  = "https://www.rfc-editor.org/rfc/rfc3339"
+    spec?: = "https://www.rfc-editor.org/rfc/rfc3339"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
   }
@@ -401,10 +401,10 @@
     mandatory.
     """
   time_type => atom & atom_specification & {
-    spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
+    spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    precision:  non_negative_integer?
+    precision?: non_negative_integer
   }
 
   @doc:"""
@@ -415,10 +415,10 @@
     mandatory.
     """
   datetime_type => atom & atom_specification & {
-    spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
+    spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    precision:  non_negative_integer?
+    precision?: non_negative_integer
   }
 
   @doc:"""
@@ -465,11 +465,11 @@
     is a multiple of `PT15M`.
     """
   duration_type => atom & atom_specification & {
-    spec:        = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
+    spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    precision:   non_negative_integer?
-    multiple_of: value?
+    precision?:  non_negative_integer
+    multiple_of?: value
   }
 
   @doc:"""
@@ -486,21 +486,21 @@
     uniform rule: `P3M` admits only whole quarters.
     """
   period_type => atom & atom_specification & {
-    spec:        = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
+    spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    multiple_of: value?
+    multiple_of?: value
   }
 
   @doc:"UUID constraint vocabulary. Instance is `uuid` in core."
   uuid_type => atom & atom_specification & {
-    spec:     = "https://www.rfc-editor.org/rfc/rfc9562"
-    version:  non_negative_integer?
+    spec?:    = "https://www.rfc-editor.org/rfc/rfc9562"
+    version?: non_negative_integer
   }
 
   @doc:"Email constraint vocabulary. Instance is `email` in core."
   email_type => text_type & atom_specification & {
-    spec: = "https://www.rfc-editor.org/rfc/rfc5322"
+    spec?: = "https://www.rfc-editor.org/rfc/rfc5322"
   }
 
   @doc:"""
@@ -513,9 +513,9 @@
     network. `excluding` carves holes out of `within`.
     """
   ipv4_type => atom & atom_specification & {
-    spec:       = "https://www.rfc-editor.org/rfc/rfc3986"
-    within:     [value]?
-    excluding:  [value]?
+    spec?:      = "https://www.rfc-editor.org/rfc/rfc3986"
+    within?:    [value]
+    excluding?: [value]
   }
 
   @doc:"""
@@ -525,9 +525,9 @@
     the field is present, and inside no `excluding` network.
     """
   ipv6_type => atom & atom_specification & {
-    spec:       = "https://www.rfc-editor.org/rfc/rfc4291"
-    within:     [value]?
-    excluding:  [value]?
+    spec?:      = "https://www.rfc-editor.org/rfc/rfc4291"
+    within?:    [value]
+    excluding?: [value]
   }
 
   @doc:"""
@@ -540,11 +540,11 @@
     containment, so a wider value cannot smuggle an excluded block.
     """
   cidr4_type => atom & atom_specification & {
-    spec:        = "https://www.rfc-editor.org/rfc/rfc4632"
-    min_prefix:  non_negative_integer?
-    max_prefix:  non_negative_integer?
-    within:      [value]?
-    excluding:   [value]?
+    spec?:       = "https://www.rfc-editor.org/rfc/rfc4632"
+    min_prefix?: non_negative_integer
+    max_prefix?: non_negative_integer
+    within?:     [value]
+    excluding?:  [value]
   }
 
   @doc:"""
@@ -555,11 +555,11 @@
     subnet-of for `within`, non-overlap for `excluding`.
     """
   cidr6_type => atom & atom_specification & {
-    spec:        = "https://www.rfc-editor.org/rfc/rfc4291"
-    min_prefix:  non_negative_integer?
-    max_prefix:  non_negative_integer?
-    within:      [value]?
-    excluding:   [value]?
+    spec?:       = "https://www.rfc-editor.org/rfc/rfc4291"
+    min_prefix?: non_negative_integer
+    max_prefix?: non_negative_integer
+    within?:     [value]
+    excluding?:  [value]
   }
 
   @doc:"""
@@ -569,7 +569,7 @@
     as niche, and OUI is a living registry.
     """
   mac_type => atom & atom_specification & {
-    spec: = "https://www.rfc-editor.org/rfc/rfc9542"
+    spec?: = "https://www.rfc-editor.org/rfc/rfc9542"
   }
 
   @doc:"Ordering classification (ISO/IEC 11404 / XSD fundamental facet)."

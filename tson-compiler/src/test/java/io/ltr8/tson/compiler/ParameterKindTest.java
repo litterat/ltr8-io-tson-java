@@ -152,7 +152,7 @@ class ParameterKindTest {
      */
     @Test
     void aParameterUsedAsBothATypeAndAValueIsRefusedAtTheDeclaration() {
-        String message = rejected("  both => <T> { v: T  w: int32 ~ T }");
+        String message = rejected("  both => <T> { v: T  w?: int32 ~ T }");
 
         assertTrue(message.contains("parameter 'T' stands in both a type position and a value position"),
                 message);
@@ -200,7 +200,7 @@ class ParameterKindTest {
     void anApplicationClosedOnDemandClassifiesItsArgumentsToo() {
         TsonCompiledSchema compiled = compile("""
                   st => !enum [red green]
-                  t  => <M> { a: st ~ M }
+                  t  => <M> { a?: st ~ M }
                   x  => t<red> & { b: text }""");
 
         TypeDefinition composed = compiled.schema().entries().get("x");

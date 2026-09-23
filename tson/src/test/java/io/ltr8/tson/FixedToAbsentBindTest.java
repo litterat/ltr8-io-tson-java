@@ -30,7 +30,7 @@ class FixedToAbsentBindTest {
             !!meta:"%s"
             !!import:"%s"
             {
-              person => { name: text  retired: text? = _ }
+              person => { name: text  retired?: void? }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     public record Person(String name, String retired) {

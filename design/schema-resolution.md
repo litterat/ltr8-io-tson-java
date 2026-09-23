@@ -11,8 +11,9 @@ field states, groups, subtraction, and the exception boundary. Current form only
 - `abstract`/`final` are grammar, not annotations; `=?` is field syntax; and the definition mark is
   applied once, in `resolve`, not inside whichever `resolve*` built the body.
 - A restated field's annotations concatenate over the inherited ones, restatement first — never replacement by name.
-- A modifier-only tightening keeps the presence marker it inherits, so `= 0` on an inherited-optional field is a pin
-  on a voidable field and is refused; a parametric `= P` is the exception and lands required and FREE.
+- A field's name `?`, type `?` and modifier each set one fact; the name's is never inherited, and a modifier-only
+  tightening inherits the type's with the elided type. A restated group member stays a member: no name `?`, no
+  default, and a pin that is never supplied.
 - Refinement of a field is three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
   omission yields, so the order on it is checked on `RecordField.omitted`.
 - Subtraction runs last, empties `type_definition.supertypes` (every supertype goes) and keeps `record.supertypes` as
@@ -167,36 +168,31 @@ are kept in step deliberately.
   subtraction (`A & { ... } - { f }`, §5.9);
   restating a field group in a refinement or composition body (§5.11 — same member labels in the same order,
   types verbatim, state tightening OPTIONAL→REQUIRED only; only the *group's* state moves, since members
-  flatten as optional and voidable regardless).
-- **A resolved field is four facts, not a state** (`RecordField`, the kernel's `record_field`): `optional`
-  (the key may be omitted), `voidable` (a written `_` is admitted), `role` (FREE, DEFAULT or FIXED) and
-  `value`. `FieldModifiers.of` maps each spelling: `a: T` states none; `a: T?` is optional and voidable;
-  `a: T ~ v` and `a: T = v` are optional with a DEFAULT or FIXED value, omission injecting either; `a: T? = _`
-  is optional, voidable and FIXED with no value — pinned to `_`, so §8.1 writes a `record_field` without a
-  `value` member. Its resolver errors are enforced: `~ _` on any field, `= _` on a required one,
-  `type? ~ value`, and **`type? = value`, a pin on a voidable field**, which the facts cannot hold — the
-  written-`_` decision would admit what the pin refuses. **Presence comes from the entry's own `?` when it
-  restates a type, else from the field it tightens** — §5.2 makes `= _` valid on a field "declared with `?`
-  *or inherited as OPTIONAL*", and a modifier-only entry has no `?` to read. The `?` is the only thing that
-  makes a field voidable, so the inherited `voidable` is the marker read. That is why `resolveField` takes the
-  whole inherited `RecordField`, not just its type, and why `= 0` on an inherited-optional field is refused:
-  it spells `type? = 0`. Pinning it takes restating the type (`min: integer = 0`). The exception is a
-  **parametric** `= P`, which §5.7's "Open modifiers" leaves required and FREE with the parameter in `value`
-  whatever the marker says (that is what makes a user template's `min_items: = MIN` mandatory), so the
-  parameter branch sits ahead of the optional-pin refusal; materialisation turns it optional and FIXED.
+  flatten as optional regardless).
+- **A resolved field is four facts, not a state** (`RecordField`, the kernel's `record_field`), and §5.2's
+  spelling `name?: type? ~ value` has one mark per fact: the name's `?` is `optional` (the key may be omitted),
+  the type's `?` is `voidable` (a written `_` is admitted), and `~`/`=` give the `role` (DEFAULT or FIXED) and
+  its `value`. `FieldModifiers.of` maps the marks one to one and adds only its refusals: a default on an
+  unmarked name (a value omission never reaches), a pin on a voidable type (the written-`_` decision would
+  admit what the pin refuses), `= _` and `~ _` in every reading (`_` is no value of a type — "omitted or `_`,
+  never a value" is spelled `a?: void?`), and `=?` on anything but an unmarked name over a non-voidable type.
+  **A modifier-only entry has no type slot of its own**, so it inherits the tightened field's voidability
+  with its type; its name's `?` is always its own. That is why `resolveField` takes the whole inherited
+  `RecordField`. A **parametric** `= P` is FREE with the parameter in `value` (§5.7's "Open modifiers") until
+  materialisation closes it to FIXED, keeping the name's mark, so the parameter branch sits ahead of the
+  literal pin.
+- **A restated group member stays a member** (`resolveTighteningField`). Its presence is the group's, so the
+  restatement takes no name `?` and the member stays optional whatever it writes; a default is refused; and a
+  pin is admitted and **never supplied** (`RecordField.omitted` answers NOTHING for a member), since an
+  injected member would be present and presence is what selects the alternative. So no member is ever always
+  present, and §5.11's rule against two always-present members has nothing left to refuse: there is no check
+  for it.
 - **Refinement is three orders** (`refines`), one per question a field answers, each least to most
   determined: what omission yields, absent → missing-field error → injected (`RecordField.omitted`, asked of
   a plain field); voidable → not; role FREE → DEFAULT → FIXED. A restatement refines its source when no order
-  moves backwards, and a FIXED field keeps what it is pinned to, `_` or a value. That reproduces §5.7's
-  transition matrix cell for cell, and the matrix exists nowhere in the code.
-- **§5.11's group presence rule is checked after every body**, refinement and composition alike: two members
-  of one group both always present (required, or carrying a value that omission injects) is a
-  resolver error, because a group admits at most one member and nothing could satisfy the result. Only this
-  declaration's own tightenings can trip it — members flatten as optional when first declared, so by
-  induction a source that passed hands on at most one always-present member. `= _` is deliberately *not*
-  always-present: a member pinned to `_` is never injected; forbidding one alternative's value is what §5.11
-  offers it for. The spec says "a refinement" but the paragraph is headed "Refinement and composition" and a
-  composition body builds the identical unsatisfiable type, so both are checked.
+  moves backwards. That reproduces §5.7's transition matrix cell for cell, and the matrix exists nowhere in
+  the code. No rule compares a restated type with its source's here, so `nickname?: void?` restating
+  `nickname?: text?` narrows the field to `_` alone and keeps it in the contract.
 - **Subtraction runs last and breaks IS-A on purpose** (§5.9). Supertypes merge, the body adds and tightens,
   *then* removals apply to the merged field set with no regard for which supertype contributed a field
   (rule 3 — the contract is already broken, so there is none left to violate). Two things are rejected:
@@ -212,7 +208,7 @@ are kept in step deliberately.
   §5.9 gives the reason: the clause is head-level, so its effect is readable without scanning the parents'
   field sets. Subtract first and compose second where an author wants partial retention.
   Groups follow §5.11: a removed member leaves `members`, a group down to one member is
-  dissolved into a plain field taking the *group's* state (members flatten as `OPTIONAL` whatever the group
+  dissolved into a plain field taking the *group's* state (members flatten as optional whatever the group
   says, so the survivor would otherwise silently lose a REQUIRED group's "exactly one"), and a group with no
   members left is dropped — §5.11 runs the arity ladder to zero and states the two-member minimum as an
   invariant of resolved output.

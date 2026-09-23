@@ -119,7 +119,7 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       cannot be one. `loop => <T> loop<T>` is then judged on what is wrong with it — it applies itself forever.
     - **Two declaration-time verdicts fall out**, neither of which has to wait for an application: a
       parameter standing for a whole collection or record (`<T> !enum { members: T }`) is neither a reference
-      nor a scalar, and a parameter standing in both kinds of position (`<T> { v: T  w: int32 ~ T }`) has no
+      nor a scalar, and a parameter standing in both kinds of position (`<T> { v: T  w?: int32 ~ T }`) has no
       argument that could satisfy both.
     - **An application closed on demand infers its own template.** A composition supertype and a refinement
       source close during resolution's driving loop, before the batch pass can run; the template in hand has

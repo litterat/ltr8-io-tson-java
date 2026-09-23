@@ -38,8 +38,8 @@ class ValueParamFixedFieldTest {
             !!import:"https://tson.io/2026/36/m/core.tn"
             {
               order    => { id: text }
-              literal  => { status: int32 = 201  body: order }
-              response => <T, S> { status: int32 = S  body: T }
+              literal  => { status?: int32 = 201  body: order }
+              response => <T, S> { status?: int32 = S  body: T }
               created  => response<order, 201>
             }
             """;
@@ -117,7 +117,7 @@ class ValueParamFixedFieldTest {
      */
     @Test
     void aMaterialisedValueParameterDefaultStaysADefault() {
-        String schema = SCHEMA.replace("status: int32 = S", "status: int32 ~ S");
+        String schema = SCHEMA.replace("status?: int32 = S", "status?: int32 ~ S");
         SchemaSource source = uri -> schema;
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
 
@@ -153,9 +153,9 @@ class ValueParamFixedFieldTest {
                 {
                   order    => { id: text }
                   base     => { status: int32  body: order }
-                  fresh    => <T, S> { status: int32 = S  body: T }
-                  composed => <T, S> base & { status: = S  body: T }
-                  refined  => <S> base ^ { status: = S }
+                  fresh    => <T, S> { status?: int32 = S  body: T }
+                  composed => <T, S> base & { status?: = S  body: T }
+                  refined  => <S> base ^ { status?: = S }
                   a => fresh<order, 201>
                   b => composed<order, 201>
                   c => refined<201>
@@ -190,9 +190,9 @@ class ValueParamFixedFieldTest {
                 {
                   order    => { id: text }
                   base     => { status: int32  body: order }
-                  fresh    => <T, S> { status: int32 = S  body: T }
-                  composed => <T, S> base & { status: = S  body: T }
-                  refined  => <S> base ^ { status: = S }
+                  fresh    => <T, S> { status?: int32 = S  body: T }
+                  composed => <T, S> base & { status?: = S  body: T }
+                  refined  => <S> base ^ { status?: = S }
                   sized    => <N> { xs: [text; N..] }
                   a => fresh<order, 201>
                   b => composed<order, 201>

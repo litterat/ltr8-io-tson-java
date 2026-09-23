@@ -557,6 +557,9 @@ public final class TsonSchemaParser extends TsonDataParser {
         // Taken before the token is consumed, exactly as a declaration's own name position is.
         Position namePosition = peek().start();
         Token name = expectFieldNameToken("a record field name");
+        // The name's `?`: the key may be omitted (§5.2). `?` is always a token of its own, so `a?:` needs no
+        // lexer change, and adjacency is what keeps `a ?:` from reading as the same mark.
+        boolean omittable = consumeAdjacentQuestion();
         if (check(TokenType.MAP_ARROW)) {
             throw parseError("a record body's entries are 'name: type'; '=>' begins a map type only where a "
                     + "type is expected (§12.2), not in a refinement body, a composition tail or a "
@@ -570,13 +573,13 @@ public final class TsonSchemaParser extends TsonDataParser {
             modifier = Optional.of(parseFieldModifier());
         } else {
             TypeRef ref = parseTypeRef();
-            boolean optional = consumeAdjacentQuestion();
-            type = Optional.of(new FieldDef.FieldType(ref, optional));
+            boolean voidable = consumeAdjacentQuestion();
+            type = Optional.of(new FieldDef.FieldType(ref, voidable));
             if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
                 modifier = Optional.of(parseFieldModifier());
             }
         }
-        FieldDef field = new FieldDef(annotations, name.text(), type, modifier);
+        FieldDef field = new FieldDef(annotations, name.text(), omittable, type, modifier);
         fieldPositions.put(field, namePosition);
         return field;
     }
@@ -630,17 +633,22 @@ public final class TsonSchemaParser extends TsonDataParser {
     private GroupDef.Member parseGroupMember() {
         List<Annotation> annotations = parseAnnotationList();
         Token name = expectFieldNameToken("a field group member's name");
+        if (check(TokenType.QUESTION)) {
+            throw parseError("a field group member takes no '?' on its name -- the group decides whether a "
+                    + "member is present (§5.11); '?' after the member's type admits '_'");
+        }
         expect(TokenType.COLON, "a field group member's ':'");
         TypeRef type = parseTypeRef();
+        boolean voidable = consumeAdjacentQuestion();
         if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
-            // §5.11: a member is uniformly OPTIONAL and carries no value modifier, so `~`, `=` and `=?` are
-            // parse errors here. Said plainly, because the next token to be read is `|` or `)` and the
+            // §5.11: a member's presence is the group's, and a group does not inject, so `~`, `=` and `=?`
+            // are parse errors here. Said plainly, because the next token to be read is `|` or `)` and the
             // failure would otherwise be reported as a malformed group.
-            throw parseError("a field group member takes no value modifier -- §5.11 makes every member "
-                    + "OPTIONAL and gives none of them a default, a pin, or the discriminator mark '=?', "
-                    + "whose field must be REQUIRED");
+            throw parseError("a field group member takes no value modifier -- §5.11 gives the group a "
+                    + "member's presence, so none of them takes a default, a pin, or the discriminator mark "
+                    + "'=?', whose field must be required");
         }
-        return new GroupDef.Member(annotations, name.text(), type);
+        return new GroupDef.Member(annotations, name.text(), type, voidable);
     }
 
     // ── Type References (§5.3, §12.1) ────────────────────────────────────
@@ -923,14 +931,17 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
     }
 
-    /** {@code "?"} MUST be immediately adjacent to the preceding token (§12.3) -- field type, tuple/array position, or field group. */
+    /**
+     * {@code "?"} MUST be immediately adjacent to the preceding token (§12.3) -- field name, field type,
+     * tuple/array position, or field group.
+     */
     private boolean consumeAdjacentQuestion() {
         if (!check(TokenType.QUESTION)) {
             return false;
         }
         Position prevEnd = lastTokenEnd();
         if (!prevEnd.equals(peek().start())) {
-            throw parseError("'?' must be immediately adjacent to the preceding type (no whitespace)");
+            throw parseError("'?' must be immediately adjacent to the name or type it marks (no whitespace)");
         }
         advance();
         return true;

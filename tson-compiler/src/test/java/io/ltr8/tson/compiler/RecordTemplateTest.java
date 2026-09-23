@@ -157,7 +157,7 @@ class RecordTemplateTest {
     @Test
     void aValueParameterBindsTheAppliedLiteral() {
         TsonCompiledSchema compiled = compile("""
-                  retry => <N> { attempts: int32 ~ N }
+                  retry => <N> { attempts?: int32 ~ N }
                   holder => { r: retry<3> }""");
 
         RecordField attempts = fieldOf(compiled, fieldType(compiled, "holder", "r"), "attempts");
@@ -178,7 +178,7 @@ class RecordTemplateTest {
     @Test
     void oneFieldMayCarryATypeParameterAndAValueParameterAtOnce() {
         TsonCompiledSchema compiled = compile("""
-                  test1 => <T, N> { first: T ~ N }
+                  test1 => <T, N> { first?: T ~ N }
                   holder => { d: test1<int32, 10> }""");
 
         RecordField first = fieldOf(compiled, fieldType(compiled, "holder", "d"), "first");
@@ -188,7 +188,7 @@ class RecordTemplateTest {
 
         SchemaValidationException swapped = assertThrows(SchemaValidationException.class,
                 () -> compile("""
-                          test1 => <T, N> { first: T ~ N }
+                          test1 => <T, N> { first?: T ~ N }
                           holder => { d: test1<10, int32> }"""));
         assertTrue(swapped.getMessage().contains("'10': U+0031 at index 0 cannot start an identifier"),
                 swapped.getMessage());
@@ -217,7 +217,7 @@ class RecordTemplateTest {
     void aDeclarationPositionApplicationTakesTheSameArgumentFormsAsAFieldOne() {
         TsonCompiledSchema compiled = compile("""
                   box     => <T> { v: T }
-                  counted => <N> { n: int32 ~ N }
+                  counted => <N> { n?: int32 ~ N }
                   nested  => box<box<text>>
                   three   => counted<3>""");
 
@@ -237,7 +237,7 @@ class RecordTemplateTest {
     @Test
     void aRecursiveTemplateTiesTheKnotThroughTheEntryUnderConstruction() {
         TsonCompiledSchema compiled = compile("""
-                  chain => <T> { head: T  tail: chain<T>? }
+                  chain => <T> { head: T  tail?: chain<T>? }
                   use => { c: chain<text> }""");
 
         List<String> made = instantiationsOf(compiled, "chain");
@@ -416,7 +416,7 @@ class RecordTemplateTest {
     void refiningAnApplicationTightensTheClosedEntrysFields() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
-                  pinned => box<text> ^ { v: = "fixed" }""");
+                  pinned => box<text> ^ { v?: = "fixed" }""");
 
         assertEquals(TypeRef.of("text"), fieldOf(compiled, "pinned", "v").type());
         assertEquals("fixed", fieldOf(compiled, "pinned", "v").value().orElseThrow().text());
@@ -517,7 +517,7 @@ class RecordTemplateTest {
     void applyingATypeWhereTheBodyRoutesAValueIsCaughtByValueConformance() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
-                          retry => <N> { attempts: int32 ~ N }
+                          retry => <N> { attempts?: int32 ~ N }
                           holder => { r: retry<text> }"""));
 
         assertTrue(thrown.getMessage().contains("field 'attempts'"), thrown.getMessage());
@@ -537,7 +537,7 @@ class RecordTemplateTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           box   => <T> { v: T }
-                          weird => <T> { next: weird<box<T>>? }
+                          weird => <T> { next?: weird<box<T>>? }
                           use   => { w: weird<text> }"""));
 
         assertTrue(thrown.getMessage().contains("does not pass 'T' through unchanged"), thrown.getMessage());
@@ -547,7 +547,7 @@ class RecordTemplateTest {
     @Test
     void regularRecursionClosesWhereNonRegularDoesNot() {
         assertEquals(1, instantiationsOf(compile("""
-                  chain => <T> { head: T  tail: chain<T>? }
+                  chain => <T> { head: T  tail?: chain<T>? }
                   use => { c: chain<text> }"""), "chain").size());
     }
 

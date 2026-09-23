@@ -23,7 +23,7 @@ class ScalarFieldDefaultTest {
                 !!meta:"https://tson.io/2026/36/m/meta.tn"
                 !!import:"https://tson.io/2026/36/m/core.tn"
                 {
-                  plan => { term: period ~ P1Y }
+                  plan => { term?: period ~ P1Y }
                 }
                 """);
         assertEquals(List.of(), problems, problems::toString);
@@ -35,7 +35,7 @@ class ScalarFieldDefaultTest {
                 !!meta:"https://tson.io/2026/36/m/meta.tn"
                 !!import:"https://tson.io/2026/36/m/core.tn"
                 {
-                  plan => { gap: duration ~ PT30M }
+                  plan => { gap?: duration ~ PT30M }
                 }
                 """);
         assertEquals(List.of(), problems, problems::toString);

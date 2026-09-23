@@ -43,7 +43,7 @@ class JsonAliasTagReadTest {
               sq_of  => square
 
               pet    => abstract { pet_type: text =? }
-              dog    => pet & { pet_type: = "dog"  bark: text }
+              dog    => pet & { pet_type?: = "dog"  bark: text }
               dog_of => dog
 
               note   => { body: text }

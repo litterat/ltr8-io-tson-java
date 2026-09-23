@@ -48,8 +48,8 @@ class CrossEncodingParityTest {
             {
               person => {
                 name:   text
-                tries:  int32 ~ 0
-                kind:   text = "person"
+                tries?: int32 ~ 0
+                kind?:  text = "person"
                 labels: [text]
               }
               sized  => [text; 2..3]
@@ -75,8 +75,8 @@ class CrossEncodingParityTest {
               picked    => { pick: scalars }
               shaped    => { outline: shape }
               pet       => abstract { pet_type: text =?  name: text }
-              dog       => pet & { pet_type: = "dog"  breed: text }
-              cat       => pet & { pet_type: = "cat"  indoor: boolean }
+              dog       => pet & { pet_type?: = "dog"  breed: text }
+              cat       => pet & { pet_type?: = "cat"  indoor: boolean }
               figure    => abstract { area: int32 }
               disc      => figure & { side: int32 }
               kennel    => { p: pet }

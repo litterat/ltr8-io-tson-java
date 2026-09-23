@@ -37,8 +37,8 @@ class TsonSealedFamilyBindTest {
             !!import:"%s"
             {
               msg  => abstract { kind: text =?  id: int32 }
-              ping => msg & { kind: = "ping"  seq: int32 }
-              pong => msg & { kind: = "pong"  latency: int32 }
+              ping => msg & { kind?: = "ping"  seq: int32 }
+              pong => msg & { kind?: = "pong"  latency: int32 }
 
               channel => { m: msg }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);

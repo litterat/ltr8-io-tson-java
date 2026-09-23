@@ -93,7 +93,7 @@ class OperandFollowsReferenceChainTest {
         TsonLinkedSchema linked = resolve("ofc3", """
                   rec => { x: int32 }
                   ali => rec
-                  sub => ali ^ { x: int32 = 1 }
+                  sub => ali ^ { x?: int32 = 1 }
                 """);
 
         assertEquals(1, linked.schema().entries().get("sub").supertypes().stream()
@@ -143,7 +143,7 @@ class OperandFollowsReferenceChainTest {
         TsonLinkedSchema linked = resolve("ofc8", """
                   box => <V> { item: V }
                   bx  => box<text>
-                  sub => bx ^ { item: text = "x" }
+                  sub => bx ^ { item?: text = "x" }
                 """);
 
         assertEquals(List.of("item"), fieldNames(linked, "sub"), "refinement adds no field (§5.7)");

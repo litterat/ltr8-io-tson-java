@@ -32,7 +32,7 @@ class ValueIdentityTest {
               hex_digest => !bytes_type { encoding: HEX  length: 2 }
               hexes   => set<hex_digest>
 
-              stamped => { k: bytes = "SGk=" }
+              stamped => { k?: bytes = "SGk=" }
               holder  => { d: digests  t: tags  m: by_hash }
               hexed   => { h: hexes }
 
@@ -40,8 +40,8 @@ class ValueIdentityTest {
               clocks   => set<time>
               logged   => { datetime => text }
               dated    => { i: instants  c: clocks  l: logged }
-              due      => { at: datetime = "2026-01-01T09:00:00Z" }
-              alarm    => { at: time = "01:30:00Z" }
+              due      => { at?: datetime = "2026-01-01T09:00:00Z" }
+              alarm    => { at?: time = "01:30:00Z" }
             }
             """;
 

@@ -337,7 +337,7 @@ class TsonValidateSchemaTest {
         List<Diagnostic> problems = check("""
                 {
                   box => <T> { v: T }
-                  weird => <T> { next: weird<box<T>>? }
+                  weird => <T> { next?: weird<box<T>>? }
                   use => { w: weird<int32> }
                 }
                 """);

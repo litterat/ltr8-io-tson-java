@@ -35,8 +35,8 @@ class NumberIdentityTest {
             {
               by_number  => { number => text }
               number_set => set<number>
-              pinned     => { rate: number = 1.0  label: text }
-              scaled     => { rate: number = 199.90  label: text }
+              pinned     => { rate?: number = 1.0  label: text }
+              scaled     => { rate?: number = 199.90  label: text }
             }
             """;
 
