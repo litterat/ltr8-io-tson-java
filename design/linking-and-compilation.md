@@ -174,14 +174,17 @@ for a defect in the schema, at a line the data's author does not control.
   a value" but "does this recursion reach a base case".
 - **Exact, total and two-valued.** The sibling derivation (`design/choice-disjointness.md`) had to give up
   exactness to stay total; this needs no such trade, and there is no third answer to report.
-- **The base cases, and nothing else**: an optional field or tuple position, a container whose `min_items` is
-  zero or absent, and a choice variant that does not recur. A choice is the one place the walk **branches**
-  rather than conjoins — one good variant is enough, where a product needs every part.
-  - **Field groups are walked separately**, because §5.11 makes their members uniformly OPTIONAL in `fields`
+- **The base cases, and nothing else**: a field that admits `_` or may be omitted with no value of its own, an
+  optional tuple position, a container whose `min_items` is zero or absent, and a choice variant that does not
+  recur. `void`'s only value is `_`, so a `void` field that does not admit `_` is stated by no document:
+  `a: void` empties its record, where `a?: void` empties only the field (`TypeInhabitance.satisfiable`). A
+  choice is the one place the walk **branches** rather than conjoins — one good variant is enough, where a
+  product needs every part.
+  - **Field groups are walked separately**, because §5.11 makes their members uniformly optional in `fields`
     with the requirement carried by the group's own state — reading the field list alone would find nothing
     required and call every group satisfied.
-  - **Every REQUIRED-family field counts, the two carrying a value included**: a fixed or default value of a
-    type nothing can satisfy does not exist either.
+  - **Every other field counts, one carrying a value included**: a fixed or default value of a type nothing
+    can satisfy does not exist either.
 - **Every local entry is judged, referenced or not** — same footing as a declared type parameter the body
   never uses (§5.10). So an uninhabited *variant* is rejected even where the choice around it still works.
   Imported entries are skipped: they were judged when their own schema linked, and repeating the verdict

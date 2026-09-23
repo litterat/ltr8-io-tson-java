@@ -40,7 +40,7 @@ class AliasedInstantiationBindingTest {
             !!import:"%s"
             {
               msg    => abstract { kind: text =? }
-              msg_of => <T, V> msg & { kind: = T  body: V }
+              msg_of => <T, V> msg & { kind?: = T  body: V }
 
               ping_body => { seq: int32 }
               pong_body => { seq: int32  latency: int32 }

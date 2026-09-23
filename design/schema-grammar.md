@@ -104,8 +104,14 @@ materialization, no validation (those are the resolver's/linker's jobs).
   else, with no tie-break between a declaration-level and an inline spelling to state.
   - **Nesting is the recursion in `ElementType`**, which holds a plain `TypeRef` — `[[T; 2]; 3]` and
     `{text => [order; 1..]}` and `{text => {text => integer}}` need no second node family.
-  - **An element's `?` and a field's own `?` cannot collide**: a field is `field-name ":" type-ref ["?"]`,
-    so in `xs: [T?]?` the inner belongs to `element-type` and the outer to the field.
+  - **An element's `?` and a field's own `?`s cannot collide**: a field is `field-name ["?"] ":" type-ref
+    ["?"]`, so in `xs?: [T?]?` the first belongs to the name (the key may be omitted), the inner to
+    `element-type`, and the outer to the field's type (the field may be written `_`).
+- **A field has one slot per question** (`FieldDef.omittable`, `FieldType.voidable`, the modifier), and the
+  parser only records the marks: which combinations are refused is `FieldModifiers`', after parsing. The
+  name's `?` needs no lexer change — `?` is always a token of its own, and `consumeAdjacentQuestion` holds it
+  to the name as it holds the other to the type. A group member takes a type `?` and refuses a name `?` and
+  a modifier outright, its presence being the group's (§5.11).
   - A map key stays `type-name ["<" type-args ">"]` and nothing else — not a paren type, not a bracket form
     — which is what holds the brace dispatch below to its lookahead budget; a composite key earns a named
     declaration and the explicit `!map { key_type: … }` form.

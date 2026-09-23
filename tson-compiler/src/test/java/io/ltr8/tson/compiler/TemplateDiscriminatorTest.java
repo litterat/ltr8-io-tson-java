@@ -71,7 +71,7 @@ class TemplateDiscriminatorTest {
 
     private static final String FAMILY = """
               dog_type => { breed: text }
-              pet      => <T, V> { type: text = T  value: V }
+              pet      => <T, V> { type?: text = T  value: V }
               dogpet   => pet<"dog", dog_type>
             """;
 

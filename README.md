@@ -57,9 +57,9 @@ including records, record groups, enums and some in-built types. The `2026/36` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/36/getting-started/person.tn?sha256=d9c119ab6196440c905d2bc612fee53c18a84583f570c6d8214e25bf3dd7fe08"
-!!meta:"https://tson.io/2026/36/m/meta.tn?sha256=3be22eab98fd8cb743bdfa053005646640104fb8c177945101cd2e53c821e909"
-!!import:"https://tson.io/2026/36/m/core.tn?sha256=2136d82dbb1fb69f2c440e28c98231d46eee6812c7153c2c2c83c86a2c31ff3c"
+!!id:"https://example.com/2026/36/getting-started/person.tn?sha256=fa118de87ec94a23a5a77a0e925641083d0ac0c5edae20b2425b041a951393e7"
+!!meta:"https://tson.io/2026/36/m/meta.tn?sha256=329affb265d9ff17cbfea5e9afec5622add8c3e147424f063e5594897804bec9"
+!!import:"https://tson.io/2026/36/m/core.tn?sha256=837990c69361cea5208831b044c733286e017f88be1393952be4e5a891d66a94"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]
@@ -76,7 +76,7 @@ URIs is the draft year/revision marker from the spec's release scheme.
     age: int32
     role: role
     joined: date
-    email: text?
+    email?: text
     address: address
     skills: [text]
     ( phone: text | mobile: text )?

@@ -47,7 +47,7 @@ class JsonNameHygieneTest {
             !!meta:"https://tson.io/2026/36/m/meta.tn"
             !!import:"https://tson.io/2026/36/m/core.tn"
             {
-              account => { password: text  note: text? }
+              account => { password: text  note?: text? }
               circle  => { radius: float64 }
               square  => { side: float64 }
               shape   => ( circle | square )

@@ -31,14 +31,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ClosedOperandFamilyTest {
 
     private static final String SEALED = """
-              pet    => <T> { pet_type: text = T  name: text }
+              pet    => <T> { pet_type?: text = T  name: text }
               dog    => pet<"dog"> & { breed: text }
               cat    => pet<"cat"> & { indoor: boolean }
               holder => { p: pet }
             """;
 
     private static final String ABSTRACT = """
-              pet    => abstract <T> { pet_type: text = T  name: text }
+              pet    => abstract <T> { pet_type?: text = T  name: text }
               dog    => pet<"dog"> & { breed: text }
               cat    => pet<"cat"> & { indoor: boolean }
               holder => { p: pet }

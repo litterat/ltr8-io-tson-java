@@ -1697,9 +1697,9 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 |-----------|-------|-----|
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/35/tson-part1-data |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/35/tson-guide |
-| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/36/m/meta-kernel.tn?sha256=4da7dd93579530430b73dc09027a1ac5a58865828047dbd60e6d39ccfb7e5b4b |
-| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/36/m/meta.tn?sha256=3be22eab98fd8cb743bdfa053005646640104fb8c177945101cd2e53c821e909 |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/36/m/core.tn?sha256=2136d82dbb1fb69f2c440e28c98231d46eee6812c7153c2c2c83c86a2c31ff3c |
+| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/36/m/meta-kernel.tn?sha256=93c62422a70500afc03383d3e908c87a4f0cf481dfd18b58f8787ea559d6319a |
+| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/36/m/meta.tn?sha256=329affb265d9ff17cbfea5e9afec5622add8c3e147424f063e5594897804bec9 |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/36/m/core.tn?sha256=837990c69361cea5208831b044c733286e017f88be1393952be4e5a891d66a94 |
 
 ### 13.3 Informative References
 

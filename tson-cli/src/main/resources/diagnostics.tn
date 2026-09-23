@@ -64,15 +64,15 @@
     states it once in `policy` and this states the remedy.
     """
   diagnostic => {
-    path: text?
-    schema_pointer: text?
-    schema_id: text?
+    path?: text?
+    schema_pointer?: text?
+    schema_id?: text?
     code: diagnostic_code
     message: text
-    expected: text?
-    actual: text?
-    data_position: text?
-    schema_position: text?
+    expected?: text?
+    actual?: text?
+    data_position?: text?
+    schema_position?: text?
   }
   @doc:"""
     UTS #39 §5.2's restriction levels, a hand-written copy of TsonUnicodePolicy.Level checked against it

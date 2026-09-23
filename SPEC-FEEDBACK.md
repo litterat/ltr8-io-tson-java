@@ -2264,8 +2264,8 @@ still does — at the price of the pair having two refinement rules.
 §6.1.5, §7, §7.2, §7.3 (the Part 3 half, below).
 **Kind:** gap, with an inconsistency in Part 1, one in §5.7's matrix, one between §5.2, §7.6 and §4.2 on what
 `a: T? = v` and `a: void` admit, and one between [TSON-JSON] §7.2 and the text tree on whether decoded output
-records a spelling of absence. **Status: the storage is built and the syntax is not** (*What is running*, after
-the storage paragraphs). The evidence is a consumer of this
+records a spelling of absence. **Status: the storage and the syntax are built; the JSON tree's null and the
+schema-directed encoder are not** (*What is running*, after the storage paragraphs). The evidence is a consumer of this
 library: `ltr8-io-tson-benchmarks`, which converts 1,113 JSON Schemas (150 from BFCL, 963 from SchemaStore, in
 740 families) to TSON and compiles every one. Its `corpus/nullable/MATRIX.md` runs every cell of the table below
 through both validators, and `corpus/nullable/CENSUS.md` counts each cell's declarations in both corpora; the
@@ -2589,29 +2589,26 @@ differ from the schema's; the `_` question is a boolean because decision 1 has t
 only third outcome on offer — a written `_` reads as the default, proto-schema Part 8's decoder-table rule — is
 the assignment under which a defaulted field can never be cleared.
 
-**What is running.** The kernel's `record_field` stores exactly these four facts — `optional`, `voidable`,
-`role` over `field_role => !enum [FREE DEFAULT FIXED]`, and `value` — and `field_state` is gone. The syntax
-is today's, each spelling mapped onto the facts: `a: T` states none; `a: T?` is optional and voidable; `a: T ~
-v` and `a: T = v` are optional with a DEFAULT or FIXED value, since today's omission injects both, so they
-are this proposal's `a?: T ~ v` and `a?: T = v`; and `a: T? = v` is a resolver error, a pin on a voidable type,
-which this proposal refuses and which today's A/A/fixed reading has no fact to store. The three decisions run
-as stated, in both encodings, with the omission answer derived once (`RecordField.omitted`), and refinement is
-the three orders below, which reproduce §5.7's matrix. The pinned group member has no spelling until the name
-mark exists: its only spelling today is a modifier-only `= v` on an inherited optional member, which is the
-refused `a: T? = v`.
+**What is running.** Everything in this entry up to the Part 3 half, as proposed. The kernel's
+`record_field` stores `optional`, `voidable`, `role` over `field_role => !enum [FREE DEFAULT FIXED]` and
+`value`, and `field_state` is gone. The parser reads the name's `?` and the type's `?` as separate marks, a
+group member taking the type's and refusing the name's; the resolver refuses a default on an unmarked name,
+a pin on a voidable type, `= _` and `~ _`, and a selector that may be omitted or `_`. A restated group member
+stays a member — no name mark, no default, and a pin checked where written and never supplied — so no member
+is ever always present, and §5.11's rule against two always-present members has nothing left to refuse. The
+three reader decisions run in both encodings with the omission answer derived once (`RecordField.omitted`),
+refinement is the three orders, productivity treats a voidable field as a recursion guard and a `void` field
+that refuses `_` as unstatable, and the positional form counts unmarked names. The bundled schemas are
+re-spelled: the kernel's and meta's formerly `T?` fields are all `a?: T`, their defaults and pins take the
+name mark, and the conformance corpus preserves each field's meaning under the new marks.
 
-One place departs from this entry, and the departure is proposed in its place. **`= _` is a pin whose value
-is `_`**, not the type `void`: it stores as optional, voidable and FIXED with no `value`, a written value
-contradicts it, a written `_` matches it, and omission injects it — in a tree, the absent node a written `_`
-gives — except at a field group's member, whose presence selects the alternative and so is never supplied.
-That keeps the declared type, so restating a member `= _` needs no rule letting `void` refine a type (*Field
-groups*, above), and it makes the pin uniform: every pin injects on omission, `_` included. It costs two of
-the invariants above, which become "`value` is present exactly when `role` is not FREE, except a pin to `_`"
-and "FIXED requires `voidable: false`, except a pin to `_`", the one pin whose value decision 1 admits. **Open:
-the spelling under the three slots.** `a?: T = _` writes the pin where the modifier slot says values go, but
-then admits `_` with no `?` on the type, the slot that answers it; `a?: T? = _` keeps the type slot honest and
-needs the pin-on-a-voidable-type refusal to except the value `_`, the one value that refusal's reason does not
-reach. Where this entry elsewhere writes `a?: void?` for `= _`, this paragraph supersedes it.
+**`= _` goes, in both of its readings under the three slots.** `a?: T = _` pins `T` to a value that is not
+one of `T`'s, so it is refused unless `T` is `void`, where the pin says nothing the type does not. `a?: T? = _`
+is a pin on a voidable type, refused on the grounds `a?: T? = v` is: decision 1 settles a written `_` before
+the pin is consulted. What it would have said — the key may be omitted, and if written it is `_` — is spelled
+by the type, `a?: void?`, and by `a: void?` at a restated group member (*Field groups*, above). So the
+exceptions a pin to `_` would need never arise: `value` is present exactly when `role` is not FREE, and FIXED
+requires `voidable: false`, with no carve-out.
 
 **`voidable`, not nullable.** The word names the property by the type: `void` is the type whose sole value is
 `_`, so a voidable position is one that admits `void`'s value beside its type's. It is a property of the
@@ -2704,7 +2701,9 @@ through and set aside, because a syntax whose three marks answer three questions
 
 ### The Part 3 half
 
-Edited into [TSON-JSON] directly once the model is built:
+Edited into [TSON-JSON] directly. §7's rule, §7.3's mapping and §6.1.2's two-mark statement are in, the
+syntax having made the old text false; §6.1.2's encoder MUSTs and §7.2's tree rule wait on the JSON tree
+keeping null and on a schema-directed encoder, neither built:
 
 - §7's rule: JSON null is admitted at a voidable member, whatever the name mark; a missing member at a field
   whose name is unmarked is the missing-field validation error, and at an optional field with a value it

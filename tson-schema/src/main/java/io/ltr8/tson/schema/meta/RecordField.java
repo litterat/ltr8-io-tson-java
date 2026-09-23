@@ -15,12 +15,11 @@ import java.util.Optional;
  * role} and {@code value}; a field never written reads {@code optional}, then {@code value} -- and nothing
  * stores what omission yields, which is derived from those two.
  *
- * <p>The spellings §5.2 gives today land here as follows. {@code a: T} is none of the three facts; {@code
- * a: T?} is optional and voidable; {@code a: T ~ v} is optional with a {@link FieldRole#DEFAULT} value, and
- * {@code a: T = v} optional with a {@link FieldRole#FIXED} one, since omission injects either; {@code
- * a: T? = _} is optional, voidable and FIXED with no value -- pinned to {@code _}, which a written value
- * contradicts and omission injects ({@link #pinnedToAbsent}). A FIXED value on a voidable field has no
- * spelling: {@code _} would be admitted where the pin refuses it.
+ * <p>Each fact is one mark of §5.2's spelling {@code name?: type? ~ value}: the name's {@code ?} is {@code
+ * optional}, the type's is {@code voidable}, and {@code ~}/{@code =} give a {@link FieldRole#DEFAULT} or
+ * {@link FieldRole#FIXED} value. Two combinations have no spelling: a FIXED voidable field, whose {@code _}
+ * would be admitted where the pin refuses it, and a DEFAULT on a field that is not optional, a value only
+ * omission reaches.
  *
  * <p><b>{@code value} is one slot, and carries a parameter as readily as a literal.</b> Inside a template
  * body a token there is a parameter exactly when its text resolves into the enclosing entry's {@code
@@ -78,58 +77,56 @@ public record RecordField(String name, TypeRef type, boolean optional, boolean v
         return new RecordField(name, type, false, false, FieldRole.FREE, Optional.empty());
     }
 
-    /** {@code a: T?} -- the key may be omitted, and {@code _} is admitted. */
+    /** {@code a?: T} -- the key may be omitted, and {@code _} is refused. */
     public static RecordField optional(String name, TypeRef type) {
+        return new RecordField(name, type, true, false, FieldRole.FREE, Optional.empty());
+    }
+
+    /** {@code a: T?} -- the key must be written, and may be written {@code _}. */
+    public static RecordField voidable(String name, TypeRef type) {
+        return new RecordField(name, type, false, true, FieldRole.FREE, Optional.empty());
+    }
+
+    /** {@code a?: T?} -- the key may be omitted, and may be written {@code _}. */
+    public static RecordField optionalVoidable(String name, TypeRef type) {
         return new RecordField(name, type, true, true, FieldRole.FREE, Optional.empty());
     }
 
-    /** {@code a: T ~ value} -- omission injects {@code value}, and a written value overrides it. */
+    /** {@code a?: T ~ value} -- omission injects {@code value}, and a written value overrides it. */
     public static RecordField defaulted(String name, TypeRef type, Token value) {
         return new RecordField(name, type, true, false, FieldRole.DEFAULT, Optional.of(value));
     }
 
-    /** {@code a: T = value} -- omission injects {@code value}, and a written value must equal it. */
+    /** {@code a?: T = value} -- omission injects {@code value}, and a written value must equal it. */
     public static RecordField fixed(String name, TypeRef type, Token value) {
         return new RecordField(name, type, true, false, FieldRole.FIXED, Optional.of(value));
     }
 
-    /** {@code a: T? = _} -- pinned to {@code _}: omitted or written {@code _}, never a value. */
-    public static RecordField fixedAbsent(String name, TypeRef type) {
-        return new RecordField(name, type, true, true, FieldRole.FIXED, Optional.empty());
-    }
-
-    /**
-     * Whether this field is pinned to {@code _}: FIXED with no value. A written value contradicts it, and
-     * omission injects the absence -- except at a field group's member, whose presence selects the group's
-     * alternative, so that a member is never injected.
-     */
-    public boolean pinnedToAbsent() {
-        return role == FieldRole.FIXED && value.isEmpty();
+    /** {@code a: T = value} -- a marker: the key must be written, and its value must equal {@code value}. */
+    public static RecordField marker(String name, TypeRef type, Token value) {
+        return new RecordField(name, type, false, false, FieldRole.FIXED, Optional.of(value));
     }
 
     /** What a field yields when a document never writes it -- see {@link #omitted}. */
-    public enum Omitted { MISSING, VALUE, ABSENCE, NOTHING }
+    public enum Omitted { MISSING, VALUE, NOTHING }
 
     /**
      * What this field yields when a document never writes it: the one reader decision no single fact answers,
      * derived here once so every reader derives it alike, and why nothing stores it. A field that is not
-     * optional is the missing-field error; an optional one with a value injects it, whatever its role; one
-     * pinned to {@code _} injects absence, unless it is a field group's member -- a member's presence selects
-     * the group's alternative, so a member is never supplied; anything else stays absent.
+     * optional is the missing-field error; an optional one with a value injects it, whatever its role, unless
+     * it is a field group's member -- a member's presence selects the group's alternative, so a member is
+     * never supplied; anything else stays absent.
      */
     public Omitted omitted(boolean groupMember) {
         if (!optional) {
             return Omitted.MISSING;
         }
-        if (value.isPresent()) {
-            return Omitted.VALUE;
-        }
-        return pinnedToAbsent() && !groupMember ? Omitted.ABSENCE : Omitted.NOTHING;
+        return value.isPresent() && !groupMember ? Omitted.VALUE : Omitted.NOTHING;
     }
 
     /**
      * These facts in the words a diagnostic uses, by the spelling that produces them: {@code required},
-     * {@code optional}, {@code defaulted}, {@code fixed} or {@code fixed to absent}.
+     * {@code optional}, {@code defaulted} or {@code fixed}.
      */
     public String describe() {
         if (!optional) {
@@ -138,7 +135,7 @@ public record RecordField(String name, TypeRef type, boolean optional, boolean v
         return switch (role) {
             case FREE -> "optional";
             case DEFAULT -> "defaulted";
-            case FIXED -> pinnedToAbsent() ? "fixed to absent" : "fixed";
+            case FIXED -> "fixed";
         };
     }
 

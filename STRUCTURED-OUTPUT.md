@@ -19,8 +19,8 @@ loop) and **constrain-during-generate** (outlines/xgrammar/guidance-style: the s
 into a token-level automaton so the decoder can't emit invalid output at all). Real advantages
 already in place: a formal ABNF grammar top to bottom, bounded/typed atoms instead of JSON
 Schema's advisory `format`, tagged unions via `!C value` construction (the type-ref *is* the
-discriminator, unlike untagged `oneOf`), exhaustively-resolved field state
-(`REQUIRED`/`OPTIONAL`/`REQUIRED_DEFAULT`/`REQUIRED_FIXED`), and a compile-once/read-many
+discriminator, unlike untagged `oneOf`), field presence answered one question per mark (`name?:` may be
+omitted, `type?` admits null, `~`/`=` default or pin), and a compile-once/read-many
 architecture (`TsonCompiledSchema`/`TsonCompiledSchemaRegistry`) that already fits a hot request loop.
 Recursive/deeply-nested schemas remain a genuinely shared hard problem either way — not something
 TSON magically avoids.
@@ -80,7 +80,7 @@ here; they are `BACKLOG.md`'s ("The rest of [TSON-DATA] §9.1's resource limits"
   declaration's syntax error in one pass, but a schema whose first problem is an unterminated multi-line token
   reports one and stops. Recovery is harder to justify here than in the parser — an unterminated token leaves
   no reliable boundary to resume on — so this wants a specific case that bites before it becomes work.
-- [ ] **The `REQUIRED_FIXED`/`OPTIONAL_FIXED` identity-diagonal invariant** (a restated fixed field's value must
+- [ ] **The FIXED identity-diagonal invariant** (a restated fixed field's value must
   not change) is never checked. `design/schema-resolution.md` records it as a deferred design question.
 
 ### Tier 1.5 — validate-and-rewind at structural boundaries
@@ -117,7 +117,7 @@ TSON schema compiles to a *token mask*, not just the grammar: integer ranges →
 enums → alternation, `regex` atoms → the regex, text length → counting, field presence/order →
 structural FSM (all Tier 2). So the architecture is: **mask everything maskable (prevention, zero
 rewind); use record-boundary-validate-and-rewind only for the residue** — cross-field constraints,
-`choice` disjointness, uniqueness/referential integrity, the `REQUIRED_FIXED` identity-diagonal rule —
+`choice` disjointness, uniqueness/referential integrity, the FIXED identity-diagonal rule —
 i.e. exactly what *can't* be a local automaton. That makes the rewind loop rare, and unifies the two
 tiers: one schema→constraint backend, split by "is this constraint a local mask or not?" TSON is
 unusually suited to this because the wire is explicitly typed — the writer always knows the expected
@@ -190,7 +190,7 @@ routes and forbids extending them ("no trying variants in order", which is how J
 a declared discriminator, or a disjoint choice whose variants are class-stable. So:
 
 - **A `oneOf` that carries a discriminator converts to a sealed record family**, not a choice: a `@sealed` base
-  whose `@discriminator` fields each subtype pins `REQUIRED_FIXED` to a distinct value, dispatched on the
+  whose `@discriminator` fields each subtype pins (`= v`) to a distinct value, dispatched on the
   object's own members ([TSON-JSON] §6.1.5, `DispatchMemberReader`). That is the flat `kind`-plus-siblings shape
   hand-written discriminated JSON already has, and what OpenAPI's `discriminator.mapping` reaches for. The
   record-family placement is this implementation's, proposed against the spec's choice-level `@discriminator`

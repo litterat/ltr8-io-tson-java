@@ -58,7 +58,7 @@ class MetaLayerConstructorThroughTsonTest {
               }
               webhook => data & {
                 path:     text
-                delivers: [type_ref]?
+                delivers?: [type_ref]?
               }
             }
             """;

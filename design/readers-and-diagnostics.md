@@ -77,13 +77,13 @@ is small and parsed once.)
 - **A field is four facts, and each reader decision reads its own** (`RecordField`: `optional`, `voidable`,
   `role`, `value`). A written `_` reads `voidable`; a written value reads `role` (FIXED means compare) and
   `value`; a field never written reads `RecordField.omitted`, which derives from `optional` and `value` —
-  not optional is `FIELD_REQUIRED`, optional with a value injects it whatever the role, pinned to `_` (FIXED
-  with no value, `type? = _`) injects absence, and anything else stays absent. **A field group's member pinned
-  to `_` is the one exception and is never injected**: its presence is what selects the group's alternative,
-  so injecting it would make a member present that the document never wrote. A pin on a voidable field has no
-  spelling (`type? = value` is refused), because the written-`_` decision runs before the pin is consulted.
-  Nothing is pre-seeded: every field the document didn't state goes through one `valueForAbsentField` switch
-  over the four `Omitted` answers, and the JSON reader's `fillAbsent` switches over the same four.
+  not optional is `FIELD_REQUIRED`, optional with a value injects it whatever the role, and anything else
+  stays absent. **A field group's member is the one exception and is never injected**, pin or not: its
+  presence is what selects the group's alternative, so injecting it would make a member present that the
+  document never wrote. A pinned field is never voidable (`type? = value` is refused), because the written-`_`
+  decision runs before the pin is consulted, so a `_` at a FIXED field is always `FIELD_FIXED`. Nothing is
+  pre-seeded: every field the document didn't state goes through one `valueForAbsentField` switch over the
+  three `Omitted` answers, and the JSON reader's `fillAbsent` switches over the same three.
 - **An array element's own state is the two-member `ElementState`, and an absent element occupies its slot.**
   Under `[T?]` (`state: OPTIONAL`) an element may be the absent sentinel `_`; under the default `REQUIRED` one
   is `FIELD_REQUIRED`. Either way `ArrayAbstractReader` consumes the `AbsentEvent` and advances the index, so
@@ -226,8 +226,7 @@ is small and parsed once.)
   (`statedAbsentValue`, per subclass) because bind mode has nowhere to put it — a Java component has no third
   state between "set to nothing" and "never set", so both readings arrive as `null` there. A limit of the
   target rather than a reading of §2.9, and the reason the tree's answer is not aligned down to it. An array
-  element and a tuple slot keep the same distinction, so the containers agree, and so does a `= _` field —
-  which the tree also gives the absent node where the field is omitted, the pin's value being absence.
+  element and a tuple slot keep the same distinction, so the containers agree.
 - **A written `_` at a defaulted field is an error**, where plain omission still injects the
   default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 makes an explicit `_` a
   validation error at every REQUIRED-family field — "`_` asserts absence at a position the schema always

@@ -128,8 +128,8 @@
     body: !record { supertypes: [top]  fields: [
       !record_field { name: parameters      type: array_param_name_xxhash }
       !record_field { name: template        type: text }
-      !record_field { name: extension       type: record_extension_type  optional: true  voidable: true }
-      !record_field { name: discriminators  type: array_field_name_xxhash  optional: true  voidable: true }
+      !record_field { name: extension       type: record_extension_type  optional: true }
+      !record_field { name: discriminators  type: array_field_name_xxhash  optional: true }
     ] }
   }
 
@@ -181,13 +181,13 @@
   integer_type => !type_definition {
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: size           type: integer_size  optional: true  voidable: true }
-      !record_field { name: min            type: integer  optional: true  voidable: true }
-      !record_field { name: exclusive_min  type: integer  optional: true  voidable: true }
-      !record_field { name: max            type: integer  optional: true  voidable: true }
-      !record_field { name: exclusive_max  type: integer  optional: true  voidable: true }
-      !record_field { name: multiple_of    type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: members        type: integer_member_set  optional: true  voidable: true }
+      !record_field { name: size           type: integer_size  optional: true }
+      !record_field { name: min            type: integer  optional: true }
+      !record_field { name: exclusive_min  type: integer  optional: true }
+      !record_field { name: max            type: integer  optional: true }
+      !record_field { name: exclusive_max  type: integer  optional: true }
+      !record_field { name: multiple_of    type: non_negative_integer  optional: true }
+      !record_field { name: members        type: integer_member_set  optional: true }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -211,11 +211,11 @@
     supertypes: [atom top]
     subtypes: [regex_type uri_type]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: min_length  type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: max_length  type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: length      type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: pattern     type: regex    optional: true  voidable: true }
-      !record_field { name: members     type: text_member_set  optional: true  voidable: true }
+      !record_field { name: min_length  type: non_negative_integer  optional: true }
+      !record_field { name: max_length  type: non_negative_integer  optional: true }
+      !record_field { name: length      type: non_negative_integer  optional: true }
+      !record_field { name: pattern     type: regex    optional: true }
+      !record_field { name: members     type: text_member_set  optional: true }
     ] }
   }
 
@@ -236,13 +236,13 @@
   uri_type => !type_definition {
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length  type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: max_length  type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: length      type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: pattern     type: regex    optional: true  voidable: true }
-      !record_field { name: members     type: text_member_set  optional: true  voidable: true }
+      !record_field { name: min_length  type: non_negative_integer  optional: true }
+      !record_field { name: max_length  type: non_negative_integer  optional: true }
+      !record_field { name: length      type: non_negative_integer  optional: true }
+      !record_field { name: pattern     type: regex    optional: true }
+      !record_field { name: members     type: text_member_set  optional: true }
       !record_field { name: spec        type: uri   optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
-      !record_field { name: scheme      type: text  optional: true  voidable: true }
+      !record_field { name: scheme      type: text  optional: true }
     ] }
   }
 
@@ -255,11 +255,11 @@
   regex_type => !type_definition {
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length  type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: max_length  type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: length      type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: pattern     type: regex    optional: true  voidable: true }
-      !record_field { name: members     type: text_member_set  optional: true  voidable: true }
+      !record_field { name: min_length  type: non_negative_integer  optional: true }
+      !record_field { name: max_length  type: non_negative_integer  optional: true }
+      !record_field { name: length      type: non_negative_integer  optional: true }
+      !record_field { name: pattern     type: regex    optional: true }
+      !record_field { name: members     type: text_member_set  optional: true }
       !record_field { name: spec        type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9485" }
     ] }
   }
@@ -289,15 +289,15 @@
   type_ref => !type_definition {
     body: !record { fields: [
       !record_field { name: name       type: type_name }
-      !record_field { name: arguments  type: array_type_argument_xxhash  optional: true  voidable: true }
+      !record_field { name: arguments  type: array_type_argument_xxhash  optional: true }
     ] }
   }
 
   @doc:"One positional argument of a type application. `name` holds every reference (types, entries, parameters of either kind); `value` holds concrete literals only. Exactly one member is present; no positional form — the braced record is the reference/literal discrimination."
   type_argument => !type_definition {
     body: !record { fields: [
-      !record_field { name: name   type: type_ref  optional: true  voidable: true }
-      !record_field { name: value  type: value  optional: true  voidable: true }
+      !record_field { name: name   type: type_ref  optional: true }
+      !record_field { name: value  type: value  optional: true }
     ]
     groups: [
       !field_group { members: [name value] }
@@ -360,7 +360,7 @@
       !record_field { name: optional       type: boolean  optional: true  role: DEFAULT  value: false }
       !record_field { name: voidable       type: boolean  optional: true  role: DEFAULT  value: false }
       !record_field { name: role           type: field_role  optional: true  role: DEFAULT  value: FREE }
-      !record_field { name: value          type: value  optional: true  voidable: true }
+      !record_field { name: value          type: value  optional: true }
     ] }
   }
 
@@ -386,10 +386,10 @@
       !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: NAMED }
       !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: FIXED }
       !record_field { name: fields          type: array_record_field_xxhash }
-      !record_field { name: groups          type: array_field_group_xxhash  optional: true  voidable: true }
+      !record_field { name: groups          type: array_field_group_xxhash  optional: true }
       !record_field { name: extension       type: record_extension_type  optional: true  role: DEFAULT  value: OPEN }
-      !record_field { name: supertypes      type: array_type_ref_xxhash   optional: true  voidable: true }
-      !record_field { name: discriminators  type: array_field_name_xxhash  optional: true  voidable: true }
+      !record_field { name: supertypes      type: array_type_ref_xxhash   optional: true }
+      !record_field { name: discriminators  type: array_field_name_xxhash  optional: true }
     ] }
   }
 
@@ -403,8 +403,8 @@
       !record_field { name: state           type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
       !record_field { name: unordered       type: boolean  optional: true  role: DEFAULT  value: false }
       !record_field { name: unique_items    type: boolean  optional: true  role: DEFAULT  value: false }
-      !record_field { name: min_items       type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: max_items       type: non_negative_integer  optional: true  voidable: true }
+      !record_field { name: min_items       type: non_negative_integer  optional: true }
+      !record_field { name: max_items       type: non_negative_integer  optional: true }
     ] }
   }
 
@@ -419,7 +419,7 @@
       !record_field { name: unordered       type: boolean  optional: true  role: FIXED  value: true }
       !record_field { name: unique_items    type: boolean  optional: true  role: FIXED  value: true }
       !record_field { name: min_items       type: non_negative_integer  optional: true  role: DEFAULT  value: 1 }
-      !record_field { name: max_items       type: non_negative_integer  optional: true  voidable: true }
+      !record_field { name: max_items       type: non_negative_integer  optional: true }
     ] }
   }
   map => !type_definition {
@@ -430,8 +430,8 @@
       !record_field { name: key_type        type: type_ref }
       !record_field { name: value_type      type: type_ref }
       !record_field { name: state           type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
-      !record_field { name: min_items       type: non_negative_integer  optional: true  voidable: true }
-      !record_field { name: max_items       type: non_negative_integer  optional: true  voidable: true }
+      !record_field { name: min_items       type: non_negative_integer  optional: true }
+      !record_field { name: max_items       type: non_negative_integer  optional: true }
     ] }
   }
 
@@ -479,16 +479,16 @@
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
       !record_field { name: variants  type: array_type_ref_xxhash }
-      !record_field { name: disjoint  type: boolean  optional: true  voidable: true }
+      !record_field { name: disjoint  type: boolean  optional: true }
     ] }
   }
 
   @doc:"Resolver output."
   type_definition => !type_definition {
     body: !record { fields: [
-      !record_field { name: source       type: type_ref  optional: true  voidable: true }
-      !record_field { name: supertypes   type: array_type_name_xxhash  optional: true  voidable: true }
-      !record_field { name: subtypes     type: array_type_name_xxhash  optional: true  voidable: true }
+      !record_field { name: source       type: type_ref  optional: true }
+      !record_field { name: supertypes   type: array_type_name_xxhash  optional: true }
+      !record_field { name: subtypes     type: array_type_name_xxhash  optional: true }
       !record_field { name: body         type: top }
     ] }
   }

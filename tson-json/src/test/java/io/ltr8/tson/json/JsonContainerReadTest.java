@@ -32,10 +32,17 @@ class JsonContainerReadTest {
             {
               person => {
                 name:     text
-                nickname: text?
-                tries:    int32 ~ 0
-                kind:     text = "person"
-                retired:  text? = _
+                nickname?: text?
+                tries?:   int32 ~ 0
+                kind?:    text = "person"
+                retired?: void?
+              }
+
+              marks => {
+                nickname?: text
+                from:      int32?
+                timeout?:  int32? ~ 30
+                version:   text = "2.0"
               }
 
               bounded => {
@@ -94,9 +101,9 @@ class JsonContainerReadTest {
     @Test
     void aRecordIsAJsonObjectWithOneMemberPerField() {
         assertEquals("""
-                {"name":"Ada","nickname":"A","tries":7,"kind":"person","retired":null}""",
+                {"name":"Ada","nickname":"A","tries":7,"kind":"person"}""",
                 json(read("person", """
-                        {"name": "Ada", "nickname": "A", "tries": 7, "kind": "person", "retired": null}""")
+                        {"name": "Ada", "nickname": "A", "tries": 7, "kind": "person"}""")
                         .accepted()));
     }
 
@@ -171,22 +178,21 @@ class JsonContainerReadTest {
 
     // ── §6.1.3 defaults and fixed values ─────────────────────────────────
 
-    /**
-     * §6.1.3: a missing member with a default or a pin injects, so output is fully populated -- a pin to
-     * absence included, which injects the null it would have been written as.
-     */
+    /** §6.1.3: a missing member with a default or a pin injects, so output is fully populated. */
     @Test
     void anOmittedDefaultAndFixedMemberAreInjected() {
         assertEquals("""
-                {"name":"Ada","tries":0,"kind":"person","retired":null}""", json(read("person", """
+                {"name":"Ada","tries":0,"kind":"person"}""", json(read("person", """
                 {"name": "Ada"}""").accepted()));
     }
 
-    /** {@code = _}: null is the member's one value and presence is what it carries, so it is kept. */
+    /** {@code retired?: void?}: null is the member's one value, and any other is refused by {@code void}. */
     @Test
-    void anAbsentFixedMemberWrittenNullIsKept() {
-        assertTrue(json(read("person", """
-                {"name": "Ada", "retired": null}""").accepted()).contains("\"retired\":null"));
+    void aVoidMemberAdmitsNullAndNothingElse() {
+        read("person", """
+                {"name": "Ada", "retired": null}""").accepted();
+        read("person", """
+                {"name": "Ada", "retired": "yes"}""").refusal();
     }
 
     /** §6.1.2: at a defaulted field the fix is omission -- writing null disclaims a value the schema always fills. */
@@ -217,6 +223,49 @@ class JsonContainerReadTest {
     void aFixedValueIsComparedByValueAndNotBySpelling() {
         read("person", """
                 {"name": "Ada", "kind": "person"}""").accepted();
+    }
+
+    // ── §6.1.2 one mark per question ─────────────────────────────────────
+
+    /** {@code from: int32?}: the member must be written, and null is one way to write it. */
+    @Test
+    void aVoidableFieldWithAnUnmarkedNameTakesNullAndRefusesOmission() {
+        assertEquals("""
+                {"timeout":30,"version":"2.0"}""", json(read("marks", """
+                {"from": null, "version": "2.0"}""").accepted()));
+        Diagnostic missing = read("marks", """
+                {"version": "2.0"}""").refusal();
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, missing.code());
+        assertEquals("/from", missing.path().orElseThrow());
+    }
+
+    /** {@code nickname?: text}: the member may be left out, and null is refused -- JSON Schema's optional. */
+    @Test
+    void anOptionalFieldWithAnUnmarkedTypeRefusesNull() {
+        Diagnostic refusal = read("marks", """
+                {"nickname": null, "from": 1, "version": "2.0"}""").refusal();
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, refusal.code());
+        assertEquals("/nickname", refusal.path().orElseThrow());
+    }
+
+    /** {@code timeout?: int32? ~ 30}: omitted it is 30, written null it is cleared. */
+    @Test
+    void aVoidableDefaultedFieldIsClearedByNullAndDefaultedByOmission() {
+        assertEquals("""
+                {"from":1,"version":"2.0"}""", json(read("marks", """
+                {"from": 1, "timeout": null, "version": "2.0"}""").accepted()));
+        assertEquals("""
+                {"from":1,"timeout":30,"version":"2.0"}""", json(read("marks", """
+                {"from": 1, "version": "2.0"}""").accepted()));
+    }
+
+    /** {@code version: text = "2.0"}: a pin on an unmarked name is a marker the document must state. */
+    @Test
+    void aMarkerMustBeWritten() {
+        Diagnostic refusal = read("marks", """
+                {"from": 1}""").refusal();
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, refusal.code());
+        assertEquals("/version", refusal.path().orElseThrow());
     }
 
     // ── §6.1.4 field groups ──────────────────────────────────────────────

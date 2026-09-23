@@ -1321,8 +1321,6 @@ final class DefinitionResolver {
         if (construction.removal().isPresent()) {
             applyRemovals(name, construction.removal().get(), bodyNames(construction), fields, groups);
         }
-        checkGroupPresence(name, fields, groups);
-
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(directSupertypes, fields, groups, RecordExtensionType.OPEN,
                 construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()));
@@ -1576,9 +1574,8 @@ final class DefinitionResolver {
                         + "' names no inherited field -- a refinement copies its source's whole field set and "
                         + "admits no new fields; composition (`&`) is what adds one (§5.7)");
             }
-            fields.set(index, resolveTighteningField(name, fieldDef, fields.get(index), parameters));
+            fields.set(index, resolveTighteningField(name, fieldDef, fields.get(index), groups, parameters));
         }
-        checkGroupPresence(name, fields, groups);
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN,
@@ -1820,7 +1817,8 @@ final class DefinitionResolver {
             case FieldDef fieldDef -> {
                 Integer index = inheritedFieldIndex.get(fieldDef.name());
                 if (index != null) {
-                    fields.set(index, resolveTighteningField(declarationName, fieldDef, fields.get(index), parameters));
+                    fields.set(index, resolveTighteningField(declarationName, fieldDef, fields.get(index), groups,
+                            parameters));
                 } else {
                     requireFieldNameNotSeen(declarationName, fieldDef.name(), seenFieldNames, FieldOrigin.BODY_FIELD);
                     RecordField field = resolveField(fieldDef, parameters, Optional.empty());
@@ -1850,15 +1848,34 @@ final class DefinitionResolver {
      * §5.7's refinement/tightening rules, applied to one composition-body field that names an
      * already-inherited field: resolved the same way as any field ({@link #resolveField}), except
      * an elided type-ref (a modifier-only entry, {@code field: = value}) inherits {@code
-     * inherited.type()} rather than failing, and the result MUST refine the inherited field
-     * ({@link #refines}) -- e.g. {@code array}'s own {@code access_pattern: product_access_type =
-     * INDEX} pins {@code product}'s required field, which refines it. The identity-diagonal rule (a
-     * FIXED restatement MUST NOT change the pinned value) is not checked here: the two values are
-     * never compared.
+     * inherited.type()} and its voidability rather than failing, and the result MUST refine the inherited
+     * field ({@link #refines}) -- e.g. {@code array}'s own {@code access_pattern?: product_access_type =
+     * INDEX} pins {@code product}'s required field, which refines it. The identity-diagonal rule (a FIXED
+     * restatement MUST NOT change the pinned value) is not checked here: the two values are never compared.
+     *
+     * <p><b>A restated group member stays a member</b> (§5.11). Its presence is the group's, so the name takes
+     * no {@code ?} and the member stays optional whatever the restatement writes; a default is refused, being
+     * a value only omission reaches; and a pin is admitted and never injected ({@link RecordField#omitted}),
+     * since an injected member would be present and presence is what selects the group's alternative.
      */
     private RecordField resolveTighteningField(String declarationName, FieldDef fieldDef, RecordField inherited,
-                                                List<String> parameters) {
+                                                List<FieldGroup> groups, List<String> parameters) {
+        boolean member = groups.stream().anyMatch(group -> group.members().contains(fieldDef.name()));
+        if (member && fieldDef.omittable()) {
+            throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
+                    + "member of a field group, whose presence the group decides (§5.11) -- restate it without "
+                    + "the '?' on its name");
+        }
+        if (member && fieldDef.modifier().filter(m -> m.kind() == FieldDef.Modifier.Kind.DEFAULT).isPresent()) {
+            throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
+                    + "member of a field group and takes no default -- a default is what omission yields, and "
+                    + "a member's omission is the group's (§5.11). A pin ('= value') is checked where written "
+                    + "and never supplied");
+        }
         RecordField tightened = resolveField(fieldDef, parameters, Optional.of(inherited));
+        if (member) {
+            tightened = tightened.withFacts(true, tightened.voidable(), tightened.role());
+        }
         if (!refines(inherited, tightened)) {
             // §5.7's table is a rule about schemas, not a coverage boundary: "refinement can only restrict,
             // never expand -- FIXED states are terminal, and loosening a required field to optional is a
@@ -1874,30 +1891,26 @@ final class DefinitionResolver {
      * §5.7's refinement of one field, as three orders -- one per question a field answers, each running from
      * least to most determined -- and a restatement refines its source exactly when no question moves
      * backwards. What omission yields runs absent → missing-field error → injected; whether {@code _} is
-     * admitted runs voidable → not; the value's role runs FREE → DEFAULT → FIXED. A FIXED field also keeps
-     * what it is pinned to, {@code _} or a value: the one comparison of pins the stored facts make visible.
+     * admitted runs voidable → not; the value's role runs FREE → DEFAULT → FIXED.
      *
      * <p>That reproduces §5.7's transition table cell for cell: a plain required field may take a default or
      * a pin, an optional one may become anything, a default may be pinned, and a pin is terminal.
      */
     private static boolean refines(RecordField from, RecordField to) {
-        if (omission(to) < omission(from) || (to.voidable() && !from.voidable())
-                || to.role().ordinal() < from.role().ordinal()) {
-            return false;
-        }
-        return from.role() != FieldRole.FIXED || from.pinnedToAbsent() == to.pinnedToAbsent();
+        return omission(to) >= omission(from) && (from.voidable() || !to.voidable())
+                && to.role().ordinal() >= from.role().ordinal();
     }
 
     /**
      * What omitting the field yields, ranked for {@link #refines}: 0 absence, 1 the missing-field error, 2 an
-     * injected value or absence. Asked as of a plain field: a group member's presence is the group's, and a
-     * member's facts refine like any field's.
+     * injected value. Asked as of a plain field: a group member's presence is the group's, and a member's
+     * facts refine like any field's.
      */
     private static int omission(RecordField field) {
         return switch (field.omitted(false)) {
             case NOTHING -> 0;
             case MISSING -> 1;
-            case VALUE, ABSENCE -> 2;
+            case VALUE -> 2;
         };
     }
 
@@ -1947,18 +1960,17 @@ final class DefinitionResolver {
      *
      * <p>What a parametric modifier still changes is the field's <b>role</b>. A parametric {@code =}
      * (e.g. {@code array}'s {@code element_type: type_ref = T}, {@code T} declared by {@code array =>
-     * <T> ...}) leaves the field required and FREE -- nothing is actually fixed at declaration, the argument
-     * arriving at application (§5.10), so {@code array}'s own {@code element_type} states no facts in output
-     * -- and fixation happens at materialisation (§5.7). A parametric {@code ~} is a DEFAULT, identically to a
-     * literal default. A literal modifier makes the field optional, omission injecting the value, with the
-     * role DEFAULT ({@code ~}) or FIXED ({@code =}). The absent sentinel ({@code = _}) is FIXED with no value:
-     * pinned to {@code _}, forbidding the field's value while keeping it in the contract.
+     * <T> ...}) leaves the field FREE -- nothing is actually fixed at declaration, the argument arriving at
+     * application (§5.10), so {@code array}'s own {@code element_type} states no facts in output -- and
+     * fixation happens at materialisation (§5.7). A parametric {@code ~} is a DEFAULT, identically to a literal
+     * default. A literal modifier gives the role DEFAULT ({@code ~}) or FIXED ({@code =}); whether omission
+     * reaches it is the name's {@code ?}, which {@link FieldModifiers} reads beside it.
      *
      * <p>{@code inherited}, supplied only from {@link #resolveTighteningField}, is the field this entry
      * tightens. Two things are read off it: its <b>type</b>, when {@code field.type()} is elided ({@code
-     * field: = value}, a modifier-only entry, §5.7's "Elided type-refs"), and its <b>presence marker</b>,
-     * because §5.2 makes {@code = _} valid on a field "declared with {@code ?} <em>or inherited as
-     * OPTIONAL</em>" and a modifier-only entry has no {@code ?} of its own to read. A fresh (non-tightening)
+     * field: = value}, a modifier-only entry, §5.7's "Elided type-refs"), and with the type its
+     * <b>voidability</b>, the type's {@code ?} living in the slot the entry elides. The name's {@code ?} is
+     * always the entry's own and is never inherited. A fresh (non-tightening)
      * field always passes {@code Optional.empty()}, and an elided type with nothing to inherit from is the
      * <b>author's</b> error, not a gap -- §5.7 requires the resolver to reject a modifier-only entry both in a
      * fresh record (no source to elide toward) and in a composition body naming no inherited field, so it
@@ -2035,12 +2047,11 @@ final class DefinitionResolver {
                     + "always a tightening, so it is only meaningful in a refinement or composition body, "
                     + "against a field the source declares (§5.7)");
         }
-        // §5.2's presence marker: the entry's own `?` when it restates a type, otherwise the one it inherits
-        // -- `= _` is "valid only when the field is OPTIONAL (declared with `?` OR inherited as OPTIONAL)",
-        // and a modifier-only tightening entry (`min: = _`) has no `?` of its own to read. The `?` makes a
-        // field voidable, and nothing else does, so that is the fact that says it was written.
-        boolean optional = field.type().isPresent()
-                ? field.type().get().optional()
+        // The type's `?` sits in the type slot, so an entry that elides the type -- a modifier-only
+        // tightening, `min: = 0` -- inherits the voidability of the field it tightens with the type itself.
+        // The name's `?` is always the entry's own: an unmarked name says the key is written.
+        boolean voidable = field.type().isPresent()
+                ? field.type().get().voidable()
                 : inherited.map(RecordField::voidable).orElse(false);
 
         // A parameter and a literal share the `value` slot: §8.1's shadowing rule tells them apart, a token
@@ -2048,7 +2059,7 @@ final class DefinitionResolver {
         // What still differs is the *role* -- §5.7 leaves a parametric `= P` FREE, nothing being fixed until
         // the value is concrete -- and that is what FieldModifiers decides.
         FieldModifiers.Resolved resolved =
-                FieldModifiers.of(field.name(), optional, field.modifier(), parameters);
+                FieldModifiers.of(field.name(), field.omittable(), voidable, field.modifier(), parameters);
         return new RecordField(field.name(), type, resolved.optional(), resolved.voidable(), resolved.role(),
                 resolved.value().map(DefinitionResolver::toMetaToken), Annotations.empty(),
                 positions.of(field));
@@ -2062,63 +2073,6 @@ final class DefinitionResolver {
             case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
         };
         return new Token(token.text(), form);
-    }
-
-    /**
-     * §5.11's presence rule: "Group presence rules are checked against the refined states at schema load: a
-     * refinement under which two members of one group are always present (both in a REQUIRED-family state)
-     * is a resolver error." A group means <em>at most one</em> member is present (exactly one, if REQUIRED),
-     * so two members that must always be there is a contract nothing can satisfy -- every instance of the
-     * type would fail validation, for a reason the author never wrote down.
-     *
-     * <p>Run for a composition body too, not only a refinement. The sentence says "a refinement", but it sits
-     * in a paragraph headed "Refinement and composition" whose opening line puts both bodies under §5.7's
-     * tightening rules -- and a composition body tightening two members of an inherited group produces the
-     * identical unsatisfiable type. Reading it as refinement-only would leave the same defect legal by the
-     * other spelling.
-     *
-     * <p>Only this declaration's own tightenings can trip it, by induction: a group's members are flattened
-     * as optional when first declared (§5.11), so a source that passed this check hands on at most one
-     * always-present member. Checking the final state rather than the body's edits costs nothing and is
-     * what the rule literally asks for.
-     *
-     * <p>{@code = _} (fixed to absent) is deliberately <em>not</em> always-present: a member is never
-     * injected, so it is present only where written, and forbidding one alternative's value is exactly what
-     * §5.11 offers it for.
-     */
-    private static void checkGroupPresence(String declarationName, List<RecordField> fields,
-                                            List<FieldGroup> groups) {
-        for (FieldGroup group : groups) {
-            List<String> alwaysPresent = group.members().stream()
-                    .filter(member -> isAlwaysPresent(fieldNamed(fields, member)))
-                    .toList();
-            if (alwaysPresent.size() > 1) {
-                throw new SchemaValidationException((declarationName == null ? "" : "'" + declarationName + "': ")
-                        + "members " + String.join(" and ", alwaysPresent) + " of the group ("
-                        + String.join(" | ", group.members()) + ") are both always present, but at most one "
-                        + "member of a group may be (§5.11) -- no value could satisfy this type. Leave all but "
-                        + "one optional, or fix the others to absent ('= _')");
-            }
-        }
-    }
-
-    /**
-     * Whether a group member is present in every conforming value: a required one must be supplied, and one
-     * carrying a value supplies it itself. A member pinned to {@code _} is not: a member is never injected
-     * with absence, and one written {@code _} is the alternative it selects.
-     */
-    private static boolean isAlwaysPresent(RecordField field) {
-        return !field.optional() || field.value().isPresent();
-    }
-
-    private static RecordField fieldNamed(List<RecordField> fields, String name) {
-        for (RecordField field : fields) {
-            if (field.name().equals(name)) {
-                return field;
-            }
-        }
-        throw new IllegalStateException("group member '" + name + "' has no field -- a group's members are "
-                + "flattened into the field list as they are resolved, so this cannot happen");
     }
 
     private static List<String> memberNames(GroupDef groupDef) {
@@ -2198,15 +2152,15 @@ final class DefinitionResolver {
 
     /**
      * §12.1 gives a group member its own annotation position ({@code group-member = *annotation field-name ws
-     * ":" ws type-ref}), and it is read here on {@link #resolveField}'s terms: the marks are consumed and
+     * ":" ws type-ref ["?"]}), and it is read here on {@link #resolveField}'s terms: the marks are consumed and
      * everything else reaches the annotation channel -- which is what keeps the member's {@code @doc}. A
      * selector cannot be written here at all: §5.11 makes a value modifier a parse error on a member, and
      * {@code =?} is one -- a member is uniformly optional, and a selector that may be absent selects
-     * nothing. One reached by refinement is the linker's to refuse. The state is §5.11's own, presence
-     * governed by the group.
+     * nothing. One reached by refinement is the linker's to refuse. The member is optional, presence being
+     * governed by the group (§5.11), and voidable exactly where its type carries {@code ?}.
      */
     private RecordField resolveGroupMember(GroupDef.Member member) {
-        return new RecordField(member.name(), resolveTypeRef(member.typeRef()), true, true, FieldRole.FREE,
+        return new RecordField(member.name(), resolveTypeRef(member.typeRef()), true, member.voidable(), FieldRole.FREE,
                 Optional.empty(), annotationsOf(member.name(), member.annotations()), Optional.empty());
     }
 

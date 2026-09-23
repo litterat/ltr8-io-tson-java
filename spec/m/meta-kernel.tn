@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=4da7dd93579530430b73dc09027a1ac5a58865828047dbd60e6d39ccfb7e5b4b"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=93c62422a70500afc03383d3e908c87a4f0cf481dfd18b58f8787ea559d6319a"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -122,8 +122,8 @@
   template => top & {
     parameters:      [param_name]
     template:        text
-    extension:       record_extension_type?
-    discriminators:  [field_name]?
+    extension?:      record_extension_type
+    discriminators?: [field_name]
   }
 
   @doc:"""
@@ -285,11 +285,11 @@
     first.
     """
   integer_type => atom & {
-    size:  integer_size?
+    size?: integer_size
     ( min: integer | exclusive_min: integer )?
     ( max: integer | exclusive_max: integer )?
-    multiple_of:  non_negative_integer?
-    members:      integer_member_set?
+    multiple_of?: non_negative_integer
+    members?:     integer_member_set
   }
 
   integer => !integer_type {}
@@ -323,11 +323,11 @@
     never change it.
     """
   text_type => atom & {
-    min_length:  non_negative_integer?
-    max_length:  non_negative_integer?
-    length:      non_negative_integer?
-    pattern:     regex?
-    members:     text_member_set?
+    min_length?: non_negative_integer
+    max_length?: non_negative_integer
+    length?:     non_negative_integer
+    pattern?:    regex
+    members?:    text_member_set
   }
 
   text => !text_type {}
@@ -343,15 +343,15 @@
     rather than going through the text instance.
     """
   uri_type => text_type & atom_specification & {
-    spec:    = "https://www.rfc-editor.org/rfc/rfc3986"
-    scheme:  text?
+    spec?:   = "https://www.rfc-editor.org/rfc/rfc3986"
+    scheme?: text
   }
 
   uri => !uri_type {}
 
   @doc:"Regex constraint vocabulary. Same shape pattern as uri_type, pinned to I-Regexp."
   regex_type => text_type & atom_specification & {
-    spec: = "https://www.rfc-editor.org/rfc/rfc9485"
+    spec?: = "https://www.rfc-editor.org/rfc/rfc9485"
   }
 
   regex => !regex_type {}
@@ -391,7 +391,7 @@
     """
   type_ref => {
     name:       type_name
-    arguments:  [type_argument]?
+    arguments?: [type_argument]
   }
 
   @doc:"""
@@ -481,11 +481,12 @@
     that a written `_` is admitted; `role`, what `value` is for; and
     `value`, a concrete default or fixed value read against the
     field's declared type — for a type_ref-typed slot, a reference in
-    the bare positional form. What omission yields is derived, never
-    stored: a field that is not optional is missing, an optional one
-    with a value injects it, and a FIXED one with no value is pinned
-    to `_` and injects that — except at a field group's member,
-    whose presence is the group's.
+    the bare positional form. Each is one mark of the spelling
+    `name?: type? ~ value`: the name's `?`, the type's `?`, and `~`
+    or `=` with its value. What omission yields is derived, never
+    stored: a field that is not optional is missing, and an optional
+    one with a value injects it — except at a field group's member,
+    whose presence is the group's and which is never supplied.
 
     Within a template body it also carries a parameter, and needs no
     label to do so: a held body is not read against this vocabulary
@@ -514,15 +515,15 @@
   record_field => {
     name:      field_name
     type:      type_ref
-    optional:  boolean ~ false
-    voidable:  boolean ~ false
-    role:      field_role ~ FREE
-    value:     value?
+    optional?: boolean ~ false
+    voidable?: boolean ~ false
+    role?:     field_role ~ FREE
+    value?:    value
   }
 
   tuple_element => {
     element_type: type_ref
-    state:        element_state ~ REQUIRED
+    state?:       element_state ~ REQUIRED
   }
 
   @doc:"""
@@ -537,7 +538,7 @@
     """
   field_group => {
     members:  [field_name]
-    state:    element_state ~ REQUIRED
+    state?:   element_state ~ REQUIRED
   }
 
   @doc:"""
@@ -589,24 +590,24 @@
     what lowers into this list ([TSON-SCHEMA] §5.2).
     """
   record => product & {
-    access_pattern:  product_access_type = NAMED
-    size_type:       product_size_type = FIXED
+    access_pattern?: product_access_type = NAMED
+    size_type?:      product_size_type = FIXED
     fields:          [record_field]
-    groups:          [field_group]?
-    extension:       record_extension_type ~ OPEN
-    supertypes:      [type_ref]?
-    discriminators:  [field_name]?
+    groups?:         [field_group]
+    extension?:      record_extension_type ~ OPEN
+    supertypes?:     [type_ref]
+    discriminators?: [field_name]
   }
 
   array => product & {
-    access_pattern:  product_access_type = INDEX
-    size_type:       product_size_type = VARIABLE
+    access_pattern?: product_access_type = INDEX
+    size_type?:      product_size_type = VARIABLE
     element_type:    type_ref
-    state:           element_state ~ REQUIRED
-    unordered:       boolean ~ false
-    unique_items:    boolean ~ false
-    min_items:       non_negative_integer?
-    max_items:       non_negative_integer?
+    state?:          element_state ~ REQUIRED
+    unordered?:      boolean ~ false
+    unique_items?:   boolean ~ false
+    min_items?:      non_negative_integer
+    max_items?:      non_negative_integer
   }
 
   @doc:"""
@@ -617,11 +618,10 @@
     it — but every set in the meta layer wants a non-empty one, and a
     default is what makes non-emptiness the thing an author gets
     without writing it and emptiness the thing they ask for. The
-    field is restated with its type, and without the `?`, because a
-    defaulted field cannot be optional — `non_negative_integer? ~ 1` is not a
-    state ([TSON-SCHEMA] §5.2): the restatement gives it a DEFAULT
-    and makes it no longer voidable, which is a tightening — a set
-    admits fewer values than the array it refines.
+    restatement `min_items?: non_negative_integer ~ 1` gives the
+    field a DEFAULT where array's is FREE, so omission yields 1
+    rather than nothing ([TSON-SCHEMA] §5.2) — a tightening, since a
+    set admits fewer values than the array it refines.
 
     Named `set_type`, with the atom constructors' suffix, because the
     bare name is taken by the template an author actually writes:
@@ -630,25 +630,25 @@
     no such template and applies the constructor directly.
     """
   set_type => array ^ {
-    state:        = REQUIRED
-    unordered:    = true
-    unique_items: = true
-    min_items:     non_negative_integer ~ 1
+    state?:       = REQUIRED
+    unordered?:   = true
+    unique_items?: = true
+    min_items?:    non_negative_integer ~ 1
   }
 
   map => product & {
-    access_pattern:  product_access_type = NAMED
-    size_type:       product_size_type = VARIABLE
+    access_pattern?: product_access_type = NAMED
+    size_type?:      product_size_type = VARIABLE
     key_type:        type_ref
     value_type:      type_ref
-    state:           element_state ~ REQUIRED
-    min_items:       non_negative_integer?
-    max_items:       non_negative_integer?
+    state?:          element_state ~ REQUIRED
+    min_items?:      non_negative_integer
+    max_items?:      non_negative_integer
   }
 
   tuple => product & {
-    access_pattern:  product_access_type = INDEX
-    size_type:       product_size_type = FIXED
+    access_pattern?: product_access_type = INDEX
+    size_type?:      product_size_type = FIXED
     elements:        [tuple_element]
   }
 
@@ -672,7 +672,7 @@
 
   enum => atom & {
     members:  enum_set
-    profile:  enum_profile ~ IDENTIFIER
+    profile?: enum_profile ~ IDENTIFIER
   }
 
   @doc:"""
@@ -692,16 +692,16 @@
     """
   choice => sum & {
     variants:  [type_ref]
-    disjoint:  boolean?
+    disjoint?: boolean
   }
 
   @doc:"""
     Resolver output — what every entry of a schema map resolves to.
     """
   type_definition => {
-    source:       type_ref?
-    supertypes:   [type_name]?
-    subtypes:     [type_name]?
+    source?:      type_ref
+    supertypes?:  [type_name]
+    subtypes?:    [type_name]
     body:         top
   }
 

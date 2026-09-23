@@ -71,8 +71,8 @@ class SealedFamilyCheckTest {
         isClean(Tson.standard(), "happy", """
                 {
                   pet => abstract { pet_type: text =?  name: text }
-                  dog => pet & { pet_type: = "dog"  breed: text }
-                  cat => pet & { pet_type: = "cat"  indoor: boolean }
+                  dog => pet & { pet_type?: = "dog"  breed: text }
+                  cat => pet & { pet_type?: = "cat"  indoor: boolean }
                 }""");
     }
 
@@ -89,7 +89,7 @@ class SealedFamilyCheckTest {
         String schema = schema("inherit", """
                 {
                   pet => abstract { pet_type: text =?  name: text }
-                  dog => pet & { pet_type: = "dog" }
+                  dog => pet & { pet_type?: = "dog" }
                 }""");
         // validateSchema registers a schema that reports nothing, so asking for it again would be a second
         // registration under one identity -- the entries are already there to read.
@@ -112,9 +112,9 @@ class SealedFamilyCheckTest {
         isClean(Tson.standard(), "matrix", """
                 {
                   cell => abstract { row: text =?  col: text =?  v: int32 }
-                  a1 => cell & { row: = "a"  col: = "1" }
-                  a2 => cell & { row: = "a"  col: = "2" }
-                  b1 => cell & { row: = "b"  col: = "1" }
+                  a1 => cell & { row?: = "a"  col?: = "1" }
+                  a2 => cell & { row?: = "a"  col?: = "2" }
+                  b1 => cell & { row?: = "b"  col?: = "1" }
                 }""");
     }
 
@@ -168,7 +168,7 @@ class SealedFamilyCheckTest {
         assertTrue(problems(Tson.standard(), "refine", """
                 {
                   base => final { x: int32 }
-                  sub  => base ^ { x: int32 = 1 }
+                  sub  => base ^ { x?: int32 = 1 }
                 }""").contains("is final and admits none"));
     }
 
@@ -191,8 +191,8 @@ class SealedFamilyCheckTest {
     @Test
     void aSelectorMustBeRequired() {
         assertTrue(problems(Tson.standard(), "optsel",
-                "{ pet => abstract { pet_type: text? =?  name: text } }")
-                .contains("is a discriminator ('=?') and optional"));
+                "{ pet => abstract { pet_type?: text =?  name: text } }")
+                .contains("is a discriminator ('=?') that may be omitted"));
     }
 
     /**
@@ -239,7 +239,7 @@ class SealedFamilyCheckTest {
         assertTrue(problems(Tson.standard(), "defpin", """
                 {
                   pet => abstract { pet_type: text =?  name: text }
-                  dog => pet & { pet_type: text ~ "dog" }
+                  dog => pet & { pet_type?: text ~ "dog" }
                 }""").contains("It is defaulted here"));
     }
 
@@ -248,8 +248,8 @@ class SealedFamilyCheckTest {
         assertTrue(problems(Tson.standard(), "dup", """
                 {
                   pet => abstract { pet_type: text =?  name: text }
-                  dog => pet & { pet_type: = "dog"  breed: text }
-                  hound => pet & { pet_type: = "dog"  scent: text }
+                  dog => pet & { pet_type?: = "dog"  breed: text }
+                  hound => pet & { pet_type?: = "dog"  scent: text }
                 }""").contains("to the same value"));
     }
 
@@ -268,7 +268,7 @@ class SealedFamilyCheckTest {
         String refusal = problems(Tson.standard(), "displayed", """
                 {
                   pet => abstract { pet_type: text =? }
-                  pet_of => <T, V> pet & { pet_type: = T  pet: V }
+                  pet_of => <T, V> pet & { pet_type?: = T  pet: V }
                   a => pet_of<"cat", text>
                   b => pet_of<"cat", int32>
                 }""");
@@ -290,8 +290,8 @@ class SealedFamilyCheckTest {
         assertTrue(problems(Tson.standard(), "radix", """
                 {
                   code => abstract { id: int32 =?  name: text }
-                  a => code & { id: = 255  x: text }
-                  b => code & { id: = 0xFF  y: text }
+                  a => code & { id?: = 255  x: text }
+                  b => code & { id?: = 0xFF  y: text }
                 }""").contains("to the same value"));
     }
 
@@ -301,8 +301,8 @@ class SealedFamilyCheckTest {
         assertTrue(problems(Tson.standard(), "scale", """
                 {
                   code => abstract { id: number =?  name: text }
-                  a => code & { id: = 1  x: text }
-                  b => code & { id: = 1.0  y: text }
+                  a => code & { id?: = 1  x: text }
+                  b => code & { id?: = 1.0  y: text }
                 }""").contains("to the same value"));
     }
 
@@ -314,7 +314,7 @@ class SealedFamilyCheckTest {
             !!import:"%s"
             {
               pet => abstract { pet_type: text =?  name: text }
-              dog => pet & { pet_type: = "dog"  breed: text }
+              dog => pet & { pet_type?: = "dog"  breed: text }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static String importer(String name, String body) {

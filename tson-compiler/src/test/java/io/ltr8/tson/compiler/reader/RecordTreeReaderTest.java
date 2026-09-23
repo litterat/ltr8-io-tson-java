@@ -17,8 +17,6 @@ import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.tree.TsonAbsent;
-import io.ltr8.tson.tree.TsonRecord;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -29,8 +27,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -98,18 +94,16 @@ class RecordTreeReaderTest {
 
     @Test
     void absentOptionalFieldReadsAsNull() {
-        RecordField optional = RecordField.optional("value", TypeRef.of("integer"));
+        RecordField optional = RecordField.optionalVoidable("value", TypeRef.of("integer"));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), optional));
 
         assertNull(read(compiled, "{}").get("value"));
         assertNull(read(compiled, "{ value: _ }").get("value"));
     }
 
-    /** {@code value: integer = token}, or {@code value: integer? = _} where {@code token} is null. */
+    /** {@code value?: integer = token}. */
     private static RecordField fixed(String token) {
-        return token == null
-                ? RecordField.fixedAbsent("value", TypeRef.of("integer"))
-                : RecordField.fixed("value", TypeRef.of("integer"), new Token(token, Token.Form.UNQUOTED));
+        return RecordField.fixed("value", TypeRef.of("integer"), new Token(token, Token.Form.UNQUOTED));
     }
 
     /**
@@ -178,19 +172,16 @@ class RecordTreeReaderTest {
     /**
      * The code is {@code FIELD_FIXED}, not {@code ATOM_CONSTRAINT_VIOLATION}: nothing about {@code 9}
      * failed {@code integer}'s grammar or any facet of it, so a consumer routing on {@code code} must be
-     * able to tell a §5.2 field-state rule from an atom's own contract. All three ways to break a FIXED
+     * able to tell a §5.2 field-state rule from an atom's own contract. Both ways to break a FIXED
      * field report the same code.
      */
     @Test
     void everyFixedViolationReportsFieldFixedRatherThanAnAtomConstraint() {
         TsonCompiledSchema required = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
                 fixed("7")));
-        TsonCompiledSchema fixedAbsent = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(null)));
 
         assertEquals(Diagnostic.Code.FIELD_FIXED, onlyDiagnostic(required, "{ value: 9 }").code());
         assertEquals(Diagnostic.Code.FIELD_FIXED, onlyDiagnostic(required, "{ value: _ }").code());
-        assertEquals(Diagnostic.Code.FIELD_FIXED, onlyDiagnostic(fixedAbsent, "{ value: 7 }").code());
     }
 
     /**
@@ -240,40 +231,6 @@ class RecordTreeReaderTest {
 
         ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: _ }"));
         assertTrue(thrown.getMessage().contains("cannot be absent"), thrown.getMessage());
-    }
-
-    /**
-     * §5.2's sixth spelling, {@code field: type? = _}: pinned to {@code _}, so "the field MUST either be
-     * omitted or be the absent sentinel in conforming data; any other value is a validation error". There is
-     * no value to compare against -- only presence is checked.
-     */
-    @Test
-    void optionalFixedWithNoValueAdmitsOnlyOmissionOrTheAbsentSentinel() {
-        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(null)));
-
-        assertNull(read(compiled, "{}").get("value"));
-        assertNull(read(compiled, "{ value: _ }").get("value"));
-
-        ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: 7 }"));
-        assertTrue(thrown.getMessage().contains("fixed to absent"), thrown.getMessage());
-    }
-
-    /**
-     * At {@code = _} a written {@code _} is the field's one value, and [TSON-DATA] §2.9 makes it present with an
-     * absent value -- so the tree keeps it, as it does at any voidable field. Omission yields the same node: the
-     * pin's value is absence, and a pin is injected where the field is omitted.
-     */
-    @Test
-    void aFieldFixedToAbsentIsPresentAndAbsentWhetherWrittenOrOmitted() {
-        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), fixed(null)));
-
-        assertInstanceOf(TsonAbsent.class, record(compiled, "{ value: _ }").get("value"));
-        assertInstanceOf(TsonAbsent.class, record(compiled, "{}").get("value"));
-    }
-
-    private static TsonRecord record(TsonCompiledSchema compiled, String source) {
-        return (TsonRecord) compiled.get("point").read(TestDocuments.document(source, DiagnosticsReceiver.throwing()));
     }
 
     @Test

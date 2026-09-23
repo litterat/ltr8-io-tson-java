@@ -89,16 +89,6 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     }
 
     /**
-     * A value written at a {@code = _} field, which the schema pins to absence ([TSON-SCHEMA] §5.2) -- at a
-     * field group's member, the spelling whose presence alone is the information.
-     */
-    public Refusal fixedToAbsentFieldValued(String field, String spelling, String found) {
-        return new Refusal(Diagnostic.Code.FIELD_FIXED,
-                "'%s' is fixed to absent on '%s' and may only be omitted or written as absent"
-                        .formatted(field, typeName), spelling, found);
-    }
-
-    /**
      * A value at a FIXED field contradicting the pin ([TSON-SCHEMA] §5.2: verified, "never a value the decoder
      * silently overwrites"). The message names the remedy, because the two modifiers differ by exactly this.
      */

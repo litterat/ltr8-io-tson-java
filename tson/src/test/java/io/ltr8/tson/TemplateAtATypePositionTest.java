@@ -52,7 +52,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aRecordTemplateMayBeNamedAtAFieldPosition() {
         assertEquals(List.of(), validate("t1", """
-                  pet    => <T, V> { type: text = T  value: V }
+                  pet    => <T, V> { type?: text = T  value: V }
                   holder => { p: pet }
                 """));
     }
@@ -61,7 +61,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aRecordTemplateMayBeNamedAtAnElementPosition() {
         assertEquals(List.of(), validate("t2", """
-                  pet    => <T, V> { type: text = T  value: V }
+                  pet    => <T, V> { type?: text = T  value: V }
                   kennel => { pets: [pet] }
                 """));
     }
@@ -70,7 +70,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aSealedRecordTemplateMayBeNamedToo() {
         assertEquals(List.of(), validate("t3", """
-                  pet    => <T, V> { type: text = T  value: V }
+                  pet    => <T, V> { type?: text = T  value: V }
                   holder => { p: pet }
                 """));
     }
@@ -107,7 +107,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aWrongArgumentCountIsStillRefused() {
         assertTrue(refusal("t7", """
-                  pet    => <T, V> { type: text = T  value: V }
+                  pet    => <T, V> { type?: text = T  value: V }
                   holder => { p: pet<text> }
                 """).contains("takes 2 type arguments"));
     }

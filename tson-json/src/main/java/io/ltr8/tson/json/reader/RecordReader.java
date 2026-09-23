@@ -19,8 +19,8 @@ import java.util.Objects;
  *
  * <p><b>A slot says what the document did with its field.</b> Null means the document did not state it; non-null
  * means it did, which is what the duplicate check, the group count and the absent-field pass all ask. The
- * {@link Slots} markers carry the cases a value cannot -- stated as absent, null kept at a field pinned to absent,
- * and a child's refusal -- and each builder decides what they become.
+ * {@link Slots} markers carry the cases a value cannot -- stated as absent, and a child's refusal -- and each
+ * builder decides what they become.
  *
  * <p><b>Member order carries no meaning</b> (§6.1.6), so presence is settled once the object has closed: the
  * groups over what the document stated, then the fields it never mentioned -- refused, or injected with their
@@ -123,9 +123,7 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
     /** One stated member, at its field: the slot it fills, never null, the member having been seen. */
     private Object readField(JsonReadContext ctx, int at, String memberName) {
         if (plan.fields[at].role() == FieldRole.FIXED) {
-            return plan.stated[at] != null
-                    ? verifyFixed(ctx, at, memberName)
-                    : fixedToAbsent(ctx, at, memberName);
+            return verifyFixed(ctx, at, memberName);
         }
         if (ctx.peek() instanceof JsonEvent.NullValue) {
             return statedNull(ctx, at, memberName);
@@ -137,22 +135,6 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
     private Object readValue(JsonReadContext ctx, int at) {
         Object value = readers[at].read(plan.field(ctx, at));
         return value == null ? Slots.REFUSED : value;
-    }
-
-    /**
-     * {@code = _}: the field is pinned to <em>absence</em> ([TSON-SCHEMA] §5.2). So null is the member's only
-     * conforming value, and it is kept -- as it is injected where the member is omitted, except at a field
-     * group's member, where presence alone is the information.
-     */
-    private Object fixedToAbsent(JsonReadContext ctx, int at, String memberName) {
-        JsonEvent event = ctx.next();
-        if (event instanceof JsonEvent.NullValue) {
-            return Slots.NULL_KEPT;
-        }
-        plan.field(ctx, at).report(plan.rules.fixedToAbsentFieldValued(memberName, RecordPlan.NULL,
-                JsonAtoms.describe(event)));
-        EventSkip.value(ctx, event);
-        return Slots.ABSENT;
     }
 
     /**
@@ -225,8 +207,7 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
 
     /**
      * Every field the document never mentioned: §6.1.3's injection, §6.1.2's permitted absences, and §7.6's
-     * refusals, as {@link RecordField#omitted} derives them. A field pinned to absent injects its pin as null,
-     * kept as the stated form is ({@link #fixedToAbsent}).
+     * refusals, as {@link RecordField#omitted} derives them.
      */
     private void fillAbsent(JsonReadContext ctx, Object[] slots) {
         for (int i = 0; i < slots.length; i++) {
@@ -236,7 +217,6 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
             switch (plan.omitted[i]) {
                 case MISSING -> plan.field(ctx, i).report(plan.rules.missingRequiredField(plan.fields[i].name()));
                 case VALUE -> slots[i] = injected[i];
-                case ABSENCE -> slots[i] = Slots.NULL_KEPT;
                 case NOTHING -> { }
             }
         }

@@ -790,7 +790,7 @@ final class TemplateMaterialiser {
         }
         return new RecordBody(record.supertypes(), record.fields().stream()
                 .map(field -> field.role() == FieldRole.FREE && field.value().isPresent()
-                        ? field.withFacts(true, false, FieldRole.FIXED)
+                        ? field.withFacts(field.optional(), false, FieldRole.FIXED)
                         : field)
                 .toList(), record.groups(), closedExtension(record));
     }

@@ -45,10 +45,10 @@ class JsonBindRecordReadTest {
                 id: uuid
                 name: text
                 age: int32
-                born: date?
+                born?: date?
                 home: address
-                level: int32 ~ 1
-                kind: text = "person"
+                level?: int32 ~ 1
+                kind?: text = "person"
               }
               shape   => abstract { area: int32 }
               square  => shape & { side: int32 }

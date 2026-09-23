@@ -441,8 +441,8 @@ final class SchemaDesugarer {
                 // The field's own position has to be carried, for schemaMap's reason one level down: a field
                 // whose type is a sugar form is rebuilt, and a rebuilt node is a different identity in a
                 // table keyed by one. Any record with a single `[T]` field hits this.
-                FieldDef rewritten = new FieldDef(field.annotations(), field.name(),
-                        Optional.of(new FieldDef.FieldType(ref, fieldType.optional())), field.modifier());
+                FieldDef rewritten = new FieldDef(field.annotations(), field.name(), field.omittable(),
+                        Optional.of(new FieldDef.FieldType(ref, fieldType.voidable())), field.modifier());
                 positions.carry(field, rewritten);
                 yield rewritten;
             }
@@ -456,7 +456,8 @@ final class SchemaDesugarer {
 
     private GroupDef.Member groupMember(GroupDef.Member member) {
         TypeRef ref = typeRef(member.typeRef());
-        return ref == member.typeRef() ? member : new GroupDef.Member(member.annotations(), member.name(), ref);
+        return ref == member.typeRef() ? member
+                : new GroupDef.Member(member.annotations(), member.name(), ref, member.voidable());
     }
 
     /**
@@ -775,12 +776,13 @@ final class SchemaDesugarer {
                     for (GroupDef.Member member : group.members()) {
                         requireFieldNameUnseen(member.name(), seen, "a group member repeats it -- member "
                                 + "labels share the enclosing record's field namespace");
-                        // A group's members are ordinary optional, voidable fields of the record, and the group
-                        // records only their names and its own state (§5.11) -- the shape the resolver builds.
+                        // A group's members are ordinary optional fields of the record, voidable where the type
+                        // says so, and the group records only their names and its own state (§5.11) -- the
+                        // shape the resolver builds.
                         List<RecordValue.Field> memberFields = new ArrayList<>(List.of(
                                 WireForm.nameField(WireForm.NAME, member.name()),
                                 new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(member.typeRef())))));
-                        WireForm.addFacts(memberFields, true, true, FieldRole.FREE);
+                        WireForm.addFacts(memberFields, true, member.voidable(), FieldRole.FREE);
                         fields.add(WireForm.scoped(new RecordValue(memberFields), member.annotations()));
                         members.add(WireForm.scoped(new TokenValue(member.name(), TokenForm.UNQUOTED)));
                     }
@@ -864,7 +866,7 @@ final class SchemaDesugarer {
         }
         FieldDef.FieldType type = field.type().orElseThrow();
         FieldModifiers.Resolved resolved =
-                FieldModifiers.of(field.name(), type.optional(), field.modifier(), currentParameters);
+                FieldModifiers.of(field.name(), field.omittable(), type.voidable(), field.modifier(), currentParameters);
         List<RecordValue.Field> members = new ArrayList<>();
         members.add(WireForm.nameField(WireForm.NAME, field.name()));
         members.add(new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(type.typeRef()))));

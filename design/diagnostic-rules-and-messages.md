@@ -114,12 +114,11 @@ is not a gap but a decision — see below.)
 **A broken FIXED field is `FIELD_FIXED`, not an atom code.** `field: type = value` (§5.2) is a field-state
 rule, so a value contradicting it has satisfied its atom's grammar and every facet — it is simply not the
 one value permitted. `FIELD_FIXED` sits beside `FIELD_REQUIRED` for that reason: the two §5.2 field-state
-rules a document can break, neither of them about the field's type. All three ways to break one report it
-(`RecordAbstractReader.verifyFixed`): a stated value contradicting `= value`, a field pinned to a value
-written `_`, and a value written where `= _` fixes the field to absent. The contradiction message also
-names the fix — `=` reads as "default" to anyone arriving from JSON Schema, so `priority: priority = medium`
-is a plausible mis-spelling of `~ medium`, and without the hint the author discovers it only by watching
-every differing document get rejected.
+rules a document can break, neither of them about the field's type. Both ways to break one report it
+(`RecordAbstractReader.verifyFixed`): a stated value contradicting `= value`, and a pinned field written
+`_`. The contradiction message also names the fix — `=` reads as "default" to anyone arriving from JSON
+Schema, so `priority?: priority = medium` is a plausible mis-spelling of `~ medium`, and without the hint
+the author discovers it only by watching every differing document get rejected.
 
 **`expected` carries the constraint that failed, never the type's name.** `AtomTypeException` holds an
 `expected` alongside its message, filled at each throw site from the facet that rejected the value, and all
