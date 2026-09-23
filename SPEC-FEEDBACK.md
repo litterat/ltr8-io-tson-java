@@ -2256,3 +2256,528 @@ not generalise: text is the only tier whose member set shares its position with 
 is the half that cannot be narrowed. A reviewer preferring uniformity would let `text_type.members` shrink
 like the others — nothing breaks if it does, since a subset of a set whose members all matched the pattern
 still does — at the price of the pair having two refinement rules.
+
+## 23. A field state answers three questions, and the six states leave four cells empty that real schemas use
+
+**Documents:** [TSON-DATA] §2.9, §7.2.4; [TSON-SCHEMA] §4.2, §5.2, §5.4, §5.6 (the positional form), §5.7,
+§5.10 (productivity), §5.11, §7.6, §12.1, and the kernel's `field_state` and `record_field`; [TSON-JSON] §6.1.2,
+§6.1.5, §7, §7.2, §7.3 (the Part 3 half, below).
+**Kind:** gap, with an inconsistency in Part 1, one in §5.7's matrix, one between §5.2, §7.6 and §4.2 on what
+`a: T? = v` and `a: void` admit, and one between [TSON-JSON] §7.2 and the text tree on whether decoded output
+records a spelling of absence. **Status: draft — nothing is built.** The evidence is a consumer of this
+library: `ltr8-io-tson-benchmarks`, which converts 1,113 JSON Schemas (150 from BFCL, 963 from SchemaStore, in
+740 families) to TSON and compiles every one. Its `corpus/nullable/MATRIX.md` runs every cell of the table below
+through both validators, and `corpus/nullable/CENSUS.md` counts each cell's declarations in both corpora; the
+tables here consolidate the two.
+
+### The three questions
+
+§5.2 spells field states through two markers, presence and mutability, and notes that they "are not
+independent axes". Pulled fully apart, every state is an answer to three questions that are independent:
+
+1. **What does omitting the field mean?** An error (**E**), absence (**A**), or the schema's value injected
+   (**I**).
+2. **What does a written `_` mean?** An error (**E**), or absence (**A**).
+3. **What may a written value be?** Anything (*free*, carrying a *default* where omission injects), only the
+   pinned value (*fixed*), or nothing but `_` (*none*).
+
+Three answers, two and three give eighteen combinations, less the two where a field admitting no value has nothing
+to inject: **sixteen declarations**. Every one is below, with what each corpus does with it. The two count columns
+are the census: every `properties` entry in every schema classified by its three answers — 209,859 declarations in
+SchemaStore's 963 schemas, 1,866 in BFCL's 150 contracts — and *families* are SchemaStore file names with the
+version stripped, 740 in all. A percentage is of that corpus's declarations.
+
+| Omitted | `_` | Value | JSON Schema | TSON today | State | SchemaStore | Families | BFCL |
+|---|---|---|---|---|---|---|---|---|
+| E | E | free | req, `T` | `a: T` | REQUIRED | 23,686 (11.3%) | 456 | 1,036 (55.5%) |
+| E | A | free | req, `[T, "null"]` | **none** | — | 412 (0.2%) | 9 | 0 |
+| A | E | free | opt, `T` | **none** | — | 173,382 (82.6%) | 644 | 473 (25.3%) |
+| A | A | free | opt, `[T, "null"]` | `a: T?` | OPTIONAL | 5,685 (2.7%) | 106 | 0 |
+| I | E | default | opt, `T`, `"default": v` | `a: T ~ v` | REQUIRED_DEFAULT | — | — | — |
+| I | A | default | opt, `[T, "null"]`, `"default": v` | **none** — `a: T? ~ v` is a resolver error | — | — | — | — |
+| E | E | fixed | req, `"const": v` | **none** | — | 4,687 (2.2%) | 136 | 357 (19.1%) |
+| E | A | fixed | req, `"enum": [v, null]` | **none** | — | 0 | 0 | 0 |
+| A | E | fixed | opt, `"const": v` | `a: T? = v` by §7.6; **measured at A/A**, below | OPTIONAL_FIXED | 1,877 (0.9%) | 117 | 0 |
+| A | A | fixed | opt, `"enum": [v, null]` | `a: T? = v` as built | — | 5 (0.0%) | 2 | 0 |
+| I | E | fixed | opt, `"const": v`, `"default": v` | `a: T = v` | REQUIRED_FIXED | — | — | — |
+| I | A | fixed | — | **none** | — | — | — | — |
+| E | E | none | req, `{"not": {}}` | `a: void` — nothing satisfies it | REQUIRED, `void`-typed | 0 | 0 | 0 |
+| E | A | none | req, `"type": "null"` | **none** | — | 2 (0.0%) | 1 | 0 |
+| A | E | none | opt, `{"not": {}}` | **none** | — | 19 (0.0%) | 2 | 0 |
+| A | A | none | opt, `"type": "null"` | `a: T? = _`, `a: void?` | OPTIONAL_FIXED (no value) | 104 (0.0%) | 8 | 0 |
+
+In the JSON Schema column, *req* means the key is listed in the object's `required`, *opt* that it is not, and
+`[T, "null"]` is `"type": [T, "null"]` (or an `anyOf` with `{"type": "null"}`); `null` is the JSON spelling of `_`
+(Part 3 §7). JSON Schema's `default` is an annotation, not a rule: a validator never injects it. So I/E/default
+and A/E/free validate the same documents there, as do I/E/fixed and A/E/fixed — which is why the three *I* rows
+carry no count: the census files a property with a `default` under the A row of the same shape and cannot
+separate it. Value admission is a heuristic, stated as one: `const` and `enum` count exactly, `{"not": {}}` and a
+null-only type admit nothing, and everything else is *free*.
+
+**JSON Schema spells 12 of 16; TSON spells 7**, with `a: T? = v` at A/E/fixed as the next paragraph settles. Of
+the nine TSON cannot, four carry weight and are the four this entry argues for: A/E/free is four fifths of
+SchemaStore and a quarter of BFCL; E/E/fixed is 136 families, and every BFCL instance is the discriminator, which
+dispatch already makes E; E/A/free is 9 families; I/A/default the census cannot see. The other five hold 26
+declarations in at most five families between them, or are unreachable.
+
+**What the measurement moved.** Two rows of an earlier draft of this table sat elsewhere, and the run placed them.
+
+- **`a: void` is E/E/none, not E/A/none.** §7.6 makes a written `_` a validation error at every REQUIRED-family
+  state whatever the type, and `void` admits nothing else, so nothing satisfies the field in either encoding —
+  checked in TSON text and in JSON, which agree. §4.2's "usable in data as a field type meaning 'no value'" holds
+  only at an OPTIONAL position, where `a: void?` and `a: T? = _` coincide; at a REQUIRED one it declares an
+  uninhabitable field, which §4.2 should say.
+- **`a: T? = v` is measured at A/A/fixed**: both of this library's readers admit `_` at OPTIONAL_FIXED with a
+  value. §5.2's "if present, must be this value" is silent on `_`, and §7.6's row admits `_` at "OPTIONAL, or
+  OPTIONAL_FIXED with `= _`", which read strictly refuses it at `= v`. The two cells' populations settle which
+  reading to adopt: A/E/fixed (opt, `const`) is 1,877 declarations in 117 families, A/A/fixed is 5 in 2.
+  **Proposed: §7.6's strict reading stands, and §5.2 says so** — a written `_` at `a: T? = v` is a validation
+  error, `_` being a value the pin does not match — and this library's readers change to match. The rest of
+  this entry assumes it.
+
+**A field state is an input schema and an output schema.** The TypeScript validator ecosystem has a name for
+the difference. Standard JSON Schema (<https://standardschema.dev/json-schema>), the interface Zod, Valibot and
+ArkType expose, has every schema produce two JSON Schemas, `input()` and `output()`, because "the input and
+output types can differ". Zod's `z.toJSONSchema` names a default among the schemas where they do, and writes
+the output type unless asked for `io: "input"` (<https://zod.dev/json-schema>). A single JSON Schema is one of
+the two; a TSON field state is both, from one declaration. The *I* answer is exactly "absent from the input,
+present in the output":
+
+| Cell | Input schema | Output schema |
+|---|---|---|
+| A/E/free | opt, `T` | opt, `T` |
+| I/E/default | opt, `T`, `"default": v` | **req**, `T` |
+| I/A/default | opt, `[T, "null"]`, `"default": v` | **req**, `[T, "null"]` |
+| A/E/fixed | opt, `"const": v` | opt, `"const": v` |
+| I/E/fixed | opt, `"const": v`, `"default": v` | **req**, `"const": v` |
+| E/E/fixed | **req**, `"const": v` | req, `"const": v` |
+
+The pairs JSON Schema cannot tell apart share an input schema and differ in their output one. The JSON Schema
+column of the main table is the input schema: what a document must be, which is what a converter reads and what
+an LLM is shown when the schema describes a tool's parameters.
+
+The same libraries also show the four free cells are four authored choices, not three and a converter's
+accident: Zod spells them `z.string()`, `.optional()`, `.nullable()` and `.nullish()` — E/E, A/E, E/A and
+A/A — and `.default(v)` for *I*. A JSON Schema generated from one of them that says "optional, not nullable"
+records that its author chose `.optional()` over `.nullish()`.
+
+Five more cells exist and the census confirms nothing asks for them: a fixed value that also admits `_` (E/A,
+A/A and I/A with *fixed*; JSON Schema's `"enum": [v, null]`), at 0, 5 and unreachable, the 5 being one-member
+enums on a nullable type, which are enum types rather than pins; a field that may be
+neither written nor `_` (A/E/*none*; JSON Schema's `{"not": {}}` or `"a": false`, which forbids the key), 19
+declarations in 2 families; and E/E/*none*, which no document satisfies, at 0. The proposal below refuses a
+pin on a voidable type, which is E/A/fixed and I/A/fixed; leaves A/E/fixed and A/A/fixed to pinned group
+members, since on a plain field an omittable pin is injected; refuses E/E/none because it empties the record;
+and leaves A/E/none legal because it empties only a field.
+
+**So nine cells are empty, four of them real schemas use, and the four are not one kind.** Only I/A/default
+changes what decodes: omission, `_` and a value become three different outcomes. The other three change only
+which spellings a document may use; a document valid under both declarations decodes to the same value. That
+makes them invisible to a TSON reader, and it is why each is easy to dismiss — but each matters to a reader
+*other* than TSON's decoded output, and that reader is named per cell below.
+
+- **E/A/free — key required, value may be `_`.** JSON Schema's `required` with `["T", "null"]`, XSD's
+  `nillable="true"`. Proposed spelling `a: T?`.
+- **A/E/free — key optional, `_` refused.** JSON Schema's ordinary optional field, and the commonest field shape
+  there is. Proposed spelling `a?: T`.
+- **I/A/default — omission injects, `_` is absence.** JSON Schema's nullable-with-default. Proposed spelling
+  `a?: T? ~ v`.
+- **E/E/fixed — the pinned value must be written.** JSON Schema's `required` with `const`, the shape of a
+  self-describing marker. Proposed spelling `a: T = v`.
+
+### Why E/A/free
+
+Every other position that admits `_` already behaves this way: an element of `[T?]`, a tuple position, an
+entry value of `{K => V?}` all keep their slot, and `_` fills it. The record field is the one position where
+admitting `_` also licenses leaving the slot out.
+
+In the corpus: **412 SchemaStore field declarations (0.2%) in 9 of 740 families** by the census, and none in
+BFCL. The benchmark's earlier site count (`scripts/null_sites.py`) has 736 occurrences in 46 schemas and 13
+families (1.8%); the two instruments count differently, and the census is the one whose rows partition every
+declaration, so its figure is the one carried here. A converter meeting one has no spelling, and [TSON-JSON]
+§7.3 tells it to report rather than invent — the benchmark's converter refuses the case, so the cell shows up as
+a smaller corpus rather than as a disagreement. The two shortest statements of intent:
+
+- `dotnet-tools.json`, `tools.*.version`, required, `anyOf: [string, null]` — "*If null, the latest version
+  will be used.*"
+- `abc-clinical-demand-forecast`, `WeightRange.fromWeight`, required, `["number", "null"]` — "*null for no
+  lower bound.*" Three such records partition a weight axis; `fromWeight: null` is −∞, and an omitted
+  `fromWeight` is an author who did not say where the band starts.
+
+In both, omission and `_` mean different things **to the author**: one is "no value", the other is an
+incomplete document. That is the case for the cell. It is a completeness rule, not a third value — bound output
+still never records which spelling arrived. What a tree records is the mode's business, not the declaration's
+(*Delivery is the mode's*, below).
+
+The proto-schema series named the capability (Part 8, *Multiplicity & Nullability*,
+https://litterat.substack.com/p/proto-schema-part-8-multiplicity): "*Allowing a field to be present and be null
+is an important capability*". It carried it as `includeAbsent`, a record-level or runtime flag directing an
+encoder to write sentinels for unset fields — an encoder directive the decoder table then dropped ("*purely an
+encoder concern*"), and per record rather than per field. The property it was reaching for is a rule of
+**reading**, on one field.
+
+### §2.9 says both
+
+> A field or entry set to `_` is **present with an absent value** — distinct from not appearing at all.
+
+> Whether absent values at optional positions are encoded on the wire using `_` or omitted entirely is a
+> serialisation context concern, not a document property.
+
+In the table's terms, the second sentence is true exactly where questions 1 and 2 give the same answer. It
+holds at OPTIONAL (A/A); it is false at OPTIONAL_FIXED `= _` in a group, where a member written as `_` selects
+the alternative and an omitted one does not (§5.11), and [TSON-JSON] §6.1.2 carves that case out as "the one
+field state where the null spelling is the point". Proposed replacement for the second sentence: **`_` versus
+omission is a serialisation choice where the field's declaration gives both the same meaning, and the
+declaration decides everywhere else.**
+
+### Proposed resolution: one slot per question
+
+The gap is not four missing states; it is that two of the three questions share one mark. `?` on a field's type
+answers both "may I write `_`" and "may I omit the key", and `=` answers both "is the value pinned" and "is it
+injected". Separating the questions in the syntax spells every cell, and the resolved model then stores the
+answers instead of naming their combinations. **A proposal, and a whole one: nothing here is built.**
+
+**Syntax: one slot per question, and no mark answers two.**
+
+```
+name?: type? ~ default
+name?: type? = fixed
+```
+
+- `?` on the **name** answers omission: the key may be omitted from the document. Unmarked, the key must be
+  written. It is the input question, and nothing else: what omission then yields is the modifier's. Required by
+  default is the right choice for a typed notation, and the one structured-output validation wants.
+- `?` on the **type** answers a written `_`, and means what it means at every other position already — an array
+  element, a map value, a tuple slot: `_` is admitted here. The record field is the one position where the mark
+  today also answers omission, and that overload is the whole source of the gap.
+- The **modifier** answers the value. `~ v` and `= v` both name a value the schema supplies, and differ in one
+  thing: a written value may override `~ v` and must equal `= v`. Omission yields the value in either case, so
+  `a?: T` yields absence and `a?: T ~ v` and `a?: T = v` both yield `v`. A `~ v` is therefore written only on a
+  key that may be omitted, and `a: T = v` is a marker the document must state itself.
+
+Four spellings the slots admit and the resolver refuses, as rules rather than omissions: `a: T ~ v` (and
+`a: T? ~ v`), because an unmarked name says the key is always written and `~ v` is a value only omission can
+reach; `a: T? = v` and `a?: T? = v`, a pin on a voidable type, because a pin names the only value the field
+admits and `_` is not it; a modifier on a `void`-typed field, which §5.2 refuses today and which stays refused,
+`void` having nothing to default or pin; and the selector `=?` on anything but an unmarked name and a
+non-voidable type, below.
+
+The sixteen cells again, spelled this way. Value admission *none* is the type `void` in the type slot, so the
+four *none* rows are the four free rows with `void` written in, and are not field states at all:
+
+| Omitted | `_` | Value | JSON Schema | Proposed TSON | Note |
+|---|---|---|---|---|---|
+| E | E | free | req, `T` | `a: T` | |
+| E | A | free | req, `[T, "null"]` | `a: T?` | today's gap, 9 families |
+| A | E | free | opt, `T` | `a?: T` | today's gap, 82.6% of SchemaStore |
+| A | A | free | opt, `[T, "null"]` | `a?: T?` | today's `a: T?` |
+| I | E | default | opt, `T`, `"default": v` | `a?: T ~ v` | today's `a: T ~ v` |
+| I | A | default | opt, `[T, "null"]`, `"default": v` | `a?: T? ~ v` | today's gap |
+| E | E | fixed | req, `"const": v` | `a: T = v` | today's gap; the discriminator shape |
+| E | A | fixed | req, `"enum": [v, null]` | **refused** — `a: T? = v` pins a voidable type | nothing asks |
+| A | E | fixed | opt, `"const": v` | a pinned group member only | today's `a: T? = v` under §7.6; opt-`const` converts to `a?: T = v` |
+| A | A | fixed | opt, `"enum": [v, null]` | a pinned group member only | nothing asks |
+| I | E | fixed | opt, `"const": v`, `"default": v` | `a?: T = v` | today's REQUIRED_FIXED |
+| I | A | fixed | — | **refused** — `a?: T? = v` pins a voidable type | unreachable in JSON Schema |
+| E | E | none | req, `{"not": {}}` | `a: void` | the record uninhabitable; a resolver error (§5.10) |
+| E | A | none | req, `"type": "null"` | `a: void?` | the key must be written, as `_` |
+| A | E | none | opt, `{"not": {}}` | `a?: void` | the field unwritable, the record inhabitable; legal |
+| A | A | none | opt, `"type": "null"` | `a?: void?` | today's `a: T? = _`; the group member |
+
+**Fourteen are spelled, and two are refused.** Twelve on a plain field, by the three slots directly. A/E/fixed
+and A/A/fixed are the pin whose only information is presence, and they are spelled where §5.2 says that
+information earns its keep: a pinned member of a field group, which the group governs and never injects.
+E/A/fixed and I/A/fixed are a pin on a voidable type, and a resolver error. JSON Schema spells 12 of the 16, and
+eleven convert with no case analysis: `required` decides the name's `?`, `null` in the type decides the type's
+`?`, and `const` or `default` decides the modifier — an opt-`const` property becomes `a?: T = v`, whose input
+schema is the same and whose output is populated. The twelfth, `required` with `"enum": [v, null]`, is the
+refused E/A/fixed; nothing in SchemaStore writes it, in that form or any other, and a converter meeting it
+reports. The census's five A/A/fixed declarations are not that shape either: each is a one-member enum on a
+nullable type — Rust's `Option<Marker>` as `vector.json`'s generator emits it, and a `layout` enum with one
+member so far — which is an enum *type* that admits `_`, `a?: E?`, and not a pin. It is also the
+spelling a JSON author already reads: TypeScript's four property shapes are the four free cells, and three
+match to the character — `a: T`, `a?: T`, `a?: T | null` against `a?: T?` — the fourth being `a: T | null`
+against `a: T?`.
+
+**An omittable pin is injected, and the discriminator is one.** A pinned value is either something a reader
+without the schema needs, in which case it must be written, or it is not, in which case the key may be omitted
+and the decoder fills it, as it fills a default: `a: T = v` is the JSON-RPC marker, `a?: T = v` the pin a
+consumer never has to look up. Decoded output stays fully populated, which is §5.2's own principle for defaults,
+and a pin is the one value a consumer could least sensibly be asked to fetch from the schema. The discriminator's
+terse form needs no rule of its own: `call_0 => call & { name?: = "fn" }` lets TSON text write
+`!call_0 { arguments: … }` and have `name` delivered, because it is an omittable pin; that a member-dispatched
+JSON position must write it is dispatch's rule, since dispatch runs before the record is read ([TSON-JSON]
+§6.1.5). The `= _` form goes, because the type already spells it: `a?: void?` is a field that may be omitted or
+written as `_` and nothing else, which is what a group member needs.
+
+**The selector, `a: T =?`, is the one form with no data answer of its own.** #10's fourth modifier reads
+*pinned, but not here — by the members*, and it completes the modifier slot: `~ v` defaulted here, `= v` pinned
+here, `=?` pinned by each member. No document is ever read against the base as itself — a position typed by it
+admits its subtypes (§7.2) and dispatch selects one — so the field's omission, `_` and value answers are the
+member's pin, and the base states only that a pin is owed. That is why the form is expressible in the schema
+alone, and why it is admitted on exactly one shape: an unmarked name and a non-voidable type. `a?: T =?` is a
+selector that may be absent, selecting nothing; `a: T? =?` one that may be `_`, selecting nothing, which #10
+already refuses; and `=?` takes no value, so a value beside it is a parse error. A member restates it as
+`a: = v`, the marker that must be written, or `a?: = v`, the injected one, and both are FREE → FIXED with the
+name mark moving forward or standing still; a member that leaves it unpinned is itself abstract, #10's
+intermediate base, and one that writes `a?: T` or `a: T?` at it moves a question backwards and is refused by
+the orders below with no rule of its own.
+
+**The two `void` rows the type leaves unwritable are not alike.** `a: void` (E/E/none) makes the *record*
+uninhabitable — no document validates — and §5.10's productivity rule already makes a type that admits no value
+a resolver error. `a?: void` (A/E/none) leaves the record inhabitable as long as the key is omitted: only the
+field is unwritable, and a declared field is still a schema-level fact — it participates in closure, and a
+removal clause (§5.9) can name it — so it stays legal. Refuse the declaration that empties the record, not the
+one that empties a field.
+
+**Field groups.** A group member takes no name mark, because the group decides presence (§5.11), and no
+modifier, because a group does not inject; its type slot takes `?` like any other position, so §12.1's
+`group-member` becomes `field-name ":" type-ref ["?"]`. A voidable member written as `_` is present and selects
+its alternative, as `= _` does today; at a member that is not voidable, a written `_` is the ordinary refusal. A
+member restated in a refinement body is an ordinary field and takes the ordinary marks, under the transition
+rules §5.11 already gives.
+
+**Positional form (§5.6) and productivity (§5.10).** The positional form writes one field and omits the rest,
+so it is valid only when exactly one field has an unmarked name, whatever its modifier — counting a voidable
+one, since `a: T?` must still be written, and a marker, since `a: T = v` must too. A field guards a recursive
+reference when omission or `_` is admitted: an optional field or a voidable one, so `a: T?` joins `a?: T` among
+the terminating positions.
+
+**Storage: what the reader consults, and nothing else.** A schema-backed record reader makes three decisions, and
+the resolved `record_field` holds exactly the facts those decisions read:
+
+| Decision | Reads | Never reads |
+|---|---|---|
+| 1, a written `_` | `voidable` | `value`, `optional` |
+| 2, a written value | `role = FIXED`, `value` | `voidable`, `optional` |
+| 3, a field never written | `optional`, then `value` | `voidable`, `role` |
+
+```
+record_field => {
+  name:     field_name
+  type:     type_ref
+  optional: boolean ~ false                  # the name's ?
+  voidable: boolean ~ false                  # the type's ?
+  role:     !enum [FREE DEFAULT FIXED] ~ FREE
+  value:    value?                           # present exactly when role is not FREE
+}
+```
+
+Decision 1 is one test: `_` at a field that is not voidable is a validation error, and the slot decodes to
+absence either way. Decision 2 reads the value by its type, then compares it against `value` when the role is
+FIXED. Decision 3 runs over the slots never written: a field that is not optional is the missing-field error;
+an optional one with a value injects it, whatever the role; otherwise the slot stays absent. Three resolver
+invariants, all visible in that flow: `value` is present exactly when `role` is not FREE; DEFAULT requires
+`optional: true`, since a default on a key that is always written is a value nothing can reach; and FIXED
+requires `voidable: false`, since decision 1 would otherwise admit a value decision 2 refuses. Nothing stores
+an "omitted" answer: decision 3 derives it from `optional` and `value`, which is the argument against a
+`field_state` enum of any size — the kernel's `field_state` goes, and §7.6's record-field row reads "permitted
+when the field is voidable". A selector adds nothing here: its field is FREE on an unmarked, non-voidable
+name, and the record's `discriminators` (#11) names it, which is where dispatch reads it. The value's role is
+the one enum the reader needs, and it is consulted once, at decision 2, to say whether a written value may
+differ from the schema's; the `_` question is a boolean because decision 1 has two outcomes, and the
+only third outcome on offer — a written `_` reads as the default, proto-schema Part 8's decoder-table rule — is
+the assignment under which a defaulted field can never be cleared.
+
+**`voidable`, not nullable.** The word names the property by the type: `void` is the type whose sole value is
+`_`, so a voidable position is one that admits `void`'s value beside its type's. It is a property of the
+*position*, not a type operator: `?` is written at a field's value, an element, an entry value or a tuple slot,
+and nowhere else — never on a choice variant — so `( T | void )` and `( T | U? )` stay refused, and §5.4's
+rationale stands unchanged: absence is the position's own state, and a variant is not a position. What changes
+is only that the record field's `?` now says the one thing every other position's `?` says. The word keeps the
+question about the value where `optional` keeps its question about the key, and it keeps JSON's `null` out of
+the model: `"type": [T, "null"]` converts to a voidable field, and null stays what [TSON-JSON] §7 makes it, the
+encoding's spelling of `_`. The degenerate case reads correctly, `a?: void?` being an optional, voidable field
+whose only writable value is `_`.
+
+**Refinement (§5.7)** is three orders and no matrix, one per question, each running from least to most
+determined: omission **A → E → I**, read off the declaration as `?` without a value, an unmarked name, and `?`
+with a value; voidable **true → false**; and role **FREE → DEFAULT → FIXED**, a default overridable until it is
+fixed. A declaration refines another exactly when no question moves backwards. That reproduces every cell of
+§5.7's current matrix: `a: T` → `a?: T ~ v` is E → I and FREE → DEFAULT, allowed, today's REQUIRED →
+REQUIRED_DEFAULT; `a?: T ~ v` → `a: T` is I → E, refused, today's REQUIRED_DEFAULT → REQUIRED; `a?: T ~ v` →
+`a?: T = v` is DEFAULT → FIXED, allowed, today's REQUIRED_DEFAULT → REQUIRED_FIXED; `a?: T?` → `a?: T` is
+voidable true → false, allowed, and `a?: T` → `a: T` is A → E, allowed, today's OPTIONAL → REQUIRED. The cell
+§5.7 and the three-question orders disagreed on, OPTIONAL_FIXED `= v` → REQUIRED_FIXED `= v`, dissolves: on a
+plain field the non-injecting pin no longer exists, and a pinned group member's presence is the group's
+(§5.11). Nothing stores the omission answer, and nothing needs to: the order is checked on the derived answer,
+which is two facts of `record_field` read together. The third invariant shapes one move: `a?: T? ~ v` reaches a
+pin only as `a?: T = v`, voidable and role moving forward together.
+
+One consequence is worth stating. A marker written in a base, `a: T = v`, may be relaxed by a subtype to
+`a?: T = v`, E → I, exactly as REQUIRED → REQUIRED_DEFAULT relaxes the obligation to write any field today; a
+family that needs its marker written in every member restates it unmarked in each. The alternative, ranking
+completeness above injection (A → I → E), would refuse REQUIRED → REQUIRED_DEFAULT, a cell of the current
+matrix, to protect a case a restatement already covers; the simple total rule wins.
+
+**Delivery is the mode's, and only admission is the field's.** The four facts decide what a document may say
+and what the schema supplies. What the reader then hands over is decided by the mode, and the two modes differ:
+
+- **Bind mode collapses the free cells.** A Java `String` field has one null. `a: T?` delivers a written `_` as
+  null, `a?: T` delivers omission as null, and `a?: T?` delivers both as null; the cells differ in what they
+  refuse, never in what they hand over. That is the collapse the original TSON design counted on at the binding
+  spot, and it is right: a bound value is an object, and an object has no place to keep a spelling. Only the *I*
+  rows change the delivered object, by supplying a value.
+- **A tree keeps the spelling.** A tree is the document, and [TSON-DATA] §2.9 says a field set to `_` is
+  "present with an absent value — distinct from not appearing at all". So `{ x: _ }` reads with `x` present as
+  the absent node and `{ }` with no `x`, in both encodings: a JSON null at a voidable member is the absent node,
+  not a member left out. The consumer that needs the difference is a tree consumer — the weight-range record's
+  `fromWeight: _` arrives as present-with-absent, no lower bound, and a missing `fromWeight` arrives missing,
+  a broken record — and the declaration's job was only to make sure the document could say both.
+
+**The inconsistency this exposes.** [TSON-JSON] §7.2 says decoded output "never records the spelling, in either
+encoding". That is true of bind mode and of this library's JSON tree, which leaves a null member out of the
+object, and false of its text tree, which keeps `_` as an absent node distinct from a missing field, as the tree
+model requires. The JSON tree has one exception already — at `OPTIONAL_FIXED = _` it keeps the null, "presence
+being the information" — and the exception is the tell: it keeps the spelling exactly where a field state says
+presence matters, so the tree's shape is leaking a state. A tree that keeps the spelling everywhere needs no
+exception. Proposed: §7.2 reads "**bound** output never records the spelling; a tree does, in either encoding",
+and the JSON tree keeps the null at every voidable member.
+
+**Patch semantics** — set, clear, or leave unchanged — are not a cell of the table. They need the three outcomes
+value, absent and missing. A tree has all three, so patch semantics are expressible in tree mode with no
+declaration involved; bind mode has two, and no declaration can give it the third. They are a capability of the
+mode, not of the field.
+
+**What it costs against today.** Every `a: T?` re-spells as `a?: T?`, or more often `a?: T`, which the census
+says is what most authors meant; every `a: T ~ v` and every `a: T = v` that relied on injection takes a `?` on
+its name, the discriminator's `name: = "fn"` included; every `= _` becomes `a?: void?`. Nothing is frozen and
+no released schema exists, so the rewrite is the bundled schemas and the corpus. The alternative, an opt-in name mark that
+leaves every existing spelling alone, reaches the same cells at the price of `?` appearing in two places with
+overlapping meanings and a per-mark admission table to keep one cell from having two spellings; it was worked
+through and set aside, because a syntax whose three marks answer three questions needs neither.
+
+### The Part 3 half
+
+Edited into [TSON-JSON] directly once the model is built:
+
+- §7's rule: JSON null is admitted at a voidable member, whatever the name mark; a missing member at a field
+  whose name is unmarked is the missing-field validation error, and at an optional field with a value it
+  injects. The mapping in §7.3 becomes one column
+  to the next: `required` decides the name's `?`, `null` in the type decides the type's `?`, `const` is `= v` and
+  `default` is `~ v`; a `const` or one-member `enum` beside null has no spelling and is reported. The sentence
+  ruling a "member that must be *present* yet null" out of TSON goes.
+- §6.1.2: at an optional voidable member the two spellings are equivalent, per §2.9's replacement sentence. At
+  a voidable member that is not optional an encoder MUST write the member, as null when the value is absent. At
+  `a?: T? ~ v` an encoder MUST write null for an absent value, because omission would decode to the default: the
+  one declaration where omitting an absent value changes it. The `= _` carve-out becomes the general rule.
+- §7.2: bound output never records the spelling; a tree does, in either encoding (*The inconsistency this
+  exposes*, above).
+
+### The evidence per cell
+
+Each of the four cells this entry argues for, on the same terms: where it comes from, what TSON does with it
+today, which reader the difference reaches, what stands in for it now, and what the proposal does with it.
+
+#### A/E/free — key optional, `_` refused
+
+**Source.** A JSON Schema property that is not in `required` and whose type does not admit null — the default
+shape of a JSON Schema field. **173,382 of 209,859 SchemaStore field declarations (82.6%), in 644 of 740
+families (87%); 473 of BFCL's 1,866 (25.3%).** That figure sizes *exposure* — every site where a stray null
+would pass — not the number of authors who meant to refuse null, and it includes every property carrying a
+`default`, since JSON Schema's `default` never injects.
+
+**Today.** The converter writes `a: T?`, which admits `_`, so TSON accepts JSON null where JSON Schema rejects it.
+This is the only construct on which the benchmark's two validators disagree: **170 of 2,341 probes, in 101 of 150
+BFCL cases, every one JSON Schema reject / TSON accept**. 76 closed once the converter carried a property's
+`default` as `a: T ~ v`, which has this cell's accept profile; the 94 that remain, in 64 cases, are fields with
+no default to lean on, and a simulated A/E/free declaration closes all 94. The series already has this cell in
+fixed form — OPTIONAL_FIXED `= v` refuses `_` under §7.6's reading adopted above — but not with a free value.
+
+**Which reader it reaches.** Not a TSON reader: omission and `_` decode to the same absence. It reaches a
+consumer of the **raw encoding**, and the schema is a promise to that consumer — "if present, a `T`" — whatever
+the author meant by leaving null out. Two deployments make it concrete:
+
+- A validator used as a gate, forwarding the document it validated rather than its decoded output. This is the
+  usual shape of structured-output validation: the model's JSON is checked, then handed on.
+- Tool calls. Omitting an argument and passing null are different calls: `f()` selects the callee's own default,
+  `f(x=None)` overrides it. A TSON gate that admits `{"x": null}` for an optional `x` has admitted a call the
+  schema's author did not.
+
+Both are safe only when the pipeline forwards TSON's bound output, which carries one absence however it was
+spelled.
+
+**What stands in for it.** Nothing in the schema. A reader policy in [TSON-JSON] — "null only where the
+declaration gives it a meaning of its own" — would refuse null at every `a: T?` in JSON, and so trade this cell
+for its neighbour: A/A/free is JSON Schema's optional-and-nullable field (OpenAPI's `nullable: true`), which
+such a reader could then no longer admit. A policy moves the gap; it does not close it.
+
+**Under the proposal.** `a?: T`. Omitted: absent. `_`: validation error. A value: the value. An encoder writes
+the value or omits the field, never `_`, and in JSON never null. `?` is already a special token ([TSON-DATA]
+§7.2.5), so `a?:` lexes as name, `?`, `:` with no lexer change. A JSON Schema converter writes `a?: T` for every
+property that is neither `required` nor nullable, and `a?: T?` only where null is admitted, which is the
+distinction the corpus shows authors drawing — with one exception: a property outside `required` that carries
+`default` is the input half of an *I* declaration (above), and converts to `a?: T ~ v`, or `a?: T? ~ v` where
+null is admitted, never to `a?: T`, which would drop the default.
+
+**Verdict: needed.** It is the commonest field shape a converter meets, and the one disagreement the benchmark
+measured.
+
+#### I/A/default — `a?: T? ~ v`
+
+**Source.** A JSON Schema property with a `default` whose type admits null; OpenAPI's `nullable: true` beside
+`default`. The use is configuration: `timeout: _` means *no timeout*, an omitted `timeout` means *the default of
+30 seconds*; `proxy: _` means *no proxy*, an omitted `proxy` means *the system's*. **Not measurable by the
+census**: JSON Schema's `default` never injects, so the census files these under A/A/free (5,685 declarations,
+106 families) and cannot separate them. The proxy — a `default` beside a null-admitting type — is still owed.
+
+**Today.** §5.2 refuses the spelling: "a default implies the field is always present, contradicting optional
+semantics". In the table's terms that sentence conflates questions 1 and 2 — a default is what *omission*
+yields, and says nothing about what `_` yields. A converter must drop the default (and lose injection) or drop
+the null (and refuse the "none" documents).
+
+**Which reader it reaches.** Every reader, TSON's included: this is the one empty cell that changes what decodes.
+Omitted, the field decodes to the default; written `_`, to absence; written, to the value.
+
+**What stands in for it.** A choice `( duration | off )` with an enum member for *off* cannot carry the default,
+because a value modifier is admitted only where the declared type resolves to an atom or an enum (§5.2). The
+alternatives are two fields, or a default applied in application code and absent from the schema.
+
+**Proto-schema Part 8 left exactly this open.** Its table for an optional field with a default marks both the
+absent field and the no-value sentinel "*Use default? Not set?*" and calls whatever rule an implementation picks
+"*arbitrary*". It is not: omission → default and `_` → unset is the only assignment that keeps both outcomes
+reachable. The article's objection to the combination — that "*an optional field with a default can never be
+cleared*" — holds only when `_` also yields the default; here `_` is how the field is cleared. Its required-with-
+default row (a sentinel warns and injects the default) is the other assignment, and the one that makes clearing
+impossible. [TSON-JSON] §7.3's position that an "explicitly cleared" marker is data does not reach this case:
+*no timeout* is not a marker standing for something else, it is the absence of a timeout.
+
+**Under the proposal.** `a?: T? ~ v`: the key may be omitted, the type is voidable, and omission yields `v`,
+which is exactly what the three questions say and what §5.2's resolver error today calls a contradiction.
+Omitted: the default, injected. `_`: absent. A value: the value. **An encoder MUST write `_` (in JSON, null)
+for an absent value**, because omission would decode to the default: the one declaration where omitting an
+absent value changes it. §5.2's SHOULD to write defaulted values applies unchanged.
+
+**Verdict: needed** — the only empty cell carrying information, and the only one a schema cannot approximate by
+restricting spellings. The corpus count is owed.
+
+#### E/E/fixed — the pinned value must be written
+
+**Source.** A JSON Schema property that is `required` and pinned by `const` or a one-member `enum`. The shape of
+a self-describing marker: JSON-RPC 2.0's `"jsonrpc": "2.0"`, which "MUST be exactly '2.0'"; an `apiVersion`; a
+`kind` in a per-kind schema; a format `version`. **4,687 SchemaStore declarations (2.2%) in 136 families; 357 in
+BFCL (19.1%), every one the discriminator `name` under `items/oneOf`, and none at an argument.**
+
+**Today.** `a: T = v` is REQUIRED_FIXED, which injects on omission, so TSON accepts a JSON-RPC request with no
+`jsonrpc` member where JSON Schema rejects it. One case is already covered: at an abstract position a missing
+discriminator is a validation error ([TSON-JSON] §6.1.5), because dispatch needs it — which is why BFCL's 357
+produce no disagreement: the converter reads them into a sealed family, and both validators reject a call with
+no `name`. A concrete position, and any marker that is not a discriminator, are not covered, and SchemaStore's
+4,687 are those. (The benchmark's converter has no `const` branch at an ordinary field and widens it to `json`;
+that is a converter defect, `f: text = "v"` being available, not a gap.)
+
+**Which reader it reaches.** A reader **without the schema**. A marker exists so that something that has not
+chosen a schema yet — a router, a version sniff, a log search — can tell what it is looking at; injection helps
+only a reader that already holds the schema, which is the reader that needed the marker least. Part 2 already
+leans this way for defaults: an encoder SHOULD write them because "a document that states its defaults reads
+without its schema" (§5.2). This cell makes the same statement binding on the reader for one field.
+
+**What stands in for it.** Nothing: every FIXED spelling injects or leaves the field absent.
+
+**Under the proposal.** `a: T = v`, the same characters as today's REQUIRED_FIXED with the injection removed.
+Omitted: validation error. `_`: validation error. A value: it MUST equal `v` (§5.2's FIXED check). Today's
+behaviour, the pin injected on omission, is `a?: T = v`, and the discriminator's terse form is that spelling.
+
+**Verdict: needed**, and less urgently than the other two: it matters to schema-less readers of self-describing
+documents, and the dispatch case is already covered. The count is in: 136 families declare it, the
+fourth-commonest cell JSON Schema spells, and outside BFCL's discriminators none of it is reached by dispatch.
