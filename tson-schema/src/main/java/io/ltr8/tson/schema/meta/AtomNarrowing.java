@@ -143,19 +143,30 @@ final class AtomNarrowing {
      * A facet a refinement may <b>set where the source left it unset, and thereafter only restate</b> --
      * §5.7's identity-only rule, for a facet where narrowing is decidable in principle and not cheaply.
      *
-     * <p>{@code pattern} is the case: whether one regular language contains another is decidable, but a
-     * schema-load check is the wrong place to spend it, and getting it wrong in the permissive direction
-     * admits a refinement that is not one. Adding a pattern to a source that has none narrows -- from every
-     * string to the ones it matches -- so that stays permitted; replacing one is refused.
+     * <p>{@code pattern} is the case it was written for: whether one regular language contains another is
+     * decidable, but a schema-load check is the wrong place to spend it, and getting it wrong in the
+     * permissive direction admits a refinement that is not one. Adding a pattern to a source that has none
+     * narrows -- from every string to the ones it matches -- so that stays permitted; replacing one is
+     * refused.
+     *
+     * <p>{@code text_type}'s {@code members} takes the same rule for a different reason, which is why the
+     * reason is a parameter: a member set is decidably narrowable, and shares its logical position with a
+     * {@code pattern} that is not. One rule for the position keeps the narrowing relation from turning on
+     * which of the two spellings the author reached for.
      *
      * <p><b>Enforceable because the facet is optional.</b> "The source left it unset" is visible in resolved
      * output, which is what §5.7's selector rule cannot say of a facet whose default is injected.
      */
     static <T> void checkSettableOnce(List<String> out, String facet, Optional<T> source, Optional<T> refined) {
+        checkSettableOnce(out, facet, source, refined, "whether one narrows the other is not decided here");
+    }
+
+    /** {@link #checkSettableOnce(List, String, Optional, Optional)} with the facet's own reason. */
+    static <T> void checkSettableOnce(List<String> out, String facet, Optional<T> source, Optional<T> refined,
+            String because) {
         if (source.isPresent() && refined.isPresent() && !source.get().equals(refined.get())) {
             out.add(facet + " " + refined.get() + " replaces the source's own " + source.get()
-                    + "; whether one narrows the other is not decided here, so a set " + facet
-                    + " may be restated but not changed");
+                    + "; " + because + ", so a set " + facet + " may be restated but not changed");
         }
     }
 

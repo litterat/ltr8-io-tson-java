@@ -250,7 +250,8 @@ class DefinitionResolverTest {
                  List.of(), List.of(), new EnumBody(List.of("true", "false")));
 
         assertEquals("{ source: { name: \"enum\" arguments: [] } "
-                        + "supertypes: [] subtypes: [] body: !enum { members: [ \"true\" \"false\" ] } }",
+                        + "supertypes: [] subtypes: [] body: !enum { members: [ \"true\" \"false\" ] "
+                        + "profile: \"IDENTIFIER\" } }",
                 write(booleanDef));
     }
 
@@ -943,9 +944,10 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesEnumFromTheRealMetaKernelFixtureNamingTheEnumSetEntry() throws IOException, DataBindException {
-        // enum => atom & { members: enum_set }, where enum_set => !set_type { element_type: identifier }.
-        // The named entry exists because `!` forms stay prohibited at field positions (§5.2) and `set`
-        // has no sugar of its own -- there is no generic application left to write here.
+        // enum => atom & { members: enum_set  profile: enum_profile ~ IDENTIFIER }, where enum_set is
+        // !set_type { element_type: text }. The named entries exist because `!` forms stay prohibited at
+        // field positions (§5.2) and `set` has no sugar of its own -- there is no generic application
+        // left to write here.
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
@@ -959,6 +961,8 @@ class DefinitionResolverTest {
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } state: \"REQUIRED\" "
                         + "} "
+                        + "{ name: \"profile\" type: { name: \"enum_profile\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: IDENTIFIER } "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(enumDef));
     }

@@ -1946,7 +1946,10 @@ rule above.
 
 **Documents:** [TSON-SCHEMA] §7.4, §9, §5.4, §5.7, §11.4; [TSON-DATA] §7.7, §8.2.
 **Kind:** limitation — a construct that spells one of the two things it models, with no way to say which was
-meant. **This entry is a proposal: nothing below is built.** What is running is §7.4 as written.
+meant. **The resolution below is built and running**, against the bundled schemas: `enum_set` is typed by
+`text`, `enum` carries `profile: enum_profile ~ IDENTIFIER`, and the identifier rule is a coherence check on
+the enum body rather than a property of the member set's element type. Conformance vectors cover both
+profiles and the default's omission from the binding record.
 
 ### The two things an enum is
 
@@ -1967,11 +1970,31 @@ document is somebody else's.
 
 ### What it costs, measured
 
-In a conversion of 150 real schemas to TSON (2,351 tool-calling contracts, 4,171 enum declarations):
-**33.9% of enum declarations cannot be an `!enum`**. 6,141 individual members fail, 99% of them for two
-mundane reasons — **57.5% contain a space** (`lightly active`, `Personal Info`, `Job History`) and **41.6%
-start with a digit** (`2D`, `3D`, `24 hours`). The share is worse in the real-world half of that pool
-(34.4%) than in the hand-authored half (25.8%), and the real-world half holds 94% of the enums.
+Measured over BFCL's AST pool — 2,351 tool-calling contracts carrying 4,171 enum declarations and 22,713
+string enum members, of which 1,000 contracts are hand-authored by the BFCL team and 1,351 are contributed
+real-world data:
+
+**33.9% of enum declarations cannot be an `!enum`**, and 6,141 individual members fail the identifier rule.
+The share is worse in the real-world half (34.4%) than in the hand-authored half (25.8%), and the
+real-world half holds 94% of the enums — so the constraint rests on contributed data rather than on one
+team's house style. (150 of these contracts were converted to TSON end to end; the enum counts are from the
+whole pool.)
+
+Where the failing members fall, by the profile that would admit them:
+
+| | Members | Of all | Of failing |
+|---|---:|---:|---:|
+| `IDENTIFIER` — admitted today | 16,572 | 73.0% | — |
+| `TOKEN` would admit — `2D`, `3DES`, `7z`, `C++`, `tar.gz`, `pm2.5` | 2,552 | 11.2% | **41.6%** |
+| needs `TEXT`, i.e. quoting — `lightly active`, `Personal Info`, `<`, `>` | 3,589 | 15.8% | **58.4%** |
+
+Of the 3,589 that need `TEXT`, **3,551 (98.9%) contain whitespace** and 38 carry other punctuation: the
+`TEXT` case is multi-word display strings almost exclusively. The `TOKEN` row was measured against this
+implementation, which accepts a bare token of letters, digits, `_`, `.`, `-` and `+`, and requires quotes
+for everything else — `@ / : % & = < >` and any whitespace.
+
+Enum sizes bear on the diagnostic argument below: median 4 members, p90 13, **max 29**, with 82 enums over
+20. A message that names the member list stays readable at that scale.
 
 Those declarations fall back to a pattern alternation. Accept/reject is exactly equivalent — TSON patterns
 are implicitly anchored — so what is lost is the diagnostic, which is the reason to have the construct at
@@ -2019,16 +2042,19 @@ profile, §7.7's identifier profile — so `member_profile: IDENTIFIER` reads in
 does not spend `form`, which §2.4 has already committed to quoted-versus-unquoted.
 
 **An enum rather than a boolean, because there is a real third point already named in the series.**
-`IDENTIFIER ⊂ TOKEN ⊂ TEXT`, where TOKEN is §7.1's unquoted-token profile: it admits `2D`, `3D`, `007`,
-`192.168.0.1` — everything writable without quotes — which is **41.6% of the failing members above**, and it
-preserves the terse unquoted spelling. This entry does not propose shipping TOKEN: it buys spelling, not
-binding (`2D` is no more a host constant than `lightly active`) and not hygiene, and there is no measured
-demand for the middle. Its existence is the argument for the shape. A boolean forecloses it; an enum slots
-into §5.7's **selector facet** category, whose rule already reads "may move under refinement only along the
-narrowing relation its members carry, which each family states" — and the relation here is that chain,
-stated in one line. It also matches the kernel's existing internal enums (`product_access_type`,
-`field_state`, `record_extension_type`, `scope_kind`), where the kernel's three booleans (`signed`,
-`unordered`, `disjoint`) are all intrinsically two-valued facts and this is not.
+`IDENTIFIER ⊂ TOKEN ⊂ TEXT`, where TOKEN is §7.1's unquoted-token profile: it admits `2D`, `3DES`, `007`,
+`192.168.0.1`, `tar.gz`, `C++` — everything writable without quotes — which is **41.6% of the failing
+members** in the table above, and it preserves the terse unquoted spelling. This entry does not propose
+shipping TOKEN: it buys spelling, not binding (`2D` is no more a host constant than `lightly active`) and
+not hygiene, and `TEXT` subsumes the whole population at the cost of quotes. But the middle is a real and
+sizeable one — 2,552 members, 11.2% of every string enum member measured — so the case for not shipping it
+is that `TEXT` covers it, not that nobody writes it. Its existence is the argument for the shape. A
+boolean forecloses it; an enum slots into §5.7's **selector facet** category, whose rule already reads
+"may move under refinement only along the narrowing relation its members carry, which each family states"
+— and the relation here is that chain, stated in one line. It also matches the kernel's existing
+internal enums (`product_access_type`, `field_state`, `record_extension_type`, `scope_kind`), where the
+kernel's three booleans (`signed`, `unordered`, `disjoint`) are all intrinsically two-valued facts and
+this is not.
 
 **IDENTIFIER by default**, for four reasons in order of weight:
 
@@ -2128,7 +2154,10 @@ JSON reader in this implementation still enforces the old rule and now needs the
 ## 22. `text_type` is the only tier with well-defined value identity and no member set
 
 **Documents:** [TSON-SCHEMA] §7.4, §9, §5.7, §5.11.
-**Kind:** omission — an asymmetry in the constraint vocabulary. **Proposal: not built.**
+**Kind:** omission — an asymmetry in the constraint vocabulary. **The resolution below is built and
+running**: `text_member_set` beside `integer_member_set`, `members` a plain field on `text_type`, the
+pattern/member coherence rule, and both facets settable once. `uri_type`, `regex_type` and `email_type`
+inherit it through the composition they already use for the length rule.
 
 ### The asymmetry
 

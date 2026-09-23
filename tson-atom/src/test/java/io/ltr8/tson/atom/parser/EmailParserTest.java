@@ -67,7 +67,7 @@ class EmailParserTest {
 
     private static EmailParser withMaxLength(int max) {
         return new EmailParser(new EmailType(EmailType.UNCONSTRAINED.spec(), Optional.empty(),
-                Optional.of(max), Optional.empty(), Optional.empty()));
+                Optional.of(max), Optional.empty(), Optional.empty(), Optional.empty()));
     }
 
     @Test
@@ -86,7 +86,8 @@ class EmailParserTest {
     @Test
     void appliesThePatternFacet() {
         EmailParser corporate = new EmailParser(new EmailType(EmailType.UNCONSTRAINED.spec(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(".*@example\\.com")));
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(".*@example\\.com"),
+                Optional.empty()));
 
         assertEquals("ada@example.com", corporate.read(token("ada@example.com")));
         assertThrows(AtomValidationException.class, () -> corporate.read(token("ada@other.com")));

@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -102,12 +103,14 @@ class RecordBindReaderTest {
                 List.of(), IntegerType.UNCONSTRAINED));
         entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
                 List.of(), TextType.UNCONSTRAINED));
+        entries.put("text_member_set", TypeDefinition.product(ArrayBody.of(TypeRef.of("text"))));
         io.ltr8.tson.schema.meta.FieldState optional = io.ltr8.tson.schema.meta.FieldState.OPTIONAL;
         entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
                 new RecordField("min_length", TypeRef.of("integer"), optional, Optional.empty()),
                 new RecordField("max_length", TypeRef.of("integer"), optional, Optional.empty()),
                 new RecordField("length", TypeRef.of("integer"), optional, Optional.empty()),
-                new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty())))));
+                new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty()),
+                new RecordField("members", TypeRef.of("text_member_set"), optional, Optional.empty())))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
@@ -133,6 +136,7 @@ class RecordBindReaderTest {
                 List.of(), IntegerType.UNCONSTRAINED));
         entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
                 List.of(), TextType.UNCONSTRAINED));
+        entries.put("text_member_set", TypeDefinition.product(ArrayBody.of(TypeRef.of("text"))));
         io.ltr8.tson.schema.meta.FieldState optional = io.ltr8.tson.schema.meta.FieldState.OPTIONAL;
         entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
                 new RecordField("min_length", TypeRef.of("integer"),
@@ -141,7 +145,8 @@ class RecordBindReaderTest {
                                 io.ltr8.tson.schema.meta.Token.Form.UNQUOTED))),
                 new RecordField("max_length", TypeRef.of("integer"), optional, Optional.empty()),
                 new RecordField("length", TypeRef.of("integer"), optional, Optional.empty()),
-                new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty())))));
+                new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty()),
+                new RecordField("members", TypeRef.of("text_member_set"), optional, Optional.empty())))));
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
                 new TsonLinkedSchema(new TsonSchema("https://example.test/s.tn",
                         "https://example.test/meta.tn", List.of(), entries)),
@@ -194,7 +199,7 @@ class RecordBindReaderTest {
         for (String name : linked.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(59, linked.schema().entries().size());
+        assertEquals(61, linked.schema().entries().size());
     }
 
     @Test
@@ -210,6 +215,7 @@ class RecordBindReaderTest {
                 List.of(), IntegerType.UNCONSTRAINED));
         entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
                 List.of(), TextType.UNCONSTRAINED));
+        entries.put("text_member_set", TypeDefinition.product(ArrayBody.of(TypeRef.of("text"))));
         io.ltr8.tson.schema.meta.FieldState optional = io.ltr8.tson.schema.meta.FieldState.OPTIONAL;
         entries.put("text_type", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
                 List.of(), List.of("email_type"),
@@ -217,7 +223,9 @@ class RecordBindReaderTest {
                         new RecordField("min_length", TypeRef.of("integer"), optional, Optional.empty()),
                         new RecordField("max_length", TypeRef.of("integer"), optional, Optional.empty()),
                         new RecordField("length", TypeRef.of("integer"), optional, Optional.empty()),
-                        new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty())))));
+                        new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty()),
+                        new RecordField("members", TypeRef.of("text_member_set"), optional,
+                                Optional.empty())))));
         // Both bodies carry the constructor's whole resolved field shape. An abbreviated stand-in used to
         // compile and silently bind null into the components it left out; the binding check refuses it now,
         // which is the same trap CLAUDE.md records against UriType/RegexType, caught at the fixture instead.
@@ -228,6 +236,7 @@ class RecordBindReaderTest {
                         new RecordField("max_length", TypeRef.of("integer"), optional, Optional.empty()),
                         new RecordField("length", TypeRef.of("integer"), optional, Optional.empty()),
                         new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty()),
+                        new RecordField("members", TypeRef.of("text_member_set"), optional, Optional.empty()),
                         new RecordField("spec", TypeRef.of("text"), optional, Optional.empty())))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);

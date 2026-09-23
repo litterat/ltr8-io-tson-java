@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=2e23da2dbb6ab99b5b227e0c7ba4a7403dd25b3a0404f7f0b399fdd73221283f"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=486d05eadd8867623e9b86ab932bc295f4355bcbe15546af07138e6487378926"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -156,8 +156,8 @@
   @doc:"""
     Identifier primitive. Instance of the unit atom constructor, and the
     type of every naming position in the series — type names, field
-    names, parameter names (through the three roles below) and enum
-    members (through enum_set). A rule stated here reaches all of them.
+    names and parameter names, through the three roles below. A rule
+    stated here reaches all of them.
 
     An identifier is a name, not a lexeme: it is the decoded text of a
     token, after unquoting, escape processing and normalisation, and it
@@ -274,7 +274,7 @@
     all of them.
 
     Enumeration: `members` lists the admitted values outright — the
-    spelling for numeric codes, since enum members are identifiers
+    spelling for numeric codes, an enum's members being text
     (`!integer ^ { members: [1 2 3] }`, not `!enum [1 2 3]`). Every
     member must itself satisfy the bounds, the width and
     `multiple_of` present on the same body — a member outside them is
@@ -307,16 +307,27 @@
     """
   non_negative_integer => !integer ^ { min: 0 }
 
+  @doc:"A named entry for the same reasons integer_member_set is one."
+  text_member_set => !set_type { element_type: text }
+
   @doc:"""
     Text constraint vocabulary. Atom constructor whose instance,
     `text`, is the kernel's Unicode code point sequence type. Lengths
     count code points.
+
+    `members` lists the admitted strings outright. Every member must
+    satisfy the other facets on the same body, the pattern included.
+
+    `pattern` and `members` are each settable once: a refinement may
+    set one the source left unset, or restate the source's own, and
+    never change it.
     """
   text_type => atom & {
     min_length:  non_negative_integer?
     max_length:  non_negative_integer?
     length:      non_negative_integer?
     pattern:     regex?
+    members:     text_member_set?
   }
 
   text => !text_type {}
@@ -639,10 +650,21 @@
     ([TSON-SCHEMA] §5.2), sets have no bracket sugar, and the `set<T>`
     template lives in meta, out of the kernel's reach.
     """
-  enum_set => !set_type { element_type: identifier }
+  enum_set => !set_type { element_type: text }
+
+  @doc:"""
+    Which lexical profile an enum's members lie in. IDENTIFIER
+    constrains every member to the identifier grammar ([TSON-DATA]
+    §7.7) and carries the name-hygiene rules that follow from it
+    (§8.2); TEXT admits any text and carries none of them. IDENTIFIER
+    is inside TEXT, which is the narrowing relation a refinement
+    follows ([TSON-SCHEMA] §5.7).
+    """
+  enum_profile => !enum [IDENTIFIER TEXT]
 
   enum => atom & {
-    members: enum_set
+    members:  enum_set
+    profile:  enum_profile ~ IDENTIFIER
   }
 
   @doc:"""

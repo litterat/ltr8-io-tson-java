@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/36/m/meta.tn?sha256=eefb6051e3a3c1f9b0366e781562c1462dd19d32f59cc6b2122869d4506c3a0c"
-!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=2e23da2dbb6ab99b5b227e0c7ba4a7403dd25b3a0404f7f0b399fdd73221283f"
-!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=2e23da2dbb6ab99b5b227e0c7ba4a7403dd25b3a0404f7f0b399fdd73221283f"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=6f4671c6da4457507dc18f791f97c564b4ab3fa617a067f3137490eefe23b2ac"
+!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=486d05eadd8867623e9b86ab932bc295f4355bcbe15546af07138e6487378926"
+!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=486d05eadd8867623e9b86ab932bc295f4355bcbe15546af07138e6487378926"
 @doc:"""
   TSON meta-schema (2026 Revision 36 draft).
 
@@ -110,9 +110,9 @@
   the value, a refinement may only tighten the step to an integer
   multiple of the inherited one, and the step composes with every
   other facet present. `members`, where it appears, is likewise
-  uniform: every member satisfies the other facets on the same body
-  or the schema fails to load, and a refinement may only shrink the
-  set.
+  uniform in what it admits: every member satisfies the other facets
+  on the same body or the schema fails to load. Refinement differs by
+  tier — the numeric tiers shrink the set, `text_type` sets it once.
   """
 {
   @doc:"""

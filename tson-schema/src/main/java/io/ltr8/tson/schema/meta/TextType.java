@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.ArrayList;
@@ -21,6 +22,11 @@ import java.util.stream.Stream;
  * TextParser}/{@code UriParser} compile it at validation time instead of storing the compiled
  * form.
  *
+ * <p><b>{@code members} is the sparse case</b>, as {@link IntegerType#members} is for integers: the strings
+ * admitted, written out. Every member must satisfy the other facets on the same body -- the length facets
+ * are checked in {@link #coherenceCheck}, the {@code pattern} is not and cannot be, needing the regex engine
+ * this module has no dependency on. {@code tson-compiler} carries that half.
+ *
  * <p>Also an {@link Atom} variant: {@code text => !text_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
@@ -29,7 +35,19 @@ public record TextType(
         @Field("min_length") Optional<Integer> minLength,
         @Field("max_length") Optional<Integer> maxLength,
         Optional<Integer> length,
-        Optional<String> pattern) implements Atom {
+        Optional<String> pattern,
+        Optional<List<String>> members) implements Atom {
+
+    @Record
+    public TextType {
+        members = members.map(List::copyOf);
+    }
+
+    /** The four facets that were this type's whole vocabulary before {@link #members} joined them. */
+    public TextType(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+            Optional<String> pattern) {
+        this(minLength, maxLength, length, pattern, Optional.empty());
+    }
 
     /** {@code text => !text_type {}} -- the unconstrained text type. */
     public static final TextType UNCONSTRAINED =
@@ -64,6 +82,8 @@ public record TextType(
         AtomNarrowing.checkAtMost(violations, "max_length", effectiveMaxLength(), other.maxLength);
         AtomNarrowing.checkAtMost(violations, "length", effectiveMaxLength(), other.length);
         AtomNarrowing.checkSettableOnce(violations, "pattern", pattern, other.pattern);
+        AtomNarrowing.checkSettableOnce(violations, "members", members, other.members,
+                "members and pattern share one position and pattern cannot be narrowed");
         return List.copyOf(violations);
     }
 
@@ -92,6 +112,11 @@ public record TextType(
      * <p>Whether a pattern admits no string of a length the same body permits ({@code min_length: 5} beside
      * {@code pattern: "a"}) is a separate question and equally unchecked, needing length-bounded emptiness
      * the engine does not expose.
+     *
+     * <p><b>{@link #members} against {@link #pattern} is checked, and not here.</b> Every member must match a
+     * pattern present on the same body, which is the one member coherence rule in the series needing a regex
+     * match rather than a comparison -- so it sits where the engine is, in {@code tson-compiler}'s resolver,
+     * beside the call that runs this method. The length facets are checked here because they are counts.
      */
     @Override
     public List<String> coherenceCheck() {
@@ -102,6 +127,15 @@ public record TextType(
         AtomCoherence.checkOrdered(violations, "min_length", minLength, "max_length", maxLength);
         AtomCoherence.checkOrdered(violations, "min_length", minLength, "length", length);
         AtomCoherence.checkOrdered(violations, "length", length, "max_length", maxLength);
+        members.ifPresent(set -> set.forEach(member -> {
+            int codePoints = member.codePointCount(0, member.length());
+            length.filter(fixed -> codePoints != fixed).ifPresent(fixed -> violations.add(
+                    "member '" + member + "' is " + codePoints + " characters, and length is " + fixed));
+            minLength.filter(min -> codePoints < min).ifPresent(min -> violations.add(
+                    "member '" + member + "' is " + codePoints + " characters, under min_length " + min));
+            maxLength.filter(max -> codePoints > max).ifPresent(max -> violations.add(
+                    "member '" + member + "' is " + codePoints + " characters, over max_length " + max));
+        }));
         return List.copyOf(violations);
     }
 

@@ -201,6 +201,11 @@
   }
 
   @doc:"Text constraint vocabulary. Its instance `text` is the kernel's Unicode code point sequence type."
+  text_member_set => !type_definition {
+    source: set_type
+    body: !set_type { element_type: text  min_items: 1 }
+  }
+
   text_type => !type_definition {
     supertypes: [atom top]
     subtypes: [regex_type uri_type]
@@ -209,6 +214,7 @@
       !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
       !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
       !record_field { name: pattern     type: regex    state: OPTIONAL }
+      !record_field { name: members     type: text_member_set  state: OPTIONAL }
     ] }
   }
 
@@ -233,6 +239,7 @@
       !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
       !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
       !record_field { name: pattern     type: regex    state: OPTIONAL }
+      !record_field { name: members     type: text_member_set  state: OPTIONAL }
       !record_field { name: spec        type: uri   state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
       !record_field { name: scheme      type: text  state: OPTIONAL }
     ] }
@@ -251,6 +258,7 @@
       !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
       !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
       !record_field { name: pattern     type: regex    state: OPTIONAL }
+      !record_field { name: members     type: text_member_set  state: OPTIONAL }
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9485" }
     ] }
   }
@@ -436,7 +444,12 @@
   @doc:"A named entry rather than an inline form: ! constructor applications remain prohibited at field positions (Part 2 Section 5.2) and set_type has no sugar of its own."
   enum_set => !type_definition {
     source: set_type
-    body: !set_type { element_type: identifier  min_items: 1 }
+    body: !set_type { element_type: text  min_items: 1 }
+  }
+
+  enum_profile => !type_definition {
+    source: enum
+    body: !enum { members: [IDENTIFIER TEXT] }
   }
 
   @doc:"A count. Refines integer rather than constructing beside it, so it IS-A integer."
@@ -455,6 +468,7 @@
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: members  type: enum_set }
+      !record_field { name: profile  type: enum_profile  state: REQUIRED_DEFAULT  value: IDENTIFIER }
     ] }
   }
 
