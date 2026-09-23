@@ -241,6 +241,7 @@
   }
 
   @doc:"Octet sequence, and the only binary type. The alphabet a text encoding spells it in is @bytes_encoding's, not the type's."
+  @ordered:NONE @bounded:false
   bytes => !type_definition {
     source: bytes_type
     body: !bytes_type { encoding: BASE64 }
@@ -255,27 +256,28 @@
     body: !date_type {}
   }
 
-  @doc:"Time of day. RFC 3339 full-time. PARTIAL ordering across timezone offsets."
-  @ordered:PARTIAL @bounded:true
+  @doc:"Time of day. RFC 3339 full-time with a mandatory offset. TOTAL ordering: the value is the instant, normalised to UTC."
+  @ordered:TOTAL @bounded:true
   time => !type_definition {
     source: time_type
     body: !time_type {}
   }
 
-  @doc:"Date and time. RFC 3339 date-time. PARTIAL ordering across timezone offsets."
-  @ordered:PARTIAL @bounded:false
+  @doc:"Date and time. RFC 3339 date-time with a mandatory offset. TOTAL ordering: the value is the instant on the UTC timeline."
+  @ordered:TOTAL @bounded:false
   datetime => !type_definition {
     source: datetime_type
     body: !datetime_type {}
   }
 
-  @doc:"Time duration. ISO 8601 PnYnMnDTnHnMnS. PARTIAL ordering: calendar units have no fixed length."
-  @ordered:PARTIAL @bounded:false
+  @doc:"Elapsed time, a signed rational number of seconds. TOTAL ordering: no month component, so every value has a fixed length."
+  @ordered:TOTAL @bounded:false
   duration => !type_definition {
     source: duration_type
     body: !duration_type {}
   }
 
+  @ordered:TOTAL @bounded:false
   period => !type_definition {
     source: period_type
     body: !period_type {}
@@ -339,12 +341,14 @@
   }
 
   @doc:"A type from a foreign schema, which the value names for itself."
+  @ordered:NONE @bounded:false
   extern => !type_definition {
     source: scoped
     body: !scoped { scope: [EXTERN] }
   }
 
   @doc:"A type from either namespace — the widest scoped instance."
+  @ordered:NONE @bounded:false
   dynamic => !type_definition {
     source: scoped
     body: !scoped { scope: [LOCAL EXTERN] }

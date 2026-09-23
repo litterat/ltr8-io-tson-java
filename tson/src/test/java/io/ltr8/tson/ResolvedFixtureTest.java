@@ -129,7 +129,8 @@ class ResolvedFixtureTest {
      * <b>And every entry resolves to the same thing.</b> No category of difference is expected or tolerated:
      * this resolver's output and the spec's own published resolver output agree, entry for entry, over
      * {@code kind}, {@code source}, {@code parameters}, {@code constructor}, {@code supertypes}, {@code
-     * subtypes}, {@code disjoint}, {@code body} and the annotations each carries.
+     * subtypes}, {@code disjoint} and {@code body}. An entry's annotations sit on its schema-map key, which
+     * binding drops, so they are not compared here: {@link #everyKeyCarriesTheSameAnnotations} compares them.
      *
      * <p>What the agreement rests on is worth knowing before changing any of it: {@code array}, {@code set}
      * and {@code map} carry no parameter lists ([TSON-SCHEMA] §4.2), so a container form is never an
@@ -142,6 +143,29 @@ class ResolvedFixtureTest {
                     ResolvedForm.rendered(fixtureDefinition), ResolvedForm.rendered(comparison.ours().get(name)),
                     comparison.label() + ": " + name + " does not resolve to what the fixture records"));
         }
+    }
+
+    /**
+     * <b>And every entry's key carries the same annotations</b> -- {@code @ordered}, {@code @bounded}, {@code
+     * @exact}, {@code @numeric} and the rest, {@code @doc} aside. They sit on the schema-map key, where binding
+     * the fixture drops them, so this is the one assertion that reaches them; through the bound document both
+     * sides would carry none and agree for the wrong reason, which is how a fixture drifts unnoticed.
+     */
+    @Test
+    void everyKeyCarriesTheSameAnnotations() throws Exception {
+        Map<String, String> fixtures = Map.of(
+                "meta-kernel-resolved.tn", TsonBundledSchemas.META_KERNEL_ID,
+                "meta-resolved.tn", TsonBundledSchemas.META_ID,
+                "core-resolved.tn", TsonBundledSchemas.CORE_ID);
+        for (Map.Entry<String, String> fixture : fixtures.entrySet()) {
+            Map<String, List<String>> written = ResolvedForm.fixtureKeyAnnotations(
+                    Files.readString(specDirectory().resolve(fixture.getKey())));
+            Map<String, List<String>> ours = ResolvedForm.ourKeyAnnotations(tson(), fixture.getValue());
+            assertEquals(written, ours, fixture.getKey() + ": a key's annotations differ from this resolver's");
+        }
+        // Non-vacuous: core marks its atoms, so an empty-equals-empty pass is not available here either.
+        assertTrue(ResolvedForm.fixtureKeyAnnotations(Files.readString(specDirectory().resolve("core-resolved.tn")))
+                .get("int32").contains("@ordered:TOTAL"), "core-resolved.tn marks int32 @ordered:TOTAL");
     }
 
     /**

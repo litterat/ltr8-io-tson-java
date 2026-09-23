@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -170,6 +171,53 @@ final class ResolvedForm {
             }
         });
         return marked;
+    }
+
+    /**
+     * Annotation names a key comparison leaves out: {@code doc}, whose text a fixture abbreviates to a summary
+     * of the source's, and {@code synthetic}, which {@link #markedSynthetics} compares on its own terms.
+     */
+    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", "synthetic");
+
+    /**
+     * Each schema-map key's annotations in a §8 resolved-schema document, as {@code @name} or {@code
+     * @name:value}, hashes normalised -- read from the document's <em>text</em>, parsed as data.
+     *
+     * <p>Parsed rather than bound, for {@link #markedSynthetics}' reason: a key-position annotation is dropped
+     * when the document is bound, so a comparison through the value model would find none on either side.
+     * Parsed rather than scanned, because an annotation value is a token and a regex over the text cannot
+     * tell one from the prose inside a {@code @doc}.
+     */
+    static Map<String, List<String>> fixtureKeyAnnotations(String resolvedText) {
+        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseDocument().root().coreValue();
+        Map<String, List<String>> keys = new TreeMap<>();
+        for (MapValue.MapEntry entry : map.entries()) {
+            String name = ((TokenValue) entry.key().coreValue()).text();
+            keys.put(withoutHash(name), entry.key().annotations().stream()
+                    .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
+                    .map(annotation -> "@" + annotation.name() + annotation.value()
+                            .map(value -> ":" + ((TokenValue) value.coreValue()).text()).orElse(""))
+                    .sorted().toList());
+        }
+        return keys;
+    }
+
+    /** The same, from this resolver: the annotations on the keys of the schema's own entries. */
+    static Map<String, List<String>> ourKeyAnnotations(Tson tson, String id) {
+        var linked = tson.bindRegistry().core().resolveLinked(id);
+        var entries = linked.schema().entries();
+        String canonical = CanonicalIdentity.canonicalize(id);
+        Map<String, List<String>> keys = new TreeMap<>();
+        entries.forEach((name, definition) -> {
+            if (linked.originOf(name).equals(canonical)) {
+                keys.put(withoutHash(name), entries.getAnnotations(name).values().stream()
+                        .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
+                        .map(annotation -> "@" + annotation.name()
+                                + annotation.value().map(value -> ":" + value).orElse(""))
+                        .sorted().toList());
+            }
+        });
+        return keys;
     }
 
     /**
