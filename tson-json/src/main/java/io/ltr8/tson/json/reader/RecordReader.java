@@ -139,8 +139,9 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
 
     /**
      * A member written null. §7 spends it as the absent sentinel before any type rule applies, so what happens
-     * next is the field's facts and nothing else: at a voidable field the two spellings are equivalent and
-     * decoded output records neither, so the member decodes to absence. A FIXED field never reaches here.
+     * next is the field's facts and nothing else: at a voidable field the member decodes to absence, stated --
+     * which a tree keeps as {@code JsonNull} and bind mode delivers as {@code null} (§7.2). A FIXED field never
+     * reaches here.
      */
     private Object statedNull(JsonReadContext ctx, int at, String memberName) {
         ctx.next();

@@ -160,9 +160,9 @@ work, and the first is the largest single obstacle to the stated goal.
 4. **Enum members must be identifiers.** `"in-progress"` converts; `"not found"` does not. The fallback is a
    `text` refinement with a pattern, which costs the enum its discrimination class and so costs §8.2's untagged
    route a variant it could have dispatched on.
-5. **Required-but-nullable.** `required: [x]` beside `type: [X, "null"]` has no TSON spelling — present with
-   an absent value is not a state (§7.3), and OPTIONAL would *weaken* the source contract. Drop-with-report,
-   per the companion note's list D.
+5. **Required-but-nullable converts; a pin beside null does not.** `required: [x]` beside `type: [X, "null"]`
+   is `x: X?` — each keyword decides one mark (§7.3). What has no spelling is `const` or a one-member `enum`
+   beside null, a pin on a voidable type. Drop-with-report, per the companion note's list D.
 6. **`format` becomes binding.** JSON Schema's `format` is advisory; the atom it converts to is not. A
    document that passed with a malformed `format: email` value fails here. That is the point of converting and
    still a change of behaviour, so a converter should say so rather than let it surface as a first-request

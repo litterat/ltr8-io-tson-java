@@ -149,17 +149,18 @@ class JsonContainerReadTest {
     // ── §6.1.2 presence and absence, and §7 ──────────────────────────────
 
     /**
-     * §6.1.2: an absent OPTIONAL field has two spellings -- omitted, or present with null -- and decoded
-     * output never records which arrived. Encoders SHOULD omit, so omission is what both decode to.
+     * §6.1.2 and §7.2: at a field that admits both, omission and null are two spellings of one absence, and a
+     * tree keeps which arrived -- a member written null stands as null, one never written is not there -- as
+     * the text tree keeps {@code _} apart from a missing field. Bound output has one null for both.
      */
     @Test
-    void theTwoSpellingsOfAnAbsentOptionalFieldDecodeIdentically() {
+    void aTreeKeepsWhichSpellingOfAbsenceArrived() {
         String omitted = json(read("person", """
                 {"name": "Ada"}""").accepted());
         String stated = json(read("person", """
                 {"name": "Ada", "nickname": null}""").accepted());
-        assertEquals(omitted, stated);
-        assertTrue(omitted.indexOf("nickname") < 0, "an absent optional field is omitted: " + omitted);
+        assertTrue(omitted.indexOf("nickname") < 0, "a member never written is not there: " + omitted);
+        assertTrue(stated.contains("\"nickname\":null"), "a member written null is kept: " + stated);
     }
 
     /** §6.1.2/§7: at a REQUIRED-family field a null member is a validation error, precisely as `_` is in text. */
@@ -231,7 +232,7 @@ class JsonContainerReadTest {
     @Test
     void aVoidableFieldWithAnUnmarkedNameTakesNullAndRefusesOmission() {
         assertEquals("""
-                {"timeout":30,"version":"2.0"}""", json(read("marks", """
+                {"from":null,"timeout":30,"version":"2.0"}""", json(read("marks", """
                 {"from": null, "version": "2.0"}""").accepted()));
         Diagnostic missing = read("marks", """
                 {"version": "2.0"}""").refusal();
@@ -252,7 +253,7 @@ class JsonContainerReadTest {
     @Test
     void aVoidableDefaultedFieldIsClearedByNullAndDefaultedByOmission() {
         assertEquals("""
-                {"from":1,"version":"2.0"}""", json(read("marks", """
+                {"from":1,"timeout":null,"version":"2.0"}""", json(read("marks", """
                 {"from": 1, "timeout": null, "version": "2.0"}""").accepted()));
         assertEquals("""
                 {"from":1,"timeout":30,"version":"2.0"}""", json(read("marks", """

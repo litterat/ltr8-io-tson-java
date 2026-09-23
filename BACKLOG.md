@@ -70,12 +70,6 @@ it — and no schema declares one, so nothing in this stack reads a schema-side 
 written. A record is closed under its type and open-ended data is a declared map-typed field, identically in both
 encodings ([TSON-JSON] §6.1.1).
 
-- [ ] **The JSON tree drops a null member at a voidable field.** `RecordReader.statedNull` answers `Slots.ABSENT`
-  at every voidable field, so `{"from": null}` and `{}` read to the same tree, where the text tree keeps `_` as
-  an absent node distinct from a missing field. `SPEC-FEEDBACK.md` #23 (*The inconsistency this exposes*)
-  proposes the tree keep the null in both encodings and §7.2 say that only *bound* output never records the
-  spelling; the Part 3 edit is owed with it, and `CrossEncodingParityTest` is where the two trees agree.
-
 - [ ] **A JSON document has no in-band way to name its schema — §3.4's second route.** The out-of-band route
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
   and it is the one the spec calls the expected production route. What is left is the in-band one: a root value
