@@ -25,7 +25,7 @@ import io.ltr8.tson.schema.meta.RegexType;
  * constraint field is {@code String} for the identical reason).
  *
  * <p><b>Validation goes through {@code tson-regex}, not {@code java.util.regex}.</b> {@code regex_type}'s
- * {@code spec} is pinned {@code REQUIRED_FIXED} to RFC 9485 (I-Regexp), so the text is validated against the
+ * {@code spec} is pinned to RFC 9485 (I-Regexp), so the text is validated against the
  * I-Regexp subset via {@link TsonRegex#parse} -- which rejects the non-interoperable constructs the JVM's
  * engine would silently accept ({@code \d}/{@code \w}/{@code \s}, subtraction, back-references, lookaround,
  * Unicode blocks). The parsed form is discarded once validation passes; matching a value against a {@code

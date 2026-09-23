@@ -9,7 +9,7 @@ import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.Reference;
@@ -771,16 +771,16 @@ final class TemplateMaterialiser {
 
     /**
      * §5.7's fixation, applied where the section says it happens: "fixation happens downstream, where values
-     * are concrete". A field routed by {@code = P} is held as {@code state: REQUIRED} with the parameter
-     * standing in {@code value}, and a REQUIRED field carrying a value is that and nothing else -- a closed
-     * REQUIRED field has none, which is what {@code REQUIRED_FIXED} means. Once substitution has made the
-     * value concrete the field takes the state its literal spelling would have had. A {@code ~ P} default
-     * arrives as {@code REQUIRED_DEFAULT} and stays one: data may still override it.
+     * are concrete". A field routed by {@code = P} is held as a required FREE field with the parameter
+     * standing in {@code value}, and a FREE field carrying a value is that and nothing else -- a closed FREE
+     * field has none. Once substitution has made the value concrete the field takes the facts its literal
+     * spelling would have had, optional and FIXED. A {@code ~ P} default arrives as a DEFAULT and stays one:
+     * data may still override it.
      *
      * <p><b>Fixation is also where a family's selectors stop.</b> Which fields a family dispatches <em>on</em>
      * is the base's statement ({@code record.discriminators}): the base declares the selectors unpinned and
      * names them, and whoever pins them is a member and carries the values instead. A template's own field is
-     * the base's -- REQUIRED with the parameter standing in {@code value} -- so the names belong in the held
+     * the base's -- required with the parameter standing in {@code value} -- so the names belong in the held
      * body; the instantiation that closes it has pinned them, so it names none, which is what the body built
      * here leaves unstated.
      */
@@ -789,8 +789,8 @@ final class TemplateMaterialiser {
             return body;
         }
         return new RecordBody(record.supertypes(), record.fields().stream()
-                .map(field -> field.state() == FieldState.REQUIRED && field.value().isPresent()
-                        ? field.withState(FieldState.REQUIRED_FIXED)
+                .map(field -> field.role() == FieldRole.FREE && field.value().isPresent()
+                        ? field.withFacts(true, false, FieldRole.FIXED)
                         : field)
                 .toList(), record.groups(), closedExtension(record));
     }

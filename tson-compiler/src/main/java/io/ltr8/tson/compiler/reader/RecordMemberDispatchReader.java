@@ -18,7 +18,7 @@ import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
@@ -129,7 +129,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         for (Selector selector : selectors) {
             Optional<RecordField> field = record.fields().stream()
                     .filter(f -> Nfc.of(f.name()).equals(selector.name())).findFirst();
-            if (field.isEmpty() || field.get().state() != FieldState.REQUIRED_FIXED
+            if (field.isEmpty() || field.get().role() != FieldRole.FIXED
                     || field.get().value().isEmpty()) {
                 return null; // the linker already refused this; the family is read without it
             }

@@ -34,7 +34,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.EnumProfile;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
@@ -1466,7 +1466,7 @@ public final class TsonSchemaLinker {
             // message follows: it already states the rule and cites the section, so nothing here restates it.
             throw new SchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
                     + "declared '" + field.type().name() + "', but its "
-                    + (field.state() == FieldState.REQUIRED_DEFAULT ? "default" : "fixed value") + " "
+                    + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " "
                     + asWritten(value) + " is not a value of that type -- " + e.getMessage() + ". §5.2 makes "
                     + "a field's fixed or default value a value of the field's own declared type");
         }
@@ -1492,7 +1492,7 @@ public final class TsonSchemaLinker {
                                                                  Token value, Top body) {
         return new SchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
                 + "declared '" + field.type().name() + "', which is " + describe(body) + ", so it cannot "
-                + "have " + (field.state() == FieldState.REQUIRED_DEFAULT ? "a default" : "a fixed value")
+                + "have " + (field.role() == FieldRole.DEFAULT ? "a default" : "a fixed value")
                 + " -- " + asWritten(value) + " is a token, and §5.2 admits only a bare token there. A "
                 + "fixed or default value is available on a field typed by an atom or an enum, and nowhere "
                 + "else: drop the modifier, or declare the field with a scalar type");

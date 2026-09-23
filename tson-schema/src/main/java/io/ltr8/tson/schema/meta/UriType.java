@@ -51,7 +51,7 @@ public record UriType(String spec, @Field("min_length") Optional<Integer> minLen
      *
      * <p>The length facets narrow as {@link TextType}'s own rule says, {@link #length} pinning both ends.
      * {@link #pattern} is undecidable here for the reason {@link TextType#constraintsCheck} gives;
-     * {@link #scheme} is a selector ({@link ComplexType}); {@code spec} is {@code REQUIRED_FIXED} in the
+     * {@link #scheme} is a selector ({@link ComplexType}); {@code spec} is fixed in the
      * schema, so a refinement cannot move it in the first place.
      */
     @Override

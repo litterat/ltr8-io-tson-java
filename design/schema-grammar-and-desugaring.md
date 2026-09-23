@@ -111,7 +111,7 @@ rebuilt and called a cache.
 - **The variadic pair, `choice` and `tuple`, differ in what one position *is*.** A variant is a bare
   `type_ref`; an element is a `tuple_element` record carrying a type **and** its own `ElementState`, so each
   tuple position needs a record built for it. `state` is written only for an `OPTIONAL` position — the member
-  is `REQUIRED_DEFAULT` (`state: element_state ~ REQUIRED`), so a `REQUIRED` one is spelled by omitting it,
+  is defaulted (`state: element_state ~ REQUIRED`), so a `REQUIRED` one is spelled by omitting it,
   as every other defaulted vocabulary field is. Nothing rides on trust: the emitted body binds through the
   governing meta's compiled reader, where an undeclared member is `UNRECOGNIZED_FIELD` under §7.2's closure.
   §5.4's "each variant resolves to a distinct type" is deliberately not checked here — it is a question about
@@ -133,7 +133,7 @@ rebuilt and called a cache.
 - **The element `?` binds `state` directly.** `[T?]` becomes `!array { element_type: T  state: OPTIONAL }` —
   §5.3's "elements at any position MAY be the absent sentinel `_`; absent elements occupy positional slots".
   It has no parameter to route through, which is why §5.3 gives the `?` forms no template route. An unmarked
-  element states nothing and lets §5.2's REQUIRED_DEFAULT injection supply `REQUIRED`, exactly as a REQUIRED
+  element states nothing and lets §5.2's default injection supply `REQUIRED`, exactly as a REQUIRED
   tuple position omits its own `state`. The state reaches the derived name too, or `[T?]` and `[T]` collide on
   one injected entry. `[T?; 3]` — the form §5.3 states the rule through — puts the state and both bounds on
   one binding record, which is the shape the whole table is written in. On the read side `ArrayAbstractReader`

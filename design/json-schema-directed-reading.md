@@ -230,7 +230,8 @@ mode. What differs by mode is decided in two places, neither of them on the per-
 
 **A slot says what the document did.** Null is unstated and non-null is stated — which is what the duplicate
 check, the group count and the absent-field pass ask, so there is no second array — and three `RecordReader`
-markers carry what a value cannot: stated-as-absent, null kept at `OPTIONAL_FIXED = _`, and a child's refusal.
+markers carry what a value cannot: stated-as-absent, null kept at a field pinned to absent (`= _`, written or
+injected where omitted), and a child's refusal.
 Each builder decides what they become. The rules are methods on the plan and in the loop, not a superclass, so the
 loop is the whole of what a record read does.
 

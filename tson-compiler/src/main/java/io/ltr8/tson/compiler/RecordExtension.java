@@ -10,7 +10,7 @@ import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
@@ -136,16 +136,16 @@ final class RecordExtension {
      */
     private static void checkDiscriminatorField(String name, RecordField field, List<FieldGroup> groups,
             Map<String, TypeDefinition> merged, List<Violation> violations) {
-        // Group membership is checked first and alone: §5.11 forces a member OPTIONAL, so the state rule
+        // Group membership is checked first and alone: §5.11 forces a member optional, so the state rule
         // would fire too and report the symptom beside the cause. One mistake, one verdict.
         if (groups.stream().anyMatch(group -> group.members().contains(field.name()))) {
             violations.add(new Violation(name, "'" + name + "': discriminator field '" + field.name()
                     + "' is a member of a field group, whose members are mutually exclusive and uniformly "
                     + "optional (§5.11) -- so a conforming value may leave it out, and a selector that may be "
                     + "absent selects nothing. Declare it beside the group instead"));
-        } else if (field.state() != FieldState.REQUIRED) {
+        } else if (field.optional() || field.voidable() || field.role() != FieldRole.FREE) {
             violations.add(new Violation(name, "'" + name + "': discriminator field '" + field.name()
-                    + "' is " + field.state() + ", and must be REQUIRED -- an optional selector leaves a value "
+                    + "' is " + field.describe() + ", and must be required -- an optional selector leaves a value "
                     + "with nothing to dispatch on, and a pinned or defaulted one fixes in the base what each "
                     + "subtype has to state differently (§5.2, §5.7)"));
         }
@@ -222,14 +222,14 @@ final class RecordExtension {
         for (RecordField selector : selectors) {
             RecordField pinned = record.fields().stream()
                     .filter(f -> f.name().equals(selector.name())).findFirst().orElse(null);
-            if (pinned == null || pinned.state() != FieldState.REQUIRED_FIXED || pinned.value().isEmpty()) {
+            if (pinned == null || pinned.role() != FieldRole.FIXED || pinned.value().isEmpty()) {
                 if (localNames.contains(subtype)) {
                     violations.add(new Violation(subtype, "'" + subtype + "' is a subtype of the sealed '"
                             + base + "' but does not pin its discriminator '" + selector.name() + "' -- every "
                             + "member of a sealed family states its own value for each selector, with `= `, "
                             + "and it is those values a position typed '" + base + "' dispatches on. "
                             + (pinned == null ? "The field is not restated here."
-                                    : "It is " + pinned.state() + " here, and a default is omissible so it "
+                                    : "It is " + pinned.describe() + " here, and a default is omissible so it "
                                             + "cannot dispatch.") + " (§5.2, §5.7)"));
                 }
                 return null;

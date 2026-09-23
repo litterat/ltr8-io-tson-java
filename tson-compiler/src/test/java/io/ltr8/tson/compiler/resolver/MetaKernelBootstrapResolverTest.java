@@ -102,7 +102,7 @@ class MetaKernelBootstrapResolverTest {
 
         assertEquals(new EnumBody(List.of("INDEX", "NAMED")), schema.entries().get("product_access_type").body());
         assertEquals(new EnumBody(List.of("FIXED", "VARIABLE")), schema.entries().get("product_size_type").body());
-        for (String name : List.of("field_state", "element_state")) {
+        for (String name : List.of("field_role", "element_state")) {
             assertInstanceOf(EnumBody.class, schema.entries().get(name).body());
         }
     }

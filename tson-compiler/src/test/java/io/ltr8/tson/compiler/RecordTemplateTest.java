@@ -9,7 +9,6 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -163,7 +162,7 @@ class RecordTemplateTest {
 
         RecordField attempts = fieldOf(compiled, fieldType(compiled, "holder", "r"), "attempts");
         assertEquals("3", attempts.value().orElseThrow().text());
-        assertEquals(FieldState.REQUIRED_DEFAULT, attempts.state(), "a routed default stays a default");
+        assertEquals("defaulted", attempts.describe(), "a routed default stays a default");
     }
 
     /**
@@ -185,7 +184,7 @@ class RecordTemplateTest {
         RecordField first = fieldOf(compiled, fieldType(compiled, "holder", "d"), "first");
         assertEquals(TypeRef.of("int32"), first.type(), "T stood in the type slot");
         assertEquals("10", first.value().orElseThrow().text(), "N stood in the value slot");
-        assertEquals(FieldState.REQUIRED_DEFAULT, first.state(), "~ is a default, and stays one");
+        assertEquals("defaulted", first.describe(), "~ is a default, and stays one");
 
         SchemaValidationException swapped = assertThrows(SchemaValidationException.class,
                 () -> compile("""

@@ -11,7 +11,6 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -55,7 +54,9 @@ final class RecordPlan {
     final String[] names;
 
     final RecordField[] fields;
-    final FieldState[] states;
+
+    /** What each field yields when the document never writes it ({@link RecordField#omitted}). */
+    final RecordField.Omitted[] omitted;
 
     /** The reader each field's declared type compiled to -- what a mode reads a field at unless it re-targets it. */
     final JsonTypeReader<?>[] schemaReaders;
@@ -82,7 +83,7 @@ final class RecordPlan {
         int count = body.fields().size();
         this.fields = body.fields().toArray(RecordField[]::new);
         this.names = new String[count];
-        this.states = new FieldState[count];
+        this.omitted = new RecordField.Omitted[count];
         this.schemaReaders = new JsonTypeReader<?>[count];
         this.stated = new FieldValue[count];
         Map<String, Integer> byName = new HashMap<>();
@@ -91,7 +92,7 @@ final class RecordPlan {
             // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule.
             names[i] = Nfc.of(field.name());
             byName.put(names[i], i);
-            states[i] = field.state();
+            omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.members().contains(field.name())));
             schemaReaders[i] = context.readers().resolve(field.type().name());
             if (field.value().isPresent()) {
                 stated[i] = FieldValue.of(context.schema(), field.type().name(), field.value().get());

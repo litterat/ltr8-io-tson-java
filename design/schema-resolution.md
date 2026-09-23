@@ -11,8 +11,10 @@ field states, groups, subtraction, and the exception boundary. Current form only
 - `abstract`/`final` are grammar, not annotations; `=?` is field syntax; and the definition mark is
   applied once, in `resolve`, not inside whichever `resolve*` built the body.
 - A restated field's annotations concatenate over the inherited ones, restatement first — never replacement by name.
-- A modifier-only tightening moves only the mutability axis (`= 0` on an inherited-OPTIONAL field is `OPTIONAL_FIXED`);
-  a parametric modifier is the exception and lands in a REQUIRED-family state.
+- A modifier-only tightening keeps the presence marker it inherits, so `= 0` on an inherited-optional field is a pin
+  on a voidable field and is refused; a parametric `= P` is the exception and lands required and FREE.
+- Refinement of a field is three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
+  omission yields, so the order on it is checked on `RecordField.omitted`.
 - Subtraction runs last, empties `type_definition.supertypes` (every supertype goes) and keeps `record.supertypes` as
   lineage.
 - `subtypes` is linking's throughout: a closed entry's own `subtypes` is empty when it is minted.
@@ -165,26 +167,35 @@ are kept in step deliberately.
   subtraction (`A & { ... } - { f }`, §5.9);
   restating a field group in a refinement or composition body (§5.11 — same member labels in the same order,
   types verbatim, state tightening OPTIONAL→REQUIRED only; only the *group's* state moves, since members
-  flatten as `OPTIONAL` regardless).
-- **All six of §5.2's field-state spellings resolve**, including `field: type? = _` — `OPTIONAL_FIXED`
-  carrying *no* value, so §8.1 writes a `record_field` without a `value` member and the field must be
-  omitted or written `_`. Its three resolver errors are enforced: `~ _` on any field, `= _` on a REQUIRED
-  one, and `type? ~ value`. **Presence comes from the entry's own `?` when it restates a type, else from the
-  field it tightens** — §5.2 makes `= _` valid on a field "declared with `?` *or inherited as OPTIONAL*",
-  and a modifier-only entry has no `?` to read. That is why `resolveField` takes the whole inherited
-  `RecordField`, not just its type. A consequence worth knowing: a modifier-only tightening moves only the
-  *mutability* axis (§5.7's "only the value state changes"), so an inherited-OPTIONAL field pinned with
-  `= 0` lands in `OPTIONAL_FIXED`, not `REQUIRED_FIXED` — promoting it to always-present takes restating the
-  type (`min: integer = 0`). The exception is a **parametric** modifier, which §5.7's "Open modifiers" puts
-  in a REQUIRED-family state whatever the presence axis says (that is what makes a user template's
-  `min_items: = MIN` mandatory), so the parameter branch sits ahead of the `OPTIONAL_FIXED` one.
+  flatten as optional and voidable regardless).
+- **A resolved field is four facts, not a state** (`RecordField`, the kernel's `record_field`): `optional`
+  (the key may be omitted), `voidable` (a written `_` is admitted), `role` (FREE, DEFAULT or FIXED) and
+  `value`. `FieldModifiers.of` maps each spelling: `a: T` states none; `a: T?` is optional and voidable;
+  `a: T ~ v` and `a: T = v` are optional with a DEFAULT or FIXED value, omission injecting either; `a: T? = _`
+  is optional, voidable and FIXED with no value — pinned to `_`, so §8.1 writes a `record_field` without a
+  `value` member. Its resolver errors are enforced: `~ _` on any field, `= _` on a required one,
+  `type? ~ value`, and **`type? = value`, a pin on a voidable field**, which the facts cannot hold — the
+  written-`_` decision would admit what the pin refuses. **Presence comes from the entry's own `?` when it
+  restates a type, else from the field it tightens** — §5.2 makes `= _` valid on a field "declared with `?`
+  *or inherited as OPTIONAL*", and a modifier-only entry has no `?` to read. The `?` is the only thing that
+  makes a field voidable, so the inherited `voidable` is the marker read. That is why `resolveField` takes the
+  whole inherited `RecordField`, not just its type, and why `= 0` on an inherited-optional field is refused:
+  it spells `type? = 0`. Pinning it takes restating the type (`min: integer = 0`). The exception is a
+  **parametric** `= P`, which §5.7's "Open modifiers" leaves required and FREE with the parameter in `value`
+  whatever the marker says (that is what makes a user template's `min_items: = MIN` mandatory), so the
+  parameter branch sits ahead of the optional-pin refusal; materialisation turns it optional and FIXED.
+- **Refinement is three orders** (`refines`), one per question a field answers, each least to most
+  determined: what omission yields, absent → missing-field error → injected (`RecordField.omitted`, asked of
+  a plain field); voidable → not; role FREE → DEFAULT → FIXED. A restatement refines its source when no order
+  moves backwards, and a FIXED field keeps what it is pinned to, `_` or a value. That reproduces §5.7's
+  transition matrix cell for cell, and the matrix exists nowhere in the code.
 - **§5.11's group presence rule is checked after every body**, refinement and composition alike: two members
-  of one group both left in a REQUIRED-family state (`REQUIRED`/`REQUIRED_DEFAULT`/`REQUIRED_FIXED`) is a
+  of one group both always present (required, or carrying a value that omission injects) is a
   resolver error, because a group admits at most one member and nothing could satisfy the result. Only this
-  declaration's own tightenings can trip it — members flatten as `OPTIONAL` when first declared, so by
+  declaration's own tightenings can trip it — members flatten as optional when first declared, so by
   induction a source that passed hands on at most one always-present member. `= _` is deliberately *not*
-  always-present (it lands in `OPTIONAL_FIXED`); forbidding one alternative's value is what §5.11 offers it
-  for. The spec says "a refinement" but the paragraph is headed "Refinement and composition" and a
+  always-present: a member pinned to `_` is never injected; forbidding one alternative's value is what §5.11
+  offers it for. The spec says "a refinement" but the paragraph is headed "Refinement and composition" and a
   composition body builds the identical unsatisfiable type, so both are checked.
 - **Subtraction runs last and breaks IS-A on purpose** (§5.9). Supertypes merge, the body adds and tightens,
   *then* removals apply to the merged field set with no regard for which supertype contributed a field

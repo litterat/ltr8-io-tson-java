@@ -156,7 +156,7 @@ It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recover
 - **`RegexParser` returns `String`, and `TextType.pattern`/`UriType.pattern` are `Optional<String>`, not
   `Pattern`** — `regex` IS-A piece of text (§5.7), so its host value is `String` like every other
   text-composing atom; the text is validated as I-Regexp via `tson-regex`'s `TsonRegex.parse` (not
-  `java.util.regex`, whose grammar is a superset — `regex_type`'s `spec` is `REQUIRED_FIXED` to RFC 9485),
+  `java.util.regex`, whose grammar is a superset — `regex_type`'s `spec` is fixed to RFC 9485),
   and the parsed form discarded once it's confirmed well-formed. Keeping these as plain equatable `String`
   (not a compiled matcher) is also what lets them bind generically with no `DataBridge`. **Matching** a value
   against a `pattern` constraint (`TextParser`/`UriParser`) runs through `tson-regex`'s `TsonRegex.matches` —

@@ -13,7 +13,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -84,6 +84,9 @@ final class WireForm {
     static final String MEMBERS = "members";
     static final String TYPE = "type";
     static final String STATE = "state";
+    static final String OPTIONAL = "optional";
+    static final String VOIDABLE = "voidable";
+    static final String ROLE = "role";
     static final String SUPERTYPES = "supertypes";
 
     /**
@@ -118,6 +121,23 @@ final class WireForm {
      */
     static ScopedValue scoped(CoreValue value, List<Annotation> annotations) {
         return new ScopedValue(Optional.empty(), new DataValue(annotations, Optional.empty(), value));
+    }
+
+    /**
+     * A {@code record_field}'s presence and role, each written only where it leaves the kernel's own default
+     * ({@code optional: false}, {@code voidable: false}, {@code role: FREE}) -- the one spelling both producers
+     * of a held record share, so a template body and the closed record beside it state a field alike.
+     */
+    static void addFacts(List<RecordValue.Field> members, boolean optional, boolean voidable, FieldRole role) {
+        if (optional) {
+            members.add(nameField(OPTIONAL, "true"));
+        }
+        if (voidable) {
+            members.add(nameField(VOIDABLE, "true"));
+        }
+        if (role != FieldRole.FREE) {
+            members.add(nameField(ROLE, role.name()));
+        }
     }
 
     static RecordValue.Field nameField(String name, String text) {
@@ -189,9 +209,7 @@ final class WireForm {
             List<RecordValue.Field> members = new ArrayList<>();
             members.add(nameField(NAME, field.name()));
             members.add(new RecordValue.Field(TYPE, scoped(refValue(field.type()))));
-            if (field.state() != FieldState.REQUIRED) {
-                members.add(nameField(STATE, field.state().name()));
-            }
+            addFacts(members, field.optional(), field.voidable(), field.role());
             // The two channels collapse into one: a literal keeps its own token form, and a routed parameter
             // is a bare name standing where the literal would.
             field.value().ifPresent(token -> members.add(new RecordValue.Field(VALUE,

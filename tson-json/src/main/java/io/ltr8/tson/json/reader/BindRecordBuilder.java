@@ -17,7 +17,7 @@ import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
-import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.lang.reflect.RecordComponent;
@@ -76,7 +76,7 @@ final class BindRecordBuilder implements RecordBuilder {
                     // A FIXED field is exempt: the schema settles its value, so a component would hold a constant
                     // the schema already knows. Every other field needs one -- an OPTIONAL one included, being
                     // exactly the field that works in development and fails the first time a caller sends it.
-                    if (!isFixed(plan.states[i])) {
+                    if (plan.fields[i].role() != FieldRole.FIXED) {
                         mismatches.add("no component for field '" + plan.fields[i].name() + "'");
                     }
                     continue;
@@ -296,9 +296,5 @@ final class BindRecordBuilder implements RecordBuilder {
             }
         }
         return unbound;
-    }
-
-    private static boolean isFixed(FieldState state) {
-        return state == FieldState.REQUIRED_FIXED || state == FieldState.OPTIONAL_FIXED;
     }
 }

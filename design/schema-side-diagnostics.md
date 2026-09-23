@@ -153,7 +153,7 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       OPTIONAL to the read that writes one is the tempting split and the worse trade: an optional field is
       exactly the one that works in development and fails the first time a caller sends it, so deferring it
       reports the hardest mismatch to find at the moment it has already gone wrong.
-    - **REQUIRED_FIXED / OPTIONAL_FIXED** → exempt. The schema settles the value, so a component would hold
+    - **A FIXED field** → exempt. The schema settles the value, so a component would hold
       a constant. **This exemption is what makes strictness possible at all**: 21 of the mismatches in this
       library's own bundled binding are FIXED fields (`access_pattern`, `size_type`, an atom's `spec`).
     - The rule bites the library first, which is the point: `datetime_type` declares `precision`, so

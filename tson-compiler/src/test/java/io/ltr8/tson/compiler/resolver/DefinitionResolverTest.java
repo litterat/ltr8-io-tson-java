@@ -20,12 +20,12 @@ import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -102,9 +102,11 @@ class DefinitionResolverTest {
     private static final String EXPECTED_INTEGER_SIZE =
             "{ supertypes: [] subtypes: [] "
                     + "body: !record { supertypes: [] fields: [ "
-                    + "{ name: \"bits\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" "
+                    + "{ name: \"bits\" type: { name: \"integer\" arguments: [] } "
+                    + "optional: false voidable: false role: \"FREE\" "
                     + "} "
-                    + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } state: \"REQUIRED\" "
+                    + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } "
+                    + "optional: false voidable: false role: \"FREE\" "
                     + "} "
                     + "] groups: [] extension: \"OPEN\" discriminators: [] } }";
 
@@ -354,16 +356,19 @@ class DefinitionResolverTest {
         // product: two brand-new fields added by the trailing body (top contributes none).
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
-                + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } state: \"REQUIRED\" "
+                + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                + "optional: false voidable: false role: \"FREE\" "
                 + "} "
-                + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } state: \"REQUIRED\" "
+                + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                + "optional: false voidable: false role: \"FREE\" "
                 + "} "
                 + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(product));
 
         // reference: one brand-new field.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
-                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
+                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } "
+                + "optional: false voidable: false role: \"FREE\" } "
                 + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(reference));
     }
 
@@ -385,19 +390,26 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
-                        + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } state: \"OPTIONAL\" "
+                        + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
-                        + "{ name: \"min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "{ name: \"min\" type: { name: \"integer\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
-                        + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
-                        + "{ name: \"max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "{ name: \"max\" type: { name: \"integer\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
-                        + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
-                        + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
-                        + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } state: \"OPTIONAL\" "
+                        + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} ] "
                         + "groups: [ "
                         + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "
@@ -570,9 +582,11 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"first\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" "
+                        + "{ name: \"first\" type: { name: \"text\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"second\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" "
+                        + "{ name: \"second\" type: { name: \"text\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
                         + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pair));
@@ -640,9 +654,11 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" "
+                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
+                        + "optional: true voidable: false role: \"DEFAULT\" "
                         + ""
                         + "value: REQUIRED } "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
@@ -662,9 +678,11 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } state: \"REQUIRED\" "
+                        + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
+                        + "optional: true voidable: false role: \"DEFAULT\" "
                         + ""
                         + "value: REQUIRED } "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
@@ -680,7 +698,7 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
+                        + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pinned));
     }
@@ -726,7 +744,7 @@ class DefinitionResolverTest {
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"N\" ] "
                         + "template: \"!record { fields: [ "
-                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] }\" "
+                        + "{ name: attempts type: integer optional: true role: DEFAULT value: N } ] }\" "
                         + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(retry));
     }
@@ -753,20 +771,22 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
+                        + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
+                        + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: REQUIRED } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: false } "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: false } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: false } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: false } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(array));
@@ -789,18 +809,20 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: NAMED } "
+                        + "optional: true voidable: false role: \"FIXED\" value: NAMED } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
+                        + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
                         + "{ name: \"key_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"value_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: REQUIRED } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(map));
@@ -839,10 +861,12 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [ \"config\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"config\" arguments: [] } ] fields: [ "
-                        + "{ name: \"host\" type: { name: \"text\" arguments: [] } state: \"REQUIRED_FIXED\" "
+                        + "{ name: \"host\" type: { name: \"text\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FIXED\" "
                         + ""
                         + "value: \"prod.example.com\" } "
-                        + "{ name: \"port\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" "
+                        + "{ name: \"port\" type: { name: \"integer\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
                         + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(production));
@@ -897,20 +921,22 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
+                        + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
+                        + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: REQUIRED } "
+                        + "optional: true voidable: false role: \"FIXED\" value: REQUIRED } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: true } "
+                        + "optional: true voidable: false role: \"FIXED\" value: true } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: true } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "optional: true voidable: false role: \"FIXED\" value: true } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"DEFAULT\" "
                         + "value: 1 } "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: true role: \"FREE\" "
                         + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(set));
@@ -959,10 +985,11 @@ class DefinitionResolverTest {
         assertEquals(List.of("atom", "top"), enumDef.supertypes());
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
-                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } state: \"REQUIRED\" "
+                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"profile\" type: { name: \"enum_profile\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: IDENTIFIER } "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: IDENTIFIER } "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(enumDef));
     }
@@ -1666,8 +1693,8 @@ class DefinitionResolverTest {
         RecordBody body = bodyOf(entries.get("strict"));
         assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.REQUIRED)), body.groups());
         assertEquals(List.of("a", "min", "exclusive_min"), fieldNames(entries.get("strict")));
-        assertEquals(FieldState.OPTIONAL, body.fields().get(1).state());
-        assertEquals(FieldState.OPTIONAL, body.fields().get(2).state());
+        assertEquals("optional", body.fields().get(1).describe());
+        assertEquals("optional", body.fields().get(2).describe());
         // the source keeps its own OPTIONAL group -- the restatement builds a new list, it does not edit it
         assertEquals(ElementState.OPTIONAL, bodyOf(entries.get("bounds")).groups().get(0).state());
     }
@@ -1758,32 +1785,42 @@ class DefinitionResolverTest {
                 bodyOf(entries.get("extended")).groups());
     }
 
-    // ── The six field-state spellings (§5.2) ──────────────────────────────
+    // ── The field spellings (§5.2) ────────────────────────────────────────
 
-    /** §5.2's table, end to end: five states across six spellings, in one record. */
+    /** §5.2's spellings, end to end, in one record, each landing on its facts. */
     @Test
-    void resolvesAllSixFieldStateSpellings() {
+    void resolvesEveryFieldSpelling() {
         RecordBody body = bodyOf(resolveAll("""
                 config => {
                   host:   text
                   port:   integer ~ 8080
                   debug:  boolean = false
                   label:  text?
-                  format: text? = json
                   extra:  text? = _
                 }
                 """).get("config"));
 
-        assertEquals(FieldState.REQUIRED, body.fields().get(0).state());
-        assertEquals(FieldState.REQUIRED_DEFAULT, body.fields().get(1).state());
-        assertEquals(FieldState.REQUIRED_FIXED, body.fields().get(2).state());
-        assertEquals(FieldState.OPTIONAL, body.fields().get(3).state());
-        assertEquals(FieldState.OPTIONAL_FIXED, body.fields().get(4).state());
-        // the sixth spelling: OPTIONAL_FIXED carrying no value at all, so §8.1 writes a record_field
-        // *without* a `value` member -- the field must be omitted or written as `_`
-        assertEquals(FieldState.OPTIONAL_FIXED, body.fields().get(5).state());
-        assertEquals(Optional.empty(), body.fields().get(5).value());
-        assertTrue(body.fields().get(4).value().isPresent());
+        assertEquals(RecordField.required("host", TypeRef.of("text")), body.fields().get(0));
+        assertEquals(RecordField.defaulted("port", TypeRef.of("integer"), new Token("8080", Token.Form.UNQUOTED)),
+                body.fields().get(1));
+        assertEquals(RecordField.fixed("debug", TypeRef.of("boolean"), new Token("false", Token.Form.UNQUOTED)),
+                body.fields().get(2));
+        assertEquals(RecordField.optional("label", TypeRef.of("text")), body.fields().get(3));
+        // pinned to `_`: FIXED with no value at all, so §8.1 writes a record_field *without* a `value` member
+        // -- the field must be omitted or written as `_`
+        assertEquals(RecordField.fixedAbsent("extra", TypeRef.of("text")), body.fields().get(4));
+    }
+
+    /**
+     * {@code type? = value} pins a voidable field, and the facts a field stores cannot say it: a written
+     * {@code _} is decided before the pin is consulted, so the field would admit {@code _} where the pin
+     * refuses it.
+     */
+    @Test
+    void aPinOnAnOptionalFieldIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveAll("config => { format: text? = json }"));
+        assertTrue(thrown.getMessage().contains("pins an optional field to a value"), thrown.getMessage());
     }
 
     /**
@@ -1800,7 +1837,7 @@ class DefinitionResolverTest {
                 """);
 
         RecordField nickname = bodyOf(entries.get("anonymous")).fields().get(1);
-        assertEquals(FieldState.OPTIONAL_FIXED, nickname.state());
+        assertEquals("fixed to absent", nickname.describe());
         assertEquals(Optional.empty(), nickname.value());
         // unlike removal (§5.9), IS-A survives -- the field is still in the contract
         assertEquals(List.of("base"), entries.get("anonymous").supertypes());
@@ -1864,10 +1901,10 @@ class DefinitionResolverTest {
         Set<String> names = HeldBody.of(held).names();
         assertTrue(names.contains("MIN"), () -> "the parameter is in the body: " + names);
         assertTrue(names.contains("integer"), () -> "the type came from the source: " + names);
-        // REQUIRED is the constructor's own default and so is not written at all -- which is the assertion:
-        // the inherited OPTIONAL did not survive, and no FIXED state was reached either.
-        assertFalse(names.contains(FieldState.OPTIONAL.name()), names::toString);
-        assertFalse(names.contains(FieldState.OPTIONAL_FIXED.name()), names::toString);
+        // A required FREE field states none of its facts, `record_field`'s own defaults -- which is the
+        // assertion: the inherited optional did not survive, and no FIXED role was reached either.
+        assertFalse(names.contains("true"), names::toString);
+        assertFalse(names.contains("FIXED"), names::toString);
     }
 
     // ── Group presence under tightening (§5.11) ───────────────────────────
@@ -1913,20 +1950,15 @@ class DefinitionResolverTest {
     }
 
     /**
-     * Pinning <em>one</em> alternative is the point of tightening a member, and stays legal. It also shows
-     * the two spellings apart: a modifier-only entry moves only the mutability axis (§5.7's "only the value
-     * state changes"), so an inherited-OPTIONAL member pinned with {@code = 0} lands in OPTIONAL_FIXED and
-     * stays absent-able -- which for a group member is exactly right, since the sibling alternative has to
-     * remain reachable.
+     * A modifier-only entry keeps the presence marker it inherits (§5.7's "only the value state changes"), so
+     * {@code = 0} on an inherited-optional member spells {@code min: integer? = 0}: a pin on a voidable field,
+     * which the stored facts cannot hold -- {@code _} would be admitted where the pin refuses it.
      */
     @Test
-    void tighteningASingleGroupMemberIsFine() {
-        Map<String, TypeDefinition> entries = resolveAll(BOUNDS + "  pinned => bounds ^ { min: = 0 }");
-
-        RecordBody body = bodyOf(entries.get("pinned"));
-        assertEquals(FieldState.OPTIONAL_FIXED, body.fields().get(1).state());
-        assertEquals(FieldState.OPTIONAL, body.fields().get(2).state());
-        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.OPTIONAL)), body.groups());
+    void pinningAnInheritedOptionalFieldToAValueIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveAll(BOUNDS + "  pinned => bounds ^ { min: = 0 }"));
+        assertTrue(thrown.getMessage().contains("pins an optional field to a value"), thrown.getMessage());
     }
 
     /** The rule is per group -- one always-present member in each of two groups is not a conflict. */
@@ -1938,8 +1970,8 @@ class DefinitionResolverTest {
                 """);
 
         assertEquals(2, bodyOf(entries.get("pinned")).groups().size());
-        assertEquals(FieldState.REQUIRED_FIXED, bodyOf(entries.get("pinned")).fields().get(0).state());
-        assertEquals(FieldState.REQUIRED_FIXED, bodyOf(entries.get("pinned")).fields().get(2).state());
+        assertEquals("fixed", bodyOf(entries.get("pinned")).fields().get(0).describe());
+        assertEquals("fixed", bodyOf(entries.get("pinned")).fields().get(2).describe());
     }
 
     // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
@@ -2128,7 +2160,7 @@ class DefinitionResolverTest {
         TypeDefinition view = entries.get("account_view");
         assertEquals(List.of("name", "email"), fieldNames(view));
         // the tightening replaced the inherited field in place, and removal ran afterwards
-        assertEquals(FieldState.REQUIRED_DEFAULT, bodyOf(view).fields().get(1).state());
+        assertEquals("defaulted", bodyOf(view).fields().get(1).describe());
     }
 
     /**
@@ -2177,7 +2209,7 @@ class DefinitionResolverTest {
         TypeDefinition dissolved = entries.get("one_bound");
         assertEquals(List.of("a", "min"), fieldNames(dissolved));
         assertEquals(List.of(), bodyOf(dissolved).groups());
-        assertEquals(FieldState.REQUIRED, bodyOf(dissolved).fields().get(1).state());
+        assertEquals("required", bodyOf(dissolved).fields().get(1).describe());
         // the source still has both members and its group
         assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.REQUIRED)),
                 bodyOf(entries.get("bounds")).groups());
@@ -2191,7 +2223,7 @@ class DefinitionResolverTest {
                 one_bound => bounds - { exclusive_min }
                 """);
 
-        assertEquals(FieldState.OPTIONAL, bodyOf(entries.get("one_bound")).fields().get(1).state());
+        assertEquals("optional", bodyOf(entries.get("one_bound")).fields().get(1).describe());
     }
 
     /** Three members less one is still a group: two members left, state untouched. */
@@ -2331,7 +2363,7 @@ class DefinitionResolverTest {
 
         RecordField pinned = dog.fields().stream().filter(f -> f.name().equals("pet_type")).findFirst()
                 .orElseThrow();
-        assertEquals(FieldState.REQUIRED_FIXED, pinned.state(), "the member pins the selector");
+        assertEquals("fixed", pinned.describe(), "the member pins the selector");
         assertTrue(dog.discriminators().isEmpty(), "and the mark stays with the base that declared it");
     }
 

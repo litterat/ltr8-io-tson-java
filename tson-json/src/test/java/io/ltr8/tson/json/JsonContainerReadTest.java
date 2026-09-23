@@ -35,7 +35,6 @@ class JsonContainerReadTest {
                 nickname: text?
                 tries:    int32 ~ 0
                 kind:     text = "person"
-                badge:    text? = "gold"
                 retired:  text? = _
               }
 
@@ -95,9 +94,9 @@ class JsonContainerReadTest {
     @Test
     void aRecordIsAJsonObjectWithOneMemberPerField() {
         assertEquals("""
-                {"name":"Ada","nickname":"A","tries":7,"kind":"person","badge":"gold"}""",
+                {"name":"Ada","nickname":"A","tries":7,"kind":"person","retired":null}""",
                 json(read("person", """
-                        {"name": "Ada", "nickname": "A", "tries": 7, "kind": "person", "badge": "gold"}""")
+                        {"name": "Ada", "nickname": "A", "tries": 7, "kind": "person", "retired": null}""")
                         .accepted()));
     }
 
@@ -172,19 +171,15 @@ class JsonContainerReadTest {
 
     // ── §6.1.3 defaults and fixed values ─────────────────────────────────
 
-    /** §6.1.3: a missing member at REQUIRED_DEFAULT or REQUIRED_FIXED injects, so output is fully populated. */
+    /**
+     * §6.1.3: a missing member with a default or a pin injects, so output is fully populated -- a pin to
+     * absence included, which injects the null it would have been written as.
+     */
     @Test
     void anOmittedDefaultAndFixedMemberAreInjected() {
         assertEquals("""
-                {"name":"Ada","tries":0,"kind":"person"}""", json(read("person", """
+                {"name":"Ada","tries":0,"kind":"person","retired":null}""", json(read("person", """
                 {"name": "Ada"}""").accepted()));
-    }
-
-    /** §6.1.3: OPTIONAL_FIXED is never injected -- an omitted one stays absent. */
-    @Test
-    void anOmittedOptionalFixedMemberStaysAbsent() {
-        assertTrue(json(read("person", """
-                {"name": "Ada"}""").accepted()).indexOf("badge") < 0, "OPTIONAL_FIXED is not injected");
     }
 
     /** {@code = _}: null is the member's one value and presence is what it carries, so it is kept. */
@@ -194,7 +189,7 @@ class JsonContainerReadTest {
                 {"name": "Ada", "retired": null}""").accepted()).contains("\"retired\":null"));
     }
 
-    /** §6.1.2: at REQUIRED_DEFAULT the fix is omission -- writing null disclaims a value the schema always fills. */
+    /** §6.1.2: at a defaulted field the fix is omission -- writing null disclaims a value the schema always fills. */
     @Test
     void nullAtADefaultedFieldIsRefusedWhereOmissionInjects() {
         Read read = read("person", """
@@ -221,7 +216,7 @@ class JsonContainerReadTest {
     @Test
     void aFixedValueIsComparedByValueAndNotBySpelling() {
         read("person", """
-                {"name": "Ada", "kind": "person", "badge": "gold"}""").accepted();
+                {"name": "Ada", "kind": "person"}""").accepted();
     }
 
     // ── §6.1.4 field groups ──────────────────────────────────────────────

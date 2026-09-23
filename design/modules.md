@@ -88,7 +88,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   emptiness check over a `CodePointSet` interval algebra, the building block for §5.4 pattern disjointness).
   A true leaf — depends on **nothing**, I-Regexp being an external standard, not TSON-specific. The
   *engine* counterpart to `tson-bind` (a general dependency-free engine), not a value model like
-  `tson-tree`; TSON pins its `regex` atom to I-Regexp (`regex_type`'s `REQUIRED_FIXED spec = rfc9485`), so
+  `tson-tree`; TSON pins its `regex` atom to I-Regexp (`regex_type`'s fixed `spec = rfc9485`), so
   this owns I-Regexp semantics rather than delegating to `java.util.regex` (a laxer superset).
   `tson-schema`, `tson-atom` and `tson-compiler` require it; it names no TSON type.
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the token-side atom glue

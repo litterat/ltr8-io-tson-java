@@ -2,7 +2,6 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import org.junit.jupiter.api.Test;
@@ -102,7 +101,7 @@ class SealedFamilyCheckTest {
         RecordField pinned = member.fields().stream()
                 .filter(f -> f.name().equals("pet_type")).findFirst().orElseThrow();
 
-        assertEquals(FieldState.REQUIRED_FIXED, pinned.state(), "the member pins the selector");
+        assertEquals("fixed", pinned.describe(), "the member pins the selector");
         assertTrue(member.discriminators().isEmpty(),
                 () -> "and the member names no selector of its own, the base having stated it: " + member);
     }
@@ -234,14 +233,14 @@ class SealedFamilyCheckTest {
                 }""").contains("does not pin its discriminator 'pet_type'"));
     }
 
-    /** A default is omissible, so it cannot dispatch -- REQUIRED_FIXED and nothing else (§5.2). */
+    /** A default is omissible, so it cannot dispatch -- a pin and nothing else (§5.2). */
     @Test
     void aDefaultIsNotAPin() {
         assertTrue(problems(Tson.standard(), "defpin", """
                 {
                   pet => abstract { pet_type: text =?  name: text }
                   dog => pet & { pet_type: text ~ "dog" }
-                }""").contains("It is REQUIRED_DEFAULT here"));
+                }""").contains("It is defaulted here"));
     }
 
     @Test
