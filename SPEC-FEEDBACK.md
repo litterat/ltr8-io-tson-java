@@ -2366,8 +2366,8 @@ A/A and I/A with *fixed*; JSON Schema's `"enum": [v, null]`), at 0, 5 and unreac
 enums on a nullable type, which are enum types rather than pins; a field that may be
 neither written nor `_` (A/E/*none*; JSON Schema's `{"not": {}}` or `"a": false`, which forbids the key), 19
 declarations in 2 families; and E/E/*none*, which no document satisfies, at 0. The proposal below refuses a
-pin on a voidable type, which is E/A/fixed and I/A/fixed; leaves A/E/fixed and A/A/fixed to pinned group
-members, since on a plain field an omittable pin is injected; refuses E/E/none because it empties the record;
+pin on a voidable type, which is E/A/fixed, A/A/fixed and I/A/fixed; leaves A/E/fixed to a pinned group
+member, since on a plain field an omittable pin is injected; refuses E/E/none because it empties the record;
 and leaves A/E/none legal because it empties only a field.
 
 **So nine cells are empty, four of them real schemas use, and the four are not one kind.** Only I/A/default
@@ -2475,19 +2475,19 @@ four *none* rows are the four free rows with `void` written in, and are not fiel
 | I | A | default | opt, `[T, "null"]`, `"default": v` | `a?: T? ~ v` | today's gap |
 | E | E | fixed | req, `"const": v` | `a: T = v` | today's gap; the discriminator shape |
 | E | A | fixed | req, `"enum": [v, null]` | **refused** — `a: T? = v` pins a voidable type | nothing asks |
-| A | E | fixed | opt, `"const": v` | a pinned group member only | today's `a: T? = v` under §7.6; opt-`const` converts to `a?: T = v` |
-| A | A | fixed | opt, `"enum": [v, null]` | a pinned group member only | nothing asks |
+| A | E | fixed | opt, `"const": v` | a group member restated `a: = v` only | today's `a: T? = v` under §7.6; opt-`const` converts to `a?: T = v` |
+| A | A | fixed | opt, `"enum": [v, null]` | **refused** — a pin on a voidable type | nothing asks |
 | I | E | fixed | opt, `"const": v`, `"default": v` | `a?: T = v` | today's REQUIRED_FIXED |
 | I | A | fixed | — | **refused** — `a?: T? = v` pins a voidable type | unreachable in JSON Schema |
 | E | E | none | req, `{"not": {}}` | `a: void` | the record uninhabitable; a resolver error (§5.10) |
 | E | A | none | req, `"type": "null"` | `a: void?` | the key must be written, as `_` |
 | A | E | none | opt, `{"not": {}}` | `a?: void` | the field unwritable, the record inhabitable; legal |
-| A | A | none | opt, `"type": "null"` | `a?: void?` | today's `a: T? = _`; the group member |
+| A | A | none | opt, `"type": "null"` | `a?: void?` | today's `a: T? = _`; as a group member, `a: void?` |
 
-**Fourteen are spelled, and two are refused.** Twelve on a plain field, by the three slots directly. A/E/fixed
-and A/A/fixed are the pin whose only information is presence, and they are spelled where §5.2 says that
-information earns its keep: a pinned member of a field group, which the group governs and never injects.
-E/A/fixed and I/A/fixed are a pin on a voidable type, and a resolver error. JSON Schema spells 12 of the 16, and
+**Thirteen are spelled, and three are refused.** Twelve on a plain field, by the three slots directly. A/E/fixed
+is the pin whose only information is presence, and it is spelled where §5.2 says that information earns its
+keep: a pinned member of a field group, which the group governs and never injects (*Field groups*, below).
+E/A/fixed, A/A/fixed and I/A/fixed are a pin on a voidable type, and a resolver error. JSON Schema spells 12 of the 16, and
 eleven convert with no case analysis: `required` decides the name's `?`, `null` in the type decides the type's
 `?`, and `const` or `default` decides the modifier — an opt-`const` property becomes `a?: T = v`, whose input
 schema is the same and whose output is populated. The twelfth, `required` with `"enum": [v, null]`, is the
@@ -2508,7 +2508,8 @@ terse form needs no rule of its own: `call_0 => call & { name?: = "fn" }` lets T
 `!call_0 { arguments: … }` and have `name` delivered, because it is an omittable pin; that a member-dispatched
 JSON position must write it is dispatch's rule, since dispatch runs before the record is read ([TSON-JSON]
 §6.1.5). The `= _` form goes, because the type already spells it: `a?: void?` is a field that may be omitted or
-written as `_` and nothing else, which is what a group member needs.
+written as `_` and nothing else, and a group member restated `a: void?` is the same field with the group
+deciding its presence.
 
 **The selector, `a: T =?`, is the one form with no data answer of its own.** #10's fourth modifier reads
 *pinned, but not here — by the members*, and it completes the modifier slot: `~ v` defaulted here, `= v` pinned
@@ -2533,9 +2534,17 @@ one that empties a field.
 **Field groups.** A group member takes no name mark, because the group decides presence (§5.11), and no
 modifier, because a group does not inject; its type slot takes `?` like any other position, so §12.1's
 `group-member` becomes `field-name ":" type-ref ["?"]`. A voidable member written as `_` is present and selects
-its alternative, as `= _` does today; at a member that is not voidable, a written `_` is the ordinary refusal. A
-member restated in a refinement body is an ordinary field and takes the ordinary marks, under the transition
-rules §5.11 already gives.
+its alternative, as `= _` does today; at a member that is not voidable, a written `_` is the ordinary refusal.
+
+**A member restated in a refinement or composition body stays a member**, and the two rules above follow it
+there. Proposed: the restatement takes no name mark, since its omission answer is the group's and a mark would
+state a second one to disagree with it; its type slot moves voidable true → false or narrows the type, as at any
+field; and it may take `= v`, which is checked when written and never injected — the one pin that does not
+inject, because an injected member would be present, and presence is what selects the group's alternative. A
+restated `a: = v` is therefore A/E/fixed, the cell's one spelling. `~ v` stays refused on a member, a default
+being a value only omission reaches and omission being the group's. `a: void?`, today's `= _`, narrows a
+member's type to `void`, and so needs §5.7 to say that `void` refines every type at a voidable position — the
+value set `{_}` being a subset of every voidable position's — which it does not say today.
 
 **Positional form (§5.6) and productivity (§5.10).** The positional form writes one field and omits the rest,
 so it is valid only when exactly one field has an unmarked name, whatever its modifier — counting a voidable
@@ -2556,10 +2565,10 @@ the resolved `record_field` holds exactly the facts those decisions read:
 record_field => {
   name:     field_name
   type:     type_ref
-  optional: boolean ~ false                  # the name's ?
-  voidable: boolean ~ false                  # the type's ?
-  role:     !enum [FREE DEFAULT FIXED] ~ FREE
-  value:    value?                           # present exactly when role is not FREE
+  optional?: boolean ~ false                 # the name's ?
+  voidable?: boolean ~ false                 # the type's ?
+  role?:     !enum [FREE DEFAULT FIXED] ~ FREE
+  value?:    value                           # present exactly when role is not FREE
 }
 ```
 
@@ -2625,6 +2634,16 @@ and what the schema supplies. What the reader then hands over is decided by the 
   `fromWeight: _` arrives as present-with-absent, no lower bound, and a missing `fromWeight` arrives missing,
   a broken record — and the declaration's job was only to make sure the document could say both.
 
+**An encoder without the schema cannot write every cell.** Bind mode's collapse runs the other way on output:
+a bound object's null component has one spelling to choose between omission and `_`, and the right choice is
+the declaration's. Omitting it is right at `a?: T`, `a?: T?` and `a?: T ~ v`, and wrong at two cells: at
+`a: T?` the re-read document is missing a required key, and at `a?: T? ~ v` it silently reads back as `v`,
+the MUST the *Part 3 half* states below. Writing `_` instead is right at those two and a validation error at
+`a?: T`, the commonest cell there is. No schema-less rule serves all five, so an encoder that must satisfy
+those two cells is directed by the schema. Proposed: §5.2 says so — the encoder MUSTs this entry adds bind an
+encoder that has the schema, and a schema-less encoder omits an absent value, which is correct wherever
+omission and `_` mean the same and is the reason those two cells need the schema at all.
+
 **The inconsistency this exposes.** [TSON-JSON] §7.2 says decoded output "never records the spelling, in either
 encoding". That is true of bind mode and of this library's JSON tree, which leaves a null member out of the
 object, and false of its text tree, which keeps `_` as an absent node distinct from a missing field, as the tree
@@ -2641,8 +2660,19 @@ mode, not of the field.
 
 **What it costs against today.** Every `a: T?` re-spells as `a?: T?`, or more often `a?: T`, which the census
 says is what most authors meant; every `a: T ~ v` and every `a: T = v` that relied on injection takes a `?` on
-its name, the discriminator's `name: = "fn"` included; every `= _` becomes `a?: void?`. Nothing is frozen and
-no released schema exists, so the rewrite is the bundled schemas and the corpus. The alternative, an opt-in name mark that
+its name, the discriminator's `name: = "fn"` included; every `= _` becomes `a?: void?`, or `a: void?` at a
+restated group member. Nothing is frozen and no released schema exists, so the rewrite is the bundled schemas
+and the corpus.
+
+The meta layer is the first schema the rewrite reaches, and it shows the injected pin is load-bearing, not
+only the discriminator's convenience. Every one of the kernel's 24 `T?` fields means A/E — `min_length`,
+`supertypes`, `discriminators`, none of which a resolved schema ever writes as `_` — and becomes `a?: T`. Its
+product bodies pin `access_pattern`, `size_type`, `unordered` and `unique_items` with `= v`, and resolved
+schema documents omit those fields and rely on injection to supply them; under the proposal each becomes
+`a?: T = v`, since `a: T = v` would make every resolved record, array and set document state its own access
+pattern. The kernel's `~ v` defaults each take a `?` on the name, as the `record_field` above does.
+
+The alternative, an opt-in name mark that
 leaves every existing spelling alone, reaches the same cells at the price of `?` appearing in two places with
 overlapping meanings and a per-mark admission table to keep one cell from having two spellings; it was worked
 through and set aside, because a syntax whose three marks answer three questions needs neither.
