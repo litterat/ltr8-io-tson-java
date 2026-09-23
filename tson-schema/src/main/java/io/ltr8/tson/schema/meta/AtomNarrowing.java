@@ -144,10 +144,9 @@ final class AtomNarrowing {
      * §5.7's identity-only rule, for a facet where narrowing is decidable in principle and not cheaply.
      *
      * <p>{@code pattern} is the case it was written for: whether one regular language contains another is
-     * decidable, but a schema-load check is the wrong place to spend it, and getting it wrong in the
-     * permissive direction admits a refinement that is not one. Adding a pattern to a source that has none
-     * narrows -- from every string to the ones it matches -- so that stays permitted; replacing one is
-     * refused.
+     * decidable in principle and not by the engine this module has, which answers disjointness rather than
+     * containment. Adding a pattern to a source that has none narrows -- from every string to the ones it
+     * matches -- so that stays permitted; replacing one is refused.
      *
      * <p>{@code text_type}'s {@code members} takes the same rule for a different reason, which is why the
      * reason is a parameter: a member set is decidably narrowable, and shares its logical position with a

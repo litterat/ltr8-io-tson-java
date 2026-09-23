@@ -21,8 +21,8 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
   binds to its family's host type (`ValueParser.at`), so temporal and duration bounds are compared as values.
 - `text_type`'s `pattern` and `members` are each **settable once** — they occupy one logical position and the pattern
   half cannot be narrowed, so the position takes one rule. A member set may still be *added* to a patterned source.
-- `members` against `pattern` is the one member check needing a regex match, so it is the one coherence rule that
-  is **not** on the family: `DefinitionResolver.checkMembersMatchThePattern`, beside the call that asks the family.
+- `members` against `pattern` is checked on the family with the length facets — one rule, one place. `tson-schema`
+  depends on `tson-regex` for it; the engine is an internal library like any other.
 
 Related: `design/schema-resolution.md` (the resolution phase and its exception boundary),
 `design/constructor-application.md` (what makes an entry an atom instance), `design/template-materialisation.md`
@@ -52,10 +52,10 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the *merged* result rather than the refinement body is what lets an unmentioned facet tighten vacuously; a
   stated bound is judged against the source's **effective** range, folding in a derived one like an integer's
   `size` (intersecting the refinement's own bounds first would make every widening vacuous). Unchecked by
-  design, each documented on its class: `pattern` against `pattern` (regular-language containment, and
-  `tson-schema` has no `tson-regex` dependency — which is also why `text_type.members` takes the identity-only
-  rule rather than the subset rule the numeric tiers use: one rule for a position whose other half cannot be
-  narrowed) and **selector** facets
+  design, each documented on its class: `pattern` against `pattern` (regular-language containment; `TsonRegex`
+  answers disjointness and exposes no complement to build containment from, so having the engine is not having
+  the oracle — which is also why `text_type.members` takes the identity-only rule rather than the subset rule
+  the numeric tiers use: one rule for a position whose other half cannot be narrowed) and **selector** facets
   (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
   rejecting one would reject a documented construct — §5.7 states the rule per facet kind, and a selector is
   settable where the source leaves it at the constructor's default, identity-only once bound.
@@ -96,11 +96,11 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
     and `DecimalParser` validate with `value.remainder(m)`, which throws on a zero divisor — so without the
     check a valid *data* document read against such a type would fail on the library's own fault code, an
     author error reported against the wrong document. `RationalParser` guards its own divisor.
-  - **`text_type.members` is checked in two halves, and only one is on the family.** The length facets are counts,
-    so `TextType.coherenceCheck` judges every member against them; the `pattern` is a regex match, and
-    `tson-schema` carries no `tson-regex` dependency, so `DefinitionResolver.checkMembersMatchThePattern` runs
-    that half where the engine already is. It reaches `uri_type`/`regex_type`/`email_type` through
-    `textConstraints()`, the same delegation their length rule uses.
+  - **`text_type.members` answers to every facet beside it, in one place.** `TextType.coherenceCheck` judges
+    every member against the length facets and against the `pattern` — one rule ("every member satisfies the
+    other facets on the same body"), not split by which engine each half needs, which is why `tson-schema`
+    depends on `tson-regex`. `uri_type`/`regex_type`/`email_type` reach it through `textConstraints()`, the
+    same delegation their length rule already uses.
   - Unchecked by design, each documented on its class and matching that family's existing narrowing gap:
     `pattern` emptiness and selector facets. `duration_type` and `period_type` bounds are compared as the values
     they denote (a `Duration`; a period's months), never as text — `"P1M"` vs `"P30D"` does not order lexically.

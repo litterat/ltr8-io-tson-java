@@ -48,11 +48,6 @@ import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.regex.TsonRegex;
-import io.ltr8.tson.schema.meta.EmailType;
-import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.TextType;
-import io.ltr8.tson.schema.meta.UriType;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -1056,50 +1051,15 @@ final class DefinitionResolver {
      * body never mentioned is already filled in from the constructor's own schema-composed default.
      */
     private static void checkCoherent(String name, String constructorName, Top body) {
-        List<String> violations = new ArrayList<>(switch (body) {
+        List<String> violations = switch (body) {
             case Atom atom -> atom.coherenceCheck();
             case Product product -> product.coherenceCheck();
             case Sum sum -> sum.coherenceCheck();
             default -> List.of();
-        });
-        checkMembersMatchThePattern(violations, body);
+        };
         if (!violations.isEmpty()) {
             throw new SchemaValidationException("'" + name + "': the body's own '" + constructorName
                     + "' constraints contradict each other: " + String.join("; ", violations));
-        }
-    }
-
-    /**
-     * The half of {@code text_type}'s member coherence that {@code tson-schema} cannot run: every member of a
-     * {@code members} set must match a {@code pattern} present on the same body ({@code meta-kernel.tn}'s
-     * {@code text_type} doc, and meta.tn's uniform members rule). It is the only member check in the series
-     * needing a regex match rather than a comparison, and {@code tson-schema} deliberately carries no
-     * dependency on {@code tson-regex} -- so the length half sits on the family beside every other coherence
-     * rule and this half sits here, where the engine already is.
-     *
-     * <p>Reached through {@link TextType} rather than the variant, so the families composing {@code
-     * text_type} ({@code uri_type}, {@code regex_type}, {@code email_type}) are covered by the same line
-     * that covers {@code text} -- they already delegate their length rule the same way.
-     *
-     * <p>The pattern was parsed and found well-formed when the {@code pattern} facet itself was read, so
-     * {@link TsonRegex#parse} cannot fail here.
-     */
-    private static void checkMembersMatchThePattern(List<String> violations, Top body) {
-        TextType text = switch (body) {
-            case TextType value -> value;
-            case UriType value -> value.textConstraints();
-            case RegexType value -> value.textConstraints();
-            case EmailType value -> value.textConstraints();
-            default -> null;
-        };
-        if (text == null || text.pattern().isEmpty() || text.members().isEmpty()) {
-            return;
-        }
-        TsonRegex compiled = TsonRegex.parse(text.pattern().get());
-        for (String member : text.members().get()) {
-            if (!compiled.matches(member)) {
-                violations.add("member '" + member + "' does not match pattern " + text.pattern().get());
-            }
         }
     }
 

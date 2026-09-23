@@ -49,7 +49,11 @@ module has a real `module-info.java`; module names mirror each module's root exp
   registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`) and
   `TsonBundledSchemas`. **The linker is not here** — it is an engine, not a value model, so
   `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the pipeline; what stays is storage
-  and the identity algorithm lookups compare by. Depends on `tson-annotation` and `tson-base` (`requires transitive`).
+  and the identity algorithm lookups compare by. Depends on `tson-annotation`, `tson-base` (`requires
+  transitive`) and `tson-regex` — the last so that `text_type`'s member-against-pattern coherence sits on the
+  family with the length checks it shares a rule with, rather than being split across modules by which engine
+  each half needs. The engine is an internal library like any other; the boundary worth keeping is the one
+  that stops a value model depending on the *pipeline*, and `tson-regex` is a leaf.
   **`tson-compiler` depends on `tson-schema`, not the reverse** — the opposite of what the names suggest, deliberately
   so the compiler's resolver can hold and consult `schema.meta` types directly. `schema.meta` names no `tson-compiler`
   type; where it needs
@@ -86,7 +90,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   *engine* counterpart to `tson-bind` (a general dependency-free engine), not a value model like
   `tson-tree`; TSON pins its `regex` atom to I-Regexp (`regex_type`'s `REQUIRED_FIXED spec = rfc9485`), so
   this owns I-Regexp semantics rather than delegating to `java.util.regex` (a laxer superset).
-  `tson-atom` and `tson-compiler` require it; it names no TSON type.
+  `tson-schema`, `tson-atom` and `tson-compiler` require it; it names no TSON type.
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the token-side atom glue
   (`atom`: `RawTokenParser`, `TokenAtomType`, `ValueParser` — the vocabulary itself is `tson-atom`'s),
   schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades

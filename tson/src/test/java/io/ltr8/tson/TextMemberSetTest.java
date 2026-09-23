@@ -54,10 +54,9 @@ class TextMemberSetTest {
     }
 
     /**
-     * The pattern half of the same rule, checked where the regex engine is: {@code tson-schema} carries no
-     * dependency on {@code tson-regex}, so this one sits in the resolver rather than on the family beside
-     * the length checks. Same diagnostic shape either way, which is the point of putting it there rather
-     * than leaving it unchecked.
+     * The pattern half of the same rule -- the one member check in the series needing a regex match rather
+     * than a comparison, and checked on the family beside the length half rather than split off by which
+     * engine each needs. "Every member satisfies the other facets on the same body" is one rule.
      */
     @Test
     void aMemberThePatternExcludesIsASchemaLoadError() {
@@ -68,11 +67,19 @@ class TextMemberSetTest {
                 messages(diagnostics));
     }
 
-    /** The families composing {@code text_type} inherit the facet, and the rule that polices it. */
+    /**
+     * The families composing {@code text_type} inherit the facet and the rule that polices it, through the
+     * {@code textConstraints()} delegation their length rule already used -- both halves, since both halves
+     * are now on the family.
+     */
     @Test
     void theComposingFamiliesInheritTheMemberSet() {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("uri", """
                 { endpoint => !uri ^ { members: ["https://a.test/" "https://b.test/"] } }""")));
+
+        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("uripat", """
+                { endpoint => !uri ^ { pattern: "https://.*"  members: ["ftp://a.test/"] } }"""));
+        assertTrue(messages(diagnostics).contains("does not match pattern"), messages(diagnostics));
     }
 
     // ── Refinement: each of the pair is settable once ────────────────────

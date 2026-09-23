@@ -2213,11 +2213,11 @@ made for them.
 
 **Coherence: the pattern MUST admit every member.** This is meta.tn's uniform `members` rule — "every
 member satisfies the other facets on the same body or the schema fails to load" — applied, and the three
-length facets take it unchanged. It is called out because it is the only member coherence check in the
-series that needs a **regex engine**: the others are comparisons. That has a placement consequence an
-implementation should be told about rather than left to discover — `tson-schema` deliberately carries no
-dependency on a regex engine (the same boundary the linker's pattern-disjointness gap sits behind), so this
-one check cannot sit beside the other atom coherence checks and belongs where the engine already is.
+length facets take it unchanged. It is worth naming because it is the only member coherence check in the
+series that needs a **regex match**: the others are comparisons. An implementation whose constraint model is
+separated from its regex engine will feel the pull to split the rule in half by which engine each needs;
+this one resolved it the other way, by having the constraint model depend on the engine, so that "every
+member satisfies the other facets" is one rule checked in one place.
 
 **Refinement: `pattern` and `members` are each settable once** — written in one body, thereafter restated
 verbatim or left alone, never changed. A facet not yet set may still be set by a refinement, so the
