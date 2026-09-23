@@ -9,6 +9,11 @@ import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.json.stream.JsonStream;
+import io.ltr8.tson.json.tree.JsonNull;
+import io.ltr8.tson.json.tree.JsonObject;
+import io.ltr8.tson.json.tree.JsonValue;
+import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonRecord;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -16,6 +21,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -24,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>This is a drift guard, and it exists because the schema-directed readers are two implementations.</b>
  * {@code tson-json} has its own compiled reader stack rather than sharing {@code tson-compiler}'s -- see
  * {@code design/json-encoding.md} for why that is the right trade -- and the cost of the trade is that the
- * field-state rules ([TSON-SCHEMA] §5.2's six states, REQUIRED_FIXED injection, the FIXED check, closure,
+ * field rules ([TSON-SCHEMA] §5.2's marks read through a field's facts, injection, the FIXED check, closure,
  * duplicate members) are written twice and can drift apart silently.
  *
  * <p>[TSON-JSON] §9.4 makes that a <b>specification obligation</b> rather than a tidiness: this encoding
@@ -93,6 +99,12 @@ class CrossEncodingParityTest {
               int_box    => box<int32>
               text_box   => box<text>
               crate      => { b: box }
+              marks      => {
+                nickname?: text
+                from:      int32?
+                timeout?:  int32? ~ 30
+                version:   text = "2.0"
+              }
             }
             """;
 
@@ -188,6 +200,63 @@ class CrossEncodingParityTest {
 
         static Rule of(Diagnostic d) {
             return new Rule(d.code(), d.path().orElse("?"), d.expected(), d.message());
+        }
+    }
+
+    // ── §5.2 one mark per question ────────────────────────────────────────
+
+    /** {@code nickname?: text} may be omitted and refuses {@code _}: one rule, stated once, in both encodings. */
+    @Test
+    void anOptionalFieldRefusesAbsenceInBothEncodings() {
+        sameRule("marks", """
+                { nickname: _  from: 1  version: "2.0" }""", """
+                {"nickname": null, "from": 1, "version": "2.0"}""");
+    }
+
+    /** {@code from: int32?} admits {@code _} and must be written; {@code version: text = "2.0"} must be too. */
+    @Test
+    void anUnmarkedNameMustBeWrittenInBothEncodings() {
+        bothAccept("marks", """
+                { from: _  version: "2.0" }""", """
+                {"from": null, "version": "2.0"}""");
+        sameRule("marks", """
+                { version: "2.0" }""", """
+                {"version": "2.0"}""");
+        sameRule("marks", """
+                { from: 1 }""", """
+                {"from": 1}""");
+    }
+
+    /**
+     * Both trees keep the spelling of absence (§7.2): a field written {@code _} or null stands as the absent
+     * node, and one never written is not there -- the text tree's {@code TsonAbsent} and the JSON tree's
+     * {@code JsonNull} at the same fields, in both directions.
+     */
+    @Test
+    void bothTreesKeepWhichSpellingOfAbsenceArrived() {
+        TsonRecord text = (TsonRecord) TSON.treeReader().read("""
+                !!schema:"%s"
+                !marks { from: _  timeout: _  version: "2.0" }""".formatted(ID));
+        JsonObject json = (JsonObject) jsonTree("marks", """
+                {"from": null, "timeout": null, "version": "2.0"}""");
+        for (String field : List.of("from", "timeout")) {
+            assertInstanceOf(TsonAbsent.class, text.get(field), field);
+            assertInstanceOf(JsonNull.class, json.get(field), field);
+        }
+        assertFalse(text.fields().containsKey("nickname"));
+        assertTrue(json.tryGet("nickname").isEmpty());
+    }
+
+    private static JsonValue jsonTree(String rootType, String body) {
+        List<Diagnostic> problems = new ArrayList<>();
+        DiagnosticsReceiver receiver = problems::add;
+        try (ByteSource bytes = ByteSource.of(body)) {
+            JsonReadContext ctx = JsonReadContext.of(new JsonStream(bytes, ProcessorPolicy.defaults(), receiver),
+                    receiver);
+            ctx = COMPILED.rootDeclaration(rootType).map(ctx::underDeclaration).orElse(ctx);
+            JsonValue value = (JsonValue) COMPILED.get(rootType).read(ctx);
+            assertEquals(List.of(), problems);
+            return value;
         }
     }
 

@@ -2259,17 +2259,17 @@ still does — at the price of the pair having two refinement rules.
 
 ## 23. A field state answers three questions, and the six states leave four cells empty that real schemas use
 
-**Documents:** [TSON-DATA] §2.9, §7.2.4; [TSON-SCHEMA] §4.2, §5.2, §5.4, §5.6 (the positional form), §5.7,
-§5.10 (productivity), §5.11, §7.6, §12.1, and the kernel's `field_state` and `record_field`; [TSON-JSON] §6.1.2,
-§6.1.5, §7, §7.2, §7.3 (the Part 3 half, below).
+**Documents:** [TSON-DATA] §2.9, §7.2.4; [TSON-SCHEMA] §4.2, §5.2, §5.4, §5.6 (the positional form), §5.7, §5.10
+(productivity), §5.11, §7.6, §12.1, and the kernel's `field_state` and `record_field`; [TSON-JSON] §6.1.2, §6.1.5,
+§7, §7.2, §7.3 (the Part 3 half, below).
 **Kind:** gap, with an inconsistency in Part 1, one in §5.7's matrix, one between §5.2, §7.6 and §4.2 on what
-`a: T? = v` and `a: void` admit, and one between [TSON-JSON] §7.2 and the text tree on whether decoded output
-records a spelling of absence. **Status: the storage and the syntax are built; the JSON tree's null and the
-schema-directed encoder are not** (*What is running*, after the storage paragraphs). The evidence is a consumer of this
-library: `ltr8-io-tson-benchmarks`, which converts 1,113 JSON Schemas (150 from BFCL, 963 from SchemaStore, in
-740 families) to TSON and compiles every one. Its `corpus/nullable/MATRIX.md` runs every cell of the table below
-through both validators, and `corpus/nullable/CENSUS.md` counts each cell's declarations in both corpora; the
-tables here consolidate the two.
+`a: T? = v` and `a: void` admit, and one between [TSON-JSON] §7.2 and the text tree on whether decoded output records
+a spelling of absence. **Status: built, Part 3 half included** (*What is running*, after the storage paragraphs);
+the encoder MUSTs bind a schema-directed encoder, which this library does not have yet. The evidence is a consumer
+of this library: `ltr8-io-tson-benchmarks`, which converts 1,113 JSON Schemas (150 from BFCL, 963 from
+SchemaStore, in 740 families) to TSON and compiles every one. Its `corpus/nullable/MATRIX.md` runs every cell of
+the table below through both validators, and `corpus/nullable/CENSUS.md` counts each cell's declarations in both
+corpora; the tables here consolidate the two.
 
 ### The three questions
 
@@ -2589,7 +2589,41 @@ differ from the schema's; the `_` question is a boolean because decision 1 has t
 only third outcome on offer — a written `_` reads as the default, proto-schema Part 8's decoder-table rule — is
 the assignment under which a defaulted field can never be cleared.
 
-**What is running.** Everything in this entry up to the Part 3 half, as proposed. The kernel's
+**The old states named what is delivered; the facts name what is present.** Each of the five names answers
+*what does a consumer receive?* — REQUIRED_DEFAULT is REQUIRED because the consumer always gets a value, though
+the document may leave the key out, and OPTIONAL_FIXED `= _` is OPTIONAL because the consumer may get nothing,
+though the one thing the document may write is `_`. That is the output-schema view (*A field state is an input
+schema and an output schema*, above), and it is why two questions shared one mark: a delivery name has to say
+how the value arrives and what arrives in one word. The four facts answer *what is present in the data?* —
+the input view — and delivery is derived from them, never stored:
+
+| Old state | The name says | Spelling | Key in the data | `_` in the data | Value in the data | Delivered |
+|---|---|---|---|---|---|---|
+| REQUIRED | always a value | `a: T` | written | refused | any | the value |
+| REQUIRED_DEFAULT | always a value | `a?: T ~ v` | may be omitted | refused | any | the value, or `v` |
+| REQUIRED_FIXED | always `v` | `a?: T = v` | may be omitted | refused | `v` only | `v` |
+| OPTIONAL | a value, or none | `a?: T?` | may be omitted | admitted | any | the value, or absence |
+| OPTIONAL_FIXED `= v` | `v`, or none | refused — a pin on a voidable type | | | | |
+| OPTIONAL_FIXED `= _` | none | `a?: void?` | may be omitted | admitted | none | absence |
+| — | | `a?: T` | may be omitted | refused | any | the value, or absence |
+| — | | `a: T?` | written | admitted | any | the value, or absence |
+| — | | `a?: T? ~ v` | may be omitted | admitted | any | the value, `v`, or absence |
+| — | | `a: T = v` | written | refused | `v` only | `v` |
+
+The four rows with no old state are the four cells this entry argues for, and each is a row where the
+document's obligation differs from what is delivered — invisible to names that describe delivery.
+
+It is also the reading proto-schema Part 5 gives a record, its **spectrum of completeness**
+(https://litterat.substack.com/p/proto-schema-part-5-templates): a field is a name, a type and a value, data
+and schema differ only in how many of the three are filled, and "a default value is a position where both the
+type and value are specified, but the value can be overridden … distinct from … a fixed position (type and
+value that cannot be changed)". A `record_field` states which of the document's positions it must fill and
+which the schema has already filled: the name's `?` says whether the position may be left off the twine, the
+type's `?` whether it may hold the blank `_`, and `~ v` and `= v` are the bead already placed, replaceable or
+not. A delivery state collapses that back to a single answer about the finished value, which is the one
+thing the spectrum says a declaration is not.
+
+**What is running.** Everything in this entry, as proposed, and the Part 3 half edited in. The kernel's
 `record_field` stores `optional`, `voidable`, `role` over `field_role => !enum [FREE DEFAULT FIXED]` and
 `value`, and `field_state` is gone. The parser reads the name's `?` and the type's `?` as separate marks, a
 group member taking the type's and refusing the name's; the resolver refuses a default on an unmarked name,
@@ -2600,7 +2634,10 @@ three reader decisions run in both encodings with the omission answer derived on
 refinement is the three orders, productivity treats a voidable field as a recursion guard and a `void` field
 that refuses `_` as unstatable, and the positional form counts unmarked names. The bundled schemas are
 re-spelled: the kernel's and meta's formerly `T?` fields are all `a?: T`, their defaults and pins take the
-name mark, and the conformance corpus preserves each field's meaning under the new marks.
+name mark, and the conformance corpus preserves each field's meaning under the new marks. The JSON tree keeps
+a member written null as `JsonNull` at every voidable field, as the text tree keeps `_`. The writers are the
+schemaless ones, and omit an absent value — right wherever the two spellings mean the same, and the reason
+`a: T?` and `a?: T? ~ v` need a schema-directed writer to be written correctly.
 
 **`= _` goes, in both of its readings under the three slots.** `a?: T = _` pins `T` to a value that is not
 one of `T`'s, so it is refused unless `T` is `void`, where the pin says nothing the type does not. `a?: T? = _`
@@ -2656,6 +2693,29 @@ and what the schema supplies. What the reader then hands over is decided by the 
   `fromWeight: _` arrives as present-with-absent, no lower bound, and a missing `fromWeight` arrives missing,
   a broken record — and the declaration's job was only to make sure the document could say both.
 
+What each mode hands over, per declaration, for the two ways a document can say nothing. *Absent node* is
+`TsonAbsent` in the text tree and `JsonNull` in the JSON tree; *not there* is a record without the field; an
+*error* still delivers the default where there is one (decision 1 reports, and the value comes back whole):
+
+| Declaration | Omitted — bind | Omitted — tree | `_` or null — bind | `_` or null — tree |
+|---|---|---|---|---|
+| `a: T` | error | error | error | error |
+| `a?: T` | `null` | not there | error | error |
+| `a: T?` | error | error | `null` | absent node |
+| `a?: T?` | `null` | not there | `null` | absent node |
+| `a?: T ~ v` | `v` | `v` | error | error |
+| `a?: T? ~ v` | `v` | `v` | `null` | absent node |
+| `a?: T = v` | `v` | `v` | error | error |
+| `a: T = v` | error | error | error | error |
+| `a?: void?` | `null` | not there | `null` | absent node |
+| group member `a: T?` | `null`, not selected | not there | `null`, selected | absent node, selected |
+
+The modes differ in exactly the rows where both spellings are admitted and neither supplies a value: bind
+mode delivers `null` for both, a tree keeps which one arrived. At `a?: T? ~ v` bind mode still tells them
+apart, because omission delivers `v` — which is why that row, and not `a?: T?`, is the one an encoder must
+write with the schema. At a group member the two spellings select differently in both modes; a bound member
+reports its selection through the group's own carrier, not through the component.
+
 **An encoder without the schema cannot write every cell.** Bind mode's collapse runs the other way on output:
 a bound object's null component has one spelling to choose between omission and `_`, and the right choice is
 the declaration's. Omitting it is right at `a?: T`, `a?: T?` and `a?: T ~ v`, and wrong at two cells: at
@@ -2666,14 +2726,14 @@ those two cells is directed by the schema. Proposed: §5.2 says so — the encod
 encoder that has the schema, and a schema-less encoder omits an absent value, which is correct wherever
 omission and `_` mean the same and is the reason those two cells need the schema at all.
 
-**The inconsistency this exposes.** [TSON-JSON] §7.2 says decoded output "never records the spelling, in either
-encoding". That is true of bind mode and of this library's JSON tree, which leaves a null member out of the
-object, and false of its text tree, which keeps `_` as an absent node distinct from a missing field, as the tree
-model requires. The JSON tree has one exception already — at `OPTIONAL_FIXED = _` it keeps the null, "presence
-being the information" — and the exception is the tell: it keeps the spelling exactly where a field state says
-presence matters, so the tree's shape is leaking a state. A tree that keeps the spelling everywhere needs no
-exception. Proposed: §7.2 reads "**bound** output never records the spelling; a tree does, in either encoding",
-and the JSON tree keeps the null at every voidable member.
+**The inconsistency this exposed.** [TSON-JSON] §7.2 said decoded output "never records the spelling, in
+either encoding". That was true of bind mode and of this library's JSON tree, which left a null member out of
+the object, and false of its text tree, which keeps `_` as an absent node distinct from a missing field, as
+the tree model requires. The JSON tree had one exception — at `OPTIONAL_FIXED = _` it kept the null,
+"presence being the information" — and the exception was the tell: it kept the spelling exactly where a field
+state said presence matters, so the tree's shape was leaking a state. §7.2 now reads that **bound** output
+never records the spelling and a tree does, in either encoding, and the JSON tree keeps the null at every
+voidable member, which needs no exception.
 
 **Patch semantics** — set, clear, or leave unchanged — are not a cell of the table. They need the three outcomes
 value, absent and missing. A tree has all three, so patch semantics are expressible in tree mode with no
@@ -2701,9 +2761,7 @@ through and set aside, because a syntax whose three marks answer three questions
 
 ### The Part 3 half
 
-Edited into [TSON-JSON] directly. §7's rule, §7.3's mapping and §6.1.2's two-mark statement are in, the
-syntax having made the old text false; §6.1.2's encoder MUSTs and §7.2's tree rule wait on the JSON tree
-keeping null and on a schema-directed encoder, neither built:
+Edited into [TSON-JSON] directly, all three:
 
 - §7's rule: JSON null is admitted at a voidable member, whatever the name mark; a missing member at a field
   whose name is unmarked is the missing-field validation error, and at an optional field with a value it
@@ -2714,7 +2772,8 @@ keeping null and on a schema-directed encoder, neither built:
 - §6.1.2: at an optional voidable member the two spellings are equivalent, per §2.9's replacement sentence. At
   a voidable member that is not optional an encoder MUST write the member, as null when the value is absent. At
   `a?: T? ~ v` an encoder MUST write null for an absent value, because omission would decode to the default: the
-  one declaration where omitting an absent value changes it. The `= _` carve-out becomes the general rule.
+  one declaration where omitting an absent value changes it. An encoder without the schema omits an absent
+  value, which is right wherever the two spellings mean the same. The `= _` carve-out becomes the general rule.
 - §7.2: bound output never records the spelling; a tree does, in either encoding (*The inconsistency this
   exposes*, above).
 

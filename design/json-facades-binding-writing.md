@@ -209,7 +209,8 @@ Three rules are §7-shaped, as far as a Java class can express §7:
   ([TSON-SCHEMA] §7.6). A component `tson-bind` marks required is a primitive, or one carrying
   `@Field(required = true)`.
 - **JSON null anywhere else is the absence**, which a bound object spells `null`, having no third state —
-  so an omitted member and a null member are indistinguishable in the result, which §6.1.2 says outright.
+  so an omitted member and a null member are indistinguishable in the result, which §7.2 says outright of
+  bound output.
   It is the same treatment `DataClassObjectReader` gives `_`, which is the point: §7 makes the two
   spellings one concept.
 - **An `Annotations` carrier is filled empty**, §4.3 giving the JSON wire no annotation channel. Nothing

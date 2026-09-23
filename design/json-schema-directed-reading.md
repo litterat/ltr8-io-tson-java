@@ -229,10 +229,12 @@ mode. What differs by mode is decided in two places, neither of them on the per-
   builds a `JsonObject` in declaration order; `BindRecordBuilder` calls the class's constructor.
 
 **A slot says what the document did.** Null is unstated and non-null is stated — which is what the duplicate
-check, the group count and the absent-field pass ask, so there is no second array — and three `RecordReader`
-markers carry what a value cannot: stated-as-absent, and a child's refusal.
-Each builder decides what they become. The rules are methods on the plan and in the loop, not a superclass, so the
-loop is the whole of what a record read does.
+check, the group count and the absent-field pass ask, so there is no second array — and two `Slots` markers
+carry what a value cannot: stated-as-absent, and a child's refusal. Each builder decides what they become: a
+stated absence is `JsonNull` in a tree and `null` in a bound object, so **the tree keeps a member written null
+apart from one never written**, as the text tree keeps `_` ([TSON-JSON] §7.2), and bind mode collapses the two
+into its one null. A clean read produces a stated absence only at a voidable field. The rules are methods on the
+plan and in the loop, not a superclass, so the loop is the whole of what a record read does.
 
 **Every mode is all-or-nothing, and says so in one place.** The loop tells the builder whether anything was
 reported while the record was read, and neither builder builds where it was: a bound object is application data

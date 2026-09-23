@@ -2,6 +2,7 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.json.JsonReadContext;
 
+import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonObject;
 import io.ltr8.tson.json.tree.JsonValue;
 
@@ -16,8 +17,13 @@ import io.ltr8.tson.json.tree.JsonValue;
  * field is declared instead of appended after everything the document happened to state.
  *
  * <p><b>All-or-nothing, as bind mode is.</b> A record whose read reported anything builds nothing: a placeholder
- * for a refused member would be the same node as a real absent one, and the diagnostics are the answer. Of a
- * clean read, an absent member is left out.
+ * for a refused member would be the same node as a real absent one, and the diagnostics are the answer.
+ *
+ * <p><b>A tree keeps the spelling of absence</b> ([TSON-JSON] §7.2). Of a clean read, a member written null --
+ * which a clean read admits only at a voidable field -- stands as {@link JsonNull}, and a member never written
+ * is left out, as the text tree keeps {@code _} as an absent node distinct from a missing field ([TSON-DATA]
+ * §2.9's "present with an absent value"). Bind mode has one null and collapses the two; a tree is the document,
+ * and the consumer that needs "no lower bound" told apart from "not stated" is a tree consumer.
  */
 final class TreeRecordBuilder implements RecordBuilder {
 
@@ -49,10 +55,10 @@ final class TreeRecordBuilder implements RecordBuilder {
         JsonObject.Builder members = JsonObject.builder(slots.length);
         for (int i = 0; i < slots.length; i++) {
             Object slot = slots[i];
-            if (slot == null || slot == Slots.ABSENT) {
+            if (slot == null) {
                 continue;
             }
-            members.put(names[i], (JsonValue) slot);
+            members.put(names[i], slot == Slots.ABSENT ? JsonNull.INSTANCE : (JsonValue) slot);
         }
         return members.build();
     }
