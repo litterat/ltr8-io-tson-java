@@ -34,16 +34,16 @@ import java.util.Optional;
 public record UriType(String spec, @Field("min_length") Optional<Integer> minLength,
                       @Field("max_length") Optional<Integer> maxLength,
                       Optional<Integer> length, Optional<String> pattern,
-                      Optional<String> scheme) implements Atom {
+                      Optional<List<String>> members, Optional<String> scheme) implements Atom {
 
     /** {@code uri => !uri_type {}} -- the unconstrained URI, §5.5's {@code !uri}. */
     public static final UriType UNCONSTRAINED = new UriType(
             "https://www.rfc-editor.org/rfc/rfc3986", Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty());
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
     public TextType textConstraints() {
-        return new TextType(minLength, maxLength, length, pattern);
+        return new TextType(minLength, maxLength, length, pattern, members);
     }
 
     /**

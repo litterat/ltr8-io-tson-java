@@ -34,10 +34,10 @@ public sealed interface Atom extends Top permits Unit, EnumBody, IntegerType, Te
      * why an unchanged facet has to tighten <em>vacuously</em> rather than being treated as a
      * restatement that must strictly narrow.
      *
-     * <p>An implementation compares facets only where narrowing is decidable by ordinary value
-     * comparison. Where it is not -- a {@code pattern} against another {@code pattern} (regular
-     * language containment, which {@code tson-schema} deliberately cannot reach, having no
-     * dependency on {@code tson-regex}), or an ISO 8601 duration carried as unparsed text -- the
+     * <p>An implementation compares facets only where narrowing is decidable. Where it is not -- a
+     * {@code pattern} against another {@code pattern} (regular-language containment, which the engine this
+     * module has does not decide: {@code TsonRegex} answers disjointness, and containment needs a
+     * complement it does not expose), or an ISO 8601 duration carried as unparsed text -- the
      * facet is left unchecked rather than guessed at, and each implementation names its own gaps.
      */
     default List<String> constraintsCheck(Atom refined) {

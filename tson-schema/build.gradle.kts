@@ -12,6 +12,12 @@ dependencies {
     // is a separate concern from the module graph's own presence requirement.
     api(project(":tson-annotation"))
 
+    // `text_type.members` must answer to a `pattern` on the same body, which is a regex match. The engine
+    // is an internal library like any other and the check belongs beside the length checks that share its
+    // method, so the constraint model carries the dependency rather than splitting one coherence rule
+    // across two modules. `implementation`: no public schema.meta signature names a tson-regex type.
+    implementation(project(":tson-regex"))
+
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

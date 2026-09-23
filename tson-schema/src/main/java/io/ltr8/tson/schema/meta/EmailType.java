@@ -20,12 +20,13 @@ import java.util.Optional;
 @Typename(name = "email_type")
 public record EmailType(String spec, @Field("min_length") Optional<Integer> minLength,
                          @Field("max_length") Optional<Integer> maxLength,
-                         Optional<Integer> length, Optional<String> pattern) implements Atom {
+                         Optional<Integer> length, Optional<String> pattern,
+                         Optional<List<String>> members) implements Atom {
 
     /** {@code email => !email_type {}} -- the unconstrained email address, core.tn's own {@code !email}. */
     public static final EmailType UNCONSTRAINED = new EmailType(
             "https://www.rfc-editor.org/rfc/rfc5322", Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty());
+            Optional.empty(), Optional.empty(), Optional.empty());
 
     /**
      * {@inheritDoc}
@@ -40,13 +41,17 @@ public record EmailType(String spec, @Field("min_length") Optional<Integer> minL
         if (!(refined instanceof EmailType other)) {
             return List.of("refines an email with " + refined.getClass().getSimpleName());
         }
-        return new TextType(minLength, maxLength, length, pattern)
-                .constraintsCheck(new TextType(other.minLength, other.maxLength, other.length, other.pattern));
+        return textConstraints().constraintsCheck(other.textConstraints());
+    }
+
+    /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
+    public TextType textConstraints() {
+        return new TextType(minLength, maxLength, length, pattern, members);
     }
 
     /** {@inheritDoc} <p>The length facets this composes, judged by {@link TextType#coherenceCheck} that owns them. */
     @Override
     public List<String> coherenceCheck() {
-        return new TextType(minLength, maxLength, length, pattern).coherenceCheck();
+        return textConstraints().coherenceCheck();
     }
 }

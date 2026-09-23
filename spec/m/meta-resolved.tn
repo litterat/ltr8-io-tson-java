@@ -243,6 +243,7 @@
       !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
       !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
       !record_field { name: pattern     type: regex    state: OPTIONAL }
+      !record_field { name: members     type: text_member_set  state: OPTIONAL }
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc5322" }
     ] }
   }

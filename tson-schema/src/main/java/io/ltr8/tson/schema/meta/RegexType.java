@@ -34,16 +34,17 @@ import java.util.Optional;
 @Typename(name = "regex_type")
 public record RegexType(String spec, @Field("min_length") Optional<Integer> minLength,
                         @Field("max_length") Optional<Integer> maxLength,
-                        Optional<Integer> length, Optional<String> pattern) implements Atom {
+                        Optional<Integer> length, Optional<String> pattern,
+                        Optional<List<String>> members) implements Atom {
 
     /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
     public static final RegexType UNCONSTRAINED = new RegexType(
             "https://www.rfc-editor.org/rfc/rfc9485", Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty());
+            Optional.empty(), Optional.empty(), Optional.empty());
 
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
     public TextType textConstraints() {
-        return new TextType(minLength, maxLength, length, pattern);
+        return new TextType(minLength, maxLength, length, pattern, members);
     }
 
     /**

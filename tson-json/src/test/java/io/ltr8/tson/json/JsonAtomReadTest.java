@@ -45,6 +45,8 @@ class JsonAtomReadTest {
               day        => date
               blob       => bytes
               colour     => !enum [ RED GREEN BLUE ]
+              activity   => !enum { members: ["sedentary" "lightly active"]  profile: TEXT }
+              country    => !text ^ { length: 2  members: ["AU" "NZ"] }
               flag       => boolean
               nothing    => void
               small      => !integer ^ { min: 0  max: 10 }
@@ -216,6 +218,25 @@ class JsonAtomReadTest {
     @Test
     void anEnumRefusesAValueMatchingNoMember() {
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, read("colour", "\"MAUVE\"").refusal().code());
+    }
+
+    /**
+     * A value-set enum needs nothing from this encoding: its members are text either way, and a JSON string
+     * is matched against them by content exactly as a TSON token is (§5.1). The profile governs what may be
+     * <em>declared</em>, which is a schema-load question this encoding never sees.
+     */
+    @Test
+    void aValueSetEnumReadsAMemberNoIdentifierRuleWouldAdmit() {
+        assertEquals("lightly active", read("activity", "\"lightly active\"").accepted());
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+                read("activity", "\"very active\"").refusal().code());
+    }
+
+    /** {@code text_type.members} likewise: §5.6's string rule hands the content to the same parser. */
+    @Test
+    void aTextMemberSetIsEnforcedFromTheSameParser() {
+        assertEquals("NZ", read("country", "\"NZ\"").accepted());
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, read("country", "\"GB\"").refusal().code());
     }
 
     /** {@code boolean} is that general rule applied, not an exception to it -- and it reads a real Boolean. */
