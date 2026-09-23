@@ -243,7 +243,7 @@ not a mode of its own.
 
 ### The risk this keeps, and the guard that holds it
 
-Two copies of the field-state rules — §5.2's six field states, `REQUIRED_FIXED` injection, the FIXED check,
+Two copies of the field rules — §5.2's spellings read through `RecordField`'s facts, injection, the FIXED check,
 duplicate members, closure — can drift apart, and [TSON-JSON] §9.4 makes one diagnostic vocabulary across both
 encodings a **specification obligation** rather than a tidiness. Duplication here does not cost maintenance
 so much as it costs the guarantee that one schema yields one verdict over both encodings.

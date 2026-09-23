@@ -10,8 +10,8 @@ git.
   branches on which, and a reader asks `reported()` (a count) to learn whether its children complained.
 - `of(...)` is not a whole-document read; in `requireDocumentEnd` the pull past the root value, not the assertion after
   it, is the point.
-- A stated FIXED value is checked, not obeyed, with the **pre-rebind** parser (`FixedCheck`); an omitted
-  `OPTIONAL_FIXED` field stays absent while an omitted `REQUIRED_FIXED` one is injected.
+- A stated FIXED value is checked, not obeyed, with the **pre-rebind** parser (`FixedCheck`); what an omitted field
+  yields is `RecordField.omitted`, derived once per field and shared by both encodings' readers.
 - Collecting mode always keeps reading, so every problem surfaces; the value is all-or-nothing in both modes
   (`ConstructionGuard` per value, `CountingReceiver` at each facade) — a read that reported anything returns `null`.
 - Reporting instead of throwing obliges a reader to skip (`EventSkip`), or the enclosing frame's next pull sees the
@@ -73,20 +73,23 @@ is small and parsed once.)
   value. Skipping it unread would let a document say one thing and decode to another in
   silence. The comparison uses a raw parsed value and the **pre-rebind** parser (`FixedCheck`), because bind
   mode narrows `precomputedValue` in place and comparing across that narrowing would flag every conforming
-  document. **The two FIXED states differ in exactly one thing:** §5.2's injection rule names
-  `REQUIRED_DEFAULT` and `REQUIRED_FIXED` and *not* `OPTIONAL_FIXED`, so an omitted `OPTIONAL_FIXED` field
-  stays **absent** while an omitted `REQUIRED_FIXED` one is injected. Reading it the other way makes the two
-  states indistinguishable and the `?` decide nothing; §5.2 says it outright ("**OPTIONAL and OPTIONAL_FIXED
-  fields are never injected**"). `_` is a validation error at
-  `REQUIRED_FIXED`, fine at `OPTIONAL_FIXED`; a `= _` field (`OPTIONAL_FIXED` with no value) admits only
-  omission or `_`. Nothing is pre-seeded: every field the document didn't state goes through
-  one `valueForAbsentField` switch over all five states.
+  document.
+- **A field is four facts, and each reader decision reads its own** (`RecordField`: `optional`, `voidable`,
+  `role`, `value`). A written `_` reads `voidable`; a written value reads `role` (FIXED means compare) and
+  `value`; a field never written reads `RecordField.omitted`, which derives from `optional` and `value` —
+  not optional is `FIELD_REQUIRED`, optional with a value injects it whatever the role, pinned to `_` (FIXED
+  with no value, `type? = _`) injects absence, and anything else stays absent. **A field group's member pinned
+  to `_` is the one exception and is never injected**: its presence is what selects the group's alternative,
+  so injecting it would make a member present that the document never wrote. A pin on a voidable field has no
+  spelling (`type? = value` is refused), because the written-`_` decision runs before the pin is consulted.
+  Nothing is pre-seeded: every field the document didn't state goes through one `valueForAbsentField` switch
+  over the four `Omitted` answers, and the JSON reader's `fillAbsent` switches over the same four.
 - **An array element's own state is the two-member `ElementState`, and an absent element occupies its slot.**
   Under `[T?]` (`state: OPTIONAL`) an element may be the absent sentinel `_`; under the default `REQUIRED` one
   is `FIELD_REQUIRED`. Either way `ArrayAbstractReader` consumes the `AbsentEvent` and advances the index, so
   `[a _ c]` has three elements and satisfies a `[T?; 3]` size constraint — §5.3's own stated equivalence,
   which falls out of counting rather than being checked for. Elements have no default/fixed concept at all
-  (`ElementState` has two members where a record field's `FieldState` has five), so none of the
+  (`ElementState` has two members where a record field carries a role and a value), so none of the
   `valueForAbsentField` machinery above has an array counterpart.
 - **A name's identity is its NFC form, and normalising happens where a token becomes a name.** §2.5 and
   §2.6 define field-name and scalar-key identity by NFC-normalised text, whichever spelling produced it, so
@@ -223,9 +226,9 @@ is small and parsed once.)
   (`statedAbsentValue`, per subclass) because bind mode has nowhere to put it — a Java component has no third
   state between "set to nothing" and "never set", so both readings arrive as `null` there. A limit of the
   target rather than a reading of §2.9, and the reason the tree's answer is not aligned down to it. An array
-  element and a tuple slot keep the same distinction, so the containers agree, and so does an
-  `OPTIONAL_FIXED` field, valued or `= _`.
-- **A written `_` at a `REQUIRED_DEFAULT` field is an error**, where plain omission still injects the
+  element and a tuple slot keep the same distinction, so the containers agree, and so does a `= _` field —
+  which the tree also gives the absent node where the field is omitted, the pin's value being absence.
+- **A written `_` at a defaulted field is an error**, where plain omission still injects the
   default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 makes an explicit `_` a
   validation error at every REQUIRED-family field — "`_` asserts absence at a position the schema always
   fills; at REQUIRED_DEFAULT the fix is to omit the field" — which is §7.6's table read down its own column.

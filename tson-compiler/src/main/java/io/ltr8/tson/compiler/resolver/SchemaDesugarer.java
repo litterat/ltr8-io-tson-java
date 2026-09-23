@@ -33,7 +33,7 @@ import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ElementState;
-import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
 
@@ -614,7 +614,7 @@ final class SchemaDesugarer {
      *
      * <p><b>The element {@code ?} binds {@code state} directly</b>, alongside the bounds rather than through
      * them: §5.3's {@code [T?; 3]} states both at once and both land on the one record. An unmarked element
-     * states nothing at all and lets §5.2's REQUIRED_DEFAULT injection supply it, exactly as a REQUIRED tuple
+     * states nothing at all and lets §5.2's default injection supply it, exactly as a REQUIRED tuple
      * position omits its own {@code state}.
      */
     private static Optional<Binding> arrayBinding(TypeRef element, boolean optional, Optional<SizeSpec> size,
@@ -738,8 +738,8 @@ final class SchemaDesugarer {
      * syntactic, as fixed and as closed as the sugar table above, so it belongs beside it.
      *
      * <p><b>Only what the author wrote is written.</b> {@code access_pattern} and {@code size_type} are
-     * {@code REQUIRED_FIXED} on the {@code record} constructor and a field's unmarked {@code REQUIRED} is
-     * that constructor's own default, so neither is stated -- the same economy {@link #arrayBinding} makes
+     * fixed on the {@code record} constructor and an unmarked field's facts are {@code record_field}'s own
+     * defaults, so neither is stated -- the same economy {@link #arrayBinding} makes
      * with an unmarked element's {@code state}, and what keeps the held form the one the author would
      * recognise.
      *
@@ -747,8 +747,8 @@ final class SchemaDesugarer {
      * a literal. That is what a held body buys, and why the kernel's {@code record_field} needs no separate
      * parameter channel: a body read as constructor vocabulary at its declaration could not say which of the
      * two a token is, and a held body is read as vocabulary only once its parameters are gone. §5.7's fixation
-     * then happens at materialisation, where {@code TemplateMaterialiser} turns a {@code REQUIRED} field that
-     * has acquired a value into {@code REQUIRED_FIXED}.
+     * then happens at materialisation, where {@code TemplateMaterialiser} turns a required FREE field that
+     * has acquired a value into an optional FIXED one.
      */
     private Binding recordBinding(RecordDef record) {
         List<ScopedValue> fields = new ArrayList<>();
@@ -775,12 +775,13 @@ final class SchemaDesugarer {
                     for (GroupDef.Member member : group.members()) {
                         requireFieldNameUnseen(member.name(), seen, "a group member repeats it -- member "
                                 + "labels share the enclosing record's field namespace");
-                        // A group's members are ordinary OPTIONAL fields of the record, and the group records
-                        // only their names and its own state (§5.11) -- the same shape the resolver builds.
-                        fields.add(WireForm.scoped(new RecordValue(List.of(
+                        // A group's members are ordinary optional, voidable fields of the record, and the group
+                        // records only their names and its own state (§5.11) -- the shape the resolver builds.
+                        List<RecordValue.Field> memberFields = new ArrayList<>(List.of(
                                 WireForm.nameField(WireForm.NAME, member.name()),
-                                new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(member.typeRef()))),
-                                WireForm.nameField(WireForm.STATE, FieldState.OPTIONAL.name()))), member.annotations()));
+                                new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(member.typeRef())))));
+                        WireForm.addFacts(memberFields, true, true, FieldRole.FREE);
+                        fields.add(WireForm.scoped(new RecordValue(memberFields), member.annotations()));
                         members.add(WireForm.scoped(new TokenValue(member.name(), TokenForm.UNQUOTED)));
                     }
                     List<RecordValue.Field> groupFields = new ArrayList<>();
@@ -867,9 +868,7 @@ final class SchemaDesugarer {
         List<RecordValue.Field> members = new ArrayList<>();
         members.add(WireForm.nameField(WireForm.NAME, field.name()));
         members.add(new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(type.typeRef()))));
-        if (resolved.state() != FieldState.REQUIRED) {
-            members.add(WireForm.nameField(WireForm.STATE, resolved.state().name()));
-        }
+        WireForm.addFacts(members, resolved.optional(), resolved.voidable(), resolved.role());
         resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.scoped(token))));
         return WireForm.scoped(new RecordValue(members), field.annotations());
     }

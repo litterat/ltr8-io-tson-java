@@ -2264,7 +2264,8 @@ still does — at the price of the pair having two refinement rules.
 §6.1.5, §7, §7.2, §7.3 (the Part 3 half, below).
 **Kind:** gap, with an inconsistency in Part 1, one in §5.7's matrix, one between §5.2, §7.6 and §4.2 on what
 `a: T? = v` and `a: void` admit, and one between [TSON-JSON] §7.2 and the text tree on whether decoded output
-records a spelling of absence. **Status: draft — nothing is built.** The evidence is a consumer of this
+records a spelling of absence. **Status: the storage is built and the syntax is not** (*What is running*, after
+the storage paragraphs). The evidence is a consumer of this
 library: `ltr8-io-tson-benchmarks`, which converts 1,113 JSON Schemas (150 from BFCL, 963 from SchemaStore, in
 740 families) to TSON and compiles every one. Its `corpus/nullable/MATRIX.md` runs every cell of the table below
 through both validators, and `corpus/nullable/CENSUS.md` counts each cell's declarations in both corpora; the
@@ -2587,6 +2588,30 @@ the one enum the reader needs, and it is consulted once, at decision 2, to say w
 differ from the schema's; the `_` question is a boolean because decision 1 has two outcomes, and the
 only third outcome on offer — a written `_` reads as the default, proto-schema Part 8's decoder-table rule — is
 the assignment under which a defaulted field can never be cleared.
+
+**What is running.** The kernel's `record_field` stores exactly these four facts — `optional`, `voidable`,
+`role` over `field_role => !enum [FREE DEFAULT FIXED]`, and `value` — and `field_state` is gone. The syntax
+is today's, each spelling mapped onto the facts: `a: T` states none; `a: T?` is optional and voidable; `a: T ~
+v` and `a: T = v` are optional with a DEFAULT or FIXED value, since today's omission injects both, so they
+are this proposal's `a?: T ~ v` and `a?: T = v`; and `a: T? = v` is a resolver error, a pin on a voidable type,
+which this proposal refuses and which today's A/A/fixed reading has no fact to store. The three decisions run
+as stated, in both encodings, with the omission answer derived once (`RecordField.omitted`), and refinement is
+the three orders below, which reproduce §5.7's matrix. The pinned group member has no spelling until the name
+mark exists: its only spelling today is a modifier-only `= v` on an inherited optional member, which is the
+refused `a: T? = v`.
+
+One place departs from this entry, and the departure is proposed in its place. **`= _` is a pin whose value
+is `_`**, not the type `void`: it stores as optional, voidable and FIXED with no `value`, a written value
+contradicts it, a written `_` matches it, and omission injects it — in a tree, the absent node a written `_`
+gives — except at a field group's member, whose presence selects the alternative and so is never supplied.
+That keeps the declared type, so restating a member `= _` needs no rule letting `void` refine a type (*Field
+groups*, above), and it makes the pin uniform: every pin injects on omission, `_` included. It costs two of
+the invariants above, which become "`value` is present exactly when `role` is not FREE, except a pin to `_`"
+and "FIXED requires `voidable: false`, except a pin to `_`", the one pin whose value decision 1 admits. **Open:
+the spelling under the three slots.** `a?: T = _` writes the pin where the modifier slot says values go, but
+then admits `_` with no `?` on the type, the slot that answers it; `a?: T? = _` keeps the type slot honest and
+needs the pin-on-a-voidable-type refusal to except the value `_`, the one value that refusal's reason does not
+reach. Where this entry elsewhere writes `a?: void?` for `= _`, this paragraph supersedes it.
 
 **`voidable`, not nullable.** The word names the property by the type: `void` is the type whose sole value is
 `_`, so a voidable position is one that admits `void`'s value beside its type's. It is a property of the

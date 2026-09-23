@@ -18,8 +18,8 @@ import io.ltr8.tson.json.tree.JsonValue;
  *
  * <p><b>All-or-nothing, as bind mode is.</b> A record whose read reported anything builds nothing: a placeholder
  * for a refused member would be the same node as a real absent one, and the diagnostics are the answer. Of a
- * clean read, an {@code OPTIONAL_FIXED = _} member written null stands as {@link JsonNull}, presence being the
- * information ([TSON-SCHEMA] §5.2), and an absent member is left out.
+ * clean read, a member pinned to absent ({@code = _}) stands as {@link JsonNull}, written or injected -- the
+ * pin's value is absence ([TSON-SCHEMA] §5.2) -- and an absent member is left out.
  */
 final class TreeRecordBuilder implements RecordBuilder {
 

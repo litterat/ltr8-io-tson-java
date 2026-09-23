@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=486d05eadd8867623e9b86ab932bc295f4355bcbe15546af07138e6487378926"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=4da7dd93579530430b73dc09027a1ac5a58865828047dbd60e6d39ccfb7e5b4b"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -418,8 +418,7 @@
   @doc:"Internal enumerations."
   product_access_type => !enum [INDEX NAMED]
   product_size_type   => !enum [FIXED VARIABLE]
-  field_state         => !enum [REQUIRED REQUIRED_DEFAULT REQUIRED_FIXED
-                                       OPTIONAL OPTIONAL_FIXED]
+  field_role          => !enum [FREE DEFAULT FIXED]
   element_state       => !enum [REQUIRED OPTIONAL]
 
   @doc:"""
@@ -477,9 +476,16 @@
   synthetic     => @annotation void
 
   @doc:"""
-    Supporting records. `value` carries a concrete fixed or default
-    value, read against the field's declared type — for a
-    type_ref-typed slot, a reference in the bare positional form.
+    Supporting records. A record field is the four facts a reader
+    consults: `optional`, that the key may be omitted; `voidable`,
+    that a written `_` is admitted; `role`, what `value` is for; and
+    `value`, a concrete default or fixed value read against the
+    field's declared type — for a type_ref-typed slot, a reference in
+    the bare positional form. What omission yields is derived, never
+    stored: a field that is not optional is missing, an optional one
+    with a value injects it, and a FIXED one with no value is pinned
+    to `_` and injects that — except at a field group's member,
+    whose presence is the group's.
 
     Within a template body it also carries a parameter, and needs no
     label to do so: a held body is not read against this vocabulary
@@ -490,26 +496,28 @@
     resolve into, so the same slot is unambiguous at both ends.
 
     [TSON-SCHEMA] §5.7's fixation is what the single channel costs
-    and where it is paid: a parametric `= P` is REQUIRED with the
-    parameter in `value`, and becomes REQUIRED_FIXED when
-    substitution makes the value concrete.
+    and where it is paid: a parametric `= P` is a required FREE
+    field with the parameter in `value`, and becomes optional and
+    FIXED when substitution makes the value concrete.
 
     Which fields a sealed family dispatches on is the enclosing
     record's own statement, `record.discriminators`, and no field
     says it of itself: §5.8 flattens a base's fields into every
     member, so a per-field mark would have to be cleared again at
     each one, while a member's record simply states none. The rules
-    on a named field are unchanged — REQUIRED, no member of a field
-    group, typed by an atom or an enum, carrying no value of its own
-    (the base cannot pin what its subtypes each pin differently,
-    §5.7) — and each subtype restates it REQUIRED_FIXED, the pins
+    on a named field are unchanged — required and not voidable, no
+    member of a field group, typed by an atom or an enum, carrying no
+    value of its own (the base cannot pin what its subtypes each pin
+    differently, §5.7) — and each subtype restates it FIXED, the pins
     pairwise distinct under the field type's own equality.
     """
   record_field => {
-    name:   field_name
-    type:   type_ref
-    state:  field_state ~ REQUIRED
-    value:  value?
+    name:      field_name
+    type:      type_ref
+    optional:  boolean ~ false
+    voidable:  boolean ~ false
+    role:      field_role ~ FREE
+    value:     value?
   }
 
   tuple_element => {
@@ -611,8 +619,8 @@
     without writing it and emptiness the thing they ask for. The
     field is restated with its type, and without the `?`, because a
     defaulted field cannot be optional — `non_negative_integer? ~ 1` is not a
-    state ([TSON-SCHEMA] §5.2): the restatement moves it from
-    OPTIONAL to REQUIRED_DEFAULT, which is a tightening — a set
+    state ([TSON-SCHEMA] §5.2): the restatement gives it a DEFAULT
+    and makes it no longer voidable, which is a tightening — a set
     admits fewer values than the array it refines.
 
     Named `set_type`, with the atom constructors' suffix, because the

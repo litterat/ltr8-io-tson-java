@@ -6,7 +6,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -90,7 +89,7 @@ class ValueParamFixedFieldTest {
         assertEquals(List.of("T", "S"), held.parameters(), "the entry's own parameter list, as declared");
         assertTrue(held.template().contains("value: S"),
                 () -> "the parameter stands in the ordinary value slot: " + held.template());
-        assertFalse(held.template().contains(FieldState.REQUIRED_FIXED.name()),
+        assertFalse(held.template().contains("FIXED"),
                 () -> "nothing is fixed at declaration: " + held.template());
     }
 
@@ -106,9 +105,9 @@ class ValueParamFixedFieldTest {
 
         RecordField materialised = statusOf(linked, "created");
         assertEquals("201", materialised.value().orElseThrow().text());
-        assertEquals(statusOf(linked, "literal").state(), materialised.state(),
+        assertEquals(statusOf(linked, "literal").describe(), materialised.describe(),
                 "the templated form says what the literal form says");
-        assertEquals(FieldState.REQUIRED_FIXED, materialised.state());
+        assertEquals("fixed", materialised.describe());
     }
 
     /**
@@ -125,7 +124,7 @@ class ValueParamFixedFieldTest {
         RecordField materialised = statusOf(tson.resolve(schema), "created");
 
         assertEquals("201", materialised.value().orElseThrow().text());
-        assertEquals(FieldState.REQUIRED_DEFAULT, materialised.state());
+        assertEquals("defaulted", materialised.describe());
     }
 
     /** What it costs at read time, which is the whole reason it matters. */
@@ -167,7 +166,7 @@ class ValueParamFixedFieldTest {
 
         for (String entry : List.of("a", "b", "c")) {
             RecordField status = statusOf(linked, entry);
-            assertEquals(FieldState.REQUIRED_FIXED, status.state(), entry);
+            assertEquals("fixed", status.describe(), entry);
             assertEquals("201", status.value().orElseThrow().text(), entry);
         }
     }

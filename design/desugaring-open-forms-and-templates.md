@@ -16,8 +16,8 @@ in git. The sugar table and the naming rule these bullets refer to are in `desig
 - `DataClassObjectWriter` cannot produce a held body: `HeldBody.names()` and substitution key on a token being
   *unquoted*.
 - Only a *template* is normalised to a held body; a closed record or closed alias resolves at its declaration.
-- Only what the author wrote is written into a held record — no `REQUIRED_FIXED` constructor fields, no defaulted
-  `state`.
+- Only what the author wrote is written into a held record — no fixed constructor fields, no field facts at their
+  `record_field` defaults.
 - §5.11's uniqueness rule is asked here as well as in the resolver; the two see different phases' bodies.
 
 Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived names, reporting),
@@ -101,12 +101,12 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
   - **Only a *template*.** A closed record still resolves at its declaration into a `RecordBody`, because
     nothing about it is deferred. **Every** template takes it: there is no marker to route one elsewhere. The
     two paths share the §5.2 state
-    table (`FieldModifiers`) so the six spellings and the errors around them cannot drift apart between a template and
+    table (`FieldModifiers`) so the spellings and the errors around them cannot drift apart between a template and
     the closed record beside it.
-  - **Only what the author wrote is written.** `access_pattern` and `size_type` are `REQUIRED_FIXED` on the
-    `record` constructor, and an unmarked field's `REQUIRED` is that constructor's own default, so none of the
-    three is stated — the same economy `arrayBinding` makes with an unmarked element's `state`, and what keeps
-    the held form the one the author would recognise.
+  - **Only what the author wrote is written.** `access_pattern` and `size_type` are fixed on the `record`
+    constructor, and an unmarked field's facts are `record_field`'s own defaults, so none of them is stated —
+    the same economy `arrayBinding` makes with an unmarked element's `state`, and what keeps the held form the
+    one the author would recognise.
   - **The rewrite has to be here rather than in the resolver.** Resolving the body and writing the resolved
   form back out puts a *second producer* in front of
     a wire form two later phases read, and they disagree: `DataClassObjectWriter` states a no-argument `type_ref`

@@ -100,7 +100,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 // worse trade -- an optional field is exactly the one that works in development and fails
                 // the first time a caller sends it, which is the bug this check exists to prevent. One rule
                 // for every field beats two that differ on when the developer finds out.
-                if (!isFixed(field.schema().state())) {
+                if (field.schema().role() != FieldRole.FIXED) {
                     mismatches.add("no component for field '" + field.schema().name() + "'");
                 }
                 continue;
@@ -140,9 +140,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 field = new CompiledField(field.schema(), rebound);
                 fields.set(i, field);
             }
-            FieldState state = field.schema().state();
-            if (state == FieldState.REQUIRED_DEFAULT || state == FieldState.REQUIRED_FIXED
-                    || state == FieldState.OPTIONAL_FIXED) {
+            if (field.schema().value().isPresent()) {
                 precomputedValue[i] = readSchemaDefault(fields.get(i));
             }
         }

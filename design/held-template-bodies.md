@@ -14,8 +14,8 @@ lives in git.
   `DataValue`.
 - Substitution is one rule at every depth: an **unquoted** token in a tree, rewritten when its text resolves into the
   entry's `parameters` (§8.1's shadowing rule); a quoted token is a literal.
-- §5.7's fixation happens at closing (`fixRoutedValues`): a routed `= P` arrives `REQUIRED` and becomes
-  `REQUIRED_FIXED`; a `~ P` arrives `REQUIRED_DEFAULT` and stays one.
+- §5.7's fixation happens at closing (`fixRoutedValues`): a routed `= P` arrives required and FREE and becomes
+  optional and FIXED; a `~ P` arrives a DEFAULT and stays one.
 - Applications inside a held body close before the entry is named, and in the synthetic merge the closed-record name
   wins; only a form whose binding held an application moves.
 - A closed form is named for itself through `DerivedName.ofBinding`, the application gets a second `Reference` entry,
@@ -72,11 +72,10 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     fields to substitute into. Holding it makes `close` total over held bodies, with any other shape an
     `IllegalStateException` naming the invariant.
   - **§5.7's fixation happens here** (`fixRoutedValues`), which is what a held record body's retirement of
-    the single `value` channel costs and where §5.7 says to pay it: a field routed by `= P` is held as
-    `state: REQUIRED`
-    with the parameter standing in `value`, and a REQUIRED field carrying a value is that and nothing else —
-    a closed REQUIRED field has none, which is what `REQUIRED_FIXED` means. A `~ P` default arrives as
-    `REQUIRED_DEFAULT` and stays one: data may still override it.
+    the single `value` channel costs and where §5.7 says to pay it: a field routed by `= P` is held required
+    and FREE with the parameter standing in `value`, and a FREE field carrying a value is that and nothing
+    else — a closed FREE field has none. Closing makes it optional and FIXED, what the literal spelling gives.
+    A `~ P` default arrives as a DEFAULT and stays one: data may still override it.
   - **Substitution is one rule, at every depth.** The body was never read against constructor vocabulary, so
     a parameter in a slot, one inside an application a slot holds (`tree<p0>` becoming `tree<text>`), and one
     inside a collection are the same thing here: an unquoted token in a tree, rewritten when its text resolves

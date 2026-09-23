@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/36/m/meta.tn?sha256=6f4671c6da4457507dc18f791f97c564b4ab3fa617a067f3137490eefe23b2ac"
-!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=486d05eadd8867623e9b86ab932bc295f4355bcbe15546af07138e6487378926"
-!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=486d05eadd8867623e9b86ab932bc295f4355bcbe15546af07138e6487378926"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=3be22eab98fd8cb743bdfa053005646640104fb8c177945101cd2e53c821e909"
+!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=4da7dd93579530430b73dc09027a1ac5a58865828047dbd60e6d39ccfb7e5b4b"
+!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=4da7dd93579530430b73dc09027a1ac5a58865828047dbd60e6d39ccfb7e5b4b"
 @doc:"""
   TSON meta-schema (2026 Revision 36 draft).
 
@@ -365,7 +365,7 @@
     A complex value is a pair of components (real and imaginary parts).
     `component` selects the type of both parts from the closed
     `complex_component` vocabulary; it defaults to `NUMBER`
-    (REQUIRED_DEFAULT, §5.2), so a bare complex has exact components —
+    (a DEFAULT, §5.2), so a bare complex has exact components —
     a defaulted selector.
     The enum both enforces that a component is numeric (unlike a free
     `type_name`, which any token would satisfy) and keeps meta free of

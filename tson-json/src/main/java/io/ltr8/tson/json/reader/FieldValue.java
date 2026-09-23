@@ -21,7 +21,7 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * compared against ([TSON-JSON] §6.1.3: a present member at a FIXED field MUST be verified against the pin),
  * and it has to be the decoded value rather than the text because §5.3 makes {@code 1} and {@code 1.0} one
  * value -- comparing spellings would refuse a document that conforms. The <b>node</b> is what an omitted
- * REQUIRED_DEFAULT or REQUIRED_FIXED member injects, and it has to be JSON because §6.1.3 wants decoded
+ * defaulted or fixed member injects, and it has to be JSON because §6.1.3 wants decoded
  * output fully populated: "a JSON document read by schema-less JSON consumers is exactly the document that
  * must state its defaults".
  *

@@ -18,7 +18,7 @@ import java.util.Optional;
  * min_length}/{@code max_length}/{@code length}/{@code pattern}/{@code spec} side by side, with no
  * sub-record anywhere. A component nesting any of them under a name the wire doesn't have receives
  * nothing at all: {@code tson-compiler}'s compiled {@code Record*Reader} fills a field, including a
- * {@code REQUIRED_FIXED} field's schema-composed default, under its own schema field name. This is
+ * fixed field's schema-composed default, under its own schema field name. This is
  * why the shape here is field-for-field {@link EmailType}'s -- {@code email_type} is declared by the
  * identical composition and differs only in which document {@code spec} is fixed to.
  *
@@ -51,7 +51,7 @@ public record RegexType(String spec, @Field("min_length") Optional<Integer> minL
      * {@inheritDoc}
      *
      * <p>A regex IS-A piece of text, so the narrowing rule is {@link TextType}'s own, applied to the
-     * facets this composes. {@code spec} is {@code REQUIRED_FIXED} to RFC 9485 and cannot move.
+     * facets this composes. {@code spec} is fixed to RFC 9485 and cannot move.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {

@@ -99,9 +99,9 @@ public final class FamilySelectors {
      * A template base's selectors, each taken from the first member that declares a field of that name --
      * every member carrying it at the base's own type, for the reason the class note gives.
      *
-     * <p>The field is handed back as the <em>base</em> would have declared it: REQUIRED and unpinned, the pin
-     * being what each member supplies and what the dispatch compares. A member's own copy is REQUIRED_FIXED
-     * and would say a selector is already decided, which is the opposite of what it is for.
+     * <p>The field is handed back as the <em>base</em> would have declared it: required and unpinned, the pin
+     * being what each member supplies and what the dispatch compares. A member's own copy is FIXED and would
+     * say a selector is already decided, which is the opposite of what it is for.
      */
     private static List<RecordField> fromMembers(List<String> names, List<String> members,
                                                   Map<String, TypeDefinition> entries) {
@@ -114,8 +114,8 @@ public final class FamilySelectors {
                 }
                 Optional<RecordField> found = field(record, name);
                 if (found.isPresent()) {
-                    selectors.add(new RecordField(found.get().name(), found.get().type(), FieldState.REQUIRED,
-                            Optional.empty(), found.get().annotations(), Optional.empty()));
+                    selectors.add(new RecordField(found.get().name(), found.get().type(), false, false,
+                            FieldRole.FREE, Optional.empty(), found.get().annotations(), Optional.empty()));
                     break;
                 }
             }

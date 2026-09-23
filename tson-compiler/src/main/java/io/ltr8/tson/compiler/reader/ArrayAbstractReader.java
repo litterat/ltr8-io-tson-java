@@ -28,7 +28,7 @@ import java.util.function.Consumer;
  * {@code List.add}, or a {@code tson-bind} {@code DataClassArray}'s own {@code put()} {@link
  * java.lang.invoke.MethodHandle}) differs completely between the two subclasses. Array elements have
  * no default/fixed-value concept at all ({@link ElementState} has only {@code REQUIRED}/{@code
- * OPTIONAL}, unlike a record field's five-member {@code FieldState}), so there's nothing here
+ * OPTIONAL}, where a record field carries a role and a value), so there's nothing here
  * resembling {@link RecordAbstractReader}'s own precomputed-default machinery.
  *
  * <p>{@code unordered} is deliberately never validated here -- there's nothing to check about a

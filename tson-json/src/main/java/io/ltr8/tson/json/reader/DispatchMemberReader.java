@@ -13,7 +13,7 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
@@ -146,7 +146,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         for (Selector selector : selectors) {
             Optional<RecordField> field = record.fields().stream()
                     .filter(f -> Nfc.of(f.name()).equals(selector.name())).findFirst();
-            if (field.isEmpty() || field.get().state() != FieldState.REQUIRED_FIXED
+            if (field.isEmpty() || field.get().role() != FieldRole.FIXED
                     || field.get().value().isEmpty()) {
                 return null; // the linker already refused this; the family is read without it
             }

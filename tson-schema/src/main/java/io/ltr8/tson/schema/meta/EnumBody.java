@@ -11,7 +11,7 @@ import java.util.List;
  * The meta-kernel's {@code enum} constructor's own vocabulary, resolved (Part 2 §4.1, §8.1):
  * {@code members: set<text>} and the {@code profile} saying which kind of enumeration they spell --
  * backs {@code boolean} (`[true false]`), the kernel's own internal enumerations ({@code
- * product_access_type}, {@code field_state}, ...), and every user-declared {@code !enum [...]}
+ * product_access_type}, {@code field_role}, ...), and every user-declared {@code !enum [...]}
  * instance. Kept as an ordered {@code List}, matching how {@link TypeDefinition#supertypes}/{@link
  * TypeDefinition#subtypes} already represent conceptual sets -- member order is preserved for
  * deterministic output, not semantically significant.

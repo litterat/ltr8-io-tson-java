@@ -190,8 +190,9 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
     duplicated logic and the most correctness-sensitive, and the JSON gaps above close by moving across rather than
     by being written again.
   - **The bind builder** — construct from slots, fill a carrier, all-or-nothing, report a constructor's refusal.
-  - **The field-state decisions** — what a stated absence, an omitted field and a FIXED member become per state.
-    The wording is already one (`base.diagnostics`); the decisions are two copies.
+  - **The field decisions** — what a stated absence and a written FIXED member become. The wording is already one
+    (`base.diagnostics`), and so is what an omitted field yields (`RecordField.omitted`); the other two decisions
+    are two copies.
   - **The dispatch tables built at compile** — a sealed family's pin table keyed by `ValueIdentity`, the deeper
     names, the alias index (`ReferenceChain.namesMeaning` beside `Subsumption.admitting`), and
     `DiscriminationClass`. The lookahead that reads them stays with each encoding.

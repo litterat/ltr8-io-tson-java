@@ -146,14 +146,13 @@ final class TypeInhabitance {
     }
 
     /**
-     * A field a document may leave out places no demand on its type. Every other state does, the two that
-     * carry a value included: a fixed or default value of a type nothing can satisfy does not exist either.
+     * A field a document may leave out, and that supplies no value of its own, places no demand on its type.
+     * Every other field does, one carrying a value included: a fixed or default value of a type nothing can
+     * satisfy does not exist either. A field pinned to {@code _} demands nothing, {@code _} not being a value
+     * of its type.
      */
     private static boolean isOptional(RecordField field) {
-        return switch (field.state()) {
-            case OPTIONAL, OPTIONAL_FIXED -> true;
-            case REQUIRED, REQUIRED_DEFAULT, REQUIRED_FIXED -> false;
-        };
+        return field.optional() && field.value().isEmpty();
     }
 
     private static boolean positionInhabited(TupleElement element, Map<String, TypeDefinition> namespace,
