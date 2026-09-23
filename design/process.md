@@ -55,10 +55,12 @@ lets a schema change land across several commits with the integrity checks left 
 
 **The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
 `@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`
-does it: every entry must read back into `schema.meta` and have a counterpart here, and what may still
-differ is pinned per schema. They are the only external statement of what a conforming resolver produces,
-so a change that moves those counts wants looking at rather than renumbering. Keep them in step with the
-`.tn` beside them.
+does it: every entry must read back into `schema.meta`, have a counterpart here and resolve identically,
+and every schema-map key must carry the same annotations (`@ordered`, `@bounded`, `@exact`, `@numeric`,
+`@synthetic`; `@doc` aside, a fixture summarising it). **Key annotations are compared from the parsed
+text**, never through the bound document, which drops them, so both sides would carry none and agree for the
+wrong reason. They are the only external statement of what a conforming resolver produces. Keep them in step
+with the `.tn` beside them.
 
 ## Branches and revisions
 
