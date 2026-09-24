@@ -8,7 +8,6 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -138,7 +137,8 @@ class TsonSchemaLinkerTest {
      * test states one directly rather than assembling the tree it denotes.
      */
     private static TypeDefinition template(String parameter, String body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(), new TemplateBody(List.of(parameter), body));
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(),
+                new TemplateBody(List.of(parameter), body, Optional.empty()));
     }
 
     /**
@@ -440,7 +440,8 @@ class TsonSchemaLinkerTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("thing", TypeDefinition.product(new RecordBody(List.of(),
                 List.of(RecordField.required("a", TypeRef.of("thing"))),
-                List.of(new FieldGroup(List.of("not_a_real_field"), io.ltr8.tson.schema.meta.ElementState.OPTIONAL)))));
+                List.of(new FieldGroup(List.of("not_a_real_field"), io.ltr8.tson.schema.meta.ElementState.OPTIONAL)),
+                io.ltr8.tson.schema.meta.RecordExtensionType.OPEN)));
 
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(schemaOf(entries), null));
     }

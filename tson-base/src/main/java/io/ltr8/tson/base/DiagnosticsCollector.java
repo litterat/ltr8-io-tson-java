@@ -6,8 +6,9 @@ import java.util.List;
 
 /**
  * A {@link DiagnosticsReceiver} that accumulates every problem instead of throwing, so a read runs to the end
- * and returns a partial value alongside the full list of what was wrong with it. The value-plus-diagnostics shape
- * a validate-and-retry loop wants.
+ * and every problem in the document is found in one pass. A read that reported anything returns no value
+ * ({@link CountingReceiver}): the list, each entry with a path into the document, is the answer a
+ * validate-and-retry loop works from.
  *
  * <p>Stateful and single-read: {@link #diagnostics()} reports what this instance has been given, so reusing one
  * across two reads accumulates both. Take a fresh one per read -- {@link DiagnosticsReceiver#collecting()}.

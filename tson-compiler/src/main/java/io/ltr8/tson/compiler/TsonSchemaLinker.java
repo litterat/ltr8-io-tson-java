@@ -31,9 +31,10 @@ import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.EnumProfile;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
@@ -105,12 +106,12 @@ import java.util.Set;
  * <p><b>{@code !!import} merging (Part 2 §2.2.3).</b> The final namespace a schema is checked
  * against is built in two stages, in this order: (1) every {@code !!import}'s whole namespace, in
  * declaration order, looked up via {@code loader} by canonical identity -- <b>transitive, not shallow</b>:
- * {@code loader} hands back an already-registered, already-flattened {@code TsonSchema}, and all of its
- * {@code entries()} are taken, so an import contributes its own imports' entries too; (2) this schema's own
- * entries, exactly as resolved. §2.2.3 requires exactly this: "an {@code !!import} contributes the imported
- * schema's entire namespace -- the entries it declares and the entries it imported", matching the {@code
- * !!meta} half §3.3.1 already defined as "the target's local declarations <i>plus its imports</i>". A flat
- * namespace with no hiding is the rule the rest of the format is built on.
+ * {@code loader} hands back an already-registered, already-linked schema whose {@code entries()} hold its
+ * own import closure merged in, and all of them are taken, so an import contributes its own imports'
+ * entries too; (2) this schema's own entries, exactly as resolved. §2.2.3 requires exactly this: "an {@code
+ * !!import} contributes the imported schema's entire namespace -- the entries it declares and the entries
+ * it imported", matching the {@code !!meta} half §3.3.1 defines as "the target's local declarations
+ * <i>plus its imports</i>". A flat namespace with no hiding is the rule the rest of the format is built on.
  *
  * <p><b>Collisions are decided by entry identity.</b> One schema reached by several routes unifies; two
  * *different* schemas declaring one name is the error, as is a local declaration shadowing any name the
@@ -249,7 +250,13 @@ public final class TsonSchemaLinker {
                 default -> List.of();
             };
             String noun = body instanceof RecordBody ? "field names" : "members";
-            checkScope(receiver, schema, name, definition, names, noun, identifiers);
+            // An enum under `profile: TEXT` has members that are values rather than names, so §8.2's two
+            // per-name rules do not reach them: a value set carries whatever its domain carries, and there
+            // is nothing to spoof where nothing is looked up by name. The collision relation stays -- two
+            // members that render alike is the hazard either way, and it is a property of the set.
+            boolean perNameRules = !(body instanceof EnumBody enumBody)
+                    || enumBody.profile() == EnumProfile.IDENTIFIER;
+            checkScope(receiver, schema, name, definition, names, noun, identifiers, perNameRules);
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
             // them as one anyway -- §11.4 declines the scope. A parameter is a name, §11.4's own reasoning for
@@ -264,9 +271,23 @@ public final class TsonSchemaLinker {
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
                                    UnicodePolicy identifiers) {
+        checkScope(receiver, schema, entry, definition, names, noun, identifiers, true);
+    }
+
+    /**
+     * {@code perNameRules} is false for the one scope whose members are not names -- an enum declaring
+     * {@code profile: TEXT}. The collision relation runs either way; §8.2's restricted-character and
+     * restricted-script rules are per-<em>name</em> and lapse with the declaration.
+     */
+    private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
+                                   TypeDefinition definition, List<String> names, String noun,
+                                   UnicodePolicy identifiers, boolean perNameRules) {
         ConfusableNames.firstCollision(names).ifPresent(collision -> refuse(receiver, schema, entry,
                 definition, Diagnostic.Code.CONFUSABLE_NAMES,
                 "'" + entry + "' has " + noun + " that read alike: " + collision.describe()));
+        if (!perNameRules) {
+            return;
+        }
         String singular = noun.substring(0, noun.length() - 1);
         names.forEach(member -> perName(receiver, schema, entry, definition, member,
                 "'" + entry + "' has a " + singular + " where ", identifiers));
@@ -276,11 +297,10 @@ public final class TsonSchemaLinker {
      * §8.2's two per-name rules over one name: the restricted-character rule ({@code Identifier_Status}) and
      * the restricted-script rule (the restriction level).
      *
-     * <p><b>Both are here rather than at the positions that read the name</b>, which is where the
-     * restricted-character rule
-     * used to be -- spread over the schema parser, the definition resolver and the atom vocabulary, by three
-     * different exceptions and three different codes, with holes wherever a naming position reached only one
-     * of the three. §8.2 defines its rules over named scopes and [TSON-SCHEMA] §11.4 supplies the
+     * <p><b>Both are here rather than at the positions that read the name.</b> Those positions are spread
+     * over the schema parser, the definition resolver and the atom vocabulary, so a rule applied there is
+     * three call sites with three exceptions, and has a hole wherever a naming position reaches only one of
+     * them. §8.2 defines its rules over named scopes and [TSON-SCHEMA] §11.4 supplies the
      * schema layer's, so the walk that already enumerates those scopes is the one place all three belong.
      * What stays at the reading positions is §7.7's grammar, which is validity and really is a parse error.
      */
@@ -501,13 +521,14 @@ public final class TsonSchemaLinker {
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins);
 
         // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
-        // flattens another schema's entries into *this* schema's own returned entries()). !!meta only says
+        // merges another schema's entries into *this* schema's own returned entries()). !!meta only says
         // "this schema's own vocabulary/constructors come from that other schema"; it never merges anything
         // in, and (§3.3.2) it's never consulted for an ordinary type-ref -- only at the constructor roles
-        // §3.3.1 lists. Used as a lookup fallback in exactly one spot now: `source` validation below
-        // (`validateEntry`'s own `sourceLookup`), a `source` naming a constructor being one of those roles.
-        // Everywhere else (field/key/value/element types, supertypes, subtypes, choice variants) stays
-        // type-name-namespace-only, per §3.3.2's explicit "NOT extended by the structure namespace". Empty
+        // §3.3.1 lists. Used as a lookup fallback in two spots, both in `validateEntry`: `source` validation
+        // (its `sourceLookup`), a `source` naming a constructor being one of those roles, and the derived
+        // `supertypes` chain, which is the residue of one. Every author-written reference (field/key/value/
+        // element types, subtypes, choice variants) stays type-name-namespace-only, per §3.3.2's explicit
+        // "NOT extended by the structure namespace". Empty
         // if !!meta isn't registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration).
         Optional<TsonLinkedSchema> governingMeta =
                 loader == null ? Optional.empty() : loader.load(CanonicalIdentity.canonicalize(schema.meta()));
@@ -578,7 +599,7 @@ public final class TsonSchemaLinker {
                         merged, structureNamespace);
             } catch (UnresolvedReference e) {
                 String author = heldDeclarationNaming(e.name(), entry.getValue(), merged);
-                if (author == null) { // the applier's own text, or a name no held body wrote: as before
+                if (author == null) { // the applier's own text, or a name no held body wrote: blame the entry
                     reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged), merged,
                             e.getMessage(), e);
                     continue;
@@ -597,6 +618,7 @@ public final class TsonSchemaLinker {
         }
 
         checkEveryEntryIsInhabited(schema, merged, localNames, receiver);
+        checkRecordExtension(schema, merged, localNames, receiver);
 
         AnnotatedMap<String, TypeDefinition> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, localNames, receiver);
@@ -637,6 +659,26 @@ public final class TsonSchemaLinker {
                     + ", and nothing in that chain can be left out or left empty (§5.10.1). A recursion "
                     + "terminates only where it reaches a base case -- an optional field, a possibly-empty "
                     + "container, or a choice variant that does not recur");
+        }
+    }
+
+    /**
+     * What each {@code record.extension} member obliges of the rest of the closure ({@link RecordExtension}) --
+     * that nothing composes onto a FINAL record, that a sealed family's selectors are usable and its members
+     * pin them distinctly, and that the two marks agree with each other.
+     *
+     * <p><b>Runs on the merged map rather than the annotated one</b>, unlike {@link #checkDisjointAssertions}:
+     * the marks are consumed into the body by the resolver, so there is no annotation left to consult and the
+     * pass needs only what {@code subtypes} population has already put in place.
+     *
+     * <p>Reporting stays here because {@link RecordExtension} hands back the entry each violation belongs to
+     * and nothing else -- a checker that knew about {@code DiagnosticsReceiver} would be a checker two callers
+     * could not share, and it is already the shape {@link ChoiceDisjointness} keeps.
+     */
+    private static void checkRecordExtension(TsonSchema schema, Map<String, TypeDefinition> merged,
+                                              Set<String> localNames, DiagnosticsReceiver receiver) {
+        for (RecordExtension.Violation violation : RecordExtension.check(merged, localNames)) {
+            report(receiver, schema, violation.entry(), merged.get(violation.entry()), violation.message());
         }
     }
 
@@ -826,7 +868,21 @@ public final class TsonSchemaLinker {
                                                                  Set<String> localNames) {
         Map<String, Set<String>> newSubtypesByName = new LinkedHashMap<>();
         for (String localName : localNames) {
-            for (String supertype : merged.get(localName).supertypes()) {
+            TypeDefinition local = merged.get(localName);
+            if (!local.parameters().isEmpty() && !isFamilyBase(local)) {
+                // An *unmarked* template is not a type until it is applied (§5.10), so no value can ever be
+                // one and it has no business in an index of what a position typed by the supertype admits.
+                // Its own `supertypes` stays: `<V> base & { … }` records the composition there, and that is
+                // what materialisation reads to give each instantiation its contract -- so what is excluded
+                // is the reverse edge alone, and each application still indexes under the base as it closes.
+                //
+                // A template carrying `extension` is a family base and does take part
+                // (§5.10): a value at a position typed by it is a value of some
+                // member, so it is a type by the only test that matters -- something can stand at it.
+                continue;
+            }
+            indexUnderItsTemplate(localName, local, merged, newSubtypesByName);
+            for (String supertype : local.supertypes()) {
                 if (merged.containsKey(supertype)) {
                     newSubtypesByName.computeIfAbsent(supertype, ignored -> new LinkedHashSet<>()).add(localName);
                 }
@@ -841,6 +897,41 @@ public final class TsonSchemaLinker {
             result.put(entry.getKey(), withAddedSubtypes(result.get(entry.getKey()), entry.getValue()));
         }
         return result;
+    }
+
+    /**
+     * An <b>instantiation</b> is a member of the parent its template has (§5.10), so
+     * it indexes under the head it closes -- {@code pet<"dog", dog_type>} under {@code pet}.
+     *
+     * <p>The head is read off {@code source}, which §8.2 makes an instantiation record as written, head and
+     * arguments alike. Only an application has one, so nothing else here is touched.
+     *
+     * <p><b>Only where the template has a parent.</b> A container, a constructor application and a reference
+     * template are no types, so crediting {@code arr<text>} to {@code arr} would put members under something
+     * no position can name -- the same defect, in the other direction, that keeping a template out of its
+     * base's index removed.
+     */
+    private static void indexUnderItsTemplate(String name, TypeDefinition def,
+            Map<String, TypeDefinition> merged, Map<String, Set<String>> newSubtypesByName) {
+        String head = def.source().filter(source -> !source.arguments().isEmpty())
+                .map(TypeRef::name).orElse(null);
+        if (head == null) {
+            return;
+        }
+        TypeDefinition template = merged.get(head);
+        if (template != null && template.body() instanceof TemplateBody held && held.extension().isPresent()) {
+            newSubtypesByName.computeIfAbsent(head, ignored -> new LinkedHashSet<>()).add(name);
+        }
+    }
+
+    /**
+     * Whether this entry is a <b>family base</b> -- a template whose held body carries {@code extension}
+     * (§5.10), which is what makes it a participant in IS-A rather than a form waiting
+     * for arguments. A container, a constructor application and a reference template carry none, so they stay
+     * out of every index: nothing can stand at one, there being no dispatch to eliminate the parameters.
+     */
+    private static boolean isFamilyBase(TypeDefinition def) {
+        return def.body() instanceof TemplateBody held && held.extension().isPresent();
     }
 
     /**
@@ -896,7 +987,7 @@ public final class TsonSchemaLinker {
      * of entries, so re-arrival is unification, not conflict. Two *different* schemas declaring one name is
      * the real collision, and it is still an error: distinct types cannot share a name in a flat namespace.
      * That is also what makes a revision mismatch (one route reaching {@code /2026/32/m/core.tn}, another
-     * {@code /2026/35/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
+     * {@code /2026/36/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
      * conflict between two identically-spelled types much later.
      *
      * <p>Identity is the canonical one ([TSON-DATA] §2.2.1), so a pinned and an unpinned reference to one
@@ -991,10 +1082,8 @@ public final class TsonSchemaLinker {
         // type-refs to the type-name namespace; §2.2.3 puts a merged entry's own derived references in its
         // defining schema's namespace, not the importer's. A derived chain reaches a constructor
         // whenever a refinement derives from one -- meta-kernel's own `set => ~array ^ {...}` resolves with
-        // [array, product, top]. The fallback is defensive rather than load-bearing today: a
-        // refinement source resolves through the type-name namespace alone, so a schema deriving from `array`
-        // already names it. What did need it -- a transfer of a template's supertypes onto every sized array
-        // materialised in a user schema -- is gone with the size templates themselves.
+        // [array, product, top]. The fallback is defensive rather than load-bearing: a refinement source
+        // resolves through the type-name namespace alone, so a schema deriving from `array` already names it.
         for (String supertype : def.supertypes()) {
             if (!namespace.containsKey(supertype) && !structureNamespace.containsKey(supertype)) {
                 throw new SchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");
@@ -1013,11 +1102,10 @@ public final class TsonSchemaLinker {
         checkCoherent(body);
         switch (body) {
             case RecordBody r -> {
-                for (String supertype : r.supertypes()) {
-                    if (!namespace.containsKey(supertype)) {
-                        throw new SchemaValidationException(
-                                "'" + entryName + "' has an unresolved supertype '" + supertype + "'");
-                    }
+                // A reference channel like the field types beside it: the body's lineage may be written as
+                // an application, so arity and nested arguments are checked here rather than the name alone.
+                for (TypeRef supertype : r.supertypes()) {
+                    validateTypeRef(supertype, namespace, ownParameters, entryName, " supertype");
                 }
                 for (RecordField field : r.fields()) {
                     validateTypeRef(field.type(), namespace, ownParameters, entryName,
@@ -1212,15 +1300,15 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * §5.10's parameter-usage rule: an <em>open</em> entry references every parameter it declares. {@code box => <T> { v: text }} declares
-     * {@code T} and never uses it, so no application of it could differ from any other -- the parameter is a
-     * mistake, not a degenerate-but-legal template.
+     * §5.10's parameter-usage rule: an <em>open</em> entry references every parameter it declares. {@code box
+     * => <T> { v: text }} declares {@code T} and never uses it, so no application of it could differ from any
+     * other -- the parameter is a mistake, not a degenerate-but-legal template.
      *
      * <p><b>A {@link SchemaValidationException}.</b> A parameter list is author-written, so an unused one
      * is the author's error rather than a library fault.
      *
-     * <p>Its old converse -- §5.10's closed-entry rule, checked over {@code record_field.value_param} -- has
-     * no sound form now that a parameter and a literal share one slot: at a closed entry there are no
+     * <p>The converse -- §5.10's closed-entry rule, that a closed entry carries no parameter in a value slot
+     * -- has no check of its own, a parameter and a literal sharing one slot: at a closed entry there are no
      * parameters for a token to resolve into, so a token there <em>is</em> a literal (§8.1's shadowing rule)
      * and there is nothing to detect. The rule's reference half is unaffected, and needs no code of its own:
      * {@link #validateTypeRef} accepts a name only if the namespace holds it or {@code ownParameters} lists
@@ -1326,8 +1414,8 @@ public final class TsonSchemaLinker {
      * type of fixed/default values, which must be the field's declared type" -- and calls it "a dependency
      * the schema language does not express directly", which is what leaves it to a check like this one.
      *
-     * <p><b>Here rather than at compile, because of who the verdict belongs to.</b> The same check runs
-     * today as a side effect of building the record's reader ({@code RecordAbstractReader} decodes every
+     * <p><b>Here rather than at compile, because of who the verdict belongs to.</b> The same check also
+     * runs as a side effect of building the record's reader ({@code RecordAbstractReader} decodes every
      * FIXED/DEFAULT value once, at construction), and a failure there becomes an {@code ErrorReader} -- so
      * the author's own {@code tson compile} passes, and the mistake surfaces to whoever later sends data,
      * coded as a gap in this library. The verdict does not change as this library improves, so by the
@@ -1378,7 +1466,7 @@ public final class TsonSchemaLinker {
             // message follows: it already states the rule and cites the section, so nothing here restates it.
             throw new SchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
                     + "declared '" + field.type().name() + "', but its "
-                    + (field.state() == FieldState.REQUIRED_DEFAULT ? "default" : "fixed value") + " "
+                    + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " "
                     + asWritten(value) + " is not a value of that type -- " + e.getMessage() + ". §5.2 makes "
                     + "a field's fixed or default value a value of the field's own declared type");
         }
@@ -1398,13 +1486,13 @@ public final class TsonSchemaLinker {
      * instead: a fixed or default value is available on a scalar-typed field and nowhere else. §5.6 is a
      * spelling rule for data values, not a claim that a record <em>is</em> a token, and this reads §5.2's
      * "the value must be the field's declared type" as requiring a type a token denotes directly, which is
-     * what §5.2's "Which fields may carry a value" now states.
+     * what §5.2's "Which fields may carry a value" states.
      */
     private static SchemaValidationException notAScalarType(String entryName, RecordField field,
                                                                  Token value, Top body) {
         return new SchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
                 + "declared '" + field.type().name() + "', which is " + describe(body) + ", so it cannot "
-                + "have " + (field.state() == FieldState.REQUIRED_DEFAULT ? "a default" : "a fixed value")
+                + "have " + (field.role() == FieldRole.DEFAULT ? "a default" : "a fixed value")
                 + " -- " + asWritten(value) + " is a token, and §5.2 admits only a bare token there. A "
                 + "fixed or default value is available on a field typed by an atom or an enum, and nowhere "
                 + "else: drop the modifier, or declare the field with a scalar type");
@@ -1541,6 +1629,14 @@ public final class TsonSchemaLinker {
                     + "none (§5.10); drop the argument list");
         }
         if (supplied == 0) {
+            if (referenced.body() instanceof TemplateBody held && held.extension().isPresent()) {
+                // A record-bodied template has a parent, and naming it here names that parent
+                // (§5.10). Nothing is ever read *against* it: a value at the position
+                // is a value of some member, selected by a tag or by the discriminators, and every member is
+                // a closed entry -- so the existential is eliminated by dispatch rather than by inferring
+                // arguments from the payload, which is what makes naming `box` here still an error.
+                return;
+            }
             throw new SchemaValidationException(context + ": '" + ref.name() + "' is a template taking "
                     + declared + " type argument" + (declared == 1 ? "" : "s") + " " + referenced.parameters()
                     + ", and a template is not a type until it is applied -- write '" + ref.name()

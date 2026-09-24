@@ -51,7 +51,7 @@ import java.util.Optional;
  * are involved -- so two threads resolving the same schema is a race one of them loses, not a way to warm a
  * cache. Resolve every schema the process needs at startup, then read; a {@link
  * io.ltr8.bind.DataBindContext} needs no such care: its configuration closes when it is built. The design
- * note {@code docs/linking-and-compilation.md} has the mechanics, and {@code ReadPathConcurrencyTest} pins
+ * note {@code design/compiled-registries.md} has the mechanics, and {@code ReadPathConcurrencyTest} pins
  * the read-path half.
  *
  * <p><b>The read mode is which registry you hold, not a parameter.</b> {@link #treeRegistry()} reads into an

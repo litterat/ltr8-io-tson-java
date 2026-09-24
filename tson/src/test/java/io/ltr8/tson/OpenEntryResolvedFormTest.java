@@ -111,7 +111,7 @@ class OpenEntryResolvedFormTest {
     @Test
     void anOpenEntryWithAValueParameterValidates() {
         assertEquals(List.of(), tson().validate("""
-                !!schema:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!schema:"https://tson.io/2026/36/m/meta-kernel.tn"
                 !schema {
                   vector => !type_definition {
                     source: array
@@ -138,7 +138,7 @@ class OpenEntryResolvedFormTest {
     void aHeldBodyReadsBackAsTheApplicationItHolds() {
         Tson tson = metaBoundTson();
         String resolved = """
-                !!schema:"https://tson.io/2026/35/m/meta.tn"
+                !!schema:"https://tson.io/2026/36/m/meta.tn"
                 !schema {
                   extern_of => !type_definition {
                     source: scoped
@@ -188,8 +188,8 @@ class OpenEntryResolvedFormTest {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/shapes.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                   base           => { id: text }
                   pair           => <A, B> { first: A  second: B }
@@ -255,8 +255,8 @@ class OpenEntryResolvedFormTest {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/kinds.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                   port   => !integer_type { min: 0  max: 65535 }
                   age    => !int32 ^ { min: 0  max: 150 }

@@ -1,6 +1,8 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
+import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.annotation.Typename;
 
 import java.util.ArrayList;
@@ -21,6 +23,11 @@ import java.util.stream.Stream;
  * TextParser}/{@code UriParser} compile it at validation time instead of storing the compiled
  * form.
  *
+ * <p><b>{@code members} is the sparse case</b>, as {@link IntegerType#members} is for integers: the strings
+ * admitted, written out. Every member must satisfy the other facets on the same body, {@code pattern}
+ * included -- one rule, checked in one place ({@link #coherenceCheck}), which is why this module depends on
+ * {@code tson-regex}.
+ *
  * <p>Also an {@link Atom} variant: {@code text => !text_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
@@ -29,7 +36,19 @@ public record TextType(
         @Field("min_length") Optional<Integer> minLength,
         @Field("max_length") Optional<Integer> maxLength,
         Optional<Integer> length,
-        Optional<String> pattern) implements Atom {
+        Optional<String> pattern,
+        Optional<List<String>> members) implements Atom {
+
+    @Record
+    public TextType {
+        members = members.map(List::copyOf);
+    }
+
+    /** The four facets that were this type's whole vocabulary before {@link #members} joined them. */
+    public TextType(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+            Optional<String> pattern) {
+        this(minLength, maxLength, length, pattern, Optional.empty());
+    }
 
     /** {@code text => !text_type {}} -- the unconstrained text type. */
     public static final TextType UNCONSTRAINED =
@@ -43,12 +62,20 @@ public record TextType(
      * against, and a refined {@code length} is itself checked against that range from both sides --
      * which is what rejects re-fixing an exactly-5 text to exactly 7.
      *
-     * <p><b>{@link #pattern} is deliberately unchecked.</b> Deciding whether one I-Regexp accepts a
-     * subset of another's language is regular-language containment, and {@code tson-schema} has no
-     * dependency on {@code tson-regex} to decide it with (the same boundary the linker's own
-     * pattern-disjointness gap sits behind). A refinement may therefore replace a pattern with an
-     * unrelated one and pass -- a known hole, not an oversight, and the natural place an injected
-     * containment oracle would plug in.
+     * <p><b>{@link #pattern} is settable once</b>, and so is {@link #members}. A refinement may set either
+     * where the source left it unset, or restate the source's own verbatim, and may never change it.
+     *
+     * <p>{@code pattern}'s reason is that the narrowing question is undecided: whether one I-Regexp accepts
+     * a subset of another's language is regular-language containment, and {@link TsonRegex} answers
+     * disjointness rather than containment, with no complement to build one from. Having the engine is not
+     * having the oracle. Refusing the change is the total rule available without it -- an undecidable
+     * narrowing is not waved through -- and it is the natural place an injected containment oracle would
+     * relax.
+     *
+     * <p>{@code members}' reason is different, which is why {@code AtomNarrowing} takes it as a parameter: a
+     * member set <em>is</em> decidably narrowable, and shares its logical position with a pattern that is
+     * not. One rule for the position keeps the narrowing relation from turning on which of the two
+     * spellings an author reached for, which is [TSON-SCHEMA] §5.7's <b>settable once</b> facet kind.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
@@ -61,6 +88,8 @@ public record TextType(
         AtomNarrowing.checkAtMost(violations, "max_length", effectiveMaxLength(), other.maxLength);
         AtomNarrowing.checkAtMost(violations, "length", effectiveMaxLength(), other.length);
         AtomNarrowing.checkSettableOnce(violations, "pattern", pattern, other.pattern);
+        AtomNarrowing.checkSettableOnce(violations, "members", members, other.members,
+                "members and pattern share one position and pattern cannot be narrowed");
         return List.copyOf(violations);
     }
 
@@ -76,8 +105,8 @@ public record TextType(
      *
      * <p><b>{@link #pattern} emptiness is deliberately not checked, and this is a decision rather than a
      * gap.</b> A pattern matching no string would leave the type uninhabited, and the check is cheap to
-     * write -- {@code tson-regex}'s disjointness asked of a pattern against itself decides it exactly, from
-     * {@code tson-compiler}, which has the engine this module does not. It was built and removed, because
+     * write -- {@link TsonRegex}'s disjointness asked of a pattern against itself decides it exactly, and
+     * this module has the engine. It was built and removed, because
      * <b>an empty language is not reachable by mistake in RFC 9485</b>: I-Regexp has no lookaround, no
      * anchors and no character-class subtraction, and the two errors an author actually makes -- an inverted
      * range ({@code [z-a]}) and a backwards quantifier ({@code a{2,1}}) -- are <em>syntax</em> errors the
@@ -89,6 +118,11 @@ public record TextType(
      * <p>Whether a pattern admits no string of a length the same body permits ({@code min_length: 5} beside
      * {@code pattern: "a"}) is a separate question and equally unchecked, needing length-bounded emptiness
      * the engine does not expose.
+     *
+     * <p><b>{@link #members} answers to every facet beside it, {@link #pattern} included.</b> The lengths are
+     * counts and the pattern is a regex match, and the two are one rule -- "every member satisfies the other
+     * facets on the same body or the schema fails to load" -- so they are checked together here rather than
+     * split across modules by which engine each needs.
      */
     @Override
     public List<String> coherenceCheck() {
@@ -99,6 +133,18 @@ public record TextType(
         AtomCoherence.checkOrdered(violations, "min_length", minLength, "max_length", maxLength);
         AtomCoherence.checkOrdered(violations, "min_length", minLength, "length", length);
         AtomCoherence.checkOrdered(violations, "length", length, "max_length", maxLength);
+        members.ifPresent(set -> set.forEach(member -> {
+            int codePoints = member.codePointCount(0, member.length());
+            length.filter(fixed -> codePoints != fixed).ifPresent(fixed -> violations.add(
+                    "member '" + member + "' is " + codePoints + " characters, and length is " + fixed));
+            minLength.filter(min -> codePoints < min).ifPresent(min -> violations.add(
+                    "member '" + member + "' is " + codePoints + " characters, under min_length " + min));
+            maxLength.filter(max -> codePoints > max).ifPresent(max -> violations.add(
+                    "member '" + member + "' is " + codePoints + " characters, over max_length " + max));
+            // Well-formed by the time the pattern facet itself was read, so parse cannot fail here.
+            pattern.filter(regex -> !TsonRegex.parse(regex).matches(member)).ifPresent(regex ->
+                    violations.add("member '" + member + "' does not match pattern " + regex));
+        }));
         return List.copyOf(violations);
     }
 

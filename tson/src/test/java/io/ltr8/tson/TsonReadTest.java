@@ -32,8 +32,8 @@ class TsonReadTest {
     private static final String POINT_ID = "https://example.test/point-1.tn";
     private static final String POINT_SCHEMA = """
             !!id:"https://example.test/point-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             { point => { x: int32  y: int32 } }
             """;
 
@@ -270,8 +270,8 @@ class TsonReadTest {
         assertEquals(Optional.of("/x"), problems.diagnostics().get(0).path());
         assertEquals(Optional.of("/y"), problems.diagnostics().get(1).path());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.diagnostics().get(0).code());
-        // The tree still comes back, so a caller has the partial value alongside what was wrong with it.
-        assertTrue(node.isRecord());
+        // Every problem, and no value: the diagnostics are the answer for an invalid document.
+        assertNull(node);
     }
 
     @Test

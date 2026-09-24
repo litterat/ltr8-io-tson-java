@@ -78,14 +78,14 @@ class JsonFrontDoorTest {
     }
 
     @Test
-    void the_two_readers_differ_on_what_a_collecting_read_hands_back() {
-        // The asymmetry CLAUDE.md calls deliberate: a JsonObject has somewhere to put a partial answer and
-        // a Java record does not, so a tree keeps what it built where a bound read hands back nothing.
+    void the_two_readers_agree_that_a_collecting_read_with_problems_hands_back_nothing() {
+        // One rule for both: a placeholder or a partial object cannot say which of its parts to trust, so the
+        // diagnostics are the answer.
         DiagnosticsCollector treeProblems = new DiagnosticsCollector();
         JsonValue tree = Json.standard().treeReader().withDiagnostics(treeProblems)
                 .read("{\"a\": 1, \"a\": 2}");
         assertFalse(treeProblems.isEmpty());
-        assertEquals(2, tree.get("a").asInt());
+        assertNull(tree);
 
         DiagnosticsCollector boundProblems = new DiagnosticsCollector();
         Person bound = Json.standard().objectReader().withDiagnostics(boundProblems)

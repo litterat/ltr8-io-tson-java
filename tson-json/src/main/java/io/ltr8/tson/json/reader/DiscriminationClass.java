@@ -25,7 +25,7 @@ import java.util.Optional;
  *
  * <p><b>A type with no class needs no verdict.</b> {@code rational} and {@code complex} (both strings, but
  * §5.4 gives them no class), the {@code unit} instances, a nested choice and the {@code scoped} instances all
- * answer empty -- and a choice containing one is not disjoint ([TSON-SCHEMA] §5.4), so §8.2's route 2 never
+ * answer empty -- and a choice containing one is not disjoint ([TSON-SCHEMA] §5.4), so §8.2's untagged route never
  * consults them.
  *
  * <p><b>The derivation itself is the type system's and is shared with the TSON reader by duplication</b>, not
@@ -102,7 +102,7 @@ enum DiscriminationClass {
      *
      * <p>The two leaks §8.3 names are <em>not</em> folded in here, and that is the point of keeping stability
      * a separate question: a string may be an approximate atom's special value and an array may be a map in
-     * pairs form, but a class-stable variant set contains neither, so route 2 reads the kind straight.
+     * pairs form, but a class-stable variant set contains neither, so the untagged route reads the kind straight.
      */
     static Optional<DiscriminationClass> ofKind(JsonEvent event) {
         return switch (event) {
@@ -129,12 +129,12 @@ enum DiscriminationClass {
      * </ol>
      *
      * <p>Everything else is stable, records with a rest field included, absorption changing members and never
-     * the object kind. A type with no class is not unstable -- it is unreachable by route 2 either way.
+     * the object kind. A type with no class is not unstable -- it is unreachable by the untagged route either way.
      */
     static boolean stable(TsonSchema schema, String name) {
         return ReferenceChain.terminal(schema, name).map(resolved -> switch (resolved.definition().body()) {
             case FloatType floats -> !floats.allowNan() && !floats.allowInfinity();
-            case MapBody map -> TreeMapReader.isObjectForm(schema, map);
+            case MapBody map -> MapPlan.isObjectForm(schema, map);
             default -> true;
         }).orElse(true);
     }

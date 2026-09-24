@@ -7,9 +7,10 @@ import java.util.Optional;
 /**
  * The CIDR mechanics {@link Cidr4Parser} and {@link Cidr6Parser} share -- prefix-length grammar, the
  * family-range and host-bits rules, and the {@code min_prefix}/{@code max_prefix} facets. Neither family
- * owns them -- unlike {@link Ipv4Parser#IPV4_ADDRESS}, which {@link Ipv6Parser} genuinely reaches into
- * because RFC 4291 §2.2 embeds the IPv4 grammar -- so they sit here rather than on one of the two parsers
- * with the other reaching across for them.
+ * owns them, so they sit here rather than on one of the two parsers with the other reaching across for them.
+ * The address half of a network is not here either: both address grammars are
+ * {@link io.ltr8.tson.base.atom.InternetAddress}'s, where RFC 4291 §2.2's embedded IPv4 form reads the IPv4
+ * grammar beside it.
  *
  * <p>The split between a parse failure and a validation failure is [TSON-DATA] §5.5's own, not a choice made
  * here: "A token that does not match the named format is a parse error; a CIDR prefix length outside the

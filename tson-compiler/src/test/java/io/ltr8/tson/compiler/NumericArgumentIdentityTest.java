@@ -34,8 +34,8 @@ class NumericArgumentIdentityTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/numeric-identity.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                 %s
                 }
@@ -103,7 +103,7 @@ class NumericArgumentIdentityTest {
     @ValueSource(strings = {"1.00", "1e0", "1.0"})
     void everyFloatSpellingOfOneMagnitudeLandsOnOneEntry(String spelling) {
         List<String> derived = derivedEntries(compile("""
-                  box => <T, N> { v: T = N }
+                  box => <T, N> { v?: T = N }
                   u   => { a: box<float64, 1.0>  b: box<float64, %s> }""".formatted(spelling)));
 
         assertEquals(1, derived.size(), () -> spelling + " -> " + derived);
@@ -123,7 +123,7 @@ class NumericArgumentIdentityTest {
     @Test
     void anIntegerAndAFloatOfOneMagnitudeStayApart() {
         List<String> derived = derivedEntries(compile("""
-                  box => <T, N> { v: T = N }
+                  box => <T, N> { v?: T = N }
                   u   => { a: box<float64, 1>  b: box<float64, 1.0> }"""));
 
         assertEquals(2, derived.size(), derived::toString);
@@ -138,7 +138,7 @@ class NumericArgumentIdentityTest {
     @Test
     void aQuotedTokenIsNeverANumber() {
         List<String> derived = derivedEntries(compile("""
-                  box => <T, N> { v: T = N }
+                  box => <T, N> { v?: T = N }
                   u   => { a: box<text, "255">  b: box<text, "0xFF"> }"""));
 
         assertEquals(2, derived.size(), derived::toString);

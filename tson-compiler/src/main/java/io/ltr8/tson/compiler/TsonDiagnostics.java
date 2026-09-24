@@ -14,15 +14,13 @@ import java.util.Optional;
  * TsonUnsupportedDocumentException}, {@code LimitExceededException}, {@code
  * SchemaFetchException}. A {@code Diagnostic} is the shape of an answer and is shared by every
  * encoding ([TSON-JSON] §9.4 reports in the same four categories and adds none); <em>classifying</em> a
- * failure is reading a document, which is each encoding's own. Leaving these on the record would have
- * made {@code tson-base} depend on the TSON engine, or made one switch responsible for exceptions it
- * cannot name -- which is how {@code ofBaseSyntaxError} came to rethrow anything it did not recognise,
- * including another encoding's syntax error.
+ * failure is reading a document, which is each encoding's own. Placing these on the record would make
+ * {@code tson-base} depend on the TSON engine, or make one switch responsible for exceptions it cannot
+ * name -- so that another encoding's syntax error would be rethrown as a fault rather than classified.
  *
- * <p>Public for the same reason {@code ofBaseSyntaxError} always was: one of the three base-syntax
- * exception types lives in the unexported {@code lexer} package and cannot be named in a {@code catch}
- * from another module, so a caller driving the parser directly cannot make this classification
- * themselves.
+ * <p>Public because one of the three base-syntax exception types, {@code LexException}, lives in the
+ * unexported {@code lexer} package and cannot be named in a {@code catch} from another module, so a
+ * caller driving the parser directly cannot make this classification themselves.
  */
 public final class TsonDiagnostics {
 
@@ -141,8 +139,8 @@ public final class TsonDiagnostics {
      *
      * <p>Taking the whole exception is also what picks the {@link Diagnostic.Code}, and what fills the {@code
      * expected}/{@code actual} pair: the reference that could not be obtained is {@code actual}, since it is
-     * the thing a consumer must look at. The alternative -- passing a flattened message -- is how this
-     * factory came to state {@link SchemaFetchException.Reason}'s distinction nowhere.
+     * the thing a consumer must look at. A flattened message could carry neither: {@link
+     * SchemaFetchException.Reason}'s distinction would be stated nowhere.
      */
     public static Diagnostic ofSchemaUnavailable(String schemaId, String declaration,
                                                  SchemaFetchException e, Optional<SourcePosition> position) {

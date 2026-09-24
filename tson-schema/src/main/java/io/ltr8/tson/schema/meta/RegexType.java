@@ -18,7 +18,7 @@ import java.util.Optional;
  * min_length}/{@code max_length}/{@code length}/{@code pattern}/{@code spec} side by side, with no
  * sub-record anywhere. A component nesting any of them under a name the wire doesn't have receives
  * nothing at all: {@code tson-compiler}'s compiled {@code Record*Reader} fills a field, including a
- * {@code REQUIRED_FIXED} field's schema-composed default, under its own schema field name. This is
+ * fixed field's schema-composed default, under its own schema field name. This is
  * why the shape here is field-for-field {@link EmailType}'s -- {@code email_type} is declared by the
  * identical composition and differs only in which document {@code spec} is fixed to.
  *
@@ -34,23 +34,24 @@ import java.util.Optional;
 @Typename(name = "regex_type")
 public record RegexType(String spec, @Field("min_length") Optional<Integer> minLength,
                         @Field("max_length") Optional<Integer> maxLength,
-                        Optional<Integer> length, Optional<String> pattern) implements Atom {
+                        Optional<Integer> length, Optional<String> pattern,
+                        Optional<List<String>> members) implements Atom {
 
     /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
     public static final RegexType UNCONSTRAINED = new RegexType(
             "https://www.rfc-editor.org/rfc/rfc9485", Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty());
+            Optional.empty(), Optional.empty(), Optional.empty());
 
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
     public TextType textConstraints() {
-        return new TextType(minLength, maxLength, length, pattern);
+        return new TextType(minLength, maxLength, length, pattern, members);
     }
 
     /**
      * {@inheritDoc}
      *
      * <p>A regex IS-A piece of text, so the narrowing rule is {@link TextType}'s own, applied to the
-     * facets this composes. {@code spec} is {@code REQUIRED_FIXED} to RFC 9485 and cannot move.
+     * facets this composes. {@code spec} is fixed to RFC 9485 and cannot move.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {

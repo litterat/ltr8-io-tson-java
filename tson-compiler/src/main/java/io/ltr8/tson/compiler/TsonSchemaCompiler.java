@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.compiler.reader.Subsumption;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -15,6 +16,7 @@ import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -24,8 +26,8 @@ import java.util.function.Function;
  * this project's own parse -&gt; resolve -&gt; link -&gt; register -&gt; compile -&gt; read
  * pipeline vocabulary: this class is the verb, {@link TsonCompiledSchema} is the noun it produces.
  * Requires a {@link TsonLinkedSchema}, not a bare {@code TsonSchema} -- every {@code type_ref}
- * reachable from a body must already be argument-free (materialization already flattened any {@code
- * <...>} application into a reference to a synthesized entry), and every name a body refers to must
+ * reachable from a body must already be argument-free (materialisation closes every {@code <...>}
+ * application into a reference to the entry it mints), and every name a body refers to must
  * actually be present in {@code linkedSchema.schema().entries()}; a referenced-but-missing name is
  * treated as a bug, not a normal failure (see {@link Compilation#resolve}'s own {@code
  * IllegalStateException}).
@@ -39,13 +41,19 @@ import java.util.function.Function;
  * <p>A build failure for one specific entry doesn't abort the whole walk -- {@link
  * Compilation#resolve} catches it and substitutes an {@link ErrorReader}, so the schema as a whole
  * still compiles; only actually reading a value against that one entry fails, at that point. This
- * covers both a constructor with no registered {@link ValueReaderFactory} at all, and a factory
- * that's registered but rejects this particular entry.
+ * covers both a constructor with no {@link ValueReaderFactory} to dispatch to, and a factory that exists
+ * but rejects this particular entry. Every constructor meta-kernel.tn and meta.tn declare has a factory,
+ * so the first case is a constructor declared by a meta-layer schema this library has never seen
+ * ([TSON-SCHEMA] §2.2.2's extension point), or one out of the governing meta's scope ({@link
+ * #governedFactory}).
  *
- * <p><b>An entry declaring type parameters never reaches a factory at all</b>: it is a template, not a type
- * (§5.10), so it compiles to an {@link OpenTemplateReader} that reports against the data and skips the
- * value. Only a <em>data</em> type-ref can reach one -- a schema naming a template without applying it is
- * refused when it links -- and that is the author's error, not a gap. See {@link OpenTemplateReader}.
+ * <p><b>An entry declaring type parameters never reaches a factory at all</b>, and compiles to one of two
+ * readers. A template whose held body carries {@code extension} is a <em>family base</em> and compiles to
+ * an {@link AbstractTemplateReader}, which dispatches to one of its instantiations by tag or by the
+ * discriminators exactly as a closed abstract or sealed record does. Every other template is not a type
+ * (§5.10) and compiles to an {@link OpenTemplateReader}, which reports against the data and skips the
+ * value: only a <em>data</em> type-ref can reach one -- a schema naming a template without applying it is
+ * refused when it links -- and that is the author's error, not a gap.
  *
  * <p>Two compile modes share this eager walk, differing only in how a body's constructor name maps to
  * a factory. A <b>governed</b> compile ({@link #compile(TsonLinkedSchema, TsonCompiledMetaSchema)})
@@ -172,10 +180,18 @@ public final class TsonSchemaCompiler {
 
         /**
          * §7.2's alias index, built once: which written names mean each entry. A property of the schema
-         * rather than of the entry being guarded, so computing it per entry made the walk quadratic in the
-         * schema's size for an answer that never changed.
+         * rather than of the entry being guarded, so deriving it per entry would make the walk quadratic in
+         * the schema's size for an answer that never changes.
          */
         private final Map<String, Set<String>> namesMeaning;
+
+        /**
+         * The inverse of §8.3's alias hop, built once: which written names reach each entry. A binding map is
+         * keyed on the names an author wrote and a materialised entry has none of its own (§8.2), so a bind
+         * lookup asks under these before the entry's own name -- and, like {@code namesMeaning}, this is a
+         * property of the schema rather than of the entry, so deriving it per entry would be quadratic.
+         */
+        private final Map<String, List<String>> referrers;
 
         /**
          * What every built reader is handed for its own name lookups. Resolves through this compilation
@@ -191,6 +207,7 @@ public final class TsonSchemaCompiler {
             this.factoryFor = factoryFor;
             this.foreign = foreign;
             this.namesMeaning = Subsumption.namesMeaning(schema.entries());
+            this.referrers = ValueReaderContext.referrers(schema.entries());
         }
 
         TsonTypeReader<?> resolve(String name) {
@@ -234,11 +251,19 @@ public final class TsonSchemaCompiler {
 
         private TsonTypeReader<?> build(String name, TypeDefinition definition) {
             if (definition.kind() == TypeKind.TEMPLATE) {
-                // A template is not a type ([TSON-SCHEMA] §5.10), and its kind says so -- the same field
-                // every other entry is dispatched on. See OpenTemplateReader for why the refusal is the
+                ValueReaderContext context =
+                        new ValueReaderContext(linked, readers, foreign, namesMeaning, referrers);
+                if (definition.body() instanceof TemplateBody held && held.extension().isPresent()) {
+                    // A *family base* -- a template carrying `extension` (§5.10). No
+                    // value is read against it: one of its instantiations is, selected by a tag or by the
+                    // discriminators, so it dispatches exactly as a closed abstract or sealed record does.
+                    return new AbstractTemplateReader(name, definition, context, readers);
+                }
+                // Every other template is not a type ([TSON-SCHEMA] §5.10), and its kind says so -- the same
+                // field every other entry is dispatched on. See OpenTemplateReader for why the refusal is the
                 // entry's own reader rather than a check at the root.
                 return new OpenTemplateReader(name, definition.parameters(),
-                        new ValueReaderContext(linked, readers, foreign).locationOf(name, definition));
+                        context.locationOf(name, definition));
             }
             Top body = definition.body();
             if (body instanceof Reference r) {
@@ -250,7 +275,8 @@ public final class TsonSchemaCompiler {
                 return UseSite.named(resolve(r.target().name()), EntryDisplayName.of(name, definition));
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
-            TsonTypeReader<?> built = factory.create(name, definition, new ValueReaderContext(linked, readers, foreign));
+            TsonTypeReader<?> built = factory.create(name, definition,
+                    new ValueReaderContext(linked, readers, foreign, namesMeaning, referrers));
             // §7.2's subsumption rule, applied at every position it governs rather than only where a record
             // happened to have subtypes -- see Subsumption for which kinds it deliberately leaves alone.
             return Subsumption.guard(name, definition, built, namesMeaning, readers);

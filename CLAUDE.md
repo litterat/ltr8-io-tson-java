@@ -1,1528 +1,191 @@
 # CLAUDE.md
 
-Orientation for Claude Code sessions in this repo. It describes the code **as it stands** — current
-form, present tense. How it got here lives in git history and `BACKLOG.md`, not here; when a design
-choice has a non-obvious *why*, the current rationale is stated directly rather than the sequence of
-edits that produced it.
+Orientation for Claude Code sessions in this repo: what the project is, the rules that apply to every change, and where
+the detail lives. It describes the code **as it stands** — present tense; history is in git.
 
-**This file is deliberately an overview.** The full per-phase design detail lives in `docs/` (map below)
-and in class Javadoc. **Before working in an area, read its `docs/` note** — each note carries the
-invariants, spec-feedback citations, and deliberate divergences for that area at the depth this file used
-to. Trust but verify: the code is the source of truth if a note has drifted.
+**This file is an index, and it stays short.** Design detail lives in `design/` (map below), in class Javadoc, and in
+the `CLAUDE.md` inside each module directory, which loads when you touch that module. **Before working in an area, read
+its `design/` note** — each opens with the invariants that are easy to break silently, then the why. Read the one or two
+notes the task touches, not all of them. Trust but verify: the code is the source of truth if a note has drifted.
 
-| Area | Design note |
+**When you learn something, put it in the area's note, not here.** A paragraph added to this file is read by every
+session on every task; one added to a note is read by the sessions that need it. This file grows only when a rule
+applies to all work in the repo.
+
+## Design notes (`design/`)
+
+Forty-odd notes, each under ~25 KB and opening with its invariants. Pick by the class you are about to touch.
+
+| Area | Notes (`design/…`) |
 |---|---|
-| Lexer, Tier 2/3 data parsing, base type resolution, atom vocabulary | `docs/lexer-and-data-parsing.md` |
-| Schema grammar, desugaring | `docs/schema-grammar-and-desugaring.md` |
-| Schema resolution, template materialisation, meta-kernel bootstrap | `docs/schema-resolution.md` |
-| Identity, linking, registry, Class 2 compilation, compiled registries | `docs/linking-and-compilation.md` |
-| Streaming readers, read context, diagnostics (data- and schema-side) | `docs/readers-and-diagnostics.md` |
-| Read facades, writers, tree model, `Tson` front door | `docs/facades-and-tree.md` |
-| CLI, config package, bundled schemas, content hashing | `docs/cli-config-hashing.md` |
-| The JSON encoding: its own lexer, structural layer, tree and readers | `docs/json-encoding.md` |
+| **Lexing and data parsing** | `lexer-and-data-parsing.md` (lexer, Tier 2 stream, Tier 3 AST) · `base-types-and-atom-vocabulary.md` (§4 resolution, `tson-atom`) |
+| **Schema grammar, desugaring** | `schema-grammar.md` (`TsonSchemaParser`) · `schema-grammar-and-desugaring.md` (`SchemaDesugarer`, sugar table, lifts) · `desugaring-open-forms-and-templates.md` |
+| **Resolution** | `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, reference hops, `@synthetic`, meta-kernel bootstrap) |
+| **Templates (§5.10)** | `held-template-bodies.md` (`TemplateBody`, parameter kinds) · `template-materialisation.md` (`TemplateMaterialiser`, `SyntheticMerge`, regularity) |
+| **Linking** | `linking-and-compilation.md` (registry, identity, import merge, inhabitance, `record.extension`) · `choice-disjointness.md` · `meta-layer-data-kind.md` (`Data`) · `name-hygiene-and-minted-names.md` (`checkNames`, `InternalName`) |
+| **Compilation** | `class2-compilation.md` (`TsonSchemaCompiler`, `CompiledReaders`, `ErrorReader`, untagged choices) · `compiled-registries.md` (the two registries, `ForeignSchemas`, concurrency) |
+| **Reading** | `readers-and-diagnostics.md` (`TsonReadContext`, the read rules, tree/bind asymmetry) · `record-dispatch.md` · `scope-push.md` (§7.8) · `reader-naming-and-schema-location.md` · `name-hygiene-read-path.md` |
+| **Diagnostics and policy** | `diagnostic-model.md` (`Diagnostic`, `Code`, the component rule) · `diagnostic-rules-and-messages.md` (`base.diagnostics`, `expected`) · `schema-side-diagnostics.md` (reporting overloads, `validateSchema`, bind agreement) · `processor-policy.md` (`ProcessorPolicy`, `LimitsPolicy`) |
+| **Facades, writers, tree** | `facades-and-tree.md` (the two read facades) · `writers-and-document-header.md` (writers, sinks, `TsonDocumentPeek`) · `tree-model.md` (`TsonValue`) · `front-door-and-config.md` (`Tson`, `ProcessorConfig`) |
+| **JSON encoding** | `json-encoding.md` (rationale: why a separate stack) · `json-lexer-stream-tree.md` · `json-schema-directed-reading.md` · `json-facades-binding-writing.md` · `json-unicode-policies.md` |
+| **Modules** | `modules.md` (every boundary and why) · `tson-base.md` (the shared vocabulary, package by package) |
+| **CLI, bundled schemas, hashing** | `cli-config-hashing.md` |
+| **Conformance, build, process** | `conformance-suite.md` (runner contract, §8.2 scope walks) · `build.md` (commands, allocation harness, publishing) · `process.md` (branches, spec-feedback register, backlog and identity rules at full length) |
+
+Other root documents: `BACKLOG.md` (outstanding work), `SPEC-FEEDBACK.md` (open spec issues against Parts 1 and 2),
+`STRUCTURED-OUTPUT.md` (the target use case: LLM structured-output validation, JSON compatibility), and the
+consumer-facing `README.md`, `STATUS.md` (the implemented checklist) and `CONFORMANCE.md` (edge-case behaviour).
+`skills/` holds the consumer-facing Claude skills (`tson-java`), linked into `.claude/skills/`.
 
 ## Project
 
-A from-scratch Java implementation of TSON (Typed Schema Object Notation), built directly against the TSON
-spec series (2026 revision):
+A from-scratch Java implementation of TSON (Typed Schema Object Notation), built directly against the TSON spec series
+(2026 revision), and the spec's first implementation:
 
-- Part 1 — lexer, structural grammar, base type resolution, built-in type vocabulary:
-  https://tson.io/raw/2026/35/tson-part1-data.md
-- Part 2 — schema grammar, type system, resolution, linking, compilation:
-  https://tson.io/raw/2026/35/tson-part2-schema.md
+- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/36/tson-part1-data.md
+- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/36/tson-part2-schema.md
+- Part 3 — the JSON encoding, **drafted in this repo**: `spec/tson-part3-json.md`
 
-The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
-doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
-copy. `spec/` holds local snapshots of the current revision for quick reference: `spec/tson-part1-data.md`,
-`spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core}.tn` (the spec's own bundled schema
-documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
-on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not a
-source of truth — with **two** standing exceptions. The three `.tn` schemas are **packaged from here at build
-time**, so they are the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in
-place**: see "Part 3 is drafted here" below. They carry **Revision 35 identities** —
-`https://tson.io/2026/35/m/*.tn`, the published revision's own. `spec/` holds Revision 35 of both parts, whose
-§13.2 table names those same identities and is stamped from these bytes — so the table is neither a revision
-behind nor stale, and **§13.2 is a fourth pin to move** whenever the artifacts change.
-`scripts/restamp-bundled-schemas.sh` does not know about it: the script covers the repo's own pins, and the
-spec document is a cache it does not write, so §13.2 is the one that has to be re-stamped by hand and is
-therefore the one that silently drifts. `tson hash spec/m/<name>.tn` is the check. The divergences earlier
-revisions carried are all in the spec now — `reference.target` typed `type_ref`, no
-`instance_template`/`template_argument`/`value_param` (§5.10's held bodies replaced the quoted open-body
-vocabulary), and `map`'s `state` field behind `{K => V?}` (§5.3). The open-entry shape is the spec's now too:
-an open entry's body is an instance of the kernel's `template` constructor — the parameter names and the
-application as text (§8.1) — so `type_definition` has lost `parameters` to that body, `disjoint` to the choice
-body it is derived over (§5.4), and `kind` altogether, the kernel losing `type_kind` with it because a kind is
-derived from an entry's own supertypes and body (§4.1, §8.1's four-branch rule). `TypeDefinition.kind`
-survives as an `@Unbound` component: computed at resolution for this resolver's own use, never written.
-**Changing them means re-stamping all three digests bottom-up**, moving the matching `*-resolved.tn`
-entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the published
-values. `scripts/restamp-bundled-schemas.sh` does the digest half — every pin in the repo, in dependency
-order, plus the getting-started example, which pins meta and core and so has a digest of its own that moves
-with them; `--check` reports staleness and writes nothing. **The digests are not a test-only concern**: the
-library verifies the packaged bytes against `TsonBundledSchemas`' held digest on every load, so one stale
-constant fails `Tson.standard()` and with it most of the suite. Restamping after each edit is what
-lets a schema change land across several commits with the integrity checks left on.
+The spec is a working revision that changes without compatibility guarantees. When in doubt, **re-fetch the current URL**
+and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 36, not
+edited here) with **two exceptions that are live**: `spec/m/{meta-kernel,meta,core}.tn` are packaged from here at build
+time, and `spec/tson-part3-json.md` is edited in place.
 
-**The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
-`@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`
-does it: every entry must read back into `schema.meta` and have a counterpart here, and what may still
-differ is pinned per schema. They are the only external statement of what a conforming resolver produces,
-so a change that moves those counts wants looking at rather than renumbering. Keep them in step with the
-`.tn` beside them; both have drifted before.
+**Editing a bundled schema means re-stamping.** The library verifies the packaged bytes against
+`TsonBundledSchemas`' digests on every load, so one stale constant fails `Tson.standard()` and most of the suite.
+`scripts/restamp-bundled-schemas.sh` re-pins everything in dependency order (`--check` reports only); Part 2 §13.2's
+table in `spec/` is the one pin it does not write. Keep `spec/m/*-resolved.tn` in step — `ResolvedFixtureTest` checks
+them. `design/process.md` has the procedure.
 
-**`main` is the reference implementation of the published revision, which is Revision 35.** Each published
-revision's implementation stays reachable at the point it was the whole of `main`: `r2026-32`, `r2026-34`.
-The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling corpus branch of
-the same name and `SUITE_PIN` following it — where the register's entries state what is *running* rather
-than what is *proposed*, the branch being the argument. It merges when the spec lands and not before, since
-merging a divergence early costs `main` the one signal it exists to give. The bundled schemas carry the
-revision's own identities from the start, so a content change lands on artifacts named for the revision
-proposing it rather than being re-identified at the end.
+**Branches.** `main` is the reference implementation of the *published* revision (36); published revisions are tags
+(`r2026-32`, `r2026-34`, `r2026-35`). **No proposal branch is open**: PR branches come off `main` and merge into it.
+Work that needs an unpublished revision — a meta-kernel change the published spec cannot carry — opens
+`r2026-37-proposal`, with a corpus branch of the same name, and it merges when the spec lands and not before.
 
-**Nothing here is frozen, and nothing is owed to a user who does not exist.** The spec is a working
-revision, this is its first implementation, and the artifact has no published releases and no remote
-repository configured — every version carries `-SNAPSHOT`. So **correctness wins over stability, every
-time**: a wrong rule gets fixed rather than kept, a bad name gets changed rather than deprecated, a public
-method that turned out to be the wrong shape gets deleted rather than wrapped. Where the spec itself is
-wrong, `SPEC-FEEDBACK.md` is how that gets fixed too. A compatibility argument is only worth making about a
-real consumer, and there are none — the one place any of this becomes binding is §10's immutability rule for
-a *published* schema `!!id`, which is about documents in the world, not about Java signatures.
+**Nothing here is frozen, and nothing is owed to a user who does not exist.** No published releases, every version
+`-SNAPSHOT`. So correctness wins over stability every time: a wrong rule gets fixed, a bad name changed rather than
+deprecated, a wrongly-shaped public method deleted rather than wrapped. The one binding exception is §10's immutability
+of a *published* schema `!!id`.
 
-**Status:** Part 2's grammar, resolution, linking, and Class 2 compilation
-all work: the three bundled schemas resolve/register/compile in full, user schemas governed by them
-validate and read, and a `tson` CLI drives it end to end. Known gaps are listed under "Not yet
-implemented".
+**Status.** Parts 1 and 2 work end to end — the bundled schemas resolve, link and compile; user schemas validate and
+read in tree and bind mode; the `tson` CLI drives it. The JSON encoding has its own full stack in tree mode. What is
+left is in `BACKLOG.md`.
 
-**Hard constraints:**
-- Java 25 only.
-- No external runtime dependencies in main code. JUnit (Jupiter) is permitted for tests only.
+**Hard constraints:** Java 25 only. No external runtime dependencies in main code; JUnit (Jupiter) for tests only.
+
+## Pipeline and modules
+
+Schema documents: **parse → desugar → resolve → link → register → compile → read** (`TsonSchemaParser`,
+`SchemaDesugarer`, `TsonSchemaResolver`, `TsonSchemaLinker`, `TsonSchemaRegistry`, `TsonSchemaCompiler`,
+`TsonTypeReader`). Data documents with no schema run lex → parse → base-type-resolve.
+
+| Module | Holds |
+|---|---|
+| `tson-base` | Shared by every encoding: `Diagnostic`, policies, schema sources, host atom values, byte I/O, UCD tables |
+| `tson-annotation` | Binding annotations and the `Annotations` carrier |
+| `tson-bind` | Generic `DataValue`↔object binding engine; knows nothing of schemas |
+| `tson-schema` | `schema.meta` resolved-schema value model, registry, `TsonBundledSchemas` |
+| `tson-atom` | The built-in atom vocabulary, over `String`, shared by both encodings |
+| `tson-tree` | `TsonValue` data tree model; depends on nothing |
+| `tson-regex` | RFC 9485 I-Regexp engine; depends on nothing |
+| `tson-compiler` | The engine: lexer, grammars, resolver, linker, compiler, readers, writers, facades |
+| `tson` | The front door: `Tson` |
+| `tson-json` | The JSON encoding, a separate stack with no dependency on `tson-compiler` |
+| `tson-cli` | The `tson` command |
+
+Dependencies run toward the value models: `tson-compiler` depends on `tson-schema` and `tson-tree`, never the reverse.
+JPMS enforces it. `design/modules.md` has each boundary and why.
 
 ## Spec feedback — this is the first implementation
 
-This is the spec's first implementation, which makes it the first real test of whether the prose resolves
-unambiguously to one behavior — valuable to the spec author precisely because it's still a draft. Actively
-watch for and flag:
+Being first makes this the real test of whether the spec's prose resolves to one behaviour. Watch for **ambiguity**,
+**internal inconsistency**, **underspecification** and plain **errors**. When you find one, say so in conversation and
+record it — never silently pick an interpretation.
 
-- **Ambiguity** — wording a careful reader could reasonably implement two ways.
-- **Internal inconsistency** — two sections (or a grammar production and its prose) that disagree.
-- **Underspecification** — a case the grammar/prose doesn't address where an implementation must still
-  pick something.
-- **Errors** — plain mistakes (wrong cross-reference, grammar that doesn't parse its own examples).
-
-When you find one: say so in conversation, and record it in `SPEC-FEEDBACK.md` (spec section, concrete
-description, the interpretation this implementation chose and why, suggested resolution). Don't silently
-pick an interpretation — a resolved ambiguity is invisible again three sessions later unless written down.
-
-**Part 3 is drafted here, so edit `spec/tson-part3-json.md` directly as you go.** [TSON-JSON] is a very early
-draft and this implementation exists to validate it, which makes the loop tighter than for Parts 1 and 2: a
-finding becomes a **spec change in the same session**, in place, with git history as its record — not a
-register entry waiting for someone else's adjudication. Parts 1 and 2 keep the register, because their current
-revision is published and this implementation *proposes* changes to them rather than making them; Part 3 has
-no published revision to be behind, so there is nothing to propose against.
-
-What that changes in practice:
-
-- **A Part 3 finding does not go in `SPEC-FEEDBACK.md`.** Fix §N and say so in the commit. An entry spanning
-  Part 3 and an earlier part stays in the register, and says which half is which.
-- **Edit the prose, not just a note beside it.** An underspecification is closed by stating the rule; an
-  overclaim by correcting the sentence. Where the choice is genuinely open, state the rule *and* why the
-  alternative was not taken, so the author is reading a decision rather than a shrug.
-- **Cite the section, not this implementation.** The document never mentions this codebase, a Java type, or a
-  test. What running code buys is confidence that a rule is implementable and that its consequences were
-  followed; the document states the rule.
-- **The obligation runs the other way too.** Implementing a section is when its wording gets its only real
-  reading — so a section you build against and leave unedited is a section you are asserting is right.
-- **Keep it to what implementation taught you.** A Part 3 edit should trace to something the code forced a
-  decision about. Rewriting prose that no reader tripped over is churn in a document someone else is also
-  editing.
-A finding still open is cited by number (`SPEC-FEEDBACK.md` #N); once the spec carries the rule, the
-citations name the section instead.
-
-**The register holds what is open against the current revision, and renumbers from #1 when a revision
-closes.** It is an input to the next revision's adjudication, so its numbering is what that revision's
-change log will answer against. The evidence beside it is this implementation itself — an entry proposing a
-design states what is running — which is why the shared corpus's `proposed/` bucket stays empty here: the
-proposal is the code, not a vector another implementation is asked to fail. Entries whose resolution
-landed are deleted; the closing revision's change log in `spec/` keeps all of them under *their* numbers.
-**Cite the spec, not the argument that got it there.** Prose and Javadoc state the rule as built and name
-the current section that requires it; a `SPEC-FEEDBACK.md #N` citation is for an entry still open, where
-there is no section to point at yet. When
-an entry closes, the citations to it become spec citations — the reasoning has served its purpose and the
-spec now carries the rule.
-
-**The register is the as-built record, and it is self-contained.** It is what goes to the spec reviewer, so
-an entry proposing a design this implementation has built states the design, what is running, and what is
-not, rather than pointing at a design document beside it. Where an entry's recommendation is a proposal
-rather than a report, it says so at the point it makes it — a reviewer adopting a rule needs to know which
-claims are running code. Working design documents are not kept in `spec/`: once a design lands, the entry
-absorbs what survives of the argument and the document goes, git history keeping it.
+- **Parts 1 and 2 → `SPEC-FEEDBACK.md`**: section, concrete description, the interpretation chosen and why, suggested
+  resolution. The register holds only what is open against the current revision and renumbers from #1 when a revision
+  closes; resolved entries are deleted. It is self-contained and is the as-built record that goes to the spec reviewer:
+  an entry proposing a design states what is *running*, and says so where a recommendation is a proposal instead.
+- **Part 3 → edit `spec/tson-part3-json.md` directly**, in the same session, and say so in the commit; it has no
+  published revision to propose against. State the rule in the prose (and, where the choice was open, why the
+  alternative lost). The document never mentions this codebase. Keep edits to what implementation forced a decision
+  about; a section you build against and leave unedited is one you are asserting is right.
+- **Cite the spec, not the argument.** Prose and Javadoc name the current section that requires a rule. A
+  `SPEC-FEEDBACK.md #N` citation is only for an entry still open; when it closes, the citation becomes the section.
 
 ## Conventions
 
-**Javadoc documents current contract only, no change history.** Java source Javadoc describes an element's
-*current* behavior — never dates, "renamed from X", "used to do Y, now does Z", "on the user's direction",
-or similar changelog framing. If a design needs a WHY, state the current invariant and its rationale
-directly. When you edit a class, clean up its Javadoc in the same edit — remove stale narrative (even if
-you didn't write it), fix anything that no longer matches the code, tighten what's left. The `docs/` notes
-and this file follow the same no-history rule; the dated log lives in git.
-
-**`BACKLOG.md` is a clean list of outstanding work and nothing else.** Every entry names something someone
-could pick up and do. Three things are therefore not entries, however true: **what was done** (an item that
-ships comes out entirely — not annotated as complete, not kept as a record of how it was solved), **what was
-decided against** (a won't-do is not work), and **what might become work later** (a standing note to revisit
-something if conditions change is not actionable today, and sits in the list forever looking like a task).
-Prose inside a live entry follows the same rule — say what is left and what constrains it; recounting which
-halves already work turns an item into a status report that goes stale silently. Where one of those facts has
-to survive its entry, it belongs in the `docs/` note, the Javadoc, or the test that owns the area, where the
-person who trips over it will be looking. Git history is the log. Same rule for the "Not yet implemented"
-section of this file.
-
-**Keep the `docs/` note current in the same session as the change.** When work alters behavior an area's
-design note describes, update that note the way you'd update the class's Javadoc — same edit, not a
-follow-up. A note that silently drifts is worse than no note.
-
-**`Tson` is a prefix, never an infix.** A class name containing `Tson` must lead with it (`TsonSchema`,
-`TsonDataParser`, `TsonCompiledSchema`) — never buried (`CompiledTsonSchema` is wrong). The prefix is
-**not** applied to every class: most internal machinery is deliberately bare (`Lexer`,
-`RecordAbstractReader`, `DeferredTypeReader`, `ChoiceDisjointness`, `SchemaResolver`,
-`DefinitionResolver`). Reserve `Tson` for types a *consumer of this library* names in their own code — its
-value is disambiguation at the call site (`TsonSchema` vs. a domain `Schema`). When adding a new public,
-developer-facing type, ask "would a consumer plausibly have their own class with this bare name?" — if yes
-and it's consumer-facing, prefix it; if it's internal machinery, leave it bare.
-
-**A fixed or default value is available on a scalar-typed field and nowhere else.** §5.2 makes a `~`/`=`
-value a value of the field's declared type, and §12.1 admits only a bare token there; `TsonSchemaLinker`
-resolves the field's type and parses the token with that type's own reader parser, so a default is accepted
-exactly when a read would accept the same token in the same position. A field typed by anything but an
-**atom or an enum** is refused whatever token stands beside it — records and choices included, though §5.6's
-positional form and an atom-typed variant mean a read would accept some. Admitting those would make "may
-this field have a default?" depend on another declaration's field count or variant list, a rule an author
-computes rather than remembers, and one that breaks silently when that other declaration gains a field.
-§5.2's "Which fields may carry a value" states exactly this rule; `void` and the scoped instances fall out of the
-same line.
-
-**A schema and its bound class must agree about a type's fields** (`BindMismatchException`, raised at
-bind-mode compile — startup, not first read; its subclass `MissingBindingException` covers a type with
-*no* class at all and is deferred to the first read of that type, since a schema legitimately declares types
-a consumer never binds). Any non-FIXED field with no component, or a component no
-field fills, is refused — optional fields included, since those are the ones that work in development and
-fail on the first caller who sends them. A FIXED field is exempt, the schema settling its value. `@Unbound` marks a component as the
-class's own, **There is no wholesale opt-out**, and that is deliberate: accepting fewer fields without
-saying *which* is the defect §7.2 refuses on the wire, and a class that means to read one version of a
-schema while another is current declares a `@Profile` constructor for it. Reaching a read as a diagnostic
-instead (a schema compiled on demand), it keeps its own code, `Diagnostic.Code.BIND_MISMATCH` — a
-misconfiguration in the reading application is no more a verdict on the document than a gap is.
-`docs/readers-and-diagnostics.md` has the why.
-
-**Exception classification is a policy, not a style choice.** Across the schema pipeline:
-`TsonSchemaValidationException` means *the author's schema is wrong and the spec says so*;
-`UnsupportedOperationException` means *this library hasn't implemented that yet*; `IllegalStateException`
-means an internal invariant broke. The classification test: **a schema error's verdict doesn't change when
-this library improves; a gap's does.** A gap is not a verdict on the author's schema, and the CLI's exit 1
-vs. exit 70 rides on that distinction — **carried by `Diagnostic.Code.NOT_IMPLEMENTED`, not by the channel**.
-Both kinds are collected: a gap thrown out of a phase that reports per declaration took every other
-declaration's verdict with it, so the schema pipeline reports it beside the ordinary problems and the code
-keeps it apart. The exception classification itself is unchanged and is what picks the code.
-`DefinitionResolver`'s Javadoc lists the exact current boundary.
-
-**Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
-`https://tson.io/2026/35/ltr8/<group>/<name>-<version>.tn` — `/2026/35` is the spec revision, `ltr8` the
-publishing org, `<group>` the subsystem (`cli`), `<name>-<version>` the schema name with a trailing
-integer version. **The version is bumped on a release, not on a change.** §10's immutability rule binds a
-*published* identity: once a release ships carrying the schema, the document under that `!!id` is fixed and
-a later shape change mints the next version (`diagnostics-12.tn`) rather than editing it. Between releases
-— while the build version carries `-SNAPSHOT`, so nothing has published the identity — the schema is in
-development and is edited in place. Bumping per change instead mints versions nobody ever consumed, one for
-every field added during a development cycle. **Use `.tn`, not `.tn1`** — `.tn1` is a stability claim §7.1
-reserves for the eventual frozen "TSON version 1", which hasn't happened.
-
-**Line wrapping:** wrap both comments and code to 125 characters.
-
-## Modules and dependency direction
-
-Package group is `io.ltr8` (reverse-DNS identifies who *publishes* the artifact — this is one
-implementation of the spec published under the `ltr8.io` banner, not *the* tson.io-blessed one). Every
-module has a real `module-info.java`; module names mirror each module's root exported package.
-
-- **`tson-base`** — four packages, and **the root names none of the other three**: every dependency runs
-  inward, so a subpackage reads on its own and the vocabulary at the centre stays free of the machinery
-  around it. `io.ltr8.tson.base` is how a problem is stated — `Diagnostic` (the record and its closed `Code`
-  enum), the three diagnostics receivers, `SourcePosition`, `CanonicalIdentity` (§2.2.1's algorithm, how a
-  schema is named), and the exceptions whose fact is the **processor's** rather than
-  any one encoding's — `ReadException`, `ParseException`, `WriteException`, `LimitExceededException`,
-  `SchemaValidationException`,
-  `BindMismatchException` and its
-  `MissingBindingException` subclass, `SchemaFetchException` (whose `Reason` is what `Diagnostic.Code.of`
-  maps), `ContentHashMismatchException`. **The exceptions stay at the root rather than following their
-  subject**, which is what keeps the inward rule true — `Diagnostic.ofLimitExceeded` and
-  `Code.of(SchemaFetchException.Reason)` are same-package calls, where filing each exception with the package
-  it is thrown by would have the centre depend on two of its own subpackages. Sorting the eight by "is a
-  `Throwable`" would be sorting by Java mechanism in any case; this library files by subject, which is why
-  `LexException` sits in `lexer`. **The prefix is dropped here and only here**: `Tson` earns its keep
-  disambiguating a consumer's own `Schema` from `TsonSchema`, and in this module the competing name is
-  another *encoding's* type in this same library — `ReadException` beside `JsonValueException` reads right
-  where `TsonReadException` beside it implies the first belongs to the text encoding, which is exactly what
-  nothing here does. The argument outlived its first example: `ParseException` is now *shared* rather than
-  one encoding's, which is the same conclusion reached from the other end. A **true pure leaf** — depends on
-  nothing, and nothing in it knows what a TSON document or a JSON one looks like. It is a module rather
-  than a package because [TSON-JSON] §9.4 makes the JSON encoding report in [TSON-DATA] §8.1's four
-  categories and add none of its own: the vocabulary is one vocabulary across both encodings *by
-  specification*, so leaving it in `tson-compiler` would make every other encoding depend on the TSON text
-  engine to say "this field is required", or mint a second vocabulary for one fact. **What deliberately
-  stayed behind is the classifying half**: `Diagnostic`'s ten `of*` factories all switch on an exception
-  type an encoding declares, so each encoding owns its own (`TsonDiagnostics` here, `JsonDiagnostics` in
-  the JSON stack) — which is also what closes the old "`ofBaseSyntaxError` cannot classify another
-  encoding's syntax failure" gap, since there is no longer one switch responsible for exceptions it cannot
-  name. `SourcePosition` moved here from `schema.meta` so the base need not require `tson-schema`; the
-  bonus is that any encoding's own position type can implement it and reach a `Diagnostic` with no
-  conversion — `JsonPosition` does. **`LimitsPolicy` and `LimitExceededException` are here on the
-  same argument**: [TSON-JSON] §10.1 makes the bound §9.1's policy "in JSON clothing, and the same policy
-  applies with the same defaults", so one record and one refusal serve both encodings and a deployment that
-  raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and is the one factory that
-  stayed on the record — its nine siblings switch on an encoding's own exception type where it classifies
-  nothing at all.
-  **`io.ltr8.tson.base.policy`** is what this processor will admit and spend — `ProcessorPolicy` and the two
-  it composes, `UnicodePolicy` (§8.2's levels) and `LimitsPolicy` (§9.1's bounds), plus `FetchPolicy`, the
-  same statement about *obtaining a schema* (document cap, cache cap, whether a `?sha256=` pin is required)
-  — one package because a deployment states one set of constraints, and §8.2 requires a relaxation be code
-  rather than ambient: this is where that code points. **`FetchPolicy` is `ProcessorPolicy`'s sibling, not
-  its component**: a `ProcessorPolicy` is threaded into every reader and every stream, none of which fetch,
-  so a fetch bound riding the read path would be carried everywhere and used nowhere. A fetch *timeout*
-  stays `HttpSchemaSource`'s own — a directory has none, and a component one implementation silently ignores
-  is what makes a shared policy value untrustworthy.
-  **`io.ltr8.tson.base.source`** is where a schema comes from — `SchemaSource` and the two
-  implementations that ship, a directory and an HTTPS host allow-list, both denying by default, with
-  `SchemaReference` (§2.2.1's rules on what an identity may be) package-private among them, and
-  `SchemaAccess` collecting a source with the `FetchPolicy` governing it. [TSON-JSON]
-  §10.4 names that as the restriction an application processing untrusted input sets, which makes it
-  configuration like the policies rather than machinery like an encoding's reader.
-  **`ProcessorConfig` sits at the root**, beside the values it holds: one immutable value naming what a
-  deployment states -- the policy, the schema access, the bind context, and the one seam into the meta
-  vocabulary -- with every setting returning a new instance, so a configuration may be handed out and
-  derived from without the holder losing what they stated. Construction is not here and cannot be: it names
-  the compiler's registry, which is why `Tson.of(config)` lives with the engine.
-  **`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to — `Rational`, `Complex`,
-  `CidrInet4Network`/`CidrInet6Network`, `InternetAddress` — the question a consumer arrives with rather than
-  part of §8's model, and
-  pure values depending on nothing. **`io.ltr8.tson.base.bind`** is what a deployment binds with:
-  `AtomContext` registers those host values, and the JDK ones beside them, with a `DataBindContext`, so a
-  class binds the same under every encoding ([TSON-JSON] §5.1). **That is why this module requires
-  `tson-bind`, and why doing so costs it nothing**: `tson-bind` is a general engine that binds a `DataValue`
-  to a Java object and has never heard of a schema — system-library standing, like the `java.net.http` this
-  module already rests on. The property that matters is unchanged: nothing here knows what a TSON document or
-  a JSON one looks like.
-  **`io.ltr8.tson.base.diagnostics`** is what a **rule** says when a document breaks one — `Refusal`, the four
-  `Diagnostic` components a rule determines (code, message, `expected`, `actual`), and a class per family
-  stating them once for every encoding. §9.4 makes that an obligation rather than a tidiness: one vocabulary
-  across both encodings, so a document wrong in one is wrong in the other for the same stated reason, and the
-  `code` and `expected` a consumer routes on cannot be left to two readers agreeing by having been copied.
-  **The prose is the schema's vernacular** — a record has *fields* in both encodings, absence is *absent*
-  rather than `_` or `null` — because it is the schema that refused the document; the encoding's own spelling
-  rides in `actual`, which is data. That split is what the parity test compares: code, path, `expected` and
-  `message`, never `actual`. `RecordDiagnostics` is the family that proves the shape; the rest follow. What
-  stays with each reader is any rule the other encoding has no counterpart for.
-  **`io.ltr8.tson.base.io`** is where a document's bytes come from and go — `ByteSource` and `ByteSink`,
-  one pair for both encodings because [TSON-JSON] §3.1 makes the JSON lexer decode UTF-8 from bytes exactly
-  as [TSON-DATA] §9.1 makes the TSON one. **Bytes, never characters**: §7.1 forbids substituting on
-  malformed UTF-8 and §8.1 requires a byte offset in every diagnostic, so a `Reader` could satisfy neither
-  — the substitution would already have happened under someone else's rules — while a `String` is admitted
-  because it re-encodes as a value and the offset stays exact. **`resident()` is the zero-copy path**: a
-  source already in memory hands back the whole input as a `MemorySegment` (a `byte[]`, a heap or direct
-  `ByteBuffer`, a mapped file) and a lexer indexes it, allocating no block at all — asked once, at
-  construction, off a final field; a streaming source keeps the block, and **the block is the source's to
-  size** (`block()`, defaulting to 512), which is where a pool would go and the knob a throughput
-  measurement turns. **Closing releases what a source acquired and nothing it was handed**, so
-  `of(InputStream)` closes nothing and `of(Path)` closes the stream it opened — and whoever *creates* a
-  source closes it, which is why a reader given one through `read(ByteSource)` does not.
-  **`ByteSink` is the write-side counterpart and carries the same two rules**: the block is the sink's to
-  size (`block()`), and closing releases what it acquired and nothing it was handed — `of(OutputStream)`
-  closes nothing, `of(Path)` closes the stream it opened. **Closing is not flushing**, and for output that
-  distinction is load-bearing: bytes sit in a block until pushed, so a document never flushed is a document
-  never written, and a sink cannot tell a caller who finished from one who abandoned the write. Every writer
-  flushes explicitly. What stays smaller is the *target* set, not the contract: `Appendable` is a genuinely
-  different target rather than one spelled twice, so `toTson`'s char path is untouched.
-  **`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
-  `IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — and the
-  UTS #39 rules over them, read by two engines and knowing nothing about either format. `UnicodePolicy` is
-  in `policy` rather than beside the tables it reads, because the line between the two Unicode packages is
-  **who touches them**: a consumer names `policy` to configure a processor and never names `unicode`; the
-  engines read `unicode` and never name `policy`.
-  **`IdentifierProfile` is here too**, beside the tables it reads: [TSON-DATA] §7.7's grammar (`validate`)
-  and §8.2's restricted-character rule (`hygiene`), both **reporting** a violation rather than throwing one.
-  That is what lets one check serve a caller that owes a parse error and one that owes a diagnostic — the
-  identical violation is a `ParseException` from the lexer and a refusal from the linker — where a signature
-  that threw forced the lexer's answer on everyone. It is not a parser: nothing here turns a token into a
-  host value, and the `identifier` atom is a wrapper over `validate` living with the rest of the vocabulary
-  (`atom.parser.IdentifierAtom`). A side effect worth having: `lexer` is now exactly `Lexer`, `LexException`,
-  `Token` and `TokenType`.
-- **`tson-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations, plus `Annotations`/
-  `Annotation`, the wire-annotation carrier a bound class declares a component of. The carrier lives here
-  rather than with the engine because it is the one module `tson-bind` (which analyses classes),
-  `tson-schema` (whose `schema.meta` model is itself a bind target) and consumer code all see.
-- **`tson-bind`** — the generic `DataValue`↔Java-object binding engine (`DataBindContext`, `DataClass`
-  descriptors, `DataNameBinder`, bridges). Depends only on `tson-annotation`, whose annotations and carrier
-  types it reads off a class under analysis. A context may name a **binding profile**
-  (`DataBindContext.Builder.profile`), selecting among a class's `@Profile` constructors so one class binds
-  several shapes — one context per schema version, descriptors still cached per context. The name is opaque
-  here: matched by equality, with nothing in the module knowing what it stands for, which is what keeps
-  selection out of the schema layer. **A cyclic type graph resolves** — a record reaching itself, directly or
-  through others: `getDescriptor` hands a re-entrant call a deferred supplier and each holder keeps it in a
-  final `Memoized`, so laziness is confined to the cyclic edge and every other component still resolves
-  eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` → `ScopedValue` →
-  `DataValue`), which is what lets a held template body be written at all.
-- **`tson-schema`** — `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
-  records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
-  deliberately open branch, `Data`, which a consumer's own class implements — see below). **The host value
-  types are not here**: `Rational`, `Complex`, the `CidrNetwork` pair and `InternetAddress` are `base.atom`'s, because
-  *what do I get back from `!rational`?* is a question about the type system rather than about §8's model,
-  and they depend on nothing. `schema.meta` reads them structurally — `RationalType`'s
-  `min`/`max`/`multiple_of` are `Rational` values — which is what used to hold them here, and is a pull from
-  above rather than a reason to live above. Plus the schema
-  registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`/`TsonCanonicalIdentity`) and
-  `TsonBundledSchemas`. **The linker is not here** — it is an engine, not a value model, so
-  `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the pipeline; what
-  stays is storage and the identity algorithm lookups
-  compare by. Depends only on `tson-annotation`. **`tson-compiler` depends on `tson-schema`, not
-  the reverse** — the opposite of what the names suggest, deliberately so the compiler's resolver can hold
-  and consult `schema.meta` types directly. `schema.meta` names no `tson-compiler` type; where it needs
-  one structurally it declares a local stand-in (`schema.meta.Token` mirrors `ast.TokenValue`/`TokenForm`;
-  `schema.meta.SourcePosition` is an interface `tson-compiler`'s `Position` implements), converted at the
-  one spot that needs it.
-- **`tson-atom`** — the built-in atom vocabulary: which tokens each family accepts and what host value results (§5.2's
-  parsing contracts). **A module rather than a package inside an engine, because the vocabulary is not an engine's** —
-  [TSON-JSON] §5.1 hands a JSON string's content to the atom's own parser exactly as a TSON quoted token's text would be, so
-  which families a reader binds, and what they read to, is a property of the type system and not of the encoding that carried
-  them. Three packages, split by who touches them: `io.ltr8.tson.atom` is what a caller names — `AtomType`, the two indices
-  over it (`BuiltinTypeVocabulary` by name, `HostAtoms` by host class), `AtomParsers` from a resolved body, `VocabularyAtoms`
-  for the write direction, and the exceptions a refusal arrives as; `io.ltr8.tson.atom.number` is §4's number production and
-  the narrowing over it, exported because base type resolution stays with the text encoding and reads it;
-  `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on the same terms as `tson-compiler`'s
-  own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its constraint record), `tson-base` and `tson-regex`.
-  **What deliberately stayed behind is everything that depends on *how* a token was written**: `AtomType` takes a `String`,
-  and the two atoms needing the lexical form — the kernel's `value`, whose §4.4 rule is that a quoted token is a string, and
-  `Token`, which records the spelling §8's resolved form carries — stay in `tson-compiler` with `TokenValue` and
-  `BaseTypeResolver`. That those two are exactly where the encodings legitimately differ is no coincidence: JSON has no token
-  forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
-- **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonValue` and its
-  pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
-  true leaf: depends on **nothing** (not even `tson-annotation` — the nodes aren't bind targets, they're
-  assembled by hand-written readers). The data-tree counterpart to `tson-schema`'s `schema.meta`: same
-  "pure value model in its own module, engine depends on it not the reverse" shape, so JPMS keeps the tree
-  from ever coupling to compiler internals. `tson-compiler` depends on it; it names no `tson-compiler` type.
-- **`tson-regex`** — **only** `io.ltr8.tson.regex`: a native RFC 9485 I-Regexp engine — `TsonRegex.parse`
-  builds a `RegexNode` AST (or `TsonRegexSyntaxException`), `TsonRegex.matches` runs a Thompson-NFA/Pike-VM
-  simulation (linear-time, no backtracking → ReDoS-safe; `\p{…}` via JDK `Character.getType`), and
-  `TsonRegex.isDisjointFrom` decides whether two patterns share any string (exact — a symbolic product-NFA
-  emptiness check over a `CodePointSet` interval algebra, the building block for §5.4 pattern disjointness).
-  A true leaf — depends on **nothing**, I-Regexp being an external standard, not TSON-specific. The
-  *engine* counterpart to `tson-bind` (a general dependency-free engine), not a value model like
-  `tson-tree`; TSON pins its `regex` atom to I-Regexp (`regex_type`'s `REQUIRED_FIXED spec = rfc9485`), so
-  this owns I-Regexp semantics rather than delegating to `java.util.regex` (a laxer superset).
-  `tson-compiler`'s atom vocabulary depends on it; it names no `tson-compiler` type.
-- **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the atom vocabulary,
-  schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades
-  (`TsonTreeReader`/`TsonObjectReader`) over their schemaless `reader`-package engines
-  (`SchemalessTreeReader`/`DataClassObjectReader`), the `TsonTreeWriter`/`TsonObjectWriter` writers over
-  their own `writer`-package engines (`TreeValueWriter`/`DataClassObjectWriter`), and
-  config/wiring. Everything here is tightly coupled to the shared lexer/token-stream machinery, so it's
-  one module. Root package `io.ltr8.tson.compiler`; exports the packages with real cross-module callers
-  and keeps `reader`/`atom`/`base`/`lexer` internal.
-- **`tson`** — the front door, and now **one class**: `Tson`, over `tson-compiler`, the way Retrofit sits on
-  OkHttp. Declares `tson-compiler`/`tson-schema`/`tson-bind`/`tson-tree` as `api` so a caller sees the real
-  classes underneath. **`ProcessorConfig` is not here** — a configuration is a value stating what a deployment
-  chose, so it sits in `tson-base` with the values it holds and is shared by every encoding; what cannot
-  follow it is construction, which names the compiler's own registry. Hence `Tson.of(config)`, and
-  `Tson.standard()` for the unconfigured case.
-- **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree, readers,
-  writers, and its own schema-directed reader stack over them — `JsonTypeReader`/`JsonCompiledSchema`/
-  `JsonSchemaCompiler`, with [TSON-JSON] §5's atoms, the whole of §6's containers, §7's absence, §3.2's
-  reserved namespace and §3.3's annotation object (so §6.1.5's `$type` selects a subtype — the JSON
-  spelling of `!employee` at a `person` field), and §8.2's discrimination predicate over §8.3's class
-  stability, all compiled in **tree mode**; §8.5's scoped positions reach a `NOT_IMPLEMENTED` reader.
-  **Recognising an annotation object needs a rewindable lookahead** — §6.1.6 gives member order no meaning,
-  so `$type` may sit anywhere and the opening brace settles nothing; `lookingAhead` scans member names,
-  skips values, and replays from a buffer rather than re-lexing. It runs before every
-  record read, because §8.1 makes a redundant tag admissible at any typed position and no shortcut is sound;
-  `BACKLOG.md` carries the measurement that is owed. **A schema is named, never
-  authored** — `Json.withSchemas(TsonSchemaLoader)` takes an already-resolved one, because a schema document
-  is TSON text whichever encoding the data arrives in, so §3.4's out-of-band binding costs no dependency on
-  that engine either; `treeReader().withSchema(uri).readAs(source, rootType)` and `Json.validate` are the
-  surface, and a schema that cannot be reached is a diagnostic rather than a verdict. §6.5's two map forms are
-  chosen by the key type at compile time and never by inspecting the value, which is §4.1's rule applied
-  where it matters most — an object being one syntax for a record and a map both. **A
-  schema-directed read hands back a `JsonValue`, never a `TsonValue`**: the parsers run, which is the
-  validation, and the host value is discarded — tree mode answers *does this conform* and bind mode
-  answers *give me the value*, so converting an encoding belongs to neither. What that costs is one kind
-  of test, which is why `ValueReaderFactoryRegistry.atoms()` (§5's vocabulary with no mode over it)
-  stays as the registry the parsing contract is pinned against. Two copies of the field-state rules are
-  what the parallel stack buys, and `CrossEncodingParityTest` is the guard §9.4 makes obligatory — same
-  schema, same document in both encodings, same `Diagnostic.Code` and same RFC 6901 pointer, over the
-  rules that are genuinely written twice. The atom vocabulary is excluded because it is shared and cannot
-  drift; **one divergence is pinned as a divergence** — an unquoted TSON token at a `text` field is that
-  field's content where a JSON number is of the wrong kind (§5.1 makes which kinds reach a parser each
-  encoding's own). A
-  separate stack rather than a front end over `tson-compiler`'s `TsonEventSource` — see "Not yet implemented"
-  for the two disagreements that decide it. The **tree model follows [JEP 540](https://openjdk.org/jeps/540)**
-  (`jdk.incubator.json`, JDK 28, unavailable now): sealed `JsonValue` over `JsonObject`/`JsonArray`/`JsonString`/
-  `JsonNumber`/`JsonBoolean`/`JsonNull` — one value model to learn across the two, and a bridge that is later a
-  mapping rather than a rewrite. Where it must differ, §3.1 is why: it decodes UTF-8
-  itself from bytes where JEP 540 parses an already-decoded `String`, and carries a byte offset in every position
-  because [TSON-DATA] §8.1 requires one of every error report.
-  **The alignment is the `tree` package and nothing else, and every JEP 540 mention in the module is to be read
-  that way** — it names a value model or a spelling, never a behaviour. **Reading, writing and exceptions follow
-  the TSON side of this library**: a fail-fast read throws `ReadException` carrying a `Diagnostic` (`Json.parse`
-  included — the statics borrow the JDK's spelling, not its contract), a collecting read throws nothing for a bad
-  document and the collector says why, and problems come from one closed `Code` vocabulary across both encodings
-  (§9.4). There is no `JsonParseException`: the stack raises `tson-base`'s shared `ParseException` beneath the
-  readers and `JsonDiagnostics` classifies it, the peer of `TsonDiagnostics` and separate for the reason that
-  class's own note gives: each encoding owns the switch over its own exceptions. **`Json` is the prefix here,
-  on `Tson`'s own terms** — the names a consumer writes are the JDK's, so this module keeps them rather than minting a second
-  vocabulary for one hierarchy. **In the exported packages only**: `reader` is unexported, so its types are
-  bare like `tson-compiler`'s, and thirteen of them share a name with their counterpart there, which is what
-  makes the two stacks legible as peers. Its schema-directed readers are named **mode first** —
-  `TreeRecordReader`, `TreeMapObjectReader` — so bind mode lands as `BindRecordReader` beside its peer.
-  **The write side is the read side's inverse and no more**:
-  `JsonTreeWriter`/`JsonObjectWriter` over `JsonDataEmitter` (the push peer of `JsonStream`, which owns the
-  separators so no walk places its own) and their `writer`-package engines. The **tree** round trip is total
-  — RFC 8259 has six kinds and one spelling each, and `JsonNumber` holds the literal, so §5.3's digits and
-  scale come back out — where `TsonTreeWriter`'s has documented losses; the **object** round trip is through
-  the class that wrote it, an `int`'s width and a tuple's tuple-ness living there exactly as they live in a
-  schema. Two things are refused rather than approximated, both because the reader could not take them back:
-  a choice (§8.2 admits an untagged one only by facts a schema states) and a host value with no JSON
-  spelling — `WriteException`, `tson-base`'s, shared for `ParseException`'s reason. Non-finite doubles are
-  *not* among them: §5.4 spells them `".inf"`/`"-.inf"`/`".nan"`, [TSON-DATA] §7.6's own productions.
-  A pure leaf, and the schema-directed decode of §5–§8 keeps it one: what a compiled JSON
-  reader consumes is `TsonLinkedSchema`, a `tson-schema` record `tson-atom` already re-exports, so the
-  stack is `tson-json`'s own **all the way up** — `JsonTypeReader`/`JsonCompiledSchema`/`JsonSchemaCompiler`
-  beside `tson-compiler`'s rather than derived from them, with no dependency on that engine at all. That is a
-  deferral and not a conclusion: the two disagreements above defeat a shared *event source* and both dissolve
-  above the schema, where §4.1 makes the position decide and a compiled reader **is** the position
-  (`EmptyBraceEvent` is the precedent already in the tree). One compiled schema over an encoding-neutral
-  context stays a real design; it is just not one worth deriving from a single implementation, and the seam
-  is cheaper to find from two working stacks than to unpick from a wrong shared contract. What the choice
-  keeps is drift between two copies of the field-state rules, which §9.4 makes a spec obligation rather than
-  a tidiness — guarded by a **cross-encoding parity test** (one schema, the same document in both encodings,
-  same `Diagnostic.Code` and same RFC 6901 pointer) rather than by shared code.
-- **`tson-cli`** — the `tson` command-line application. Depends on nothing depending on it (exports
-  nothing).
-
-**JPMS enforcement is real, not just convention.** An unexported package is genuinely unreachable from
-other modules (verified by scratch-importing across a boundary and watching it fail). Internal dispatch
-types kept in unexported packages but referenced by a public method signature produce an accepted
-`-Xlint:exports` warning (e.g. `ValueReaderFactoryResolver`); this is deliberate, not a defect. No `opens`
-directives — binding only ever touches public constructors/methods.
-
-## Pipeline
-
-The schema pipeline is **parse → desugar → resolve → link → register → compile → read**; the class
-vocabulary follows it (`TsonSchemaParser`, `SchemaDesugarer`, `TsonSchemaResolver`, `TsonSchemaLinker`,
-`TsonSchemaRegistry`, `TsonSchemaCompiler`, `TsonTypeReader`). Data documents (Class 1, no schema) run the
-shorter lex → parse → base-type-resolve path. One paragraph per phase below; the depth is in the `docs/`
-note named at the head of each.
-
-### Lexer (`tson-compiler/.../lexer/`) — `docs/lexer-and-data-parsing.md`
-
-`Lexer` is a single hand-written scanner producing `Token`s off `nextToken()` (never a batch). §1.3 says
-higher parts add no tokens, modes or character-classification changes, which is a statement about the
-*layering* and holds; it is not a reason to leave a lexer bug in place, and Revision 35's escape-table change
-is what that looks like in practice. Constructed from a
-**`ByteSource`** (`tson-base`) whose **UTF-8 it decodes itself** (§9.1), code-point
-addressed (never char-addressed), with `Position` tracking line / code-point column / UTF-8 byte offset —
-counted from the input rather than re-derived from the decoded character, and malformed UTF-8 is a
-`LexException` rather than a U+FFFD substitution (§7.1: a decoder MUST NOT substitute). NFC normalization
-applies to *unquoted* tokens only; Pattern_White_Space is the spec's fixed 11-character set, hardcoded — but
-**not one set doing one job**: UAX31-R3a-1 splits it into line terminators, *ignorable format controls*
-(U+200E/U+200F, which it names) and horizontal space, so an LRM/RLM is consumed, contributes nothing, and is
-refused where it stands inside a token rather than at a boundary — §7.2 rule 1 folds them into horizontal
-space would be what let `[1<LRM>2]` read as two elements, which is why §7.2 rule 1 sorts them apart and
-§9.5 rests on it.
-**The escape table is `\" \\ \b \f \n \r \t \s` plus two `\u` forms, and one rule covers both**: `\uXXXX` and
-`\u{1*6HEXDIG}` are two spellings of one number, checked by asking whether the value denoted is a Unicode scalar
-value — so a surrogate is refused either way and there is nothing to pair, which is the whole of what UTF-16
-pairing's three MUST clauses used to do. The braced form is what makes the one rule sufficient (four hex digits
-cannot reach past the BMP, and plane 14's invisible characters are the ones worth writing visibly). **There is
-no `\/`**, and a leading BOM is still stripped on §7.1's own authority rather than as a debt to another format.
-§7.1's UAX #31 profile is implemented exactly, not approximated: the JDK's identifier predicates are
-`ID_*` unioned with the identifier-ignorable set (all `Cf`, plus non-whitespace controls), so `Lexer`
-subtracts that set and two literal `ID_ \ XID_` tables — verified zero-over/zero-under against Unicode
-16.0, which `Xid.UNICODE_VERSION` declares. ZWNJ/ZWJ continue a token, `XID_Continue` containing both and
-§7.1 admitting them on that basis; what constrains them is a *name* rule (§7.7 rule 2), applied by
-`IdentifierProfile` through `JoiningControls` (UTS #39 §3.1.1.1's contexts A1/A2/B).
-Errors are fail-fast (`LexException`); multi-error recovery is deferred.
-
-### Structural parsing: Tier 2 stream + Tier 3 AST — `docs/lexer-and-data-parsing.md`
-
-One implementation of the data grammar, split by role: **`TsonDataStream`** (Tier 2) is the only thing that
-walks source text — a lazy pull-based `TsonEventSource` over a sealed `TsonEvent` hierarchy, frame-stacked,
-at most two tokens of lookahead; **`TsonDataParser`** (Tier 3) reduces the event sequence into the sealed
-`CoreValue` AST and holds no grammar logic of its own. Whitespace is gone by token time — adjacency (§7.5)
-and separators (§2.4) are checked via `Position` gaps — where the rule is **a comma may follow a value**, so a
-trailing comma is ordinary and a leading or doubled one fails as a missing value rather than by a rule of its
-own. The layering is deliberately incomplete per §1.2:
-neither tier dedupes fields/keys, resolves `EmptyBrace`, or interprets token text — those belong to later
-layers. **A name is the one exception, and §7.6 is the precedent**: `type-ref = "!" identifier` and
-`annotation = "@" identifier`, so `TsonDataStream` matches each name's decoded text against
-`IdentifierProfile` the way a number's text is matched against the number grammar — a production that is no
-part of the token-stream grammar, over a token the lexer has already produced. `field-name` stays lexical
-(`unquoted-token / single-line-token`, where a map key keeps all three forms), but **that is the token rule
-only**: a field name is an identifier at every layer, so `TsonDataStream` matches its decoded text against the
-profile whichever spelling carried it. Quoting buys the lexical accidents of the unquoted form — a name that
-would otherwise resolve as a number — and never a key that is not a name; a key that is not a name is what a
-map is for, and the diagnostic says so. Normalisation runs *before* the match, since §2.5 gives a field name
-its identity by NFC-normalised comparison and the lexer already normalises the unquoted spelling: requiring
-NFC as a form here would make the quoted spelling the stricter of the two.
-`!!meta` in the header is **reported, not refused**, and so is any other directive the header does not admit
-— `!!import` is left unconsumed for `TsonSchemaParser`, and a data document carrying one meets the
-*value-position* rule instead, which names it. `DocumentStart` carries all three of §2.2's directives,
-so classifying a schema document (§7.1) is an answer the events give. Whether one may be *read* is a
-conformance-class question one tier up — `TsonDataParser` and both read facades raise
-`TsonUnsupportedDocumentException` on it (not `TsonParseException`: a schema document is unsupported, not
-malformed), while `TsonSchemaParser` requires the directive. One header grammar, each parser applying its own
-class to the result -- and `TsonSchemaParser` takes its `!!id`/`!!meta` off the same event, so §2.2's header
-has **one** implementation rather than one per conformance class. What stays with each parser is its own
-rule: §12.1 requires exactly one `!!meta` where §2.2 merely permits it, and a schema document governed by
-`!!schema` is told which directive it needs. **The root value is framed on first demand rather than with
-the header**, so reading only the header leaves an empty frame stack — which is what lets a schema parser
-take the event and then drive `drain` over a stack the header never touched, and what stops the stream
-needing to know what kind of document it holds.
-
-### Base type resolution (`.../base/`) — `docs/lexer-and-data-parsing.md`
-
-`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (boolean → number → string) for
-untyped tokens — **there is no `null`**: absence has one spelling, `_`, and it is lexical (its own token type,
-its own event, its own AST node), so it is never a `TokenValue` and no order here reaches it, while the
-unquoted token `null` is the string `null` as `frobnicate` is. `BaseValue` carries an `AbsentValue` member
-`resolve` never returns, so that binding an identified value stays one switch (`AtomBinder.bind`) and a
-schemaless bind reaching `_` has a way into it. `NumberGrammar.tryParse` recognizes the number production and extracts structure into
-`NumberForm` **without** converting to a host type — over a hand-written `NumberScanner`, one method per
-ABNF rule, because a reference implementation should not state the grammar in a host regex dialect no port
-shares (`NumberScannerEquivalenceTest` fuzzes it against the patterns it replaced) — binding decides the
-host type and enforces the
-`255`/`0xFF` equivalences. Quoted tokens always resolve to `StringValue` (§4.4); form is consulted once,
-here.
-
-### Built-in atom vocabulary (`tson-atom`) — `docs/lexer-and-data-parsing.md`
-
-`AtomType<T>` is a built-in atom's parsing contract, **over a `String`**: every family but two is a function of the text
-alone, which is what lets one vocabulary serve both encodings (§5.1). `BuiltinTypeVocabulary` is the fixed name→`AtomType`
-table (§5), `HostAtoms` the reverse index by host class — what a reader with no type-ref dispatches on, restricted to
-[TSON-JSON] §5.6's string-content families since §4.4 makes a quoted token a string — and `AtomParsers` the one from a
-resolved body, which the compiled readers and the linker both ask so there is no second opinion about which parser reads
-which body. Each constructor splits into a constraint-values record in `schema.meta` (`IntegerType`, …) plus a same-named
-`*Parser` in `atom.parser` that holds one and does the work. Pattern facets stay `String`, not `Pattern` — validated and
-matched via `tson-regex` (I-Regexp, ReDoS-safe), never `java.util.regex`. `unit`'s three instances are dispatched on the
-declaration's own name — §4.2 makes that dispatch normative, the resolved shapes being identical and deliberately
-uninformative — and two of the three are the *encoding's* rather than this vocabulary's: `AtomParsers` answers for
-`identifier` and declines `value` and `void`, whose readings depend on the lexical form and on a sentinel no token is.
-
-### Schema grammar (`TsonSchemaParser`, `.../ast/schema/`) — `docs/schema-grammar-and-desugaring.md`
-
-Parses a schema document body (Part 2 §12.1) into a `SchemaDocument`, grammar-only — no resolution, no
-validation. `extends TsonDataParser` (same package) because §12.1 imports Part 1's grammar directly.
-`SchemaMap.declarations` is a `LinkedHashMap` and duplicate names overwrite (grammar layer doesn't dedupe).
-Two entry points: `parseSchemaDocument()` is fail-fast, `parseSchemaDocument(receiver)` reports each
-declaration's syntax error and resyncs to the next.
-§12.1's productions are implemented as written — `instance` takes a `core-value`, `atom-refinement` a
-braced `record-def`, `field-modifier` a bare token or the absent sentinel. The bracket
-form is parsed twice per the spec's own overlapping productions, and the `{K => V}` map sugar twice
-alongside it. A `{` at a type position dispatches by consuming one token and inspecting — Part 1 §2.8's
-record/map idiom, imported wholesale — and `{` is a map and only a map everywhere except type-def position,
-since a bare record body is not spellable at a type position (§5.2). §12.2 states the dispatch's own
-lookahead budget — one consumed token plus one of lookahead — and §5.3 the key-`?` rule it makes
-unreachable for the common spelling. **`type-name = identifier`** — every declared name, type parameter,
-referenced name and `!` constructor head matches the profile, which *replaces* §12.1's separate "numbers are
-not declarable names" rather than joining it: identifier-Start is `XID_Start`, so the one rule answers both
-and also catches the names that merely begin like a number (`42x`, `-foo`).
-
-### Desugaring (`.../resolver/SchemaDesugarer.java`) — `docs/schema-grammar-and-desugaring.md`
-
-An AST→AST rewrite between parsing and resolution: every sugar form — `[T]` and the sized forms, `[T, U]`,
-`{K => V}`, `(A | B)` — becomes the `!C value` construction it denotes, at declaration position simply *being*
-one and anywhere else becoming an injected declaration plus a bare reference — **which is now the spec's own
-rule**, not a divergence: §4.2 de-parameterises `array`/`set`/`map` so a container at a use site
-cannot be an application at all, and §5.3 states one lift rule — every sugar form lifts at desugar, a concrete
-form to a closed synthetic entry. The rule this settles on: **`TypeRef.arguments` non-empty means an open
-form — a template application — and everything closed is an entry referenced by a bare name.** So
-`DefinitionResolver` only ever sees a bare
-reference or `!C value`. **The phase is purely syntactic and consults no governing meta**: the sugar set is
-closed, so the head each form desugars to and the vocabulary field each argument fills are a fixed table —
-which is also why meta-kernel's bootstrap needs no hand-written routing of its own. §5.3's element/position
-`?` binds `state` directly (`[T?; 3]` puts a state and both bounds on one binding record) — **and so does a
-map's value**, `{K => V?}`, against the `state` field the kernel gives `map` (§5.3's own row); a map
-*key* takes no `?`, §2.9 forbidding an absent key outright. The size
-specifier binds the `min_items`/`max_items` pair directly for arrays and maps alike, with no size template in
-between. §5.3's declaration-level container syntax is complete. Bottom-up, so nesting needs no special case;
-an injected name derives from the *resolved binding record*, so `[T; 3]` and `[T; 3..3]` land on one entry. A
-generic application can only be a §5.10 user-template application (§3.3.1 resolves heads in the type-name
-namespace only), and applying one is rejected at the site that writes it, an imported head included. Invalid
-sugar forms report per declaration via `DesugarFailureReporter` rather than throwing.
-
-### Shared resolver vocabulary: `WireForm`, `MetaRefs`, `DerivedName` — `docs/schema-resolution.md`
-
-Three leaf classes the phases share, each owning a fact none of them owns individually. **`WireForm`** is how
-schema vocabulary is spelled as data, in both directions — the vocabulary member names, `refValue` and its
-inverse `typeRefOf`, the held-record writers, and §5.10 substitution over a held body. A held body is written
-by two phases and read by four, and *a second opinion about what an application looks like is what makes one
-of them wrong*, so there is one. **`MetaRefs`** is the `schema.meta` reference walk (`mapRefs`/`mapBodyRefs`):
-which body shape carries which references is a fact about the value model, stated where the model is walked
-rather than in whichever caller happens to hold it — flattening, the synthetic rename and the regularity check
-all visit through it. **`DerivedName`** is §8.2's names and the renderings their hashes run over, keeping the
-two families apart: a binding record renders by field name, an application positionally, and they reuse the
-same tag letters in different roles. What is shared is each family's own rendering — `ofBinding` is called by
-*both* lift channels, which is what makes a form written directly and the same form closed from a template land
-on one entry.
-
-### Schema resolution (`.../resolver/`) — `docs/schema-resolution.md`
-
-`DefinitionResolver` (package-private) turns one declaration into a resolved `schema.meta.TypeDefinition`;
-`TsonSchemaResolver` (public) resolves a whole `SchemaDocument`, merging `!!import` entries into the
-namespace first. Namespace dependencies are constructor-fixed functional interfaces. Everything §5 defines
-resolves — composition, refinement (`^`), constructor application (bound generically via the compiled meta
-reader, no name→class table), atom refinement (which **merges with its source** via a `DataClassObjectWriter`
-round-trip and is checked to genuinely narrow), subtraction (which empties `type_definition.supertypes` on
-purpose), group restatement, all six field-state spellings. An annotation on a declaration resolves **one hop
-against the governing meta** and nowhere else (§3.3.3): a name the schema declares itself or `!!import`s is
-usable by the schema's *data* documents but not within the schema document, and writing one is an error, not
-an annotation that keeps its name and drops its value (§6: an annotation whose name does not resolve is a
-resolver error, the valueless form included). Every atom body is checked twice over, by two
-per-family rules asking different questions: `Atom.constraintsCheck` (over `AtomNarrowing`) that a refinement
-tightens its source, and `Atom.coherenceCheck` (over `AtomCoherence`) that a single body's own facets admit
-anything at all — `{ min: 10 max: 3 }` is the second one's, and meta.tn's own `@doc` calls it "a schema-load
-check". **`Product.coherenceCheck` is that second rule's structural twin**, asking it of a container's
-`min_items`/`max_items` pair over the same `AtomCoherence` comparison; it lives on the family rather than
-with any one spelling, so `[text; 5..3]` and the `!array { … }` body it denotes — one type — get one answer,
-and `TsonSchemaLinker` asks **every** family the same question again for the entries materialisation mints,
-which is how §8.2's "every family coherence rule ... asked once more of the closed record" is met without a
-list — "a resolver needs no list", as it puts it.
-The exception-classification policy under Conventions governs every rejection here;
-`DefinitionResolver`'s Javadoc lists the exact boundary.
-
-**Materialisation (`TemplateMaterialiser`)** closes a §5.10 template application, running over the
-*resolved* form after every declaration has resolved — an application arrives as a `TypeRef` carrying
-arguments, so substitution is a walk over `schema.meta` values and the entry it mints can record its own
-`source`, which §8.2 keys identity on. Two `box<text>` anywhere share one entry and a declaration naming the
-application aliases it; arguments close innermost-first; the memo is registered before the body is
-substituted, so regular recursion ties the knot on the entry under construction. Non-regular recursion —
-where the argument grows every level and the memo never fires — is caught by a depth guard rather than run
-into a `StackOverflowError`. Three template shapes close, by three paths: a **record** template is
-substituted and kept; an **open instance** (a container sugar form over a parameter) stops being a template
-and binds through its constructor's own reader; a **reference** template — §5.10's partial application,
-`uuid_pair => <B> pair<uuid, B>` — composes its argument list into the application it names and mints no
-entry of its own, so a chain of aliases collapses to the one type at the end of it.
-
-**The synthetic merge (`SyntheticMerge`)** is §8.2's required pass, run between materialisation and
-flattening — the moment that section names, "identity settles after Pass 2". Both lift channels name a closed
-form by one function of one thing: the binding record with **every inner form reduced to its entry name**.
-Closing reaches that always; desugaring reaches it for a nested sugar form (it lifts innermost-first) and
-cannot for a nested application, `box<text>` having no entry yet — so a form lifted eagerly with an
-application in a slot is named from an unreduced record. That form is re-derived here through
-`TemplateMaterialiser.closedFormName` and its references rewritten onto the closed-record name, which is the
-one that wins: it is a function of the resolved form alone, so two schemas reaching one form by different
-spellings agree on it. Only a form whose binding held an application moves at all.
-
-**Parameter kinds (`ParameterKinds`)** are §5.10's "two parameter kinds, inferred by use", and what an
-argument is classified by. §12.1 decides an argument's channel by token shape, so an unquoted non-numeric
-argument arrives as a reference; §5.10 has it "read by the position it lands in", and the kind is what makes
-that position known at the application. A parameter's kind is the **declared type of the slot it stands in**,
-read from the constructor's own vocabulary — `array.element_type` is typed `type_ref`, `enum.members` a set
-of `identifier`, `record_field.value` a `value` — so a `type_ref` slot gives a TYPE parameter, one resolving
-to an `Atom` a VALUE parameter, and anything else (a parameter standing for a whole collection or record) is
-refused at the declaration, along with a parameter standing in both kinds of position. §9 makes the rule
-general rather than a table of kernel names: a slot holding a type reference MUST be typed `type_ref`.
-**It is a fixed point, not one walk** — meta-kernel's `type_argument` puts a parameter of *either* kind on
-the reference channel, so a parameter passed to another template takes the callee's kind at that position and
-two templates may wait on each other. An application closed on demand (a composition supertype, a refinement
-source) infers its one template itself, that template having already resolved.
-
-**A reference is a hop, not a rewrite.** §8.3's use-site flattening is gone and `@alias` with it: resolved
-output states the chain the author wrote, a type position naming a `REFERENCE` entry keeps that name, and the
-chain stays walkable through the entries. **A processor collapses the chain when it compiles readers** — after
-linking, once per entry (`TsonSchemaCompiler`'s reference branch, whose reader *is* its target's, named for
-the entry doing the referring). The walk was never avoidable — the compiler, `DiscriminationClass`,
-`TypeInhabitance` and the linker each do one, and §8.3 required `reference.target` stay unflattened anyway —
-so rewriting the output as well was a second representation to keep in step, whose `@alias` summary kept only
-the source-site name and dropped the hops that mattered. A directive on an alias is applied where the alias
-compiles (`UseSite.named`, applied by the reference entry's own compile). §8.3 states both halves — a
-processor MAY collapse after linking, when it compiles for reading, and MUST NOT collapse in resolved output;
-`docs/schema-resolution.md` has the measurements.
-
-**The `@synthetic` marker** is the one derived marker (§8.1): §8.2 puts the bare marker on the schema-map
-**key** of every entry the resolver materialised from a sugar form, and on no other — an instantiation entry
-deliberately carries none, its `source` being an application where a synthetic's is a bare constructor, and a
-declaration's own sugar body never lifts at all. Its two mint sites are the desugar lift
-(`SchemaDesugarer.lifted`, the document's own set difference) and materialisation closing an open synthetic
-(`TemplateMaterialiser.syntheticNames`); `SchemaResolver` attaches it where it assembles the entry map. Key
-position, never the `TypeDefinition` value — §6 forbids hoisting between the two — so `AnnotatedMap` carries
-it and the linker re-attaches it, imports included. The bootstrap route attaches none (it is informational),
-and meta-kernel's own nine are marked anyway, by the ordinary resolution everything but the transient
-governing-meta stand-in comes from.
-
-### Meta-kernel bootstrap (`MetaKernelBootstrapResolver`) — `docs/schema-resolution.md`
-
-Meta-kernel's `!!meta` names itself (§1.5's one deliberate circularity), so ordinary resolution can't
-bootstrap it. `getMetaKernelSchema()` resolves it in **two passes** (non-`Instance` declarations first,
-deferred `Instance` declarations second) with a closed `instanceBody` switch instead of a compiled reader.
-Desugaring needs no special case: the table is fixed by the sugar forms, so the phase consults no governing
-meta — which here would have been the very entries this class is producing. The payoff: meta-kernel's linked
-form needs no materialization.
-
-### Registry and linking (`TsonSchemaLinker`, `tson-schema/.../registry/`) — `docs/linking-and-compilation.md`
-
-`TsonCanonicalIdentity.canonicalize` is §2.2.1's algorithm (exactly two reductions — strip scheme, strip
-query — everything else must already be canonical), public API because `TsonSchemaLoader` keys on it.
-`TsonSchemaLinker.link(schema, loader)` merges `!!import`s — an import's **whole namespace**, its own imports
-included (§2.2.3: "an `!!import` contributes the imported schema's entire namespace"), with
-**collisions decided by entry identity rather than name occurrence**: one schema reached by several routes
-unifies (so the core.tn diamond is ordinary), two different schemas declaring one name is an error, and
-nothing may shadow a name the closure already binds (recording each merged entry's origin schema id in
-`TsonLinkedSchema.entryOrigins`, transitively — so a declaration's identity and its line always come from the
-same document, whichever schema flattened it in, and so the identity comparison has a key). It populates
-`subtypes`, rejects an entry no finite document can
-satisfy (`TypeInhabitance` — a least fixed point over the entry graph, exact and total; §5.10.1's
-productivity rule), derives choice
-`disjoint` (`ChoiceDisjointness` — total and two-valued: `true` iff every variant occupies a distinct
-discrimination class, the same `DiscriminationClass` untagged reading dispatches on; §5.4), and validates
-every reference — refusing one that names a **DATA-kinded entry** (an entry describing
-something other than a data value is declared by its schema but is not a type; without this the misuse
-resolves, links *and* compiles and fails only at read), including choice-variant
-distinctness at the end of each variant's reference chain, rejection of a variant resolving to `void` (optionality is not choice,
-§5.4), the author's `@disjoint` marker against the derived fact (`false` is
-an error; no third outcome exists), and
-constructor eligibility from both ends (§2.2.2/§4.2). The linker materializes nothing —
-desugaring already did. `TsonSchemaRegistry.register` rejects duplicate identities (no overwrite: that plus
-unmodifiable `entries()` *is* the "locked" guarantee). The linker lives in `tson-compiler` (a pipeline
-stage, next to `Diagnostic` and `tson-regex`); the registry stays in `tson-schema` (storage over the value
-model).
-
-### Meta-layer vocabulary: `Data` and the `data` base kind — `docs/linking-and-compilation.md`
-
-§2.2.2 makes the meta layer the format's extension point, and §4.1's fourth base kind — **`data => top & {}`**,
-with `DATA` in `type_kind` — is where an instance of a meta-schema's own constructor lives when the thing it
-describes is not a data type; `schema.meta.Data` is the matching **`non-sealed`** branch of `Top` — the one open
-point in the body model, because the constructors reaching it are declared by meta-schemas this library has
-never seen. A consumer registers a class by carrying `@Typename` and being findable by the
-`DataNameBinder` (`ProcessorConfig.metaNameBinder` through the front door, composed over
-`SchemaMetaNameBinder.INSTANCE` — the resolution core's *mode* is fixed, the names it knows are not); there
-is no reader family and no factory entry, the ordinary record reader binding the payload and validating it
-in full, and an unresolvable class is an error where the constructor is applied.
-`Data.references()` is how a body's own type references reach the linker, declared rather than discovered.
-§9's guidance for extension meta-schemas is the other half: a slot holding a type reference MUST be typed
-`type_ref`, which is what makes it participate in reference walking and identity.
-
-### Class 2 compilation (`TsonSchemaCompiler`, `.../reader/`) — `docs/linking-and-compilation.md`
-
-`compile` turns a `TsonLinkedSchema` into a `TsonCompiledSchema` — one `TsonTypeReader` per entry, wired as
-real Java references, **eager** so a broken entry surfaces at compile time. `TsonTypeReader<T>` is strictly
-one method, `T read(TsonReadContext)`; framing and error policy live elsewhere. A `RuntimeException` while
-building one entry becomes an `ErrorReader` (the schema compiles; reading that entry reports
-`NOT_IMPLEMENTED` and skips the value, so a gap costs that value a verdict and nothing else's — the code,
-not the channel, being what keeps it apart from an author error), with two deliberate exceptions: a `BindMismatchException` is
-rethrown so a schema and a class that disagree fail the compile rather than the first read, and its
-`MissingBindingException` subclass rides an `ErrorReader` but is thrown from it **unwrapped**, being a
-misconfiguration rather than a gap. An entry declaring type parameters becomes an
-`OpenTemplateReader` before its body is looked at at all: a template is not a type, so naming one in *data*
-is an ordinary data diagnostic (a schema naming one unapplied was already refused at link time).
-`TsonCompiledSchema` is `sealed permits TsonCompiledMetaSchema` (a
-meta-layer schema can govern others). Two compile modes (governed / standalone) share one walk; two output
-modes (tree / bind) share each `*AbstractReader` family, selected by which factory registry you hold.
-
-### The compiled registries — `docs/linking-and-compilation.md`
-
-`TsonCompiledMetaRegistry` is the shared meta/resolution core: compiles and caches **only** meta-layer
-schemas, resolves/links/registers everything else (`resolveLinked`) without compiling it, owns content-hash
-verification, the bootstrap, and §2.2.3's import-cycle guard (a per-thread in-flight set — a schema is
-registered only once linked, so a cycle is invisible to every cache and was a `StackOverflowError`). `TsonCompiledSchemaRegistry` (`dom(core)` / `bind(core, context)`) is a
-per-mode registry of compiled user schemas — **the read mode is which registry you hold**, not a compile
-parameter. Resolution is always bind-anchored (meta instances bind to `schema.meta.Top`), so every read
-registry shares the one bind-mode core; core.tn is never compiled in the core, only inline in a read
-registry. **A read registry also hands its own lookup to every compile it performs** (`ForeignSchemas`,
-threaded through `TsonSchemaCompiler` into `ValueReaderContext`): §7.8's scope push resolves a schema the
-*document* names, so `ScopedReader` is given where to go and ask rather than an answer, and a foreign schema
-shares this cache, this loader and this read mode with the schema that admitted it. A compile with no
-registry behind it passes `ForeignSchemas.none()`, whose every lookup is `SCHEMA_NOT_PERMITTED` — a fact
-about the deployment, never a verdict.
-
-### Streaming readers and read context — `docs/readers-and-diagnostics.md`
-
-Every compiled reader pulls `TsonEvent`s through `TsonReadContext` — no reader requires a materialized
-tree. The context holds **no error policy**: `report(...)` hands a `Diagnostic` to the read's
-`DiagnosticsReceiver` (`throwing()` / `collecting()` / caller's own), and readers ask `reported()` (a
-count) when they need to know whether children complained. **A receiver sees every problem with the
-document, base syntax included** — both facades catch a document that will not lex or parse and report
-`Diagnostic.ofBaseSyntaxError(e)`, so a collecting read never throws for a bad document (it returns nothing
-and the collector says why) while fail-fast still throws, as `ReadException` rather than
-`TsonParseException`. A fault in the library propagates as itself. Load-bearing read rules, each detailed in the
-note: a stated FIXED value is checked, not obeyed; an omitted `OPTIONAL_FIXED` field stays absent where
-`REQUIRED_FIXED` injects (§5.2); collecting mode always keeps reading; **bind mode is all-or-nothing
-(`ConstructionGuard`) while tree mode keeps everything it built** — deliberate asymmetry, not
-inconsistency; records are closed under their type (§7.2, `UNRECOGNIZED_FIELD` — **on the schemaless bind
-path too**, where the target class is the schema and a field it does not declare is reported rather than
-dropped, a later version's extra field being able to change what the fields a class does read mean;
-`ignoringUnknownFields()` is the derived opt-out on both encodings' readers — the same line polices
-schema authoring through the meta's compiled reader); repeated fields/map keys are errors (§2.5/§2.6) with
-last-value-wins recovery underneath; map-key identity is the decoded host value, type-ref and annotations
-stripped (§2.6) — and one `ValueIdentity` answers that, §7.5's duplicate rule and §5.2's FIXED check
-together, three sites having compared decoded values three ways with `bytes` comparing by reference at all
-of them; a written `_` at an `OPTIONAL` field is §2.9's *present with an absent value* and tree mode
-keeps it (`TsonAbsent` against a missing field), where bind mode collapses both to `null` for want of a third
-state — `RecordAbstractReader.statedAbsentValue` is the per-mode answer; a written `_` at `REQUIRED_DEFAULT`
-is an error where omission injects silently; `{}` is
-the empty container of the position's own type (§2.8), so a zero-entry map faces `min_items` like any
-other value; and a reader names itself in a message by what the author wrote, never by a
-content-derived entry name — `EntryDisplayName` renders a minted entry as the sugar or application that
-produced it (told apart by having no source position), and a `REFERENCE` entry's reader takes that entry's
-own name, so a position naming an alias reports as the alias rather than as the type at the end of its chain.
-Both run where a reader is built, so neither costs a read anything.
-
-**§7.8's scope push is `ScopedReader`, and who may open one is `ScopePush`.** At a `scoped` position the
-value's own shape picks the cell: a nested `!!schema` is EXTERN, a bare type-ref is LOCAL, and neither is a
-validation error (§7.8's required discriminant — *validation*, not resolver: nothing failed to resolve). A
-cell the instance's `scope` does not hold refuses the value it would have taken, so `declared` refuses a push
-and `extern` requires one, from the one reader. LOCAL resolves through the governing schema's own compiled
-readers, fixed at compile time — a `scoped` entry belongs to exactly one schema. EXTERN loads through
-`ForeignSchemas` as the value arrives, so a schema nothing would supply is one of the five `SCHEMA_*` codes
-and never a verdict; the scope then **pops by returning**, the foreign type's reader being wired to the
-foreign schema's own entries, so everything below it resolves there by construction and nothing after it
-does. Tree mode keeps the push (`TsonScopedValue`); bind mode hands the object back unwrapped, a bound class
-having nowhere to carry a URI — the same asymmetry §2.9 already gets. **The containers leave a `SchemaRef`
-where it stands** rather than consuming it, which is how a document used to push a scope its schema never
-opted into and be read as though it had not: `ScopePush.notAdmitted` answers it once per position and refuses
-it where that position's reader is not a scoped one (§7.8's typed-position restriction — "cross-schema
-acceptance is authored intent, not accident"). A **schemaless** document opens no scope at all, which is
-§7.8's own rule: a nested `!!schema` in a document with no `!!schema` of its own is a validation error naming
-the directive.
-
-### Diagnostics — `docs/readers-and-diagnostics.md`
-
-`Diagnostic` (`tson-base`) is one record for both data- and schema-side problems — the variation is
-locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual`, four location
-components matching JSON Schema 2020-12 §12's output unit (`path`, `schemaId`+`schemaPointer`, plus
-`dataPosition`/`schemaPosition`) — and nothing else. **Every component is a location**; the one fact that is
-not, why a schema could not be obtained, is the `Code` itself: five members, one per
-`SchemaFetchException.Reason` (`SCHEMA_NOT_PERMITTED`/`SCHEMA_NOT_FOUND`/`SCHEMA_UNREACHABLE`/
-`SCHEMA_TIMEOUT`/`SCHEMA_TOO_LARGE`, mapped by `Code.of`). Consumers *route* on that question and a code is
-what a consumer routes on, so a field beside it was a second carrier for one fact; five rather than two
-because consumers partition the reasons differently and no partition is privileged. The exception's own
-`Reason` stays, as the throwing channel's vocabulary and the single input to the mapping, so the thrown and
-the collected channel cannot disagree. `Code.verdict()` answers the other question a consumer asks — whether
-the code is a verdict on the document at all, which the five, `NOT_IMPLEMENTED`, `BIND_MISMATCH` and
-`LIMIT_EXCEEDED` are not.
-**A §8.2 name-hygiene refusal is a diagnostic like any other and carries nothing extra**: which rule
-refused is the `Code` — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT`, one each, since the
-three want three different remedies and the code is what a consumer routes on — and the Unicode data
-version §8.2 requires a refusal to name is a fact about the *processor*, so it is stated once beside the
-diagnostics rather than N times inside them (`ProcessorPolicy`, below).
-**What earns a component at all is one rule** — *a fact not recoverable from the
-document plus the schema, and not one the consumer routes on* — which is why an atom's
-failed bound (in the schema), a duplicate key (in the document) and the rule that fired (the code) get none;
-`tson-cli`'s wire shape applies a second filter, whether the recipient can act on it. Both RFC 6901 pointers are
-`Optional<String>` because `""` is the *root*,
-a location this really emits, not an absence; the three components where `""` really is absence
-(`schemaId`/`expected`/`actual`) offer `schemaIdIfKnown()`/`expectedIfStated()`/`actualIfStated()`, so a
-renderer asks rather than remembering which convention each component uses. `expected` carries the
-**constraint that failed** — `<= 100`, `one of (A, B, C)` — from `AtomTypeException`'s six-shape
-vocabulary, never the type's name; the name leads
-`message` instead. The base-syntax exceptions keep their position out of `getMessage()` (it is in
-`position()`, and in `toString()` for a stack trace) so a diagnostic states it once. A read's schema end is
-one `SchemaLocation` (id + pointer + position) **accumulated as the read descends**, not claimed by whichever
-reader is innermost: the pointer is the path taken (`/person/age`), never the leaf it resolves to (`/int32` in
-core.tn), because the leaf names a file the author didn't write and never mentions the field they can edit.
-`schemaField` steps data and schema together where `field`/`index` step data alone — each step a linked
-node, both pointers rendered only when a diagnostic is built, since concatenating per step is quadratic in
-depth and thrown away by every read that reports nothing; a record re-anchors
-id+position on itself (but a declaration with no line of its own contributes none, leaving the enclosing
-one's), everything else offers its own declaration only as a seed for a value nothing encloses — and the
-**facade** seeds the root from the name the read entered through, so a pointer into a template-derived type
-names the author's alias rather than the entry the resolver minted.
-Schema-side reporting runs through the same receiver: `TsonSchemaParser`,
-`SchemaResolver` and `TsonSchemaLinker` have reporting overloads that collect every independent problem in
-one pass (a failed declaration leaves an answer-everything placeholder, javac-style), while
-`Tson.validateSchema` owns the phase boundary — resolution runs only if the document parsed whole, linking
-only if resolution was clean, and a schema that reported anything is never registered. A schema *syntax*
-error reports per declaration too (`Diagnostic.ofSchemaSyntaxError`, located at the schema end, resyncing on
-`name =>` at schema-map depth), naming the **construct** the position admits rather than the token class —
-and the recovering parse hands back no document at all, since resolving a half-document reports every
-reference to a dropped declaration on top of the real error. Namespace-level failures (unloadable
-`!!import`, ineligible `!!meta`, `!!id` cross-check) still throw even with a receiver. Compilation, and the
-lexer under everything, are still fail-fast.
-
-**`ProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2 policies
-(`identifierPolicy`, `tokenPolicy`, under `ProcessorConfig`'s own names — level, whole-name or per-segment unit, and any
-`permitting` relaxations) plus the UCD version and §9.1's limits, reachable as `Tson.processorPolicy()`, either facade's
-`processorPolicy()` (read off the reader that judged, since a derived reader is where the two can differ), and `tson policy`
-on the command line. **It is also configured once**: `ProcessorConfig.withProcessorPolicy` takes the whole value, the three
-named setters derive one component each from what is already stated, and `Tson` holds the result — so the report is an accessor
-rather than a reassembly, and `Json.withProcessorPolicy` takes the same value, one policy serving both encodings. **The value
-holds its own invariant**: a token policy may not be per-segment (`_` and `-` are word separators in a name and ordinary
-characters in a value, so segmenting one admits UTS #39's own `Toys-Я-Us`), and the compact constructor is what refuses it,
-so no assembly route — setter, wither, or a value a caller composes — is a way around a rule the others apply. It is what
-makes a §8.2 divergence explainable: the same bytes may be refused here and accepted elsewhere, and the reason is in neither
-the document nor the schema. It is deliberately **not** a diagnostic component — the fact is constant for a run, so a
-per-refusal copy is N copies of one string; it arrives only on failure, where what a sender needs is the rule *before* it
-writes; and a version says what refused you where a level says what would be accepted. That last is why the standalone
-surface matters more than the envelope one: a generator that reads the policy first never writes the name that would be
-refused, which is the round trip the format exists to avoid. §8.2 requires exactly this shape, naming the two policies
-(`identifier policy`, `token policy`) so two implementations reporting them agree on what they are called.
-
-**`LimitsPolicy` is §9.1's half of the same statement, and it is a component of it.** What this
-processor will *spend* reading a document, where the two above are what it will *admit as a name* —
-`Tson.limitsPolicy()` (`processorPolicy().limits()` in one call), either facade's, `TsonTreeReader.withLimits`,
-`tson policy`, and a `limits` record in every CLI envelope's `policy` field. It sat beside rather than inside
-for as long as the container was called `ProcessorPolicy`, which was right: a nesting bound has no
-business inside a *Unicode* policy. The container was the problem and not the grouping — a deployment states
-one policy, and the CLI envelope had been nesting `limits` under `policy` all along. What survives the merge
-is the independence, not the separation: the three components answer three questions, and changing one still
-says nothing about the others. **Only nesting depth is bounded** (default 64 — the tightest in common
-use, so a document that fits travels — §9.1's own default). §9.1 states eleven more with a default each and
-§11.5 five on the schema side under the same policy; `BACKLOG.md` carries what is left.
-**Counted in `TsonDataStream.advance`**, the one place every token is consumed, so the refusal lands before
-any reader descends — which matters because the stream is iterative and every reader over it recurses, and
-`EventSkip` recurses through values no reader keeps. The same counter reaches a schema document. A refusal is
-`LIMIT_EXCEEDED`, is **not a verdict**, and has its own classifier (`Diagnostic.ofLimitExceeded`, caught ahead
-of `ofBaseSyntaxError` in both facades) — a base-syntax failure is a verdict every processor repeats, this is
-a statement about the reader. It replaced a `StackOverflowError` that escaped every `catch (RuntimeException)`
-and got exit 1 with nothing on stdout.
-
-### Read facades and writers — `docs/facades-and-tree.md`
-
-`TsonObjectReader` (bound Java object) and `TsonTreeReader` (`TsonValue` tree) are the whole
-document-reading surface, dual-mode fixed at construction: standalone = schemaless (Class 1,
-Jackson-style); from a `Tson` facade = schema-aware (a self-describing document validates against its
-`!!schema` as it's read). Jackson-`ObjectReader`-style derivation (`withDiagnostics`, `withSchema(uri)`,
-`preservingUnknownTypeRefs`, `withTokenPolicy`, `withLimits`) keeps source form / error policy / schema
-selection / Unicode policy / resource limits orthogonal; derived
-readers share the original's compiled-schema registry. Failures reaching or resolving the schema are
-diagnostics, not exceptions. A schemaless read still checks type-refs (`TypeRefCheck`: built-in name →
-must satisfy the atom; names-the-target → accepted, bind only; else `UNKNOWN_TYPE_REF` — a reader policy,
-a reader policy where §7.1 asks only that an unresolved annotation be treated as informational). Both tree
-paths capture wire annotations; a schema-driven read also type-checks
-annotation *names* against the governing schema (§1.3's Class 2 bullet) — **wherever they are written, not only where the
-reader keeps them**, since whether a bound class has an `Annotations` carrier is no part of whether the
-document conforms. `TsonTreeWriter`/`TsonObjectWriter` re-emit
-annotations in §7.4 order; `toTson` is mainly a debugging tool with documented losses. Both writers also
-take a sink — `write(value, ByteSink|OutputStream|Appendable)`, UTF-8, flushed and not closed — so a
-document never
-has to exist as a `String`; `TsonDataEmitter` holds either an `Appendable` or a `ByteSink`, and `toTson` is that method
-over a
-`StringBuilder`. **The byte path encodes UTF-8 itself** (`base.io`'s `Utf8Sink`) rather than through an
-`OutputStreamWriter` — the write-side mirror of the lexer decoding it, which is what lets a document reach a
-`ByteBuffer` or a channel and not only an `OutputStream`, puts the block under `ByteSink.block()` rather
-than the JDK's, and **refuses an unpaired surrogate where the JDK writes `?`**: a character nobody wrote,
-in a document whose identity may be a hash of its bytes. Both can also emit a document header
-(`describing(schemaUri[, rootType])`/`identifiedBy`), **off by default** because a bare value is what a
-writer is usually asked for, not to protect output nobody consumes — the object writer needs the root type too, a bound
-object carrying neither fact, where a tree already names its own; `TsonDataEmitter.typeRef` refuses a second
-type-ref on one value, which is what keeps a declared root type from writing an unparseable document. The
-same `TsonDocumentHeader` carrier reads, through **`TsonDocumentPeek`** (`Tson.begin(…)`, or
-`TsonDocumentPeek.of(…)` standalone): §7.1's classification from the opening bytes — `!!id` plus `!!schema`,
-or `!!meta` and it is a schema document — for a caller that must route on what a document names before
-reading it. **The peek keeps the rest of the document**, so a reader continues on the same stream
-(`read(peek, …)` / `readAs(peek, …)`) and an HTTP body is routed and then read without a rewind — there is no
-resumable/non-resumable pair, every peek continues, and a caller who only classifies takes `header()` and
-drops it. Which reader continues is the caller's — that is how one process serves two schema versions — but
-the **lexical** half of the policy may not differ from the one the header was read under, and a reader that
-disagrees is refused. It is **total**: a header it cannot read yields nothing rather than throwing, never a
-schema the document does not name, and the failure it kept is reported by the read that follows.
-`TsonDocumentHeader` itself is a pure value with no way to obtain one — reading a header means running the
-lexer, which is the stream's job.
-These live in `tson-compiler`'s root package because `DefinitionResolver` depends on
-`TsonObjectWriter`.
-
-### Tree model: `TsonValue` (`tson-tree`) — `docs/facades-and-tree.md`
-
-A sealed `TsonValue` over eight pure immutable node types (`TsonRecord`/`TsonMap`/`TsonArray`/`TsonTuple`/
-`TsonAtom`/`TsonAbsent`/`TsonMissing`/`TsonScopedValue`), structure-preserving and annotation-aware. No `Node`
-suffix (deliberate, against Jackson's names). `get`/`at` never throw — a `TsonMissing` carries the RFC 6901
-pointer of the step that failed. **One no-value node, because there is one no-value spelling**: `TsonAbsent`
-carries `_` and a collecting-mode read failure, and nothing else. `null` is a `TsonAtom` holding the string
-`null`, schemaless and under a schema alike; a `void` position admits `_` and nothing else (`VoidReader`),
-which is where a second spelling would be cheapest to admit and is refused anyway.
-**`TsonScopedValue` is the eighth, and it is a wrapper because the directive belongs to the position**:
-`scoped-value = [ schema-directive ws ] data-value` (§2.3), so the same record means the same thing with or
-without one, and a nested `!!schema` attaches *around* a value rather than as a ninth component on each of
-the other seven — the same argument `TsonDocument` makes at document level, which is why the two are
-separate types rather than one (a document also carries `!!id`, is not itself a value, and cannot stand at a
-field position). It is **transparent to navigation**: every kind predicate, accessor and step delegates
-through, so `at("/attachments/0/claim_id")` reads the same whether or not a scope was pushed and a consumer
-that does not care never unwraps one. Only a genuine push produces one, so a tree round-trips through
-`TsonTreeWriter` with its directives where the author put them.
-Two accessor families with different questions: `as(Class)`/`asString`/…
-**cast** ("what host type did the read produce?"), `asInt`/`asLong`/`asDouble` **convert** ("what number is
-this?") — a test asserting which host type a reader produced must use `as(Class)`. Read-side only; no
-builders or transforms, deferred until a concrete produce/edit use case exists rather than pending
-(`docs/facades-and-tree.md`).
-**`TsonDocument(id, schema, root)` is the model's document** — the counterpart of `ast.Document`, since §2.2
-makes a header a property of the document and not of its root value. No `meta` component: that would be a
-*schema* document, whose model is `schema.meta`, and `TsonDocumentHeader` (which carries all three) answers
-the different question of classifying a document before reading it. `treeReader().readDocument(...)` returns
-one and `read` is unchanged beside it; `TsonTreeWriter.toTson(TsonDocument)` writes it back, the document's
-own directives beating the writer's where it has them. **`TsonObjectDocument<T>`** (in `tson-compiler`, beside
-the facades) is the object side's, and a distinct type rather than the same one: it needs a fourth component,
-`rootType`, a `TsonValue` naming its own type where a bound object names nothing. What it carries is what the
-*read* established — the class and its context already fix the schema, but `!!id` is per-document data and
-`rootType` is a name a `DataNameBinder` cannot invert, which is also why `TsonObjectWriter.describing` takes
-two arguments where the tree writer's takes one.
-
-### Front door: `Tson` (`tson` module) / `ProcessorConfig` (`tson-base`) — `docs/facades-and-tree.md`
-
-`Tson.standard()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
-`ProcessorConfig.withDataBindContext` says which Java classes the schema's types bind to. **The vocabulary
-for building a context is `tson-bind`'s, not `ProcessorConfig`'s** — `DataNameBinder.ofMap(map)` over
-`DataBindContext.builder().registerAtoms(AtomContext.hostTypes())`, with `orElse` composing a caller's
-names over the kernel's own — so `bindings`/`profile` are gone from the front door rather than
-restating it. **Strictness is configuration and not a reader derivation**, which is a fact about when
-the check can run rather than a preference: it compares a *compiled* schema against a class, so a
-reader derived afterwards has no answer left to give. Which field a *document* may carry beyond its
-class is the different question `ignoringUnknownFields` asks, per reader, at read time.
-
-```java
-Tson tson = Tson.standard();
-tson.resolve(schemaText);                      // registers the schema by its own !!id
-TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
-```
-
-### CLI, config, bundled schemas, hashing — `docs/cli-config-hashing.md`
-
-`tson validate [--output text|json|tson] <file|->...` auto-classifies a flat file list into schemas (by
-embedded `!!id`, never filename) and data, and validates each data document via `Tson.validate` — fully
-self-describing, no `--type`; `-` is stdin, at most once, always data. One `ValidationRun` envelope per
-invocation. **Exit codes: 0 all valid, 1 any data file invalid, 2 usage/classification, 69 a schema nothing
-would supply, 70 a library gap or fault** — the split is load-bearing and rides on the exception-classification
-policy. 1 is a verdict on the document — *checked and rejected*, a §8.2 refusal included, since the sender
-still holds the fix; **69, 75, 78 and 70 are the absence of one**, naming who could not give it (whoever was
-to serve the schema, permanently or not; whoever wired this application; this library). A **§9.1 limit
-refusal** is 1 as well, and is the one place an `outcome` of `NOT_CHECKED` exits 1: the envelope answers *was
-it read* and the exit code answers *what now*, and here the runner can act (`--max-depth`, or a smaller
-document) where every other non-verdict has nobody present who can.
-`TsonCli.exitCodeFor` **ranks by who must act first, permanence breaking the tie** where nobody present can
-act: `70 > 78 > 69 > 75 > 1`. Every non-verdict rides in the report as a code with a stderr note, the report
-on stdout unchanged. 70's halves print differently: a gap that escapes as an exception prints
-`not implemented yet: <message>`, whose text usually names the workaround; a fault gets the please-report-it
-banner and its stack trace. Also `tson compile`, `tson hash` (stamps a
-`?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `ProcessorPolicy`
-and §9.1's `LimitsPolicy` with no document in hand, the same record every `validate`/`compile` envelope
-carries in its `policy` field.
-**Those three commands also take the policy flags** (`PolicyOptions`, which consumes them so each subcommand's
-own loop still sees only `--output` and positionals): `--max-depth` takes §9.1's nesting bound (refused below
-1 rather than clamped), `--identifier-policy`/`--token-policy` take a level in
-either spelling the CLI prints or a person types, `--identifier-per-segment` the unit, and
-`--identifier-scripts`/`--token-scripts` a `Latin+Cyrillic` combination, repeatable. Two rules keep a flag from
-meaning nothing: **`--token-scripts` alone raises the token level** to `SINGLE_SCRIPT` (its `UNRESTRICTED`
-default scans nothing, so the list would be inert), and a relaxation named against a *stated* level that scans
-nothing is a usage error rather than a no-op — `withTokenPolicy`'s own habit of refusing a policy that cannot
-mean what it says. There is no `--token-per-segment`; the library refuses one. In `--output text` a run prints
-the policy when it refused something **or** when it configured one (§8.2 requires a relaxation not be silent);
-the machine formats always carry it, a consumer wanting one shape.
-**A `.json` input is validated too**, against a schema supplied out of band: `--schema <uri> --type <name>`
-are one statement binding every JSON input in the run ([TSON-JSON] §3.4, since a JSON document names neither
-for itself), and the encoding is read off the extension on §3.1's own authority — the one filename this CLI
-reads, the axis being the encoding where the `!!id` rule is about schema-versus-data. Half a binding, a
-`.json` with none, a binding with no JSON to bind, and a `--type` the schema does not declare are all **usage
-errors** (exit 2) rather than verdicts: each is the command line's mistake, and the last is checked before any
-document is read so one typo prints once instead of once per file. Stdin takes the binding as its marker,
-having no name to classify by. One envelope, one exit-code ranking, one policy field across both encodings.
-
-`TsonBundledSchemas` serves the three bundled schemas' identities, text (copied from `spec/m/` at build
-time) and published digests. `TsonContentHash` hashes every byte past the `!!id` line; pins are
-verification metadata, not identity, checked through the loader on every pinned reference — a schema
-registered from text in-process is hashed by the same call that registers it, since §10.2 verifies per
-identity and not per route. The
-`config` package holds the two default bind contexts (consumer vs. internal `schema.meta` resolution),
-differing by exactly the name binder.
-
-## Traps — read before touching the class involved
-
-Hard-won invariants that look like cleanup targets or are easy to break silently. Each is documented at
-the class and (where noted) pinned by a test; the `docs/` notes carry the full why.
-
-- **`TypeArgument` is a sealed interface (`Ref`/`Value`), never a plain record.** It is the labelled choice
-  the kernel declares, and a plain record with two `Optional`s would be a worse model: nothing in the type
-  would say exactly one is present. It used to be the only shape that *worked* as well — `TypeRef`/
-  `TypeArgument` are mutually recursive and the record binder had no cycle protection — but
-  `DataBindContext` carries a cycle guard now (`Memoized`, `RecursiveModelTest`), so that half is history
-  and the shape rests on the modelling argument alone.
-- **`SchemaDesugarer` returns un-rewritten nodes by identity** — `declarationPositions()` is an
-  `IdentityHashMap`, so an equal-but-rebuilt `Declaration` silently loses its source position and its
-  diagnostics. `SchemaDesugarerTest` asserts `assertSame`.
-- **`requireDocumentEnd`: the pull is the point, not the assertion after it.** Nothing fails if you simply
-  stop reading a lazy `TsonDataStream`; pulling past the root value is what makes trailing content get
-  rejected. Javadoc on both facades.
-- **Lexer multi-line closing-delimiter detection strips leading whitespace *before* comparing against
-  `"""`.** Backwards, every multi-line token is spuriously "unterminated". Happened once; guarded by
-  `LexerTest`.
-- **`Position` must keep the record's default `toString()`.** `ResolvedForm` -- shared by
-  `ResolvedFixtureTest` and the Class 2 schema suite -- normalises the `@Unbound` `position` component away
-  by regex over rendered text, `position=Optional\[Position\[[^\]]*\]\]`. Give the record a `toString()`
-  of its own and the pattern stops matching, positions stop being normalised, and seven fixtures diverge on
-  a component §8's resolved form has no field for. The coupling is the test's to loosen; until it is, the
-  record renders as records do.
-- **Never put literal BOM/NEL/LS/PS characters in source or tests** — use `\uXXXX` escapes; the invisible
-  character is an editing hazard (§9.4's confusable risk).
-- **`CompiledReaders` is rebound exactly once, from the in-progress `Compilation` to the finished
-  `TsonCompiledSchema`** — handing readers `Compilation::resolve` would leak its mutable state past the
-  compile. `CompiledReadersTest` pins the handover.
-- **`verifyFixed` compares with the pre-rebind parser (`FixedCheck`)** — bind mode narrows
-  `precomputedValue` in place, and comparing across that narrowing flags every conforming document.
-- **A `schema.meta` bind target with more than one public constructor needs `@Record` on the canonical
-  one**, or `DefaultRecordBinder` throws (`IntegerType`/`IntegerSize` hit this).
-- **An atom body's components must mirror its constructor's *resolved* shape, not the composition that
-  produced it** — every field flat, one component per schema field name. Composition flattens (§5.8) and a
-  compiled `Record*Reader` fills a field, including a `REQUIRED_FIXED` field's schema-composed default,
-  under its own schema field name, so a component nesting one (`specification: AtomSpecification` for
-  `spec`) or omitting one silently binds `null` rather than failing. `UriType`/`RegexType` did both for a
-  long time, invisibly, because their tests asserted against hand-written `UNCONSTRAINED` constants and
-  `MetaKernelBootstrapResolver` hands those same constants back — only a schema resolved through the
-  compiled meta reader shows it. `DefinitionResolverTest.resolvesRegexAndUriInstancesWithEveryComposedFieldBound`
-  is the guard.
-- **A desugar-reported declaration is replaced with an absorbing stand-in, never passed through** — passing
-  it through hands `DefinitionResolver` the very node the phase removes and turns a reported author error
-  into an unreported abort. Injected declarations are never rolled back (later declarations may already
-  reference them). **Both placeholders keep the failed declaration's own type parameters** (`absorbed`, and
-  `SchemaResolver.unresolved` one phase later): answering "how many type parameters?" with zero tells a
-  downstream `bl<text>` to "drop the argument list", which is a wrong fix for someone else's error.
-- **Atom refinement's write round-trip has no cheaper substitute** — the merge must run on the
-  wire record before binding, or `REQUIRED`-no-default constructor fields fail `FIELD_REQUIRED`
-  (`DefinitionResolverTest.atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed`). What the resolver
-  reaches for is `writer.DataClassObjectWriter`, the engine — **never `TsonObjectWriter`**, the facade over
-  it: a resolver naming the front door would make the engine's own module depend on what is built above it.
-
-## Conformance suite (`ConformanceSuiteTest`, `Class2ConformanceSuiteTest`)
-
-Separate from the fine-grained unit tests, these run every vector in the sibling
-[ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite) repo as JUnit 5 dynamic
-tests — a conformance/integration check against an external, language-agnostic, spec-derived fixture set,
-to catch drift against the spec.
-
-**Two runners, split by conformance class and therefore by module.** `ConformanceSuiteTest`
-(`tson-compiler`) runs `class1/` against the real `Lexer`/`TsonDataParser`/`BaseTypeResolver`/
-`BuiltinTypeVocabulary`. `Class2ConformanceSuiteTest` (`tson`) runs `class2/` against the `Tson` front
-door, because a Class 2 vector is about a phase boundary — did this schema resolve, did it link, does this
-document validate against it — and those boundaries are `Tson.validateSchema`/`Tson.validate`'s to own,
-not a test's to reassemble. What the two share lives in `tson-compiler/src/testShared`, added to both test
-source sets: `SuiteCheckout` (finding the corpus), `Sidecar` (reading a sidecar and splicing a subject's
-header) and `Vectors` (walking the tree). One statement of the corpus's contract rather than two, which is
-what `RUNNER.md` exists to keep from drifting — the first two runners written against its prose had already
-disagreed about what a subject even is.
-
-**The corpus states its own contract, and this runner obeys it rather than inferring it.**
-`schemas/<layer>-sidecar.tn` gives each layer's sidecar shape and every sidecar names one with
-`!!schema`; `RUNNER.md` is normative for the runner. Three rules bind here: a subject reaches the lexer
-as the **bytes on disk**, never a decoded and re-encoded string; an `error` vector's §8.1 **category is
-asserted at every layer**, not only the vocabulary one (the layers are pipeline stages and cross the
-categories — the vocabulary layer raises `resolver` and `validation` errors and never a "vocabulary"
-one); and **position is never asserted**, implementations legitimately failing at different points
-depending on lookahead. A sidecar carries its outcome as a **field group member** (§5.11), so exactly
-one of `valid`/`error`/`schema-document`/`refused` is present and the payload cannot be separated from it;
-`absent`, `empty-brace` and `schema-document` carry nothing and are typed `void`, written `_`.
-
-**`refused` is §8.1's fifth outcome and is not a verdict on the document or the schema.** §8.2's name-hygiene
-rules refuse without making a document invalid — each reads data the UCD does not freeze, so none of
-them may decide validity — and §8.2 says the refusal MUST NOT be reported in any of the four categories.
-`checkRefusedVector` therefore asserts both halves: that something was refused, and that *nothing* was
-reported as invalid, `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT` being the three codes that mean
-policy, one per rule. A vector
-names the rule it exercises and the UTS #39 data version it was computed against, and a version this
-implementation does not carry is `RUNNER.md` rule 5's fourth legitimate skip — the only one that is about
-the vector rather than the conformance class. It has two homes: `class1/reader/refused/` for Part 1's one
-scope, and `class2/schema/refused/` for §11.4's, where the enum-member and group-member-label vectors are
-the ones that catch a processor checking each name where it is *read* rather than where a scope is
-*walked* — the failure this implementation had. Template parameters stay out of the corpus: §11.4 and §5.10
-both decline to list them as a scope, so a vector asserting the look-alike refusal would fail a conforming
-implementation, and `ConfusableNameScopesTest` carries those cases instead. Only that rule diverges —
-mechanisms 2 and 3 are per-name and reach every identifier position anyway (§8.2).
-
-**The grammar runs where a name is read; the policy runs once per layer, over scopes.** That split is
-§8.2's own — §7.7 is validity, stable across Unicode versions, and a failure is a parse error; §8.2's three
-name-hygiene rules are policy over *named scopes*, read unstable data, and a failure is a refusal. So
-`IdentifierProfile.validate` is the grammar and `IdentifierProfile.hygiene` the restricted-character rule;
-**both report a violation and neither throws**, so what a failure becomes is the caller's — a parse error
-where the grammar is read, a refusal where the policy is applied — and **no position that reads a name
-applies a policy**. The joiners belong to the grammar despite
-being `Identifier_Status=Restricted` — §7.7 rule 2 makes their admission a question of form.
-
-Each layer has exactly one place that walks its scopes, and all three rules run there — names that read
-alike (`CONFUSABLE_NAMES`), a character outside the identifier profile (`RESTRICTED_CHARACTER`), a script
-script the restriction level does not admit (`RESTRICTED_SCRIPT`, wider than a mix — at `ASCII_ONLY` a
-single-script name is refused with nothing mixed):
-
-| Layer | Walk | Scopes |
-|---|---|---|
-| Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (§11.4 declines the scope) |
-| Data (TSON) | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
-| Data (JSON), schemaless | `reader.DataClassObjectReader.checkNameHygiene` | one record's member names — the two per-name rules only |
-| Data (JSON), schema-directed | `reader.NameHygiene`, from the record and choice readers | an **unmatched** member name; a `$type` naming nothing — the two per-name rules only |
-
-**The schema-directed reach is narrower than the schemaless one, and deliberately so** ([TSON-JSON] §9.4): a
-member name matching a declared field, or a `$type` naming a declared type, carries that declaration's own
-verdict, given when the schema loaded — so only an **unmatched** name is judged. The schemaless bind reader
-checks every name instead, and is right to: there the class is the schema and nothing judged its component
-names at load. **The order is load-bearing**: §8.2 before §6.1.1, because a refusal MUST NOT be reported in
-one of §8.1's four categories, and a look-alike field name told it is *unknown* is a verdict on the document
-for a policy rule — advice to add a field that is already declared, when the fix is one character.
-
-**JSON reaches fewer scopes, and the reason is §4.1 rather than an omission.** `{"a": 1}` is one syntax
-for a record and a map, so the position decides which — and only a reader holding one can say. The object
-reader's target class *is* that position (it plays the schema's part, §4.1), so a record component's
-members are names and a `Map` component's are keys, which are data and the token policy's business. The
-tree reader holds no position and so applies nothing; that is the same fact that made `tson-json` a
-separate stack rather than a front end over `TsonEventSource`. **The look-alike rule reaches no JSON
-position, and that is settled rather than owed**: it is a property of a *set*, and the one place any
-encoding applies it to data is TSON's schemaless tree read, where the grammar has already said the members
-are fields. In JSON the attack and a legitimate map of look-alike keys are spelled identically, so it must
-be accepted — a deployment that will not accept it raises the **token** policy, which reaches every token
-including a key. `docs/json-encoding.md` has the worked comparison.
-
-**A minted name is judged by the same walk, and is built so it can be.** A derived name splices
-author-written content into its readable half, so `InternalName` restricts that half to **ASCII**: what §7.7
-admits is spliced, other ASCII keeps its admitted characters and gains a hash (`"/x"` → `x_h00000f2f`), and
-anything else is the hash alone. That satisfies §8.2's freshness MUST — an internal name is a valid
-`identifier` — and, because an ASCII name is single-script and inside the identifier profile, it also passes
-all three hygiene rules at every level. Admitting `XID_Continue` instead would keep the name legal while
-letting a document's own text shape a namespace name, and would refuse any schema written outside Latin
-script; exempting minted names from the walk would answer that by leaving the hole open.
-`docs/linking-and-compilation.md` has the detail.
-
-**One place is the point, not a tidiness.** The restricted-character rule used to run at the reading
-positions instead — spread over the schema parser, the definition resolver and the atom vocabulary — and had
-holes at exactly the positions only some of them reached: an enum member and a group's member labels were
-checked for reading alike and for script mixing, and never for a restricted character. A scope list can be
-reviewed; three call sites cannot. **A field name is a name and meets all three rules** (§2.5, §7.7) — the two
-per-name ones in `DefaultTsonReadContext` beside a type-ref's and an annotation's, the look-alike one in
-`SchemalessTreeReader`, which is where it belongs because it is a property of a *set*. There is no
-conformance class in which a record's field names are judged by a different rule. The identifier policy
-defaults to Highly Restrictive
-whole-name (§8.2's SHOULD) and relaxes through `withIdentifierPolicy`, which §8.2 requires be code rather
-than ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
-may legitimately be anything.
-
-`SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
-documentation: every sidecar read against the schema it declares, plus the negatives the groups exist
-for. `SidecarSchemasTest` checks the schemas themselves resolve — every `.tn` in `schemas/`, listed rather
-than named in a constant, so a layer schema added upstream is one this has to resolve — serving the suite's
-own identities beside the bundled ones since the layer schemas `!!import` `sidecar-common.tn`.
-
-**The corpus is a declared input of every `Test` task** (root `build.gradle.kts`). It lives outside this
-build, so Gradle would otherwise report the previous run as up to date over an edited vector — a stale green
-over a changed corpus, which is the one thing a conformance signal must not do.
-
-**A skip is not a pass.** `SuiteCheckout` finds the corpus — a sibling working copy first (a developer
-editing vectors must see their own edits), then the pinned copy `scripts/fetch-references.sh` fetches
-into `.references/`, with `-Dtson.testSuite.dir` overriding both authoritatively. An absent corpus
-aborts through `Assumptions` so a bare clone stays green, **except where `TSON_REQUIRE_TEST_SUITE` is
-set — CI sets it — where it fails instead**. CI used not to check the corpus out at all, so every vector
-aborted and the build went green while measuring nothing; that is what the variable exists to stop.
-**The pin is a commit, never a branch**: an upstream vector must not be able to turn this repo red with
-no change here.
-
-**The `reader` layer is where a Class 1 document gets its verdict**, and the rules §1.2 leaves to no tier
-live there and nowhere else — §2.5's unique field names, §2.6's key identity (including the decoded-value
-rule a parser cannot apply), §2.8's empty brace, §2.9's absent-key restriction. A `parser/invalid/` vector
-cannot fail on `{ a: 1  a: 2 }`; the parser accepts it by design. An error vector there states
-`category: resolver` and its subject must parse, which `checkReaderVector` asserts before asking the reader
-for a verdict.
-
-**The `class2/` layers are the three answers a Class 2 processor gives.** `schema/` needs no invented
-expectation format: §1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a
-valid vector's subject is a schema document and its expected side is that document's resolved output in §8's
-own form, read back through `ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question
-of `spec/m/*-resolved.tn`) and compared entry for entry, `@synthetic` key markers included. `link/` states
-individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived disjointness, §8.2's
-`subtypes` index. `validate/` is a data document against a schema that loaded, where the expected side of a
-failure is §8.1's category plus the RFC 6901 pointer into the data and nothing else.
-
-**At the schema and link layers the category is the phase's, not the diagnostic code's.** §8.1 says every
-error that makes a schema fail to load or ingest is a resolver error "however value-like the violated rule",
-so a schema-authoring mistake this library catches through the meta's own compiled reader arrives carrying a
-record-shaped code and is still a resolver error. What is checked per diagnostic instead is that each one is
-a **verdict** (`Code.verdict()`): a gap, a bind mismatch and the five fetch codes say the vector could not be judged, and
-letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
-
-**No `class2/schema/` subject declares a template yet, and nothing stops one now.** An open entry's body is
-the kernel's `template` constructor carrying the application as text (`schema.meta.TemplateBody`), so it is a
-`type_definition` like any other and reads back as ordinary data — where §8.1's older shape wrote the
-application as though it were a value of the constructor's own vocabulary, which no reader could apply
-(`SPEC-FEEDBACK.md` #5). `ResolvedForm` compares an open entry's body by its *parsed* form, §5.10's one
-spelling being about the application and not the whitespace, so the layer needs no expectation format of its
-own. Templates are covered at the `link/` layer meanwhile, over the entries they mint; `BACKLOG.md` carries
-the vectors that are owed.
-
-**Add test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge —
-with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, so a Part 1
-vector about schema resolution has nowhere to go and the honest move is to say so rather than wedge one into
-the wrong bucket.
-A vector whose sidecar carries `encoding` is fed the file's bytes unchanged (`checkEncodingVector`),
-because the ordinary string round-trip would re-encode exactly the bytes such a vector exists to test;
-an encoding this implementation does not read is skipped, not failed, which `RUNNER.md` admits as one of
-its three legitimate grounds.
+**Javadoc and notes document the current contract only.** No dates, no "renamed from", no "used to", no "on the user's
+direction". If a design needs a why, state the invariant and its rationale, once, in proportion to its logic. When you
+edit a class, clean its Javadoc in the same edit. `design/` and this file follow the same rule.
+
+**Keep the `design/` note current in the same session as the change**, the way you would the Javadoc. A note that
+silently drifts is worse than no note.
+
+**`BACKLOG.md` is a list of outstanding work and nothing else.** Every entry is something someone could pick up. Not
+entries: what was done (a shipped item comes out entirely), what was decided against, what might become work later. A
+fact that must survive its entry goes in the note, the Javadoc or the test that owns the area.
+
+**`Tson` is a prefix, never an infix** (`TsonCompiledSchema`, never `CompiledTsonSchema`), and only on types a consumer
+names in their own code; internal machinery is bare (`Lexer`, `SchemaResolver`). `tson-base` drops it; `tson-json`
+uses `Json` on the same terms.
+
+**Exception classification is a policy.** `SchemaValidationException`: the author's schema is wrong and the spec
+says so. `UnsupportedOperationException`: this library has not implemented that yet. `IllegalStateException`: an
+internal invariant broke. The test: *a schema error's verdict doesn't change when this library improves; a gap's does.*
+A gap travels as `Diagnostic.Code.NOT_IMPLEMENTED`, and the CLI's exit 1 vs 70 rides on that code.
+
+**Project-owned schema `!!id`:** `https://tson.io/2026/36/ltr8/<group>/<name>-<version>.tn`. The version is bumped on
+a *release*, not on a change — between releases the schema is edited in place. Use `.tn`, never `.tn1`.
+
+**Line wrapping:** 125 characters, comments and code. Count characters, not bytes (`scripts/check-line-length.sh`).
+
+**Never put literal BOM/NEL/LS/PS characters in source or tests** — use `\uXXXX` escapes.
+
+**Add conformance vectors in the same session as lexer/parser/resolver work.** The corpus is the sibling repo
+`ltr8-io-tson-test-suite`; it moves first, then `SUITE_PIN`. `design/conformance-suite.md` has the runner contract.
+
+## Traps
+
+One line each; the class Javadoc and the note carry the why. Read before touching the class involved.
+
+- `TypeArgument` is a sealed interface (`Ref`/`Value`), never a record with two `Optional`s.
+- `SchemaDesugarer` returns un-rewritten nodes **by identity** — positions live in an `IdentityHashMap`.
+- A desugar-reported declaration is replaced with an absorbing stand-in that **keeps its type parameters**; injected
+  declarations are never rolled back.
+- `requireDocumentEnd`: the pull past the root value is the point, not the assertion after it.
+- Lexer multi-line close detection strips leading whitespace *before* comparing against `"""`.
+- `Position` must keep the record's default `toString()` — `ResolvedForm` normalises positions by regex over it.
+- `CompiledReaders` is rebound exactly once, from the `Compilation` to the finished `TsonCompiledSchema`.
+- `verifyFixed` compares with the pre-rebind parser (`FixedCheck`).
+- A `schema.meta` bind target with more than one public constructor needs `@Record` on the canonical one.
+- An atom body's components mirror its constructor's *resolved* (flattened) shape, one component per schema field name —
+  a nested or missing one binds `null` silently.
+- Atom refinement merges through `writer.DataClassObjectWriter` on the wire record before binding — never through the
+  `TsonObjectWriter` facade, and there is no cheaper substitute.
 
 ## Build and test
 
-No system Gradle — always use the wrapper:
+No system Gradle — always the wrapper. `build` also runs javadoc (doclint), so a dangling `{@link}` fails locally.
 
 ```
-./gradlew build                   # also builds the javadoc/sources jars, so doclint runs under `build`
-./gradlew test
-./gradlew publishToMavenLocal     # installs every module into ~/.m2 as io.ltr8:<module>:0.35.0-SNAPSHOT
-./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.lexer.LexerTest"
-./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonDataParserTest"
-./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.ConformanceSuiteTest"  # class1; skipped unless ../../ltr8-io-tson-test-suite exists
-./gradlew :tson:test --tests "io.ltr8.tson.Class2ConformanceSuiteTest"                 # class2, same corpus
-./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonSchemaLinkerTest"
-./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonCompiledSchemaRegistryTest"
-./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.DefinitionResolverTest"
-./gradlew :tson-cli:installDist   # then tson-cli/build/install/tson/bin/tson validate ...
-./gradlew :tson:allocationReport  # the allocation harness alone, numbers on stdout
-./gradlew :tson-base:test         # the shared vocabulary: diagnostics, policies, identity, schema sources
-./gradlew :tson-json:test         # the JSON encoding's own stack
+./gradlew build
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.lexer.LexerTest"      # one class
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.ConformanceSuiteTest" # class1 corpus
+./gradlew :tson:test --tests "io.ltr8.tson.Class2ConformanceSuiteTest"             # class2 corpus
+./gradlew :tson-base:test :tson-json:test
+./gradlew :tson-cli:installDist      # then tson-cli/build/install/tson/bin/tson validate ...
+./gradlew :tson:allocationReport     # allocation harness, numbers on stdout
+./gradlew publishToMavenLocal        # io.ltr8:<module>:0.36.0-SNAPSHOT; no remote repository, deliberately
+scripts/restamp-bundled-schemas.sh --check
 ```
 
-**Allocation is measured, not assumed** (`AllocationHarnessTest`, `tson/src/test/.../perf/`, with
-`JsonAllocationHarnessTest` the JSON stack's own; `AllocationProbe` is shared from
-`tson-base/src/testShared`). Two separate questions over the bind read path: **retention** — settled heap
-across 20,000 reads of one schema, plus a
-weak-reference check that no read output stays reachable, both currently a flat **0 bytes per read**, which
-is what the "resolve every schema at startup, then read" design claims and nothing else asserts — and
-**transient bytes**, reported per read with a ceiling loose enough to survive a JDK upgrade and tight enough
-to catch a 50x mistake (a `Pattern` per character was one, at 188 bytes per character written). Numbers move
-with the JDK and the machine; treat the *shape* as the signal — `whereAReadsBytesGo` splits a read into
-stream/tree/bind so a change says which stage moved. **Per-*value* work needs a difference, not a total**: a
-per-record map is a fraction of a read and two whole-read figures land within noise of each other, so both
-harnesses also report bytes per bound record, measured between a document of 4 records and one of 64. What
-that costs is a ratchet here; the exact properties are pinned where they are cheap to state — that a name
-index is built once per class in `tson-bind` (`DataClassRecordFieldIndexTest`), and that a repeated
-*undeclared* field is still reported in each reader's own test, that being the one repeat a filled slot
-cannot answer for — because a threshold tight enough to catch a tenth of a read is a budget the next JDK
-breaks. `AllocationProbe`'s Javadoc has the Flight Recorder
-flags for when the next question is "where".
+**A skipped conformance run reads green.** The corpus is found as a sibling checkout, then the pinned copy in
+`.references/` (`scripts/fetch-references.sh`); absent, the vectors abort through `Assumptions` unless
+`TSON_REQUIRE_TEST_SUITE` is set, as CI does. Check the run actually executed vectors before calling it a pass.
 
-**Publishing is packaging, not release.** Every subproject applies `maven-publish` with a `mavenJava`
-publication (the `java` component plus sources and javadoc jars) and a POM carrying name/description/
-url/licence, so `publishToMavenLocal` gives another project on the same machine an ordinary
-`io.ltr8:tson:0.35.0-SNAPSHOT` dependency instead of an included build. **No remote repository is
-configured, deliberately** — Maven Central needs signed artifacts and a POM with scm/developers, and
-publishing under a name is not a decision the build should make quietly. The jars carry real
-`module-info.class`es, so a consumer works on the class path or the module path; `tson-annotation` and
-`tson-regex` land in a consumer's POM at runtime scope (they are `implementation` dependencies of the
-modules that use them), which is enough for both, verified end to end against a real consuming build.
+**Allocation is measured, not assumed** (`AllocationHarnessTest`, `JsonAllocationHarnessTest`): retention is a flat 0
+bytes per read, transient bytes have a loose ceiling. Treat the shape as the signal. `design/build.md`.
 
-`BACKLOG.md` tracks the actively-maintained engineering backlog; `SPEC-FEEDBACK.md` records spec issues;
-`STRUCTURED-OUTPUT.md` holds the target-use-case plan (LLM structured-output validation, JSON
-compatibility).
-
-## Not yet implemented
-
-- **Part 2 resolution gaps** — **none: no
-  `NOT_IMPLEMENTED` is reachable from a schema any more**, the pipeline reporting `SCHEMA_ERROR` for
-  everything it refuses. A parameterized supertype resolves (`vip => <T> customer & box<T>` absorbs the
-  operand's fields while the application is open, the operand contributing its own supertypes but not its
-  name, a template being no type), and so does an argument that is itself an application (`box<inner<T>>` —
-  substitution writes a bound reference through `WireForm.refValue`, which spells one carrying
-  arguments in `type_ref`'s record form). `OpenOperandCompositionTest` pins both, including the two IS-A
-  edges an open operand does and does not give. `DefinitionResolver`'s Javadoc is the exact current boundary.
-  Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
-  schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
-  **No gap reaches a read either**, `scoped` having been the last: every constructor
-  meta-kernel.tn and meta.tn declare builds a real reader, and `CoreSchemaImportTest` asserts that no entry
-  of core.tn — the whole standard library — compiles to an `ErrorReader`. `ErrorReader` stays, and so does
-  `NOT_IMPLEMENTED`'s machinery: §2.2.2's extension point still reaches one, a meta-layer constructor this
-  library has never seen having no factory to dispatch to. It **rides in the report**, located at the value
-  it could not read, and costs that value a verdict and nothing else's — so a gap and an ordinary error in
-  one document both get reported, and `TsonCli.exitCodeFor` lifts the run to 70.
-- **A container position that is an application, and what a held open body still cannot say.** §5.10
-  substitution works for both template shapes: a **record** template (parameters occupying field types and
-  values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T
-  min_items: N }`. An open instance's body is **held** as text — the application as written, unread
-  until materialisation substitutes its parameters away (`schema.meta.TemplateBody` carries it, `HeldBody`
-  parses it, `docs/schema-resolution.md`)
-  — which is what makes §5.10's "collection-valued slots are parameterizable" work: `result => <T>
-  ( T | error )` (the spec's own example), `<T> [T, text]` and `<T> { v: (T | text) }` all resolve. A
-  container position holding an
-  application works too: the binding keeps the `type_ref` whole, so `tree => <T> { value: T  children:
-  [tree<T>; 1..] }` ties its knot through the lifted synthetic. A *closed* container position takes one as
-  well (`[box<text>]`, nested arguments included): the slot is written in `type_ref`'s record form and
-  materialisation rewrites it to the instantiation entry one pass later, which needed `type_argument` — an
-  untagged labelled choice — to become readable (`GroupUnionBindReader`). **A collection-valued position is
-  no different** — `( box<text> | int32 )` and `[text, box<text>]` write the same record form into
-  `variants`/`elements`, closed or open, because a `[type_ref]` holds what a `type_ref` holds. What remains is narrower: a *value*
-  argument keeps its token, so `[vector<float32, 3>]` closes to a nested array with both bounds at 3
-  (`RawTokenParser`); §4.3's equivalence is applied where identity is derived (`NumericIdentity`), so `<255>`
-  and `<0xFF>` are one application while `1` and `1.0` stay two, §4 resolving them to different base types —
-  §8.2's rule exactly, recorded as written and compared as the value denoted. **Every template holds its
-  body**, so one process closes them all.
-  §5.2 says `{ x: T }` denotes `!record { fields: [ { name: x  type: T } ] }`, and `SchemaDesugarer` rewrites
-  it there, where the body is written; a **composition or refinement** template is held one phase later
-  (`DefinitionResolver.holdIfOpen`), because both absorb fields from a source and the form to hold is the
-  *flattened* one — but through `WireForm.heldRecord`, so two producers of the wire form share one
-  spelling. **An alias is written the same way**, and is: `uuid_pair => <B> pair<text, B>` leaves the desugar
-  phase as `<B> !reference { target: pair<text, B> }`, spellable because the kernel's `reference.target` is a
-  `type_ref`. So **every** open entry's body is held, with no exception — which is what lets materialisation
-  dispatch on the constructor head (`record` closes to the instantiation, `reference` to a name, everything
-  else to a synthetic) rather than on what shape the body arrived in.
-  `record_field.value_param`, `instance_template` and `template_argument` are **gone from the kernel**: a
-  routed parameter rides `value` with §8.1's shadowing rule to tell it from a literal, and §5.7's fixation
-  moves to materialisation. What a held body cannot enforce is half of §5.10's argument-kind rule — see
-  "Not yet implemented".
-- **The atom vocabulary is complete** — `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` all have
-  parsers, the CIDR pair reusing the two address grammars and validating §5.5's family-range and
-  host-bits-zero rules on top. All four network families apply `within`/`excluding` and judge the pair
-  for emptiness at schema load — exactly, prefix-tree cover being counting rather than searching, with a
-  network family's prefix bounds folded in, both halves stated by §5.5 — and **`cidr4`/`cidr6` read to a host
-  type each** (`base.atom.CidrInet4Network`/`CidrInet6Network`, members of a sealed `CidrNetwork` sharing one
-  implementation of the prefix arithmetic) rather than to text, a class two families produce being one
-  `HostAtoms` can carry no entry for — the address grammars and the network value live
-  in `tson-schema` so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries
-  without the linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its siblings**, and its format check is
-  the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted local parts, domain literals or
-  comments.
-- **Schema-side diagnostics** — **none outstanding**; what follows is the boundary. Parsing, desugaring,
-  resolution and linking all report through a `DiagnosticsReceiver` (see
-  `docs/readers-and-diagnostics.md`), and read- and schema-side diagnostics now populate the same four
-  location components. Throw-site classification is done across the whole schema pipeline. The lexer stays
-  fail-fast on purpose and is the floor under schema-parse recovery — not a tracked gap;
-  `STRUCTURED-OUTPUT.md` holds the open question. **`schemaPosition` descends with the pointer** —
-  `/person/age` carries `age`'s own line, `RecordField` holding an `@Unbound` position beside
-  `TypeDefinition`'s and one `SchemaPositions` carrier threading both from the parser. **Inside a
-  declaration's own body the position is the declaration's**, deliberately: a choice variant and a supertype
-  have none of their own, and the schema-side pointer names that same unit (`/method`, the failing
-  declaration), so the two agree on granularity where a finer position alone would not. The message is what
-  names the offending token.
-- **§5.10's argument-kind rule is answered by two other rules, not by the kind rule.** A held body has no
-  slot types — that is what it is for — so it can never say *this slot expected a value*. Neither half needs
-  it to: a literal applied where the body uses the parameter as a **type** is refused because `3` is not an
-  identifier at all — `type_ref.name` is typed `identifier`, so it fails where the substituted body is read
-  against the kernel's own vocabulary, which is sharper than the unresolved-reference verdict it used to get
-  (that one implied an author could go and declare a type called `3`) — and a type name routed into a
-  field's **value** is
-  refused because §5.2 makes `record_field.value` a value of the field's declared type — which catches
-  `int32 ~ text` whether a parameter put it there or the author wrote it literally (`TsonSchemaLinker`'s
-  `checkFieldValue`, `FieldValueConformanceTest`). §5.10 states the same division — an argument is "read by
-  the position it lands in" — and §5.2's value conformance is the half named there. What is left is that
-  check's own boundary, below.
-- **Deferred design questions** — the identity-diagonal FIXED-value invariant. **Routed-value
-  substitution is
-  no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →
-  `REQUIRED_FIXED`, `~` staying a default), which is §5.7's "fixation happens downstream" applied to the
-  downstream §5.7 now names ("fixation happens at materialisation"). **Thread-safety is no longer wholly
-  open**: concurrent reads through one `Tson` are safe (the
-  readers are immutable, the lexer/stream are per-read, both on-demand caches settle a race by keeping
-  one entry, and a cache *hit* — which is every read, in a process that resolved its schemas at startup —
-  takes no lock at all; `docs/linking-and-compilation.md`), and **both halves are now stated on `Tson` and
-  `ProcessorConfig` themselves** rather than only in the design notes — a consumer reads the front door, not
-  `docs/`, and that guarantee is what decides between one instance and one per request
-  (`SharedInstanceConcurrencyTest` pins it at that surface). What is still open is everything *outside* a
-  read: registering schemas concurrently. **Mutating a `DataBindContext` after use is no longer one** —
-  registration is `DataBindContext.Builder`'s and closes when the context is built, so the API cannot
-  express a registration arriving after `getDescriptor` has handed out a descriptor for that class.
-- **§9.1's resource limits** — the policy exists (`LimitsPolicy`, above) and bounds **nesting depth** at
-  §9.1's own default of 64. §9.1 now states the whole set as one table with a default each — eleven more on
-  the document side — and [TSON-SCHEMA] §11.5 adds five on the schema side under the same policy and the same
-  reporting surfaces, one of which `TemplateMaterialiser.MAX_CLOSING_DEPTH` already enforces as a bare
-  constant with nowhere to live. So nothing here is a judgement call any more; what is left is the counting.
-  `BACKLOG.md` has each limit, its default, and where it is counted.
-- **JSON ([TSON-JSON], `spec/tson-part3-json.md`)** — the lexical layer is built; everything above it is owed, and
-  `BACKLOG.md`'s "JSON encoding" section holds the list. What is settled is the shape: a stack of `tson-json`'s own,
-  not a second front end over `TsonEventSource`. Sharing the TSON event contract would let one encoding's layering
-  decide the other's at the two points where the formats genuinely disagree — TSON text tells a record from a map
-  syntactically where JSON's `{"a": 1}` is one syntax for both and §4.1 makes the *position* decide, and `null` is a
-  value in a JSON tree and the absent sentinel under a schema (§7). Both are the shape of the compatibility claim
-  Revision 35 withdrew, and the cost of that claim is the reason not to repeat it one layer down.
+**Shipping a change** follows the `/ship` skill: issue → branch off `main` → PR → CI green *for the HEAD
+commit* → merge commit. A fix's test is shown to fail without the fix.

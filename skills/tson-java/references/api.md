@@ -3,8 +3,9 @@
 Module by module. Javadoc on the source is the authority where this and the code disagree; **`./gradlew
 build` runs javadoc**, so a dangling `{@link}` fails the build.
 
-Only the packages listed here are exported. JPMS enforcement is real, not convention — `lexer`, `atom`,
-`base`, `reader` and `resolver` are genuinely unreachable from another module.
+Only the packages listed here are exported. JPMS enforcement is real, not convention — `tson-compiler`'s
+`lexer`, `atom`, `base`, `reader` and `resolver`, and `tson-atom`'s `parser`, are genuinely unreachable from
+another module.
 
 ---
 
@@ -14,13 +15,17 @@ Only the packages listed here are exported. JPMS enforcement is real, not conven
 
 ```java
 public final class Tson {
-    public static ProcessorConfig builder();
+    public static Tson standard();                     // ProcessorConfig.defaults()
+    public static Tson of(ProcessorConfig config);
 
+    public TsonDocumentPeek begin(String|InputStream source);   // the header, before the body
     public TsonObjectReader objectReader();      // schema-aware, over this instance's bindRegistry
     public TsonTreeReader   treeReader();        // schema-aware, over this instance's treeRegistry
     public TsonObjectWriter objectWriter();
     public TsonTreeWriter   treeWriter();
     public DataBindContext  dataBindContext();
+    public ProcessorPolicy  processorPolicy();   // the §8.2 policies, the limits, the Unicode data version
+    public LimitsPolicy     limitsPolicy();
 
     public TsonLinkedSchema resolve(String schemaText);          // parse→resolve→link→REGISTER; fail-fast
     public List<Diagnostic> validateSchema(String schemaText);   // the same, collecting — and registers when sound
@@ -152,11 +157,12 @@ public interface DiagnosticsReceiver { void report(Diagnostic d);
     static DiagnosticsCollector collecting(); }
 public final class DiagnosticsCollector implements DiagnosticsReceiver {
     public List<Diagnostic> diagnostics();  public boolean isEmpty(); }
-// The base holds Diagnostic, the receivers, SourcePosition, the three policies, and the exceptions
-// whose fact is the processor's rather than one encoding's: ReadException, ParseException,
-// LimitExceededException, SchemaValidationException, BindMismatchException, MissingBindingException,
-// SchemaFetchException, ContentHashMismatchException. The classifying half stays with each encoding,
-// which is why TsonDiagnostics' factories are the compiler's and not these.
+// The root package holds Diagnostic, the receivers, SourcePosition, CanonicalIdentity, ProcessorConfig,
+// and the exceptions whose fact is the processor's rather than one encoding's: ReadException,
+// ParseException, WriteException, LimitExceededException, SchemaValidationException,
+// BindMismatchException, MissingBindingException, SchemaFetchException, ContentHashMismatchException.
+// The classifying half stays with each encoding (TsonDiagnostics, JsonDiagnostics); the one factory on
+// the record is Diagnostic.ofLimitExceeded.
 
 public record Position(int line, int column, int byteOffset)   // io.ltr8.tson.compiler --
         implements SourcePosition {}                           // any encoding's own position type
@@ -166,14 +172,28 @@ public record SchemaLocation(…)   // io.ltr8.tson.compiler -- id + pointer + p
 ```
 
 ```java
-public record ProcessorPolicy(UnicodePolicy identifierPolicy,
-                                  UnicodePolicy tokenPolicy,
-                                  LimitsPolicy limits,
-                                  String unicodeDataVersion) {
-    public static ProcessorPolicy of(UnicodePolicy identifier, UnicodePolicy token,
-                                         LimitsPolicy limits);
+public record ProcessorPolicy(UnicodePolicy identifierPolicy,       // io.ltr8.tson.base.policy
+                              UnicodePolicy tokenPolicy,
+                              LimitsPolicy limits,
+                              String unicodeDataVersion) {
+    public static ProcessorPolicy defaults();
+    public static ProcessorPolicy of(UnicodePolicy identifier, UnicodePolicy token, LimitsPolicy limits);
+    public ProcessorPolicy withIdentifierPolicy(UnicodePolicy policy);
+    public ProcessorPolicy withTokenPolicy(UnicodePolicy policy);    // refused if per-segment
+    public ProcessorPolicy withLimits(LimitsPolicy limits);
+}
+
+public record LimitsPolicy(int maxDepth) {                           // io.ltr8.tson.base.policy
+    public static final int DEFAULT_MAX_DEPTH = 64;
+    public static LimitsPolicy defaults();
+    public LimitsPolicy withMaxDepth(int depth);
 }
 ```
+
+The compact constructor refuses a per-segment token policy with `IllegalArgumentException`. `LimitsPolicy`
+is §9.1's bounds; nesting depth is the one enforced, by the event stream, and a document past it is reported
+as `LIMIT_EXCEEDED` — not a verdict, the document perhaps being valid and readable by a processor configured
+for more.
 
 **What a report is read against, stated once.** [TSON-DATA] §8.2's rules read Unicode data the Consortium
 does not freeze, at a level this deployment chose, so the same document can be refused here and accepted
@@ -185,7 +205,7 @@ in order not to be refused is this record *before* it writes. `tson policy` prin
 ### Unicode policy
 
 ```java
-public final class UnicodePolicy {
+public final class UnicodePolicy {                          // io.ltr8.tson.base.policy
     public enum Level { ASCII_ONLY, SINGLE_SCRIPT, HIGHLY_RESTRICTIVE,
                         MODERATELY_RESTRICTIVE, MINIMALLY_RESTRICTIVE, UNRESTRICTED }
 
@@ -211,6 +231,39 @@ public final class UnicodePolicy {
 }
 ```
 
+### The other `tson-base` packages
+
+- `io.ltr8.tson.base.atom` — the **host values** built-in atoms read to: `Rational`, `Complex`,
+  `CidrInet4Network`/`CidrInet6Network` (and their `CidrNetwork` supertype), `InternetAddress`. What you
+  hold after reading `!rational` or `!cidr4`, and what a component declares to bind one.
+- `io.ltr8.tson.base.bind` — `AtomContext`: `hostTypes()` (the list to `registerAtoms` on a builder) and
+  `defaultContext()`, the context both front doors start from.
+- `io.ltr8.tson.base.io` — `ByteSource`/`ByteSink`: bytes, never characters; closing releases only what was
+  acquired, and closing is not flushing.
+- `io.ltr8.tson.base.unicode` — the UCD-derived tables (`Xid`, the identifier profile, scripts,
+  confusables) the §8.2 rules read.
+- `io.ltr8.tson.base.diagnostics` — the rule classes whose prose and `expected` both encodings report.
+
+---
+
+## `io.ltr8.tson.atom` (module `tson-atom`) — the built-in atom vocabulary
+
+Which tokens each atom family accepts and what host value results, over a `String`, shared by both
+encodings. Exports `io.ltr8.tson.atom` and `io.ltr8.tson.atom.number`; the per-family parsers are in the
+unexported `parser` package.
+
+```java
+public interface AtomType<T> { … }                 // an atom's parsing contract over text (§5.2)
+public final class VocabularyAtoms {                // the atom host classes, and how each binds
+    public static Map<Class<?>, Entry> defaults(); … }
+public sealed abstract class AtomTypeException extends RuntimeException
+        permits AtomParseException, AtomValidationException { public String expected(); }
+```
+
+`AtomParseException` is a token outside the atom's grammar (`ATOM_FORM_INVALID`); `AtomValidationException`
+a token that parsed and broke a declared constraint (`ATOM_CONSTRAINT_VIOLATION`). `expected()` is the
+constraint that failed, never the type's name.
+
 ---
 
 ## `io.ltr8.tson.compiler` (module `tson-compiler`) — the engine
@@ -224,14 +277,19 @@ public final class TsonTreeReader {
 
     public TsonTreeReader withSchema(String schemaUri);
     public TsonTreeReader withDiagnostics(DiagnosticsReceiver receiver);
+    public TsonTreeReader withProcessorPolicy(ProcessorPolicy policy);
     public TsonTreeReader withTokenPolicy(UnicodePolicy policy);
     public TsonTreeReader withIdentifierPolicy(UnicodePolicy policy);
+    public TsonTreeReader withLimits(LimitsPolicy limits);
     public TsonTreeReader preservingUnknownTypeRefs();
+    public ProcessorPolicy processorPolicy();                 // what THIS reader judges under
+    public LimitsPolicy    limitsPolicy();
 
-    public TsonValue    read(String|InputStream source);        // honours the document's own !!schema
-    public TsonDocument readDocument(String|InputStream source);// + its !!id and !!schema
-    public TsonValue    readWithoutSchema(String|InputStream source);
-    public TsonValue    readAs(String|InputStream source, String typeName);
+    // source is String, InputStream, ByteSource (tson-base's io) or a TsonDocumentPeek
+    public TsonValue    read(source);                        // honours the document's own !!schema
+    public TsonDocument readDocument(source);                // + its !!id and !!schema
+    public TsonValue    readWithoutSchema(source);           // String, InputStream or peek
+    public TsonValue    readAs(source, String typeName);
     public TsonValue    read(TsonReadContext ctx);
 }
 
@@ -239,11 +297,12 @@ public final class TsonObjectReader {
     public TsonObjectReader();
     public TsonObjectReader(DataBindContext context);
     public TsonObjectReader(TsonCompiledSchemaRegistry bind, DataBindContext context);
-    // the same six derivations, and:
-    public <T> T                    read(String|InputStream source, Class<T> targetClass);
-    public <T> TsonObjectDocument<T> readDocument(String|InputStream source, Class<T> targetClass);
-    public <T> T                    readWithoutSchema(String|InputStream source, Class<T> targetClass);
-    public <T> T                    readAs(String|InputStream source, String typeName, Class<T> targetClass);
+    // the same derivations and policy accessors, plus:
+    public TsonObjectReader ignoringUnknownFields();          // schemaless only: drop, don't report
+    public <T> T                    read(source, Class<T> targetClass);
+    public <T> TsonObjectDocument<T> readDocument(source, Class<T> targetClass);
+    public <T> T                    readWithoutSchema(source, Class<T> targetClass);
+    public <T> T                    readAs(source, String typeName, Class<T> targetClass);  // not from a peek
     public <T> T                    read(TsonReadContext ctx, Class<T> targetClass);
 }
 ```
@@ -296,12 +355,21 @@ writing an unparseable document.
 ### Document header
 
 ```java
+public final class TsonDocumentPeek {
+    public static TsonDocumentPeek of(String|InputStream source);                   // total: never throws
+    public static TsonDocumentPeek of(String|InputStream source, ProcessorPolicy policy);
+    public TsonDocumentHeader header();
+    public boolean isSchemaDocument();
+}                                   // then reader.read(peek) / readAs(peek, …) continues the same stream
+
 public record TsonDocumentHeader(Optional<String> id, Optional<String> schema, Optional<String> meta) {
-    public static TsonDocumentHeader peek(String|InputStream source);   // total: never throws
-    public static TsonDocumentPeek   of(InputStream source);            // .header(), then read(peek)
+    public static final TsonDocumentHeader NONE;
     public boolean isSchemaDocument();                                  // it carries !!meta
 }
 ```
+
+`tson.begin(source)` is `TsonDocumentPeek.of(source, tson.processorPolicy())`. The reader that continues
+from a peek must judge under the same policy the header was read under, and refuses the peek if not.
 
 §7.1's classification from the opening bytes — at most two directives of lookahead and no value parsing.
 A gigabyte document costs the same as a two-line one, and a document whose body will not parse still
@@ -312,6 +380,7 @@ classifies.
 ```java
 public final class TsonContentHash {
     public static String sha256(byte[] document);              // every byte past the !!id line
+    public static Optional<String> sha256IfAddressable(byte[] document);  // empty: not content-addressable
     public static int contentStart(byte[] document);
     public static Optional<String> declaredSha256(String uri); // read a ?sha256= pin back out
     public static void verify(byte[] content, String referenceUri);
@@ -359,8 +428,8 @@ verification, the bootstrap and §2.2.3's import-cycle guard.
 ### Pipeline stages, if you need one directly
 
 `TsonSchemaParser`, `TsonSchemaResolver`, `TsonSchemaLinker`, `TsonSchemaCompiler`, `TsonDataParser`,
-`TsonDataStream`, `ChoiceDisjointness`, `TypeInhabitance`, `SchemaFailure`, `VocabularyAtoms`.
-`TsonSchemaParser` / `SchemaResolver` / `TsonSchemaLinker` each have a reporting overload that collects
+`TsonDataStream`, `TsonDiagnostics` (the classifiers over this engine's exceptions).
+`TsonSchemaParser` / `TsonSchemaResolver` / `TsonSchemaLinker` each have a reporting overload that collects
 every independent problem in one pass; namespace-level failures (unloadable `!!import`, ineligible
 `!!meta`, `!!id` cross-check) still throw even with a receiver. Compilation, and the lexer under
 everything, are fail-fast by design.
@@ -375,8 +444,10 @@ everything, are fail-fast by design.
   `DocumentStart`/`End`, `RecordStart`/`End`, `MapStart`/`MapArrow`/`MapEnd`, `ArrayStart`/`End`,
   `FieldName`, `TokenEvent`, `AbsentEvent`, `EmptyBraceEvent`, `TypeRef`, `SchemaRef`,
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
-- `io.ltr8.tson.compiler.config` — `TsonAtomContext` (the two default bind contexts),
-  `SchemaMetaNameBinder`.
+- `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`:
+  the schema pipeline's own bind context), `SchemaMetaNameBinder` (`INSTANCE`, `defaultContext()`,
+  `contextExtendedWith(binder)`, `extendedWith(binder)`: the meta vocabulary's names), and
+  `SourcePositionStringBridge`.
 
 ---
 
@@ -386,7 +457,8 @@ A true leaf — depends on **nothing**, not even `tson-annotation`.
 
 ```java
 public sealed interface TsonValue
-        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonAbsent, TsonMissing {
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonAbsent, TsonMissing,
+                TsonScopedValue {
 
     default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isAbsent() / isMissing();
     default boolean isContainer();
@@ -415,6 +487,8 @@ public sealed interface TsonValue
 public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
         implements TsonValue { public static TsonAtom of(Object value[, String typeRef]); }
 
+public record TsonScopedValue(String schema, TsonValue root) implements TsonValue {}  // §7.8, transparent
+
 public record TsonDocument(Optional<String> id, Optional<String> schema, TsonValue root) {}
 ```
 
@@ -441,12 +515,6 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     public Optional<TsonLinkedSchema> load(String canonicalIdentity);
 }
 
-public final class TsonCanonicalIdentity {
-    public static String  canonicalize(String uri);         // §2.2.1: strip scheme, strip query. Nothing else.
-    public static void    validate(String uri);
-    public static boolean sameIdentity(String a, String b);
-}
-
 public final class TsonBundledSchemas {
     public static final String META_KERNEL_ID / META_ID / CORE_ID;
     public static final String META_KERNEL_SHA256 / META_SHA256 / CORE_SHA256;
@@ -456,18 +524,16 @@ public final class TsonBundledSchemas {
 ```
 
 `register` rejecting a duplicate identity, plus an unmodifiable `entries()`, **is** the "locked"
-guarantee.
+guarantee. `CanonicalIdentity` (§2.2.1's algorithm — strip scheme, strip query, nothing else) is
+`tson-base`'s, `io.ltr8.tson.base.CanonicalIdentity`.
 
-The module exports two packages. `io.ltr8.tson.schema.meta` is the resolved-schema value model — pure
-records, sealed interfaces and enums, §8's `TypeDefinition` et al. `io.ltr8.tson.schema.atom` is the three
-**host value types** the built-in atoms read to — `Rational`, `IsoDuration`, `Complex` — which is what you
-hold after reading `!rational`, `!duration` or `!complex`, and what you declare a component of to bind one.
-The parsing half of an atom stays in `tson-compiler`'s unexported `atom` package, so a consumer sees the
-values and not the readers. `Top` is sealed except for its one deliberately open
-branch, **`Data`**, which a consumer's own class implements: §4.1's fourth base kind, where an instance
-of a meta-schema's own constructor lives when the thing it describes is not a data type. A consumer
-registers such a class by carrying `@Typename` and being findable by the `metaNameBinder`;
-`Data.references()` is how its own type references reach the linker, declared rather than discovered.
+The module exports two packages: `io.ltr8.tson.schema` (the above) and `io.ltr8.tson.schema.meta`, the resolved-schema
+value model — pure records, sealed interfaces and enums, §8's `TypeDefinition` et al. The host values the atoms read to
+are not here (see `tson-base`'s `atom` package, above). `Top` is sealed except for its one deliberately open branch,
+**`Data`**, which a consumer's own class implements: §4.1's fourth base kind, where an instance of a meta-schema's own
+constructor lives when the thing it describes is not a data type. A consumer registers such a class by carrying
+`@Typename` and being findable by the `metaNameBinder`; `Data.references()` is how its own type references reach the
+linker, declared rather than discovered.
 
 ---
 
@@ -476,14 +542,20 @@ registers such a class by carrying `@Typename` and being findable by the `metaNa
 ```java
 public class DataBindContext {
     public static Builder builder();                // allowAny, allowSerializable, nameBinder,
-                                                    // nameBinderAliases, nameBinderPackages, profile
+                                                    // nameBinderAliases, nameBinderPackages, profile,
+                                                    // registerAtom(Class[, DataBridge]), registerAtoms(List)
     public Optional<String> profile();
     public DataClass getDescriptor(Class<?> targetClass) throws DataBindException;
     public DataClass getDescriptor(Class<?> targetClass, Type parameterizedType) throws DataBindException;
     public DataClass getDescriptor(String schemaTypeName) throws DataBindException;
-    public void          registerAtom(Class<?> targetClass) throws DataBindException;
-    public DataClassAtom registerAtom(Class<?> targetClass, DataBridge<?, ?> bridge) throws DataBindException;
+    public Supplier<DataClass> componentSource(Class<?> targetClass, Type parameterizedType);
 }
+```
+
+**Everything is fixed at `build()`** — atoms, the name binder and the profile are the builder's, and the
+built context has no mutators.
+
+```java
 ```
 
 Also exports `io.ltr8.bind.mapper` and `io.ltr8.bind.bridge`. See `references/bindings.md`.
@@ -493,8 +565,8 @@ Also exports `io.ltr8.bind.mapper` and `io.ltr8.bind.bridge`. See `references/bi
 ## `io.ltr8.annotation` (module `tson-annotation`)
 
 `@Typename`, `@Field`, `@Record`, `@Tuple`, `@Union`, `@Atom`, `@Transparent`, `@Profile`, `@Unbound`,
-`@FieldOrder`, `@Namespace`, plus `Annotations` / `Annotation` (the wire-annotation carrier) and
-`Annotated` / `AnnotatedMap`. See `references/bindings.md`.
+`@FieldOrder`, `@Namespace`, plus `Annotations` / `Annotation` (the wire-annotation carrier),
+`Annotated` / `AnnotatedMap`, and the `DataBridge` / `ToData` conversion interfaces. See `references/bindings.md`.
 
 ---
 
@@ -518,6 +590,56 @@ disjointness.
 
 ---
 
+## `io.ltr8.tson.json` (module `tson-json`) — the JSON encoding
+
+A stack of its own — lexer, event stream, tree, readers, writers, schema-directed readers — with **no
+dependency on `tson-compiler`**. Exports `io.ltr8.tson.json`, `io.ltr8.tson.json.tree` and
+`io.ltr8.tson.json.stream`.
+
+```java
+public final class Json {
+    public static Json standard();                      // AtomContext.defaultContext(), default policy
+    public static Json of(ProcessorConfig config);      // the same value Tson.of takes
+    public Json withSchemas(TsonSchemaLoader loader);   // e.g. tson.schemaRegistry()
+
+    public JsonTreeReader   treeReader();
+    public JsonObjectReader objectReader();
+    public JsonTreeWriter   treeWriter();
+    public JsonObjectWriter objectWriter();
+    public List<Diagnostic> validate(String|InputStream source, String schemaUri, String rootType);
+    public ProcessorPolicy processorPolicy();  public LimitsPolicy limitsPolicy();
+    public DataBindContext dataBindContext();
+
+    public static JsonValue parse(String|InputStream source[, ProcessorPolicy policy]);  // JEP 540's spelling
+    public static String toDisplayString(JsonValue value[, String indent]);
+}
+
+public final class JsonTreeReader {         // withProcessorPolicy, withDiagnostics, withSchema(uri)
+    public JsonValue read(String|InputStream|ByteSource source);
+    public JsonValue readAs(String|InputStream|ByteSource source, String rootType);   // schema-directed
+}
+public final class JsonObjectReader {       // withProcessorPolicy, withDiagnostics, ignoringUnknownFields,
+                                            // withSchema(uri) -- from Json.withSchemas(loader).objectReader()
+    public <T> T read(String|InputStream|ByteSource source, Class<T> type);                  // the class is the schema
+    public <T> T readAs(String|InputStream|ByteSource source, String typeName, Class<T> type);  // schema-directed
+}
+public final class JsonTreeWriter {          // indented(), indented(indent)
+    public String toJson(JsonValue v);  public void write(JsonValue v, OutputStream|Appendable|ByteSink out); }
+public final class JsonObjectWriter {        // standard(), using(context), indented(…)
+    public String toJson(Object v);     public void write(Object v, OutputStream|Appendable|ByteSink out); }
+
+public sealed interface JsonValue           // io.ltr8.tson.json.tree
+        permits JsonObject, JsonArray, JsonString, JsonNumber, JsonBoolean, JsonNull { … }
+```
+
+**A JSON document binds out of band** — it names neither its schema nor its root type, so both are
+arguments. Obtaining the schema is the TSON engine's job: resolve through `Tson` and hand
+`tson.schemaRegistry()` to `withSchemas`. A schema-directed tree read returns a `JsonValue`, never a `TsonValue`;
+`JsonObjectReader.readAs` validates in full and binds, all-or-nothing, the peer of `TsonObjectReader.readAs`. Both
+report in the same `Diagnostic` vocabulary through `ReadException` — there is no `JsonParseException`.
+
+---
+
 ## `io.ltr8.tson.cli` (module `tson-cli`)
 
 Exports nothing. `TsonCli.main` is the entry point; the wire shapes (`ValidationRun`, `FileReport`,
@@ -529,11 +651,13 @@ module's own `diagnostics.tn`, which `--output tson` is validated against.
 ## Resource limits
 
 §9.1 asks (SHOULD) for configurable limits on **nesting depth, token length and document size** as DoS
-hardening. **None is enforced here** — there is no `maxNestingDepth` knob, and a document a few thousand
-containers deep overflows the stack. That arrives as a `StackOverflowError`, an `Error`, so it passes
-through every `catch (RuntimeException)` in the reader stack and in the CLI: `tson validate` on one
-prints a bare JVM stack trace and **exits 1**, as though the document were invalid. A deployment reading
-untrusted documents must cap depth and bytes before handing them to a reader. Tracked in `BACKLOG.md`.
+hardening. **Nesting depth is enforced**: `LimitsPolicy.maxDepth`, 64 by default, checked by the event
+stream as a container opens, so a document a few thousand containers deep is refused before it can overflow
+the stack. Configure it on `ProcessorConfig.withLimits`, on either reader's `withLimits`, or with
+`tson validate --max-depth`. The refusal is `LIMIT_EXCEEDED` (a `LimitExceededException` on a fail-fast
+read) and is **not a verdict**. Token length and document size are not bounded yet; a deployment reading
+untrusted documents caps bytes before handing them to a reader. `LimitsPolicy`'s Javadoc and `BACKLOG.md`
+carry what is left.
 
-(The schema-side template materialiser does carry a depth backstop, at 64 nested instantiations, but
-that is a resolver guard against non-regular recursion, not a document limit.)
+(The schema-side template materialiser carries its own depth backstop, at 64 nested instantiations — a
+resolver guard against non-regular recursion, not a document limit.)

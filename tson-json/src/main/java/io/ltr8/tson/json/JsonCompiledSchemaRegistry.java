@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.json.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.json.reader.ValueReaderFactoryResolver;
@@ -21,8 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * same argument that keeps the compiled reader stack free of it. An application typically hands
  * {@code tson.schemaRegistry()}, or its own loader over one.
  *
- * <p><b>The read mode is which factory set this holds</b>, exactly as it is on the TSON side: today tree
- * mode, which validates and hands back the JSON.
+ * <p><b>The read mode is which factory set this holds</b>, exactly as it is on the TSON side: {@link Mode#TREE}
+ * validates and hands back the JSON, {@link Mode#BIND} builds the classes a {@link DataBindContext} binds. A
+ * schema compiled for one mode is cached apart from the other's, the readers differing all the way down.
  *
  * <p>Safe for concurrent reads. Two threads racing to compile one identity may both compile it; the map
  * keeps one and the loser's copy is discarded, which is cheaper than holding a lock across a resolve. A
@@ -30,19 +32,44 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class JsonCompiledSchemaRegistry {
 
+    /** Which read mode a registry's readers are compiled for. */
+    public enum Mode {
+        /** Readers that validate and hand back the document as a {@code JsonValue}. */
+        TREE,
+        /** Readers that build the classes a {@code DataBindContext} binds. */
+        BIND
+    }
+
     private final TsonSchemaLoader loader;
     private final ValueReaderFactoryResolver factories;
+    private final Mode mode;
     private final Map<String, JsonCompiledSchema> compiled = new ConcurrentHashMap<>();
 
-    private JsonCompiledSchemaRegistry(TsonSchemaLoader loader, ValueReaderFactoryResolver factories) {
+    private JsonCompiledSchemaRegistry(TsonSchemaLoader loader, ValueReaderFactoryResolver factories, Mode mode) {
         this.loader = loader;
         this.factories = factories;
+        this.mode = mode;
     }
 
     /** Tree mode over {@code loader}: a read validates and hands back the document. */
     public static JsonCompiledSchemaRegistry tree(TsonSchemaLoader loader) {
         return new JsonCompiledSchemaRegistry(Objects.requireNonNull(loader, "loader"),
-                ValueReaderFactoryRegistry.tree());
+                ValueReaderFactoryRegistry.tree(), Mode.TREE);
+    }
+
+    /**
+     * Bind mode over {@code loader}, building the classes {@code binding} resolves for each schema type. A schema
+     * whose types the bound classes do not match fails its compile with {@code BindMismatchException}, from {@link
+     * #get}, the first time it is asked for.
+     */
+    public static JsonCompiledSchemaRegistry bind(TsonSchemaLoader loader, DataBindContext binding) {
+        return new JsonCompiledSchemaRegistry(Objects.requireNonNull(loader, "loader"),
+                ValueReaderFactoryRegistry.bind(Objects.requireNonNull(binding, "binding")), Mode.BIND);
+    }
+
+    /** The read mode this registry's readers are compiled for. */
+    public Mode mode() {
+        return mode;
     }
 
     /**

@@ -81,8 +81,8 @@ class TsonCliTest {
     /** A schema that loads clean and cannot be read against: {@code precision} is carried but not enforced. */
     private static final String SCOPE_SCHEMA = """
             !!id:"https://example.test/cli-scope.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               stamped => { at: extern  n: int32 }
               plain   => { n: int32 }
@@ -222,8 +222,8 @@ class TsonCliTest {
         for (String body : List.of("{ widens => !uint8 ^ { min: -10 } }", "{ narrow => !uint8 ^ 5 }")) {
             Path schema = writeFile(dir, "authorerror.tn", """
                     !!id:"https://example.test/cli-author-error.tn"
-                    !!meta:"https://tson.io/2026/35/m/meta.tn"
-                    !!import:"https://tson.io/2026/35/m/core.tn"
+                    !!meta:"https://tson.io/2026/36/m/meta.tn"
+                    !!import:"https://tson.io/2026/36/m/core.tn"
                     %s
                     """.formatted(body));
 
@@ -241,13 +241,18 @@ class TsonCliTest {
      * Naming a template as a data document's own type is the author's error, and gets an author's answer:
      * exit 1 and a diagnostic naming the route. It used to reach an ErrorReader and exit 70 under "this is a
      * bug in tson", the worst answer in the whole surface for one of the likeliest mistakes.
+     *
+     * <p><b>The exit code is what this pins.</b> A record-bodied template is a family base
+     * (§5.10), so the message is the one an abstract base gives -- name the member --
+     * rather than "a template is not a type". Either wording is a verdict on the document, which is the
+     * distinction the code rides on.
      */
     @Test
     void dataNamingATemplateIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "paged.tn", """
                 !!id:"https://example.test/cli-paged.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                   order => { id: text }
                   paged => <T> { items: [T] }
@@ -262,8 +267,8 @@ class TsonCliTest {
         String out = captureStdout(() ->
                 assertEquals(1, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
 
-        assertTrue(out.contains("is a template taking 1 type argument [T]"), out);
-        assertTrue(out.contains("my_type => paged<...>"), out);
+        assertTrue(out.contains("'paged' selects nothing"), out);
+        assertTrue(out.contains("orders_page"), out);
     }
 
     @Test
@@ -450,8 +455,8 @@ class TsonCliTest {
         // when schema files are also present. A plain, well-formed value is valid.
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-arg-test.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", "42");
@@ -466,8 +471,8 @@ class TsonCliTest {
     void validateEndToEndThroughMainDispatchExitsZeroForValidData(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-arg-test-2.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", """
@@ -486,8 +491,8 @@ class TsonCliTest {
     void dashReadsOneDataDocumentFromStandardInput(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-stdin.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 { my_int => int32 }
                 """);
         String data = "!!schema:\"https://example.test/cli-stdin.tn\"\n!my_int 42\n";

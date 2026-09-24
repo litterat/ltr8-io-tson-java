@@ -50,7 +50,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
                 "each field stated once", "'" + field + "' stated again");
     }
 
-    /** A REQUIRED field the document never mentioned. */
+    /** A required field the document never mentioned. */
     public Refusal missingRequiredField(String field) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
                 "missing required field '%s' for '%s'".formatted(field, typeName),
@@ -58,10 +58,10 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     }
 
     /**
-     * Absence written at a field whose state admits none ([TSON-SCHEMA] §7.6).
+     * Absence written at a field that is not voidable ([TSON-SCHEMA] §7.6).
      *
      * <p>{@code spelling} is how the document said it -- {@code _} in TSON text, {@code null} in JSON -- and
-     * appears in {@code actual} rather than in the prose, because the rule is about the field's state and not
+     * appears in {@code actual} rather than in the prose, because the rule is about the field and not
      * about how absence was spelled.
      */
     public Refusal absenceAtRequiredField(String field, String spelling) {
@@ -71,7 +71,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     }
 
     /**
-     * Absence written at a REQUIRED_DEFAULT field. [TSON-SCHEMA] §5.2 makes omission the injection route, so
+     * Absence written at a defaulted field. [TSON-SCHEMA] §5.2 makes omission the injection route, so
      * the fix is to omit the field rather than to disclaim its value -- and the default is still what the
      * field decodes to, only the verdict changes.
      */
@@ -82,20 +82,10 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
                 "the field omitted, or a value for '" + field + "'", spelling);
     }
 
-    /** Absence written at a REQUIRED_FIXED field, whose value the schema settles and which is never absent. */
+    /** Absence written at a field pinned to a value, which the schema settles and which is never absent. */
     public Refusal fixedFieldAbsent(String field, String pinned, String spelling) {
         return new Refusal(Diagnostic.Code.FIELD_FIXED,
                 "'%s' is fixed on '%s' and cannot be absent".formatted(field, typeName), pinned, spelling);
-    }
-
-    /**
-     * A value written at an {@code OPTIONAL_FIXED = _} field -- the group-member state, where the schema fixes
-     * the field to absence and presence alone is the information ([TSON-SCHEMA] §5.2).
-     */
-    public Refusal fixedToAbsentFieldValued(String field, String spelling, String found) {
-        return new Refusal(Diagnostic.Code.FIELD_FIXED,
-                "'%s' is fixed to absent on '%s' and may only be omitted or written as absent"
-                        .formatted(field, typeName), spelling, found);
     }
 
     /**

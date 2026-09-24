@@ -20,12 +20,15 @@ import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.UriType;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -100,9 +103,13 @@ class DefinitionResolverTest {
     private static final String EXPECTED_INTEGER_SIZE =
             "{ supertypes: [] subtypes: [] "
                     + "body: !record { supertypes: [] fields: [ "
-                    + "{ name: \"bits\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" } "
-                    + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } state: \"REQUIRED\" } "
-                    + "] groups: [] } }";
+                    + "{ name: \"bits\" type: { name: \"integer\" arguments: [] } "
+                    + "optional: false voidable: false role: \"FREE\" "
+                    + "} "
+                    + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } "
+                    + "optional: false voidable: false role: \"FREE\" "
+                    + "} "
+                    + "] groups: [] extension: \"OPEN\" discriminators: [] } }";
 
     /**
      * The same shape as the real fixture resolves it. meta-kernel types {@code bits} as a count rather than
@@ -151,7 +158,7 @@ class DefinitionResolverTest {
     @Test
     void resolvesAFreshRecordWithPlainRequiredFields() throws DataBindException {
         SchemaDocument doc = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { integer_size => { bits: integer  signed: boolean } }""").parseSchemaDocument();
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
 
@@ -176,7 +183,7 @@ class DefinitionResolverTest {
         // resolving a whole document, in source order, is this loop, matching
         // SchemaResolver#resolveSchema's own production loop.
         SchemaDocument doc = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   integer_size => { bits: integer  signed: boolean }
                   point => { x: integer  y: integer }
@@ -203,7 +210,7 @@ class DefinitionResolverTest {
     @Test
     void structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists() throws DataBindException {
         SchemaDocument doc = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   integer_size => { bits: integer  signed: boolean }
                   point => { x: integer  y: integer }
@@ -246,7 +253,8 @@ class DefinitionResolverTest {
                  List.of(), List.of(), new EnumBody(List.of("true", "false")));
 
         assertEquals("{ source: { name: \"enum\" arguments: [] } "
-                        + "supertypes: [] subtypes: [] body: !enum { members: [ \"true\" \"false\" ] } }",
+                        + "supertypes: [] subtypes: [] body: !enum { members: [ \"true\" \"false\" ] "
+                        + "profile: \"IDENTIFIER\" } }",
                 write(booleanDef));
     }
 
@@ -308,7 +316,8 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.PRODUCT, top.kind());
         assertEquals(List.of(), top.supertypes());
         assertEquals("{ supertypes: [] subtypes: [] "
-                + "body: !record { supertypes: [] fields: [] groups: [] } }", write(top));
+                + "body: !record { supertypes: [] fields: [] groups: [] extension: \"OPEN\" "
+                + "discriminators: [] } }", write(top));
     }
 
     @Test
@@ -339,22 +348,29 @@ class DefinitionResolverTest {
 
         // atom, sum: empty trailing body, no fields inherited from top (which has none) -- just the composition itself.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] } }", write(atom));
+                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [] groups: [] "
+                + "extension: \"OPEN\" discriminators: [] } }", write(atom));
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] } }", write(sum));
+                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [] groups: [] "
+                + "extension: \"OPEN\" discriminators: [] } }", write(sum));
 
         // product: two brand-new fields added by the trailing body (top contributes none).
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ \"top\" ] fields: [ "
-                + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } state: \"REQUIRED\" } "
-                + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } state: \"REQUIRED\" } "
-                + "] groups: [] } }", write(product));
+                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
+                + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                + "optional: false voidable: false role: \"FREE\" "
+                + "} "
+                + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                + "optional: false voidable: false role: \"FREE\" "
+                + "} "
+                + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(product));
 
         // reference: one brand-new field.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ \"top\" ] fields: [ "
-                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
-                + "] groups: [] } }", write(reference));
+                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
+                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } "
+                + "optional: false voidable: false role: \"FREE\" } "
+                + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(reference));
     }
 
     // ── Field groups (§5.11) + constructor flag + OPTIONAL fields: integer_type ──
@@ -374,18 +390,32 @@ class DefinitionResolverTest {
         assertEquals(List.of("atom", "top"), integerType.supertypes());
 
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"atom\" ] fields: [ "
-                        + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } state: \"OPTIONAL\" } ] "
+                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
+                        + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"min\" type: { name: \"integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"max\" type: { name: \"integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} ] "
                         + "groups: [ "
                         + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "
                         + "{ members: [ \"max\" \"exclusive_max\" ] state: \"OPTIONAL\" } "
-                        + "] } }",
+                        + "] extension: \"OPEN\" discriminators: [] } }",
                 write(integerType));
     }
 
@@ -527,6 +557,10 @@ class DefinitionResolverTest {
      * {@code !record { fields: [ ... ] }} §5.2 says it denotes, normalised at desugar and left unread until
      * materialisation substitutes the parameters away. The entry is a {@code record} construction, so
      * {@code source} names that constructor -- the same shape {@code <T> [T]} has with {@code array}.
+     *
+     * <p>{@code extension} is the <b>parent's</b> and is derived, not stated: a record-bodied template has a
+     * parent, and a parent has no direct instances whatever anyone writes, so ABSTRACT falls out with no
+     * discriminator in sight (§5.10).
      */
     @Test
     void resolvesAFreshRecordTemplateAsAHeldRecordConstruction() throws DataBindException {
@@ -537,7 +571,8 @@ class DefinitionResolverTest {
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"A\" \"B\" ] "
                         + "template: \"!record { fields: [ "
-                        + "{ name: first type: A } { name: second type: B } ] }\" } }",
+                        + "{ name: first type: A } { name: second type: B } ] }\" "
+                        + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(pair));
     }
 
@@ -548,9 +583,13 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"first\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" } "
-                        + "{ name: \"second\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" } "
-                        + "] groups: [] } }",
+                        + "{ name: \"first\" type: { name: \"text\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"second\" type: { name: \"text\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
+                        + "} "
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pair));
     }
 
@@ -563,7 +602,7 @@ class DefinitionResolverTest {
     @Test
     void resolvesACompositionTemplateAsAHeldFlattenedRecord() throws DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   base => {}
                   box => <T> base & { value: T }
@@ -577,7 +616,8 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"base\" ] "
                         + "subtypes: [] body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { supertypes: [ base ] "
-                        + "fields: [ { name: value type: T } ] }\" } }",
+                        + "fields: [ { name: value type: T } ] }\" "
+                        + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(box));
     }
 
@@ -598,7 +638,8 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"base\" ] "
                         + "subtypes: [] body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { supertypes: [ base ] "
-                        + "fields: [ { name: id type: text } { name: value type: T } ] }\" } }",
+                        + "fields: [ { name: id type: text } { name: value type: T } ] }\" "
+                        + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(entries.get("box")));
     }
 
@@ -614,10 +655,14 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
-                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
+                        + "optional: true voidable: false role: \"DEFAULT\" "
+                        + ""
                         + "value: REQUIRED } "
-                        + "] groups: [] } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(tupleElement));
     }
 
@@ -634,24 +679,28 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } state: \"REQUIRED\" } "
-                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
+                        + "optional: true voidable: false role: \"DEFAULT\" "
+                        + ""
                         + "value: REQUIRED } "
-                        + "] groups: [] } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(fieldGroup));
     }
 
     @Test
     void resolvesAnOrdinaryLiteralFixedValue() throws DataBindException {
-        // Mirrors array's own "access_pattern: product_access_type = INDEX" without the surrounding
+        // Mirrors array's own "access_pattern?: product_access_type = INDEX" without the surrounding
         // composition, so it isn't also blocked by tightening -- an ordinary (non-parameter) fixed value.
-        TypeDefinition pinned = resolveSnippet("pinned => { access_pattern: product_access_type = INDEX }");
+        TypeDefinition pinned = resolveSnippet("pinned => { access_pattern?: product_access_type = INDEX }");
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
-                        + "] groups: [] } }",
+                        + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pinned));
     }
 
@@ -664,6 +713,10 @@ class DefinitionResolverTest {
      * <p>{@code state} is the unmarked {@code REQUIRED} and so is not written: nothing is fixed at
      * declaration, because the value does not exist yet. §5.7's fixation to {@code REQUIRED_FIXED} happens at
      * materialisation, where the value is concrete -- {@code ValueParamFixedFieldTest} pins both ends.
+     *
+     * <p><b>The pin also makes the field this template's selector</b>, which is the derivation and not an
+     * extra claim: one value per application is one value per member, so the base dispatches on
+     * {@code [value]} with no {@code =?} written (§5.2, §5.10).
      */
     @Test
     void aParametricFixedValueRidesTheValueSlotAndFixesNothingYet() throws DataBindException {
@@ -674,7 +727,9 @@ class DefinitionResolverTest {
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { fields: [ "
-                        + "{ name: value type: type_ref value: T } ] }\" } }",
+                        + "{ name: value type: type_ref value: T } ] "
+                        + "discriminators: [ value ] }\" "
+                        + "extension: \"ABSTRACT\" discriminators: [ \"value\" ] } }",
                 write(sized));
     }
 
@@ -684,13 +739,14 @@ class DefinitionResolverTest {
      */
     @Test
     void aParametricDefaultValueIsPromotedToRequiredDefault() throws DataBindException {
-        TypeDefinition retry = resolveSnippet("retry_policy => <N> { attempts: integer ~ N }");
+        TypeDefinition retry = resolveSnippet("retry_policy => <N> { attempts?: integer ~ N }");
 
         assertEquals("{ source: { name: \"record\" arguments: [] } "
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"N\" ] "
                         + "template: \"!record { fields: [ "
-                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] }\" } }",
+                        + "{ name: attempts type: integer optional: true role: DEFAULT value: N } ] }\" "
+                        + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(retry));
     }
 
@@ -714,22 +770,26 @@ class DefinitionResolverTest {
         assertEquals(List.of("product", "top"), array.supertypes());
         assertEquals("{ "
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"product\" ] fields: [ "
+                        + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
+                        + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
+                        + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: REQUIRED } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: false } "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: false } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: false } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "] groups: [] } }",
+                        + "optional: true voidable: false role: \"DEFAULT\" value: false } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(array));
     }
 
@@ -748,20 +808,24 @@ class DefinitionResolverTest {
         assertEquals(List.of("product", "top"), map.supertypes());
         assertEquals("{ "
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"product\" ] fields: [ "
+                        + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: NAMED } "
+                        + "optional: true voidable: false role: \"FIXED\" value: NAMED } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
+                        + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
                         + "{ name: \"key_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"value_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "] groups: [] } }",
+                        + "optional: true voidable: false role: \"DEFAULT\" value: REQUIRED } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(map));
     }
 
@@ -770,10 +834,10 @@ class DefinitionResolverTest {
         // "count" is inherited REQUIRED; tightening it to OPTIONAL is not a permitted transition
         // (§5.7's table: REQUIRED -> OPTIONAL is an error).
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   base => { count: integer }
-                  loosened => base & { count: integer? }
+                  loosened => base & { count?: integer? }
                 }""").parseSchemaDocument().body();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
@@ -787,21 +851,25 @@ class DefinitionResolverTest {
         // "field: = value" with no type-ref restated inherits the source declaration's type
         // (§5.7's "Elided type-refs"), tightening only the value/state.
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   config => { host: text  port: integer }
-                  production => config & { host: = "prod.example.com" }
+                  production => config & { host?: = "prod.example.com" }
                 }""").parseSchemaDocument().body();
         resolved.put("config", resolver.resolve(schemaMap.declarations().get("config")));
 
         TypeDefinition production = resolver.resolve(schemaMap.declarations().get("production"));
 
         assertEquals("{ supertypes: [ \"config\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"config\" ] fields: [ "
-                        + "{ name: \"host\" type: { name: \"text\" arguments: [] } state: \"REQUIRED_FIXED\" "
+                        + "body: !record { supertypes: [ { name: \"config\" arguments: [] } ] fields: [ "
+                        + "{ name: \"host\" type: { name: \"text\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FIXED\" "
+                        + ""
                         + "value: \"prod.example.com\" } "
-                        + "{ name: \"port\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" } "
-                        + "] groups: [] } }",
+                        + "{ name: \"port\" type: { name: \"integer\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
+                        + "} "
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(production));
     }
 
@@ -826,7 +894,7 @@ class DefinitionResolverTest {
         SchemaValidationException composed = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
                         config => { host: text }
-                        production => config & { port: = 8080 }
+                        production => config & { port?: = 8080 }
                         """));
         assertTrue(composed.getMessage().contains("'port'"), composed.getMessage());
     }
@@ -854,20 +922,24 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
+                        + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
+                        + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: REQUIRED } "
+                        + "optional: true voidable: false role: \"FIXED\" value: REQUIRED } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: true } "
+                        + "optional: true voidable: false role: \"FIXED\" value: true } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: true } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" value: 1 } "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "] groups: [] } }",
+                        + "optional: true voidable: false role: \"FIXED\" value: true } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"DEFAULT\" "
+                        + "value: 1 } "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
+                        + "} "
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(set));
     }
 
@@ -880,7 +952,7 @@ class DefinitionResolverTest {
     @Test
     void refinementRejectsABodyFieldThatAddsRatherThanTightens() throws IOException {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   base => { count: integer }
                   refined => base ^ { extra: text }
@@ -899,9 +971,10 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesEnumFromTheRealMetaKernelFixtureNamingTheEnumSetEntry() throws IOException, DataBindException {
-        // enum => atom & { members: enum_set }, where enum_set => !set_type { element_type: identifier }.
-        // The named entry exists because `!` forms stay prohibited at field positions (§5.2) and `set`
-        // has no sugar of its own -- there is no generic application left to write here.
+        // enum => atom & { members: enum_set  profile: enum_profile ~ IDENTIFIER }, where enum_set is
+        // !set_type { element_type: text }. The named entries exist because `!` forms stay prohibited at
+        // field positions (§5.2) and `set` has no sugar of its own -- there is no generic application
+        // left to write here.
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
@@ -912,9 +985,13 @@ class DefinitionResolverTest {
         assertTrue(enumDef.supertypes().contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("atom", "top"), enumDef.supertypes());
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"atom\" ] fields: [ "
-                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } state: \"REQUIRED\" } "
-                        + "] groups: [] } }",
+                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
+                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"profile\" type: { name: \"enum_profile\" arguments: [] } "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: IDENTIFIER } "
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(enumDef));
     }
 
@@ -1046,7 +1123,7 @@ class DefinitionResolverTest {
     @Test
     void resolvesRegexAndUriInstancesWithEveryComposedFieldBound() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { plain_regex   => !regex_type {}
                   bounded_regex => !regex_type { max_length: 40 }
                   plain_uri     => !uri_type {}
@@ -1113,7 +1190,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1128,7 +1205,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { bad => !top ^ { x: integer } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1167,7 +1244,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelEntries);
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   int8    => !integer ^ { size: { bits: 8  signed: true } }
                   bounded => !int8 ^ { min: -100  max: 100 }
@@ -1210,7 +1287,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   uint8       => !integer ^ { size: { bits: 8  signed: false } }
                   percent     => !integer ^ { min: 0  max: 100 }
@@ -1243,7 +1320,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   percent  => !integer ^ { min: 0  max: 100 }
                   restated => !percent ^ { max: 100 }
@@ -1286,7 +1363,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   emptyByRefinement  => !integer ^ { min: 10  max: 3 }
                   emptyByApplication => !integer_type { min: 10  max: 3 }
@@ -1338,7 +1415,7 @@ class DefinitionResolverTest {
         DefinitionResolver resolver = definitionResolverFor(metaTn1Parser, namespace::get);
         namespace.put("float32", resolver.resolve(schemaMapFromCoreFixture().declarations().get("float32")));
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
                 { probability => !float32 ^ { min: 0.0  max: 1.0 } }""").parseSchemaDocument().body();
 
         TypeDefinition probability = resolver.resolve(schemaMap.declarations().get("probability"));
@@ -1360,7 +1437,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   short_text  => !text ^ { min_length: 1  max_length: 10 }
                   shorter     => !short_text ^ { max_length: 5 }
@@ -1390,7 +1467,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { bad => !integer ^ { min: "abc" } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1415,13 +1492,39 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { quantity_t => !integer ^ { minimum: 1  maximum: 100 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("quantity_t")));
         assertTrue(thrown.getMessage().contains("unknown field 'minimum' on 'integer_type'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("min | max"), thrown.getMessage());
+    }
+
+    /**
+     * {@code template} is resolver vocabulary (§8.1): an open entry's body, derived from a {@code <…>}
+     * declaration and never written by hand. Applied directly, it would mint an open entry that skipped every
+     * check §5.10 makes of a template's declaration, so it is refused -- closed and open alike, since both are
+     * a source declaration applying it.
+     */
+    @Test
+    void aSourceDeclarationApplyingTemplateDirectlyIsRejected() {
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
+                {
+                  sneaky => !template { parameters: [T]  template: "!array { element_type: T }" }
+                  open_sneaky => <U> !template { parameters: [U]  template: "!array { element_type: U }" }
+                }""").parseSchemaDocument().body();
+
+        for (String declaration : List.of("sneaky", "open_sneaky")) {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> instanceResolver.resolve(schemaMap.declarations().get(declaration)), declaration);
+            assertTrue(thrown.getMessage().contains("resolver vocabulary"), thrown.getMessage());
+            assertTrue(thrown.getMessage().contains("<"), "names the authored spelling: " + thrown.getMessage());
+        }
     }
 
     /**
@@ -1433,7 +1536,7 @@ class DefinitionResolverTest {
     @Test
     void aMetaReaderFailureThatIsNotAReadDiagnosticStaysALibraryGap() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { bad => !integer ^ { min: 1 } }""").parseSchemaDocument().body();
         Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernelCompiled().schema().entries());
         DefinitionResolver gapResolver = new DefinitionResolver(NEVER_CALLED, namespace::get, namespace::get);
@@ -1454,7 +1557,7 @@ class DefinitionResolverTest {
         // an instance" (the constructor-rejection test above), which requires `I` to resolve first.
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1562,7 +1665,7 @@ class DefinitionResolverTest {
      */
     private TypeDefinition resolveSnippet(String declaration) {
         SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { %s }""".formatted(declaration)).parseSchemaDocument();
         TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
         SchemaMap schemaMap = SchemaDesugarer.desugar(document, Set.of()).body();
@@ -1591,8 +1694,8 @@ class DefinitionResolverTest {
         RecordBody body = bodyOf(entries.get("strict"));
         assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.REQUIRED)), body.groups());
         assertEquals(List.of("a", "min", "exclusive_min"), fieldNames(entries.get("strict")));
-        assertEquals(FieldState.OPTIONAL, body.fields().get(1).state());
-        assertEquals(FieldState.OPTIONAL, body.fields().get(2).state());
+        assertEquals("optional", body.fields().get(1).describe());
+        assertEquals("optional", body.fields().get(2).describe());
         // the source keeps its own OPTIONAL group -- the restatement builds a new list, it does not edit it
         assertEquals(ElementState.OPTIONAL, bodyOf(entries.get("bounds")).groups().get(0).state());
     }
@@ -1683,95 +1786,93 @@ class DefinitionResolverTest {
                 bodyOf(entries.get("extended")).groups());
     }
 
-    // ── The six field-state spellings (§5.2) ──────────────────────────────
+    // ── The field spellings (§5.2) ────────────────────────────────────────
 
-    /** §5.2's table, end to end: five states across six spellings, in one record. */
+    /** §5.2's spellings, end to end, in one record: each mark lands on the one fact it answers. */
     @Test
-    void resolvesAllSixFieldStateSpellings() {
+    void resolvesEveryFieldSpelling() {
         RecordBody body = bodyOf(resolveAll("""
                 config => {
-                  host:   text
-                  port:   integer ~ 8080
-                  debug:  boolean = false
-                  label:  text?
-                  format: text? = json
-                  extra:  text? = _
+                  host:     text
+                  port?:    integer ~ 8080
+                  debug?:   boolean = false
+                  label?:   text?
+                  version:  text = "2.0"
+                  note:     text?
+                  timeout?: integer? ~ 30
+                  extra?:   void?
                 }
                 """).get("config"));
 
-        assertEquals(FieldState.REQUIRED, body.fields().get(0).state());
-        assertEquals(FieldState.REQUIRED_DEFAULT, body.fields().get(1).state());
-        assertEquals(FieldState.REQUIRED_FIXED, body.fields().get(2).state());
-        assertEquals(FieldState.OPTIONAL, body.fields().get(3).state());
-        assertEquals(FieldState.OPTIONAL_FIXED, body.fields().get(4).state());
-        // the sixth spelling: OPTIONAL_FIXED carrying no value at all, so §8.1 writes a record_field
-        // *without* a `value` member -- the field must be omitted or written as `_`
-        assertEquals(FieldState.OPTIONAL_FIXED, body.fields().get(5).state());
-        assertEquals(Optional.empty(), body.fields().get(5).value());
-        assertTrue(body.fields().get(4).value().isPresent());
+        assertEquals(RecordField.required("host", TypeRef.of("text")), body.fields().get(0));
+        assertEquals(RecordField.defaulted("port", TypeRef.of("integer"), new Token("8080", Token.Form.UNQUOTED)),
+                body.fields().get(1));
+        assertEquals(RecordField.fixed("debug", TypeRef.of("boolean"), new Token("false", Token.Form.UNQUOTED)),
+                body.fields().get(2));
+        assertEquals(RecordField.optionalVoidable("label", TypeRef.of("text")), body.fields().get(3));
+        assertEquals(RecordField.marker("version", TypeRef.of("text"), new Token("2.0", Token.Form.SINGLE_LINE_QUOTED)),
+                body.fields().get(4));
+        assertEquals(RecordField.voidable("note", TypeRef.of("text")), body.fields().get(5));
+        assertEquals(new RecordField("timeout", TypeRef.of("integer"), true, true, FieldRole.DEFAULT,
+                Optional.of(new Token("30", Token.Form.UNQUOTED))), body.fields().get(6));
+        assertEquals(RecordField.optionalVoidable("extra", TypeRef.of("void")), body.fields().get(7));
     }
 
     /**
-     * §5.2 makes {@code = _} valid on a field "declared with {@code ?} <b>or inherited as OPTIONAL</b>", and
-     * a modifier-only tightening entry has no {@code ?} of its own -- so presence has to be read off the
-     * field being tightened. This is §5.9's IS-A-preserving counterpart to removal: the field stays in the
-     * contract, its value is forbidden.
+     * The spellings the three slots can form and §5.2 refuses, each for its own reason: a pin on a voidable
+     * type admits {@code _} beside the pin; a default on an unmarked name is a value omission never reaches;
+     * {@code = _} pins the field to something that is not a value of its type, in either reading; and a
+     * discriminator that may be absent selects nothing.
      */
     @Test
-    void fixesAnInheritedOptionalFieldToAbsent() {
+    void theRefusedSpellings() {
+        assertRefused("config => { format?: text? = json }", "pins a voidable type");
+        assertRefused("config => { format: text? = json }", "pins a voidable type");
+        assertRefused("config => { port: integer ~ 8080 }", "always written");
+        assertRefused("config => { extra?: text = _ }", "'_' is none of them");
+        assertRefused("config => { extra?: text? = _ }", "'_' is none of them");
+        assertRefused("config => { extra?: text ~ _ }", "'_' is none of them");
+        assertRefused("pet => { kind?: text =? }", "discriminator");
+        assertRefused("pet => { kind: text? =? }", "discriminator");
+    }
+
+    private void assertRefused(String schema, String fragment) {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> resolveAll(schema));
+        assertTrue(thrown.getMessage().contains(fragment), thrown.getMessage());
+    }
+
+    /**
+     * "May be omitted, and if written is {@code _}" is spelled by the type, {@code void?}, not by a pin: a
+     * restatement narrowing an inherited field to {@code void} keeps it in the contract with its value
+     * forbidden -- §5.9's IS-A-preserving counterpart to removal.
+     */
+    @Test
+    void restatesAnInheritedFieldAsVoid() {
         Map<String, TypeDefinition> entries = resolveAll("""
-                base => { name: text  nickname: text? }
-                anonymous => base ^ { nickname: = _ }
+                base => { name: text  nickname?: text? }
+                anonymous => base ^ { nickname?: void? }
                 """);
 
         RecordField nickname = bodyOf(entries.get("anonymous")).fields().get(1);
-        assertEquals(FieldState.OPTIONAL_FIXED, nickname.state());
-        assertEquals(Optional.empty(), nickname.value());
+        assertEquals(RecordField.optionalVoidable("nickname", TypeRef.of("void")), nickname);
         // unlike removal (§5.9), IS-A survives -- the field is still in the contract
         assertEquals(List.of("base"), entries.get("anonymous").supertypes());
         assertEquals(List.of("name", "nickname"), fieldNames(entries.get("anonymous")));
     }
 
-    /** §5.2: "`~ _` (any field) -- a required field cannot fall back to not-being-filled." */
+    /** A modifier-only {@code = _} is a pin to {@code _}, refused whatever the field it restates. */
     @Test
-    void rejectsAnAbsentDefault() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("config => { label: text? ~ _ }"));
-        assertTrue(thrown.getMessage().contains("'~ _'"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("§5.2"), thrown.getMessage());
-    }
-
-    /** §5.2: "`= _` on a REQUIRED field -- a field cannot be required and fixed to not-being-present." */
-    @Test
-    void rejectsFixingARequiredFieldToAbsent() {
-        SchemaValidationException fresh = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("config => { label: text = _ }"));
-        assertTrue(fresh.getMessage().contains("required"), fresh.getMessage());
-
-        // and through inheritance: the source declares it REQUIRED, so the tightening entry inherits that
-        SchemaValidationException inherited = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("""
-                        base => { name: text }
-                        odd => base ^ { name: = _ }
-                        """));
-        assertTrue(inherited.getMessage().contains("required"), inherited.getMessage());
-    }
-
-    /** §5.2: "`type? ~ value` -- a default implies the field is always present, contradicting optional." */
-    @Test
-    void rejectsADefaultOnAnOptionalField() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("config => { label: text? ~ none }"));
-        assertTrue(thrown.getMessage().contains("contradicts optional"), thrown.getMessage());
-        // the message offers all three spellings the author might have meant
-        assertTrue(thrown.getMessage().contains("'type ~ value'"), thrown.getMessage());
+    void rejectsAModifierOnlyPinToAbsent() {
+        assertRefused("""
+                base => { name: text  nickname?: text? }
+                anonymous => base ^ { nickname?: = _ }
+                """, "'_' is none of them");
     }
 
     /**
-     * A parametric modifier lands in a REQUIRED-family state whatever the presence axis says (§5.7's "Open
-     * modifiers": "a parametric `= P` places the field in REQUIRED -- from OPTIONAL this is the table's
-     * ordinary OPTIONAL → REQUIRED tightening"). A parametric {@code = P} over an inherited OPTIONAL field
-     * is the shape, so the parameter branch has to sit ahead of the OPTIONAL_FIXED one.
+     * A parametric {@code = P} is FREE until materialisation closes it (§5.7's "Open modifiers"), and pins
+     * the field there. Its type slot is elided, so it inherits the source's voidability -- here none, the
+     * source being {@code bound?: integer}.
      *
      * <p>A refinement <b>template</b> holds its body, so the state is read off the wire record it holds. The
      * body is the <em>flattened</em> form -- the refinement is resolved against its source first, which is
@@ -1781,7 +1882,7 @@ class DefinitionResolverTest {
     @Test
     void aParametricModifierOnAnInheritedOptionalFieldStillLandsInRequired() {
         Map<String, TypeDefinition> entries = resolveAll("""
-                base => { bound: integer? }
+                base => { bound?: integer }
                 bounded => <MIN> base ^ { bound: = MIN }
                 """);
 
@@ -1789,82 +1890,37 @@ class DefinitionResolverTest {
         Set<String> names = HeldBody.of(held).names();
         assertTrue(names.contains("MIN"), () -> "the parameter is in the body: " + names);
         assertTrue(names.contains("integer"), () -> "the type came from the source: " + names);
-        // REQUIRED is the constructor's own default and so is not written at all -- which is the assertion:
-        // the inherited OPTIONAL did not survive, and no FIXED state was reached either.
-        assertFalse(names.contains(FieldState.OPTIONAL.name()), names::toString);
-        assertFalse(names.contains(FieldState.OPTIONAL_FIXED.name()), names::toString);
+        // A required FREE field states none of its facts, `record_field`'s own defaults -- which is the
+        // assertion: the inherited optional did not survive, and no FIXED role was reached either.
+        assertFalse(names.contains("true"), names::toString);
+        assertFalse(names.contains("FIXED"), names::toString);
     }
 
-    // ── Group presence under tightening (§5.11) ───────────────────────────
-    //    "Group presence rules are checked against the refined states at schema
-    //    load: a refinement under which two members of one group are always
-    //    present (both in a REQUIRED-family state) is a resolver error."
+    // ── Restating a group member (§5.11) ──────────────────────────────────
 
     /**
-     * The rule earns its keep: without it the declaration resolves, compiles, and then rejects every value
-     * ever written against it -- a group admits at most one member, so two that must always be there is a
-     * contract nothing can satisfy. Caught where it is written instead.
+     * A restated member stays a member: optional whatever the restatement writes, since its presence is the
+     * group's, and a pin on it is checked where written and never supplied -- an injected member would be
+     * present, and presence is what selects the alternative. So two members may both be pinned, which no
+     * value contradicts: at most one is written.
      */
     @Test
-    void rejectsARefinementMakingTwoGroupMembersAlwaysPresent() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(BOUNDS
-                        + "  impossible => bounds ^ { min: integer = 0  exclusive_min: integer = 1 }"));
-        assertTrue(thrown.getMessage().contains("min and exclusive_min"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("at most one"), thrown.getMessage());
-    }
+    void aRestatedMemberMayBePinnedAndIsNeverSupplied() {
+        RecordBody body = bodyOf(resolveAll(BOUNDS
+                + "  pinned => bounds ^ { min: = 0  exclusive_min: integer = 1 }").get("pinned"));
 
-    /**
-     * §5.11's sentence says "a refinement", but it sits in a paragraph headed "Refinement and composition"
-     * that puts both bodies under §5.7's tightening rules -- and a composition body produces the identical
-     * unsatisfiable type, so reading it as refinement-only would leave the same defect legal by the other
-     * spelling.
-     */
-    @Test
-    void rejectsACompositionBodyMakingTwoGroupMembersAlwaysPresent() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(BOUNDS
-                        + "  impossible => bounds & { min: integer = 0  exclusive_min: integer = 1 }"));
-        assertTrue(thrown.getMessage().contains("at most one"), thrown.getMessage());
-    }
-
-    /** REQUIRED_DEFAULT counts too: a default supplies the value, so the field is there in every value. */
-    @Test
-    void aDefaultCountsAsAlwaysPresentForTheGroupRule() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(BOUNDS
-                        + "  impossible => bounds ^ { min: integer ~ 0  exclusive_min: integer = 1 }"));
-        assertTrue(thrown.getMessage().contains("min and exclusive_min"), thrown.getMessage());
-    }
-
-    /**
-     * Pinning <em>one</em> alternative is the point of tightening a member, and stays legal. It also shows
-     * the two spellings apart: a modifier-only entry moves only the mutability axis (§5.7's "only the value
-     * state changes"), so an inherited-OPTIONAL member pinned with {@code = 0} lands in OPTIONAL_FIXED and
-     * stays absent-able -- which for a group member is exactly right, since the sibling alternative has to
-     * remain reachable.
-     */
-    @Test
-    void tighteningASingleGroupMemberIsFine() {
-        Map<String, TypeDefinition> entries = resolveAll(BOUNDS + "  pinned => bounds ^ { min: = 0 }");
-
-        RecordBody body = bodyOf(entries.get("pinned"));
-        assertEquals(FieldState.OPTIONAL_FIXED, body.fields().get(1).state());
-        assertEquals(FieldState.OPTIONAL, body.fields().get(2).state());
+        RecordField min = body.fields().get(1);
+        assertEquals(RecordField.fixed("min", TypeRef.of("integer"), new Token("0", Token.Form.UNQUOTED)), min);
+        assertEquals(RecordField.Omitted.NOTHING, min.omitted(true));
+        assertEquals("fixed", body.fields().get(2).describe());
         assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.OPTIONAL)), body.groups());
     }
 
-    /** The rule is per group -- one always-present member in each of two groups is not a conflict. */
+    /** A member's omission is the group's, so the name takes no {@code ?} and the member takes no default. */
     @Test
-    void oneAlwaysPresentMemberInEachOfTwoGroupsIsFine() {
-        Map<String, TypeDefinition> entries = resolveAll("""
-                ranged => { ( min: integer | exclusive_min: integer )? ( max: integer | exclusive_max: integer )? }
-                pinned => ranged ^ { min: integer = 0  max: integer = 9 }
-                """);
-
-        assertEquals(2, bodyOf(entries.get("pinned")).groups().size());
-        assertEquals(FieldState.REQUIRED_FIXED, bodyOf(entries.get("pinned")).fields().get(0).state());
-        assertEquals(FieldState.REQUIRED_FIXED, bodyOf(entries.get("pinned")).fields().get(2).state());
+    void aRestatedMemberTakesNoNameMarkAndNoDefault() {
+        assertRefused(BOUNDS + "  pinned => bounds ^ { min?: integer = 0 }", "without the '?' on its name");
+        assertRefused(BOUNDS + "  pinned => bounds ^ { min: integer ~ 0 }", "takes no default");
     }
 
     // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
@@ -1914,7 +1970,7 @@ class DefinitionResolverTest {
     void rejectsRefiningADefinitionWhoseBodyIsABindingRecord() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel("""
-                        bounded => integer ^ { min: = 0 }
+                        bounded => integer ^ { min?: = 0 }
                         """));
         assertTrue(thrown.getMessage().contains("finished"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("!integer ^"), thrown.getMessage());
@@ -1972,7 +2028,7 @@ class DefinitionResolverTest {
     private TypeDefinition resolveSnippetsAgainstMetaKernel(String body) {
         TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
         SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { %s }""".formatted(body)).parseSchemaDocument();
         Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.schema().entries());
         TypeDefinition last = null;
@@ -1990,7 +2046,7 @@ class DefinitionResolverTest {
     /** Resolves a whole hand-written schema body in declaration order, so a later entry can compose with an earlier one. */
     private Map<String, TypeDefinition> resolveAll(String body) {
         SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { %s }""".formatted(body)).parseSchemaDocument();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             resolved.put(declaration.name(), resolver.resolve(declaration));
@@ -2020,7 +2076,7 @@ class DefinitionResolverTest {
         TypeDefinition subtracted = entries.get("account_public");
         assertEquals(List.of("name", "email"), fieldNames(subtracted));
         assertEquals(List.of(), subtracted.supertypes());              // contract: broken
-        assertEquals(List.of("account"), bodyOf(subtracted).supertypes()); // lineage: kept
+        assertEquals(List.of(TypeRef.of("account")), bodyOf(subtracted).supertypes()); // lineage: kept
         assertEquals(TypeKind.PRODUCT, subtracted.kind());
         // the source is untouched -- removal builds a new field list, it does not edit the supertype's
         assertEquals(List.of("name", "email", "password"), fieldNames(entries.get("account")));
@@ -2041,19 +2097,19 @@ class DefinitionResolverTest {
         // inherited in supertype order (minus the removal), then the body's genuinely new field
         assertEquals(List.of("name", "email", "badge_id", "badge"), fieldNames(staff));
         assertEquals(List.of(), staff.supertypes());
-        assertEquals(List.of("account", "user"), bodyOf(staff).supertypes());
+        assertEquals(List.of(TypeRef.of("account"), TypeRef.of("user")), bodyOf(staff).supertypes());
     }
 
     /** A body entry may tighten a field that survives the removal -- §5.9's own {@code account_view}. */
     @Test
     void aRemovalCoexistsWithATighteningOfADifferentField() {
         Map<String, TypeDefinition> entries = resolveAll(ACCOUNT
-                + "  account_view => account & { email: text ~ \"n/a\" } - { password }");
+                + "  account_view => account & { email?: text ~ \"n/a\" } - { password }");
 
         TypeDefinition view = entries.get("account_view");
         assertEquals(List.of("name", "email"), fieldNames(view));
         // the tightening replaced the inherited field in place, and removal ran afterwards
-        assertEquals(FieldState.REQUIRED_DEFAULT, bodyOf(view).fields().get(1).state());
+        assertEquals("defaulted", bodyOf(view).fields().get(1).describe());
     }
 
     /**
@@ -2073,7 +2129,7 @@ class DefinitionResolverTest {
     @Test
     void rejectsARemovalNamingAFieldTheBodyTightens() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(ACCOUNT + "  odd => account & { password: text ~ \"x\" } - { password }"));
+                () -> resolveAll(ACCOUNT + "  odd => account & { password?: text ~ \"x\" } - { password }"));
         assertTrue(thrown.getMessage().contains("own body also declares"), thrown.getMessage());
     }
 
@@ -2102,7 +2158,7 @@ class DefinitionResolverTest {
         TypeDefinition dissolved = entries.get("one_bound");
         assertEquals(List.of("a", "min"), fieldNames(dissolved));
         assertEquals(List.of(), bodyOf(dissolved).groups());
-        assertEquals(FieldState.REQUIRED, bodyOf(dissolved).fields().get(1).state());
+        assertEquals("required", bodyOf(dissolved).fields().get(1).describe());
         // the source still has both members and its group
         assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.REQUIRED)),
                 bodyOf(entries.get("bounds")).groups());
@@ -2116,7 +2172,7 @@ class DefinitionResolverTest {
                 one_bound => bounds - { exclusive_min }
                 """);
 
-        assertEquals(FieldState.OPTIONAL, bodyOf(entries.get("one_bound")).fields().get(1).state());
+        assertEquals("optional", bodyOf(entries.get("one_bound")).fields().get(1).describe());
     }
 
     /** Three members less one is still a group: two members left, state untouched. */
@@ -2163,6 +2219,187 @@ class DefinitionResolverTest {
                 () -> resolver.resolve(schemaMap.declarations().get("atom")));
         assertTrue(thrown.getMessage().contains("names no type this schema declares or imports"),
                 thrown.getMessage());
+    }
+
+    // ── The four marks lower into the body (§5.2) ──
+
+    /**
+     * Both facts reach the body: {@code abstract} into {@code record.extension}, the selector into
+     * {@code record.discriminators} -- the enclosing record's statement, not the field's.
+     *
+     * <p>That they lower <em>without</em> the governing meta declaring them is a different property and is
+     * not shown here -- this harness builds a resolver with no {@code AnnotationValueReader}, so it never
+     * checks an annotation name against the meta at all. {@code
+     * TsonSchemaResolverCompiledMetaSchemaTest.theMarksLowerUnderAMetaThatDeclaresNoneOfThem} is where that
+     * one is pinned, against a resolver that does check.
+     */
+    @Test
+    void aSealedRecordLowersBothMarksIntoTheBody() {
+        RecordBody body = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel(
+                "pet => abstract { pet_type: text =?  name: text }").body());
+
+        assertEquals(RecordExtensionType.ABSTRACT, body.extension());
+        assertEquals(List.of("pet_type"), body.discriminators(),
+                "the record names the field the mark stood on, and names no other");
+    }
+
+    /** Consumed, not preserved: §8.1's author-annotation channel carries neither, so one carrier holds each fact. */
+    @Test
+    void aLoweredMarkLeavesNothingInTheAnnotationChannel() {
+        TypeDefinition pet = resolveSnippetsAgainstMetaKernel(
+                "pet => abstract { pet_type: text =?  name: text }");
+        RecordBody body = assertInstanceOf(RecordBody.class, pet.body());
+
+        assertTrue(pet.annotations().isEmpty(), "the definition mark is gone from the channel");
+        assertTrue(body.fields().get(0).annotations().isEmpty(), "and so is the field mark");
+    }
+
+    /**
+     * The mark has one position, and the words are ordinary identifiers at every other -- which is what keeps
+     * [TSON-DATA] §7.4's "no reserved words" true: the grammar still excludes nothing by name.
+     */
+    @Test
+    void aMarkWordIsAnOrdinaryNameElsewhere() {
+        RecordBody holder = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
+                abstract => { a: text }
+                final => { b: text }
+                holder => { f: abstract  g: final }""").body());
+
+        assertEquals(RecordExtensionType.OPEN, holder.extension(),
+                "the words are field types here, not marks");
+    }
+
+    /** The default, and the overwhelming majority: a record that says nothing is OPEN. */
+    @Test
+    void anUnmarkedRecordIsOpenAndNoFieldDiscriminates() {
+        RecordBody body = assertInstanceOf(RecordBody.class,
+                resolveSnippetsAgainstMetaKernel("plain => { a: text  b: text }").body());
+
+        assertEquals(RecordExtensionType.OPEN, body.extension());
+        assertTrue(body.discriminators().isEmpty());
+    }
+
+    /**
+     * Extensibility is never inherited, so a subtype of a marked base is OPEN unless it says otherwise --
+     * otherwise no concrete subtype of an abstract base could exist. The mark is read once, at the
+     * declaration that wrote it.
+     */
+    @Test
+    void aSubtypeOfASealedBaseIsOpenUnlessItSaysOtherwise() {
+        RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
+                pet => abstract { pet_type: text =?  name: text }
+                dog => pet & { pet_type?: = "dog"  breed: text }""").body());
+
+        assertEquals(RecordExtensionType.OPEN, dog.extension());
+    }
+
+    /**
+     * <b>A restatement pins the selector and carries no mark.</b> The annotation-merge rule (§5.7) is about
+     * what an entry inherits when it mentions nothing -- and there is no annotation here to inherit: the mark
+     * was <em>consumed</em> at the base, becoming {@code record.discriminators} on the base's own declaration.
+     * What the mark says is which field a family dispatches on, which is the base's statement to make; a
+     * member restates the field to pin it, and what it restates is the value.
+     *
+     * <p>So the modifier-only spelling having no annotation position is no longer a reason to copy the flag
+     * down -- it is a reason the flag was never the member's to state. Nothing reads a member's copy:
+     * {@code RecordExtension} takes a family's selectors from the base and finds each member's pin by name.
+     */
+    @Test
+    void aRestatedFieldPinsTheSelectorAndCarriesNoMark() {
+        RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
+                pet => abstract { pet_type: text =?  name: text }
+                dog => pet & { pet_type?: = "dog"  breed: text }""").body());
+
+        RecordField pinned = dog.fields().stream().filter(f -> f.name().equals("pet_type")).findFirst()
+                .orElseThrow();
+        assertEquals("fixed", pinned.describe(), "the member pins the selector");
+        assertTrue(dog.discriminators().isEmpty(), "and the mark stays with the base that declared it");
+    }
+
+    /**
+     * Three alternatives, never companions: a record states how it may be realised once. One optional slot
+     * rather than two flags is what makes this ungrammatical instead of a rule the resolver has to state.
+     */
+    @Test
+    void twoDefinitionMarksOnOneDeclarationAreRefused() {
+        ParseException thrown = assertThrows(ParseException.class,
+                () -> resolveSnippetsAgainstMetaKernel("x => abstract final { a: text }"));
+        assertTrue(thrown.getMessage().contains("on one declaration"), thrown.getMessage());
+    }
+
+
+    /**
+     * <b>{@code abstract} is a claim with a subject on a template</b> (§5.10): a
+     * template carrying {@code extension} takes part in IS-A, and {@code subtypes} holds its own
+     * instantiations -- which is exactly the set the claim ranges over. So the mark lowers into the held body
+     * like {@code abstract}, and {@code RecordExtension} judges it against the fields the way it does for a
+     * closed record.
+     */
+    @Test
+    void aTemplateMayBeSealed() {
+        TypeDefinition box = resolveSnippetsAgainstMetaKernel(
+                "box => <T> { kind: text =?  v: T }");
+
+        assertInstanceOf(TemplateBody.class, box.body());
+        // The base's own extension, derived and stated on the entry -- never read back out of the held text,
+        // whose `extension` member is an instantiation's mark (§1.3, §5.10).
+        assertEquals(Optional.of(RecordExtensionType.ABSTRACT), ((TemplateBody) box.body()).extension());
+        assertEquals(List.of("kind"), ((TemplateBody) box.body()).discriminators());
+    }
+
+    /**
+     * <b>{@code final} still cannot hold of a template.</b> It forbids anything composing onto the marked
+     * type, and every application of a template is a subtype of it by construction -- so the claim is false
+     * of the declaration before an author writes a second one.
+     */
+    @Test
+    void aTemplateCannotBeFinal() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel(
+                        "box => final <T> { kind: text =?  v: T }"));
+
+        assertTrue(thrown.getMessage().contains("subtype of it by construction"), thrown.getMessage());
+    }
+
+    /**
+     * <b>{@code abstract} is the one mark a template takes</b>, the asymmetry being the marks' own: it
+     * constrains the marked type alone -- no direct instances -- which holds of every instantiation
+     * identically, so {@code result => abstract <T> { … }} is meaningful and is what a host language spells
+     * {@code abstract class Result<T>}. §5.10 holds the body as text, so the mark is stated <em>in</em> that
+     * text and travels with it; {@code SubtypeTemplateFamilyTest} is where the closed end is checked.
+     */
+    @Test
+    void aTemplateIsAbstractByStatingTheMarkInItsHeldBody() {
+        TypeDefinition box = resolveSnippetsAgainstMetaKernel("box => abstract <T> { v: T }");
+
+        assertInstanceOf(TemplateBody.class, box.body());
+        assertTrue(((TemplateBody) box.body()).template().contains("extension:"),
+                () -> "the mark has to be in the text, there being nowhere else: "
+                        + ((TemplateBody) box.body()).template());
+        assertTrue(((TemplateBody) box.body()).template().contains("ABSTRACT"),
+                () -> ((TemplateBody) box.body()).template());
+    }
+
+    /** Only a record has an extension fact to state; the mark has nowhere to land on anything else. */
+    @Test
+    void aDefinitionMarkOnANonRecordIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("x => abstract !enum [A B]"));
+        assertTrue(thrown.getMessage().contains("only a record states how it may be realised"),
+                thrown.getMessage());
+    }
+
+    /**
+     * And nor does an <em>open</em> non-record, which is the same rule read off the held body: a template
+     * whose body applies {@code array} has no {@code extension} member for the mark to be stated in.
+     */
+    @Test
+    void aDefinitionMarkOnANonRecordTemplateIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("x => abstract <T> !array { element_type: T }"));
+        assertTrue(thrown.getMessage().contains("only a record states how it may be realised"),
+                thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("applies '!array'"), thrown.getMessage());
     }
 
     private static String readFixture() throws IOException {

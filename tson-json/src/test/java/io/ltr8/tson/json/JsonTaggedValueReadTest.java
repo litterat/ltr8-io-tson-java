@@ -23,8 +23,8 @@ class JsonTaggedValueReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/tagged-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               person   => { name: text }
               employee => person & { department: text }
@@ -104,12 +104,14 @@ class JsonTaggedValueReadTest {
         assertTrue(refusal.expected().contains("employee"), refusal.expected());
     }
 
-    /** Member order carries no meaning, so a tag is found wherever it sits (§6.1.6). */
+    /** §3.3: `$type` leads its object, so one after the record's own members is refused, not looked for. */
     @Test
-    void aTagIsFoundWhereverItSitsInTheObject() {
-        assertEquals("""
-                {"name":"Ada","department":"Engines"}""", read("person", """
-                {"name": "Ada", "department": "Engines", "$type": "employee"}""").accepted().toString());
+    void aTagAfterTheRecordsOwnMembersIsRefused() {
+        Diagnostic refusal = read("person", """
+                {"name": "Ada", "$type": "person"}""").refusal();
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, refusal.code());
+        assertEquals("/$type", refusal.path().orElseThrow());
+        assertTrue(refusal.message().contains("must lead its object"), refusal.message());
     }
 
     /** A tag reaches a nested position too -- recognition is per object, not per document. */
@@ -157,10 +159,19 @@ class JsonTaggedValueReadTest {
         assertEquals("/$comment", refusal.path().orElseThrow());
     }
 
-    /** An object carrying reserved members but no `$type` names no type, and a tag must name one. */
+    /** §3.3: a wrapper admits nothing beside `$value`, so one following the record's own members is refused. */
     @Test
-    void reservedMembersWithNoTypeAreRefused() {
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("person", """
+    void aValueMemberAfterTheRecordsOwnMembersIsRefused() {
+        Diagnostic refusal = read("person", """
+                {"$type": "person", "name": "Ada", "$value": {"name": "Ada"}}""").refusal();
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, refusal.code());
+        assertEquals("/$value", refusal.path().orElseThrow());
+    }
+
+    /** §3.3: `$value` belongs to a wrapper, which leads with `$type` -- one without it is a resolver error. */
+    @Test
+    void aValueMemberNotLedByATypeIsRefused() {
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, read("person", """
                 {"$value": {"name": "Ada"}}""").refusal().code());
     }
 
@@ -181,14 +192,14 @@ class JsonTaggedValueReadTest {
                 {"$type": 1, "$comment": 2}""").accepted().toString());
     }
 
-    // ── The lookahead itself ─────────────────────────────────────────────
+    // ── The peek itself ──────────────────────────────────────────────────
 
     /**
-     * The scan rewinds, so an untagged object reads exactly as it would have with no scan at all -- every
-     * member, its defaults, and its diagnostics unchanged.
+     * The peek at the leading members rewinds, so an untagged object reads exactly as it would have with no
+     * peek at all -- every member, its defaults, and its diagnostics unchanged.
      */
     @Test
-    void anUntaggedObjectIsUnaffectedByTheScan() {
+    void anUntaggedObjectIsUnaffectedByThePeek() {
         assertEquals("""
                 {"count":7}""", read("boxed", """
                 {"count": 7}""").accepted().toString());
@@ -196,9 +207,9 @@ class JsonTaggedValueReadTest {
                 {"count": "x"}""").refusal().path().orElseThrow());
     }
 
-    /** A scan that ran over a nested object leaves the cursor where it started, not inside one. */
+    /** A peek over an object with a nested one leaves the cursor where it started, not inside one. */
     @Test
-    void theScanIsTransparentToNesting() {
+    void thePeekIsTransparentToNesting() {
         assertEquals("""
                 {"who":{"name":"Ada"}}""", read("holder", """
                 {"who": {"name": "Ada"}}""").accepted().toString());

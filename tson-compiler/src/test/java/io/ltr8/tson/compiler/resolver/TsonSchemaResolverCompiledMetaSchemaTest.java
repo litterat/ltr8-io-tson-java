@@ -15,6 +15,8 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.Unit;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -196,7 +199,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
             {
               void => !unit {}
             }
@@ -229,8 +232,60 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         assertTrue(thrown.getMessage().contains("meta.tn"));
     }
 
+    /**
+     * The definition mark and the selector are grammar ([TSON-SCHEMA] §5.2, §12.1), so they are read before
+     * the governing meta is consulted and lower under a meta that declares no annotation at all -- the
+     * meta-kernel here. Nothing resolves them against a namespace, which is why no meta-schema can give the
+     * words another meaning and why no name has to be reserved to keep them.
+     *
+     * <p>Non-vacuous, and {@link #anOrdinaryUnknownAnnotationIsStillTheAuthorsError} is why: the same document
+     * shape with a name the grammar does not read fails at exactly the check these bypass.
+     */
+    @Test
+    void theMarksLowerUnderAMetaThatDeclaresNoneOfThem() {
+        SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
+        TsonSchema resolved = resolver.resolveSchema(new TsonSchemaParser(KERNEL_GOVERNED_MARKS)
+                .parseSchemaDocument());
+
+        RecordBody pet = assertInstanceOf(RecordBody.class, resolved.entries().get("pet").body());
+        assertEquals(RecordExtensionType.ABSTRACT, pet.extension());
+        assertEquals(List.of("pet_type"), pet.discriminators());
+        assertEquals(List.of("pet_type"), pet.discriminators());
+        assertTrue(resolved.entries().get("pet").annotations().isEmpty(), "consumed, not preserved");
+    }
+
+    /** The check the marks bypass, shown still firing for a name that is not one. */
+    @Test
+    void anOrdinaryUnknownAnnotationIsStillTheAuthorsError() {
+        SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
+        SchemaDocument document = new TsonSchemaParser(KERNEL_GOVERNED_UNKNOWN_MARK).parseSchemaDocument();
+
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolver.resolveSchema(document));
+        assertTrue(thrown.getMessage().contains("does not name a type in the governing meta-schema"),
+                thrown.getMessage());
+    }
+
+    private static final String KERNEL_GOVERNED_MARKS = """
+            !!id:"https://example.test/marks.tn"
+            !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            {
+              pet => abstract { pet_type: identifier =?  nick: identifier }
+            }
+            """;
+
+    private static final String KERNEL_GOVERNED_UNKNOWN_MARK = """
+            !!id:"https://example.test/unknown-mark.tn"
+            !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            {
+              pet => @totally_unknown_xyz { nick: identifier }
+            }
+            """;
+
     private static final String MINI_DOCUMENT_NO_ID = """
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
             {
               void => !unit {}
             }
@@ -249,7 +304,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_ID = """
             !!id:"mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
             {
               void => !unit {}
             }
@@ -267,7 +322,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
             !!import:"meta-kernel.tn"
             {
               void => !unit {}
@@ -286,8 +341,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
             {
               my_type => atom & {}
             }
@@ -319,8 +374,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
             {
               void => !unit {}
             }
@@ -342,9 +397,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/36/m/meta.tn"
             {
               placeholder => unit
             }
@@ -387,7 +442,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // synthesizes 9 extra entries for argument-bearing type-refs, e.g. enum's own "members:
         // set<token>" -- runs before compiling. Never cached (see the next test) -- only the
         // *quality* of the one-off result changed, not its lifetime.
-        assertEquals(58, compiled.schema().entries().size());
+        assertEquals(61, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
         assertNotNull(compiled.compiledSchema().get("integer_size")
@@ -416,7 +471,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = registry;
 
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
-                () -> loader.loadMeta("https://tson.io/2026/35/m/meta.tn"));
+                () -> loader.loadMeta("https://tson.io/2026/36/m/meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
 

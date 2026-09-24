@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
-import io.ltr8.tson.compiler.reader.Dom;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -15,7 +14,6 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -70,9 +68,7 @@ class MultiErrorCollectionTest {
                 """;
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue)
-                compiled.get("my_record").read(TestDocuments.document(dataSource, problems)));
+        Object result = compiled.get("my_record").read(TestDocuments.document(dataSource, problems));
 
         assertEquals(3, problems.diagnostics().size(), problems.diagnostics().toString());
 
@@ -94,15 +90,8 @@ class MultiErrorCollectionTest {
         assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, badElement.code());
         assertEquals(lineOf(dataSource, "hello"), badElement.dataPosition().orElseThrow().line());
 
-        // Collecting mode kept reading despite every failure -- the record itself still comes back as
-        // a real Map (DOM mode tolerates null values fine), "value"/"tag" are null placeholders, and
-        // "items" keeps its own null placeholder at the one bad index rather than the whole field
-        // being dropped or the whole record read aborting.
-        assertNull(result.get("value"));
-        assertNull(result.get("tag"));
-        List<?> items = (List<?>) result.get("items");
-        assertEquals((byte) 1, items.get(0));
-        assertNull(items.get(1));
-        assertEquals((byte) 3, items.get(2));
+        // Collecting mode kept reading past every failure, which is how all three surfaced; the value itself is
+        // all-or-nothing, so the record reads to nothing and the diagnostics are the answer.
+        assertNull(result);
     }
 }

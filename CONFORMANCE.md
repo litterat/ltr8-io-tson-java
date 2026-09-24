@@ -81,7 +81,7 @@ seeded here matches both the tables and core.tn — the two read paths agree by 
 this implementation choosing core.tn over a shorter table.
 
 **`!email` implements a subset of RFC 5322, not the whole grammar.** `email_type`'s `spec` is
-`REQUIRED_FIXED` to RFC 5322, but `EmailParser` accepts only the `dot-atom "@" dot-atom` core; quoted local
+fixed to RFC 5322, but `EmailParser` accepts only the `dot-atom "@" dot-atom` core; quoted local
 parts (`"a b"@example.com`), domain literals (`user@[192.0.2.1]`) and embedded comments are rejected though
 the RFC admits them. Accepting them would admit spaces, brackets and parentheses into a scalar consumers
 treat as a token — and §5.5 scopes the pin to exactly that core, so this is the contract rather than a

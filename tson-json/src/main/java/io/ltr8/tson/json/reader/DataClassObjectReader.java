@@ -144,7 +144,7 @@ public final class DataClassObjectReader {
      * that object is meaningful only at a typed position §8 recognises.
      */
     private static void reportUnion(JsonReadContext ctx, DataClassUnion union) {
-        ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, ("%s is a union, and a JSON document carries no selector for one "
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, ("%s is a union, and a JSON document carries no selector for one "
                 + "without a schema -- [TSON-JSON] §8.2 admits a tag-free choice only where a declared "
                 + "discriminator or a derived disjointness fact picks the variant, and neither is "
                 + "something a Java class states. Read the members' own types, or use the "
@@ -248,9 +248,8 @@ public final class DataClassObjectReader {
         if (ctx.reported() > mark) {
             // Bind mode is all-or-nothing: a record whose members failed is not constructed, because a
             // constructor handed nulls for components that never arrived would either throw out of the
-            // collecting read or hand back an object nobody wrote. Tree mode keeps what it built; this
-            // cannot, having nowhere to put a hole. The same asymmetry ConstructionGuard draws on the TSON
-            // side, and for the same reason.
+            // collecting read or hand back an object nobody wrote. The rule every read keeps, and
+            // ConstructionGuard's on the TSON side.
             return null;
         }
         return construct(ctx, target.constructor(), construct, target.typeClass());

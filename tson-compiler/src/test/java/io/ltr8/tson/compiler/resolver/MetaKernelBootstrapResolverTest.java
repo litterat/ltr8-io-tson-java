@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
  * {@code integer}, {@code text}/{@code uri}/{@code regex}, and six {@code enum} instances,
  * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
- * resolve to the expected kind/body -- all 50 of the real fixture's declarations resolve, alongside the
+ * resolve to the expected kind/body -- all 53 of the real fixture's declarations resolve, alongside the
  * nine entries {@link SchemaDesugarer} injects for their argument-bearing applications.
  */
 class MetaKernelBootstrapResolverTest {
@@ -102,7 +102,7 @@ class MetaKernelBootstrapResolverTest {
 
         assertEquals(new EnumBody(List.of("INDEX", "NAMED")), schema.entries().get("product_access_type").body());
         assertEquals(new EnumBody(List.of("FIXED", "VARIABLE")), schema.entries().get("product_size_type").body());
-        for (String name : List.of("field_state", "element_state")) {
+        for (String name : List.of("field_role", "element_state")) {
             assertInstanceOf(EnumBody.class, schema.entries().get(name).body());
         }
     }
@@ -126,7 +126,7 @@ class MetaKernelBootstrapResolverTest {
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is the 51 declarations the fixture writes plus one injected declaration per distinct sugar form
+     * output is the 53 declarations the fixture writes plus one injected declaration per distinct sugar form
      * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar and one {@code map}
      * entry from the {@code {K => V}} sugar in {@code instance_template.bindings}. They are the same entries
      * the linker used to synthesize; producing them here is what leaves the linker with nothing to
@@ -135,10 +135,10 @@ class MetaKernelBootstrapResolverTest {
      * form stays prohibited at a field position (§5.2).
      */
     @Test
-    void theFiftyFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
+    void theFiftyThreeFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(58, schema.entries().size());
+        assertEquals(61, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_param_name", "array_field_group",
                 "array_record_field")) {

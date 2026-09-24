@@ -6,7 +6,6 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -41,8 +40,8 @@ class PerFieldSchemaPositionTest {
     private static List<Diagnostic> read(String declarations, String data) {
         String schema = """
                 !!id:"https://example.test/pos.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                 %s
                 }
@@ -146,7 +145,7 @@ class PerFieldSchemaPositionTest {
      */
     @Test
     void positionDoesNotParticipateInIdentity() {
-        RecordField bare = new RecordField("f", TypeRef.of("text"), FieldState.REQUIRED, Optional.empty());
+        RecordField bare = RecordField.required("f", TypeRef.of("text"));
         RecordField located = bare.withPosition(Optional.of(new SourcePosition() {
             @Override
             public int line() {

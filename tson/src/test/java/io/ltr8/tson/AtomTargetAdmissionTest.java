@@ -43,8 +43,8 @@ class AtomTargetAdmissionTest {
     private static Tson tson(String decls, Class<?> bound) {
         String schema = """
                 !!id:"https://example.test/a-1.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                 %s
                 }
@@ -143,7 +143,7 @@ class AtomTargetAdmissionTest {
     public record FixedSpec(String spec) {
     }
 
-    private static final String FIXED_SCHEMA = "  t => { spec: uri = \"https://x.test/v1\" }";
+    private static final String FIXED_SCHEMA = "  t => { spec?: uri = \"https://x.test/v1\" }";
 
     /**
      * A FIXED value is the schema's, not the document's, but it still reaches the component the way a
@@ -181,7 +181,7 @@ class AtomTargetAdmissionTest {
      */
     @Test
     void aFixedValueConvertsForAFamilyNoTableEverListed() {
-        FixedUuid t = tson("  t => { id: uuid = \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }", FixedUuid.class)
+        FixedUuid t = tson("  t => { id?: uuid = \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }", FixedUuid.class)
                 .objectReader().read(doc("!t {}"), FixedUuid.class);
         assertEquals("f81d4fae-7dec-11d0-a765-00a0c91e6bf6", t.id());
     }
@@ -194,7 +194,7 @@ class AtomTargetAdmissionTest {
      */
     @Test
     void aStatedFixedValueMatchesWhatOmittingItWouldHaveGiven() {
-        String schema = "  t => { id: uuid = \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }";
+        String schema = "  t => { id?: uuid = \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }";
         FixedUuid omitted = tson(schema, FixedUuid.class).objectReader().read(doc("!t {}"), FixedUuid.class);
         FixedUuid stated = tson(schema, FixedUuid.class).objectReader()
                 .read(doc("!t { id: \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }"), FixedUuid.class);

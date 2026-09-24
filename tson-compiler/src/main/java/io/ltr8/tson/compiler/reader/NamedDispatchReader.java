@@ -53,7 +53,7 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
         if (typeRef.isPresent()) {
             String ref = typeRef.get();
             if (!candidateNames.contains(ref)) {
-                ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + ref + "' is not a " + candidateNoun + " of '"
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'" + ref + "' is not a " + candidateNoun + " of '"
                                 + positionName + "' -- expected one of " + candidateNames,
                         "one of " + candidateNames, ref);
                 EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable
@@ -64,7 +64,7 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
         if (!untaggedRecovery.isEmpty()) {
             return recoverUntagged(ctx);
         }
-        ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                 "'" + positionName + "' " + missingTypeRefMessage + ": " + candidateNames,
                 "one of " + candidateNames, "no type annotation");
         EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable

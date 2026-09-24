@@ -23,8 +23,9 @@ import java.util.Objects;
  * <p>The shape {@code Tson} takes over {@code TsonTreeReader}/{@code TsonObjectReader} -- one place a
  * deployment states its {@link ProcessorPolicy}, its binding and where problems go, and two readers that
  * carry it. {@link #treeReader()} produces a {@link JsonValue}; {@link #objectReader()} produces a bound
- * Java object. It holds no schema registry because there is nothing yet to register: the schema-directed
- * decode of [TSON-JSON] §5-§8 is where one arrives, and this is where it will live.
+ * Java object. Given a loader ({@link #withSchemas}) it also holds the compiled readers for [TSON-JSON]
+ * §5-§8's schema-directed decode; it resolves no schema itself, a schema document being TSON text whichever
+ * encoding the data arrives in.
  *
  * <p><b>JEP 540's own entry points are the statics below</b>, over a default configuration. They are the
  * zero-ceremony path this API is named for -- {@code Json.parse(text)} and nothing else to know -- and they
@@ -37,10 +38,9 @@ import java.util.Objects;
  * tree} package's value model; reading, writing and exceptions follow the TSON side of this library, so a
  * consumer reading both encodings routes on one rule.
  *
- * <p><b>What this class no longer is.</b> It used to reduce events into a tree itself, which put an engine
- * in a front door's name and left the JSON stack with no tree <em>facade</em> at all -- so a tree read
- * could not be given a receiver, a policy or a path, where a bound read could. The reduction is
- * {@code SchemalessTreeReader}'s now, under {@link JsonTreeReader}, and the two readers are peers.
+ * <p><b>It is a front door, not an engine.</b> Reducing events into a tree is {@code SchemalessTreeReader}'s,
+ * under {@link JsonTreeReader}, so a tree read takes a receiver, a policy and a path exactly as a bound read
+ * does, and the two readers are peers.
  */
 public final class Json {
 
@@ -49,9 +49,13 @@ public final class Json {
     /** Where a named schema comes from, or null for an instance that can name none. */
     private final JsonCompiledSchemaRegistry schemas;
 
-    private Json(ProcessorConfig config, JsonCompiledSchemaRegistry schemas) {
+    /** The same schemas compiled in bind mode, over this instance's bind context; null where {@link #schemas} is. */
+    private final JsonCompiledSchemaRegistry objects;
+
+    private Json(ProcessorConfig config, JsonCompiledSchemaRegistry schemas, JsonCompiledSchemaRegistry objects) {
         this.config = config;
         this.schemas = schemas;
+        this.objects = objects;
     }
 
     // ── The front door ───────────────────────────────────────────────────
@@ -85,7 +89,7 @@ public final class Json {
      * document is TSON text whichever encoding the data arrives in.
      */
     public static Json of(ProcessorConfig config) {
-        return new Json(Objects.requireNonNull(config, "config"), null);
+        return new Json(Objects.requireNonNull(config, "config"), null, null);
     }
 
     /**
@@ -103,7 +107,9 @@ public final class Json {
      * its schemas at startup pays the compile once and every read after is a lookup.
      */
     public Json withSchemas(TsonSchemaLoader loader) {
-        return new Json(config, JsonCompiledSchemaRegistry.tree(Objects.requireNonNull(loader, "loader")));
+        Objects.requireNonNull(loader, "loader");
+        return new Json(config, JsonCompiledSchemaRegistry.tree(loader),
+                JsonCompiledSchemaRegistry.bind(loader, config.dataBindContext()));
     }
 
     /**
@@ -166,9 +172,16 @@ public final class Json {
         return List.copyOf(problems);
     }
 
-    /** A reader producing a bound Java object, carrying this instance's binding, policy and receiver. */
+    /**
+     * A reader producing a bound Java object, carrying this instance's binding and policy. With schemas ({@link
+     * #withSchemas}) it can also read against one: {@code objectReader().withSchema(uri).readAs(source, type,
+     * Target.class)} validates the document in full and builds the classes the binding resolves.
+     */
     public JsonObjectReader objectReader() {
-        return JsonObjectReader.using(config.dataBindContext()).withProcessorPolicy(config.processorPolicy());
+        JsonObjectReader reader = objects == null
+                ? JsonObjectReader.using(config.dataBindContext())
+                : JsonObjectReader.over(objects, config.dataBindContext());
+        return reader.withProcessorPolicy(config.processorPolicy());
     }
 
     /** A {@link JsonTreeWriter} -- the inverse of {@link #treeReader()}, and total over a tree this reads. */

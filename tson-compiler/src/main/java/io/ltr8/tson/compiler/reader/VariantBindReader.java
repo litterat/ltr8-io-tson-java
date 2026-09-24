@@ -59,7 +59,7 @@ import java.util.Optional;
  * framing here instead, which is what reaching past the annotations to the type-ref used to require, left
  * the reader that actually builds the value unable to see annotations written on it.
  */
-final class VariantBindReader implements TsonTypeReader<Object> {
+final class VariantBindReader implements TsonTypeReader<Object>, Subsumption.Applied {
 
     private final String name;
     private final TsonTypeReader<?> ownParser;
@@ -86,7 +86,7 @@ final class VariantBindReader implements TsonTypeReader<Object> {
         }
         String ref = typeRef.get();
         if (!isMember(ref)) {
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + ref + "' is not a member of the union '" + name
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'" + ref + "' is not a member of the union '" + name
                             + "' binds against " + describeMembers(),
                     "one of " + describeMembers(), ref);
             EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable

@@ -12,9 +12,7 @@ import io.ltr8.tson.json.tree.JsonString;
 import io.ltr8.tson.json.tree.JsonValue;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Reduces an event source into a {@link JsonValue} tree -- the engine {@code JsonTreeReader} is a facade
@@ -32,10 +30,9 @@ import java.util.Map;
  * <p><b>Frame-free.</b> Draining the source through {@link JsonEvent.EndOfDocument} -- which is what
  * rejects trailing content -- belongs to whoever owns the document, which is the facade.
  *
- * <p><b>Tree mode keeps what it built.</b> A collecting read that found problems still hands back the tree,
- * where {@code DataClassObjectReader} hands back nothing: a {@code JsonObject} has somewhere to put a
- * partial answer and a Java record does not. That asymmetry is deliberate and is the one
- * {@code tson-compiler} already draws between its own two readers.
+ * <p><b>The engine builds; the facade decides.</b> A collecting read carries on past every problem so one pass
+ * finds them all, and the facade hands back no tree for a document that reported anything
+ * ({@code CountingReceiver}) -- every read is all-or-nothing, as {@code DataClassObjectReader}'s is.
  */
 public final class SchemalessTreeReader {
 
@@ -73,11 +70,11 @@ public final class SchemalessTreeReader {
      * category. JEP 540 calls it a parse error for want of anywhere else to put it; this has somewhere.
      */
     private JsonValue readObject(JsonReadContext ctx) {
-        Map<String, JsonValue> members = new LinkedHashMap<>();
+        JsonObject.Builder members = JsonObject.builder(8);
         while (true) {
             JsonEvent event = ctx.next();
             if (event instanceof JsonEvent.ObjectEnd) {
-                return new JsonObject(members);
+                return members.build();
             }
             if (!(event instanceof JsonEvent.MemberName name)) {
                 throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);

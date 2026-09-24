@@ -28,8 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  * types already gives.
  *
  * <p><b>[TSON-DATA] §4.1's base type resolution is for a position nothing types</b>, which is tree mode:
- * a {@code TsonValue} read has no target and every token gets §4's classification. §4.1 speaks of
- * *documents* and has no term for a position a host type has typed, which is {@code SPEC-FEEDBACK.md} #7.
+ * a {@code TsonValue} read has no target and every token gets §4's classification. A declared host type
+ * naming a §5 family types the position, which is §4.1's own wording.
  *
  * <p>Every case here asserts the two agree rather than asserting a literal, so the schema is the oracle and
  * a change to either side that parts them fails.
@@ -44,10 +44,10 @@ class ClassTypedPositionTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/typed.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
-              box => { i: int32?  b: int8?  s: text?  d: float64?  flag: boolean? }
+              box => { i?: int32?  b?: int8?  s?: text?  d?: float64?  flag?: boolean? }
             }
             """;
 

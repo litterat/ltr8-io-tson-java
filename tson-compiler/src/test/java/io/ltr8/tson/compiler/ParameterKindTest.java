@@ -39,8 +39,8 @@ class ParameterKindTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/kinds.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                 %s
                 }
@@ -98,7 +98,11 @@ class ParameterKindTest {
                   e   => <M> !enum { members: [a b M] }
                   use => e<c>""");
 
-        String instantiation = ((Reference) compiled.schema().entries().get("use").body()).target().name();
+        // `use => head<args>` is the instantiation entry itself (#15), and it is the entry whose `source`
+        // records the application. Following its body would be wrong here: an open-instance template closes
+        // to a *synthetic* named for the form, which the instantiation references, and a synthetic's source
+        // is the bare constructor with no arguments at all.
+        String instantiation = "use";
         TypeArgument argument = compiled.schema().entries().get(instantiation).source().orElseThrow()
                 .arguments().getFirst();
 
@@ -112,7 +116,11 @@ class ParameterKindTest {
                   arr => <T> !array { element_type: T }
                   use => arr<int32>""");
 
-        String instantiation = ((Reference) compiled.schema().entries().get("use").body()).target().name();
+        // `use => head<args>` is the instantiation entry itself (#15), and it is the entry whose `source`
+        // records the application. Following its body would be wrong here: an open-instance template closes
+        // to a *synthetic* named for the form, which the instantiation references, and a synthetic's source
+        // is the bare constructor with no arguments at all.
+        String instantiation = "use";
         TypeArgument argument = compiled.schema().entries().get(instantiation).source().orElseThrow()
                 .arguments().getFirst();
 
@@ -144,7 +152,7 @@ class ParameterKindTest {
      */
     @Test
     void aParameterUsedAsBothATypeAndAValueIsRefusedAtTheDeclaration() {
-        String message = rejected("  both => <T> { v: T  w: int32 ~ T }");
+        String message = rejected("  both => <T> { v: T  w?: int32 ~ T }");
 
         assertTrue(message.contains("parameter 'T' stands in both a type position and a value position"),
                 message);
@@ -192,7 +200,7 @@ class ParameterKindTest {
     void anApplicationClosedOnDemandClassifiesItsArgumentsToo() {
         TsonCompiledSchema compiled = compile("""
                   st => !enum [red green]
-                  t  => <M> { a: st ~ M }
+                  t  => <M> { a?: st ~ M }
                   x  => t<red> & { b: text }""");
 
         TypeDefinition composed = compiled.schema().entries().get("x");

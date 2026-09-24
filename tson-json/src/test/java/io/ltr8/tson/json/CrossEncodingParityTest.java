@@ -9,6 +9,11 @@ import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.json.stream.JsonStream;
+import io.ltr8.tson.json.tree.JsonNull;
+import io.ltr8.tson.json.tree.JsonObject;
+import io.ltr8.tson.json.tree.JsonValue;
+import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonRecord;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -16,14 +21,16 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * One schema, one document in two encodings, one verdict.
  *
  * <p><b>This is a drift guard, and it exists because the schema-directed readers are two implementations.</b>
  * {@code tson-json} has its own compiled reader stack rather than sharing {@code tson-compiler}'s -- see
- * {@code docs/json-encoding.md} for why that is the right trade -- and the cost of the trade is that the
- * field-state rules ([TSON-SCHEMA] §5.2's six states, REQUIRED_FIXED injection, the FIXED check, closure,
+ * {@code design/json-encoding.md} for why that is the right trade -- and the cost of the trade is that the
+ * field rules ([TSON-SCHEMA] §5.2's marks read through a field's facts, injection, the FIXED check, closure,
  * duplicate members) are written twice and can drift apart silently.
  *
  * <p>[TSON-JSON] §9.4 makes that a <b>specification obligation</b> rather than a tidiness: this encoding
@@ -42,17 +49,18 @@ class CrossEncodingParityTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/parity-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               person => {
                 name:   text
-                tries:  int32 ~ 0
-                kind:   text = "person"
+                tries?: int32 ~ 0
+                kind?:  text = "person"
                 labels: [text]
               }
               sized  => [text; 2..3]
               unique => set<text>
+              stamps => set<datetime>
               pair   => [text, int32]
               bounded => {
                 value: int32
@@ -72,6 +80,31 @@ class CrossEncodingParityTest {
               shape     => ( circle | square )
               picked    => { pick: scalars }
               shaped    => { outline: shape }
+              pet       => abstract { pet_type: text =?  name: text }
+              dog       => pet & { pet_type?: = "dog"  breed: text }
+              cat       => pet & { pet_type?: = "cat"  indoor: boolean }
+              figure    => abstract { area: int32 }
+              disc      => figure & { side: int32 }
+              kennel    => { p: pet }
+              dog_of    => dog
+              pet_of    => pet
+              gallery   => { f: figure }
+              garage    => { r: robot }
+              outcome    => abstract <T> { code: T }
+              won        => <T> outcome<T> & { prize: text }
+              outcome_of => outcome<text>
+              won_of     => won<text>
+              ledger     => { o: outcome<text> }
+              box        => <T> { v: T }
+              int_box    => box<int32>
+              text_box   => box<text>
+              crate      => { b: box }
+              marks      => {
+                nickname?: text
+                from:      int32?
+                timeout?:  int32? ~ 30
+                version:   text = "2.0"
+              }
             }
             """;
 
@@ -135,7 +168,7 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * The strongest comparison, for a rule both encodings now state from one place
+     * The strongest comparison, for a rule both encodings state from one place
      * ({@code base.diagnostics}): the code, the data pointer, the machine-readable {@code expected}, <b>and
      * the prose</b>.
      *
@@ -152,12 +185,278 @@ class CrossEncodingParityTest {
                 "the two encodings state this rule differently");
     }
 
+    /** Both encodings refuse on the same codes at the same pointers; the JSON diagnostics, for what is left. */
+    private static List<Diagnostic> sameCodeAndPath(String rootType, String tsonBody, String jsonBody) {
+        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
+        assertFalse(fromTson.isEmpty(), "the TSON side reported nothing, so this compares nothing");
+        List<Diagnostic> fromJson = jsonDiagnostics(rootType, jsonBody);
+        assertEquals(fromTson.stream().map(d -> d.code() + " " + d.path()).toList(),
+                fromJson.stream().map(d -> d.code() + " " + d.path()).toList(), "the two encodings differ");
+        return fromJson;
+    }
+
     /** A rule as both encodings must state it: which rule, where in the data, the constraint, and the prose. */
     private record Rule(Diagnostic.Code code, String path, String expected, String message) {
 
         static Rule of(Diagnostic d) {
             return new Rule(d.code(), d.path().orElse("?"), d.expected(), d.message());
         }
+    }
+
+    // ── §5.2 one mark per question ────────────────────────────────────────
+
+    /** {@code nickname?: text} may be omitted and refuses {@code _}: one rule, stated once, in both encodings. */
+    @Test
+    void anOptionalFieldRefusesAbsenceInBothEncodings() {
+        sameRule("marks", """
+                { nickname: _  from: 1  version: "2.0" }""", """
+                {"nickname": null, "from": 1, "version": "2.0"}""");
+    }
+
+    /** {@code from: int32?} admits {@code _} and must be written; {@code version: text = "2.0"} must be too. */
+    @Test
+    void anUnmarkedNameMustBeWrittenInBothEncodings() {
+        bothAccept("marks", """
+                { from: _  version: "2.0" }""", """
+                {"from": null, "version": "2.0"}""");
+        sameRule("marks", """
+                { version: "2.0" }""", """
+                {"version": "2.0"}""");
+        sameRule("marks", """
+                { from: 1 }""", """
+                {"from": 1}""");
+    }
+
+    /**
+     * Both trees keep the spelling of absence (§7.2): a field written {@code _} or null stands as the absent
+     * node, and one never written is not there -- the text tree's {@code TsonAbsent} and the JSON tree's
+     * {@code JsonNull} at the same fields, in both directions.
+     */
+    @Test
+    void bothTreesKeepWhichSpellingOfAbsenceArrived() {
+        TsonRecord text = (TsonRecord) TSON.treeReader().read("""
+                !!schema:"%s"
+                !marks { from: _  timeout: _  version: "2.0" }""".formatted(ID));
+        JsonObject json = (JsonObject) jsonTree("marks", """
+                {"from": null, "timeout": null, "version": "2.0"}""");
+        for (String field : List.of("from", "timeout")) {
+            assertInstanceOf(TsonAbsent.class, text.get(field), field);
+            assertInstanceOf(JsonNull.class, json.get(field), field);
+        }
+        assertFalse(text.fields().containsKey("nickname"));
+        assertTrue(json.tryGet("nickname").isEmpty());
+    }
+
+    private static JsonValue jsonTree(String rootType, String body) {
+        List<Diagnostic> problems = new ArrayList<>();
+        DiagnosticsReceiver receiver = problems::add;
+        try (ByteSource bytes = ByteSource.of(body)) {
+            JsonReadContext ctx = JsonReadContext.of(new JsonStream(bytes, ProcessorPolicy.defaults(), receiver),
+                    receiver);
+            ctx = COMPILED.rootDeclaration(rootType).map(ctx::underDeclaration).orElse(ctx);
+            JsonValue value = (JsonValue) COMPILED.get(rootType).read(ctx);
+            assertEquals(List.of(), problems);
+            return value;
+        }
+    }
+
+    // ── §7.2 subsumption ─────────────────────────────────────────────────
+
+    /**
+     * A tag naming a type the position does not admit is one rule with one code, {@code TYPE_MISMATCH}: the
+     * name resolves and is merely inadmissible where it stands, where {@code UNKNOWN_TYPE_REF} means a name
+     * denoting nothing. The code decides §8.1's category too -- {@code validation} against {@code resolver}
+     * -- so two stacks picking differently would misfile one verdict, which is what this case guards.
+     */
+    @Test
+    void aTagNamingAnInadmissibleTypeIsOneRuleInBoth() {
+        sameRule("holder", """
+                { who: !robot { serial: "x" }  labels: [] }""", """
+                {"who":{"$type":"robot","serial":"x"},"labels":[]}""");
+    }
+
+    /** The same rule where the position's type has no subtypes at all, whose remedy differs. */
+    @Test
+    void aTagAtAPositionWithNoSubtypesIsOneRuleInBoth() {
+        sameRule("garage", """
+                { r: !person { name: "Ada"  labels: [] } }""", """
+                {"r":{"$type":"person","name":"Ada","labels":[]}}""");
+    }
+
+    // ── Subtype families ([TSON-SCHEMA] §5.2, [TSON-JSON] §6.1.5) ────────
+
+    /**
+     * <b>The headline, and the reason the design exists.</b> A sealed family's value is placed by the members
+     * it already carries, so neither encoding needs a tag -- the TSON is the TSON anyone would write and the
+     * JSON is the JSON anyone would write, and they are the same value.
+     *
+     * <p>Read at a <em>field</em> position deliberately. TSON names a document's root type with its own
+     * type-ref, so a sealed root necessarily carries {@code !pet} where JSON's root type arrives out of band
+     * (§3.4) and carries nothing -- comparing those would be comparing the two encodings' root conventions
+     * rather than their reading of a family.
+     */
+    @Test
+    void aSealedFamilyIsTagFreeInBothEncodings() {
+        bothAccept("kennel", "{ p: { pet_type: dog  name: Rex  breed: corgi } }",
+                """
+                        {"p": {"pet_type": "dog", "name": "Rex", "breed": "corgi"}}""");
+    }
+
+    /** And the selection is a selection: the other pin reaches the other member's fields. */
+    @Test
+    void theOtherPinSelectsTheOtherMemberInBoth() {
+        bothAccept("kennel", "{ p: { pet_type: cat  name: Tom  indoor: true } }",
+                """
+                        {"p": {"pet_type": "cat", "name": "Tom", "indoor": true}}""");
+    }
+
+    /**
+     * Set identity is over the element's value space ([TSON-SCHEMA] §5.5): an instant's offset is a spelling, so
+     * two spellings of one instant are one element, and the second is refused in both encodings.
+     */
+    @Test
+    void twoSpellingsOfOneInstantAreOneSetElementInBoth() {
+        sameRule("stamps", "[ \"2026-01-01T00:00:30Z\" \"2026-01-01T01:00:30+01:00\" ]", """
+                ["2026-01-01T00:00:30Z", "2026-01-01T01:00:30+01:00"]""");
+    }
+
+    /**
+     * One rule, one code, one pointer -- and JSON's prose says one thing more. [TSON-JSON] §6.1.5 puts a sealed
+     * position's discriminators first, so the JSON refusal says where the member has to be; TSON text has no
+     * member order and nothing to add.
+     */
+    @Test
+    void aMissingDiscriminatorIsOneRuleInBothAndJsonSaysWhereItGoes() {
+        List<Diagnostic> json = sameCodeAndPath("kennel", "{ p: { name: Rex  breed: corgi } }",
+                """
+                        {"p": {"name": "Rex", "breed": "corgi"}}""");
+        assertTrue(json.getFirst().message().contains("lead the object"), json.getFirst().message());
+    }
+
+    @Test
+    void aDiscriminatorNoMemberPinsIsOneRuleInBoth() {
+        sameRule("kennel", "{ p: { pet_type: dgo  name: Rex } }",
+                """
+                        {"p": {"pet_type": "dgo", "name": "Rex"}}""");
+    }
+
+    /**
+     * <b>A divergence, pinned until the TSON reader catches up.</b> The JSON sealed dispatcher sends a tagged
+     * value where its tag names, and the selected member's reader refuses the pin the document contradicts --
+     * a FIXED contradiction at the discriminator. The TSON reader still compares the tag against the
+     * dispatched member itself and refuses at the value. Both refuse the document; they say so differently.
+     */
+    @Test
+    void aTagContradictingTheDiscriminatorIsRefusedInBothAndStatedDifferently() {
+        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!kennel %s".formatted(ID,
+                "{ p: !cat { pet_type: dog  name: Rex  breed: corgi } }"));
+        assertEquals(List.of(new Rule(Diagnostic.Code.TYPE_MISMATCH, "/p", "dog", fromTson.getFirst().message())),
+                fromTson.stream().map(Rule::of).toList());
+        List<Diagnostic> fromJson = jsonDiagnostics("kennel", """
+                {"p": {"$type": "cat", "pet_type": "dog", "name": "Rex", "breed": "corgi"}}""");
+        assertTrue(fromJson.stream().anyMatch(d -> d.code() == Diagnostic.Code.FIELD_FIXED
+                && d.path().orElse("").equals("/p/pet_type")), fromJson.toString());
+    }
+
+    @Test
+    void anAbstractPositionRequiresItsTagInBoth() {
+        sameRule("gallery", "{ f: { area: 4 } }", """
+                {"f": {"area": 4}}""");
+    }
+
+    /** The base has no direct instances, so naming it is an error in both -- not a redundant restatement. */
+    @Test
+    void aTagNamingTheAbstractBaseIsOneRuleInBoth() {
+        sameRule("gallery", "{ f: !figure { area: 4 } }", """
+                {"f": {"$type": "figure", "area": 4}}""");
+    }
+
+    @Test
+    void anAbstractPositionTakesTheTaggedSubtypeInBoth() {
+        bothAccept("gallery", "{ f: !disc { area: 4  side: 2 } }", """
+                {"f": {"$type": "disc", "area": 4, "side": 2}}""");
+    }
+
+    /**
+     * A tag at a sealed position may only agree with what the members already decided (§5.2), and "agree" is
+     * a comparison of names -- so it flattens at both ends like every other §7.2 comparison. An alias of the
+     * selected member agrees; an alias of the base selects nothing, exactly as the base's own name does.
+     */
+    @Test
+    void anAliasOfASealedMemberAgreesInBoth() {
+        bothAccept("kennel", "{ p: !dog_of { pet_type: \"dog\"  name: \"Rex\"  breed: \"lab\" } }", """
+                {"p": {"$type": "dog_of", "pet_type": "dog", "name": "Rex", "breed": "lab"}}""");
+    }
+
+    @Test
+    void anAliasOfASealedBaseSelectsNothingInBoth() {
+        sameRule("kennel", "{ p: !pet_of { pet_type: \"dog\"  name: \"Rex\"  breed: \"lab\" } }", """
+                {"p": {"$type": "pet_of", "pet_type": "dog", "name": "Rex", "breed": "lab"}}""");
+    }
+
+    /**
+     * The same family over a <b>template</b>: {@code outcome<text>} is abstract and {@code won<text>} is its
+     * one member. Every entry in it is minted, and §8.2 makes a minted name non-normative -- so the alias is
+     * the only name either document has for the member, and both encodings have to flatten it (§7.2's "after
+     * reference flattening of both"). TSON text did not, and the two stacks disagreed about every value in
+     * such a family.
+     */
+    @Test
+    void anAliasOfATemplateFamilyMemberSelectsItInBoth() {
+        bothAccept("ledger", "{ o: !won_of { code: \"c\"  prize: \"p\" } }", """
+                {"o": {"$type": "won_of", "code": "c", "prize": "p"}}""");
+    }
+
+    /** And an alias of the <em>base</em> selects nothing in both, which is the other end of the same set. */
+    @Test
+    void anAliasOfATemplateFamilyBaseSelectsNothingInBoth() {
+        sameRule("ledger", "{ o: !outcome_of { code: \"c\" } }", """
+                {"o": {"$type": "outcome_of", "code": "c"}}""");
+    }
+
+    /**
+     * The untagged case over a template family, which compares the two {@code expected} lists as well as the
+     * prose -- so a stack flattening aliases on one side of the comparison and not the other is caught by
+     * what it offers the author, not only by what it admits.
+     */
+    @Test
+    void anAbstractTemplatePositionRequiresItsTagInBoth() {
+        sameRule("ledger", "{ o: { code: \"c\"  prize: \"p\" } }", """
+                {"o": {"code": "c", "prize": "p"}}""");
+    }
+
+    // ── A bare template at a type position ──────────────────────────────
+    //    `crate => { b: box }` names the template itself, which is the family base its instantiations close
+    //    from (§5.10). The base is ABSTRACT by derivation -- a record body with no
+    //    discriminator -- so the tag is the selector in both encodings, and every member is minted, so an
+    //    alias is the only name either document has for one.
+
+    /** A member named by its alias reads at the template's own position, in both encodings. */
+    @Test
+    void aMemberOfABareTemplateBaseReadsInBoth() {
+        bothAccept("crate", "{ b: !int_box { v: 1 } }", """
+                {"b": {"$type": "int_box", "v": 1}}""");
+    }
+
+    /** And the other member, which is what makes the dispatch a dispatch rather than a single admission. */
+    @Test
+    void theOtherMemberOfABareTemplateBaseReadsInBoth() {
+        bothAccept("crate", "{ b: !text_box { v: \"x\" } }", """
+                {"b": {"$type": "text_box", "v": "x"}}""");
+    }
+
+    /** Untagged selects nothing: the base has no direct instances, so both encodings require the tag. */
+    @Test
+    void aBareTemplateBaseRequiresItsTagInBoth() {
+        sameRule("crate", "{ b: { v: 1 } }", """
+                {"b": {"v": 1}}""");
+    }
+
+    /** A tag naming the base itself selects nothing either, which is the other end of the same set. */
+    @Test
+    void aTagNamingTheBareTemplateBaseSelectsNothingInBoth() {
+        sameRule("crate", "{ b: !box { v: 1 } }", """
+                {"b": {"$type": "box", "v": 1}}""");
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {
@@ -414,10 +713,10 @@ class CrossEncodingParityTest {
      * §6.5: identity is over the key type's value space, so {@code 1} and {@code 1.0} under a {@code number}
      * key are one key in both encodings.
      *
-     * <p>This case was held out of the suite while the TSON reader disagreed — its {@code ValueIdentity} had
-     * no {@code BigDecimal} case, so the exact tier compared by scale there (issue #470). Pinning that as
-     * expected divergence is how a defect becomes permanent, so it waited instead, and it is here now that
-     * both encodings answer alike.
+     * <p>What this pins is that the exact tier compares by value and not by scale in both stacks: {@code
+     * BigDecimal.equals} tells {@code 1} from {@code 1.0}, so a reader comparing decoded keys with it admits
+     * the pair as two keys. It is a parity case rather than a divergence because §6.5 leaves neither encoding
+     * room to answer differently.
      */
     @Test
     void twoSpellingsOfOneKey() {

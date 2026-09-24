@@ -45,8 +45,8 @@ class ApplicationInContainerPositionTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/nested.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                 %s
                 }
@@ -112,7 +112,7 @@ class ApplicationInContainerPositionTest {
     @Test
     void theTreeFixtureTiesTheKnotThroughTheSynthetic() {
         TsonCompiledSchema compiled = compile("""
-                  tree => <T> { value: T  children: [tree<T>; 1..]? }
+                  tree => <T> { value: T  children?: [tree<T>; 1..]? }
                   use  => { t: tree<text> }""");
 
         String instantiation = fieldType(compiled, "use", "t");
@@ -130,7 +130,7 @@ class ApplicationInContainerPositionTest {
     @Test
     void theLiftedArrayIsOpenAndItsBindingKeepsTheApplication() {
         TsonCompiledSchema compiled = compile("""
-                  tree => <T> { value: T  children: [tree<T>; 1..]? }
+                  tree => <T> { value: T  children?: [tree<T>; 1..]? }
                   use  => { t: tree<text> }""");
 
         // The lifted synthetic, by its derived name: `tree` itself holds a body too now (a record template

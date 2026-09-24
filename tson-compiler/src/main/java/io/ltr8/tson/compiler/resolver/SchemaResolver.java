@@ -165,18 +165,20 @@ public final class SchemaResolver {
      * contains placeholder entries and must not be linked, registered or compiled -- the caller checks the
      * receiver and stops, which is the phase boundary javac and Swift both draw (javac attributes every entry
      * before {@code shouldStopPolicyIfError} blocks the next phase; Swift never reaches SILGen after a Sema
-     * error). {@link DiagnosticsReceiver#throwing()}, the default the other overloads pass, makes the
-     * first failure an exception again and so keeps that impossible by construction.
+     * error). The fail-fast overloads make the first failure an exception and so keep that impossible by
+     * construction.
      *
-     * <p>Only a {@link SchemaValidationException} -- the schema is wrong -- becomes a diagnostic. An
-     * {@code UnsupportedOperationException} means this library hasn't implemented the construct and keeps
-     * propagating: a gap is not a verdict on the author's schema, and reporting it as one sends them looking
-     * for a fix that doesn't exist.
+     * <p>Three exception types become a diagnostic, and the type picks the code: a
+     * {@link SchemaValidationException} -- the schema is wrong -- is a schema error, an
+     * {@code UnsupportedOperationException} is {@code NOT_IMPLEMENTED}, and a {@link BindMismatchException}
+     * is {@code BIND_MISMATCH}. A gap is collected beside the ordinary problems rather than propagating,
+     * since thrown out of a per-declaration phase it would take every other declaration's verdict with it;
+     * it is the code that keeps it from reading as a verdict on the author's schema.
      *
      * <p><b>The fail-fast overloads do not route through {@link DiagnosticsReceiver#throwing()}</b>, which
-     * would raise {@code ReadException} and so quietly change the exception type every existing caller
-     * sees -- a schema that fails to resolve is not a read failure, and the CLI's own exit codes turn on that
-     * distinction. They rethrow the original instead, unwrapped and with its stack intact.
+     * would raise {@code ReadException} -- a schema that fails to resolve is not a read failure, and the
+     * CLI's own exit codes turn on that distinction. They rethrow the original instead, unwrapped and with
+     * its stack intact.
      *
      * @param receiver where a failed declaration is reported; must not be {@code null}
      */
@@ -256,7 +258,32 @@ public final class SchemaResolver {
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary.
                 (type, value) -> read(metaParser.get(type), value),
-                metaParser.schema().entries()::get, namespaceGetter, materialiser::closeApplication, positions);
+                metaParser.schema().entries()::get, namespaceGetter, new ApplicationCloser() {
+
+                    @Override
+                    public String closeApplication(io.ltr8.tson.schema.meta.TypeRef application) {
+                        return materialiser.closeApplication(application);
+                    }
+
+                    /** An operand absorbed by value gets the same argument-kind inference a closed one does. */
+                    @Override
+                    public List<io.ltr8.tson.schema.meta.TypeArgument> byParameterKind(String head,
+                            TypeDefinition template, List<String> parameters,
+                            List<io.ltr8.tson.schema.meta.TypeArgument> arguments) {
+                        return materialiser.byParameterKind(head, template, parameters, arguments);
+                    }
+
+                    /**
+                     * A declaration naming a fully-bound application is the entry it denotes (§8.2), so the
+                     * closure happens here rather than minting a content-named entry for the declaration to
+                     * reference.
+                     */
+                    @Override
+                    public TypeDefinition closeApplicationInto(String declaredName,
+                            io.ltr8.tson.schema.meta.TypeRef application) {
+                        return materialiser.closeApplicationInto(declaredName, application);
+                    }
+                }, positions);
         namespaceGetter.resolveWith(resolver);
 
         for (String name : declarations.keySet()) {
@@ -309,11 +336,12 @@ public final class SchemaResolver {
         Map<String, TypeDefinition> instantiations = materialiser.materialise(resolvedLocals,
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
         republish(namespace, resolvedLocals, instantiations);
+        appliedParentEdges(namespace, resolvedLocals, instantiations);
 
         // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
         // have resolved". A form the desugar phase lifted with an application in a slot was named before that
-        // application had an entry to be named for; every application is closed now, so it re-derives to the
-        // name the other channel already gave the same form. See SyntheticMerge.
+        // application had an entry to be named for; at this point every application is closed, so it
+        // re-derives to the name the other channel gives the same form. See SyntheticMerge.
         Map<String, String> merged = SyntheticMerge.renames(declarations, generated, materialiser);
         if (!merged.isEmpty()) {
             SyntheticMerge.rewrite(resolvedLocals, merged);
@@ -355,11 +383,11 @@ public final class SchemaResolver {
             }
         }
 
-        // §8.3 use-site flattening used to run here and no longer exists. A reference is a hop, not a
+        // No reference is flattened here, at a use site or anywhere else. A reference is a hop, not a
         // rewrite: resolved output states the chain the author wrote, every use site keeps the name it
         // names, and a processor collapses the chain when it compiles readers -- after linking, where the
         // whole namespace is present and the walk is done once per entry rather than once per output.
-        // See docs/schema-resolution.md and [TSON-SCHEMA] §8.3.
+        // See design/resolver-vocabulary-and-bootstrap.md and [TSON-SCHEMA] §8.3.
 
         // §6: an annotation written before the declared name binds to the *name*, not to the definition,
         // and "the resolver does not hoist annotations from key to value". A resolved schema is a
@@ -455,6 +483,122 @@ public final class SchemaResolver {
             resolvedLocals.put(name, placeholder);
             namespace.put(name, placeholder);
         }
+    }
+
+    /**
+     * §5.8's IS-A edge for a <b>composition operand written as an application</b>, derived once every
+     * declaration has resolved.
+     *
+     * <p>Composition needs the operand's <em>fields</em> and nothing else, so {@code TemplateMaterialiser}
+     * leaves the application in {@code record.supertypes} exactly as written and mints no entry for it
+     * (§8.2). The edge is the half that has to wait: the entry an application denotes
+     * is whichever declaration names the same application, and asking that <em>during</em> materialisation
+     * would make the answer depend on declaration order -- {@code text_box} declared before the composition
+     * found, declared after it not. §8.1 calls this field "the derived transitive index, computed once
+     * every parent is a type", and this is that moment.
+     *
+     * <p><b>Nothing is created here.</b> The pass derives an index over entries that already exist, keyed on
+     * §8.2's canonical application so two spellings of one application agree. Where no declaration names the
+     * application there is no name to record, and that is the right answer rather than a gap: nobody declared
+     * that type, so nothing can be declared as it.
+     *
+     * <p><b>§5.9 needs no guard here, and a guard was wrong.</b> {@code DefinitionResolver} already omits an
+     * operand from {@code record.supertypes} when the declaration carries a removal -- "a name kept in the
+     * body is inert, where an application closes into a live edge" -- so a subtracted entry has no applied
+     * parent left for this pass to find. Skipping entries whose contract is empty looked like the same rule
+     * and is not: a template composing a base that itself composes nothing has an empty chain too, so
+     * {@code ok => <T> result<T> & { … }} closed at {@code ok<text>} was silently denied its edge to
+     * {@code result_of}.
+     */
+    private static void appliedParentEdges(Map<String, TypeDefinition> namespace,
+                                            Map<String, TypeDefinition> resolvedLocals,
+                                            Map<String, TypeDefinition> instantiations) {
+        Map<String, String> byApplication = new LinkedHashMap<>();
+        namespace.forEach((entryName, definition) -> definition.source()
+                .filter(source -> !source.arguments().isEmpty())
+                .ifPresent(source -> byApplication.putIfAbsent(
+                        DerivedName.canonicalApplication(source.name(), source.arguments()), entryName)));
+        if (byApplication.isEmpty()) {
+            return;
+        }
+        // <b>To a fixed point</b>, because the edge is transitive and each pass can only see the contracts
+        // the previous one left. `great => <T> ok<T> & { … }` over `ok => <T> result<T> & { … }` needs
+        // `ok_of`'s own edge to `result_of` to exist before `great_of` can inherit it, and the two are
+        // derived here rather than at their declarations. Bounded by the entry count: each round adds at
+        // least one name to some contract or stops.
+        for (int round = 0; round <= namespace.size(); round++) {
+            // Republished between the two folds as well as after them: an owner's contract grows in this
+            // same round, and `withAppliedParents` reads its ancestors out of the namespace -- so
+            // `great_of` inheriting from `ok_of` needs `ok_of`'s new edge visible before it is asked for,
+            // not one round later.
+            boolean changed = fold(resolvedLocals, byApplication, namespace);
+            republish(namespace, resolvedLocals, instantiations);
+            changed |= fold(instantiations, byApplication, namespace);
+            republish(namespace, resolvedLocals, instantiations);
+            if (!changed) {
+                return;
+            }
+        }
+    }
+
+    /** One round of {@link #appliedParentEdges} over one map -- {@code true} when any contract grew. */
+    private static boolean fold(Map<String, TypeDefinition> entries, Map<String, String> byApplication,
+                                 Map<String, TypeDefinition> namespace) {
+        boolean changedAny = false;
+        // <b>To a fixed point within the map, not merely across rounds.</b> A pass visits entries in map
+        // order while mutating them, so `great_of` can be reached before `ok_of` has grown the edge it
+        // inherits -- and both live in this same map, which an outer round cannot fix. Each inner pass
+        // republishes, because `withAppliedParents` reads an owner's ancestors out of the namespace.
+        for (int pass = 0; pass <= entries.size(); pass++) {
+            boolean changed = false;
+            for (Map.Entry<String, TypeDefinition> entry : entries.entrySet()) {
+                TypeDefinition folded = withAppliedParents(entry.getValue(), byApplication, namespace);
+                if (folded != entry.getValue()) {
+                    entry.setValue(folded);
+                    namespace.put(entry.getKey(), folded);
+                    changed = true;
+                }
+            }
+            if (!changed) {
+                return changedAny;
+            }
+            changedAny = true;
+        }
+        return changedAny;
+    }
+
+    /** One entry with every applied parent's owning declaration folded into its contract index. */
+    private static TypeDefinition withAppliedParents(TypeDefinition definition,
+                                                      Map<String, String> byApplication,
+                                                      Map<String, TypeDefinition> namespace) {
+        if (!(definition.body() instanceof RecordBody record)) {
+            return definition;
+        }
+        List<String> contract = new java.util.ArrayList<>(definition.supertypes());
+        Set<String> seen = new LinkedHashSet<>(contract);
+        for (io.ltr8.tson.schema.meta.TypeRef parent : record.supertypes()) {
+            if (parent.arguments().isEmpty()) {
+                continue;
+            }
+            String owner = byApplication.get(
+                    DerivedName.canonicalApplication(parent.name(), parent.arguments()));
+            if (owner == null || !seen.add(owner)) {
+                continue;
+            }
+            contract.add(owner);
+            TypeDefinition ownerDefinition = namespace.get(owner);
+            if (ownerDefinition != null) {
+                for (String ancestor : ownerDefinition.supertypes()) {
+                    if (seen.add(ancestor)) {
+                        contract.add(ancestor);
+                    }
+                }
+            }
+        }
+        return contract.size() == definition.supertypes().size() ? definition
+                : new TypeDefinition(definition.source(), definition.kind(), List.copyOf(contract),
+                        definition.subtypes(), definition.body(), definition.position(),
+                        definition.annotations());
     }
 
     /**

@@ -70,7 +70,7 @@ import java.util.Optional;
  * fix. It is deliberately <em>not</em> synthesized from {@code code} plus parameters -- {@code code} does
  * not determine the sentence ({@link Code#TYPE_MISMATCH} alone spans a wrong shape, a wrong token, a wrong
  * cardinality, a bare annotation, an unmatched variant and a host-binding failure), and the sentences differ
- * because the situations do. See {@code docs/readers-and-diagnostics.md}.
+ * because the situations do. See {@code design/diagnostic-model.md}.
  */
 public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, String schemaId, Code code,
                           String message, String expected, String actual,
@@ -174,9 +174,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * <p>{@code FIELD_REQUIRED} and {@code FIELD_FIXED} are the two [TSON-SCHEMA] §5.2 field-state rules a
      * document can break, and they sit together deliberately: neither is anything to do with the field's
      * <em>type</em>. A {@code FIELD_FIXED} value satisfied its atom's grammar and every facet -- it simply
-     * isn't the one value the schema permits, whether that is a stated value contradicting {@code = value},
-     * a {@code REQUIRED_FIXED} field written {@code _}, or a value written where {@code = _} fixes the
-     * field to absent.
+     * isn't the one value the schema permits, whether that is a stated value contradicting {@code = value}
+     * or a pinned field written {@code _}.
      *
      * <p>{@code DUPLICATE_MAP_KEY} and {@code DUPLICATE_FIELD} are the same mistake at the two container
      * shapes TSON keeps apart -- a key stated twice in one map ([TSON-DATA] §2.6), a field name stated
@@ -242,8 +241,30 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public enum Code {
         FIELD_REQUIRED,
         FIELD_FIXED,
+
+        /**
+         * The value's type is not one the position takes. That covers a written type annotation naming a type
+         * the position does not admit ([TSON-SCHEMA] §7.2's subsumption rule, a choice's variant membership
+         * and a union's alike) and a position where a selector is <b>required</b> and absent, since no type
+         * is established either way.
+         *
+         * <p><b>The line against {@link #UNKNOWN_TYPE_REF} is whether the written name resolves.</b> Here it
+         * does, and what fails is admissibility -- a verdict on the document read against a schema that
+         * loaded, so [TSON-DATA] §8.1's {@code validation} category. It is worth stating because the two are
+         * easy to conflate and a consumer routes on the difference: one says "correct the name", the other
+         * says "this name means nothing here".
+         */
         TYPE_MISMATCH,
         WRONG_ARITY,
+
+        /**
+         * The written name denotes nothing -- a type-ref or an annotation naming no type the governing schema
+         * declares, or, on the schemaless path, one linking to nothing at all. §8.1's {@code resolver}
+         * category, an unresolved reference being what that category is for.
+         *
+         * <p>A name that <em>does</em> resolve and is merely not admissible at its position is {@link
+         * #TYPE_MISMATCH}, not this.
+         */
         UNKNOWN_TYPE_REF,
         ATOM_FORM_INVALID,
         ATOM_CONSTRAINT_VIOLATION,

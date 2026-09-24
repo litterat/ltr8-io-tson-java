@@ -17,7 +17,7 @@ import java.util.Optional;
  * <p><b>{@code spec} is flat, and a bare {@link String}</b> -- two separate requirements, both confirmed
  * empirically, not assumed. <b>Flat</b>, because {@code atom_specification}'s own {@code spec} field
  * composes into {@code cidr4_type} flat (composition always flattens, §5.8) and {@code tson-compiler}'s
- * compiled {@code Record*Reader} fills a field, including a REQUIRED_FIXED field's schema-composed
+ * compiled {@code Record*Reader} fills a field, including a fixed field's schema-composed
  * default, under its own schema field name -- a component nesting it under a name the wire doesn't carry
  * receives nothing at all. <b>A {@link String}</b>, because the value arrives untyped: the schema
  * modifier is just {@code spec: = "https://..."}, with no {@code !uri} type-ref, and {@code AtomBinder}

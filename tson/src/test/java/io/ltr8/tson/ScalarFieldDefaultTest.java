@@ -20,10 +20,10 @@ class ScalarFieldDefaultTest {
     void aPeriodTypedFieldMayCarryADefault() {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/period-default.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
-                  plan => { term: period ~ P1Y }
+                  plan => { term?: period ~ P1Y }
                 }
                 """);
         assertEquals(List.of(), problems, problems::toString);
@@ -32,10 +32,10 @@ class ScalarFieldDefaultTest {
     void aDurationTypedFieldMayToo() {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/duration-default.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
-                  plan => { gap: duration ~ PT30M }
+                  plan => { gap?: duration ~ PT30M }
                 }
                 """);
         assertEquals(List.of(), problems, problems::toString);

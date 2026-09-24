@@ -26,8 +26,7 @@ import io.ltr8.tson.atom.BuiltinTypeVocabulary;
  * position ([TSON-SCHEMA] §4.2) rather than anything this family decides, and it is why [TSON-DATA] §4.2's
  * special status for the two tokens is a *base type resolution* rule, which a typed position never reaches.
  *
- * <p>Registered in {@link BuiltinTypeVocabulary} under {@code boolean} -- see {@code SPEC-FEEDBACK.md} #8
- * for why §5's own table omits it and why that reads as an oversight rather than a decision.
+ * <p>Registered in {@link BuiltinTypeVocabulary} under {@code boolean}, [TSON-DATA] §5.5's {@code !boolean}.
  */
 public record BooleanParser() implements AtomTypeParser<Boolean> {
 

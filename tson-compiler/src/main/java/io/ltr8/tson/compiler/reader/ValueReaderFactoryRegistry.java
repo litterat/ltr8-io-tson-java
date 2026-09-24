@@ -115,7 +115,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
 
         // meta-kernel.tn
         factories.put("unit", unitFactory);
-        factories.put("record", record);
+        factories.put("record", RecordDispatch.over(record));
         factories.put("array", array);
         factories.put("set_type", array);
         factories.put("map", map);

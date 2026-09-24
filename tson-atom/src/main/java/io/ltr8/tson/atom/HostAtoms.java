@@ -176,8 +176,8 @@ public final class HostAtoms {
      * <p><b>What a reader asks when the class is what types the position</b> -- an object-binding read of a
      * document with no {@code !!schema}, where the target class fixes the shape of every record, array and
      * atom under it. [TSON-DATA] §4.1's base type resolution is for a position nothing types, which after
-     * this is exactly tree mode; {@code SPEC-FEEDBACK.md} #7 carries why, since §4.1 speaks of documents and
-     * has no term for a position a host type has typed.
+     * this is exactly tree mode; a declared host type naming a §5 family types the position, and that
+     * family's own parsing contract reads the token.
      *
      * <p><b>What is deliberately absent</b> is every class no single family names: {@code char} and
      * {@code Object} (no family at all), the sealed {@code CidrNetwork} supertype (both {@code cidr4} and

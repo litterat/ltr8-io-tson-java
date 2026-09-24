@@ -34,8 +34,17 @@ final class ValueIdentity {
     private ValueIdentity() {
     }
 
+    /**
+     * A value that carries its identity beside it, for a mode whose value does not show it: tree mode's node
+     * of a set's atom element keeps the spelling, and the identity is the parsed value's ({@link
+     * TreeAtomKeyedReader}).
+     */
+    record Identified(Object value, Object identity) {
+    }
+
     static Object of(Object decoded) {
         return switch (decoded) {
+            case Identified identified -> identified.identity();
             case JsonValue node -> ofNode(node);
             case String text -> Nfc.of(text);
             case byte[] octets -> ByteBuffer.wrap(octets);

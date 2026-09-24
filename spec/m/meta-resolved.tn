@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/35/m/meta-resolved.tn"
-!!schema:"https://tson.io/2026/35/m/meta-kernel.tn"
+!!id:"https://tson.io/2026/36/m/meta-resolved.tn"
+!!schema:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
-  Resolver-output fixture for meta.tn (2026 Revision 35 draft).
+  Resolver-output fixture for meta.tn (2026 Revision 36 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
   Conventions as in meta-kernel-resolved.tn.
 
@@ -27,10 +27,10 @@
   bytes_type => !type_definition {
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: encoding    type: bytes_encoding  state: REQUIRED_DEFAULT  value: BASE64 }
-      !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: encoding    type: bytes_encoding  optional: true  role: DEFAULT  value: BASE64 }
+      !record_field { name: length      type: non_negative_integer  optional: true }
+      !record_field { name: min_length  type: non_negative_integer  optional: true }
+      !record_field { name: max_length  type: non_negative_integer  optional: true }
     ] }
   }
 
@@ -56,7 +56,7 @@
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
       !record_field { name: scope    type: set_scope_kind_xxhash }
-      !record_field { name: schemas  type: map_uri_array_type_name_1_ef020ac1_OPTIONAL_1_xxhash  state: OPTIONAL }
+      !record_field { name: schemas  type: map_uri_array_type_name_1_ef020ac1_OPTIONAL_1_xxhash  optional: true }
     ] }
   }
 
@@ -70,16 +70,16 @@
   float_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec                 type: uri      state: REQUIRED_FIXED  value: "https://ieeexplore.ieee.org/document/8766229" }
+      !record_field { name: spec                 type: uri      optional: true  role: FIXED  value: "https://ieeexplore.ieee.org/document/8766229" }
       !record_field { name: format               type: ieee_format }
-      !record_field { name: min                  type: value    state: OPTIONAL }
-      !record_field { name: exclusive_min        type: value    state: OPTIONAL }
-      !record_field { name: max                  type: value    state: OPTIONAL }
-      !record_field { name: exclusive_max        type: value    state: OPTIONAL }
-      !record_field { name: allow_nan            type: boolean  state: REQUIRED_DEFAULT  value: true }
-      !record_field { name: allow_infinity       type: boolean  state: REQUIRED_DEFAULT  value: true }
-      !record_field { name: allow_subnormal      type: boolean  state: REQUIRED_DEFAULT  value: true }
-      !record_field { name: allow_negative_zero  type: boolean  state: REQUIRED_DEFAULT  value: true }
+      !record_field { name: min                  type: value    optional: true }
+      !record_field { name: exclusive_min        type: value    optional: true }
+      !record_field { name: max                  type: value    optional: true }
+      !record_field { name: exclusive_max        type: value    optional: true }
+      !record_field { name: allow_nan            type: boolean  optional: true  role: DEFAULT  value: true }
+      !record_field { name: allow_infinity       type: boolean  optional: true  role: DEFAULT  value: true }
+      !record_field { name: allow_subnormal      type: boolean  optional: true  role: DEFAULT  value: true }
+      !record_field { name: allow_negative_zero  type: boolean  optional: true  role: DEFAULT  value: true }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -91,14 +91,14 @@
   decimal_type => !type_definition {
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: min              type: value    state: OPTIONAL }
-      !record_field { name: exclusive_min    type: value    state: OPTIONAL }
-      !record_field { name: max              type: value    state: OPTIONAL }
-      !record_field { name: exclusive_max    type: value    state: OPTIONAL }
-      !record_field { name: multiple_of      type: value    state: OPTIONAL }
-      !record_field { name: total_digits     type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: fraction_digits  type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: members          type: set_value_xxhash  state: OPTIONAL }
+      !record_field { name: min              type: value    optional: true }
+      !record_field { name: exclusive_min    type: value    optional: true }
+      !record_field { name: max              type: value    optional: true }
+      !record_field { name: exclusive_max    type: value    optional: true }
+      !record_field { name: multiple_of      type: value    optional: true }
+      !record_field { name: total_digits     type: non_negative_integer  optional: true }
+      !record_field { name: fraction_digits  type: non_negative_integer  optional: true }
+      !record_field { name: members          type: set_value_xxhash  optional: true }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -110,11 +110,11 @@
   rational_type => !type_definition {
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: min            type: value  state: OPTIONAL }
-      !record_field { name: exclusive_min  type: value  state: OPTIONAL }
-      !record_field { name: max            type: value  state: OPTIONAL }
-      !record_field { name: exclusive_max  type: value  state: OPTIONAL }
-      !record_field { name: multiple_of    type: value  state: OPTIONAL }
+      !record_field { name: min            type: value  optional: true }
+      !record_field { name: exclusive_min  type: value  optional: true }
+      !record_field { name: max            type: value  optional: true }
+      !record_field { name: exclusive_max  type: value  optional: true }
+      !record_field { name: multiple_of    type: value  optional: true }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -132,7 +132,7 @@
   complex_type => !type_definition {
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: component  type: complex_component  state: REQUIRED_DEFAULT  value: NUMBER }
+      !record_field { name: component  type: complex_component  optional: true  role: DEFAULT  value: NUMBER }
     ] }
   }
 
@@ -140,11 +140,11 @@
   date_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
-      !record_field { name: min            type: value  state: OPTIONAL }
-      !record_field { name: exclusive_min  type: value  state: OPTIONAL }
-      !record_field { name: max            type: value  state: OPTIONAL }
-      !record_field { name: exclusive_max  type: value  state: OPTIONAL }
+      !record_field { name: spec           type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
+      !record_field { name: min            type: value  optional: true }
+      !record_field { name: exclusive_min  type: value  optional: true }
+      !record_field { name: max            type: value  optional: true }
+      !record_field { name: exclusive_max  type: value  optional: true }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -156,12 +156,12 @@
   time_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec              type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
-      !record_field { name: min               type: value    state: OPTIONAL }
-      !record_field { name: exclusive_min     type: value    state: OPTIONAL }
-      !record_field { name: max               type: value    state: OPTIONAL }
-      !record_field { name: exclusive_max     type: value    state: OPTIONAL }
-      !record_field { name: precision         type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: spec              type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
+      !record_field { name: min               type: value    optional: true }
+      !record_field { name: exclusive_min     type: value    optional: true }
+      !record_field { name: max               type: value    optional: true }
+      !record_field { name: exclusive_max     type: value    optional: true }
+      !record_field { name: precision         type: non_negative_integer  optional: true }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -173,12 +173,12 @@
   datetime_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec              type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
-      !record_field { name: min               type: value    state: OPTIONAL }
-      !record_field { name: exclusive_min     type: value    state: OPTIONAL }
-      !record_field { name: max               type: value    state: OPTIONAL }
-      !record_field { name: exclusive_max     type: value    state: OPTIONAL }
-      !record_field { name: precision         type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: spec              type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
+      !record_field { name: min               type: value    optional: true }
+      !record_field { name: exclusive_min     type: value    optional: true }
+      !record_field { name: max               type: value    optional: true }
+      !record_field { name: exclusive_max     type: value    optional: true }
+      !record_field { name: precision         type: non_negative_integer  optional: true }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -190,13 +190,13 @@
   duration_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
-      !record_field { name: min            type: value    state: OPTIONAL }
-      !record_field { name: exclusive_min  type: value    state: OPTIONAL }
-      !record_field { name: max            type: value    state: OPTIONAL }
-      !record_field { name: exclusive_max  type: value    state: OPTIONAL }
-      !record_field { name: precision      type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: multiple_of    type: value    state: OPTIONAL }
+      !record_field { name: spec           type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
+      !record_field { name: min            type: value    optional: true }
+      !record_field { name: exclusive_min  type: value    optional: true }
+      !record_field { name: max            type: value    optional: true }
+      !record_field { name: exclusive_max  type: value    optional: true }
+      !record_field { name: precision      type: non_negative_integer  optional: true }
+      !record_field { name: multiple_of    type: value    optional: true }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -213,12 +213,12 @@
   period_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
-      !record_field { name: min            type: value  state: OPTIONAL }
-      !record_field { name: exclusive_min  type: value  state: OPTIONAL }
-      !record_field { name: max            type: value  state: OPTIONAL }
-      !record_field { name: exclusive_max  type: value  state: OPTIONAL }
-      !record_field { name: multiple_of    type: value  state: OPTIONAL }
+      !record_field { name: spec           type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
+      !record_field { name: min            type: value  optional: true }
+      !record_field { name: exclusive_min  type: value  optional: true }
+      !record_field { name: max            type: value  optional: true }
+      !record_field { name: exclusive_max  type: value  optional: true }
+      !record_field { name: multiple_of    type: value  optional: true }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -230,8 +230,8 @@
   uuid_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec     type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9562" }
-      !record_field { name: version  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: spec     type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9562" }
+      !record_field { name: version  type: non_negative_integer  optional: true }
     ] }
   }
 
@@ -239,11 +239,12 @@
   email_type => !type_definition {
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: pattern     type: regex    state: OPTIONAL }
-      !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc5322" }
+      !record_field { name: min_length  type: non_negative_integer  optional: true }
+      !record_field { name: max_length  type: non_negative_integer  optional: true }
+      !record_field { name: length      type: non_negative_integer  optional: true }
+      !record_field { name: pattern     type: regex    optional: true }
+      !record_field { name: members     type: text_member_set  optional: true }
+      !record_field { name: spec        type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc5322" }
     ] }
   }
 
@@ -251,9 +252,9 @@
   ipv4_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec       type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
-      !record_field { name: within     type: array_value_xxhash  state: OPTIONAL }
-      !record_field { name: excluding  type: array_value_xxhash  state: OPTIONAL }
+      !record_field { name: spec       type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
+      !record_field { name: within     type: array_value_xxhash  optional: true }
+      !record_field { name: excluding  type: array_value_xxhash  optional: true }
     ] }
   }
 
@@ -261,9 +262,9 @@
   ipv6_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec       type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
-      !record_field { name: within     type: array_value_xxhash  state: OPTIONAL }
-      !record_field { name: excluding  type: array_value_xxhash  state: OPTIONAL }
+      !record_field { name: spec       type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
+      !record_field { name: within     type: array_value_xxhash  optional: true }
+      !record_field { name: excluding  type: array_value_xxhash  optional: true }
     ] }
   }
 
@@ -271,11 +272,11 @@
   cidr4_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
-      !record_field { name: min_prefix  type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: max_prefix  type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: within      type: array_value_xxhash  state: OPTIONAL }
-      !record_field { name: excluding   type: array_value_xxhash  state: OPTIONAL }
+      !record_field { name: spec        type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
+      !record_field { name: min_prefix  type: non_negative_integer  optional: true }
+      !record_field { name: max_prefix  type: non_negative_integer  optional: true }
+      !record_field { name: within      type: array_value_xxhash  optional: true }
+      !record_field { name: excluding   type: array_value_xxhash  optional: true }
     ] }
   }
 
@@ -283,11 +284,11 @@
   cidr6_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
-      !record_field { name: min_prefix  type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: max_prefix  type: non_negative_integer  state: OPTIONAL }
-      !record_field { name: within      type: array_value_xxhash  state: OPTIONAL }
-      !record_field { name: excluding   type: array_value_xxhash  state: OPTIONAL }
+      !record_field { name: spec        type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
+      !record_field { name: min_prefix  type: non_negative_integer  optional: true }
+      !record_field { name: max_prefix  type: non_negative_integer  optional: true }
+      !record_field { name: within      type: array_value_xxhash  optional: true }
+      !record_field { name: excluding   type: array_value_xxhash  optional: true }
     ] }
   }
 
@@ -295,7 +296,7 @@
   mac_type => !type_definition {
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec  type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9542" }
+      !record_field { name: spec  type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9542" }
     ] }
   }
 
@@ -373,24 +374,6 @@
 
   @doc:"Marks a field an encoding's consumers may write but not read."
   write_only => @annotation !type_definition {
-    source: void
-    body: !reference { target: void }
-  }
-
-  @doc:"""
-    Names the field a member-dispatching encoding selects a choice's
-    variant on. A checked annotation: no decode force, load-time force.
-    """
-  discriminator => @annotation !type_definition {
-    source: field_name
-    body: !reference { target: field_name }
-  }
-
-  @doc:"""
-    Designates the field an encoding that flattens is meant to flatten.
-    A checked annotation on the same terms as @discriminator.
-    """
-  rest => @annotation !type_definition {
     source: void
     body: !reference { target: void }
   }

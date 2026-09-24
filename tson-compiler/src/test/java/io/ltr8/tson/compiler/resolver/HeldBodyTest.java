@@ -104,7 +104,9 @@ class HeldBodyTest {
     /** A held body belongs to an entry that declares parameters; one with none is a closed entry (§5.10). */
     @Test
     void aHeldBodyBelongsToAnEntryThatDeclaresParameters() {
-        assertThrows(IllegalArgumentException.class, () -> new TemplateBody(List.of(), "!record {}"));
-        assertThrows(NullPointerException.class, () -> new TemplateBody(List.of("T"), null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new TemplateBody(List.of(), "!record {}", Optional.empty()));
+        assertThrows(NullPointerException.class,
+                () -> new TemplateBody(List.of("T"), null, Optional.empty()));
     }
 }

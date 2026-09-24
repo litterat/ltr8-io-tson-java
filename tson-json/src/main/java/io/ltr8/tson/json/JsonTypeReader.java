@@ -3,7 +3,7 @@ package io.ltr8.tson.json;
 /**
  * Reads a JSON value at one compiled, schema-known position -- what a caller holds after compiling a schema,
  * via {@link JsonCompiledSchema#get}. The peer of {@code tson-compiler}'s {@code TsonTypeReader}, and one of
- * this stack's own: {@code docs/json-encoding.md} carries why the schema-directed readers are {@code
+ * this stack's own: {@code design/json-encoding.md} carries why the schema-directed readers are {@code
  * tson-json}'s rather than that engine's, and why that is a deferral rather than a conclusion.
  *
  * <p><b>One method, and it reads one value at {@code ctx}'s cursor and nothing more.</b> Framing -- the

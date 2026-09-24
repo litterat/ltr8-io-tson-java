@@ -14,13 +14,13 @@ import java.util.List;
  *
  * <p>Built before the body is looked at at all, so a template's unsubstituted body never reaches a factory.
  */
-public final class OpenTemplateReader implements JsonTypeReader<Object> {
+final class OpenTemplateReader implements JsonTypeReader<Object> {
 
     private final String name;
     private final List<String> parameters;
     private final JsonSchemaLocation schemaLocation;
 
-    public OpenTemplateReader(String name, List<String> parameters, JsonSchemaLocation schemaLocation) {
+    OpenTemplateReader(String name, List<String> parameters, JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.parameters = List.copyOf(parameters);
         this.schemaLocation = schemaLocation;
@@ -29,7 +29,7 @@ public final class OpenTemplateReader implements JsonTypeReader<Object> {
     @Override
     public Object read(JsonReadContext ctx) {
         ctx = ctx.underDeclaration(schemaLocation);
-        ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, message(), "a type, not a template", name);
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, message(), "a type, not a template", name);
         EventSkip.nextValue(ctx);
         return null;
     }

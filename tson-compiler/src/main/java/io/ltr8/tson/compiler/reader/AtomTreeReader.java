@@ -51,7 +51,11 @@ final class AtomTreeReader implements TsonTypeReader<TsonValue>, UseSite.Renamed
     @Override
     public TsonValue read(TsonReadContext ctx) {
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
+        int mark = ConstructionGuard.mark(ctx);
         Object value = delegate.read(ctx);
+        if (ConstructionGuard.abandoned(ctx, mark)) {
+            return null;   // refused: no node, rather than the absent one a stated `_` reads to
+        }
         if (value == null) {
             return annotations.isEmpty() ? TsonAbsent.instance() : new TsonAbsent(Optional.empty(), annotations);
         }

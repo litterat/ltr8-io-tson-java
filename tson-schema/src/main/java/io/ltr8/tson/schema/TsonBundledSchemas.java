@@ -16,19 +16,16 @@ import java.util.Optional;
  * three, make up that layer) -- plus {@link #fetch}, their raw source text, straight off this
  * module's own classpath.
  *
- * <p>Both the identities and their source text live here, in `tson-schema`, not in a separate
- * `tson-compiler`-side class -- there's nothing left for a split class to do once both halves of
- * "what these documents are" (identity) and "where their content lives" (fetch) sit in the one
- * module that can be the single canonical source for `tson-compiler`-side consumers (e.g. {@code
- * io.ltr8.tson.compiler.TsonCompiledMetaRegistry}, {@code MetaKernelBootstrapResolver},
- * {@code TsonSchemaLinker}'s own meta-kernel-governed check), since `tson-schema`
- * has no dependency on `tson-compiler` (only the reverse). {@link #fetch} deliberately doesn't
- * implement {@code io.ltr8.tson.base.source.SchemaSource} -- that interface lives in
- * `tson-compiler`, a module this one has no dependency on -- but its shape (a single {@code
- * String fetch(String uri)} method) already matches that interface's own single abstract method
- * exactly, so a `tson-compiler`-side caller needing a real {@code SchemaSource} instance passes
- * the method reference {@code TsonBundledSchemas::fetch} directly; no adapter class needed on either
- * side.
+ * <p>Both the identities and their source text live here, in {@code tson-schema}: "what these documents
+ * are" (identity) and "where their content lives" (fetch) sit in the one module every consumer of them
+ * already depends on -- {@code tson-compiler}'s {@code TsonCompiledMetaRegistry},
+ * {@code MetaKernelBootstrapResolver} and {@code TsonSchemaLinker}'s meta-kernel-governed check among them,
+ * {@code tson-compiler} depending on this module and never the reverse.
+ *
+ * <p>{@link #fetch} is a static method on a class of constants, so there is no instance to implement
+ * {@link io.ltr8.tson.base.source.SchemaSource} with. Its shape is that interface's single abstract method
+ * exactly -- {@code String fetch(String uri)} -- so a caller needing a {@code SchemaSource} passes the
+ * method reference {@code TsonBundledSchemas::fetch}, and no adapter class exists on either side.
  */
 public final class TsonBundledSchemas {
 
@@ -38,13 +35,13 @@ public final class TsonBundledSchemas {
      * {@code TsonSchemaLinker.isMetaKernelGoverned}'s own Javadoc for why that check needs this to be
      * a specific, fixed identity rather than a structural "is this schema self-referencing" test.
      */
-    public static final String META_KERNEL_ID = "https://tson.io/2026/35/m/meta-kernel.tn";
+    public static final String META_KERNEL_ID = "https://tson.io/2026/36/m/meta-kernel.tn";
 
     /** meta's own real, published identity -- see {@code spec/m/meta.tn}'s own {@code !!id}. */
-    public static final String META_ID = "https://tson.io/2026/35/m/meta.tn";
+    public static final String META_ID = "https://tson.io/2026/36/m/meta.tn";
 
     /** core's own real, published identity -- see {@code spec/m/core.tn}'s own {@code !!id}. */
-    public static final String CORE_ID = "https://tson.io/2026/35/m/core.tn";
+    public static final String CORE_ID = "https://tson.io/2026/36/m/core.tn";
 
     /**
      * meta-kernel's own published content-hash digest -- the {@code ?sha256=} on {@code
@@ -52,13 +49,13 @@ public final class TsonBundledSchemas {
      * library holds it so a hash-pinned reference to a pre-loaded schema can be verified, and so the
      * shipped resource can be checked against its own published digest ({@link #declaredSha256}).
      */
-    public static final String META_KERNEL_SHA256 = "28e4497bb5bd9c3e628547c0a9de9e6802a5b848959df96e4812a43fc53c307d";
+    public static final String META_KERNEL_SHA256 = "e778e463624a5163c31d5dbbc8376e52cac3980113ee4333fbd701878a26990c";
 
     /** meta's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String META_SHA256 = "bf967ed0e3e2cd1d56864bc06c2c9fbc69270a60c978dd81c1db83c172d3b00e";
+    public static final String META_SHA256 = "ede51d234992ccf229bf24e53d0e6e53ae30aa6a2c70760ae051e19b4f035cb4";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "3953b2a6b6fc6d254d013c80d9247b73b02068014df47f8858afb2db1a3c14e7";
+    public static final String CORE_SHA256 = "d924ef919b8fab247d7325d8fda9f4fbd4a790a4de696d39cee36d0aa9057c19";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",

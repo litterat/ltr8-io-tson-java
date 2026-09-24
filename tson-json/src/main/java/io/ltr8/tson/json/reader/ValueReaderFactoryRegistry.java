@@ -1,24 +1,30 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.bind.DataBindContext;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 
 /**
- * A {@code constructor name -> ValueReaderFactory} table, one per read mode. {@link #tree()} is the one
- * instance today; bind mode joins it over the same containers.
+ * A {@code constructor name -> ValueReaderFactory} table, one per read mode: {@link #tree()} and
+ * {@link #bind(DataBindContext)}.
  *
  * <p><b>The atom factories are shared and only the wrapper differs.</b> An atom reader produces its family's
  * natural host value whichever mode is compiling, so tree mode wraps each leaf to yield the node the document
- * carried instead ({@link TreeAtomReader}) and changes nothing about what was parsed or refused. The modes
- * genuinely diverge at the containers, which is why the split arrives with [TSON-JSON] §6.
+ * carried instead ({@link TreeAtomReader}) and changes nothing about what was parsed or refused, and bind mode
+ * leaves it bare for a record to bind to a component.
+ *
+ * <p><b>What places a value is shared too.</b> A record family's dispatchers ({@link DispatchFactories}), a
+ * family-base template's, and the choice's ({@link DispatchChoiceReader}) select a reader and build nothing,
+ * so every mode registers the same ones. So does a concrete record's loop ({@link RecordReader}); what is the
+ * mode's own is the factory that builds it and the {@link RecordBuilder} it hands its slots to.
  *
  * <p><b>An unregistered constructor is a gap, not a fault.</b> {@link #resolve} raises, {@code
  * JsonSchemaCompiler} catches, and the entry becomes a {@link ErrorReader} -- so a schema whose types this
  * encoding cannot yet read still compiles, and each unreadable value costs a verdict on itself alone. That is
- * how §6-§8's absence is currently spelled, and it is the same shape [TSON-SCHEMA] §2.2.2's extension point
- * will keep using afterwards.
+ * how §8.5's absence is spelled, and the shape [TSON-SCHEMA] §2.2.2's extension point keeps for good.
  */
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
@@ -47,7 +53,9 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      * question a mode hides: <em>what did the parser produce</em>, which tree mode discards by design.
      */
     public static ValueReaderFactoryRegistry atoms() {
-        return new ValueReaderFactoryRegistry(Map.copyOf(vocabulary(UnaryOperator.identity())));
+        Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
+        factories.put("template", DispatchFactories.TEMPLATE);
+        return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
     /**
@@ -60,14 +68,37 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      */
     public static ValueReaderFactoryRegistry tree() {
         Map<String, ValueReaderFactory> factories = vocabulary(TreeAtomReader::over);
-        factories.put("record", TreeRecordReader.FACTORY);
-        factories.put("array", TreeArrayReader.FACTORY);
+        factories.put("record", DispatchFactories.over(TreeRecordBuilder.FACTORY));
+        factories.put("array", TreeArrayBuilder.FACTORY);
         // A `set` resolves to an ArrayBody like `array` itself -- refinement never adds or removes a field --
         // so the same factory serves it and the body's own `unique_items` is what separates them.
-        factories.put("set_type", TreeArrayReader.FACTORY);
-        factories.put("tuple", TreeTupleReader.FACTORY);
-        factories.put("map", TreeMapReader.FACTORY);
-        factories.put("choice", TreeChoiceReader.FACTORY);
+        factories.put("set_type", TreeArrayBuilder.FACTORY);
+        factories.put("tuple", TreeTupleBuilder.FACTORY);
+        factories.put("map", TreeMapBuilder.FACTORY);
+        factories.put("choice", DispatchChoiceReader.FACTORY);
+        factories.put("template", DispatchFactories.TEMPLATE);
+        return new ValueReaderFactoryRegistry(Map.copyOf(factories));
+    }
+
+    /**
+     * Bind mode over {@code binding}: a record reads into the class {@code binding} resolves for its schema type,
+     * and an atom into the host value its component holds -- the atom factories unwrapped, each family reading
+     * to its natural host value until a record binds it to a component. The dispatchers are the same as tree
+     * mode's, placing a value and building nothing.
+     *
+     * <p>Every container binds: a record into the class bound to its schema type, and an array, set, tuple or map
+     * into its natural {@code List} or {@code Map} -- or, at a record component, into the class the component
+     * declares ({@link BindTargets}).
+     */
+    public static ValueReaderFactoryRegistry bind(DataBindContext binding) {
+        Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
+        factories.put("record", DispatchFactories.over(BindRecordBuilder.factory(binding)));
+        factories.put("array", BindArrayBuilder.FACTORY);
+        factories.put("set_type", BindArrayBuilder.FACTORY);
+        factories.put("tuple", BindTupleBuilder.FACTORY);
+        factories.put("map", BindMapBuilder.FACTORY);
+        factories.put("choice", DispatchChoiceReader.FACTORY);
+        factories.put("template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 

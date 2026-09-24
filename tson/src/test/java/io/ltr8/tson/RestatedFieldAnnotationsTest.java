@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * a restated one keeps its own annotations and the inherited ones after them. The rule is one rule for both
  * bodies, since one resolver path serves them.
  *
- * <p>The spelling that makes the rule necessary is §5.7's modifier-only entry: {@code legacy_id: = _} names
- * no type, tightens presence and nothing else, and has no annotation position at all -- so an entry that
+ * <p>The spelling that makes the rule necessary is §5.7's modifier-only entry: {@code legacy_id?: ~ "none"}
+ * names no type, tightens the value and nothing else, and has no annotation position at all -- so an entry that
  * mentions nothing must not be able to erase what it does not mention.
  *
  * <p>Concatenation rather than replacement by name because [TSON-DATA] §3.1 makes a name repeatable on one
@@ -42,33 +42,33 @@ class RestatedFieldAnnotationsTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               account => {
                 @doc:"Pre-2020 registry identifier."
                 @deprecated
-                legacy_id: text?
+                legacy_id?: text?
                 @doc:"Display name."
                 name: text
               }
 
               premium_account => account & {
-                legacy_id: = _
+                legacy_id?: ~ "none"
               }
 
               archived_account => account & {
                 @todo:"drop in v3"
-                legacy_id: = _
+                legacy_id?: ~ "none"
               }
 
               documented_account => account & {
                 @doc:"Never issued after the 2020 migration."
-                legacy_id: = _
+                legacy_id?: ~ "none"
               }
 
               refined_account => account ^ {
-                legacy_id: = _
+                legacy_id?: ~ "none"
               }
             }
             """.formatted(ID);

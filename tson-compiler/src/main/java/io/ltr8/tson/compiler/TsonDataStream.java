@@ -183,8 +183,8 @@ public final class TsonDataStream implements TsonEventSource {
      * context rewinds -- an event consumed during lookahead is delivered again, and a probe context can be
      * built over events already seen -- so a check there reports one token once per lookahead that crossed
      * it. This produces each token exactly once, so the check is exactly-once for free, with no set of
-     * already-reported positions to carry. It was a decorator for that reason and is inlined now because
-     * the JSON stream needs the same rule and a second wrapper would have been a second place to forget it.
+     * already-reported positions to carry. It is inlined rather than wrapped around the stream because the
+     * JSON stream needs the same rule, and a wrapper per encoding is a second place to forget it.
      *
      * <p>At {@code unrestricted()} -- the default, and every ordinary read -- the check is a field read and
      * a branch: {@code checksScripts()} is false and nothing else happens.

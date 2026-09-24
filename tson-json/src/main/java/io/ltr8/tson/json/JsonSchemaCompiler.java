@@ -3,12 +3,13 @@ package io.ltr8.tson.json;
 import io.ltr8.tson.json.reader.*;
 import io.ltr8.tson.json.reader.ValueReaderFactory;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.base.BindMismatchException;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -31,7 +32,8 @@ import java.util.Set;
  *
  * <p><b>A failure building one entry becomes a {@link ErrorReader}</b> rather than failing the compile:
  * the schema compiles, and reading a value against that one type reports {@code NOT_IMPLEMENTED} and skips
- * it. That is what keeps §6-§8's absence from costing a document every other verdict it was owed.
+ * it. That is what keeps a constructor this encoding cannot read yet from costing a document every other
+ * verdict it was owed.
  */
 public final class JsonSchemaCompiler {
 
@@ -64,7 +66,7 @@ public final class JsonSchemaCompiler {
         private final Map<String, JsonTypeReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
 
-        /** What a reader keeps for the edges that need a name at read time -- rebound once, when this ends. */
+        /** How a factory reaches another entry's reader -- rebound once, when this ends. */
         private final CompiledReaders readers = new CompiledReaders(this::resolve);
 
         Compilation(TsonLinkedSchema linked, ValueReaderFactoryResolver factories) {
@@ -90,6 +92,15 @@ public final class JsonSchemaCompiler {
                 JsonTypeReader<?> built;
                 try {
                     built = build(name, definition);
+                } catch (MissingBindingException e) {
+                    // A type with no class at all is deferred, not fatal: a schema declares types a given consumer
+                    // never binds, and failing the compile for those would make bind mode unusable. It reaches
+                    // the first read of this type still saying what it is (ErrorReader rethrows it).
+                    built = new ErrorReader(name, e);
+                } catch (BindMismatchException e) {
+                    // Not a gap: a wiring mistake between the schema and the caller's own classes, and deferring
+                    // it to the first document that happens to have this type is what makes it expensive to find.
+                    throw e;
                 } catch (RuntimeException e) {
                     built = new ErrorReader(name, e);
                 }
@@ -102,12 +113,6 @@ public final class JsonSchemaCompiler {
 
         private JsonTypeReader<?> build(String name, TypeDefinition definition) {
             ValueReaderContext context = new ValueReaderContext(linked, readers);
-            if (definition.kind() == TypeKind.TEMPLATE) {
-                // Before the body is looked at at all: a template's body is held unsubstituted text, so no
-                // factory could read it, and a template is not a type until it is applied ([TSON-SCHEMA] §5.10).
-                return new OpenTemplateReader(name, definition.parameters(),
-                        context.locationOf(name, definition));
-            }
             Top body = definition.body();
             if (body instanceof Reference reference) {
                 // [TSON-SCHEMA] §8.3: a processor MAY collapse a reference chain when it compiles for

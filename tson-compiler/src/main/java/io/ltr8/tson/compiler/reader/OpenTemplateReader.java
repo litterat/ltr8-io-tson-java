@@ -9,25 +9,23 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 import java.util.List;
 
 /**
- * The reader every <b>open</b> entry compiles to -- one that declares type parameters, so it is a template
- * rather than a type ([TSON-SCHEMA] §5.10). Reports the author's mistake and skips the value, exactly like
- * any other reader that finds the data isn't what the schema admits.
+ * The reader an <b>open</b> entry compiles to -- one that declares type parameters, so it is a template
+ * rather than a type ([TSON-SCHEMA] §5.10) -- unless its held body carries {@code extension}, which makes it
+ * a family base with a dispatch of its own ({@link AbstractTemplateReader}). Reports the author's mistake
+ * and skips the value, exactly like any other reader that finds the data isn't what the schema admits.
  *
  * <p><b>Reaching this is always a data error, never a schema one.</b> A schema referring to a template
  * without applying it is rejected far earlier, when the schema is linked ({@code TsonSchemaLinker}'s own
  * arity rule), so no field, element or supertype can route here. What is left is a <em>data</em> type-ref
  * naming the template directly -- {@code !paged { ... }} against {@code paged => <T> { ... }} -- at the
- * document root or anywhere a type-ref selects a reader. The change report is explicit that this is an
- * ordinary resolver error as a data annotation, without exception, and it is among the likeliest author
- * mistakes: a template is the natural thing to name for "a page of orders".
+ * document root or anywhere a type-ref selects a reader. It is among the likeliest author mistakes: a
+ * template is the natural thing to name for "a page of orders".
  *
- * <p><b>Why the whole entry, rather than a check at the root.</b> Without this the entry compiled to
- * whatever its parameterised body produced, which then failed at read time with the wrong verdict and the
- * wrong vocabulary: {@code box => <T> { v: T }} became an {@link ErrorReader} whose message blamed the
- * linker for not rejecting the parameter {@code T}, and {@code paged => <T> { items: [T] }} reached the
- * lifted synthetic and complained about a constructor factory it could not find -- both exiting on the
- * library's own fault code for a document that is plainly invalid. Refusing the entry itself is one place
- * and covers every position, and the parameters it names in the message are the author's own.
+ * <p><b>Why the whole entry, rather than a check at the root.</b> A parameterised body has no reader to
+ * build -- its parameters name no entry -- so compiling it like any other entry would end in an {@link
+ * ErrorReader}, which reports {@code NOT_IMPLEMENTED}: the library's own gap code, for a document that is
+ * plainly invalid. Refusing the entry itself is one place and covers every position, and the parameters it
+ * names in the message are the author's own.
  *
  * <p>The message deliberately mirrors the linker's schema-side wording for the same mistake, so the two ends
  * of one rule read as one rule, and adds the route out: name the application in the schema, then write that
@@ -49,7 +47,7 @@ public final class OpenTemplateReader implements TsonTypeReader<Object> {
     public Object read(TsonReadContext ctx) {
         ctx = ctx.underDeclaration(schemaLocation);
         // Reported before anything is consumed, so the data position is the type-ref the author wrote.
-        ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, message(), "a type, not a template", "!" + name);
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, message(), "a type, not a template", "!" + name);
         EventSkip.dataValue(ctx);
         return null;
     }

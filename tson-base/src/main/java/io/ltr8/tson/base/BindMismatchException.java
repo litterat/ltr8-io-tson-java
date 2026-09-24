@@ -19,8 +19,8 @@ package io.ltr8.tson.base;
  *
  * <p>Two shapes reach here, both meaning "this document's value cannot survive the round trip":
  * <ul>
- *   <li>a schema field the class has no component for, where the field is always present (REQUIRED or
- *       REQUIRED_DEFAULT) -- so every document of the type loses it. An <em>optional</em> field is not this:
+ *   <li>a schema field the class has no component for, where the field is always present (required, or
+ *       defaulted) -- so every document of the type loses it. An <em>optional</em> field is not this:
  *       it is lost only when written, so it is reported at the read that writes it;</li>
  *   <li>a component no schema field fills, which reaches the constructor as {@code null} on every document.
  *       {@code @Unbound} is how a class says a component is its own and not the wire's.</li>
@@ -38,5 +38,14 @@ public class BindMismatchException extends RuntimeException {
 
     public BindMismatchException(String message) {
         super(message);
+    }
+
+    /**
+     * The same, keeping what the bind engine said. A mismatch reported without its cause names the type and
+     * nothing about the class -- and the account of <em>which</em> component could not be bound is the half a
+     * caller can act on.
+     */
+    public BindMismatchException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

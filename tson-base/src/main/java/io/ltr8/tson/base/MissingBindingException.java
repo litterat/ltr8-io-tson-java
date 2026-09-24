@@ -21,4 +21,9 @@ public class MissingBindingException extends BindMismatchException {
     public MissingBindingException(String message) {
         super(message);
     }
+
+    /** The same, keeping the bind engine's own account of why nothing resolved. */
+    public MissingBindingException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

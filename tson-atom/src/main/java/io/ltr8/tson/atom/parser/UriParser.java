@@ -40,7 +40,8 @@ public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
      */
     public UriParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
                       Optional<String> pattern, Optional<String> scheme) {
-        this(new UriType(UriType.UNCONSTRAINED.spec(), minLength, maxLength, length, pattern, scheme));
+        this(new UriType(UriType.UNCONSTRAINED.spec(), minLength, maxLength, length, pattern,
+                Optional.empty(), scheme));
     }
 
     @Override

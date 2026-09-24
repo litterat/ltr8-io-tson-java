@@ -4,20 +4,23 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.json.tree.JsonNull;
-import io.ltr8.tson.json.tree.JsonValue;
 
+import io.ltr8.tson.base.unicode.Nfc;
+
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * [TSON-JSON] §3.2's reserved member namespace, and the scan that asks which of it an object carries.
+ * [TSON-JSON] §3.2's reserved member namespace, and the peek that asks which of it leads an object.
  *
  * <p><b>The spec calls the construct an "annotation object" (§3.3) and this class does not</b>, because in
  * this codebase {@code Annotation} means an {@code @name} annotation and nothing else -- two dozen types say
  * so, from the {@code tson-annotation} module through {@code Annotations}, {@code TsonAnnotation} and the
  * {@code AnnotationStart}/{@code AnnotationEnd} events. Those have no JSON carrier at all: §4.3 declines one
  * for v1 and makes encoding a value that carries them an encode error. A class named for §3.3 would be the
- * one place the word meant something else, so it is named for the namespace it scans and cites §3.3
+ * one place the word meant something else, so it is named for the namespace it reads and cites §3.3
  * throughout.
  *
  * <p>What §3.3 defines is the JSON carrier for a type annotation and a schema scope -- what TSON text
@@ -26,15 +29,16 @@ import java.util.List;
  * <p>Two forms. The <b>wrapper</b> is an object whose members are reserved only, with {@code $value} present
  * -- {@code {"$type": "age", "$value": 42}} -- and carries an annotation for a value of any shape. The
  * <b>inline</b> form lets the reserved members stand beside a record's own when the selected type reads the
- * value as a record, and {@code $value} is absent: {@code {"$type": "employee", "name": "Ada"}}. It exists
- * because wrapping every subtyped record would bury the common case (§1.3, principle 2), and it is
- * unambiguous because §3.2 reserves every {@code $}-initial name and no identifier begins with one.
+ * value as a record, and {@code $value} is absent: {@code {"$type": "employee", "name": "Ada"}}.
  *
- * <p><b>Recognising one needs a lookahead, and that is a property of JSON rather than a choice here.</b>
- * §6.1.6 gives member order no meaning, so {@code $type} may sit anywhere in the object and the opening
- * brace settles nothing. {@link #scan} therefore reads member <em>names</em> across the whole object,
- * skipping values without materialising them, and rewinds -- so the read that follows sees a stream nothing
- * has touched. It costs one pass over the object's events, replayed from a buffer rather than re-lexed.
+ * <p><b>The selectors lead, so a peek at the opening members answers the question.</b> §3.3 puts {@code
+ * $schema} first where present and {@code $type} after it, and §6.1.5 puts a sealed position's discriminators
+ * next. {@link #lead} reads those members and no others, rewinding so the read that follows sees a stream
+ * nothing has touched -- what it holds is bounded by the schema, never by the document (§10.1). A valid
+ * wrapper's only members are the reserved ones, so its {@code $value} directly follows them, and the peek
+ * sees it there; a {@code $value} anywhere else is an extra member of an invalid object, which whoever reads
+ * the object refuses. A selector's value is held only when it is a scalar: one that is not stops the peek,
+ * so a sender cannot make it hold an arbitrary value.
  */
 final class ReservedMembers {
 
@@ -48,71 +52,98 @@ final class ReservedMembers {
     }
 
     /**
-     * What an object's member names say about it.
+     * What an object's leading members say about it.
      *
-     * @param present  whether any reserved member appeared -- §3.3's recognition test, and §8.3.1's
-     * @param type     the {@code $type} member's string content, or null where it was absent or not a string
-     * @param wrapper  whether {@code $value} appeared, which is what picks the wrapper form over the inline one
-     * @param schema   whether {@code $schema} appeared -- admitted only at a scoped position (§8.5)
-     * @param unknown  a {@code $}-initial member outside the closed set, or null -- a resolver error (§3.2)
+     * @param schema    whether {@code $schema} leads -- admitted only at a scoped position (§8.5)
+     * @param typed     whether a {@code $type} member leads, whatever its value
+     * @param type      that member's string content, or null where it is absent or not a string
+     * @param wrapper   whether {@code $value} follows the reserved members -- §3.3's wrapper form
+     * @param selectors the scalar value of each requested member found leading after the reserved ones, by
+     *                  NFC name; a requested member not among them is absent here
      */
-    record Tag(boolean present, String type, boolean wrapper, boolean schema, String unknown) {
+    record Lead(boolean schema, boolean typed, String type, boolean wrapper, Map<String, JsonEvent> selectors) {
 
-        static final Tag NONE = new Tag(false, null, false, false, null);
+        static final Lead NONE = new Lead(false, false, null, false, Map.of());
+
+        /** Whether the object leads with a reserved member -- §3.3's recognition test, and §8.3.1's. */
+        boolean present() {
+            return schema || typed || wrapper;
+        }
+    }
+
+    /** The leading reserved members of the object at {@code ctx}'s cursor, which must be an {@code ObjectStart}. */
+    static Lead lead(JsonReadContext ctx) {
+        return lead(ctx, Set.of());
     }
 
     /**
-     * Reads {@code ctx}'s object far enough to say whether it is an annotation object, then rewinds.
+     * {@link #lead}, additionally capturing the members named in {@code wanted} where they lead after the
+     * reserved ones, in any order among themselves -- a sealed position's discriminators (§6.1.5).
      *
-     * <p>The caller must have established that an {@code ObjectStart} is at the cursor. Nothing is reported
-     * from here: a scan is a question, and what a wrong answer means depends on the position that asked.
+     * <p>Nothing is reported from here: a peek is a question, and what a wrong answer means depends on the
+     * position that asked. The names in {@code wanted} are NFC-normalised, as every member-name comparison in
+     * this encoding is ([TSON-DATA] §2.5).
      */
-    static Tag scan(JsonReadContext ctx) {
-        return JsonReadContext.lookingAhead(ctx, ReservedMembers::read);
+    static Lead lead(JsonReadContext ctx, Set<String> wanted) {
+        return JsonReadContext.lookingAhead(ctx, ahead -> readLead(ahead, wanted));
     }
 
-    private static Tag read(JsonReadContext ctx) {
+    private static Lead readLead(JsonReadContext ctx, Set<String> wanted) {
         if (!(ctx.next() instanceof JsonEvent.ObjectStart)) {
-            return Tag.NONE;
+            return Lead.NONE;
         }
-        boolean present = false;
-        boolean wrapper = false;
         boolean schema = false;
+        boolean typed = false;
         String type = null;
-        String unknown = null;
-        while (true) {
-            JsonEvent event = ctx.next();
-            if (event instanceof JsonEvent.ObjectEnd) {
-                return present || unknown != null
-                        ? new Tag(present, type, wrapper, schema, unknown)
-                        : Tag.NONE;
+        JsonEvent event = ctx.next();
+        if (named(event, SCHEMA)) {
+            schema = true;
+            if (!skipScalar(ctx)) {
+                return new Lead(true, false, null, false, Map.of());
             }
-            if (!(event instanceof JsonEvent.MemberName member)) {
-                return Tag.NONE;
-            }
-            String name = member.name();
-            if (name.startsWith("$")) {
-                switch (name) {
-                    case TYPE -> {
-                        present = true;
-                        type = ctx.peek() instanceof JsonEvent.StringValue string ? string.value() : null;
-                    }
-                    case VALUE -> {
-                        present = true;
-                        wrapper = true;
-                    }
-                    case SCHEMA -> {
-                        present = true;
-                        schema = true;
-                    }
-                    // §3.2: the set is closed, on the same terms as the directive name set -- there is no
-                    // unknown-reserved-member category and no extension mechanism, so this is an error and
-                    // not a member to pass through.
-                    default -> unknown = unknown == null ? name : unknown;
-                }
-            }
-            EventSkip.nextValue(ctx);
+            event = ctx.next();
         }
+        if (named(event, TYPE)) {
+            typed = true;
+            type = ctx.peek() instanceof JsonEvent.StringValue string ? string.value() : null;
+            if (!skipScalar(ctx)) {
+                return new Lead(schema, true, null, false, Map.of());
+            }
+            event = ctx.next();
+        }
+        if (named(event, VALUE)) {
+            return new Lead(schema, typed, type, true, Map.of());
+        }
+        Map<String, JsonEvent> selectors = wanted.isEmpty() ? Map.of() : new LinkedHashMap<>();
+        while (selectors.size() < wanted.size() && event instanceof JsonEvent.MemberName member) {
+            String name = Nfc.of(member.name());
+            JsonEvent value = ctx.peek();
+            if (!wanted.contains(name) || selectors.containsKey(name) || !isScalar(value)) {
+                break;
+            }
+            selectors.put(name, value);
+            ctx.next();
+            event = ctx.next();
+        }
+        return new Lead(schema, typed, type, false, selectors);
+    }
+
+    private static boolean named(JsonEvent event, String name) {
+        return event instanceof JsonEvent.MemberName member && name.equals(member.name());
+    }
+
+    /** Steps past a scalar member value, answering false -- and consuming nothing -- where it is not one. */
+    private static boolean skipScalar(JsonReadContext ctx) {
+        if (!isScalar(ctx.peek())) {
+            return false;
+        }
+        ctx.next();
+        return true;
+    }
+
+    private static boolean isScalar(JsonEvent event) {
+        return event instanceof JsonEvent.StringValue || event instanceof JsonEvent.NumberValue
+                || event instanceof JsonEvent.BooleanValue || event instanceof JsonEvent.NullValue;
     }
 
     /**
@@ -125,30 +156,62 @@ final class ReservedMembers {
      *
      * <p>Shared by every position that can be tagged -- a record under subsumption (§6.1.5) and a choice
      * variant (§8.1) -- because the wrapper is one form and a second reading of it is a second chance to
-     * disagree about what it admits.
+     * disagree about what it admits. Returns what {@code target} produced, or null where there was no
+     * {@code $value} to read: the wrapper builds nothing of its own, so it serves every mode.
      */
-    static JsonValue readWrapped(JsonReadContext ctx, JsonTypeReader<?> target) {
+    static Object readWrapped(JsonReadContext ctx, JsonTypeReader<?> target) {
         ctx.next();   // ObjectStart
-        JsonValue value = null;
+        return walkWrapper(ctx, target, SCHEMA, false, null);
+    }
+
+    /**
+     * The rest of a wrapper whose leading members have been read and whose {@code $value} name was just
+     * consumed: the value, read at {@code target}, and then whatever follows it, which a wrapper admits none of.
+     * For a record reader that met {@code $value} straight after its leading {@code $type}.
+     */
+    static Object readWrappedValue(JsonReadContext ctx, JsonTypeReader<?> target) {
+        return walkWrapper(ctx, target, null, true, target.read(ctx.field(VALUE)));
+    }
+
+    /**
+     * The wrapper's member loop, from wherever the caller left it.
+     *
+     * @param next  the leading member that may still come -- {@code $schema}, then {@code $type} (§3.3) --
+     *              or null once another member has come
+     * @param found whether {@code $value} has already been read, {@code value} being what it read
+     */
+    private static Object walkWrapper(JsonReadContext ctx, JsonTypeReader<?> target, String next, boolean found,
+                                      Object value) {
         while (true) {
             JsonEvent event = ctx.next();
             if (event instanceof JsonEvent.ObjectEnd) {
-                if (value == null) {
+                if (!found) {
                     ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                             "this is an annotation object in wrapper form and carries no '$value' to annotate",
                             "a '$value' member", "no $value");
-                    return JsonNull.INSTANCE;
                 }
                 return value;
             }
             if (!(event instanceof JsonEvent.MemberName member)) {
                 throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);
             }
-            if (VALUE.equals(member.name())) {
-                value = (JsonValue) target.read(ctx.field(VALUE));
+            String name = member.name();
+            if (VALUE.equals(name)) {
+                value = target.read(ctx.field(VALUE));
+                found = true;
                 continue;
             }
-            if (!isReserved(member.name())) {
+            // The leading members were judged before this was reached; one found here, after them, is out of
+            // place, and a `$`-initial name outside the closed set is refused wherever it stands.
+            boolean leading = !found && next != null && (name.equals(next) || TYPE.equals(name));
+            next = leading && SCHEMA.equals(name) ? TYPE : null;
+            if (SCHEMA.equals(name) || TYPE.equals(name)) {
+                if (!leading) {
+                    refuseMisplaced(ctx, name);
+                }
+            } else if (isReserved(name)) {
+                refuseUnknown(ctx, name);
+            } else {
                 ctx.field(member.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
                         "'%s' stands beside '$value' in an annotation object, which is apparatus and not a record "
                                 .formatted(member.name()) + "-- it admits the reserved members and nothing else "
@@ -161,6 +224,16 @@ final class ReservedMembers {
     /** Whether {@code name} is one this encoding reserves -- true of any {@code $}-initial name, closed set or not. */
     static boolean isReserved(String name) {
         return name.startsWith("$");
+    }
+
+    /**
+     * Reports a {@code $schema} or {@code $type} that does not lead its object (§3.3) -- a resolver error, the
+     * selectors having a fixed place so that no decoder holds more than the schema bounds before dispatch.
+     */
+    static void refuseMisplaced(JsonReadContext ctx, String name) {
+        ctx.field(name).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
+                "'%s' must lead its object -- '$schema' first where present, then '$type' (§3.3) -- and here it "
+                        .formatted(name) + "follows another member", "'" + name + "' as a leading member", name);
     }
 
     /** Reports a {@code $}-initial member outside §3.2's closed set, which admits no extension. */

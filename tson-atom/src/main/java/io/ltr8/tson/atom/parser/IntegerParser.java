@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
 import java.math.BigInteger;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -70,8 +71,9 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
 
     @Override
     public Number read(String text) {
-        Class<?> hostType = constraints.size().map(IntegerParser::hostType).orElse(BigInteger.class);
-        return (Number) narrowTo(text, hostType);
+        return (Number) narrowTo(text, constraints.size().isPresent()
+                ? hostType(constraints.size().get())
+                : BigInteger.class);
     }
 
     /** This family's own narrowing, private now that {@code AtomType} has no target-aware read. */
@@ -97,50 +99,50 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
         return value;
     }
 
+    /**
+     * The constraints in turn, each tested with {@code isPresent} rather than {@code ifPresent}: a capturing
+     * lambda per constraint per value is an allocation on the read path of every integer read, and the tests
+     * are the same either way.
+     */
     private void validate(BigInteger value, String text) {
-        constraints.size().ifPresent(s -> {
-            BigInteger min = bounds(s)[0];
-            BigInteger max = bounds(s)[1];
-            if (value.compareTo(min) < 0 || value.compareTo(max) > 0) {
+        if (constraints.size().isPresent()) {
+            IntegerSize s = constraints.size().get();
+            BigInteger[] bounds = bounds(s);
+            if (value.compareTo(bounds[0]) < 0 || value.compareTo(bounds[1]) > 0) {
                 throw new AtomValidationException("'" + text + "' is out of range for a "
                         + (s.signed() ? "signed" : "unsigned") + " " + s.bits() + "-bit integer ["
-                        + min + ", " + max + "]", ">= " + min + " and <= " + max);
+                        + bounds[0] + ", " + bounds[1] + "]", ">= " + bounds[0] + " and <= " + bounds[1]);
             }
-        });
-        constraints.min().ifPresent(m -> {
-            if (value.compareTo(m) < 0) {
-                throw new AtomValidationException("'" + text + "' is less than the minimum " + m, ">= " + m);
-            }
-        });
-        constraints.exclusiveMin().ifPresent(m -> {
-            if (value.compareTo(m) <= 0) {
-                throw new AtomValidationException("'" + text + "' must be strictly greater than " + m, "> " + m);
-            }
-        });
-        constraints.max().ifPresent(m -> {
-            if (value.compareTo(m) > 0) {
-                throw new AtomValidationException("'" + text + "' is greater than the maximum " + m, "<= " + m);
-            }
-        });
-        constraints.exclusiveMax().ifPresent(m -> {
-            if (value.compareTo(m) >= 0) {
-                throw new AtomValidationException("'" + text + "' must be strictly less than " + m, "< " + m);
-            }
-        });
-        constraints.multipleOf().ifPresent(m -> {
-            if (value.remainder(m).signum() != 0) {
-                throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
-            }
-        });
+        }
+        if (constraints.min().isPresent() && value.compareTo(constraints.min().get()) < 0) {
+            BigInteger m = constraints.min().get();
+            throw new AtomValidationException("'" + text + "' is less than the minimum " + m, ">= " + m);
+        }
+        if (constraints.exclusiveMin().isPresent() && value.compareTo(constraints.exclusiveMin().get()) <= 0) {
+            BigInteger m = constraints.exclusiveMin().get();
+            throw new AtomValidationException("'" + text + "' must be strictly greater than " + m, "> " + m);
+        }
+        if (constraints.max().isPresent() && value.compareTo(constraints.max().get()) > 0) {
+            BigInteger m = constraints.max().get();
+            throw new AtomValidationException("'" + text + "' is greater than the maximum " + m, "<= " + m);
+        }
+        if (constraints.exclusiveMax().isPresent() && value.compareTo(constraints.exclusiveMax().get()) >= 0) {
+            BigInteger m = constraints.exclusiveMax().get();
+            throw new AtomValidationException("'" + text + "' must be strictly less than " + m, "< " + m);
+        }
+        if (constraints.multipleOf().isPresent()
+                && value.remainder(constraints.multipleOf().get()).signum() != 0) {
+            BigInteger m = constraints.multipleOf().get();
+            throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
+        }
         // The member set is compared on the decoded value, which is [TSON-DATA] §4.3's identity for this
         // family: 0x50 and 80 are one member, having reduced to one BigInteger before ever reaching here.
-        constraints.members().ifPresent(members -> {
-            if (!members.contains(value)) {
-                throw new AtomValidationException(
-                        "'" + text + "' is not a member of this type -- expected one of " + members,
-                        "one of (" + members.stream().map(BigInteger::toString).collect(Collectors.joining(", ")) + ")");
-            }
-        });
+        if (constraints.members().isPresent() && !constraints.members().get().contains(value)) {
+            List<BigInteger> members = constraints.members().get();
+            throw new AtomValidationException(
+                    "'" + text + "' is not a member of this type -- expected one of " + members,
+                    "one of (" + members.stream().map(BigInteger::toString).collect(Collectors.joining(", ")) + ")");
+        }
     }
 
     /**
@@ -191,8 +193,26 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
      * signed or not, have no primitive that fits and fall through to {@link BigInteger}.
      */
     private static Class<?> hostType(IntegerSize size) {
-        BigInteger min = minValue(size);
-        BigInteger max = maxValue(size);
+        Class<?> standard = STANDARD_HOSTS.get(size);
+        return standard != null ? standard : computeHostType(size);
+    }
+
+    /**
+     * {@link #hostType} for the ladder core.tn declares, computed once: {@link #read} asks it for every value,
+     * and deriving it means both width bounds, which is what {@link #STANDARD_BOUNDS} exists to avoid.
+     */
+    private static final Map<IntegerSize, Class<?>> STANDARD_HOSTS = standardHosts();
+
+    private static Map<IntegerSize, Class<?>> standardHosts() {
+        Map<IntegerSize, Class<?>> table = new HashMap<>();
+        STANDARD_BOUNDS.keySet().forEach(size -> table.put(size, computeHostType(size)));
+        return Map.copyOf(table);
+    }
+
+    private static Class<?> computeHostType(IntegerSize size) {
+        BigInteger[] bounds = bounds(size);
+        BigInteger min = bounds[0];
+        BigInteger max = bounds[1];
         if (fits(min, max, Byte.MIN_VALUE, Byte.MAX_VALUE)) {
             return Byte.class;
         }

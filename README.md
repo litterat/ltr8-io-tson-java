@@ -6,7 +6,7 @@ one hash verifies the whole chain. The finishing touch, TSON's data format is a 
 actually enjoy writing — JSON-like in shape, and not a superset of it.
 
 > **Status: pure design, no users.** This is the first implementation of TSON, built against a working-draft
-> spec (Revision 35 of the 2026 series), and it is the first real test of whether that spec resolves to one
+> spec (Revision 36 of the 2026 series), and it is the first real test of whether that spec resolves to one
 > behaviour — which is the point of it existing. Nothing is released: there is no Maven Central artifact, no
 > remote repository is configured, and every version carries `-SNAPSHOT`.
 >
@@ -53,13 +53,13 @@ Try it (the data names its own schema and type, so no --type is needed):
 ```
 
 Here's the `person.tn` schema created. It shows a few of the basic schema features,
-including records, record groups, enums and some in-built types. The `2026/35` in the
+including records, record groups, enums and some in-built types. The `2026/36` in the
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/35/getting-started/person.tn?sha256=5a0b5f93f718fab4b58b3bc520e5658448abeea87f1875312d3dbbf284d41331"
-!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=bf967ed0e3e2cd1d56864bc06c2c9fbc69270a60c978dd81c1db83c172d3b00e"
-!!import:"https://tson.io/2026/35/m/core.tn?sha256=3953b2a6b6fc6d254d013c80d9247b73b02068014df47f8858afb2db1a3c14e7"
+!!id:"https://example.com/2026/36/getting-started/person.tn?sha256=f55231951bd8462c5c5ff550ab98a17dcfb393775f849162c16e2bf62d42382b"
+!!meta:"https://tson.io/2026/36/m/meta.tn?sha256=ede51d234992ccf229bf24e53d0e6e53ae30aa6a2c70760ae051e19b4f035cb4"
+!!import:"https://tson.io/2026/36/m/core.tn?sha256=d924ef919b8fab247d7325d8fda9f4fbd4a790a4de696d39cee36d0aa9057c19"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]
@@ -76,7 +76,7 @@ URIs is the draft year/revision marker from the spec's release scheme.
     age: int32
     role: role
     joined: date
-    email: text?
+    email?: text
     address: address
     skills: [text]
     ( phone: text | mobile: text )?
@@ -96,7 +96,7 @@ And here's a corresponding `person-data.tn` *data* document. It's *self-describi
 `!!schema` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
-!!schema:"https://example.com/2026/35/getting-started/person.tn"
+!!schema:"https://example.com/2026/36/getting-started/person.tn"
 !person {
   id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
   name: "Ada Lovelace"
@@ -250,15 +250,17 @@ try (var in = Files.newInputStream(Path.of("server.tn"))) {
 ```
 
 On a mismatch it throws `ReadException` (fail-fast). To collect *every* problem in one pass instead
-of stopping at the first, derive a reader with a collecting `DiagnosticsReceiver` — you get the
-(possibly partial) value back *alongside* the full list, rather than one or the other:
+of stopping at the first, derive a reader with a collecting `DiagnosticsReceiver`. The read runs to the
+end and hands every problem to the receiver; a document that had any comes back as `null`, in tree and
+bind mode alike, because a partial value cannot say which of its parts to trust. The diagnostics, each with
+a path into the document you already hold, are the answer:
 
 ```java
 var problems = DiagnosticsReceiver.collecting();
 
 Server server = new TsonObjectReader()
         .withDiagnostics(problems)
-        .read("{ hostname: 1  address: nope }", Server.class);
+        .read("{ hostname: 1  address: nope }", Server.class);   // null
 
 for (Diagnostic d : problems.diagnostics()) {
     System.out.println(d.path().orElse("") + ": " + d.message());   // /hostname: …, /address: …
@@ -353,9 +355,9 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.standard();
 
 String schema = """
-        !!id:"https://example.com/2026/35/app/server-1.tn"
-        !!meta:"https://tson.io/2026/35/m/meta.tn"
-        !!import:"https://tson.io/2026/35/m/core.tn"
+        !!id:"https://example.com/2026/36/app/server-1.tn"
+        !!meta:"https://tson.io/2026/36/m/meta.tn"
+        !!import:"https://tson.io/2026/36/m/core.tn"
         {
             server => { hostname: text  port: int32 }
         }""";
@@ -363,7 +365,7 @@ String schema = """
 tson.resolve(schema);
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/35/app/server-1.tn")
+        .withSchema("https://example.com/2026/36/app/server-1.tn")
         .readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
 
 value.get("hostname").asString();          // Optional[web-01] — validated against the schema
@@ -395,11 +397,11 @@ Tson tson = Tson.of(ProcessorConfig.defaults()
         // Schemas you already hold, keyed by identity. Not `schemas::get` -- a source says "I cannot
         // supply that" by throwing, where a map returns null, for whichever identity the document names.
         .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(   // the `server` schema from §4
-                Map.of("https://example.com/2026/35/app/server-1.tn", schema)))));
+                Map.of("https://example.com/2026/36/app/server-1.tn", schema)))));
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
 TsonValue server = tson.treeReader().read("""
-        !!schema:"https://example.com/2026/35/app/server-1.tn"
+        !!schema:"https://example.com/2026/36/app/server-1.tn"
         !server { hostname: "web-01"  port: 8080 }""");        // validated as it builds the tree
 
 // No !!schema? The same reader reads schemalessly, straight off the wire.
@@ -505,7 +507,7 @@ unchanged, and a writer that was not asked for a header still writes a bare valu
 ## Status
 
 This is the **first implementation** of TSON, built against a working-draft spec (Part 1 data format
-and Part 2 schema layer, Revision 35 of the 2026 series). Part 1 and most of Part 2 — schema grammar,
+and Part 2 schema layer, Revision 36 of the 2026 series). Part 1 and most of Part 2 — schema grammar,
 resolution, linking/registration, and a compiled schema-validating reader — are implemented; some Part 2
 constructs are still out of scope.
 
@@ -519,7 +521,7 @@ dedicated docs rather than crowding this page:
 - **[BACKLOG.md](BACKLOG.md)** — the actively-tracked engineering backlog
 - **[STRUCTURED-OUTPUT.md](STRUCTURED-OUTPUT.md)** — the target-use-case plan (LLM structured-output validation, JSON compatibility)
 - **[SPEC-FEEDBACK.md](SPEC-FEEDBACK.md)** — ambiguities and errors found in the spec while implementing
-- **[CLAUDE.md](CLAUDE.md)** — orientation and conventions, with the detailed per-area design notes in [docs/](docs/)
+- **[CLAUDE.md](CLAUDE.md)** — orientation and conventions, with the detailed per-area design notes in [design/](design/)
 
 ## Schema pipeline
 
@@ -564,8 +566,8 @@ linking a schema both need its own *governing* schema already compiled, to resol
 like `!enum`/`!integer_type` against — including meta-kernel itself, whose own `!!meta` names *itself*
 (§1.5's "one deliberate circularity in the series"), closed by pre-loading a hand-written bootstrap
 (`MetaKernelBootstrapResolver`) rather than resolving it the ordinary way. See
-[docs/schema-resolution.md](docs/schema-resolution.md) for the full walkthrough, including how
-meta-kernel/meta.tn/core.tn are loaded and registered together.
+[design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,
+including how meta-kernel/meta.tn/core.tn are loaded and registered together.
 
 There's no polished, single-call "load a *custom* governing chain" entry point yet (see
 [BACKLOG.md](BACKLOG.md)) — `Tson` today assumes a schema governed by the standard
@@ -676,9 +678,9 @@ nothing to reopen, so piped input is always treated as data.
 For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
-!!id:"https://example.com/2026/35/app/person-1.tn"
-!!meta:"https://tson.io/2026/35/m/meta.tn"
-!!import:"https://tson.io/2026/35/m/core.tn"
+!!id:"https://example.com/2026/36/app/person-1.tn"
+!!meta:"https://tson.io/2026/36/m/meta.tn"
+!!import:"https://tson.io/2026/36/m/core.tn"
 {
     person => { name: text  age: int32 }
 }
@@ -693,7 +695,7 @@ $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person
   "permitting":[]},"token_policy":{"level":"UNRESTRICTED","per_segment":false,"permitting":[]},
   "unicode_data_version":"16.0"},
   "files":[{"file":"bad.tn","outcome":"INVALID","errors":[{"path":"/name",
-  "schema_pointer":"/person/name","schema_id":"example.com/2026/35/app/person-1.tn",
+  "schema_pointer":"/person/name","schema_id":"example.com/2026/36/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(absent)","data_position":"2:9:63",
   "schema_position":"5:5:145"}]}],"errors":[]}

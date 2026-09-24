@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -68,7 +69,12 @@ public final class HeldBody {
      * rather than a difference between two entries that should be equal.
      */
     public static TemplateBody held(List<String> parameters, DataValue application) {
-        return new TemplateBody(parameters, WRITER.toTson(application));
+        // The parent's extension is derived here because this is the one door every open entry passes
+        // through, whatever spelling produced it -- and from the payload's own structure rather than from
+        // the text below it, which is not parsed back on this path at all.
+        return new TemplateBody(parameters, WRITER.toTson(application),
+                WireForm.parentExtension(application, parameters),
+                WireForm.parentDiscriminators(application, parameters));
     }
 
     /**

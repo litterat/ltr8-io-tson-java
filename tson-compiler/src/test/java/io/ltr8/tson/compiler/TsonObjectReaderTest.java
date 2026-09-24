@@ -1370,7 +1370,8 @@ class TsonObjectReaderTest {
         new TsonObjectReader(fresh).withDiagnostics(collected)
                 .read("{ shape: !circle { radius: 5 } }", OpenShapeHolder.class);
 
-        assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
+        // `circle` names a real class; what fails is that this union does not admit it.
+        assertEquals(List.of(Diagnostic.Code.TYPE_MISMATCH),
                 collected.diagnostics().stream().map(Diagnostic::code).toList());
     }
 

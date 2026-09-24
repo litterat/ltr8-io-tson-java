@@ -18,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * [TSON-JSON] §8.2's discrimination predicate and §8.3's class stability.
  *
- * <p>Two routes and no third. Route 1 is a declared {@code @discriminator} (§8.4) and is unbuilt, so every
- * case here is route 2 — {@code disjoint: true} with class-stable variants, dispatching on the JSON value
+ * <p>Two routes and no third. Route 1 is a declared discriminator (§8.4) and is unbuilt, so every
+ * case here is the untagged route — {@code disjoint: true} with class-stable variants, dispatching on the JSON value
  * kind — or the tagged form, or the refusal that follows when neither recovers the variant.
  */
 class JsonChoiceReadTest {
@@ -28,7 +28,7 @@ class JsonChoiceReadTest {
      * TSON defines no comment syntax ([TSON-DATA] §2.10 — metadata is annotations), so what each declaration
      * is for is said here instead.
      *
-     * <p>{@code scalar_or_list} is disjoint with class-stable variants: one per JSON kind, so route 2 holds.
+     * <p>{@code scalar_or_list} is disjoint with class-stable variants: one per JSON kind, so the untagged route holds.
      * {@code shape}'s two record variants share the brace class, so it is not disjoint and the tag is
      * required. {@code unit_circle} is a subtype of a variant, reachable by tag alone. {@code loose} carries
      * §8.3's first leak — a {@code float64} still admitting {@code .nan} and the infinities has string-class
@@ -36,10 +36,11 @@ class JsonChoiceReadTest {
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/choice-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               scalar_or_list => ( text | int32 | boolean | [text] )
+              any_json       => ( text | number | boolean | [any_json?] | {text => any_json?} )
 
               circle      => { radius: float64 }
               square      => { side: float64 }
@@ -80,7 +81,7 @@ class JsonChoiceReadTest {
         }
     }
 
-    // ── §8.2 route 2: the kind selects ───────────────────────────────────
+    // ── §8.2 untagged: the kind selects ───────────────────────────────────
 
     @Test
     void aDisjointChoiceDispatchesOnTheJsonValueKind() {
@@ -118,7 +119,7 @@ class JsonChoiceReadTest {
     }
 
     @Test
-    void routeTwoWorksAtANestedPosition() {
+    void theUntaggedRouteWorksAtANestedPosition() {
         assertEquals("""
                 {"pick":42}""", read("holder", """
                 {"pick": 42}""").accepted().toString());
@@ -127,16 +128,17 @@ class JsonChoiceReadTest {
     // ── §8.2: where neither route holds, the tag is REQUIRED ─────────────
 
     /**
-     * Two record variants share the brace class, so the choice is not disjoint and route 2 is unavailable.
+     * Two record variants share the brace class, so the choice is not disjoint and the untagged route is unavailable.
      * §8.2's last clause: the tag is REQUIRED, and the message says so rather than guessing a variant.
      */
     @Test
     void aNonDisjointChoiceRequiresATag() {
         Diagnostic refusal = read("shape", """
                 {"radius": 1.0}""").refusal();
-        // UNKNOWN_TYPE_REF, matching the TSON reader for the same document -- §9.4 gives both encodings one
-        // vocabulary, and the enum has no member for "a required tag is missing" (BACKLOG).
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, refusal.code());
+        // TYPE_MISMATCH, matching the TSON reader for the same document -- §9.4 gives both encodings one
+        // vocabulary. A required tag that is absent establishes no type, which is what the code says;
+        // UNKNOWN_TYPE_REF would claim a name denoted nothing, and there is no name here at all.
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
         assertTrue(refusal.message().contains("$type"), refusal.message());
         assertTrue(refusal.message().contains("circle"), refusal.message());
     }
@@ -146,7 +148,7 @@ class JsonChoiceReadTest {
     void nothingMatchesARecordVariantByItsMembers() {
         // `{"side": 1.0}` is unambiguous to a human -- only `square` declares `side` -- and §8.2 forbids
         // recovering the variant that way, because that is the cleverness the closed predicate excludes.
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, read("shape", """
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("shape", """
                 {"side": 1.0}""").refusal().code());
     }
 
@@ -159,7 +161,7 @@ class JsonChoiceReadTest {
                 {"$type": "circle", "radius": 1.0}""").accepted().toString());
     }
 
-    /** "A tag is never wrong": it is accepted where route 2 would have selected the same variant anyway. */
+    /** "A tag is never wrong": it is accepted where the untagged route would have selected the same variant anyway. */
     @Test
     void aTagIsAdmittedWhereItCouldHaveBeenOmitted() {
         assertEquals("""
@@ -167,6 +169,26 @@ class JsonChoiceReadTest {
                 {"$type": "circle", "radius": 1.0}""").accepted().toString());
         assertEquals("42", read("scalar_or_list", """
                 {"$type": "int32", "$value": 42}""").accepted().toString());
+    }
+
+    /**
+     * §8.3.1: the tagged form is recognised from the first member alone, so a reserved name among a map
+     * variant's later keys is a key -- §5.7's arbitrary-JSON declaration reads it untagged.
+     */
+    @Test
+    void aReservedNameAfterTheFirstMemberIsAMapKey() {
+        assertEquals("""
+                {"a":1,"$type":"x"}""", read("any_json", """
+                {"a": 1, "$type": "x"}""").accepted().toString());
+    }
+
+    /** The same name leading the object is the tag, and names no variant here. */
+    @Test
+    void aLeadingReservedNameIsTheTagEvenWhereAMapCouldTakeIt() {
+        Diagnostic refusal = read("any_json", """
+                {"$type": "x", "a": 1}""").refusal();
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
+        assertTrue(refusal.message().contains("not a variant"), refusal.message());
     }
 
     /** §8.4's note: a `$type` naming a proper subtype of a variant validates as that subtype. */
@@ -177,11 +199,22 @@ class JsonChoiceReadTest {
                 {"$type": "unit_circle", "radius": 1.0, "fixed": true}""").accepted().toString());
     }
 
+    /**
+     * The wrapper form carries the same note: the tag names {@code $value}'s type, so a subtype's own field is
+     * admitted there -- read as the variant instead, {@code fixed} would be refused as unrecognised.
+     */
+    @Test
+    void aWrapperTagNamingASubtypeOfAVariantReadsItsValueAsThatSubtype() {
+        assertEquals("""
+                {"radius":1.0,"fixed":true}""", read("shape", """
+                {"$type": "unit_circle", "$value": {"radius": 1.0, "fixed": true}}""").accepted().toString());
+    }
+
     @Test
     void aTagNamingSomethingThatIsNoVariantIsRefused() {
         Diagnostic refusal = read("shape", """
                 {"$type": "holder", "pick": 1}""").refusal();
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, refusal.code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
         assertTrue(refusal.expected().contains("circle"), refusal.expected());
     }
 
@@ -197,13 +230,13 @@ class JsonChoiceReadTest {
 
     /**
      * §8.3's first leak: a `float64` admitting `.nan` and the infinities has values that encode as JSON
-     * strings, so it is not class-stable and route 2 is unavailable however disjoint the choice looks.
+     * strings, so it is not class-stable and the untagged route is unavailable however disjoint the choice looks.
      */
     @Test
     void anApproximateVariantAdmittingSpecialsIsNotClassStable() {
         Diagnostic refusal = read("loose", "1.5").refusal();
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, refusal.code());
-        assertTrue(refusal.message().contains("$type"), "route 2 must be unavailable: " + refusal.message());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
+        assertTrue(refusal.message().contains("$type"), "the untagged route must be unavailable: " + refusal.message());
     }
 
     /** Narrowing both facets to false confines the family to JSON numbers and restores stability. */
@@ -213,7 +246,7 @@ class JsonChoiceReadTest {
         assertEquals("\"hi\"", read("tight", "\"hi\"").accepted().toString());
     }
 
-    /** A tag still reads at an unstable choice: stability gates route 2, never the tagged form. */
+    /** A tag still reads at an unstable choice: stability gates the untagged route, never the tagged form. */
     @Test
     void anUnstableChoiceStillTakesATaggedValue() {
         assertEquals("1.5", read("loose", """

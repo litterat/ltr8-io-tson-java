@@ -22,19 +22,30 @@ import java.text.Normalizer;
  * (normalisation still precedes every identity comparison) and makes the Tier 3 AST carry the normalised
  * name, so a re-emitted document spells a decomposed field name composed.
  *
- * <p>The common case allocates nothing: almost every name is already normalised -- an unquoted one always
- * is, the lexer having rejected it otherwise -- so the check short-circuits before {@link
- * Normalizer#normalize} would build a second string.
+ * <p><b>The common case allocates nothing.</b> Almost every name is already normalised, and most are ASCII.
+ * {@link Normalizer#isNormalized} allocates working buffers whatever its input, so it is reached only for a
+ * string holding a character at or above U+0300, where the combining marks begin: every character below it has
+ * canonical combining class 0 and composes with no other character below it, so a string of them is NFC by
+ * construction ({@code NfcTest} checks every such character and pair). Only a string that is not already NFC
+ * pays for {@link Normalizer#normalize}.
  */
 public final class Nfc {
+
+    /** The first character that can take part in NFC's reordering or composition; see the class comment. */
+    private static final char FIRST_COMBINING = '\u0300';
 
     private Nfc() {
     }
 
     /** {@code text} in NFC, returning it unchanged when it already is. */
     public static String of(String text) {
-        return Normalizer.isNormalized(text, Normalizer.Form.NFC)
-                ? text
-                : Normalizer.normalize(text, Normalizer.Form.NFC);
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) >= FIRST_COMBINING) {
+                return Normalizer.isNormalized(text, Normalizer.Form.NFC)
+                        ? text
+                        : Normalizer.normalize(text, Normalizer.Form.NFC);
+            }
+        }
+        return text;
     }
 }

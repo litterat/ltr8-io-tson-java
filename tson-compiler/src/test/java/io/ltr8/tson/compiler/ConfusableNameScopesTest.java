@@ -57,8 +57,8 @@ class ConfusableNameScopesTest {
     private static TsonCompiledSchema compileWith(UnicodePolicy identifiers, String declarations) {
         String schema = """
                 !!id:"https://example.test/confusable.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                 %s
                 }
@@ -139,6 +139,22 @@ class ConfusableNameScopesTest {
     @Test
     void twoEnumMembersThatReadAlikeAreRefused() {
         assertTrue(refused("  st => !enum [ACTIVE " + CYR_CAP_A + "CTIVE]")
+                .contains("has members that read alike"));
+    }
+
+    /**
+     * <b>{@code profile: TEXT} takes the members out of §8.2's two per-<em>name</em> rules and leaves the
+     * collision relation in place</b>, which is the split the declaration buys (§7.4). A value set carries
+     * whatever its domain carries, so policing its characters and scripts is a category error; two members that
+     * render alike is still the hazard, because the set is still what a value is matched against.
+     */
+    @Test
+    void aTextProfileDropsThePerNameRulesAndKeepsTheCollisionOne() {
+        String restricted = "a" + new String(Character.toChars(0x0132)) + "b";
+        // The restricted-character rule is per-name, and these are not names.
+        assertNotNull(compile("  st => !enum { members: [\"" + restricted + "\"]  profile: TEXT }"));
+
+        assertTrue(refused("  st => !enum { members: [\"ACTIVE\" \"" + CYR_CAP_A + "CTIVE\"]  profile: TEXT }")
                 .contains("has members that read alike"));
     }
 

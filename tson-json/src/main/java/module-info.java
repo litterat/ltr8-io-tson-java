@@ -2,8 +2,9 @@
  * The JSON encoding of the TSON schema system ([TSON-JSON], {@code spec/tson-part3-json.md}).
  *
  * <p>Three exported packages, layered the way the module reads a document.
- * {@code io.ltr8.tson.json} is the front door -- {@code Json}, {@code JsonPosition} and the exceptions
- * every layer raises. {@code io.ltr8.tson.json.tree} is the value model, shaped after JEP 540 so a
+ * {@code io.ltr8.tson.json} is the front door -- {@code Json}, the readers and writers, {@code
+ * JsonPosition} and {@code JsonDiagnostics}; it declares no exception of its own, every layer raising {@code
+ * tson-base}'s. {@code io.ltr8.tson.json.tree} is the value model, shaped after JEP 540 so a
  * consumer learns one value model across this and the JDK's forthcoming {@code jdk.incubator.json}; it is
  * the JSON counterpart of {@code io.ltr8.tson.tree} and stands in the same relation to its front door.
  *
@@ -35,8 +36,10 @@
  * writer -- never a token, a parser or an engine. <b>Their types carry no {@code Json} prefix</b>, which is
  * the same rule as the exported packages' rather than an exception to it: a prefix earns its keep
  * disambiguating a name a consumer writes, and nothing here is reachable from outside this module. The
- * schema-directed readers are named mode first ({@code TreeRecordReader}, {@code TreeMapObjectReader}), so a
- * second read mode lands beside its peer rather than at the other end of a listing.
+ * schema-directed classes that differ by mode are named mode first ({@code TreeRecordBuilder},
+ * {@code BindMapBuilder}), so a second read mode lands beside its peer rather than at the other end of a listing;
+ * the ones that do not -- the container loops and the dispatchers ({@code RecordReader}, {@code MapPairsReader},
+ * {@code DispatchTagReader}) -- carry no mode.
  */
 module io.ltr8.tson.json {
     exports io.ltr8.tson.json;

@@ -76,6 +76,15 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
                         "matching " + p);
             }
         });
+        // Last, as on the numeric tiers: a member set names the whole value space, so where it is present the
+        // other facets hold vacuously and their messages are the less useful of the two.
+        constraints.members().ifPresent(members -> {
+            if (!members.contains(text)) {
+                throw new AtomValidationException(
+                        "'" + text + "' is not a member of this type -- expected one of " + members,
+                        "one of (" + String.join(", ", members) + ")");
+            }
+        });
     }
 
     /** This family already reads to text, so a string target is its own value and nothing else is. */

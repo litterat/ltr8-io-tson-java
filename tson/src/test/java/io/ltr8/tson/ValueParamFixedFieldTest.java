@@ -6,7 +6,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -35,12 +34,12 @@ class ValueParamFixedFieldTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/value-param.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               order    => { id: text }
-              literal  => { status: int32 = 201  body: order }
-              response => <T, S> { status: int32 = S  body: T }
+              literal  => { status?: int32 = 201  body: order }
+              response => <T, S> { status?: int32 = S  body: T }
               created  => response<order, 201>
             }
             """;
@@ -90,7 +89,7 @@ class ValueParamFixedFieldTest {
         assertEquals(List.of("T", "S"), held.parameters(), "the entry's own parameter list, as declared");
         assertTrue(held.template().contains("value: S"),
                 () -> "the parameter stands in the ordinary value slot: " + held.template());
-        assertFalse(held.template().contains(FieldState.REQUIRED_FIXED.name()),
+        assertFalse(held.template().contains("FIXED"),
                 () -> "nothing is fixed at declaration: " + held.template());
     }
 
@@ -106,9 +105,9 @@ class ValueParamFixedFieldTest {
 
         RecordField materialised = statusOf(linked, "created");
         assertEquals("201", materialised.value().orElseThrow().text());
-        assertEquals(statusOf(linked, "literal").state(), materialised.state(),
+        assertEquals(statusOf(linked, "literal").describe(), materialised.describe(),
                 "the templated form says what the literal form says");
-        assertEquals(FieldState.REQUIRED_FIXED, materialised.state());
+        assertEquals("fixed", materialised.describe());
     }
 
     /**
@@ -118,14 +117,14 @@ class ValueParamFixedFieldTest {
      */
     @Test
     void aMaterialisedValueParameterDefaultStaysADefault() {
-        String schema = SCHEMA.replace("status: int32 = S", "status: int32 ~ S");
+        String schema = SCHEMA.replace("status?: int32 = S", "status?: int32 ~ S");
         SchemaSource source = uri -> schema;
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
 
         RecordField materialised = statusOf(tson.resolve(schema), "created");
 
         assertEquals("201", materialised.value().orElseThrow().text());
-        assertEquals(FieldState.REQUIRED_DEFAULT, materialised.state());
+        assertEquals("defaulted", materialised.describe());
     }
 
     /** What it costs at read time, which is the whole reason it matters. */
@@ -149,14 +148,14 @@ class ValueParamFixedFieldTest {
     void everyTemplateShapeFixesARoutedValueTheSameWay() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                   order    => { id: text }
                   base     => { status: int32  body: order }
-                  fresh    => <T, S> { status: int32 = S  body: T }
-                  composed => <T, S> base & { status: = S  body: T }
-                  refined  => <S> base ^ { status: = S }
+                  fresh    => <T, S> { status?: int32 = S  body: T }
+                  composed => <T, S> base & { status?: = S  body: T }
+                  refined  => <S> base ^ { status?: = S }
                   a => fresh<order, 201>
                   b => composed<order, 201>
                   c => refined<201>
@@ -167,7 +166,7 @@ class ValueParamFixedFieldTest {
 
         for (String entry : List.of("a", "b", "c")) {
             RecordField status = statusOf(linked, entry);
-            assertEquals(FieldState.REQUIRED_FIXED, status.state(), entry);
+            assertEquals("fixed", status.describe(), entry);
             assertEquals("201", status.value().orElseThrow().text(), entry);
         }
     }
@@ -186,14 +185,14 @@ class ValueParamFixedFieldTest {
     void everyTemplateShapeResolvesAgainstTheSingleValueChannel() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                   order    => { id: text }
                   base     => { status: int32  body: order }
-                  fresh    => <T, S> { status: int32 = S  body: T }
-                  composed => <T, S> base & { status: = S  body: T }
-                  refined  => <S> base ^ { status: = S }
+                  fresh    => <T, S> { status?: int32 = S  body: T }
+                  composed => <T, S> base & { status?: = S  body: T }
+                  refined  => <S> base ^ { status?: = S }
                   sized    => <N> { xs: [text; N..] }
                   a => fresh<order, 201>
                   b => composed<order, 201>

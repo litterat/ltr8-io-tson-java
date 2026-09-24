@@ -35,14 +35,49 @@ final class MetaRefs {
     /**
      * Every {@link TypeRef} a definition holds, mapped -- {@code source}, and whatever its body carries.
      *
-     * <p>{@code supertypes} is a name list rather than a type-ref channel and is deliberately not
-     * covered: a composition operand is a named reference or an application (§5.7, §5.8), so a supertype
-     * names a declared or an <em>instantiation</em> entry, never a synthetic one.
+     * <p>{@code type_definition.supertypes} is a name list rather than a type-ref channel and is not
+     * covered: it is the derived transitive index, computed once every parent is a type, so a name there
+     * denotes a declared or an <em>instantiation</em> entry and never a synthetic one. The body's own
+     * {@code record.supertypes} <em>is</em> a reference channel and is mapped with the rest.
      */
     static TypeDefinition mapRefs(TypeDefinition definition, UnaryOperator<TypeRef> map) {
-        Optional<TypeRef> source = definition.source().map(map);
+        return mapRefs(definition, map, true, true);
+    }
+
+    /**
+     * The same, leaving a {@link RecordBody}'s {@code supertypes} exactly as written.
+     *
+     * <p>{@code TemplateMaterialiser} is the caller, and a composition operand is why: an application there
+     * denotes no entry -- its fields are absorbed by value -- so the channel keeps it as the record of what
+     * was applied, and closing it would mint the entry that path exists to avoid.
+     *
+     * <p><b>Skipping the call is the point, not discarding its result.</b> Closing an application publishes
+     * the entry as a side effect, so a walk that maps this channel has already minted whatever the caller
+     * then does with the rewritten reference.
+     */
+    static TypeDefinition mapRefsKeepingRecordSupertypes(TypeDefinition definition,
+            UnaryOperator<TypeRef> map) {
+        return mapRefs(definition, map, false, false);
+    }
+
+    /**
+     * {@code source} is <b>provenance, not a reference to flatten</b>, and this walk leaves it alone.
+     *
+     * <p>§8.2 draws that line itself -- "what is canonicalised is identity, not provenance" -- and the
+     * omission only started to matter once a declaration could own an instantiation's entry (§8.2).
+     * {@code TemplateMaterialiser}'s pass walks the <em>declared</em> entries, minted ones living in the map
+     * it returns, so before that a declared entry's {@code source} was always a bare
+     * name -- a constructor, a refinement source -- where closing is a no-op. A declaration that is its own
+     * instantiation records the application there, and mapping it would close that application to the entry
+     * it denotes, which is the declaration: {@code bx}'s {@code source} became {@code bx}, arguments and all
+     * stripped, and every index derived from those arguments emptied.
+     */
+    private static TypeDefinition mapRefs(TypeDefinition definition, UnaryOperator<TypeRef> map,
+            boolean mapRecordSupertypes, boolean mapSource) {
+        Optional<TypeRef> source = mapSource ? definition.source().map(map) : definition.source();
         return new TypeDefinition(source, definition.kind(),
-                definition.supertypes(), definition.subtypes(), mapBodyRefs(definition.body(), map), definition.position(),
+                definition.supertypes(), definition.subtypes(),
+                mapBodyRefs(definition.body(), map, mapRecordSupertypes), definition.position(),
                 definition.annotations());
     }
 
@@ -51,10 +86,19 @@ final class MetaRefs {
      * carries</b>, so a shape added to {@code schema.meta} needs remembering here and nowhere else.
      */
     static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map) {
+        return mapBodyRefs(body, map, true);
+    }
+
+    private static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map, boolean mapRecordSupertypes) {
         return switch (body) {
-            case RecordBody record -> new RecordBody(record.supertypes(),
+            // `discriminators` is carried, not mapped: it holds field *names* of this record, which no
+            // reference rewrite touches. Dropping it here would lose a family's selector list on every
+            // synthetic rename and every materialisation rewrite -- a body that arrived sealed would come
+            // back with nothing to dispatch on.
+            case RecordBody record -> new RecordBody(mapRecordSupertypes
+                    ? record.supertypes().stream().map(map).toList() : record.supertypes(),
                     record.fields().stream().map(field -> field.withType(map.apply(field.type()))).toList(),
-                    record.groups());
+                    record.groups(), record.extension(), record.discriminators());
             case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.state(),
                     array.unordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(map.apply(mapBody.keyType()), map.apply(mapBody.valueType()),

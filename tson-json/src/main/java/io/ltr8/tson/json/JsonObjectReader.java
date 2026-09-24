@@ -2,15 +2,23 @@ package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.base.BindMismatchException;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.CountingReceiver;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.reader.DataClassObjectReader;
+import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
 import java.io.InputStream;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
 
 
 /**
@@ -31,11 +39,12 @@ import java.io.InputStream;
  * same reason {@code TsonObjectReader} sits beside {@code Tson}: a reader is a front door, not a
  * layer of one.
  *
- * <p><b>A facade over {@link DataClassObjectReader}</b>, which is what actually binds a value. The split is
- * the one {@code TsonObjectReader} makes over {@code DataClassObjectReader}, and for the same reason: a
- * front door owns the document -- entry points, framing, and the configuration a read is judged under --
- * where the engine owns one value at one descriptor and stops. It is also where the schema-directed decode
- * of §5-§8 will arrive: a second engine under this same door rather than a second door.
+ * <p><b>Two engines under one door.</b> {@link #read} binds through {@link DataClassObjectReader}, taking the
+ * class as the schema; {@link #readAs}, on a reader from {@code Json.withSchemas(loader).objectReader()} named a
+ * schema with {@link #withSchema}, reads against the TSON schema in bind mode -- [TSON-JSON] §5-§8's
+ * schema-directed decode, validating in full and building the classes the bind context resolves. The split is
+ * the one {@code TsonObjectReader} makes, and for the same reason: a front door owns the document -- entry
+ * points, framing, and the configuration a read is judged under -- where an engine owns one value and stops.
  *
  * <p><b>Streams the events, never a tree.</b> Memory held is proportional to nesting depth rather than
  * to document size, and {@link io.ltr8.tson.json.stream.JsonStream} 's §10.1 bound refuses a document before this descends
@@ -73,11 +82,11 @@ import java.io.InputStream;
  * difference between a document read wholly and one read partly, and why the schema-directed decode is
  * where the accommodation belongs rather than here.
  *
- * <p><b>What this reader is not.</b> It is not validation against a TSON schema, and it is not §1.3
- * principle 1's schema-directed decode: nothing here consults facets, field states, defaults, fixed
- * values, groups or the discrimination predicate, because a Java class declares none of them. It is the
- * ergonomic read for a caller who has a class and a document, and the honest name for what it checks is
- * "does this document fit this class".
+ * <p><b>What {@link #read} is not.</b> It is not validation against a TSON schema, and it is not §1.3
+ * principle 1's schema-directed decode: nothing there consults facets, field states, defaults, fixed values,
+ * groups or the discrimination predicate, because a Java class declares none of them. It is the ergonomic read
+ * for a caller who has a class and a document, and the honest name for what it checks is "does this document
+ * fit this class" -- {@link #readAs} is the read that asks whether it conforms.
  *
  * <h2>The rules that are §7-shaped, and why they are</h2>
  *
@@ -113,14 +122,29 @@ public final class JsonObjectReader {
      */
     private final ProcessorPolicy policy;
 
-    private JsonObjectReader(DataBindContext context, boolean ignoreUnknownMembers,
-                             DiagnosticsReceiver receiver, ProcessorPolicy policy) {
+    /** Where a named schema is compiled from in bind mode, or null for a reader that can name none. */
+    private final JsonCompiledSchemaRegistry schemas;
+
+    /** The schema {@link #readAs} reads against, or null until {@link #withSchema} names one. */
+    private final String schemaUri;
+
+    private JsonObjectReader(DataBindContext context, boolean ignoreUnknownMembers, DiagnosticsReceiver receiver,
+                             ProcessorPolicy policy, JsonCompiledSchemaRegistry schemas, String schemaUri) {
+        this(context, ignoreUnknownMembers, receiver, policy, schemas, schemaUri,
+                new DataClassObjectReader(context, ignoreUnknownMembers, policy.identifierPolicy()));
+    }
+
+    /** Sharing {@code engine}, for a copy that differs from its original only in its receiver. */
+    private JsonObjectReader(DataBindContext context, boolean ignoreUnknownMembers, DiagnosticsReceiver receiver,
+                             ProcessorPolicy policy, JsonCompiledSchemaRegistry schemas, String schemaUri,
+                             DataClassObjectReader engine) {
         this.context = context;
         this.ignoreUnknownMembers = ignoreUnknownMembers;
         this.receiver = receiver;
         this.policy = policy;
-        this.engine = new DataClassObjectReader(context, ignoreUnknownMembers,
-                policy.identifierPolicy());
+        this.schemas = schemas;
+        this.schemaUri = schemaUri;
+        this.engine = engine;
     }
 
 
@@ -137,7 +161,7 @@ public final class JsonObjectReader {
      * <p>It is also how a {@code Tson} front door hands this reader the same policy its TSON readers carry.
      */
     public JsonObjectReader withProcessorPolicy(ProcessorPolicy policy) {
-        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy);
+        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy, schemas, schemaUri);
     }
 
     /**
@@ -160,16 +184,46 @@ public final class JsonObjectReader {
      * <p>The peer of {@code TsonObjectReader.withDiagnostics}, and what makes a one-pass read possible:
      * {@code DiagnosticsReceiver.collecting()} gathers every problem and lets the read run to the end,
      * where the default {@code throwing()} raises {@code ReadException} at the first. A collecting read
-     * hands back {@code null} rather than a half-built object -- see {@code DataClassObjectReader} on why
-     * bind mode is all-or-nothing where a tree keeps what it built.
+     * that reported anything hands back {@code null} rather than a half-built object, as every read does.
      */
     public JsonObjectReader withDiagnostics(DiagnosticsReceiver receiver) {
-        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy);
+        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy, schemas, schemaUri);
+    }
+
+    /**
+     * Over {@code schemas}, a bind-mode registry, and the context it binds through -- what {@code
+     * Json.withSchemas(loader).objectReader()} hands back, and the only route to {@link #withSchema}.
+     */
+    static JsonObjectReader over(JsonCompiledSchemaRegistry schemas, DataBindContext context) {
+        if (schemas.mode() != JsonCompiledSchemaRegistry.Mode.BIND) {
+            throw new IllegalArgumentException("a JsonObjectReader needs a bind-mode registry "
+                    + "(JsonCompiledSchemaRegistry.bind(loader, context)) -- a tree-mode one reads to JsonValues");
+        }
+        return new JsonObjectReader(context, false, DiagnosticsReceiver.throwing(), ProcessorPolicy.defaults(),
+                schemas, null);
+    }
+
+    /**
+     * This reader bound to the schema {@code uri} names, for {@link #readAs} -- a new reader, leaving this one
+     * unchanged, sharing its compiled-schema registry. {@code TsonObjectReader.withSchema}'s peer.
+     *
+     * <p>[TSON-JSON] §3.4's <b>out-of-band route</b>: the application supplies the schema and the root type, and
+     * the document is a bare value read at that type. The schema is not resolved here: {@link #readAs} reaches
+     * for it, so a schema nothing would supply is a diagnostic on the read that needed it.
+     */
+    public JsonObjectReader withSchema(String uri) {
+        if (schemas == null) {
+            throw new IllegalStateException("this reader can name no schema -- one from Json.withSchemas(loader)"
+                    + ".objectReader() can, and a class-directed read is read(...) rather than readAs(...)");
+        }
+        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy, schemas,
+                Objects.requireNonNull(uri, "uri"));
     }
 
     /** Over a caller's own bind context — one per binding profile, descriptors cached inside it. */
     public static JsonObjectReader using(DataBindContext context) {
-        return new JsonObjectReader(context, false, DiagnosticsReceiver.throwing(), ProcessorPolicy.defaults());
+        return new JsonObjectReader(context, false, DiagnosticsReceiver.throwing(), ProcessorPolicy.defaults(),
+                null, null);
     }
 
     /**
@@ -183,7 +237,7 @@ public final class JsonObjectReader {
      */
     public static JsonObjectReader standard() {
         return new JsonObjectReader(AtomContext.defaultContext(), false, DiagnosticsReceiver.throwing(),
-                ProcessorPolicy.defaults());
+                ProcessorPolicy.defaults(), null, null);
     }
 
     /**
@@ -199,7 +253,7 @@ public final class JsonObjectReader {
      * two apart, and the schema-directed decode is where the keeping form arrives.
      */
     public JsonObjectReader ignoringUnknownFields() {
-        return new JsonObjectReader(context, true, receiver, policy);
+        return new JsonObjectReader(context, true, receiver, policy, schemas, schemaUri);
     }
 
     // ── Reading ──────────────────────────────────────────────────────────
@@ -218,24 +272,43 @@ public final class JsonObjectReader {
      * above adapt to. A source already in memory is read without a copy.
      */
     public <T> T read(ByteSource source, Class<T> type) {
-        return read(new JsonStream(source, policy, receiver), type);
+        return counted(r -> r.readEvents(new JsonStream(source, policy, r.receiver), type));
     }
 
     /** Off UTF-8 bytes, where §3.1's rules bite. {@code source} is not closed here. */
     public <T> T read(InputStream source, Class<T> type) {
         try (ByteSource bytes = ByteSource.of(source)) {
-            return read(new JsonStream(bytes, policy, receiver), type);
+            return counted(r -> r.readEvents(new JsonStream(bytes, policy, r.receiver), type));
         }
     }
 
 
-    /** Off an event source, which is the seam the two families above come through. */
+    /**
+     * Off an event source, which is the seam the two families above come through. A problem the source reports
+     * to a receiver of its own is not this read's to count.
+     */
     public <T> T read(JsonEventSource events, Class<T> type) {
+        return counted(r -> r.readEvents(events, type));
+    }
+
+    private <T> T readEvents(JsonEventSource events, Class<T> type) {
         try {
             return readDocument(events, type);
         } catch (RuntimeException e) {
             return readFailure(e);
         }
+    }
+
+    /**
+     * One whole-document read, run on a copy of this reader whose receiver counts: a document that reported
+     * anything binds to nothing, whatever was assembled beneath ({@link CountingReceiver}), and the rule holds
+     * over every route a problem takes, the root's framing and the stream's own refusals among them.
+     */
+    private <T> T counted(Function<JsonObjectReader, T> read) {
+        CountingReceiver counting = new CountingReceiver(receiver);
+        T value = read.apply(new JsonObjectReader(context, ignoreUnknownMembers, counting, policy, schemas,
+                schemaUri, engine));
+        return counting.reported() ? null : value;
     }
 
     /**
@@ -250,11 +323,139 @@ public final class JsonObjectReader {
      * limit refusal is classified apart ({@link Diagnostic#ofLimitExceeded}) because it says this processor
      * declined rather than that the document is malformed.
      */
+
     private <T> T readFailure(RuntimeException e) {
         receiver.report(e instanceof LimitExceededException limit
                 ? Diagnostic.ofLimitExceeded(limit)
                 : JsonDiagnostics.ofBaseSyntaxError(e));
         return null;
+    }
+
+    // ── Reading against a schema ─────────────────────────────────────────
+
+    /** {@link #readAs(ByteSource, String, Class)} over a string. */
+    public <T> T readAs(String source, String typeName, Class<T> type) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readAs(bytes, typeName, type);
+        }
+    }
+
+    /** {@link #readAs(ByteSource, String, Class)} over a stream, which is not closed here. */
+    public <T> T readAs(InputStream source, String typeName, Class<T> type) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readAs(bytes, typeName, type);
+        }
+    }
+
+    /**
+     * Binds {@code source} as {@code typeName}, declared by the schema {@link #withSchema} named, into {@code type}
+     * -- [TSON-JSON] §3.4's out-of-band binding, and {@code TsonObjectReader.readAs}'s peer. Unlike {@link #read},
+     * which takes the class as the schema, this validates the document in full against the TSON schema -- facets,
+     * field states, defaults and fixed values, groups, the discrimination predicate -- and builds the class from
+     * what it read: each record into the class the bind context resolves for its schema type, each field into
+     * what its component declares.
+     *
+     * <p><b>All-or-nothing, at the document too.</b> A document that reported anything binds to {@code null}. A
+     * fail-fast reader throws at the first problem; a collecting one hands every problem to its receiver and
+     * returns {@code null}.
+     *
+     * <p><b>What stands in the way of a read is a diagnostic, and a verdict only where it is one.</b> A schema
+     * nothing supplies is {@code SCHEMA_NOT_FOUND}, a type it does not declare {@code UNKNOWN_TYPE}, a schema
+     * whose types the bound classes do not match {@code BIND_MISMATCH}, and a root type bound to a class {@code
+     * type} cannot hold {@code TYPE_MISMATCH} -- that last checked before the value is read. A schema type with
+     * no bound class at all reaches the read that needs it as {@code MissingBindingException}: the reading
+     * application's own wiring, in every mode.
+     */
+    public <T> T readAs(ByteSource source, String typeName, Class<T> type) {
+        return counted(r -> r.readRootAs(source, typeName, type));
+    }
+
+    private <T> T readRootAs(ByteSource source, String typeName, Class<T> type) {
+        if (schemaUri == null) {
+            throw new IllegalStateException("no schema named -- readAs reads against one, so name it with "
+                    + "withSchema(uri); a class-directed read is read(...)");
+        }
+        Root root = root(typeName, type);
+        if (root == null) {
+            return null;   // refused before the document was touched, the reason reported
+        }
+        try {
+            JsonEventSource events = new JsonStream(source, policy, receiver);
+            JsonReadContext ctx = JsonReadContext.of(events, receiver, policy.identifierPolicy());
+            // Rooted at the name the caller supplied, so a diagnostic names the declaration the author wrote rather
+            // than whatever an alias resolves to -- JsonTreeReader.readAs does the same.
+            ctx = root.declaration().map(ctx::underDeclaration).orElse(ctx);
+            Object value = root.reader().read(ctx);
+            if (value != null && !type.isInstance(value)) {
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the schema's type `" + typeName + "` produced a "
+                        + value.getClass().getName() + ", not the requested " + type.getName(), type.getName(),
+                        value.getClass().getName());
+                return null;
+            }
+            if (!(events.next() instanceof JsonEvent.EndOfDocument)) {
+                throw new IllegalStateException("the stream produced events after the document's root value");
+            }
+            return type.cast(value);
+        } catch (RuntimeException e) {
+            return readFailure(e);
+        }
+    }
+
+    /** The reader for the root, and the declaration a diagnostic about it is rooted at. */
+    private record Root(JsonTypeReader<?> reader, Optional<JsonSchemaLocation> declaration) {
+    }
+
+    /**
+     * The reader for {@code typeName} in this reader's schema, checked against {@code type} -- or null, the reason
+     * reported, before any of the document is read.
+     */
+    private Root root(String typeName, Class<?> type) {
+        Optional<JsonCompiledSchema> schema;
+        try {
+            schema = schemas.get(schemaUri);
+        } catch (MissingBindingException e) {
+            throw e;
+        } catch (BindMismatchException e) {
+            report(Diagnostic.Code.BIND_MISMATCH, e.getMessage(), "a schema whose types the bound classes match",
+                    schemaUri);
+            return null;
+        }
+        if (schema.isEmpty()) {
+            report(Diagnostic.Code.SCHEMA_NOT_FOUND, "no schema was supplied for \"" + schemaUri + "\"",
+                    "a schema this processor can obtain", schemaUri);
+            return null;
+        }
+        Optional<JsonTypeReader<?>> reader = schema.get().find(typeName);
+        if (reader.isEmpty()) {
+            report(Diagnostic.Code.UNKNOWN_TYPE, schema.get().unknownTypeMessage(typeName),
+                    schema.get().declaredTypeNames(), typeName);
+            return null;
+        }
+        Class<?> bound = boundClass(typeName);
+        if (bound != null && !type.isAssignableFrom(bound)) {
+            report(Diagnostic.Code.TYPE_MISMATCH, "the schema's type `" + typeName + "` binds to " + bound.getName()
+                    + ", which is not assignable to the requested " + type.getName(), type.getName(), bound.getName());
+            return null;
+        }
+        return new Root(reader.get(), schema.get().rootDeclaration(typeName));
+    }
+
+    /**
+     * The class {@code typeName} is bound to, or null where it is not bound by name -- a container, an atom, a
+     * type the context cannot resolve. The before-read check then falls to the after-read one.
+     */
+    private Class<?> boundClass(String typeName) {
+        try {
+            return context.getDescriptor(typeName).typeClass();
+        } catch (DataBindException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** A problem stated about the read as a whole, before any of the document is read -- no pointer, no position. */
+    private void report(Diagnostic.Code code, String message, String expected, String actual) {
+        receiver.report(new Diagnostic(Optional.of(""), Optional.empty(), schemaUri, code, message, expected,
+                actual, Optional.empty(), Optional.empty()));
     }
 
     // ── Framing ──────────────────────────────────────────────────────────

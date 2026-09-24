@@ -9,7 +9,6 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -95,28 +94,27 @@ class RecordTreeReaderTest {
 
     @Test
     void absentOptionalFieldReadsAsNull() {
-        RecordField optional = new RecordField("value", TypeRef.of("integer"), FieldState.OPTIONAL,
-                Optional.empty());
+        RecordField optional = RecordField.optionalVoidable("value", TypeRef.of("integer"));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), optional));
 
         assertNull(read(compiled, "{}").get("value"));
         assertNull(read(compiled, "{ value: _ }").get("value"));
     }
 
-    private static RecordField fixed(FieldState state, String token) {
-        return new RecordField("value", TypeRef.of("integer"), state,
-                token == null ? Optional.empty() : Optional.of(new Token(token, Token.Form.UNQUOTED)));
+    /** {@code value?: integer = token}. */
+    private static RecordField fixed(String token) {
+        return RecordField.fixed("value", TypeRef.of("integer"), new Token(token, Token.Form.UNQUOTED));
     }
 
     /**
-     * §5.2: a REQUIRED_FIXED field "may be provided with a value matching the fixed value, or omitted (the
+     * §5.2: a fixed field "may be provided with a value matching the fixed value, or omitted (the
      * fixed value is used)". Both routes land on the schema's value -- the document's own token is never the
      * source, only a claim to be checked.
      */
     @Test
     void requiredFixedFieldInjectsWhenAbsentAndAcceptsAMatchingValue() {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.REQUIRED_FIXED, "7")));
+                fixed("7")));
 
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
         assertEquals(BigInteger.valueOf(7), read(compiled, "{ value: 7 }").get("value"));
@@ -130,7 +128,7 @@ class RecordTreeReaderTest {
     @Test
     void requiredFixedFieldRejectsAContradictingValue() {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.REQUIRED_FIXED, "7")));
+                fixed("7")));
 
         ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: 9 }"));
         assertTrue(thrown.getMessage().contains("cannot be given another value"), thrown.getMessage());
@@ -144,7 +142,7 @@ class RecordTreeReaderTest {
     @Test
     void aFixedFieldWhoseStatedTokenIsMalformedReportsOnce() {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(new IntegerType(new IntegerSize(8, true))),
-                fixed(FieldState.REQUIRED_FIXED, "7")));
+                fixed("7")));
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         compiled.get("point").read(TestDocuments.document("{ value: 300 }", problems));
@@ -161,7 +159,7 @@ class RecordTreeReaderTest {
     @Test
     void aWellFormedContradictingTokenStillReportsOnce() {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.REQUIRED_FIXED, "7")));
+                fixed("7")));
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         compiled.get("point").read(TestDocuments.document("{ value: 9 }", problems));
@@ -174,19 +172,16 @@ class RecordTreeReaderTest {
     /**
      * The code is {@code FIELD_FIXED}, not {@code ATOM_CONSTRAINT_VIOLATION}: nothing about {@code 9}
      * failed {@code integer}'s grammar or any facet of it, so a consumer routing on {@code code} must be
-     * able to tell a §5.2 field-state rule from an atom's own contract. All three ways to break a FIXED
+     * able to tell a §5.2 field-state rule from an atom's own contract. Both ways to break a FIXED
      * field report the same code.
      */
     @Test
     void everyFixedViolationReportsFieldFixedRatherThanAnAtomConstraint() {
         TsonCompiledSchema required = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.REQUIRED_FIXED, "7")));
-        TsonCompiledSchema fixedAbsent = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.OPTIONAL_FIXED, null)));
+                fixed("7")));
 
         assertEquals(Diagnostic.Code.FIELD_FIXED, onlyDiagnostic(required, "{ value: 9 }").code());
         assertEquals(Diagnostic.Code.FIELD_FIXED, onlyDiagnostic(required, "{ value: _ }").code());
-        assertEquals(Diagnostic.Code.FIELD_FIXED, onlyDiagnostic(fixedAbsent, "{ value: 7 }").code());
     }
 
     /**
@@ -197,7 +192,7 @@ class RecordTreeReaderTest {
     @Test
     void aContradictedFixedValuePointsTheAuthorAtTheDefaultSpelling() {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.REQUIRED_FIXED, "7")));
+                fixed("7")));
 
         String message = onlyDiagnostic(compiled, "{ value: 9 }").message();
 
@@ -213,7 +208,7 @@ class RecordTreeReaderTest {
     @Test
     void aFixedViolationNamesBothValuesRatherThanTheTreeNodesComponents() {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.REQUIRED_FIXED, "7")));
+                fixed("7")));
 
         Diagnostic reported = onlyDiagnostic(compiled, "{ value: 9 }");
 
@@ -232,60 +227,16 @@ class RecordTreeReaderTest {
     @Test
     void requiredFixedFieldRejectsTheAbsentSentinel() {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.REQUIRED_FIXED, "7")));
+                fixed("7")));
 
         ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: _ }"));
         assertTrue(thrown.getMessage().contains("cannot be absent"), thrown.getMessage());
     }
 
-    /**
-     * The one observable difference between the two FIXED states, and the reason both exist: §5.2's
-     * injection rule names REQUIRED_DEFAULT and REQUIRED_FIXED and <em>not</em> OPTIONAL_FIXED, so an
-     * omitted OPTIONAL_FIXED field stays absent instead of materialising a value the document never wrote.
-     * Reading it as injected made the two states indistinguishable and the {@code ?} decide nothing
-     * (§5.2 says it outright: OPTIONAL and OPTIONAL_FIXED fields are never injected).
-     */
-    @Test
-    void optionalFixedFieldStaysAbsentWhenOmittedButIsPresentWhenWritten() {
-        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.OPTIONAL_FIXED, "7")));
-
-        assertNull(read(compiled, "{}").get("value"));
-        assertNull(read(compiled, "{ value: _ }").get("value")); // optional: absence is what it permits
-        assertEquals(BigInteger.valueOf(7), read(compiled, "{ value: 7 }").get("value"));
-    }
-
-    /** Optional does not mean unconstrained: if the field is there at all, it must carry the fixed value. */
-    @Test
-    void optionalFixedFieldRejectsAContradictingValue() {
-        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.OPTIONAL_FIXED, "7")));
-
-        ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: 9 }"));
-        assertTrue(thrown.getMessage().contains("cannot be given another value"), thrown.getMessage());
-    }
-
-    /**
-     * §5.2's sixth spelling, {@code field: type? = _}: OPTIONAL_FIXED carrying no value at all, so "the field
-     * MUST either be omitted or be the absent sentinel in conforming data; any other value is a validation
-     * error". There is nothing to inject and nothing to compare against -- only presence is checked.
-     */
-    @Test
-    void optionalFixedWithNoValueAdmitsOnlyOmissionOrTheAbsentSentinel() {
-        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
-                fixed(FieldState.OPTIONAL_FIXED, null)));
-
-        assertNull(read(compiled, "{}").get("value"));
-        assertNull(read(compiled, "{ value: _ }").get("value"));
-
-        ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: 7 }"));
-        assertTrue(thrown.getMessage().contains("fixed to absent"), thrown.getMessage());
-    }
-
     @Test
     void requiredDefaultFieldFillsFromTheSchemaWhenAbsentButExplicitValueStillWins() {
-        RecordField defaulted = new RecordField("value", TypeRef.of("integer"), FieldState.REQUIRED_DEFAULT,
-                Optional.of(new Token("7", Token.Form.UNQUOTED)));
+        RecordField defaulted = RecordField.defaulted("value", TypeRef.of("integer"),
+                new Token("7", Token.Form.UNQUOTED));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), defaulted));
 
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
@@ -293,15 +244,15 @@ class RecordTreeReaderTest {
     }
 
     /**
-     * Omission and a written {@code _} are two different documents at a REQUIRED_DEFAULT field. §5.2 makes
+     * Omission and a written {@code _} are two different documents at a defaulted field. §5.2 makes
      * an explicit {@code _} at any REQUIRED-family field a validation error, omission remaining the
      * injection route -- injecting silently would answer "here is a value" to a document that said "absent".
      * The default is still what the field decodes to -- only the verdict changes.
      */
     @Test
     void requiredDefaultFieldRejectsAWrittenAbsentSentinelWhileOmissionStillInjects() {
-        RecordField defaulted = new RecordField("value", TypeRef.of("integer"), FieldState.REQUIRED_DEFAULT,
-                Optional.of(new Token("7", Token.Form.UNQUOTED)));
+        RecordField defaulted = RecordField.defaulted("value", TypeRef.of("integer"),
+                new Token("7", Token.Form.UNQUOTED));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), defaulted));
 
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
@@ -313,7 +264,7 @@ class RecordTreeReaderTest {
         assertEquals("_", thrown.diagnostic().actual());
 
         DiagnosticsCollector problems = new DiagnosticsCollector();
-        assertEquals(BigInteger.valueOf(7), read(compiled, "{ value: _ }", problems).get("value"));
+        assertNull(compiled.get("point").read(TestDocuments.document("{ value: _ }", problems)));
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
     }
 }

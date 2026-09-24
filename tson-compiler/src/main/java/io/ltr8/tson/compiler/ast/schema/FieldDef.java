@@ -7,14 +7,16 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * {@code field-def = *annotation field-name ws ":" ws ( field-type field-modifier / field-type /
- * field-modifier )} (Part 2 §12.1, §5.2) -- one record field. Exactly one of {@code type}/{@code
- * modifier} may be absent, never both: a bare {@code field:} with neither a type-ref nor a
- * modifier is not a grammar production. Where {@code type} is absent, the type is elided and
- * inherited from a refinement/composition source (§5.7's "elided type-refs") -- legal only there;
- * the compiler is responsible for rejecting an elided type-ref in a fresh record definition (§5.2).
+ * {@code field-def = *annotation field-name ["?"] ws ":" ws ( field-type field-modifier / field-type /
+ * field-modifier )} (Part 2 §12.1, §5.2) -- one record field, one slot per question it answers. {@code
+ * omittable} is the name's {@code ?}: the key may be left out of a document. The type's {@code ?} ({@link
+ * FieldType#voidable}) admits a written {@code _}. The modifier names the schema's value. Exactly one of
+ * {@code type}/{@code modifier} may be absent, never both: a bare {@code field:} with neither a type-ref nor
+ * a modifier is not a grammar production. Where {@code type} is absent, the type is elided and inherited
+ * from a refinement/composition source (§5.7's "elided type-refs") -- legal only there; the compiler is
+ * responsible for rejecting an elided type-ref in a fresh record definition (§5.2).
  */
-public record FieldDef(List<Annotation> annotations, String name, Optional<FieldType> type,
+public record FieldDef(List<Annotation> annotations, String name, boolean omittable, Optional<FieldType> type,
                         Optional<Modifier> modifier) implements RecordEntry {
 
     public FieldDef {
@@ -24,13 +26,17 @@ public record FieldDef(List<Annotation> annotations, String name, Optional<Field
         }
     }
 
-    /** {@code field-type = type-ref ["?"]} -- {@code optional} is FIELD optionality (§5.2), not element/tuple optionality. */
-    public record FieldType(TypeRef typeRef, boolean optional) {
+    /**
+     * {@code field-type = type-ref ["?"]} -- {@code voidable} admits a written {@code _}, as the same mark does
+     * at an element, an entry value or a tuple slot. Whether the key may be omitted is the name's mark.
+     */
+    public record FieldType(TypeRef typeRef, boolean voidable) {
     }
 
     /**
-     * {@code field-modifier = ws ("~" / "=") ws (token / absent)} -- {@code ~} is {@link
-     * Kind#DEFAULT}, {@code =} is {@link Kind#FIXED} (§5.2). The value is a bare token or the
+     * {@code field-modifier = ws ("~" / "=") ws (token / absent) / ws "=" ws "?"} -- {@code ~} is {@link
+     * Kind#DEFAULT}, {@code =} is {@link Kind#FIXED} (§5.2), and {@code =?} is {@link Value.Deferred},
+     * the discriminator spelling. The value is a bare token or the
      * absent sentinel only -- never annotated, never typed, never a container; §12.1 states that no
      * production of the schema grammar uses the full {@code data-value}, and §5.2 restricts modifier values
      * to scalar tokens.
@@ -46,8 +52,17 @@ public record FieldDef(List<Annotation> annotations, String name, Optional<Field
             record Literal(TokenValue token) implements Value {
             }
 
-            /** {@code = _} -- valid only on an OPTIONAL field (§5.2); {@code ~ _} is always a resolver error. */
+            /** {@code _} after {@code ~} or {@code =} -- parsed, and always a resolver error: no field's value (§5.2). */
             record Absent() implements Value {
+            }
+
+            /**
+             * {@code =?} -- pinned, but not here: this field is a **discriminator**, and each member of the
+             * family pins it (§5.2). The field itself stays REQUIRED and carries no value, §5.7's identity
+             * diagonal forbidding a base from pinning what its subtypes each pin differently; the name
+             * lowers into the enclosing {@code record.discriminators}.
+             */
+            record Deferred() implements Value {
             }
         }
     }

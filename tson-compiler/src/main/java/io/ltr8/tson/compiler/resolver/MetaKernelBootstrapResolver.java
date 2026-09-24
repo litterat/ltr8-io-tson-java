@@ -161,7 +161,7 @@ public final class MetaKernelBootstrapResolver {
             // An *open* instance is a §5.10 template, not a construction: its body is held -- the
             // application as written -- and stays unread until materialisation substitutes the parameters
             // away. Constructing it here instead would resolve `element_type: T` into a reference to a type
-            // called T, which is how `set => <T> !set_type { element_type: T }` used to fail. Held bodies are
+            // called T, which `set => <T> !set_type { element_type: T }` must not become. Held bodies are
             // the one thing this bootstrap shares with ordinary resolution, and for the same reason:
             // meta-kernel governs itself, so its own templates are applied by the layer below it.
             if (!instance.typeParams().isEmpty()) {

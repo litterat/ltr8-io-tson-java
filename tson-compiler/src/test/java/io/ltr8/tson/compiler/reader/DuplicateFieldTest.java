@@ -16,7 +16,6 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -25,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * A record field named twice is a validation error ({@code DUPLICATE_FIELD}) -- [TSON-DATA] §2.5's
@@ -57,9 +57,7 @@ class DuplicateFieldTest {
         String dataSource = "{ value: 999  value: 42 }";
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue)
-                compiled.get("holder").read(TestDocuments.document(dataSource, problems)));
+        Object result = compiled.get("holder").read(TestDocuments.document(dataSource, problems));
 
         // Two independent problems, in stream order: the malformed first occurrence was genuinely
         // read and validated (out-of-range 999), and the second occurrence is the duplication itself.
@@ -67,10 +65,8 @@ class DuplicateFieldTest {
                 problems.diagnostics().stream().map(Diagnostic::code).toList(),
                 problems.diagnostics().toString());
 
-        // The value still follows §2.5's "last value wins" -- the document is invalid either way, and
-        // reporting is not a reason to hand back a record missing a field the data did state. DOM mode
-        // narrows a real int8-typed atom to a Java byte (AtomTypeReader.INTEGER_TYPE, unrelated here).
-        assertEquals((byte) 42, result.get("value"));
+        // The document is invalid, so the record reads to nothing.
+        assertNull(result);
     }
 
     /**

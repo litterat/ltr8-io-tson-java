@@ -20,8 +20,13 @@ public record GroupDef(List<Annotation> annotations, List<Member> members, boole
         }
     }
 
-    /** {@code group-member = *annotation field-name ws ":" ws type-ref} -- bare: no {@code ?}, no value modifier. */
-    public record Member(List<Annotation> annotations, String name, TypeRef typeRef) {
+    /**
+     * {@code group-member = *annotation field-name ws ":" ws type-ref ["?"]} -- no name mark, since the group
+     * decides presence, and no value modifier, since a group does not inject; {@code voidable} is the type's
+     * {@code ?}, admitting {@code _} as at any other position. A voidable member written {@code _} is present
+     * and selects its alternative.
+     */
+    public record Member(List<Annotation> annotations, String name, TypeRef typeRef, boolean voidable) {
 
         public Member {
             annotations = List.copyOf(annotations);

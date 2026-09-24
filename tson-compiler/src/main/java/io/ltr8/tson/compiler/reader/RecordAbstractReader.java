@@ -12,7 +12,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
@@ -29,8 +29,8 @@ import java.util.stream.Collectors;
 /**
  * Everything {@link RecordTreeReader} and {@link RecordBindReader} share verbatim: the compiled
  * per-field list, the name -> position lookup, confirming a record-shaped value's own event
- * sequence, and precomputing every {@code REQUIRED_DEFAULT}/{@code REQUIRED_FIXED}/{@code
- * OPTIONAL_FIXED} field's own literal schema value once at construction rather than per read. Each
+ * sequence, precomputing every field's own literal schema value once at construction rather than per read,
+ * and what each field yields when the document never writes it. Each
  * subclass's own {@code read()} still differs in shape (a {@code Map} vs. a real bound object's own
  * constructor arguments) and stays there, along with anything specific to only one of them (object
  * mode's own target-type narrowing, for instance).
@@ -66,14 +66,13 @@ import java.util.stream.Collectors;
  * is decoded and checked against the fixed one, because §5.2 makes a contradicting value a validation
  * error. Skipping it unread would let a document say one thing and decode to another in silence.
  *
- * <p><b>Positional form (§5.6):</b> a record whose fields include exactly one bare {@code REQUIRED}
- * one (never {@code REQUIRED_DEFAULT}/{@code REQUIRED_FIXED}/{@code OPTIONAL}/{@code
- * OPTIONAL_FIXED}, even if it's the only field present) can be filled by a bare, non-braced
+ * <p><b>Positional form (§5.6):</b> a record whose fields include exactly one that is not optional (never a
+ * defaulted, fixed or optional one, even if it's the only field present) can be filled by a bare, non-braced
  * value standing in for that one field -- {@code !enum [true false]}'s own {@code [true false]}
  * filling {@code enum}'s sole required field, {@code members}, without ever writing {@code {
  * members: [true false] } }. {@link #positionalFieldIndex} (that field's own schema position, or
- * {@code -1} if the record doesn't qualify) is computed once, in the constructor, by counting bare
- * {@code REQUIRED} fields in the same pass that already visits every field for {@link
+ * {@code -1} if the record doesn't qualify) is computed once, in the constructor, by counting required
+ * fields in the same pass that already visits every field for {@link
  * #precomputedValue} -- no separate pass, and nothing paid per read: {@link #expectRecordShape} only
  * consults it on the one path that isn't already record-shaped, and {@link #readPositional} then
  * reads whatever's already sitting at the cursor directly as that single field's own value, with no
@@ -91,10 +90,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * comparable in either read mode. {@code value} is likewise the <em>raw</em> parsed value, not the
      * {@link #precomputedValue} entry that {@link RecordBindReader} narrows in place -- comparing a
      * raw-parsed token against a narrowed one would report a contradiction between two spellings of the same
-     * number. {@code mustBeAbsent} is §5.2's {@code type? = _}: no value exists to compare against, and only
-     * omission or {@code _} conforms.
+     * number.
      */
-    private record FixedCheck(boolean mustBeAbsent, Object value, TsonTypeReader<?> parser) {
+    private record FixedCheck(Object value, TsonTypeReader<?> parser) {
     }
 
     /** Called once per recognized, non-fixed field {@link #readFields}/{@link #readPositional} decode -- may be called more than once for the same {@code schemaIndex} on a duplicate field name; the last call wins. */
@@ -124,6 +122,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final Map<String, Integer> fieldIndex;
     final List<FieldGroup> groups;
     final Object[] precomputedValue;
+    /** What each field yields when the document never writes it ({@link RecordField#omitted}). */
+    private final RecordField.Omitted[] omitted;
     private final FixedCheck[] fixedCheck;
     final int positionalFieldIndex;
     final SchemaLocation schemaLocation;
@@ -147,30 +147,28 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         this.groups = body.groups();
         this.fieldIndex = new HashMap<>();
         this.precomputedValue = new Object[fields.size()];
+        this.omitted = new RecordField.Omitted[fields.size()];
         FixedCheck[] fixedChecks = new FixedCheck[fields.size()];
         int solePositionalField = -1;
-        int bareRequiredCount = 0;
+        int requiredCount = 0;
         for (int i = 0; i < fields.size(); i++) {
             CompiledField field = fields.get(i);
-            fieldIndex.put(field.schema().name(), i);
-            FieldState state = field.schema().state();
-            if (state == FieldState.REQUIRED_DEFAULT || state == FieldState.REQUIRED_FIXED
-                    || (state == FieldState.OPTIONAL_FIXED && field.schema().value().isPresent())) {
+            RecordField schema = field.schema();
+            fieldIndex.put(schema.name(), i);
+            if (schema.value().isPresent()) {
                 precomputedValue[i] = readSchemaDefault(field);
             }
-            if (isFixed(state)) {
-                // §5.2's sixth spelling (`type? = _`) is OPTIONAL_FIXED with no value at all: nothing to
-                // parse, and the only conforming document is one that omits the field or writes `_`.
-                fixedChecks[i] = new FixedCheck(field.schema().value().isEmpty(), precomputedValue[i],
-                        field.parser());
+            omitted[i] = schema.omitted(groups.stream().anyMatch(group -> group.members().contains(schema.name())));
+            if (schema.role() == FieldRole.FIXED) {
+                fixedChecks[i] = new FixedCheck(precomputedValue[i], field.parser());
             }
-            if (state == FieldState.REQUIRED) {
-                bareRequiredCount++;
+            if (!schema.optional()) {
+                requiredCount++;
                 solePositionalField = i;
             }
         }
         this.fixedCheck = fixedChecks;
-        this.positionalFieldIndex = bareRequiredCount == 1 ? solePositionalField : -1;
+        this.positionalFieldIndex = requiredCount == 1 ? solePositionalField : -1;
         this.declaredFields = fields.stream().map(field -> field.schema().name()).collect(Collectors.joining(" | "));
         this.rules = new RecordDiagnostics(displayName, declaredFields);
     }
@@ -326,17 +324,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for the `actual` of a field-state rule. */
     private static final String ABSENT = "_";
 
-    static boolean isFixed(FieldState state) {
-        return state == FieldState.REQUIRED_FIXED || state == FieldState.OPTIONAL_FIXED;
-    }
-
     /**
      * Field-group presence check (§5.11): a bare (REQUIRED) group must have exactly one member
      * present, a {@code ?} (OPTIONAL) group at most one -- the group's members flatten into ordinary
-     * OPTIONAL fields (§5.11's own resolution), so this is the only place the group's own
+     * optional fields (§5.11's own resolution), so this is the only place the group's own
      * "at most/exactly one" multiplicity is actually enforced at read time. "Present" means the
-     * member's field name appeared in the data ({@code seen}); a member written as the absent
-     * sentinel {@code _} still counts as appearing, an edge this doesn't distinguish. Reported
+     * member's field name appeared in the data ({@code seen}); a voidable member written as the absent
+     * sentinel {@code _} counts as appearing, which is what selects its alternative. Reported
      * through {@code ctx} like any other problem, so both readers gain it by calling this once after
      * their own field pass, and collecting mode surfaces a group violation alongside sibling ones.
      */
@@ -360,39 +354,36 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * The value a field takes when the document wrote {@code _} at it, which differs from never mentioning
-     * it at all ({@link #valueForAbsentField}) in exactly one state. §5.2 makes an explicit {@code _} at any
-     * REQUIRED-family field a validation error, omission remaining the injection route; this reports it and
-     * injects anyway. Injecting silently would substitute a value the
-     * document explicitly disclaimed, and for the retry loop the format targets, {@code _} at a defaulted
-     * field means the emitter misread the schema -- exactly the signal injection papers over. It also
-     * completes §7.6's table, whose REQUIRED_DEFAULT cell was the lone warn among states that already
-     * error at REQUIRED and REQUIRED_FIXED. Plain omission still injects silently, which is the whole
-     * point of the state.
+     * it at all ({@link #valueForAbsentField}). A voidable field admits it; at any other, §7.6 makes an
+     * explicit {@code _} a validation error. At a defaulted field this reports it and injects anyway:
+     * omission is the injection route, and injecting silently would substitute a value the document
+     * explicitly disclaimed -- for the retry loop the format targets, {@code _} at a defaulted field means
+     * the emitter misread the schema, exactly the signal injection papers over. Plain omission still injects
+     * silently, which is the whole point of a default.
      *
      * <p>The default is still what the field decodes to, so the value comes back whole and only the
-     * verdict changes -- the same split {@link #verifyFixed} makes for a contradicted FIXED value. Neither
-     * FIXED state reaches here at all: {@link #readFields} routes both through {@link #verifyFixed}, which
-     * answers {@code _} for itself.
+     * verdict changes -- the same split {@link #verifyFixed} makes for a contradicted FIXED value. A FIXED
+     * field never reaches here: {@link #readFields} routes it through {@link #verifyFixed}, which answers
+     * {@code _} for itself.
      */
     final Object valueForStatedAbsentField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
-        if (schema.state() == FieldState.OPTIONAL) {
+        if (schema.voidable()) {
             // [TSON-DATA] §2.9: "A field or entry set to `_` is present with an absent value -- distinct from
             // not appearing at all." Answering `valueForAbsentField`'s `null` here would collapse the two,
-            // and the state is the one where both are legal, so it is the only one where the distinction has
-            // anything to carry.
+            // and a voidable field is one where both are legal, so it is where the distinction has anything
+            // to carry.
             return statedAbsentValue();
         }
-        if (schema.state() == FieldState.REQUIRED_DEFAULT) {
+        if (schema.role() == FieldRole.DEFAULT) {
             ctx.schemaField(schema.name(), schema.position())
                     .report(rules.absenceAtDefaultedField(schema.name(), ABSENT));
             return precomputedValue[schemaIndex];
         }
-        // REQUIRED, the only state left: the document *stated* absence, so it is not missing. Delegating to
+        // A required field: the document *stated* absence, so it is not missing. Delegating to
         // valueForAbsentField reported "missing required field", which tells an author they forgot a field
         // they can see themselves writing -- §5.2's rule is that `_` asserts absence at a position the schema
-        // always fills, and that is what the diagnostic should say. Both FIXED states reach verifyFixed
-        // instead and never arrive here.
+        // always fills, and that is what the diagnostic should say.
         ctx.schemaField(schema.name(), schema.position())
                 .report(rules.absenceAtRequiredField(schema.name(), ABSENT));
         return null;
@@ -412,9 +403,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     abstract Object statedAbsentValue();
 
     /**
-     * The value a field takes when the document never stated it -- §5.2's five states answered in one place,
+     * The value a field takes when the document never stated it -- {@link RecordField#omitted} answered here,
      * which is what lets both subclasses run a single "everything not seen" pass instead of pre-seeding some
-     * states and defaulting the rest. {@code ctx} is expected to still be scoped to the *enclosing* record
+     * fields and defaulting the rest. {@code ctx} is expected to still be scoped to the *enclosing* record
      * (not yet descended into the missing field) -- this itself
      * descends one level via {@link TsonReadContext#field}, so the reported {@link Diagnostic#path()}
      * still names the missing field while its own {@link Diagnostic#dataPosition()} reflects {@code
@@ -426,33 +417,26 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     final Object valueForAbsentField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
-        return switch (schema.state()) {
-            case REQUIRED -> {
+        return switch (omitted[schemaIndex]) {
+            case MISSING -> {
                 ctx.schemaField(schema.name(), schema.position())
                         .report(rules.missingRequiredField(schema.name()));
                 yield null;
             }
-            case OPTIONAL -> null;
-            // §5.2's Default injection: "when a field has state REQUIRED_DEFAULT (or REQUIRED_FIXED) and the
-            // data does not provide a value, the decoder injects the default (or fixed) value".
-            case REQUIRED_DEFAULT, REQUIRED_FIXED -> precomputedValue[schemaIndex];
-            // OPTIONAL_FIXED is *not* on that list, and that omission is the whole difference between it and
-            // REQUIRED_FIXED: an omitted OPTIONAL_FIXED field stays absent rather than materialising a value
-            // the document never wrote. §5.2 says so outright: OPTIONAL and OPTIONAL_FIXED are never injected.
-            case OPTIONAL_FIXED -> null;
+            // §5.2's Default injection: "the decoder injects the default (or fixed) value".
+            case VALUE -> precomputedValue[schemaIndex];
+            case NOTHING -> null;
         };
     }
 
     /**
      * Checks a FIXED field the document actually stated, and re-emits the <em>schema's</em> value for it
-     * (§5.2: a REQUIRED_FIXED field "may be provided with a value matching the fixed value, or omitted").
-     * The document's token decides only whether the document is valid; it never becomes the field's value.
+     * (§5.2: a fixed field "may be provided with a value matching the fixed value, or omitted"). The
+     * document's token decides only whether the document is valid; it never becomes the field's value.
      *
-     * <p>Three outcomes are wrong and each is reported: a value contradicting the fixed one, any value at a
-     * {@code = _} field (§5.2: "the field MUST either be omitted or be the absent sentinel"), and {@code _}
-     * at a REQUIRED_FIXED field ("at a plain REQUIRED or a REQUIRED_FIXED field, `_` is a validation
-     * error"). {@code _} at an OPTIONAL_FIXED field is fine -- the field may be absent, which is what it
-     * asserts.
+     * <p>Two outcomes are wrong and each is reported: a value contradicting the fixed one, and {@code _}, since
+     * a pinned field is never voidable ("at a plain REQUIRED or a REQUIRED_FIXED field, `_` is a validation
+     * error").
      *
      * <p><b>One wrong token yields one diagnostic.</b> The stated token is decoded through the field's own
      * parser, which reports for its own reasons (an out-of-range integer, an enum non-member) and then hands
@@ -471,16 +455,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             ScopePush.refuse(fieldCtx, schema.type().name(), push);
         }
         if (ctx.peek() instanceof AbsentEvent) {
+            // A pinned field is never voidable -- `_` is not the pin -- so absence here is always the refusal.
             ctx.next();
-            if (schema.state() == FieldState.REQUIRED_FIXED) {
-                fieldCtx.report(rules.fixedFieldAbsent(fieldName, String.valueOf(check.value()), ABSENT));
-                return;
-            }
-            return; // OPTIONAL_FIXED, valued or `= _`: absence is exactly what it permits
-        }
-        if (check.mustBeAbsent()) {
-            EventSkip.scopedValue(ctx);
-            fieldCtx.report(rules.fixedToAbsentFieldValued(fieldName, ABSENT, "a value"));
+            fieldCtx.report(rules.fixedFieldAbsent(fieldName, String.valueOf(check.value()), ABSENT));
             return;
         }
         int before = ctx.reported();
@@ -523,7 +500,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     Object readSchemaDefault(CompiledField field) {
         RecordField schema = field.schema();
         Token token = schema.value().orElseThrow(() -> new IllegalStateException("'" + schema.name() + "' on '"
-                + displayName + "' is " + schema.state() + " but the schema carries no value for it -- "
+                + displayName + "' is " + schema.describe() + " but the schema carries no value for it -- "
                 + "DefinitionResolver should never produce this"));
         TokenEvent event = new TokenEvent(token.text(), TokenForm.valueOf(token.form().name()), new Position(0, 0, 0));
         // Unrestricted deliberately: this replays a token the real stream already delivered, so it has been

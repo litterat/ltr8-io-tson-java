@@ -1,8 +1,8 @@
-!!id:"https://tson.io/2026/35/m/meta.tn?sha256=bf967ed0e3e2cd1d56864bc06c2c9fbc69270a60c978dd81c1db83c172d3b00e"
-!!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=28e4497bb5bd9c3e628547c0a9de9e6802a5b848959df96e4812a43fc53c307d"
-!!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=28e4497bb5bd9c3e628547c0a9de9e6802a5b848959df96e4812a43fc53c307d"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=ede51d234992ccf229bf24e53d0e6e53ae30aa6a2c70760ae051e19b4f035cb4"
+!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=e778e463624a5163c31d5dbbc8376e52cac3980113ee4333fbd701878a26990c"
+!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=e778e463624a5163c31d5dbbc8376e52cac3980113ee4333fbd701878a26990c"
 @doc:"""
-  TSON meta-schema — 2026 Revision 35 draft.
+  TSON meta-schema (2026 Revision 36 draft).
 
   The canonical meta-schema for user schemas: a schema governed by the
   meta-kernel that adds the type constructors the core type library
@@ -46,8 +46,7 @@
 
   Plus annotation types — the classifying markers `ordered`,
   `bounded`, `exact`, `numeric`; the checked assertion `disjoint`;
-  the representation directives `rest` and `discriminator`; and the
-  documentary `deprecated`, `since`, `todo`,
+  and the documentary `deprecated`, `since`, `todo`,
   `lang`, `title`, `examples`, `read_only`, `write_only`. Annotation
   types must reside in the governing target's namespace (per Part 2
   §6); placing them in meta makes them reachable from core and from
@@ -55,16 +54,32 @@
 
   An annotation never changes a value, its type, or whether it is
   valid: validation is over values, and a schema with every
-  annotation erased admits exactly the same values. An annotation
-  may add a load-time check, and it may direct how a class of
-  encodings represents a value. No encoding is privileged — TSON
-  text is one member of the text class, beside JSON — so a directive
-  binds every encoding in its class, and a document in a directed
-  encoding may not be readable without it. That is a directive's
-  force, and it is the only force an annotation has over data. The
-  same stance governs the type docs: a value space is described
-  without reference to any encoding, and where a doc mentions how
-  TSON text spells a value it says so by name.
+  annotation erased admits exactly the same values. Part 2 §6 admits
+  two further things within that rule — a load-time check, and a
+  directive over how a class of encodings represents a value — and
+  the annotations declared here use the first alone. The same stance
+  governs the type docs: a value space is described without
+  reference to any encoding, and where a doc mentions how TSON text
+  spells a value it says so by name.
+
+  No directive is declared, and the one that was is why. `rest`
+  designated the field a flattening encoding should flatten, which
+  gave it force in JSON and none in TSON text — so its class was the
+  encodings that claimed it, which defines nothing, and what it
+  carried was a wire spelling rather than a fact the model holds. A
+  record is closed under its type (Part 2 §7.2) and open-ended data
+  is a map-typed field, written the same way in every encoding. The
+  category stands in §6; nothing here needs it.
+
+  The erasure rule holds here without exception. How a record may be
+  realised once had two annotation spellings, and each stated a fact
+  about the type — which values a position typed by the record
+  admits — so erasing one changed what conforms. Both are now
+  grammar: `abstract` and `final` are words at the declaration and
+  `=?` marks a selector field (Part 2 §5.2, §12.1), all three lowering
+  into the kernel's own `record.extension` and `record.discriminators`.
+  Neither name is declared here, so either written as an annotation is
+  the ordinary unresolved-name error.
 
   Constructors that bind to a governing specification compose with
   the kernel's atom_specification mixin and pin the spec field with
@@ -95,9 +110,9 @@
   the value, a refinement may only tighten the step to an integer
   multiple of the inherited one, and the step composes with every
   other facet present. `members`, where it appears, is likewise
-  uniform: every member satisfies the other facets on the same body
-  or the schema fails to load, and a refinement may only shrink the
-  set.
+  uniform in what it admits: every member satisfies the other facets
+  on the same body or the schema fails to load. Refinement differs by
+  tier — the numeric tiers shrink the set, `text_type` sets it once.
   """
 {
   @doc:"""
@@ -164,10 +179,10 @@
     No spec pin: RFC 4648 governs spellings, not octets.
     """
   bytes_type => atom & {
-    encoding:    bytes_encoding ~ BASE64
-    length:      non_negative_integer?
-    min_length:  non_negative_integer?
-    max_length:  non_negative_integer?
+    encoding?:   bytes_encoding ~ BASE64
+    length?:     non_negative_integer
+    min_length?: non_negative_integer
+    max_length?: non_negative_integer
   }
 
   @doc:"""
@@ -209,7 +224,7 @@
     """
   scoped => sum & {
     scope:    set<scope_kind>
-    schemas:  {uri => [type_name; 1..]?; 1..}?
+    schemas?: {uri => [type_name; 1..]?; 1..}
   }
 
   @doc:"""
@@ -256,14 +271,14 @@
     directly and rounds nothing.
     """
   float_type => atom & atom_specification & {
-    spec:                 = "https://ieeexplore.ieee.org/document/8766229"
+    spec?:                = "https://ieeexplore.ieee.org/document/8766229"
     format:               ieee_format
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    allow_nan:            boolean ~ true
-    allow_infinity:       boolean ~ true
-    allow_subnormal:      boolean ~ true
-    allow_negative_zero:  boolean ~ true
+    allow_nan?:           boolean ~ true
+    allow_infinity?:      boolean ~ true
+    allow_subnormal?:     boolean ~ true
+    allow_negative_zero?: boolean ~ true
   }
 
   @doc:"""
@@ -302,10 +317,10 @@
   decimal_type => atom & {
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    multiple_of:      value?
-    total_digits:     non_negative_integer?
-    fraction_digits:  non_negative_integer?
-    members:          set<value>?
+    multiple_of?:     value
+    total_digits?:    non_negative_integer
+    fraction_digits?: non_negative_integer
+    members?:         set<value>
   }
 
   @doc:"""
@@ -321,7 +336,7 @@
   rational_type => atom & {
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    multiple_of:  value?
+    multiple_of?: value
   }
 
   @doc:"""
@@ -350,7 +365,7 @@
     A complex value is a pair of components (real and imaginary parts).
     `component` selects the type of both parts from the closed
     `complex_component` vocabulary; it defaults to `NUMBER`
-    (REQUIRED_DEFAULT, §5.2), so a bare complex has exact components —
+    (a DEFAULT, §5.2), so a bare complex has exact components —
     a defaulted selector.
     The enum both enforces that a component is numeric (unlike a free
     `type_name`, which any token would satisfy) and keeps meta free of
@@ -362,12 +377,12 @@
     one — which is why `complex` carries no `@exact` marker of its own.
     """
   complex_type => atom & {
-    component:  complex_component ~ NUMBER
+    component?: complex_component ~ NUMBER
   }
 
   @doc:"Date constraint vocabulary. Instance is `date` in core."
   date_type => atom & atom_specification & {
-    spec:  = "https://www.rfc-editor.org/rfc/rfc3339"
+    spec?: = "https://www.rfc-editor.org/rfc/rfc3339"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
   }
@@ -386,10 +401,10 @@
     mandatory.
     """
   time_type => atom & atom_specification & {
-    spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
+    spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    precision:  non_negative_integer?
+    precision?: non_negative_integer
   }
 
   @doc:"""
@@ -400,10 +415,10 @@
     mandatory.
     """
   datetime_type => atom & atom_specification & {
-    spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
+    spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    precision:  non_negative_integer?
+    precision?: non_negative_integer
   }
 
   @doc:"""
@@ -450,11 +465,11 @@
     is a multiple of `PT15M`.
     """
   duration_type => atom & atom_specification & {
-    spec:        = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
+    spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    precision:   non_negative_integer?
-    multiple_of: value?
+    precision?:  non_negative_integer
+    multiple_of?: value
   }
 
   @doc:"""
@@ -471,21 +486,21 @@
     uniform rule: `P3M` admits only whole quarters.
     """
   period_type => atom & atom_specification & {
-    spec:        = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
+    spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
-    multiple_of: value?
+    multiple_of?: value
   }
 
   @doc:"UUID constraint vocabulary. Instance is `uuid` in core."
   uuid_type => atom & atom_specification & {
-    spec:     = "https://www.rfc-editor.org/rfc/rfc9562"
-    version:  non_negative_integer?
+    spec?:    = "https://www.rfc-editor.org/rfc/rfc9562"
+    version?: non_negative_integer
   }
 
   @doc:"Email constraint vocabulary. Instance is `email` in core."
   email_type => text_type & atom_specification & {
-    spec: = "https://www.rfc-editor.org/rfc/rfc5322"
+    spec?: = "https://www.rfc-editor.org/rfc/rfc5322"
   }
 
   @doc:"""
@@ -498,9 +513,9 @@
     network. `excluding` carves holes out of `within`.
     """
   ipv4_type => atom & atom_specification & {
-    spec:       = "https://www.rfc-editor.org/rfc/rfc3986"
-    within:     [value]?
-    excluding:  [value]?
+    spec?:      = "https://www.rfc-editor.org/rfc/rfc3986"
+    within?:    [value]
+    excluding?: [value]
   }
 
   @doc:"""
@@ -510,9 +525,9 @@
     the field is present, and inside no `excluding` network.
     """
   ipv6_type => atom & atom_specification & {
-    spec:       = "https://www.rfc-editor.org/rfc/rfc4291"
-    within:     [value]?
-    excluding:  [value]?
+    spec?:      = "https://www.rfc-editor.org/rfc/rfc4291"
+    within?:    [value]
+    excluding?: [value]
   }
 
   @doc:"""
@@ -525,11 +540,11 @@
     containment, so a wider value cannot smuggle an excluded block.
     """
   cidr4_type => atom & atom_specification & {
-    spec:        = "https://www.rfc-editor.org/rfc/rfc4632"
-    min_prefix:  non_negative_integer?
-    max_prefix:  non_negative_integer?
-    within:      [value]?
-    excluding:   [value]?
+    spec?:       = "https://www.rfc-editor.org/rfc/rfc4632"
+    min_prefix?: non_negative_integer
+    max_prefix?: non_negative_integer
+    within?:     [value]
+    excluding?:  [value]
   }
 
   @doc:"""
@@ -540,11 +555,11 @@
     subnet-of for `within`, non-overlap for `excluding`.
     """
   cidr6_type => atom & atom_specification & {
-    spec:        = "https://www.rfc-editor.org/rfc/rfc4291"
-    min_prefix:  non_negative_integer?
-    max_prefix:  non_negative_integer?
-    within:      [value]?
-    excluding:   [value]?
+    spec?:       = "https://www.rfc-editor.org/rfc/rfc4291"
+    min_prefix?: non_negative_integer
+    max_prefix?: non_negative_integer
+    within?:     [value]
+    excluding?:  [value]
   }
 
   @doc:"""
@@ -554,7 +569,7 @@
     as niche, and OUI is a living registry.
     """
   mac_type => atom & atom_specification & {
-    spec: = "https://www.rfc-editor.org/rfc/rfc9542"
+    spec?: = "https://www.rfc-editor.org/rfc/rfc9542"
   }
 
   @doc:"Ordering classification (ISO/IEC 11404 / XSD fundamental facet)."
@@ -574,9 +589,14 @@
   numeric => @annotation void
 
   @doc:"""
-    Author's assertion that a choice's variants are pairwise disjoint
-    as value sets — advisory intent, checked against the resolver's
-    derived `type_definition.disjoint` fact ([TSON-SCHEMA] §5.4). A
+    Author's assertion that a choice's variants are distinguishable
+    by an encoding's form resolution — discrimination-class
+    distinctness, not disjointness of inhabitance — checked against
+    the resolver's derived `disjoint` fact in the `!choice` body
+    ([TSON-SCHEMA] §5.4, §8.1). The fact is class-stable: a variant
+    whose forms straddle classes (an approximate atom still admitting
+    NaN or the infinities, a map with a compound key) has no class,
+    so the untagged values of a choice are one set in every encoding. A
     void-targeted presence marker like `@numeric`: written bare, and
     presence is the assertion. Carries no decode force — the resolver
     computes disjointness whether or not the annotation is present.
@@ -618,34 +638,4 @@
     A bare presence marker, on `@read_only`'s terms.
     """
   write_only => @annotation void
-
-  @doc:"""
-    Names the field a member-dispatching encoding selects a choice's
-    variant on. A representation directive: force in the class of
-    encodings that dispatch a choice on a member, none in the model —
-    a discriminated choice admits exactly the variants it admitted,
-    and an encoding that tags variants (TSON text, with `!variant` at
-    every non-disjoint choice) keeps its tags. It also carries
-    load-time force, on `@disjoint`'s verified-or-error precedent
-    ([TSON-SCHEMA] §5.4).
-
-    Checked at schema load, two outcomes and no third: every variant is
-    a record declaring the named field; that field is REQUIRED_FIXED in
-    every variant (never REQUIRED_DEFAULT — a default is omissible and
-    so cannot dispatch); and the fixed values are pairwise distinct.
-    `field_name` is an identifier, so a non-name spelling fails at the
-    annotation's own type.
-    """
-  discriminator => @annotation field_name
-
-  @doc:"""
-    Designates the field an encoding that flattens is meant to flatten
-    — the map-typed field a record's undeclared entries live in, a
-    record being closed under its type ([TSON-SCHEMA] §7.2). A
-    representation directive on `@discriminator`'s terms: force in the
-    class of encodings that flatten, none in the model. Checked at
-    schema load: the field's type resolves to a text-keyed map, and at
-    most one field per composed chain carries the mark.
-    """
-  rest => @annotation void
 }

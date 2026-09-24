@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -26,15 +27,22 @@ class JsonContainerReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/containers-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               person => {
                 name:     text
-                nickname: text?
-                tries:    int32 ~ 0
-                kind:     text = "person"
-                badge:    text? = "gold"
+                nickname?: text?
+                tries?:   int32 ~ 0
+                kind?:    text = "person"
+                retired?: void?
+              }
+
+              marks => {
+                nickname?: text
+                from:      int32?
+                timeout?:  int32? ~ 30
+                version:   text = "2.0"
               }
 
               bounded => {
@@ -93,9 +101,9 @@ class JsonContainerReadTest {
     @Test
     void aRecordIsAJsonObjectWithOneMemberPerField() {
         assertEquals("""
-                {"name":"Ada","nickname":"A","tries":7,"kind":"person","badge":"gold"}""",
+                {"name":"Ada","nickname":"A","tries":7,"kind":"person"}""",
                 json(read("person", """
-                        {"name": "Ada", "nickname": "A", "tries": 7, "kind": "person", "badge": "gold"}""")
+                        {"name": "Ada", "nickname": "A", "tries": 7, "kind": "person"}""")
                         .accepted()));
     }
 
@@ -109,23 +117,24 @@ class JsonContainerReadTest {
     }
 
     /**
-     * §6.2's {@code @rest} flatten is deliberately unbuilt, so there is no route by which an undeclared
-     * member lands anywhere. This pins the strict reading that the annotation would later relax.
+     * Nothing flattens into a record, so there is no route by which an undeclared member lands anywhere:
+     * §6.1.1's closure is total, and open-ended data belongs in a declared map-typed field.
      */
     @Test
-    void nothingCollectsAnUndeclaredMemberBecauseThereIsNoRestField() {
-        assertTrue(json(read("person", """
-                {"name": "Ada", "shoe_size": 9}""").value()).indexOf("shoe_size") < 0,
-                "an undeclared member reaches the decoded output nowhere");
+    void anUndeclaredMemberIsRefusedBecauseNothingAbsorbsIt() {
+        Read read = read("person", """
+                {"name": "Ada", "shoe_size": 9}""");
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, read.refusal().code());
+        assertNull(read.value());
     }
 
     /** §3.1: a repeated member name is an error at the repeated occurrence; the later value still wins. */
     @Test
-    void aRepeatedMemberIsRefusedAndTheLaterValueWins() {
+    void aRepeatedMemberIsRefused() {
         Read read = read("person", """
                 {"name": "Ada", "name": "Grace"}""");
         assertEquals(Diagnostic.Code.DUPLICATE_FIELD, read.problems().getFirst().code());
-        assertTrue(json(read.value()).contains("\"name\":\"Grace\""), "the repeat wins: " + json(read.value()));
+        assertNull(read.value());
     }
 
     /** §6.1.6: member order carries no meaning, and a decoder that required one would invent a rule. */
@@ -140,17 +149,18 @@ class JsonContainerReadTest {
     // ── §6.1.2 presence and absence, and §7 ──────────────────────────────
 
     /**
-     * §6.1.2: an absent OPTIONAL field has two spellings -- omitted, or present with null -- and decoded
-     * output never records which arrived. Encoders SHOULD omit, so omission is what both decode to.
+     * §6.1.2 and §7.2: at a field that admits both, omission and null are two spellings of one absence, and a
+     * tree keeps which arrived -- a member written null stands as null, one never written is not there -- as
+     * the text tree keeps {@code _} apart from a missing field. Bound output has one null for both.
      */
     @Test
-    void theTwoSpellingsOfAnAbsentOptionalFieldDecodeIdentically() {
+    void aTreeKeepsWhichSpellingOfAbsenceArrived() {
         String omitted = json(read("person", """
                 {"name": "Ada"}""").accepted());
         String stated = json(read("person", """
                 {"name": "Ada", "nickname": null}""").accepted());
-        assertEquals(omitted, stated);
-        assertTrue(omitted.indexOf("nickname") < 0, "an absent optional field is omitted: " + omitted);
+        assertTrue(omitted.indexOf("nickname") < 0, "a member never written is not there: " + omitted);
+        assertTrue(stated.contains("\"nickname\":null"), "a member written null is kept: " + stated);
     }
 
     /** §6.1.2/§7: at a REQUIRED-family field a null member is a validation error, precisely as `_` is in text. */
@@ -169,7 +179,7 @@ class JsonContainerReadTest {
 
     // ── §6.1.3 defaults and fixed values ─────────────────────────────────
 
-    /** §6.1.3: a missing member at REQUIRED_DEFAULT or REQUIRED_FIXED injects, so output is fully populated. */
+    /** §6.1.3: a missing member with a default or a pin injects, so output is fully populated. */
     @Test
     void anOmittedDefaultAndFixedMemberAreInjected() {
         assertEquals("""
@@ -177,20 +187,22 @@ class JsonContainerReadTest {
                 {"name": "Ada"}""").accepted()));
     }
 
-    /** §6.1.3: OPTIONAL_FIXED is never injected -- an omitted one stays absent. */
+    /** {@code retired?: void?}: null is the member's one value, and any other is refused by {@code void}. */
     @Test
-    void anOmittedOptionalFixedMemberStaysAbsent() {
-        assertTrue(json(read("person", """
-                {"name": "Ada"}""").accepted()).indexOf("badge") < 0, "OPTIONAL_FIXED is not injected");
+    void aVoidMemberAdmitsNullAndNothingElse() {
+        read("person", """
+                {"name": "Ada", "retired": null}""").accepted();
+        read("person", """
+                {"name": "Ada", "retired": "yes"}""").refusal();
     }
 
-    /** §6.1.2: at REQUIRED_DEFAULT the fix is omission -- writing null disclaims a value the schema always fills. */
+    /** §6.1.2: at a defaulted field the fix is omission -- writing null disclaims a value the schema always fills. */
     @Test
     void nullAtADefaultedFieldIsRefusedWhereOmissionInjects() {
         Read read = read("person", """
                 {"name": "Ada", "tries": null}""");
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, read.problems().getFirst().code());
-        assertTrue(json(read.value()).contains("\"tries\":0"), "the default is still what the field decodes to");
+        assertNull(read.value());
     }
 
     /** §6.1.3: a present member at a FIXED field is verified against the pin, never silently overwritten. */
@@ -211,7 +223,50 @@ class JsonContainerReadTest {
     @Test
     void aFixedValueIsComparedByValueAndNotBySpelling() {
         read("person", """
-                {"name": "Ada", "kind": "person", "badge": "gold"}""").accepted();
+                {"name": "Ada", "kind": "person"}""").accepted();
+    }
+
+    // ── §6.1.2 one mark per question ─────────────────────────────────────
+
+    /** {@code from: int32?}: the member must be written, and null is one way to write it. */
+    @Test
+    void aVoidableFieldWithAnUnmarkedNameTakesNullAndRefusesOmission() {
+        assertEquals("""
+                {"from":null,"timeout":30,"version":"2.0"}""", json(read("marks", """
+                {"from": null, "version": "2.0"}""").accepted()));
+        Diagnostic missing = read("marks", """
+                {"version": "2.0"}""").refusal();
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, missing.code());
+        assertEquals("/from", missing.path().orElseThrow());
+    }
+
+    /** {@code nickname?: text}: the member may be left out, and null is refused -- JSON Schema's optional. */
+    @Test
+    void anOptionalFieldWithAnUnmarkedTypeRefusesNull() {
+        Diagnostic refusal = read("marks", """
+                {"nickname": null, "from": 1, "version": "2.0"}""").refusal();
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, refusal.code());
+        assertEquals("/nickname", refusal.path().orElseThrow());
+    }
+
+    /** {@code timeout?: int32? ~ 30}: omitted it is 30, written null it is cleared. */
+    @Test
+    void aVoidableDefaultedFieldIsClearedByNullAndDefaultedByOmission() {
+        assertEquals("""
+                {"from":1,"timeout":null,"version":"2.0"}""", json(read("marks", """
+                {"from": 1, "timeout": null, "version": "2.0"}""").accepted()));
+        assertEquals("""
+                {"from":1,"timeout":30,"version":"2.0"}""", json(read("marks", """
+                {"from": 1, "version": "2.0"}""").accepted()));
+    }
+
+    /** {@code version: text = "2.0"}: a pin on an unmarked name is a marker the document must state. */
+    @Test
+    void aMarkerMustBeWritten() {
+        Diagnostic refusal = read("marks", """
+                {"from": 1}""").refusal();
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, refusal.code());
+        assertEquals("/version", refusal.path().orElseThrow());
     }
 
     // ── §6.1.4 field groups ──────────────────────────────────────────────

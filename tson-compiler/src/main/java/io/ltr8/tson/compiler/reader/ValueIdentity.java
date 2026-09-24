@@ -16,11 +16,12 @@ import java.util.Optional;
  * What a decoded value compares as -- the equality contract [TSON-SCHEMA] §7.5, §5.2 and [TSON-DATA] §2.6
  * each delegate to and none of them defines.
  *
- * <p><b>Three rules in the series compare two decoded values, and they must not disagree.</b> §7.5's
+ * <p><b>Four rules in the series compare two decoded values, and they must not disagree.</b> §7.5's
  * duplicate rule ("two values are duplicates if the element type's equality contract considers them equal"),
- * §2.6's map-key identity ("the decoded host value, type-ref and annotations stripped") and §5.2's check of a
- * stated FIXED value against its declared one are three questions with one answer, so they ask it here rather
- * than each at its own call site. §4.3 writes the contract down for one family; this is where the others get
+ * §2.6's map-key identity ("the decoded host value, type-ref and annotations stripped"), §5.2's check of a
+ * stated FIXED value against its declared one, and the distinctness of a sealed family's pins ({@code
+ * RecordExtension}, which is why this is visible outside its own package) are four questions with one answer,
+ * so they ask it here rather than each at its own call site. §4.3 writes the contract down for one family; this is where the others get
  * theirs.
  *
  * <p><b>Five host types do not compare as themselves.</b> A {@code String} compares NFC-normalised, which
@@ -55,7 +56,7 @@ import java.util.Optional;
  * them would report a duplicate in a document that has none. So an atom is identified by its normalised
  * value beside whatever it was tagged with.
  */
-final class ValueIdentity {
+public final class ValueIdentity {
 
     private ValueIdentity() {
     }
@@ -64,7 +65,7 @@ final class ValueIdentity {
      * {@code decoded} as the thing it compares as -- itself, for every host type whose Java equality is
      * already its value equality.
      */
-    static Object of(Object decoded) {
+    public static Object of(Object decoded) {
         return switch (decoded) {
             case String text -> Nfc.of(text);
             // ByteBuffer.wrap is a view, not a copy: it takes the same array and adds the value equality and

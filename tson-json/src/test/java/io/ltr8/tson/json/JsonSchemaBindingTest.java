@@ -27,10 +27,10 @@ class JsonSchemaBindingTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/binding-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
-              person => { name: text  tries: int32 ~ 0 }
+              person => { name: text  tries?: int32 ~ 0 }
               alias  => person
             }
             """;

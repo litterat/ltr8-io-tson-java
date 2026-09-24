@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -69,13 +70,10 @@ final class ResolvedForm {
      * alphabetical order and another's resolution order say the same thing. Nothing else is normalised; a
      * difference anywhere else is a real one.
      *
-     * <p><b>Including every set-typed field</b>, which [TSON-SCHEMA] §7.5's comparison MUST reaches:
-     * "implementations comparing resolver outputs MUST compare set-typed fields as sets, not ordered lists".
-     * The fields are {@code enum.members}, {@code integer_type.members}, {@code decimal_type.members} and
-     * {@code scoped.scope}. This compares each as an ordered list, which is a <b>deliberate divergence</b>
-     * recorded in {@code SPEC-FEEDBACK.md} #4 -- source order is what every producer emits, §7.4 gives a
-     * reader a reason to care about it, and the freedom the MUST compensates for is one nobody exercises.
-     * Honouring the MUST instead is one sort, here, reaching both callers.
+     * <p><b>A set-typed field is compared as the ordered list it is written as</b>: [TSON-SCHEMA] §7.5 makes
+     * source declaration order canonical in resolved output, for {@code enum.members},
+     * {@code integer_type.members}, {@code decimal_type.members}, {@code text_type.members} and
+     * {@code scoped.scope} alike, so two resolved documents are compared as §8 writes them.
      */
     static TypeDefinition canonical(TypeDefinition definition) {
         return new TypeDefinition(definition.source(), definition.kind(),
@@ -136,7 +134,8 @@ final class ResolvedForm {
      */
     private static Top parsedForComparison(TemplateBody held) {
         return new TemplateBody(held.parameters(),
-                String.valueOf(new TsonDataParser(held.template()).parseDocument().root()));
+                String.valueOf(new TsonDataParser(held.template()).parseDocument().root()),
+                held.extension());
     }
 
     /**
@@ -169,6 +168,53 @@ final class ResolvedForm {
             }
         });
         return marked;
+    }
+
+    /**
+     * Annotation names a key comparison leaves out: {@code doc}, whose text a fixture abbreviates to a summary
+     * of the source's, and {@code synthetic}, which {@link #markedSynthetics} compares on its own terms.
+     */
+    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", "synthetic");
+
+    /**
+     * Each schema-map key's annotations in a §8 resolved-schema document, as {@code @name} or {@code
+     * @name:value}, hashes normalised -- read from the document's <em>text</em>, parsed as data.
+     *
+     * <p>Parsed rather than bound, for {@link #markedSynthetics}' reason: a key-position annotation is dropped
+     * when the document is bound, so a comparison through the value model would find none on either side.
+     * Parsed rather than scanned, because an annotation value is a token and a regex over the text cannot
+     * tell one from the prose inside a {@code @doc}.
+     */
+    static Map<String, List<String>> fixtureKeyAnnotations(String resolvedText) {
+        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseDocument().root().coreValue();
+        Map<String, List<String>> keys = new TreeMap<>();
+        for (MapValue.MapEntry entry : map.entries()) {
+            String name = ((TokenValue) entry.key().coreValue()).text();
+            keys.put(withoutHash(name), entry.key().annotations().stream()
+                    .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
+                    .map(annotation -> "@" + annotation.name() + annotation.value()
+                            .map(value -> ":" + ((TokenValue) value.coreValue()).text()).orElse(""))
+                    .sorted().toList());
+        }
+        return keys;
+    }
+
+    /** The same, from this resolver: the annotations on the keys of the schema's own entries. */
+    static Map<String, List<String>> ourKeyAnnotations(Tson tson, String id) {
+        var linked = tson.bindRegistry().core().resolveLinked(id);
+        var entries = linked.schema().entries();
+        String canonical = CanonicalIdentity.canonicalize(id);
+        Map<String, List<String>> keys = new TreeMap<>();
+        entries.forEach((name, definition) -> {
+            if (linked.originOf(name).equals(canonical)) {
+                keys.put(withoutHash(name), entries.getAnnotations(name).values().stream()
+                        .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
+                        .map(annotation -> "@" + annotation.name()
+                                + annotation.value().map(value -> ":" + value).orElse(""))
+                        .sorted().toList());
+            }
+        });
+        return keys;
     }
 
     /**

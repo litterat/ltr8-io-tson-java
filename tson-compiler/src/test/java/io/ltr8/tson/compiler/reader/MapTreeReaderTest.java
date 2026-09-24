@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -204,14 +205,12 @@ class MapTreeReaderTest {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
-        @SuppressWarnings("unchecked")
-        Map<Object, Object> result = (Map<Object, Object>) Dom.of((TsonValue) compiled.get("scores")
-                .read(TestDocuments.document("{ 0xFF => 10  255 => 20 }", problems)));
+        Object result = compiled.get("scores").read(TestDocuments.document("{ 0xFF => 10  255 => 20 }", problems));
 
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
                 problems.diagnostics().stream().map(Diagnostic::code).toList(),
                 problems.diagnostics().toString());
-        assertEquals(Map.of(BigInteger.valueOf(255), BigInteger.valueOf(20)), result);
+        assertNull(result, "a map that reported a duplicate reads to nothing");
     }
 
     /**

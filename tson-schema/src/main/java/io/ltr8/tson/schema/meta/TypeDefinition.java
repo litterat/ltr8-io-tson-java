@@ -10,38 +10,30 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code type_definition} record, resolved (Part 2 §4, §8.1) -- what every
- * schema declaration ultimately resolves to. {@code kind} is REQUIRED with no default and always
- * appears in output; {@code source} is genuinely OPTIONAL ({@code
- * Optional<TypeRef>}/{@code Optional<Boolean>}) and omitted from written output when absent, the
- * same as any other {@code Optional}-wrapped scalar/record field bound through plain {@code
- * TsonObjectWriter.toTson}. {@code supertypes}/{@code subtypes} are conceptually
- * OPTIONAL in the kernel too ({@code [type_name]?} etc.), but modeled here as a bare, always-present
- * {@code List} rather than {@code Optional<List<...>>} -- {@code tson-bind} doesn't support an
- * {@code Optional} wrapping a parameterized collection type yet, so there's no way to opt an empty
- * list into the same omit-when-absent treatment; it writes as {@code []} instead. Likewise {@code
- * constructor}, a bare {@code boolean}, always appears (as {@code false}) rather than being omitted
- * at its nominal default -- a hand-written writer could special-case "omit when at default" for
- * these; plain generic binding has no such concept beyond {@code Optional.empty()}/{@code null}.
- * See {@code TsonSchema}'s and {@code DefinitionResolverTest}'s own notes for what this means in
- * practice: written output is structurally faithful but more verbose than the non-normative
- * {@code meta-kernel-resolved.tn} fixture's own hand-authored, terser conventions.
+ * The meta-kernel's {@code type_definition} record, resolved ([TSON-SCHEMA] §4, §8.1) -- what every schema
+ * declaration ultimately resolves to. Four components are the kernel's fields: {@code source},
+ * {@code supertypes}, {@code subtypes} and {@code body}. {@code source} is OPTIONAL and omitted from written
+ * output when absent, as any {@code Optional} component is. {@code supertypes}/{@code subtypes} are OPTIONAL
+ * in the kernel too ({@code [type_name]?}) but are modelled as a bare, always-present {@code List}: absent
+ * and empty are one list here, which the compact constructor normalises, and an empty one writes as
+ * {@code []}. {@code annotations} is the wire-annotation carrier for the declaration's own annotations.
  *
- * <p>{@code position} is {@code @Unbound}: §8.1's {@code type_definition} declares no such field, so no
- * schema fills it and the strict binding check would otherwise call it a mismatch. It is this
- * implementation's own, kept for diagnostics -- exactly the case the marker exists for.
+ * <p>{@code kind} and {@code position} are {@code @Unbound}: §8.1's {@code type_definition} declares neither
+ * field, so no schema fills them and the strict binding check would otherwise call each a mismatch. A kind
+ * is derived from an entry's own supertypes and body (§4.1, §8.1) and is computed at resolution for this
+ * implementation's own use, never written; {@code position} is kept for diagnostics.
  *
  * <p>{@code position} -- where this declaration sits in whatever schema source text it was resolved
- * from, when known -- is deliberately excluded from {@link #equals}/{@link #hashCode} (both
- * hand-written below, not generated). Every other component here is compared structurally
- * throughout this repo's own resolver test suite (a hand-built expected {@code TypeDefinition}
- * against a real resolved one); if {@code position} participated in equality, two {@code
- * TypeDefinition}s representing the same logical type from different parses (or the same source
- * parsed twice) would stop comparing equal, breaking that whole test style. {@code toString()} stays
- * generated -- {@code position} carries no reference back to this type or its own schema, so there's
- * no cycle risk in printing it. The compact constructor now carries {@code @Record} -- required as
- * soon as a second, convenience constructor exists, or {@code tson-bind}'s own constructor-selection
- * fails outright (see {@link IntegerSize}'s own Javadoc for the identical situation).
+ * from, when known -- is deliberately excluded from {@link #equals}/{@link #hashCode} (both hand-written
+ * below, not generated), which compare {@code source}, {@code kind}, {@code supertypes}, {@code subtypes}
+ * and {@code body} and leave {@code annotations} out as well. Those five are compared structurally
+ * throughout the resolver tests (a hand-built expected {@code TypeDefinition} against a real resolved one);
+ * if {@code position} participated
+ * in equality, two {@code TypeDefinition}s representing the same logical type from different parses (or the
+ * same source parsed twice) would not compare equal. {@code toString()} stays generated -- {@code position}
+ * carries no reference back to this type or its own schema, so there is no cycle risk in printing it. The
+ * compact constructor carries {@code @Record} because the convenience constructors beside it would
+ * otherwise leave {@code tson-bind}'s constructor selection ambiguous (see {@link IntegerSize}).
  */
 public record TypeDefinition(Optional<TypeRef> source, @Unbound TypeKind kind,
                               List<String> supertypes, List<String> subtypes,
@@ -65,7 +57,7 @@ public record TypeDefinition(Optional<TypeRef> source, @Unbound TypeKind kind,
         this(source, kind, supertypes, subtypes, body, position, Annotations.empty());
     }
 
-    /** Same as the canonical constructor, {@code position} defaulted to absent -- every existing caller that doesn't know its own source position. */
+    /** Same as the canonical constructor, {@code position} absent -- for a caller that does not know its source position. */
     public TypeDefinition(Optional<TypeRef> source, TypeKind kind,
                            List<String> supertypes, List<String> subtypes, Top body) {
         this(source, kind, supertypes, subtypes, body, Optional.empty());

@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * [TSON-JSON] §6.5: a map in one of its two JSON forms, the form selected by the key type and never by
@@ -22,8 +23,8 @@ class JsonMapReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/maps-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               counts    => { text => int32 }
               by_date   => { date => number }
@@ -104,11 +105,11 @@ class JsonMapReadTest {
     }
 
     @Test
-    void aRepeatedKeyKeepsOneEntryAndTheLaterValue() {
+    void aRepeatedKeyIsRefusedAndNothingIsBuilt() {
         Read read = read("by_number", """
                 {"1": "a", "1.0": "b"}""");
-        assertEquals("""
-                {"1":"b"}""", read.value().toString(), "one entry, under the first spelling, with the later value");
+        assertEquals(Diagnostic.Code.DUPLICATE_MAP_KEY, read.problems().getFirst().code());
+        assertNull(read.value());
     }
 
     /** §6.5: `{K => V?}` admits null as an entry's absent value; under `{K => V}` it is a validation error. */

@@ -9,7 +9,6 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -49,8 +48,8 @@ class RecordTemplateTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/template.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                 %s
                 }
@@ -136,33 +135,34 @@ class RecordTemplateTest {
     }
 
     /**
-     * A declaration naming the application is an <b>alias</b> to the instantiation entry, not a second copy
-     * of it -- so a `box<text>` written elsewhere lands on the same entry rather than on this name.
+     * A declaration naming the application <b>is</b> the instantiation entry, not a hop to a content-named
+     * one (§8.2) -- so a {@code box<text>} written elsewhere resolves to that
+     * declaration rather than minting a second entry, and one entry serves both under the author's name.
      */
     @Test
-    void aDeclarationPositionApplicationAliasesTheSameEntry() {
+    void aDeclarationPositionApplicationIsTheEntryEveryUseSiteReaches() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   text_box => box<text>
                   holder => { b: box<text> }""");
 
-        assertEquals(1, instantiationsOf(compiled, "box").size());
-        String made = instantiationsOf(compiled, "box").get(0);
-        assertEquals(made, fieldType(compiled, "holder", "b"));
-        assertEquals(made, assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
-                compiled.schema().entries().get("text_box").body()).target().name());
+        assertEquals(List.of(), instantiationsOf(compiled, "box"),
+                () -> "nothing is minted beside the declaration: " + instantiationsOf(compiled, "box"));
+        assertEquals("text_box", fieldType(compiled, "holder", "b"),
+                "the use site names the declaration the application denotes");
+        assertEquals(TypeRef.of("text"), fieldOf(compiled, "text_box", "v").type(), "T := text");
     }
 
     /** A value parameter binds the literal it was applied with, and the route is gone once bound (§5.10). */
     @Test
     void aValueParameterBindsTheAppliedLiteral() {
         TsonCompiledSchema compiled = compile("""
-                  retry => <N> { attempts: int32 ~ N }
+                  retry => <N> { attempts?: int32 ~ N }
                   holder => { r: retry<3> }""");
 
         RecordField attempts = fieldOf(compiled, fieldType(compiled, "holder", "r"), "attempts");
         assertEquals("3", attempts.value().orElseThrow().text());
-        assertEquals(FieldState.REQUIRED_DEFAULT, attempts.state(), "a routed default stays a default");
+        assertEquals("defaulted", attempts.describe(), "a routed default stays a default");
     }
 
     /**
@@ -178,17 +178,17 @@ class RecordTemplateTest {
     @Test
     void oneFieldMayCarryATypeParameterAndAValueParameterAtOnce() {
         TsonCompiledSchema compiled = compile("""
-                  test1 => <T, N> { first: T ~ N }
+                  test1 => <T, N> { first?: T ~ N }
                   holder => { d: test1<int32, 10> }""");
 
         RecordField first = fieldOf(compiled, fieldType(compiled, "holder", "d"), "first");
         assertEquals(TypeRef.of("int32"), first.type(), "T stood in the type slot");
         assertEquals("10", first.value().orElseThrow().text(), "N stood in the value slot");
-        assertEquals(FieldState.REQUIRED_DEFAULT, first.state(), "~ is a default, and stays one");
+        assertEquals("defaulted", first.describe(), "~ is a default, and stays one");
 
         SchemaValidationException swapped = assertThrows(SchemaValidationException.class,
                 () -> compile("""
-                          test1 => <T, N> { first: T ~ N }
+                          test1 => <T, N> { first?: T ~ N }
                           holder => { d: test1<10, int32> }"""));
         assertTrue(swapped.getMessage().contains("'10': U+0031 at index 0 cannot start an identifier"),
                 swapped.getMessage());
@@ -217,13 +217,17 @@ class RecordTemplateTest {
     void aDeclarationPositionApplicationTakesTheSameArgumentFormsAsAFieldOne() {
         TsonCompiledSchema compiled = compile("""
                   box     => <T> { v: T }
-                  counted => <N> { n: int32 ~ N }
+                  counted => <N> { n?: int32 ~ N }
                   nested  => box<box<text>>
                   three   => counted<3>""");
 
-        assertEquals(2, instantiationsOf(compiled, "box").size(), "the inner and outer box");
-        assertEquals("3", fieldOf(compiled, instantiationsOf(compiled, "counted").get(0), "n")
-                .value().orElseThrow().text());
+        // The outer application is the declaration itself (#15); only the inner `box<text>`, which no
+        // declaration names, is still minted.
+        assertEquals(1, instantiationsOf(compiled, "box").size(),
+                () -> "the inner box is minted, the outer is `nested`: " + instantiationsOf(compiled, "box"));
+        assertEquals(instantiationsOf(compiled, "box").get(0), fieldOf(compiled, "nested", "v").type().name(),
+                "the outer's field names the inner entry");
+        assertEquals("3", fieldOf(compiled, "three", "n").value().orElseThrow().text());
     }
 
     /**
@@ -233,7 +237,7 @@ class RecordTemplateTest {
     @Test
     void aRecursiveTemplateTiesTheKnotThroughTheEntryUnderConstruction() {
         TsonCompiledSchema compiled = compile("""
-                  chain => <T> { head: T  tail: chain<T>? }
+                  chain => <T> { head: T  tail?: chain<T>? }
                   use => { c: chain<text> }""");
 
         List<String> made = instantiationsOf(compiled, "chain");
@@ -412,7 +416,7 @@ class RecordTemplateTest {
     void refiningAnApplicationTightensTheClosedEntrysFields() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
-                  pinned => box<text> ^ { v: = "fixed" }""");
+                  pinned => box<text> ^ { v?: = "fixed" }""");
 
         assertEquals(TypeRef.of("text"), fieldOf(compiled, "pinned", "v").type());
         assertEquals("fixed", fieldOf(compiled, "pinned", "v").value().orElseThrow().text());
@@ -513,7 +517,7 @@ class RecordTemplateTest {
     void applyingATypeWhereTheBodyRoutesAValueIsCaughtByValueConformance() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
-                          retry => <N> { attempts: int32 ~ N }
+                          retry => <N> { attempts?: int32 ~ N }
                           holder => { r: retry<text> }"""));
 
         assertTrue(thrown.getMessage().contains("field 'attempts'"), thrown.getMessage());
@@ -533,7 +537,7 @@ class RecordTemplateTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           box   => <T> { v: T }
-                          weird => <T> { next: weird<box<T>>? }
+                          weird => <T> { next?: weird<box<T>>? }
                           use   => { w: weird<text> }"""));
 
         assertTrue(thrown.getMessage().contains("does not pass 'T' through unchanged"), thrown.getMessage());
@@ -543,7 +547,7 @@ class RecordTemplateTest {
     @Test
     void regularRecursionClosesWhereNonRegularDoesNot() {
         assertEquals(1, instantiationsOf(compile("""
-                  chain => <T> { head: T  tail: chain<T>? }
+                  chain => <T> { head: T  tail?: chain<T>? }
                   use => { c: chain<text> }"""), "chain").size());
     }
 
@@ -558,8 +562,11 @@ class RecordTemplateTest {
     }
 
     // ── A template named as a data value's own type ──────────────────────
-    //    A template is not a type until it is applied, and a data type-ref carries no arguments -- so
-    //    naming one in data is the author's error, not a gap in this library. See OpenTemplateReader.
+    //    A *record-bodied* template is a family base (§5.10), so naming it in data is
+    //    refused the way naming any abstract base is: the value has to say which member it is. Naming a
+    //    template with no family -- a container, a reference, a constructor application -- is still refused
+    //    by OpenTemplateReader, which says a template is not a type until it is applied. Either way it is
+    //    the author's error and an ordinary data diagnostic, never a gap in this library.
 
     /**
      * A <b>parameterised alias</b> (§5.10 partial application): a declaration whose whole body is an
@@ -701,11 +708,12 @@ class RecordTemplateTest {
         assertNull(value);
         assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
         Diagnostic problem = problems.diagnostics().get(0);
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, problem.code());
-        assertTrue(problem.message().contains("'paged' is a template taking 1 type argument [T]"),
-                problem.message());
-        assertTrue(problem.message().contains("my_type => paged<...>"), "the route out of it: " + problem.message());
-        assertEquals("!paged", problem.actual());
+        // The name resolves -- to a family base, which has no direct instances, so the value has to name the
+        // member it is. Refused for the same reason an untagged value at any abstract record is.
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
+        assertTrue(problem.message().contains("'paged' selects nothing"), problem.message());
+        assertTrue(problem.message().contains("orders_page"),
+                "the route out of it names the member a document can write: " + problem.message());
         // The applied form is a type and still reads, which is what the message points at.
         assertNotNull(compiled.get("orders_page")
                 .read(TestDocuments.document("{ items: [ { id: \"a\" } ] }")));
@@ -715,9 +723,12 @@ class RecordTemplateTest {
      * The same for a template whose body needs no lifting at all: {@code box}'s field type is the parameter
      * itself, which used to compile to an {@link io.ltr8.tson.compiler.reader.ErrorReader} whose message
      * blamed the linker for not rejecting {@code T}. The entry is refused before any of that.
+     *
+     * <p><b>And the member is accepted</b>, which is the other half of the rule: {@code !box} names the base
+     * and selects nothing, {@code !int_box} names a member and reads.
      */
     @Test
-    void aTemplateWhoseFieldIsTheParameterIsRefusedTheSameWay() {
+    void aTemplateWhoseFieldIsTheParameterIsRefusedButItsMemberReads() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   int_box => box<int32>""");
@@ -726,8 +737,11 @@ class RecordTemplateTest {
         compiled.get("box").read(TestDocuments.document("!box { v: 1 }", problems));
 
         assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
-        assertTrue(problems.diagnostics().get(0).message().startsWith("'box' is a template taking"),
+        assertTrue(problems.diagnostics().get(0).message().contains("'box' selects nothing"),
                 problems.diagnostics().get(0).message());
+
+        assertEquals(List.of(), collect(compiled, "box", "!int_box { v: 1 }"),
+                "the member a document can name reads at the base's own position");
     }
 
     /** A fail-fast read throws the read exception every other data problem throws -- never a library fault. */
@@ -740,6 +754,13 @@ class RecordTemplateTest {
         ReadException thrown = assertThrows(ReadException.class,
                 () -> compiled.get("box").read(TestDocuments.document("!box { v: 1 }")));
 
-        assertTrue(thrown.getMessage().contains("is a template taking"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("selects nothing"), thrown.getMessage());
+    }
+
+    /** Every diagnostic one document collects at {@code rootType}. */
+    private static List<Diagnostic> collect(TsonCompiledSchema compiled, String rootType, String document) {
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
+        compiled.get(rootType).read(TestDocuments.document(document, problems));
+        return List.copyOf(problems.diagnostics());
     }
 }

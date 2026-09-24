@@ -123,15 +123,14 @@ public final class JsonStream implements JsonEventSource {
      * the identifier policy as well, where the position that decides it is known; a token policy stricter
      * than that one therefore subsumes it, exactly as on the TSON side.
      *
-     * <p><b>Built in rather than wrapped.</b> {@code TsonDataStream} does the same, and had a decorator
-     * until a second encoding needed the rule: a wrapper is a second place to forget to apply it. Both
-     * streams produce each token exactly once, which is the property the check needs and the reason it
-     * cannot live in the read context, which rewinds.
+     * <p><b>Built in rather than wrapped.</b> {@code TsonDataStream} does the same: a wrapper is a second
+     * place to forget to apply the rule. Both streams produce each token exactly once, which is the
+     * property the check needs and the reason it cannot live in the read context, which rewinds.
      *
      * <p>At {@code unrestricted()} -- the default, and every ordinary read -- it is a field read and a
      * branch.
      *
-     * <p><b>The only constructor.</b> A stream reads under a policy and reports through a receiver; both
+     * <p><b>The only public constructor.</b> A stream reads under a policy and reports through a receiver; both
      * are always true, so neither is defaulted here. A caller with nothing particular to say forms
      * {@code ProcessorPolicy.defaults()} and {@code DiagnosticsReceiver.throwing()} where they can be seen,
      * rather than picking them up from an overload that hides which defaults it chose.
@@ -144,9 +143,10 @@ public final class JsonStream implements JsonEventSource {
 
 
     /**
-     * The one real constructor. The bound is read off the policy rather than taken as a number, so there is
-     * no way to hand this stream a depth that no {@code LimitsPolicy} would have accepted -- that record
-     * refuses a bound below one, and it refuses it once for every encoding.
+     * What the public constructor delegates to, assigning the lexer and the depth bound. The bound is read
+     * off the policy rather than taken as a number, so there is no way to hand this stream a depth that no
+     * {@code LimitsPolicy} would have accepted -- that record refuses a bound below one, and it refuses it
+     * once for every encoding.
      */
     private JsonStream(JsonLexer lexer, LimitsPolicy limits) {
         this.lexer = lexer;

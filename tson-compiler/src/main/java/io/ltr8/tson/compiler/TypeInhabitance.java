@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.ElementState;
@@ -116,7 +117,7 @@ final class TypeInhabitance {
      * A record needs every part it cannot do without, and one member of every group it must choose from.
      *
      * <p><b>The groups are walked separately because their members hide from the field walk</b>: §5.11 makes a
-     * group's members uniformly OPTIONAL in {@code fields}, with the requirement carried by the group's own
+     * group's members uniformly optional in {@code fields}, with the requirement carried by the group's own
      * state. Reading only the field list would find nothing required and call every group satisfied.
      */
     private static boolean recordInhabited(RecordBody record, Map<String, TypeDefinition> namespace,
@@ -124,10 +125,10 @@ final class TypeInhabitance {
         Set<String> grouped = new HashSet<>();
         record.groups().forEach(group -> grouped.addAll(group.members()));
         for (RecordField field : record.fields()) {
-            if (grouped.contains(field.name()) || isOptional(field)) {
+            if (grouped.contains(field.name()) || demandsNothing(field)) {
                 continue;
             }
-            if (!refInhabited(field.type(), namespace, inhabited)) {
+            if (!satisfiable(field, namespace, inhabited)) {
                 return false;
             }
         }
@@ -137,7 +138,7 @@ final class TypeInhabitance {
             }
             boolean any = group.members().stream().anyMatch(member -> record.fields().stream()
                     .filter(field -> field.name().equals(member))
-                    .anyMatch(field -> refInhabited(field.type(), namespace, inhabited)));
+                    .anyMatch(field -> satisfiable(field, namespace, inhabited)));
             if (!any) {
                 return false;
             }
@@ -146,14 +147,26 @@ final class TypeInhabitance {
     }
 
     /**
-     * A field a document may leave out places no demand on its type. Every other state does, the two that
-     * carry a value included: a fixed or default value of a type nothing can satisfy does not exist either.
+     * A field that admits {@code _}, or that a document may leave out and that supplies no value of its own,
+     * places no demand on its type -- so either guards a recursive reference. Every other field does, one
+     * carrying a value included: a fixed or default value of a type nothing can satisfy does not exist either.
      */
-    private static boolean isOptional(RecordField field) {
-        return switch (field.state()) {
-            case OPTIONAL, OPTIONAL_FIXED -> true;
-            case REQUIRED, REQUIRED_DEFAULT, REQUIRED_FIXED -> false;
-        };
+    private static boolean demandsNothing(RecordField field) {
+        return field.voidable() || (field.optional() && field.value().isEmpty());
+    }
+
+    /**
+     * Whether some document can state this field: as {@code _} where it is voidable, else with a value of its
+     * type. {@code void}'s only value is {@code _}, so a {@code void} field that is not voidable can be stated
+     * by nothing -- {@code a: void} empties its record, where {@code a?: void} empties only the field.
+     */
+    private static boolean satisfiable(RecordField field, Map<String, TypeDefinition> namespace,
+            Set<String> inhabited) {
+        if (field.voidable()) {
+            return true;
+        }
+        return !ReferenceChain.terminal(field.type().name(), namespace).equals("void")
+                && refInhabited(field.type(), namespace, inhabited);
     }
 
     private static boolean positionInhabited(TupleElement element, Map<String, TypeDefinition> namespace,
@@ -210,7 +223,7 @@ final class TypeInhabitance {
     /**
      * The part of a record nothing satisfies: a required field, or -- when every one of those is fine -- the
      * first member of a group that has to be chosen from and has nothing to choose. Following the group
-     * matters because its members are OPTIONAL in {@code fields}, so a chain that walked only required fields
+     * matters because its members are optional in {@code fields}, so a chain that walked only required fields
      * would stop at the record and explain nothing.
      */
     private static String recordDependency(RecordBody record, Map<String, TypeDefinition> namespace,
@@ -218,8 +231,8 @@ final class TypeInhabitance {
         Set<String> grouped = new HashSet<>();
         record.groups().forEach(group -> grouped.addAll(group.members()));
         for (RecordField field : record.fields()) {
-            if (!grouped.contains(field.name()) && !isOptional(field)
-                    && !refInhabited(field.type(), namespace, inhabited)) {
+            if (!grouped.contains(field.name()) && !demandsNothing(field)
+                    && !satisfiable(field, namespace, inhabited)) {
                 return field.type().name();
             }
         }
@@ -227,9 +240,8 @@ final class TypeInhabitance {
                 .filter(group -> group.state() == ElementState.REQUIRED)
                 .flatMap(group -> group.members().stream())
                 .flatMap(member -> record.fields().stream().filter(field -> field.name().equals(member)))
-                .map(RecordField::type)
-                .filter(type -> !refInhabited(type, namespace, inhabited))
-                .map(TypeRef::name).findFirst().orElse(null);
+                .filter(field -> !satisfiable(field, namespace, inhabited))
+                .map(field -> field.type().name()).findFirst().orElse(null);
     }
 
     /** The first thing a definition demands that nothing satisfies -- the next link of the chain. */

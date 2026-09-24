@@ -11,6 +11,7 @@ import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
+import io.ltr8.tson.compiler.ast.schema.DefinitionMark;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
@@ -285,8 +286,10 @@ public final class TsonSchemaParser extends TsonDataParser {
         declarationInProgress = name;
         expect(TokenType.MAP_ARROW, "a declaration's '=>'");
         List<Annotation> typeDefAnnotations = parseAnnotationList();
-        TypeDef typeDef = parseTypeDef();
-        SchemaMap.Declaration declaration = new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations, typeDef);
+        Optional<DefinitionMark> mark = parseDefinitionMarkOpt();
+        TypeDef typeDef = parseTypeDef(mark);
+        SchemaMap.Declaration declaration =
+                new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations, mark, typeDef);
         declarationPositions.put(declaration, namePosition);
         declarationInProgress = "";
         return declaration;
@@ -294,11 +297,73 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     // ── Type Definitions (§5, §12.1) ─────────────────────────────────────
 
-    private TypeDef parseTypeDef() {
+    /**
+     * {@code [definition-mark ws]} at the head of a type definition (§12.1) -- {@code abstract} or {@code
+     * final}, the words that say how the type may be realised. Empty where the declaration writes neither,
+     * which is OPEN and has no spelling.
+     *
+     * <p><b>The words are marks here unconditionally, and that is the whole of the reservation.</b> They are
+     * ordinary identifiers at every other position -- a declaration name, a field name, a field's type, an
+     * annotation name, a type argument -- so no name leaves the namespace and [TSON-DATA] §7.4's "no reserved
+     * words" stands. What a schema declaring {@code abstract => { … }} gives up is naming it as a whole
+     * declaration body ({@code pet => abstract}), which the second branch below says outright rather than
+     * leaving to the type-ref parse and a puzzling error two tokens later.
+     *
+     * <p>Deciding on the word alone is what keeps the marked composition writable: {@code mid => abstract base
+     * & { … }} and {@code pet => abstract} differ only in what follows the head, so a conditional reading
+     * would have to give one of them up, and an abstract link in a chain is worth more than an alias to a type
+     * called {@code abstract}.
+     */
+    private Optional<DefinitionMark> parseDefinitionMarkOpt() {
+        if (!check(TokenType.UNQUOTED)) {
+            return Optional.empty();
+        }
+        Optional<DefinitionMark> mark = DefinitionMark.of(peek().text());
+        if (mark.isEmpty()) {
+            return Optional.empty();
+        }
+        advance();
+        if (check(TokenType.UNQUOTED) && DefinitionMark.of(peek().text()).isPresent()) {
+            throw parseError("'" + mark.get().word() + "' and '" + peek().text() + "' on one declaration -- a"
+                    + " record states how it may be realised once, and the marks are alternatives rather than"
+                    + " companions (§5.2)");
+        }
+        if (check(TokenType.UNQUOTED) && peekSecond().type() == TokenType.MAP_ARROW) {
+            // The next declaration's own name, so this one's definition is missing. It has to be caught here:
+            // an identifier does open a type-def, so nothing downstream would notice before the map loop hits
+            // an unexpected `=>` two tokens later.
+            throw missingDefinition(mark.get());
+        }
+        return mark;
+    }
+
+    /**
+     * A declaration that wrote a mark and then no type definition. The mark is the reading, so the diagnostic
+     * names what the author most likely meant instead: the one thing the two words give up at this position.
+     */
+    private ParseException missingDefinition(DefinitionMark mark) {
+        return parseError("'" + mark.word() + "' here marks how the type that follows may be realised (§5.2),"
+                + " and no definition follows -- a type or template named '" + mark.word() + "' may be"
+                + " declared and referenced anywhere else, but not named as a whole declaration body");
+    }
+
+    /** Whether the cursor is on a token that can open a {@code type-def} (§12.1) -- the five alternatives' heads. */
+    private boolean startsTypeDef() {
+        return check(TokenType.BANG) || check(TokenType.LBRACE) || check(TokenType.LPAREN)
+                || check(TokenType.LBRACKET) || check(TokenType.UNQUOTED);
+    }
+
+    private TypeDef parseTypeDef(Optional<DefinitionMark> mark) {
         // The parameter list comes first, so one token then decides the alternative: `!` with no parameters
         // is an instance or an atom refinement, `!` with parameters an instance-template (§12.1). `<` only
         // ever starts a parameter list, so consuming it costs no lookahead.
         List<String> typeParams = parseTypeParamsOpt();
+        if (mark.isPresent() && !startsTypeDef()) {
+            // Reached both by a bare `pet => abstract` and by `pet => abstract<text>`, which applies a
+            // template of that name. The second cannot be caught where the mark is read, since `abstract <T>
+            // { … }` opens identically; what separates them is whether a definition follows the parameters.
+            throw missingDefinition(mark.get());
+        }
 
         if (check(TokenType.BANG)) {
             return parseAtomRefinementOrInstance(typeParams);
@@ -492,6 +557,9 @@ public final class TsonSchemaParser extends TsonDataParser {
         // Taken before the token is consumed, exactly as a declaration's own name position is.
         Position namePosition = peek().start();
         Token name = expectFieldNameToken("a record field name");
+        // The name's `?`: the key may be omitted (§5.2). `?` is always a token of its own, so `a?:` needs no
+        // lexer change, and adjacency is what keeps `a ?:` from reading as the same mark.
+        boolean omittable = consumeAdjacentQuestion();
         if (check(TokenType.MAP_ARROW)) {
             throw parseError("a record body's entries are 'name: type'; '=>' begins a map type only where a "
                     + "type is expected (§12.2), not in a refinement body, a composition tail or a "
@@ -505,13 +573,13 @@ public final class TsonSchemaParser extends TsonDataParser {
             modifier = Optional.of(parseFieldModifier());
         } else {
             TypeRef ref = parseTypeRef();
-            boolean optional = consumeAdjacentQuestion();
-            type = Optional.of(new FieldDef.FieldType(ref, optional));
+            boolean voidable = consumeAdjacentQuestion();
+            type = Optional.of(new FieldDef.FieldType(ref, voidable));
             if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
                 modifier = Optional.of(parseFieldModifier());
             }
         }
-        FieldDef field = new FieldDef(annotations, name.text(), type, modifier);
+        FieldDef field = new FieldDef(annotations, name.text(), omittable, type, modifier);
         fieldPositions.put(field, namePosition);
         return field;
     }
@@ -521,6 +589,11 @@ public final class TsonSchemaParser extends TsonDataParser {
         advance();
 
         FieldDef.Modifier.Value value;
+        if (kind == FieldDef.Modifier.Kind.FIXED && check(TokenType.QUESTION)) {
+            // `=?`: pinned by the members rather than here -- the discriminator spelling (§5.2).
+            advance();
+            return new FieldDef.Modifier(kind, new FieldDef.Modifier.Value.Deferred());
+        }
         if (check(TokenType.ABSENT)) {
             advance();
             value = new FieldDef.Modifier.Value.Absent();
@@ -530,8 +603,9 @@ public final class TsonSchemaParser extends TsonDataParser {
                 case UNQUOTED -> TokenForm.UNQUOTED;
                 case SINGLE_LINE_STRING -> TokenForm.SINGLE_LINE_QUOTED;
                 case MULTI_LINE_STRING -> TokenForm.MULTI_LINE_QUOTED;
-                default -> throw mismatch("a scalar token or the absent sentinel '_' after '"
-                        + (kind == FieldDef.Modifier.Kind.DEFAULT ? "~" : "=") + "'");
+                default -> throw mismatch(kind == FieldDef.Modifier.Kind.DEFAULT
+                        ? "a scalar token or the absent sentinel '_' after '~'"
+                        : "a scalar token, the absent sentinel '_', or '?' after '='");
             };
             advance();
             value = new FieldDef.Modifier.Value.Literal(recordPosition(new TokenValue(t.text(), form), t.start()));
@@ -559,8 +633,22 @@ public final class TsonSchemaParser extends TsonDataParser {
     private GroupDef.Member parseGroupMember() {
         List<Annotation> annotations = parseAnnotationList();
         Token name = expectFieldNameToken("a field group member's name");
+        if (check(TokenType.QUESTION)) {
+            throw parseError("a field group member takes no '?' on its name -- the group decides whether a "
+                    + "member is present (§5.11); '?' after the member's type admits '_'");
+        }
         expect(TokenType.COLON, "a field group member's ':'");
-        return new GroupDef.Member(annotations, name.text(), parseTypeRef());
+        TypeRef type = parseTypeRef();
+        boolean voidable = consumeAdjacentQuestion();
+        if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
+            // §5.11: a member's presence is the group's, and a group does not inject, so `~`, `=` and `=?`
+            // are parse errors here. Said plainly, because the next token to be read is `|` or `)` and the
+            // failure would otherwise be reported as a malformed group.
+            throw parseError("a field group member takes no value modifier -- §5.11 gives the group a "
+                    + "member's presence, so none of them takes a default, a pin, or the discriminator mark "
+                    + "'=?', whose field must be required");
+        }
+        return new GroupDef.Member(annotations, name.text(), type, voidable);
     }
 
     // ── Type References (§5.3, §12.1) ────────────────────────────────────
@@ -843,14 +931,17 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
     }
 
-    /** {@code "?"} MUST be immediately adjacent to the preceding token (§12.3) -- field type, tuple/array position, or field group. */
+    /**
+     * {@code "?"} MUST be immediately adjacent to the preceding token (§12.3) -- field name, field type,
+     * tuple/array position, or field group.
+     */
     private boolean consumeAdjacentQuestion() {
         if (!check(TokenType.QUESTION)) {
             return false;
         }
         Position prevEnd = lastTokenEnd();
         if (!prevEnd.equals(peek().start())) {
-            throw parseError("'?' must be immediately adjacent to the preceding type (no whitespace)");
+            throw parseError("'?' must be immediately adjacent to the name or type it marks (no whitespace)");
         }
         advance();
         return true;

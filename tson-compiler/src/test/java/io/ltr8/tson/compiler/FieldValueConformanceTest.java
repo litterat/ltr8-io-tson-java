@@ -38,8 +38,8 @@ class FieldValueConformanceTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/field-value.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                 %s
                 }
@@ -66,7 +66,7 @@ class FieldValueConformanceTest {
      */
     @Test
     void aDefaultThatIsNotAValueOfTheFieldsTypeIsRefused() {
-        SchemaValidationException thrown = refused("rec => { first: int32 ~ \"nope\"  other: int32 }");
+        SchemaValidationException thrown = refused("rec => { first?: int32 ~ \"nope\"  other: int32 }");
 
         assertTrue(thrown.getMessage().contains("field 'first'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("declared 'int32'"), thrown.getMessage());
@@ -85,7 +85,7 @@ class FieldValueConformanceTest {
                   small => !integer ^ { max: 100 }
                   hop   => small
                   alias => hop
-                  rec   => { n: alias ~ 500 }""");
+                  rec   => { n?: alias ~ 500 }""");
 
         assertTrue(thrown.getMessage().contains("field 'n'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("100"), thrown.getMessage());
@@ -98,7 +98,7 @@ class FieldValueConformanceTest {
                   small => !integer ^ { max: 100 }
                   hop   => small
                   alias => hop
-                  rec   => { n: alias ~ 50 }""");
+                  rec   => { n?: alias ~ 50 }""");
     }
 
     /** A fixed value is the same rule, and says "fixed value" rather than "default" so the author's own spelling is echoed. */
@@ -119,7 +119,7 @@ class FieldValueConformanceTest {
     void aDefaultOutsideTheTypesOwnConstraintsIsRefused() {
         SchemaValidationException thrown = refused("""
                   small => !integer ^ { max: 100 }
-                  rec   => { n: small ~ 500 }""");
+                  rec   => { n?: small ~ 500 }""");
 
         assertTrue(thrown.getMessage().contains("field 'n'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("100"), thrown.getMessage());
@@ -134,7 +134,7 @@ class FieldValueConformanceTest {
     void aDefaultThatIsNotAMemberOfTheFieldsEnumIsRefused() {
         SchemaValidationException thrown = refused("""
                   status => !enum [ PENDING SHIPPED ]
-                  rec    => { s: status ~ CANCELLED }""");
+                  rec    => { s?: status ~ CANCELLED }""");
 
         assertTrue(thrown.getMessage().contains("field 's'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("PENDING"), thrown.getMessage());
@@ -156,7 +156,7 @@ class FieldValueConformanceTest {
      */
     @Test
     void aQuotedNumericIsAValueOfAnIntegerFieldBecauseFormIsNotMeaning() {
-        assertNotNull(compile("rec => { n: int32 ~ \"3\"  m: float64 = \"1.5\" }"));
+        assertNotNull(compile("rec => { n?: int32 ~ \"3\"  m?: float64 = \"1.5\" }"));
     }
 
     /** A conforming value is left alone, at both spellings and across families. */
@@ -165,20 +165,11 @@ class FieldValueConformanceTest {
         assertNotNull(compile("""
                   status => !enum [ PENDING SHIPPED ]
                   rec    => {
-                    n: int32 ~ 3
-                    label: text = "fixed"
-                    s: status ~ PENDING
-                    when: date ~ "2020-01-01"
+                    n?: int32 ~ 3
+                    label?: text = "fixed"
+                    s?: status ~ PENDING
+                    when?: date ~ "2020-01-01"
                   }"""));
-    }
-
-    /**
-     * <b>The optional-fixed-to-absent spelling has no value to check</b> (§5.2's sixth): {@code = _} resolves
-     * to {@code OPTIONAL_FIXED} carrying nothing at all, so there is no token here for a type to reject.
-     */
-    @Test
-    void fixedToAbsentCarriesNoValueAndIsUntouched() {
-        assertNotNull(compile("rec => { n: int32?  m: int32? = _ }"));
     }
 
     /**
@@ -192,7 +183,7 @@ class FieldValueConformanceTest {
         for (String container : List.of("[text]", "{text => int32}", "[text, int32]")) {
             SchemaValidationException thrown = refused("""
                       ns  => %s
-                      rec => { xs: ns ~ oops }""".formatted(container));
+                      rec => { xs?: ns ~ oops }""".formatted(container));
 
             assertTrue(thrown.getMessage().contains("field 'xs'"), thrown.getMessage());
             assertTrue(thrown.getMessage().contains("cannot have a default"), thrown.getMessage());
@@ -216,14 +207,14 @@ class FieldValueConformanceTest {
     void aRecordOrChoiceTypedFieldIsRefusedEvenWhereAReadWouldAcceptTheToken() {
         SchemaValidationException positional = refused("""
                   point => { n: int32 }
-                  rec   => { p: point ~ 3 }""");
+                  rec   => { p?: point ~ 3 }""");
         assertTrue(positional.getMessage().contains("which is a record"), positional.getMessage());
         assertTrue(positional.getMessage().contains("declare the field with a scalar type"),
                 positional.getMessage());
 
         SchemaValidationException variant = refused("""
                   ch  => ( int32 | text )
-                  rec => { c: ch ~ oops }""");
+                  rec => { c?: ch ~ oops }""");
         assertTrue(variant.getMessage().contains("which is a choice"), variant.getMessage());
     }
 
@@ -235,7 +226,7 @@ class FieldValueConformanceTest {
      */
     @Test
     void voidIsNotAScalarAndCannotCarryAValue() {
-        SchemaValidationException thrown = refused("rec => { v: void ~ anything }");
+        SchemaValidationException thrown = refused("rec => { v?: void ~ anything }");
 
         assertTrue(thrown.getMessage().contains("the void type"), thrown.getMessage());
     }
@@ -250,11 +241,11 @@ class FieldValueConformanceTest {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         String schema = """
                 !!id:"https://example.test/field-value.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
-                  a => { n: int32 ~ "nope" }
-                  b => { m: int32 = "also nope" }
+                  a => { n?: int32 ~ "nope" }
+                  b => { m?: int32 = "also nope" }
                 }
                 """;
         SchemaSource source = uri -> {

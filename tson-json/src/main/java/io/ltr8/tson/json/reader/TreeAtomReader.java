@@ -3,7 +3,6 @@ package io.ltr8.tson.json.reader;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonValue;
 
 /**
@@ -13,21 +12,30 @@ import io.ltr8.tson.json.tree.JsonValue;
  * answers <em>does this document conform</em> -- {@code tson-cli} validating a JSON document against a TSON
  * schema keeps only the diagnostics -- so running {@code date}'s contract over {@code "2026-07-01"} is the
  * whole point and the {@code LocalDate} it produces is not wanted. A caller who wants the typed value is
- * asking a different question and reads in bind mode, where a class says what to build.
+ * asking a different question and reads in bind mode, where a class says what to build. The one thing a set's
+ * element keeps of it, its identity, is {@link TreeAtomKeyedReader}'s.
  *
  * <p>That is also why this yields a {@code JsonValue} and never a {@code TsonValue}: converting an encoding
  * is a different operation from reading one, and a JSON read hands back JSON.
  *
- * <p><b>A refused value yields {@link JsonNull}</b>, which is tree mode's placeholder rather than a claim
- * about the document -- the diagnostic beside it is what says what was wrong. It is the same answer
- * {@code tson-compiler}'s tree mode gives ({@code TsonAbsent}) in the same position, which is what keeps one
- * schema giving one shape of answer over both encodings.
+ * <p><b>A refused value yields no node</b>: a read is all-or-nothing in every mode, so the value it was part of
+ * builds nothing either and the diagnostic is what says what was wrong. The same answer {@code tson-compiler}'s
+ * tree mode gives in the same position, which keeps one schema giving one shape of answer over both
+ * encodings.
  */
 final class TreeAtomReader implements JsonTypeReader<JsonValue> {
 
     /** Wraps any atom-family factory so its leaf yields the node the document carried. */
     static ValueReaderFactory over(ValueReaderFactory delegate) {
         return (name, definition, context) -> new TreeAtomReader(delegate.create(name, definition, context));
+    }
+
+    /**
+     * The reader a set's elements are read at: an atom's is {@link TreeAtomKeyedReader} over the same parser.
+     * Any other element is compound, and its node is all a tree read has.
+     */
+    static JsonTypeReader<?> keyed(JsonTypeReader<?> element) {
+        return element instanceof TreeAtomReader atom ? new TreeAtomKeyedReader(atom.delegate) : element;
     }
 
     private final JsonTypeReader<?> delegate;
@@ -42,8 +50,7 @@ final class TreeAtomReader implements JsonTypeReader<JsonValue> {
         JsonValue node = Nodes.scalar(event);
         int before = ctx.reported();
         delegate.read(ctx);
-        // A composite where a scalar was due: the delegate reported it and consumed the whole value, so there
-        // is no node to hand back and the placeholder is all this position has.
-        return node == null || ctx.reported() > before ? JsonNull.INSTANCE : node;
+        // Refused -- a composite where a scalar was due among the ways -- is no node: a read is all-or-nothing.
+        return node == null || ctx.reported() > before ? null : node;
     }
 }

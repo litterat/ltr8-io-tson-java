@@ -163,10 +163,10 @@ public final class DataClassObjectReader {
      *
      * <p><b>{@code BIND_MISMATCH}, which is not a verdict.</b> A class this context cannot analyse is a
      * misconfiguration in the reading application and says nothing whatever about the document -- the
-     * distinction {@code Code.verdict()} exists to carry, and the same line {@code TsonBindMismatchException}
-     * draws at compile time between a schema and a class that disagree. It reported {@code SCHEMA_ERROR}
-     * before, which is a verdict, so a caller routing on the answer was told the document was wrong when
-     * nothing had looked at it.
+     * distinction {@code Code.verdict()} exists to carry, and the same line
+     * {@link io.ltr8.tson.base.BindMismatchException} draws at compile time between a schema and a class
+     * that disagree. {@code SCHEMA_ERROR} is a verdict, and would tell a caller routing on the answer that
+     * the document was wrong when nothing had looked at it.
      */
     private DataClass descriptorFor(TsonReadContext ctx, Class<?> targetClass) {
         try {
@@ -269,7 +269,7 @@ public final class DataClassObjectReader {
 
         // No type-ref, so the target class is what types this position, and the family it names reads the
         // token -- the same answer a schema declaring that type would give, form included (`12` and `"12"`
-        // are one int32). See HostAtoms.forTypedPosition, and SPEC-FEEDBACK.md #7 for why a class-typed
+        // are one int32). See HostAtoms.forTypedPosition, and [TSON-DATA] §4.1 for why a class-typed
         // position is not [TSON-DATA] §4.1's schemaless one.
         Optional<AtomType<?>> byHostType = HostAtoms.forTypedPosition(dataClass.dataClass());
         if (byHostType.isPresent()) {
@@ -649,14 +649,14 @@ public final class DataClassObjectReader {
         Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
         if (typeRef.isEmpty()) {
             TsonEvent e = ctx.peek();
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "union type " + dataClass.typeClass()
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "union type " + dataClass.typeClass()
                     + " requires a type annotation (!typeName) to disambiguate members", "a !typeName", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
         Class<?> member = resolveUnionMember(dataClass, typeRef.get());
         if (member == null) {
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "no member of union " + dataClass.typeClass()
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "no member of union " + dataClass.typeClass()
                     + " matches type name '" + typeRef.get() + "'",
                     "one of " + describeMembers(dataClass), typeRef.get());
             EventSkip.coreValue(ctx);

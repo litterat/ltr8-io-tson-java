@@ -34,8 +34,8 @@ class IdentifierPolicyConfigTest {
     private static String schema(String fieldName) {
         return """
                 !!id:"https://example.test/policy.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 { rec => { %s: text } }
                 """.formatted(fieldName);
     }
