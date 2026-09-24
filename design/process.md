@@ -27,13 +27,13 @@ source of truth — with **two** standing exceptions. The three `.tn` schemas ar
 time**, so they are the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in
 place**: see "Part 3 is drafted here" below.
 
-On this branch the bundled schemas carry **Revision 36 identities** — `https://tson.io/2026/36/m/*.tn`, the
-proposing revision's own, per the from-the-start rule below. `spec/` holds **Revision 36** of Parts 1 and 2,
-the adjudicated cache, not edited here except for §13.2's three artifact rows, so the table names the bytes
-beside it and stays checkable; its Part 1 and Guide rows stay at the revision those documents actually are.
-**§13.2 is a fourth pin to move** whenever the artifacts change. `scripts/restamp-bundled-schemas.sh` does
-not write it — the script covers the repo's own pins, and the spec document is a cache — so §13.2 is
-re-stamped by hand and is the one that silently drifts. `tson hash spec/m/<name>.tn` is the check.
+The bundled schemas carry **Revision 36 identities** — `https://tson.io/2026/36/m/*.tn`. `spec/` holds
+**Revision 36** of Parts 1 and 2, the published cache, not edited here except for §13.2's three artifact rows,
+so the table names the bytes beside it and stays checkable; its Part 1 and Guide rows stay at the revision
+those documents actually are. **§13.2 is a fourth pin to move** whenever the artifacts change.
+`scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins, and the spec
+document is a cache — so §13.2 is re-stamped by hand and is the one that silently drifts.
+`tson hash spec/m/<name>.tn` is the check.
 
 The bundled schemas and the spec agree on shape: `reference.target` is typed `type_ref`; there is no
 `instance_template`/`template_argument`/`value_param` (§5.10's held bodies carry an open body); `map`'s `state`
@@ -64,20 +64,20 @@ with the `.tn` beside them.
 
 ## Branches and revisions
 
-**`main` is the reference implementation of the published revision, which is Revision 35.** Each published
+**`main` is the reference implementation of the published revision, which is Revision 36.** Each published
 revision's implementation stays reachable at the point it was the whole of `main`, by tag: `r2026-32`,
-`r2026-34`. The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling corpus
+`r2026-34`, `r2026-35` — tagged before the next proposal merges, and in the corpus repo too where the pair is
+wanted. The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling corpus
 branch of the same name and `SUITE_PIN` following it — where the register's entries state what is *running* rather
 than what is *proposed*, the branch being the argument. It merges when the spec lands and not before, since
 merging a divergence early costs `main` the one signal it exists to give. The bundled schemas carry the
 revision's own identities from the start, so a content change lands on artifacts named for the revision
 proposing it rather than being re-identified at the end.
 
-**The open proposal is `r2026-36-proposal`, and this is it.** What takes the work off `main` is that the
-discriminated-family design (§5.2) needs two kernel fields — `record.extension` and
-`record.discriminators` — so it is a meta-kernel change, which a Revision 35 reference cannot carry. Work lands
-here through ordinary PR branches off this one. `main` stays the Revision 35 reference until the spec catches
-up, at which point this merges.
+**No proposal is open.** Work lands on `main` through ordinary PR branches until something needs a rule the
+published revision cannot carry — typically a meta-kernel field — and that opens `r2026-37-proposal`, its
+corpus twin, and the Revision 37 identities from its first commit. While it is open, `Closes #N` in a PR into it
+does not close the issue (GitHub fires it only on the default branch), so each is closed by hand.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** The spec is a working
 revision, this is its first implementation, and the artifact has no published releases and no remote

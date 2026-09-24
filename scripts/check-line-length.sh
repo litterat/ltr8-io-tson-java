@@ -4,7 +4,7 @@
 #
 #   scripts/check-line-length.sh              lines this working tree ADDS relative to HEAD (staged and unstaged),
 #                                             plus every line of an untracked file
-#   scripts/check-line-length.sh <base-ref>   lines added since <base-ref>, e.g. r2026-36-proposal
+#   scripts/check-line-length.sh <base-ref>   lines added since <base-ref>, e.g. main
 #   scripts/check-line-length.sh --files F... every line of the named files
 #
 # Markdown table rows and lines holding a URL are skipped: neither can be wrapped. spec/ is skipped in the diff modes:

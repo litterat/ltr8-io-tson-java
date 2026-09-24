@@ -57,10 +57,10 @@ time, and `spec/tson-part3-json.md` is edited in place.
 table in `spec/` is the one pin it does not write. Keep `spec/m/*-resolved.tn` in step — `ResolvedFixtureTest` checks
 them. `design/process.md` has the procedure.
 
-**Branches.** `main` is the reference implementation of the *published* revision (35); published revisions are tags
-(`r2026-32`, `r2026-34`). Work for a revision happens on a proposal branch, merged when the spec lands and not before.
-**The open proposal is `r2026-36-proposal`**: PR branches come off it and merge into it, the bundled schemas carry
-Revision 36 identities from the start, and the sibling corpus repo has a branch of the same name that `SUITE_PIN` follows.
+**Branches.** `main` is the reference implementation of the *published* revision (36); published revisions are tags
+(`r2026-32`, `r2026-34`, `r2026-35`). **No proposal branch is open**: PR branches come off `main` and merge into it.
+Work that needs an unpublished revision — a meta-kernel change the published spec cannot carry — opens
+`r2026-37-proposal`, with a corpus branch of the same name, and it merges when the spec lands and not before.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** No published releases, every version
 `-SNAPSHOT`. So correctness wins over stability every time: a wrong rule gets fixed, a bad name changed rather than
@@ -187,5 +187,5 @@ scripts/restamp-bundled-schemas.sh --check
 **Allocation is measured, not assumed** (`AllocationHarnessTest`, `JsonAllocationHarnessTest`): retention is a flat 0
 bytes per read, transient bytes have a loose ceiling. Treat the shape as the signal. `design/build.md`.
 
-**Shipping a change** follows the `/ship` skill: issue → branch off the proposal branch → PR → CI green *for the HEAD
+**Shipping a change** follows the `/ship` skill: issue → branch off `main` → PR → CI green *for the HEAD
 commit* → merge commit. A fix's test is shown to fail without the fix.

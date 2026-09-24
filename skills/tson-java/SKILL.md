@@ -40,9 +40,8 @@ TypeScript port is [ltr8-io-tson-typescript](https://github.com/litterat/ltr8-io
 the shared conformance vectors both are tested against are
 [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite).
 
-**Versioning is `0.<spec revision>.<patch>`.** `0.36.x` implements **2026 Revision 36**, the revision this
-implementation is proposing: its bundled schemas carry Revision 36 identities (`https://tson.io/2026/36/m/…`)
-while the published spec text is Revision 35. A new revision moves the minor, and the spec is a working draft
+**Versioning is `0.<spec revision>.<patch>`.** `0.36.x` implements **2026 Revision 36**: its bundled schemas
+carry Revision 36 identities (`https://tson.io/2026/36/m/…`). A new revision moves the minor, and the spec is a working draft
 with no compatibility guarantee between revisions — so a schema `!!id` pinned at
 `https://tson.io/2026/36/m/core.tn` is revision-specific and must match the library's own revision.
 

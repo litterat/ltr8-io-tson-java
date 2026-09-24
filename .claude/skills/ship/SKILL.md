@@ -46,9 +46,9 @@ Run these and report the results; fix what fails.
 ## 2. Issue, branch, commit, PR
 
 1. `gh issue create` — the defect or the goal, with the reproduction. The issue is the durable record of *why*.
-2. Branch off the branch the work belongs to — currently `r2026-36-proposal`, not `main`.
+2. Branch off the branch the work belongs to — `main`, unless a proposal branch (`r2026-NN-proposal`) is open for it.
 3. One commit (or the cadence the user set); message ends `Closes #N`, then the co-author line.
-4. `git push -u origin <branch>`, then `gh pr create --base r2026-36-proposal`.
+4. `git push -u origin <branch>`, then `gh pr create --base <that branch>`.
 
 ## 3. CI, verified against HEAD
 
@@ -66,4 +66,5 @@ Report the PR link and the conclusion for that SHA. Then stop.
 
 ## 4. On the user's word to merge
 
-`gh pr merge <n> --merge` — a merge commit, which keeps the branch visible in history. Then check the issue closed.
+`gh pr merge <n> --merge` — a merge commit, which keeps the branch visible in history. Then check the issue closed:
+`Closes #N` only fires on a merge into `main`, so a PR into a proposal branch needs `gh issue close`.
