@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * abstract template yields an abstract entry and nothing has to be recomputed. {@code final} is a claim over a
  * <em>set of subtypes</em>, and a template has none: an instantiation entry exists only where some schema
  * wrote that application, so the claim's subject would be assembled from whichever applications a closure
- * happens to contain ({@code SPEC-FEEDBACK.md} #11).
+ * happens to contain (§5.2).
  *
  * <p><b>The mark travels as text, because the body does.</b> §5.10 holds an open entry's body as the
  * application written out, so the mark is stated <em>in</em> that text ({@code extension: ABSTRACT}) rather
@@ -82,7 +82,7 @@ class AbstractTemplateFamilyTest {
 
     /**
      * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
-     * its instantiation ({@code SPEC-FEEDBACK.md} #15), or the entry it aliases where an earlier declaration
+     * its instantiation (§8.2), or the entry it aliases where an earlier declaration
      * already named the same application.
      */
     private static String target(TsonCompiledSchemaRegistry registry, String alias) {
@@ -201,7 +201,7 @@ class AbstractTemplateFamilyTest {
     // ── What is still refused ───────────────────────────────────────────────
 
     /**
-     * {@code abstract} <b>is</b> a claim with a subject on a template ({@code SPEC-FEEDBACK.md} #13): a
+     * {@code abstract} <b>is</b> a claim with a subject on a template (§5.10): a
      * template carrying {@code extension} takes part in IS-A and {@code subtypes} holds its own
      * instantiations, which is the set the claim ranges over. Only {@code final} still cannot hold --
      * every application is a subtype of the template by construction, so the claim is false before an

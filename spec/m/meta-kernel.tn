@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=93c62422a70500afc03383d3e908c87a4f0cf481dfd18b58f8787ea559d6319a"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=e778e463624a5163c31d5dbbc8376e52cac3980113ee4333fbd701878a26990c"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -374,20 +374,27 @@
     `name` directly, and a braced record is the explicit form,
     canonical only when `arguments` is present.
 
-    Every application materialises an entry ([TSON-SCHEMA] §8.2):
-    a sugar form lifts to a synthetic entry, closed or open per the
+    Every application denotes an entry ([TSON-SCHEMA] §8.2): a
+    sugar form lifts to a synthetic entry, closed or open per the
     lift rule ([TSON-SCHEMA] §5.3), and a fully-bound application
-    of a template materialises an instantiation entry — the applied
+    of a template denotes an instantiation entry — the applied
     form recorded in its `source`, the substituted binding record
-    its body, headed by the applied constructor. A use site holds a
-    bare reference to its entry, so `arguments` appears only where
-    an application is still open — inside template bodies, in an
-    alias's `reference.target`, and in `source` provenance — and
-    means "an application", nothing else. Entry names are internal —
-    implementation-chosen and non-normative, since identity is
-    structural ([TSON-SCHEMA] §8.2). An entry with an empty
-    `parameters` list contains no parameter references at any depth
-    ([TSON-SCHEMA] §5.10).
+    its body, headed by the applied constructor. A declaration
+    whose body is that application *is* the entry, closed in place
+    under the author's name, and a use site resolves to it where
+    one exists; only an application no declaration names mints an
+    internally named entry, and a declared name is the one a
+    consumer keys on ([TSON-SCHEMA] §8.2). An application standing
+    at a composition operand is subsumed there and mints nothing
+    ([TSON-SCHEMA] §5.8). A use site holds a bare reference to its
+    entry, so `arguments` appears only where an application is
+    still open — inside template bodies, in an alias's
+    `reference.target`, and in `source` provenance — and means "an
+    application", nothing else. Minted entry names are internal —
+    implementation-chosen and non-normative, since a minted entry's
+    identity is its canonical content ([TSON-SCHEMA] §8.2). A closed
+    entry — one whose body is not a `!template` — contains no
+    parameter references at any depth ([TSON-SCHEMA] §5.10).
     """
   type_ref => {
     name:       type_name

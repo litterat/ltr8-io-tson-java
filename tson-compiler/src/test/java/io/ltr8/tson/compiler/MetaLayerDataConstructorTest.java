@@ -298,7 +298,7 @@ class MetaLayerDataConstructorTest {
      * RESTRICTED_SCRIPT} for mixing the Latin constructor head with the author's own word.
      *
      * <p><b>Both are now unreachable for this shape rather than handled.</b> {@code getOrder =>
-     * fetch<search_request>} <em>is</em> the entry the application denotes ({@code SPEC-FEEDBACK.md} #15),
+     * fetch<search_request>} <em>is</em> the entry the application denotes (§8.2),
      * carrying the application in its own {@code source} -- so the author's punctuation and the author's
      * Cyrillic never reach a derived name, because no name is derived. The schema loads.
      *

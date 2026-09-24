@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * An instantiation indexes under the parent its template has ({@code SPEC-FEEDBACK.md} #13), so a position
+ * An instantiation indexes under the parent its template has (§5.10), so a position
  * typed by the template knows its members.
  *
  * <p><b>The head comes from {@code source}</b>, which §8.2 makes an instantiation record as written. That is
@@ -36,7 +36,7 @@ class TemplateParentSubtypesTest {
 
     /**
      * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
-     * its instantiation ({@code SPEC-FEEDBACK.md} #15), or the entry it aliases where an earlier declaration
+     * its instantiation (§8.2), or the entry it aliases where an earlier declaration
      * already named the same application.
      */
     private static String target(TsonLinkedSchema schema, String alias) {

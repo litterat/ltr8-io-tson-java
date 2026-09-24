@@ -69,7 +69,7 @@ final class DispatchFactories {
 
     /**
      * An entry that declares type parameters. A <b>family base</b> -- a template whose held body carries
-     * {@code extension} ({@code SPEC-FEEDBACK.md} #13) -- is a type by the only test that matters, a value
+     * {@code extension} (§5.10) -- is a type by the only test that matters, a value
      * standing at it being a value of one of its instantiations, so it dispatches exactly as a closed base
      * does: ABSTRACT on {@code $type}, SEALED on the discriminators {@code template.discriminators} states on
      * the entry, which this module reads without ever parsing the held body's text. Reported under the

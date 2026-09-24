@@ -131,7 +131,7 @@ final class TemplateMaterialiser {
 
     /**
      * Which <b>declared</b> name owns the entry for an application, keyed on §8.2's canonical application
-     * ({@code SPEC-FEEDBACK.md} #15). Populated by {@link #closeApplicationInto} and read by {@link
+     * (§8.2). Populated by {@link #closeApplicationInto} and read by {@link
      * #instantiate} before it derives a name of its own, so it answers two questions with one map.
      *
      * <p><b>Knot-tying</b>: a recursive application inside a declaration-owned closure -- {@code use =>
@@ -460,7 +460,7 @@ final class TemplateMaterialiser {
         arguments = byParameterKind(head, template, parameters, arguments);
         String owner = ownedBy.get(DerivedName.canonicalApplication(head, arguments));
         if (owner != null) {
-            // A declaration owns this application's entry ({@code SPEC-FEEDBACK.md} #15), so there is nothing
+            // A declaration owns this application's entry (§8.2), so there is nothing
             // to mint: a recursive reference inside its own closure ties the knot on the declared name, and a
             // use site writing the same application names the declaration instead of a derived entry.
             return owner;
@@ -743,7 +743,7 @@ final class TemplateMaterialiser {
      * The held body's applications closed -- <b>except the ones standing in {@code record.supertypes}</b>,
      * which are left exactly as written.
      *
-     * <p>A composition operand denotes no entry ({@code SPEC-FEEDBACK.md} #15, and {@code
+     * <p>A composition operand denotes no entry (§8.2, and {@code
      * DefinitionResolver}'s own supertype branch): composition needs the operand's <em>fields</em>, which
      * substitution has already produced, and nothing else. Closing it here would mint the entry that branch
      * exists to avoid -- {@code vip => <T> customer & box<T>} closed at {@code vip<text>} would produce a
@@ -802,7 +802,7 @@ final class TemplateMaterialiser {
      * is how {@code abstract} on a template reaches them all (#504, and {@code AbstractTemplateFamilyTest}
      * pins it). <b>Dispatching on members does not travel.</b> The lines above have just pinned those
      * fields and left the member naming no selectors of its own, the selectors belonging to the base that
-     * declares them unpinned ({@code SPEC-FEEDBACK.md} #10) -- so a member of a sealed family is an ordinary
+     * declares them unpinned (§5.2) -- so a member of a sealed family is an ordinary
      * concrete record, exactly as in a hand-written family, and a base that dispatches on members closes to
      * OPEN rather than carrying its abstractness into every one of them.
      */

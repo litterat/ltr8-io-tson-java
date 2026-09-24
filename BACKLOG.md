@@ -76,7 +76,7 @@ encodings ([TSON-JSON] §6.1.1).
   that is or is wrapped by an annotation object carrying `$schema` and `$type`, both REQUIRED on that route. It
   needs §3.3's annotation object, so it arrives with §8 rather than before it. Where both routes supply a binding
   they MUST agree by canonical identity, and disagreement is a resolver error — never a precedence question.
-  `SPEC-FEEDBACK.md` #2's interpretation, the `TSON-Schema` header as a projection of the directive (§3.5), is the
+  [TSON-JSON] §3.5's `TSON-Schema` field, a projection of the binding rather than an alternative to it, is the
   channel a server uses and is where this answer has to stay consistent.
 
 **`tson-json` is a stack of its own, not a second front end over `TsonEventSource`.** Reusing the TSON event
@@ -253,7 +253,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
     - It is the only writer that can serve every field declaration. A bound object's null component has one
       spelling to choose between omission and `_`, and the declaration chooses: the schemaless writers omit,
       which is right at `a?: T` and `a?: T?` and wrong at `a: T?` (the re-read document misses a required key)
-      and at `a?: T? ~ v` (it reads back as `v`). `SPEC-FEEDBACK.md` #23 makes writing `_` there an encoder
+      and at `a?: T? ~ v` (it reads back as `v`). §5.2 makes writing `_` there an encoder
       MUST for an encoder that has the schema.
     - It is also where `describing(schemaUri, rootType)` stops needing its arguments. A bind-mode registry
       already holds the compiled schema and the class→type binding, so a schema-aware writer could derive

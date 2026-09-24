@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * <b>What a declaration whose body directly denotes a type resolves to</b> -- and how the two lift channels
- * still differ at that one position ({@code SPEC-FEEDBACK.md} #15).
+ * still differ at that one position (§8.2).
  *
  * <p><b>Both are the declared entry now, rather than a hop to one.</b> §5.3's lift leaves {@code text_list =>
  * [text]} as the entry, and a declared application is its own instantiation. What still differs is what a

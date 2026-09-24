@@ -52,7 +52,7 @@ class TemplateDiscriminatorTest {
 
     /**
      * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
-     * its instantiation ({@code SPEC-FEEDBACK.md} #15), or the entry it aliases where an earlier declaration
+     * its instantiation (§8.2), or the entry it aliases where an earlier declaration
      * already named the same application.
      */
     private static String target(TsonCompiledSchema compiled, String alias) {

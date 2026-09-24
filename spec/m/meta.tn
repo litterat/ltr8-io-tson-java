@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/36/m/meta.tn?sha256=329affb265d9ff17cbfea5e9afec5622add8c3e147424f063e5594897804bec9"
-!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=93c62422a70500afc03383d3e908c87a4f0cf481dfd18b58f8787ea559d6319a"
-!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=93c62422a70500afc03383d3e908c87a4f0cf481dfd18b58f8787ea559d6319a"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=ede51d234992ccf229bf24e53d0e6e53ae30aa6a2c70760ae051e19b4f035cb4"
+!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=e778e463624a5163c31d5dbbc8376e52cac3980113ee4333fbd701878a26990c"
+!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=e778e463624a5163c31d5dbbc8376e52cac3980113ee4333fbd701878a26990c"
 @doc:"""
   TSON meta-schema (2026 Revision 36 draft).
 
@@ -589,9 +589,14 @@
   numeric => @annotation void
 
   @doc:"""
-    Author's assertion that a choice's variants are pairwise disjoint
-    as value sets — advisory intent, checked against the resolver's
-    derived `type_definition.disjoint` fact ([TSON-SCHEMA] §5.4). A
+    Author's assertion that a choice's variants are distinguishable
+    by an encoding's form resolution — discrimination-class
+    distinctness, not disjointness of inhabitance — checked against
+    the resolver's derived `disjoint` fact in the `!choice` body
+    ([TSON-SCHEMA] §5.4, §8.1). The fact is class-stable: a variant
+    whose forms straddle classes (an approximate atom still admitting
+    NaN or the infinities, a map with a compound key) has no class,
+    so the untagged values of a choice are one set in every encoding. A
     void-targeted presence marker like `@numeric`: written bare, and
     presence is the assertion. Carries no decode force — the resolver
     computes disjointness whether or not the annotation is present.

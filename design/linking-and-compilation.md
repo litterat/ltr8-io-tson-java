@@ -126,7 +126,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
     conditional, and the condition is `template.extension`: a **family base** may be named bare
     (`use => { u: box }` resolves to `box`, and a value there is a value of one of its instantiations), while
     a container, a reference and a constructor-application template carry no `extension`, have no dispatch to
-    eliminate their parameters, and are refused (`SPEC-FEEDBACK.md` #13). *Parameter usage*: an open entry references
+    eliminate their parameters, and are refused (§5.10). *Parameter usage*: an open entry references
     every parameter it declares, so
     `box => <T> { v: text }` is rejected — every application of it would denote the same type, and a
     parameter list is author-written, so an unused one is a `SchemaValidationException`.

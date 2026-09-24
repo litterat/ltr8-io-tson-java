@@ -136,7 +136,7 @@ class RecordTemplateTest {
 
     /**
      * A declaration naming the application <b>is</b> the instantiation entry, not a hop to a content-named
-     * one ({@code SPEC-FEEDBACK.md} #15) -- so a {@code box<text>} written elsewhere resolves to that
+     * one (§8.2) -- so a {@code box<text>} written elsewhere resolves to that
      * declaration rather than minting a second entry, and one entry serves both under the author's name.
      */
     @Test
@@ -562,7 +562,7 @@ class RecordTemplateTest {
     }
 
     // ── A template named as a data value's own type ──────────────────────
-    //    A *record-bodied* template is a family base ({@code SPEC-FEEDBACK.md} #13), so naming it in data is
+    //    A *record-bodied* template is a family base (§5.10), so naming it in data is
     //    refused the way naming any abstract base is: the value has to say which member it is. Naming a
     //    template with no family -- a container, a reference, a constructor application -- is still refused
     //    by OpenTemplateReader, which says a template is not a type until it is applied. Either way it is

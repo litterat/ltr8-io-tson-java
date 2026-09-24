@@ -109,8 +109,8 @@ are kept in step deliberately.
   reader, so nothing in the closing path knows the member exists. An open body applying anything but `record`
   has no such member and is refused, named by the constructor it applies. A restated field keeps a
   discriminator it does not repeat, on the annotation-merge rule's own logic below.
-- **A template carrying `extension` is a family base, and takes part in IS-A as one** (`SPEC-FEEDBACK.md`
-  #13). `template.extension` is derived and is always ABSTRACT — a parent has no direct instances — and its
+- **A template carrying `extension` is a family base, and takes part in IS-A as one** (§5.10).
+  `template.extension` is derived and is always ABSTRACT — a parent has no direct instances — and its
   presence is the test: `TsonSchemaLinker.isFamilyBase`. Such a template is credited under its own supertypes
   (so `base.subtypes` holds `box` beside `box<text>`), its `subtypes` holds its instantiations, and a type
   position naming it compiles to `AbstractTemplateReader` rather than to `OpenTemplateReader`'s refusal. What
@@ -280,7 +280,7 @@ members** where a selector survives erasure — a `=?` field, or one pinned to a
 holding the instantiations the dispatch ranges over; that does not travel to a member, §5.7 fixation having pinned
 the selectors and cleared them. Only
 `final` stays a resolver error there: every application is a subtype of the template by construction, so
-the claim is false before an author writes anything else (`SPEC-FEEDBACK.md` #13, correcting #11).
+the claim is false before an author writes anything else (§5.10, §5.2).
 `OpenOperandCompositionTest` pins the substitutability table, `SubtypeTemplateFamilyTest` the family a base template and
 its subtype templates close into, and `AbstractTemplateFamilyTest` the mark over that family. `DefinitionResolver`'s
 Javadoc is the exact current boundary. The `UnsupportedOperationException` sites left in the resolver are not constructs

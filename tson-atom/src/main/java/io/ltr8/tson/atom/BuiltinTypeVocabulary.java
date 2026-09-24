@@ -59,12 +59,8 @@ import java.util.Optional;
  * with the shape core.tn gives it) -- the RFC 5322 pin is scoped there to the {@code dot-atom "@" dot-atom}
  * core, which is exactly what {@link EmailParser} accepts.
  *
- * <p><b>{@code boolean} is seeded too, and §5's tables do not list it</b> -- this vocabulary's one departure
- * from them, and {@code SPEC-FEEDBACK.md} #8 argues the omission is an oversight: {@code boolean} is
- * meta-kernel's own {@code !enum [true false]}, [TSON-DATA] §4.2 gives its two tokens special status, and
- * every other type a schemaless document can name is here. Without it {@code !boolean true} is an
- * unresolvable annotation where {@code !int32 1} resolves, and a {@code boolean}-typed position has no family
- * to read it -- which is the same hole from the two directions §5 and §4.2 approach it from.
+ * <p>And with {@code boolean} ([TSON-DATA] §5.5's {@code !boolean}, meta-kernel's own
+ * {@code !enum [true false]}): the tokens {@code true} and {@code false}, case-sensitive.
  */
 public final class BuiltinTypeVocabulary {
 

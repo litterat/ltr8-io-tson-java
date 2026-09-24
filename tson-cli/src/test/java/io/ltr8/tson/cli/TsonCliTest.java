@@ -243,7 +243,7 @@ class TsonCliTest {
      * bug in tson", the worst answer in the whole surface for one of the likeliest mistakes.
      *
      * <p><b>The exit code is what this pins.</b> A record-bodied template is a family base
-     * ({@code SPEC-FEEDBACK.md} #13), so the message is the one an abstract base gives -- name the member --
+     * (§5.10), so the message is the one an abstract base gives -- name the member --
      * rather than "a template is not a type". Either wording is a verdict on the document, which is the
      * distinction the code rides on.
      */

@@ -269,7 +269,7 @@ public final class DataClassObjectReader {
 
         // No type-ref, so the target class is what types this position, and the family it names reads the
         // token -- the same answer a schema declaring that type would give, form included (`12` and `"12"`
-        // are one int32). See HostAtoms.forTypedPosition, and SPEC-FEEDBACK.md #7 for why a class-typed
+        // are one int32). See HostAtoms.forTypedPosition, and [TSON-DATA] §4.1 for why a class-typed
         // position is not [TSON-DATA] §4.1's schemaless one.
         Optional<AtomType<?>> byHostType = HostAtoms.forTypedPosition(dataClass.dataClass());
         if (byHostType.isPresent()) {

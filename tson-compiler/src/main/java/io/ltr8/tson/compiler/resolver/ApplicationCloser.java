@@ -40,9 +40,9 @@ interface ApplicationCloser {
     }
 
     /**
-     * The entry a <b>declaration</b> naming a fully-bound application <em>is</em> ({@code SPEC-FEEDBACK.md}
-     * #15): the application closed into this declaration's own name, rather than minted under a
-     * content-derived one for the declaration to reference.
+     * The entry a <b>declaration</b> naming a fully-bound application <em>is</em> (§8.2): the application
+     * closed into this declaration's own name, rather than minted under a content-derived one for the
+     * declaration to reference.
      *
      * <p>§8.2 gives a declared entry its name as its identity and a minted one its content, "since it has no
      * declared name to be its identity" -- so an application a declaration names needs no derived name, and

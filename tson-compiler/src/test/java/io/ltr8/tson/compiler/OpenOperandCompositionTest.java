@@ -56,7 +56,7 @@ class OpenOperandCompositionTest {
      * position, §8.2 keying identity on the application, so both land on one entry.
      *
      * <p><b>{@code box<text>} is still no type to be IS-A; {@code box} is.</b> A record-bodied template is a
-     * family base ({@code SPEC-FEEDBACK.md} #13), deriving ABSTRACT where no discriminator survives, so a
+     * family base (§5.10), deriving ABSTRACT where no discriminator survives, so a
      * value can stand at it and be a value of one of its members. The edge therefore runs from the member to
      * the base itself -- which is what indexes {@code c} under {@code box.subtypes} and lets a position typed
      * {@code box} dispatch to it. The application in between still never becomes an entry, and a declaration
@@ -117,7 +117,7 @@ class OpenOperandCompositionTest {
             """;
 
     private static String aliasTarget(TsonCompiledSchema compiled, String alias) {
-        // A `name => head<args>` declaration *is* the instantiation entry ({@code SPEC-FEEDBACK.md} #15), so
+        // A `name => head<args>` declaration *is* the instantiation entry (§8.2), so
         // the entry every use site reaches is the declaration itself -- or, where an earlier declaration
         // already named the same application, the one it aliases.
         return compiled.schema().entries().get(alias).body() instanceof io.ltr8.tson.schema.meta.Reference ref

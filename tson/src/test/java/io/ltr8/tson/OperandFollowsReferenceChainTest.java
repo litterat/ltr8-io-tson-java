@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * admitted; an alias whose chain ends at a body with no fields -- a top-level constructor application
  * (§5.6) or a choice -- is finished and admits neither operator.
  *
- * <p><b>The body is the whole test</b> ({@code SPEC-FEEDBACK.md} #16). A record template's instantiation
+ * <p><b>The body is the whole test</b> (§4.3). A record template's instantiation
  * closes to a {@code !record} carrying fields, so it merges and tightens like the hand-written record of the
  * same shape; §8.2 makes identity the question rather than provenance, so which of the two an author wrote
  * cannot decide it. Every other instantiation is refused by that same body test, having no fields of its own.
@@ -118,10 +118,10 @@ class OperandFollowsReferenceChainTest {
     // ── Admitted: the chain ends at an instantiation that is a record ────
 
     /**
-     * <b>A record template's instantiation composes like the record it is</b> ({@code SPEC-FEEDBACK.md}
-     * #16). {@code bx} closes to {@code !record { item: text }}, which is what §4.3's MUST asks for, so
-     * there is a field set to merge. Refusing it would make composition depend on whether an application or
-     * a pen produced those fields, which §8.2 rules out: what is canonicalised is identity, not provenance.
+     * <b>A record template's instantiation composes like the record it is</b> (§4.3). {@code bx} closes to
+     * {@code !record { item: text }}, which is what §4.3's MUST asks for, so there is a field set to merge.
+     * Refusing it would make composition depend on whether an application or a pen produced those fields,
+     * which §8.2 rules out: what is canonicalised is identity, not provenance.
      */
     @Test
     void aCompositionThroughAnAliasToARecordInstantiationIsAdmitted() {

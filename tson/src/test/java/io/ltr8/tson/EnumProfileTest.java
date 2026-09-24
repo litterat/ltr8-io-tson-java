@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * An enum's members are text, and {@code profile} says which kind of enumeration they spell
- * ([TSON-SCHEMA] §7.4, {@code SPEC-FEEDBACK.md} #21). {@code IDENTIFIER}, the default, is a vocabulary: every
+ * ([TSON-SCHEMA] §7.4). {@code IDENTIFIER}, the default, is a vocabulary: every
  * member is a name, so the member set stays a named scope for [TSON-DATA] §8.2's hygiene and every member
  * has a host-safe spelling. {@code TEXT} is a value set: two strings a document may carry, nothing about
  * them a name.

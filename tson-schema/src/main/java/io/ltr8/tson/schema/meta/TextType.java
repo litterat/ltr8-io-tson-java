@@ -75,8 +75,7 @@ public record TextType(
      * <p>{@code members}' reason is different, which is why {@code AtomNarrowing} takes it as a parameter: a
      * member set <em>is</em> decidably narrowable, and shares its logical position with a pattern that is
      * not. One rule for the position keeps the narrowing relation from turning on which of the two
-     * spellings an author reached for. [TSON-SCHEMA] §5.7's facet-kind table states no rule for either;
-     * see {@code SPEC-FEEDBACK.md} #22, which proposes this one.
+     * spellings an author reached for, which is [TSON-SCHEMA] §5.7's <b>settable once</b> facet kind.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {

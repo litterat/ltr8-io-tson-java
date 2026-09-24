@@ -182,19 +182,17 @@ piece of work. `design/json-encoding.md` states that goal and what it rules out 
 
 **A JSON member name that is not an identifier is refused where it is read.** A field name is an identifier at
 every layer ([TSON-DATA] §2.5), so `{"first name": 1}` fails before any schema is consulted — the largest single
-obstacle to the on-ramp. `SPEC-FEEDBACK.md` #5 states the proposal.
+obstacle to the on-ramp. `SPEC-FEEDBACK.md` #3 states the proposal.
 
 **Untagged unions.** Native TSON data announces a union member with `!typeName value` — the type-ref *is* the
 discriminator — and bare JSON has no such mechanism. [TSON-JSON] §8.2 lets a tag be omitted by exactly two
 routes and forbids extending them ("no trying variants in order", which is how JSON Schema validates a `oneOf`):
 a declared discriminator, or a disjoint choice whose variants are class-stable. So:
 
-- **A `oneOf` that carries a discriminator converts to a sealed record family**, not a choice: a `@sealed` base
-  whose `@discriminator` fields each subtype pins (`= v`) to a distinct value, dispatched on the
-  object's own members ([TSON-JSON] §6.1.5, `DispatchMemberReader`). That is the flat `kind`-plus-siblings shape
-  hand-written discriminated JSON already has, and what OpenAPI's `discriminator.mapping` reaches for. The
-  record-family placement is this implementation's, proposed against the spec's choice-level `@discriminator`
-  in `SPEC-FEEDBACK.md` #10 and #11.
+- **A `oneOf` that carries a discriminator converts to a discriminated record family**, not a choice: a base
+  whose selector fields (`=?`) each subtype pins (`= v`) to a distinct value, dispatched on the object's own
+  members ([TSON-SCHEMA] §5.2, [TSON-JSON] §6.1.5, `DispatchMemberReader`). That is the flat `kind`-plus-siblings
+  shape hand-written discriminated JSON already has, and what OpenAPI's `discriminator.mapping` reaches for.
 - **An untagged `oneOf` over object schemas has no answer**, and it is what an LLM emitting against a converted
   contract produces. All its variants are brace class, hence non-disjoint, and nothing in the document selects
   one: a conversion finds a discriminator or reports.

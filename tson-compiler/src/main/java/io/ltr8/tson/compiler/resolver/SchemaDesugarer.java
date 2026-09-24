@@ -762,7 +762,7 @@ final class SchemaDesugarer {
                     requireFieldNameUnseen(field.name(), seen, "this body declares it twice");
                     fields.add(recordField(field));
                     // `=?`, or -- in a template -- a pin taken from a value parameter, which supplies one
-                    // value per application and so one per member ({@code SPEC-FEEDBACK.md} #13). Only a
+                    // value per application and so one per member (§5.10). Only a
                     // *fresh* record body derives: this is the declaration that states the selector, where a
                     // refinement template pinning a constructor's own facet (`array ^ { element_type: = T }`)
                     // states nothing about a family and flattens through another path.

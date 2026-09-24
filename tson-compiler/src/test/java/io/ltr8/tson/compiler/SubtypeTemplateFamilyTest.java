@@ -57,7 +57,7 @@ class SubtypeTemplateFamilyTest {
 
     /**
      * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
-     * its instantiation ({@code SPEC-FEEDBACK.md} #15), or the entry it aliases where an earlier declaration
+     * its instantiation (§8.2), or the entry it aliases where an earlier declaration
      * already named the same application.
      */
     private static String target(TsonCompiledSchema compiled, String alias) {
@@ -87,7 +87,7 @@ class SubtypeTemplateFamilyTest {
     }
 
     /**
-     * <b>A family-base template <em>is</em> one of its base's subtypes</b> ({@code SPEC-FEEDBACK.md} #13).
+     * <b>A family-base template <em>is</em> one of its base's subtypes</b> (§5.10).
      * A template carrying {@code extension} is a type by the only test that matters -- something can stand
      * at it, namely a value of one of its instantiations -- so the reverse index credits it beside the
      * instantiations that close from it, and a position typed {@code base} admits a value tagged as the

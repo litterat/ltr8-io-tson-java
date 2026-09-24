@@ -272,7 +272,7 @@ final class WireForm {
     }
 
     /**
-     * The <b>parent's</b> extension for a held body, read off the payload ({@code SPEC-FEEDBACK.md} #13).
+     * The <b>parent's</b> extension for a held body, read off the payload (§5.10).
      *
      * <p><b>Absent unless the body is a record</b>, which is the one shape with a parent at all: a container,
      * a constructor application and a reference template are no types, so there is nothing for an extension
@@ -311,7 +311,7 @@ final class WireForm {
 
     /**
      * The <b>names</b> of the marked fields a held record body carries -- {@code template.discriminators}
-     * ({@code SPEC-FEEDBACK.md} #13), in the order the body declares them.
+     * (§5.10), in the order the body declares them.
      *
      * <p>Read off the payload rather than the text below it, on {@link #parentExtension}'s own terms: this is
      * the one door every open entry passes through, and the structure is in hand there. Stating the names on

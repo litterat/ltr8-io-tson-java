@@ -274,9 +274,9 @@ public final class SchemaResolver {
                     }
 
                     /**
-                     * A declaration naming a fully-bound application is the entry it denotes ({@code
-                     * SPEC-FEEDBACK.md} #15), so the closure happens here rather than minting a
-                     * content-named entry for the declaration to reference.
+                     * A declaration naming a fully-bound application is the entry it denotes (§8.2), so the
+                     * closure happens here rather than minting a content-named entry for the declaration to
+                     * reference.
                      */
                     @Override
                     public TypeDefinition closeApplicationInto(String declaredName,
@@ -491,7 +491,7 @@ public final class SchemaResolver {
      *
      * <p>Composition needs the operand's <em>fields</em> and nothing else, so {@code TemplateMaterialiser}
      * leaves the application in {@code record.supertypes} exactly as written and mints no entry for it
-     * ({@code SPEC-FEEDBACK.md} #15). The edge is the half that has to wait: the entry an application denotes
+     * (§8.2). The edge is the half that has to wait: the entry an application denotes
      * is whichever declaration names the same application, and asking that <em>during</em> materialisation
      * would make the answer depend on declaration order -- {@code text_box} declared before the composition
      * found, declared after it not. §8.1 calls this field "the derived transitive index, computed once

@@ -102,7 +102,7 @@ class TemplateRegularityTest {
      * moment. It survived because the eager-rejection discipline guarded *applications* and never bare names.
      *
      * <p><b>A record-bodied template is admitted instead</b>, naming the parent every such template has
-     * ({@code SPEC-FEEDBACK.md} #13): nothing is ever read against the template itself, a value there being a
+     * (§5.10): nothing is ever read against the template itself, a value there being a
      * value of some member. So the subject here is a container, which has no parent to name -- and
      * {@code TemplateAtATypePositionTest} carries both sides of the line.
      */
@@ -118,7 +118,7 @@ class TemplateRegularityTest {
 
     /**
      * A recursive <b>bare</b> reference inside a record template names the parent rather than forgetting an
-     * argument list ({@code SPEC-FEEDBACK.md} #13): {@code tail: chain} is "any chain", which is what an
+     * argument list (§5.10): {@code tail: chain} is "any chain", which is what an
      * abstract parent is for, and the recursion is regular because a reference is not an application that
      * grows its argument at every level.
      *

@@ -12,7 +12,7 @@ import java.util.Set;
 
 /**
  * The reader a <b>family base</b> compiles to -- a template whose held body carries {@code extension}
- * ({@code SPEC-FEEDBACK.md} #13). A value here is a value of one of the template's instantiations, chosen by
+ * (§5.10). A value here is a value of one of the template's instantiations, chosen by
  * a tag (ABSTRACT) or by reading the discriminator fields (SEALED), so the reader dispatches and never reads
  * a record of its own.
  *

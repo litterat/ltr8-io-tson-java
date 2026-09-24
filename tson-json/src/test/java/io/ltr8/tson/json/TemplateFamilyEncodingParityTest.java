@@ -19,8 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
- * <b>A template family base dispatches the same way in both encodings</b> ([TSON-JSON] §9.4, and {@code
- * SPEC-FEEDBACK.md} #13): a record-bodied template carries {@code extension}, so a value at a position typed
+ * <b>A template family base dispatches the same way in both encodings</b> ([TSON-JSON] §9.4, and
+ * [TSON-SCHEMA] §5.10): a record-bodied template carries {@code extension}, so a value at a position typed
  * by it is a value of one of its instantiations, selected by the discriminators where the base is SEALED and
  * by a tag where it is ABSTRACT.
  *

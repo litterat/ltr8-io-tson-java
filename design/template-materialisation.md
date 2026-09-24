@@ -58,7 +58,7 @@ recorded open form, and replacing the application with a reference to the entry 
 - **Identity is the flattened application** recorded in `source` (§8.2), and the derived name is built from
   it, so two `box<text>` anywhere in the schema land on one entry for free.
 - **A declaration naming the application *is* that entry, and nothing is minted beside it**
-  (`SPEC-FEEDBACK.md` #15). `text_box => box<text>` resolves to the closed record itself, carrying the
+  (§8.2). `text_box => box<text>` resolves to the closed record itself, carrying the
   canonical application in its own `source` — not a `Reference` to a content-named entry sitting beside it.
   `DefinitionResolver` reaches `closeApplicationInto`, which builds the body **under the declared name**: it
   derives no internal name and claims none (`MintedNames.claim` is never called) and publishes nothing, so
@@ -168,7 +168,7 @@ recorded open form, and replacing the application with a reference to the entry 
       stated where the composition resolves, and to the *family base* rather than to the application: a
       record-bodied template carries `extension` — always ABSTRACT, with `discriminators` beside it where a
       selector survives —
-      which is what makes it a type a member can be IS-A (`SPEC-FEEDBACK.md` #13). That is what puts the member
+      which is what makes it a type a member can be IS-A (§5.10). That is what puts the member
       in the base's `subtypes` and lets a position typed `pet` dispatch to it, by the discriminators or by a
       tag. The application in between still mints nothing, and §5.9 is untouched: a removal empties the
       contract index whatever was put in it. `ClosedOperandFamilyTest` pins it, `OpenOperandCompositionTest`
