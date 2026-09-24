@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
  * applications were not -- interchangeable at a scalar position and refused one layer of application up.
  *
  * <p><b>What this test no longer asks is "one entry".</b> Each of these declarations is its own entry
- * ({@code SPEC-FEEDBACK.md} #15) -- two declarations naming one application are two entries with one
+ * (§8.2) -- two declarations naming one application are two entries with one
  * structure, as two hand-written records with the same fields are -- so the comparison is the application
  * each records, which is what §8.2 keys identity on and where the dereferencing shows.
  */
@@ -64,7 +64,7 @@ class AliasedArgumentIdentityTest {
      * <b>The canonical application a declaration records</b>, which is what §8.2 keys identity on -- the
      * arguments with every reference chain followed to its terminal entry.
      *
-     * <p>Each of these declarations is now its own entry ({@code SPEC-FEEDBACK.md} #15), so "one entry" is no
+     * <p>Each of these declarations is now its own entry (§8.2), so "one entry" is no
      * longer the question a rename test can ask: two declarations naming one application are two entries with
      * one structure, exactly as two hand-written records with the same fields are. What survives, and is the
      * property §8.2 actually states, is that the two record the <em>same application</em>: dereferencing

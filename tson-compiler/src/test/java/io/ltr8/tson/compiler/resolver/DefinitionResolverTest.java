@@ -560,7 +560,7 @@ class DefinitionResolverTest {
      *
      * <p>{@code extension} is the <b>parent's</b> and is derived, not stated: a record-bodied template has a
      * parent, and a parent has no direct instances whatever anyone writes, so ABSTRACT falls out with no
-     * discriminator in sight ({@code SPEC-FEEDBACK.md} #13).
+     * discriminator in sight (§5.10).
      */
     @Test
     void resolvesAFreshRecordTemplateAsAHeldRecordConstruction() throws DataBindException {
@@ -716,7 +716,7 @@ class DefinitionResolverTest {
      *
      * <p><b>The pin also makes the field this template's selector</b>, which is the derivation and not an
      * extra claim: one value per application is one value per member, so the base dispatches on
-     * {@code [value]} with no {@code =?} written (§5.2, {@code SPEC-FEEDBACK.md} #13).
+     * {@code [value]} with no {@code =?} written (§5.2, §5.10).
      */
     @Test
     void aParametricFixedValueRidesTheValueSlotAndFixesNothingYet() throws DataBindException {
@@ -2221,7 +2221,7 @@ class DefinitionResolverTest {
                 thrown.getMessage());
     }
 
-    // ── The four marks lower into the body (§5.2, SPEC-FEEDBACK #10/#11) ──
+    // ── The four marks lower into the body (§5.2) ──
 
     /**
      * Both facts reach the body: {@code abstract} into {@code record.extension}, the selector into
@@ -2329,7 +2329,7 @@ class DefinitionResolverTest {
 
 
     /**
-     * <b>{@code abstract} is a claim with a subject on a template</b> ({@code SPEC-FEEDBACK.md} #13): a
+     * <b>{@code abstract} is a claim with a subject on a template</b> (§5.10): a
      * template carrying {@code extension} takes part in IS-A, and {@code subtypes} holds its own
      * instantiations -- which is exactly the set the claim ranges over. So the mark lowers into the held body
      * like {@code abstract}, and {@code RecordExtension} judges it against the fields the way it does for a
@@ -2342,7 +2342,7 @@ class DefinitionResolverTest {
 
         assertInstanceOf(TemplateBody.class, box.body());
         // The base's own extension, derived and stated on the entry -- never read back out of the held text,
-        // whose `extension` member is an instantiation's mark (§1.3, SPEC-FEEDBACK.md #13).
+        // whose `extension` member is an instantiation's mark (§1.3, §5.10).
         assertEquals(Optional.of(RecordExtensionType.ABSTRACT), ((TemplateBody) box.body()).extension());
         assertEquals(List.of("kind"), ((TemplateBody) box.body()).discriminators());
     }

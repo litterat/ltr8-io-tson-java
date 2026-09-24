@@ -28,10 +28,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * What each {@code record.extension} member obliges, checked over the linked closure ([TSON-SCHEMA] §5.2,
- * §5.7, §5.9; {@code SPEC-FEEDBACK.md} #10, #11). The peer of {@link ChoiceDisjointness}, and a checker rather
- * than a derivation: the fact is written by the author's mark and lowered by the resolver, and what is left is
- * whether the rest of the closure agrees with it.
+ * What each {@code record.extension} member obliges, checked over the linked closure ([TSON-SCHEMA] §5.2, §5.7,
+ * §5.9). The peer of {@link ChoiceDisjointness}, and a checker rather than a derivation: the fact is written by
+ * the author's mark and lowered by the resolver, and what is left is whether the rest of the closure agrees with
+ * it.
  *
  * <p><b>Why here and not at resolution.</b> Every rule below needs a namespace the declaration does not have.
  * FINAL constrains whoever composes onto it, which may be another schema; the family rules range over {@code
@@ -270,7 +270,7 @@ final class RecordExtension {
     /**
      * The record body whose family rules this entry is subject to, or {@code null} where it has none.
      *
-     * <p><b>A marked template is a family base and is judged as one</b> ({@code SPEC-FEEDBACK.md} #13). Its
+     * <p><b>A marked template is a family base and is judged as one</b> (§5.10). Its
      * body is held text, so the body checked here is assembled from the two facts the entry states
      * structurally: the derived {@code extension}, and the {@code discriminators} it names. Skipping it
      * instead -- a guard on {@code parameters().isEmpty()} alone -- would accept a marked template with no

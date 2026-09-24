@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * What each {@code record.extension} member obliges of the rest of a closure, through the front door
- * ([TSON-SCHEMA] §5.2, §5.7, §5.9; {@code SPEC-FEEDBACK.md} #10, #11). {@code RecordExtension} is the pass;
+ * ([TSON-SCHEMA] §5.2, §5.7, §5.9). {@code RecordExtension} is the pass;
  * this is the evidence it is reachable from a schema an author could write.
  *
  * <p><b>Written against the real pipeline rather than hand-built entries</b>, because half of what is under
@@ -255,7 +255,7 @@ class SealedFamilyCheckTest {
 
     /**
      * <b>A colliding member is named the way the author wrote it.</b> Both members here are declared
-     * applications, so each declaration <em>is</em> its instantiation ({@code SPEC-FEEDBACK.md} #15) and the
+     * applications, so each declaration <em>is</em> its instantiation (§8.2) and the
      * names that collide are {@code a} and {@code b} -- names an author can open and edit.
      *
      * <p>The rule the message applies is unchanged; what changed is that there is no derived name left to

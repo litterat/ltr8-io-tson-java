@@ -427,7 +427,7 @@ class CrossEncodingParityTest {
 
     // ── A bare template at a type position ──────────────────────────────
     //    `crate => { b: box }` names the template itself, which is the family base its instantiations close
-    //    from ({@code SPEC-FEEDBACK.md} #13). The base is ABSTRACT by derivation -- a record body with no
+    //    from (§5.10). The base is ABSTRACT by derivation -- a record body with no
     //    discriminator -- so the tag is the selector in both encodings, and every member is minted, so an
     //    alias is the only name either document has for one.
 

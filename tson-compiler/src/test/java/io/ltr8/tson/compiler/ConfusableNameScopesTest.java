@@ -144,10 +144,9 @@ class ConfusableNameScopesTest {
 
     /**
      * <b>{@code profile: TEXT} takes the members out of §8.2's two per-<em>name</em> rules and leaves the
-     * collision relation in place</b>, which is the split the declaration buys ({@code SPEC-FEEDBACK.md}
-     * #21). A value set carries whatever its domain carries, so policing its characters and scripts is a
-     * category error; two members that render alike is still the hazard, because the set is still what a
-     * value is matched against.
+     * collision relation in place</b>, which is the split the declaration buys (§7.4). A value set carries
+     * whatever its domain carries, so policing its characters and scripts is a category error; two members that
+     * render alike is still the hazard, because the set is still what a value is matched against.
      */
     @Test
     void aTextProfileDropsThePerNameRulesAndKeepsTheCollisionOne() {

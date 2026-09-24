@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * <b>A declaration whose body is a fully-bound application is the instantiation entry</b>, not a reference to
- * a content-named one ({@code SPEC-FEEDBACK.md} #15): {@code bx => box<text>} resolves to {@code bx => !record
+ * a content-named one (§8.2): {@code bx => box<text>} resolves to {@code bx => !record
  * { … }}, and no {@code box_text_…} entry is minted beside it.
  *
  * <p><b>Why the hop was worth removing.</b> It made an author's name a second-class citizen of its own

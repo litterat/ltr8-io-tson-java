@@ -877,7 +877,7 @@ public final class TsonSchemaLinker {
                 // is the reverse edge alone, and each application still indexes under the base as it closes.
                 //
                 // A template carrying `extension` is a family base and does take part
-                // ({@code SPEC-FEEDBACK.md} #13): a value at a position typed by it is a value of some
+                // (§5.10): a value at a position typed by it is a value of some
                 // member, so it is a type by the only test that matters -- something can stand at it.
                 continue;
             }
@@ -900,7 +900,7 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * An <b>instantiation</b> is a member of the parent its template has ({@code SPEC-FEEDBACK.md} #13), so
+     * An <b>instantiation</b> is a member of the parent its template has (§5.10), so
      * it indexes under the head it closes -- {@code pet<"dog", dog_type>} under {@code pet}.
      *
      * <p>The head is read off {@code source}, which §8.2 makes an instantiation record as written, head and
@@ -926,7 +926,7 @@ public final class TsonSchemaLinker {
 
     /**
      * Whether this entry is a <b>family base</b> -- a template whose held body carries {@code extension}
-     * ({@code SPEC-FEEDBACK.md} #13), which is what makes it a participant in IS-A rather than a form waiting
+     * (§5.10), which is what makes it a participant in IS-A rather than a form waiting
      * for arguments. A container, a constructor application and a reference template carry none, so they stay
      * out of every index: nothing can stand at one, there being no dispatch to eliminate the parameters.
      */
@@ -1631,7 +1631,7 @@ public final class TsonSchemaLinker {
         if (supplied == 0) {
             if (referenced.body() instanceof TemplateBody held && held.extension().isPresent()) {
                 // A record-bodied template has a parent, and naming it here names that parent
-                // ({@code SPEC-FEEDBACK.md} #13). Nothing is ever read *against* it: a value at the position
+                // (§5.10). Nothing is ever read *against* it: a value at the position
                 // is a value of some member, selected by a tag or by the discriminators, and every member is
                 // a closed entry -- so the existential is eliminated by dispatch rather than by inferring
                 // arguments from the payload, which is what makes naming `box` here still an error.

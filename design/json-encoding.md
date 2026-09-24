@@ -146,10 +146,10 @@ work, and the first is the largest single obstacle to the stated goal.
    JSON-LD's `@`-prefixed keys and digit- or underscore-initial names as what cannot be spelled. The only
    answer today is to refuse, or to type the position as a map and forgo per-field validation. A projection
    annotation binding a wire spelling to a declared field would fit [TSON-SCHEMA] §6's licence exactly;
-   `SPEC-FEEDBACK.md` #5 states it.
+   `SPEC-FEEDBACK.md` #3 states it.
 2. **Records are closed and JSON Schema's are open.** `additionalProperties` defaults to *true*, so a
    converted record fails §6.1.1 on the first document carrying an extra member. There is no flattened tail
-   to relax it (`SPEC-FEEDBACK.md` #20): open-ended data is a declared map-typed field, which the producer
+   to relax it (§7.2): open-ended data is a declared map-typed field, which the producer
    must nest. This is the largest producer-visible cost of a conversion and §6.1.1 states it outright.
 3. **An untagged `oneOf` over object schemas.** All brace class, so non-disjoint; with no OpenAPI
    `discriminator` there is no in-band selector, and §8.2 requires the tag. JSON Schema validates such a union
@@ -209,9 +209,9 @@ encodings genuinely share and what each owns is worth **finding** from two worki
 from one and then discovered wrong through the one consumer that has to bend around it. Consolidating two
 implementations that both pass their tests is cheap and safe; unpicking a shared contract that was wrong is
 neither. The same discipline settled `@rest`: rather than build a directive no consumer had shaped, it was
-retired (`SPEC-FEEDBACK.md` #20), and a member matching no declared field is §6.1.1's closure error in both
+retired (§7.2), and a member matching no declared field is §6.1.1's closure error in both
 encodings. Member dispatch over a sealed record family is built (`DispatchMemberReader`), reading the
-discriminator fields the base record declares (`SPEC-FEEDBACK.md` #10, #11).
+discriminator fields the base record declares (§5.2).
 
 **It also costs nothing structurally, which is what makes the deferral free.** `TsonLinkedSchema` is a record
 in `tson-schema`, a module requiring only `tson-base`, and `tson-atom` already re-exports it — so compiling

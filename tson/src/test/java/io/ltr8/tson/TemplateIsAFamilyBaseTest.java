@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A template carrying {@code extension} <b>is</b> the family base ({@code SPEC-FEEDBACK.md} #13): it takes
+ * A template carrying {@code extension} <b>is</b> the family base (§5.10): it takes
  * part in the IS-A chain, it is what a type position names, and it is what a host sealed type binds to.
  *
  * <p><b>Why the template itself rather than an entry derived from it.</b> The base is the thing an author
@@ -45,7 +45,7 @@ class TemplateIsAFamilyBaseTest {
 
     /**
      * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
-     * its instantiation ({@code SPEC-FEEDBACK.md} #15), or the entry it aliases where an earlier declaration
+     * its instantiation (§8.2), or the entry it aliases where an earlier declaration
      * already named the same application.
      */
     private static String target(TsonLinkedSchema schema, String alias) {

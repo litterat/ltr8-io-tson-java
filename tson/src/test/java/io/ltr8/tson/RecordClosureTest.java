@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A record is closed under its type ([TSON-SCHEMA] §7.2) and nothing relaxes it: no annotation, no mark and
  * no kernel field designates a field that absorbs members the type does not declare. Open-ended data is a
- * declared map-typed field, which every encoding writes the same way ({@code SPEC-FEEDBACK.md} #20).
+ * declared map-typed field, which every encoding writes the same way (§7.2).
  *
  * <p><b>Why the pair.</b> The refusal alone would pin a name that does not resolve, which any misspelling
  * satisfies. What makes it a statement about closure is the shape beside it: the thing the retired directive

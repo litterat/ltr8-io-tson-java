@@ -64,9 +64,9 @@ final class MetaRefs {
      * {@code source} is <b>provenance, not a reference to flatten</b>, and this walk leaves it alone.
      *
      * <p>§8.2 draws that line itself -- "what is canonicalised is identity, not provenance" -- and the
-     * omission only started to matter once a declaration could own an instantiation's entry ({@code
-     * SPEC-FEEDBACK.md} #15). {@code TemplateMaterialiser}'s pass walks the <em>declared</em> entries, minted
-     * ones living in the map it returns, so before that a declared entry's {@code source} was always a bare
+     * omission only started to matter once a declaration could own an instantiation's entry (§8.2).
+     * {@code TemplateMaterialiser}'s pass walks the <em>declared</em> entries, minted ones living in the map
+     * it returns, so before that a declared entry's {@code source} was always a bare
      * name -- a constructor, a refinement source -- where closing is a no-op. A declaration that is its own
      * instantiation records the application there, and mapping it would close that application to the entry
      * it denotes, which is the declaration: {@code bx}'s {@code source} became {@code bx}, arguments and all

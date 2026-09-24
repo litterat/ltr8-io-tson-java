@@ -121,7 +121,7 @@ class SyntheticEntryNamingTest {
 
     /**
      * A declared application needs no rendering at all: {@code order_response => paged<order>} <b>is</b> the
-     * instantiation entry ({@code SPEC-FEEDBACK.md} #15), so the reader already holds the name the author
+     * instantiation entry (§8.2), so the reader already holds the name the author
      * wrote. Rendering the application instead -- {@code 'paged<order>'} -- was the best available answer
      * while the entry was content-named and the declaration a hop to it; the declared name is better, being
      * a name the author can open.

@@ -167,7 +167,7 @@ letting one satisfy an error vector is how a corpus comes to pass on the strengt
 the kernel's `template` constructor carrying the application as text (`schema.meta.TemplateBody`), so it is a
 `type_definition` like any other and reads back as ordinary data — where §8.1's older shape wrote the
 application as though it were a value of the constructor's own vocabulary, which no reader could apply
-(`SPEC-FEEDBACK.md` #5). `ResolvedForm` compares an open entry's body by its *parsed* form, §5.10's one
+(§8.1). `ResolvedForm` compares an open entry's body by its *parsed* form, §5.10's one
 spelling being about the application and not the whitespace, so the layer needs no expectation format of its
 own. Templates are covered at the `link/` layer meanwhile, over the entries they mint; `BACKLOG.md` carries
 the vectors that are owed.

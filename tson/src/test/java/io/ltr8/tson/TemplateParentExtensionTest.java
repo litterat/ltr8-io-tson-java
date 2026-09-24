@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A template's <b>parent</b> extension ({@code SPEC-FEEDBACK.md} #13): {@code template.extension}, derived by
+ * A template's <b>parent</b> extension (§5.10): {@code template.extension}, derived by
  * the resolver rather than stated by an author.
  *
  * <p><b>Two levels, and this is the upper one.</b> A parent has no direct instances whatever anyone writes --

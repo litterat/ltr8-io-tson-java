@@ -28,8 +28,8 @@ time**, so they are the live copies rather than a snapshot. And **`spec/tson-par
 place**: see "Part 3 is drafted here" below.
 
 On this branch the bundled schemas carry **Revision 36 identities** — `https://tson.io/2026/36/m/*.tn`, the
-proposing revision's own, per the from-the-start rule below. `spec/` holds **Revision 35** of Parts 1 and 2,
-the published cache, not edited here except for §13.2's three artifact rows, so the table names the bytes
+proposing revision's own, per the from-the-start rule below. `spec/` holds **Revision 36** of Parts 1 and 2,
+the adjudicated cache, not edited here except for §13.2's three artifact rows, so the table names the bytes
 beside it and stays checkable; its Part 1 and Guide rows stay at the revision those documents actually are.
 **§13.2 is a fourth pin to move** whenever the artifacts change. `scripts/restamp-bundled-schemas.sh` does
 not write it — the script covers the repo's own pins, and the spec document is a cache — so §13.2 is
@@ -74,7 +74,7 @@ revision's own identities from the start, so a content change lands on artifacts
 proposing it rather than being re-identified at the end.
 
 **The open proposal is `r2026-36-proposal`, and this is it.** What takes the work off `main` is that the
-discriminated-family design (`SPEC-FEEDBACK.md` #10, #11) needs two kernel fields — `record.extension` and
+discriminated-family design (§5.2) needs two kernel fields — `record.extension` and
 `record.discriminators` — so it is a meta-kernel change, which a Revision 35 reference cannot carry. Work lands
 here through ordinary PR branches off this one. `main` stays the Revision 35 reference until the spec catches
 up, at which point this merges.

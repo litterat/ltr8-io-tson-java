@@ -309,7 +309,7 @@ final class DefinitionResolver {
      * a template has no set for such a claim to range over: {@code subtypes} indexes entries, an instantiation
      * entry exists only where some schema wrote that application, so the claim's subject would be assembled
      * from whichever applications happen to have been written and a new one elsewhere would silently change
-     * it. That is a schema error ({@code SPEC-FEEDBACK.md} #11).
+     * it. That is a schema error (§5.2).
      *
      * <p><b>An open body is text by the time the mark is read, so the mark is spliced rather than set.</b>
      * Both routes to an open record body -- {@code SchemaDesugarer} rewriting {@code { x: T }} where §5.2
@@ -343,7 +343,7 @@ final class DefinitionResolver {
                 // FINAL forbids anything composing onto the marked type, and every application of a template
                 // is a subtype of it by construction -- so the claim is false of a template before an author
                 // writes a second declaration. ABSTRACT has a subject: `subtypes` holds the template's own
-                // instantiations ({@code SPEC-FEEDBACK.md} #13).
+                // instantiations (§5.10).
                 throw new SchemaValidationException("'" + declaration.name() + "': 'final' forbids anything "
                         + "composing onto this type, and every application of a template is a subtype of it by "
                         + "construction -- so the claim is false of '" + declaration.name() + "' whatever else "
@@ -370,7 +370,7 @@ final class DefinitionResolver {
      * <p><b>The mark states the instantiation's fact, not the base's.</b> A record template's base is
      * ABSTRACT by derivation whatever is written here ({@code WireForm.parentExtension}); {@code abstract}
      * spliced into the held text is what makes each <em>application</em> abstract in turn, which is how a
-     * second-level base is spelled ({@code SPEC-FEEDBACK.md} #13).
+     * second-level base is spelled (§5.10).
      */
     private static TypeDefinition markedTemplate(String name, TypeDefinition resolved, TemplateBody open,
                                                   RecordExtensionType extension) {
@@ -1091,7 +1091,7 @@ final class DefinitionResolver {
      * a <em>template</em> application, since every constructor application is turned into an {@code !C value}
      * instance before resolution.
      *
-     * <p><b>A closed one is the entry it denotes</b> ({@code SPEC-FEEDBACK.md} #15): {@code bx => box<text>}
+     * <p><b>A closed one is the entry it denotes</b> (§8.2): {@code bx => box<text>}
      * resolves to the closed record itself, with the canonical application in its own {@code source}, rather
      * than to a {@code REFERENCE} at a content-derived entry. §8.2 makes a declared entry's identity its
      * name, and a declaration that <em>constructs</em> a type already keeps it (§5.3's lift leaves {@code
@@ -1210,7 +1210,7 @@ final class DefinitionResolver {
                 for (String ancestor : operand.ancestors()) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
                 }
-                // A *family base* is the one head that is itself a type ({@code SPEC-FEEDBACK.md} #13): its
+                // A *family base* is the one head that is itself a type (§5.10): its
                 // held body carries `extension`, so a value can stand at it and be a value of one of its
                 // members. Where this declaration takes no parameters of its own it is never held, so there
                 // is no later materialisation to close the application kept in `record.supertypes` and mint
@@ -1287,7 +1287,7 @@ final class DefinitionResolver {
             // `!record` carrying fields -- so it composes exactly as the hand-written record of the same
             // shape does, and how the author spelled it is no part of the question (§8.2: what is
             // canonicalised is identity, not provenance). Every other instantiation fails this same test on
-            // its own body: an array, a map or a choice has no fields to contribute (`SPEC-FEEDBACK.md` #16).
+            // its own body: an array, a map or a choice has no fields to contribute (§4.3).
             if (terminalSupertype == null
                     || !(terminalSupertype.body() instanceof RecordBody supertypeBody)) {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName + "'"
@@ -1506,7 +1506,7 @@ final class DefinitionResolver {
         // -- and §4.3 states it for both operator families. What is *finished* is a body with no vocabulary
         // to tighten: a top-level constructor application (§5.6), a choice, or an alias resolving to either.
         // What the walk adds is the case that is not finished: an alias of a record, which has that record's
-        // vocabulary to tighten -- a record template's instantiation included (`SPEC-FEEDBACK.md` #16).
+        // vocabulary to tighten -- a record template's instantiation included (§4.3).
         String sourceTerminal = ReferenceChain.terminal(sourceName, namespaceDefinitions::getTypeDefinition);
         boolean sourceHops = !sourceTerminal.equals(sourceName);
         TypeDefinition terminalSource = sourceHops
@@ -1516,7 +1516,7 @@ final class DefinitionResolver {
         // instantiation has one -- `box<text>` closes to a `!record` carrying fields -- so it refines like
         // the hand-written record of the same shape, and what polices a value the substitution already fixed
         // is §5.7's own per-field rule, which refuses re-fixing a FIXED field to a different value
-        // whoever wrote it. Every other instantiation fails on its own body (`SPEC-FEEDBACK.md` #16).
+        // whoever wrote it. Every other instantiation fails on its own body (§4.3).
         if (terminalSource == null || !(terminalSource.body() instanceof RecordBody sourceBody)) {
             throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName + "'"
                     + (sourceHops ? " resolves through its reference chain to '" + sourceTerminal

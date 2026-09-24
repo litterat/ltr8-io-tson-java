@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Naming a template at a <b>type position</b> ({@code SPEC-FEEDBACK.md} #13): admitted where the template has
+ * Naming a template at a <b>type position</b> (§5.10): admitted where the template has
  * a parent, refused where it has none.
  *
  * <p><b>Why a record-bodied template may be named and a container may not.</b> "A template is not a type" is

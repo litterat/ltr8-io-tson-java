@@ -169,10 +169,9 @@ reading is the only one that differs by mode: every other reading places the val
 - **ABSTRACT naming selectors** gets `DispatchMemberReader`, which reads those members and looks the value up.
 - **A family-base template** gets whichever dispatcher its own body asks for, over the template itself, through the
   registry's `template` constructor like any other entry. A template carrying `extension` is a type by the only
-  test that matters — a value can stand at it, being a value of one of its instantiations (`SPEC-FEEDBACK.md`
-  #13) — so `{ b: box }` admits
-  `{"$type": "int_box", "v": 1}` and refuses an untagged object, exactly as TSON text does. Every member of
-  such a family is minted, so the alias is the only name a document has for one, which is what makes the
+  test that matters — a value can stand at it, being a value of one of its instantiations (§5.10) — so
+  `{ b: box }` admits `{"$type": "int_box", "v": 1}` and refuses an untagged object, exactly as TSON text does.
+  Every member of such a family is minted, so the alias is the only name a document has for one, which is what makes the
   flattening above load-bearing here rather than merely consistent.
   - **Both readings, on the terms a closed base gets them.** A base naming no selector dispatches on `$type`; one naming them
     base hands its value to `DispatchMemberReader`. The discriminator names are stated structurally on the entry
@@ -287,7 +286,7 @@ so bind mode, whose elements are host values, compares what they decode to. Tree
 set's atom element is read at `TreeAtomKeyedReader` (chosen by `TreeAtomReader.keyed`), which answers the node with the
 parsed value's identity beside it (`ValueIdentity.Identified`) and the loop unwraps it — two spellings of one instant
 are one element. A compound element or key compares by host equality over what the mode built, which is all any mode can
-promise (`SPEC-FEEDBACK.md` #18).
+promise (§7.5).
 
 **Bind mode compiles each type to its natural reading, and a component declares something more specific.** A
 standalone array or tuple binds to an unmodifiable `List` of its values' natural host values and a map to an

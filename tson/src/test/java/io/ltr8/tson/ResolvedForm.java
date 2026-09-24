@@ -70,13 +70,10 @@ final class ResolvedForm {
      * alphabetical order and another's resolution order say the same thing. Nothing else is normalised; a
      * difference anywhere else is a real one.
      *
-     * <p><b>Including every set-typed field</b>, which [TSON-SCHEMA] §7.5's comparison MUST reaches:
-     * "implementations comparing resolver outputs MUST compare set-typed fields as sets, not ordered lists".
-     * The fields are {@code enum.members}, {@code integer_type.members}, {@code decimal_type.members} and
-     * {@code scoped.scope}. This compares each as an ordered list, which is a <b>deliberate divergence</b>
-     * recorded in {@code SPEC-FEEDBACK.md} #4 -- source order is what every producer emits, §7.4 gives a
-     * reader a reason to care about it, and the freedom the MUST compensates for is one nobody exercises.
-     * Honouring the MUST instead is one sort, here, reaching both callers.
+     * <p><b>A set-typed field is compared as the ordered list it is written as</b>: [TSON-SCHEMA] §7.5 makes
+     * source declaration order canonical in resolved output, for {@code enum.members},
+     * {@code integer_type.members}, {@code decimal_type.members}, {@code text_type.members} and
+     * {@code scoped.scope} alike, so two resolved documents are compared as §8 writes them.
      */
     static TypeDefinition canonical(TypeDefinition definition) {
         return new TypeDefinition(definition.source(), definition.kind(),

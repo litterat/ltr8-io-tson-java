@@ -10,8 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A <b>closed application at a composition operand</b> -- {@code dog => pet<"dog"> & { breed: text }}, where
- * the argument is a literal rather than the declaring declaration's own parameter ({@code SPEC-FEEDBACK.md}
- * #13).
+ * the argument is a literal rather than the declaring declaration's own parameter (§5.10).
  *
  * <p><b>The member is the author's own declaration and nothing is minted for the operand.</b> §5.8 absorbs
  * the operand's fields, §5.7's fixation turns the routed {@code = T} into the member's own {@code
