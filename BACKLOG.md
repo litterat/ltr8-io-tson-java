@@ -74,8 +74,10 @@ encodings ([TSON-JSON] §6.1.1).
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
   and it is the one the spec calls the expected production route. What is left is the in-band one: a root value
   that is or is wrapped by an annotation object carrying `$schema` and `$type`, both REQUIRED on that route. It
-  needs §3.3's annotation object, so it arrives with §8 rather than before it. Where both routes supply a binding
-  they MUST agree by canonical identity, and disagreement is a resolver error — never a precedence question.
+  rides §3.3's annotation object and §8.5's scope push, both built for scoped positions (`DispatchScopedReader`),
+  so what is left is the root: reading the leading `$schema`/`$type` before any schema is in hand. Where both
+  routes supply a binding they MUST agree by canonical identity, and disagreement is a resolver error — never a
+  precedence question.
   [TSON-JSON] §3.5's `TSON-Schema` field, a projection of the binding rather than an alternative to it, is the
   channel a server uses and is where this answer has to stay consistent.
 
@@ -90,28 +92,19 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **No schema-directed decode of the open sum — §8.5.** §8.5's scoped positions are the open sum and what
-  will finally admit a `$schema` member: the cell read off the members present, EXTERN needing both `$schema`
-  and `$type`, LOCAL taking `$type` alone, and a bare value a validation error in every mode. `scoped` compiles
-  to a `NOT_IMPLEMENTED` reader meanwhile. The cell is read off the leading members (§8.5: `$schema` first, then
-  `$type`), which `ReservedMembers.lead` already answers. §8.2's predicate is one condition and is built whole;
-  the member dispatch that used to be its second route is §6.1.5's and belongs to a record family, not to this
-  entry. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`,
-  `JsonCompiledSchema`,
-  `JsonSchemaCompiler`, its own factory registries — and `design/json-encoding.md` carries why that is a deferral
-  rather than a conclusion: the two disagreements that keep the *event* layers apart both dissolve above the
-  schema, where the reader is the position, so one compiled schema over an encoding-neutral context stays a real
-  option and is simply not an abstraction worth designing from one implementation. **It gains no dependency on
-  `tson-compiler`**, contrary to what this entry used to predict: `TsonLinkedSchema` is a `tson-schema` record and
-  `tson-atom` already re-exports that module, so what crosses is a value model and the pipeline producing it stays
-  where it is.
+- [ ] **The choice and scoped families do not state their rules from `base.diagnostics`.** Records, arrays,
+  sets, tuples and maps do. `tson-compiler` states its dispatch diagnostics in `NamedDispatchReader`,
+  parameterised over a "candidate noun" so one class serves both a choice and a scoped position; `tson-json`
+  words each in its own dispatcher (`DispatchChoiceReader`, `DispatchScopedReader`), and `CrossEncodingParityTest`
+  compares only their codes and pointers. The rule classes want the same parameterisation, so one sentence
+  serves both positions in both encodings and the parity cases can move to `sameRule`.
 
-- [ ] **The choice family does not state its rules from `base.diagnostics`, and is waiting on §8.5.** Records,
-  arrays, sets, tuples and maps do. Choices are entangled: `tson-compiler` states its dispatch diagnostics in
-  `NamedDispatchReader`, parameterised over a "candidate noun" so one class serves both a choice and a scoped
-  position, while `tson-json` has choice-specific wording and no scoped reader at all. Aligning now would
-  align against a shape about to change, so it waits for [TSON-JSON] §8.5 — at which point both stacks have
-  the same two positions and the shared class can be parameterised the same way.
+- [ ] **A pinned schema reference is not verified in the JSON stack.** `JsonCompiledSchemaRegistry.get`
+  canonicalises before it asks its `TsonSchemaLoader`, and the loader takes a canonical identity and nothing
+  else, so the `?sha256=` of a pushed `$schema` ([TSON-JSON] §8.5) or an out-of-band `withSchema(uri)` is
+  dropped unchecked -- where [TSON-SCHEMA] §10.2 makes verification a MUST and a mismatch a resolver error. The
+  TSON registry verifies against the bytes it fetched; the JSON side holds only linked schemas, so what it
+  needs is either the digest beside each linked schema or a loader that takes the reference as written.
 
 - [ ] **The look-alike rule reaches no JSON position, and whether it should is now a real question rather
   than a settled one.** [TSON-DATA] §8.2's two per-name rules run at the schema-directed record and `$type`
@@ -127,7 +120,7 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   Every container reads through a plan, one mode-free loop and a builder per mode
   (`design/json-schema-directed-reading.md`). What is left of that restructure:
   - **The factory layer.** Every mode registers the same constructors from one list of parts, so one added later
-    (`scoped`, §8.5) cannot be missed in one of them; and each factory is handed one per-entry record (name,
+    cannot be missed in one of them; and each factory is handed one per-entry record (name,
     display name, definition, schema location, the names that mean it) in place of each plan recomputing
     `EntryDisplayName.of` and `locationOf` — `DispatchFactories` and `RecordPlan` both build the display name for
     one OPEN record with subtypes today.

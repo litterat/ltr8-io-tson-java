@@ -10,18 +10,19 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The compilation environment beyond one entry: the schema being compiled, and how a composite reaches the
- * readers for its own children. Handed to every {@link ValueReaderFactory}.
+ * The compilation environment beyond one entry: the schema being compiled, how a composite reaches the readers
+ * for its own children, and where a scoped position finds a schema a document names for itself. Handed to
+ * every {@link ValueReaderFactory}.
  */
-public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers,
+public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers, ForeignSchemas foreign,
                                  Map<String, Set<String>> namesMeaning) {
 
     /**
      * The alias index derived rather than supplied. A compile passes its own, built once: deriving it per
      * factory walks every reference chain again for every entry.
      */
-    public ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers) {
-        this(linked, readers, ReferenceChain.namesMeaning(linked.schema()));
+    public ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers, ForeignSchemas foreign) {
+        this(linked, readers, foreign, ReferenceChain.namesMeaning(linked.schema()));
     }
 
     public TsonSchema schema() {

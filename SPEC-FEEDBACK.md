@@ -43,6 +43,7 @@ citations and the entry is deleted — nothing here is an archive.
 of a rule on purpose: where a deployment's policy lives (#1), whether a namespace should be a value (#2), how
 a declared field carries a JSON member name that is not an identifier (#3), and how a declared application
 keeps a content-derived identity across the import merge (#4). None is a defect in a rule the spec states.
+#5, raised against Revision 36 itself, is one: two rules in §7.8 give one document two categories.
 
 ---
 
@@ -336,3 +337,32 @@ that would need it — so the property is given up exactly as §8.2 says, and th
 **Status against Revision 36:** open — the rule is taken, the merge key is carried until an import-merge
 path exercises it.
 
+## 5. §7.8 gives a scope push at a `declared` position two categories
+
+**Section:** [TSON-SCHEMA] §7.8 (the cell rule, and the typed-position restriction); the same two sentences
+recur in [TSON-JSON] §3.3 and §8.5.
+
+**Kind:** defect — internal inconsistency.
+
+**The two rules.** The cell rule: "A cell the instance's `scope` does not hold refuses the value it would
+have taken, as a validation error: nothing failed to resolve". The typed-position restriction: "A nested
+`!!schema` directive is admitted at a position exactly when the position's type resolves to a `scoped`
+instance whose `scope` holds `EXTERN` … Anywhere else it is a resolver error." A `!!schema` at a position
+typed `declared` (`scope: [LOCAL]`) satisfies both: its type is a `scoped` instance whose scope does not hold
+`EXTERN`, so the restriction makes it a resolver error, and it is a value in the EXTERN cell the instance does
+not hold, so the cell rule makes it a validation error. [TSON-DATA] §8.1's categories are exclusive, so one
+of the two is wrong for this document.
+
+**Interpretation chosen:** a validation error. The cell rule is the specific one — it names exactly this case,
+and its reason ("nothing failed to resolve") holds: the directive is well-formed and the position is one that
+reads a scope's cells. The restriction then reaches only positions whose type is **not** a `scoped` instance —
+a record, a choice, a `value` — where a push has no cell to be refused by. Both encodings run it that way:
+`ScopedReader` in the text reader, and `DispatchScopedReader` for [TSON-JSON] §8.5's `$schema`, with
+`CrossEncodingParityTest` pinning that the two agree.
+
+**Suggested resolution:** scope the restriction to positions that are not scoped — "a nested `!!schema` at a
+position whose type is not a `scoped` instance, or a container of one, is a resolver error; at a `scoped`
+position the cell rule decides" — and state the cell rule's validation error as covering the push at a
+`declared` position by name, as [TSON-JSON] §8.5 already does ("a `$schema` at a `declared` position").
+
+**Status against Revision 36:** open. [TSON-JSON] §3.3 and §8.5 state the chosen reading.

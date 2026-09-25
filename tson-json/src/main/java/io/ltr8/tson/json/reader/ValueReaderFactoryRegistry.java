@@ -17,14 +17,16 @@ import java.util.function.UnaryOperator;
  * leaves it bare for a record to bind to a component.
  *
  * <p><b>What places a value is shared too.</b> A record family's dispatchers ({@link DispatchFactories}), a
- * family-base template's, and the choice's ({@link DispatchChoiceReader}) select a reader and build nothing,
+ * family-base template's, the choice's ({@link DispatchChoiceReader}) and a scoped position's ({@link
+ * DispatchScopedReader}) select a reader and build nothing,
  * so every mode registers the same ones. So does a concrete record's loop ({@link RecordReader}); what is the
  * mode's own is the factory that builds it and the {@link RecordBuilder} it hands its slots to.
  *
  * <p><b>An unregistered constructor is a gap, not a fault.</b> {@link #resolve} raises, {@code
  * JsonSchemaCompiler} catches, and the entry becomes a {@link ErrorReader} -- so a schema whose types this
- * encoding cannot yet read still compiles, and each unreadable value costs a verdict on itself alone. That is
- * how §8.5's absence is spelled, and the shape [TSON-SCHEMA] §2.2.2's extension point keeps for good.
+ * encoding cannot read still compiles, and each unreadable value costs a verdict on itself alone. Every
+ * constructor the bundled meta-schemas declare is registered, so what reaches this is [TSON-SCHEMA] §2.2.2's
+ * extension point: a constructor another meta-schema declares.
  */
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
@@ -76,6 +78,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("tuple", TreeTupleBuilder.FACTORY);
         factories.put("map", TreeMapBuilder.FACTORY);
         factories.put("choice", DispatchChoiceReader.FACTORY);
+        factories.put("scoped", DispatchScopedReader.FACTORY);
         factories.put("template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
@@ -98,6 +101,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("tuple", BindTupleBuilder.FACTORY);
         factories.put("map", BindMapBuilder.FACTORY);
         factories.put("choice", DispatchChoiceReader.FACTORY);
+        factories.put("scoped", DispatchScopedReader.FACTORY);
         factories.put("template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
@@ -118,7 +122,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         ValueReaderFactory factory = factories.get(name);
         if (factory == null) {
             throw new IllegalStateException("no JSON reader is registered for constructor '" + name
-                    + "' -- [TSON-JSON] §8.5 (scoped positions, the open sum) is not built yet");
+                    + "', which no bundled meta-schema declares ([TSON-SCHEMA] §2.2.2)");
         }
         return factory;
     }

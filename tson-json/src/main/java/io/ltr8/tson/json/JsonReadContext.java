@@ -225,6 +225,36 @@ public final class JsonReadContext {
         }
     }
 
+    /**
+     * Consumes the first member of the object at the cursor -- its name and its scalar value -- and leaves the
+     * object open, so whatever reads next meets it as though that member had never been written.
+     *
+     * <p>For [TSON-JSON] §8.5's scope push. A scoped position reads {@code $schema} to open the scope, and what
+     * is left is an annotation object led by {@code $type} in the foreign namespace -- the LOCAL cell's spelling,
+     * one schema over -- so the foreign type's reader needs no second rule for a member that is not its own to
+     * judge, and still refuses a {@code $schema} anywhere it does meet one.
+     *
+     * @throws IllegalStateException if a lookahead is running, or the cursor is not at an object whose first
+     *                               member has a scalar value -- the caller has already peeked at both
+     */
+    public static void consumeLeadingMember(JsonReadContext ctx) {
+        Cursor cursor = ctx.cursor;
+        if (cursor.recording != null) {
+            throw new IllegalStateException("a lookahead is running, and it would replay the member this drops");
+        }
+        JsonEvent open = ctx.next();
+        if (!(open instanceof JsonEvent.ObjectStart) || !(ctx.next() instanceof JsonEvent.MemberName)
+                || !isScalar(ctx.next())) {
+            throw new IllegalStateException("no leading member with a scalar value to consume at " + open);
+        }
+        cursor.rewound.addFirst(open);
+    }
+
+    private static boolean isScalar(JsonEvent event) {
+        return event instanceof JsonEvent.StringValue || event instanceof JsonEvent.NumberValue
+                || event instanceof JsonEvent.BooleanValue || event instanceof JsonEvent.NullValue;
+    }
+
     /** Where the last event consumed began -- what a diagnostic points at. */
     public Optional<SourcePosition> position() {
         return Optional.ofNullable(pinnedPosition != null ? pinnedPosition : cursor.position);

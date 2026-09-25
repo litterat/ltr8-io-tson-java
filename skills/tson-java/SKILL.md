@@ -470,7 +470,10 @@ List<Diagnostic> problems = json.validate(body, uri, "order");
 arguments (`withSchema` + `readAs`, or `validate(source, uri, type)`). `JsonValue` is a sealed tree
 (`JsonObject`, `JsonArray`, `JsonString`, `JsonNumber`, `JsonBoolean`, `JsonNull`) whose model follows JEP
 540. A schema-directed tree read returns a `JsonValue`, never a `TsonValue`; a schema-directed object read
-validates in full and builds the classes the binding resolves, all-or-nothing like TSON's. Built from the same
+validates in full and builds the classes the binding resolves, all-or-nothing like TSON's. A value at a scoped
+position (`declared`, `extern`, `dynamic`) names its own type in the object: `{"$type": "note", "body": "hi"}`, or
+led by `"$schema": "<uri>"` for a foreign schema's type, which the reader loads through the same `withSchemas`
+loader; a bare value there is refused, and the tree comes back without the tag. Built from the same
 `ProcessorConfig`, `Json.of(config)` and `Tson.of(config)` judge under the same policy and bind the same
 classes.
 

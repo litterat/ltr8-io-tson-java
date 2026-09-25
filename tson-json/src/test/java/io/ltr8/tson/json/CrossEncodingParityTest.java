@@ -99,6 +99,8 @@ class CrossEncodingParityTest {
               int_box    => box<int32>
               text_box   => box<text>
               crate      => { b: box }
+              local_box  => { v: declared }
+              extern_box => { v: extern }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -457,6 +459,36 @@ class CrossEncodingParityTest {
     void aTagNamingTheBareTemplateBaseSelectsNothingInBoth() {
         sameRule("crate", "{ b: !box { v: 1 } }", """
                 {"b": {"$type": "box", "v": 1}}""");
+    }
+
+    // ── §8.5 scoped positions: the value names its own type ──────────────────
+
+    @Test
+    void aScopedValueNamingAGoverningTypeIsAcceptedByBoth() {
+        bothAccept("local_box", "{ v: !robot { serial: R2 } }", """
+                {"v": {"$type": "robot", "serial": "R2"}}""");
+    }
+
+    /** A value naming no type has nothing to be read as, in either encoding. */
+    @Test
+    void anUntypedValueAtAScopedPositionIsRefusedInBoth() {
+        sameVerdict("local_box", "{ v: { serial: R2 } }", """
+                {"v": {"serial": "R2"}}""");
+    }
+
+    @Test
+    void aNameTheGoverningSchemaDoesNotHoldIsRefusedInBoth() {
+        sameVerdict("local_box", "{ v: !nowhere { serial: R2 } }", """
+                {"v": {"$type": "nowhere", "serial": "R2"}}""");
+    }
+
+    /** A cell the instance does not hold: a scope push at `declared`, and a bare type at `extern`. */
+    @Test
+    void aCellTheInstanceDoesNotHoldIsRefusedInBoth() {
+        sameVerdict("local_box", "{ v: !!schema:\"https://example.test/other.tn\" !robot { serial: R2 } }", """
+                {"v": {"$schema": "https://example.test/other.tn", "$type": "robot", "serial": "R2"}}""");
+        sameVerdict("extern_box", "{ v: !robot { serial: R2 } }", """
+                {"v": {"$type": "robot", "serial": "R2"}}""");
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {

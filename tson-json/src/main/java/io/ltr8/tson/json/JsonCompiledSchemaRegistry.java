@@ -85,7 +85,8 @@ public final class JsonCompiledSchemaRegistry {
             return Optional.of(hit);
         }
         return loader.load(identity).map(linked -> {
-            JsonCompiledSchema built = JsonSchemaCompiler.compile(linked, factories);
+            // A value's own `$schema` resolves back through here (§8.5), in this registry's mode and cache.
+            JsonCompiledSchema built = JsonSchemaCompiler.compile(linked, factories, this::get);
             JsonCompiledSchema raced = compiled.putIfAbsent(identity, built);
             return raced != null ? raced : built;
         });

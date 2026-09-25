@@ -32,23 +32,36 @@ import java.util.Set;
  *
  * <p><b>A failure building one entry becomes a {@link ErrorReader}</b> rather than failing the compile:
  * the schema compiles, and reading a value against that one type reports {@code NOT_IMPLEMENTED} and skips
- * it. That is what keeps a constructor this encoding cannot read yet from costing a document every other
- * verdict it was owed.
+ * it. That is what keeps a constructor this encoding cannot read -- one a meta-schema other than the bundled
+ * ones declares ([TSON-SCHEMA] §2.2.2) -- from costing a document every other verdict it was owed.
+ *
+ * <p><b>A foreign schema is not compiled here.</b> §8.5's scope push names a schema from inside the document, so
+ * a compile is handed {@link ForeignSchemas}, where to ask for one when a value arrives. A compile with no
+ * registry behind it passes {@link ForeignSchemas#none()}.
  */
 public final class JsonSchemaCompiler {
 
     private JsonSchemaCompiler() {
     }
 
-    /** Compiles every entry in tree mode; the constructors this encoding cannot yet read become gaps. */
+    /** Compiles every entry in tree mode, with no foreign schema reachable; unreadable constructors become gaps. */
     public static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
         return compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
 
-    /** Compiles every entry, dispatching each resolved body to {@code factories} by its constructor name. */
+    /** {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver, ForeignSchemas)} with no foreign schema. */
     public static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema,
                                              ValueReaderFactoryResolver factories) {
-        Compilation compilation = new Compilation(linkedSchema, factories);
+        return compile(linkedSchema, factories, ForeignSchemas.none());
+    }
+
+    /**
+     * Compiles every entry, dispatching each resolved body to {@code factories} by its constructor name, with a
+     * scoped position's foreign schemas looked up through {@code foreign}.
+     */
+    public static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
+                                             ForeignSchemas foreign) {
+        Compilation compilation = new Compilation(linkedSchema, factories, foreign);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -63,16 +76,18 @@ public final class JsonSchemaCompiler {
         private final TsonLinkedSchema linked;
         private final TsonSchema schema;
         private final ValueReaderFactoryResolver factories;
+        private final ForeignSchemas foreign;
         private final Map<String, JsonTypeReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
 
         /** How a factory reaches another entry's reader -- rebound once, when this ends. */
         private final CompiledReaders readers = new CompiledReaders(this::resolve);
 
-        Compilation(TsonLinkedSchema linked, ValueReaderFactoryResolver factories) {
+        Compilation(TsonLinkedSchema linked, ValueReaderFactoryResolver factories, ForeignSchemas foreign) {
             this.linked = linked;
             this.schema = linked.schema();
             this.factories = factories;
+            this.foreign = foreign;
         }
 
         JsonTypeReader<?> resolve(String name) {
@@ -112,7 +127,7 @@ public final class JsonSchemaCompiler {
         }
 
         private JsonTypeReader<?> build(String name, TypeDefinition definition) {
-            ValueReaderContext context = new ValueReaderContext(linked, readers);
+            ValueReaderContext context = new ValueReaderContext(linked, readers, foreign);
             Top body = definition.body();
             if (body instanceof Reference reference) {
                 // [TSON-SCHEMA] §8.3: a processor MAY collapse a reference chain when it compiles for
