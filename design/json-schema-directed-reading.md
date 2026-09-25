@@ -13,7 +13,9 @@ surface. Current form only; history lives in git.
 - Selectors lead their object ([TSON-JSON] §3.3, §6.1.5): every decision is a peek at the leading members
   (`ReservedMembers.lead`), bounded by the schema, and no reader scans an object.
 - The concrete record reader looks ahead at nothing: its member loop judges every reserved member as it arrives, and
-  `$schema` is refused everywhere this can reach.
+  `$schema` is refused everywhere except a scoped position.
+- A scoped position opens the scope by consuming `$schema` (`JsonReadContext.consumeLeadingMember`), so no reader
+  below it has a second rule for the member; a foreign schema is looked up as the value arrives (`ForeignSchemas`).
 - `CompiledReaders` is rebound exactly once, from the in-progress compilation to the finished schema.
 - The map form is chosen by the factory from `K` and the record reader from `record.extension`, once at compile, never by
   inspecting a value.
@@ -33,8 +35,8 @@ Related: `design/json-encoding.md` (why the stack is separate, the parity guard)
 The schema-directed reader stack — `JsonTypeReader`/`JsonCompiledSchema`/`JsonSchemaCompiler` — carries [TSON-JSON] §5's
 atoms, the whole of §6's containers, §7's absence, §3.2's reserved namespace and §3.3's annotation object (so §6.1.5's
 `$type` selects a subtype — the JSON spelling of `!employee` at a `person` field), and §8.2's discrimination predicate over
-§8.3's class stability, all compiled in **tree mode**; §8.5's scoped positions reach a `NOT_IMPLEMENTED` reader.
-**Bind mode** (`ValueReaderFactoryRegistry.bind`) compiles every container, the atoms and the dispatchers.
+§8.3's class stability, and §8.5's scoped positions, all compiled in **tree mode**. **Bind mode**
+(`ValueReaderFactoryRegistry.bind`) compiles every container, the atoms and the dispatchers.
 
 ## Naming inside `reader`: mode first, and no prefix
 
@@ -68,7 +70,7 @@ can do neither — `!!schema` is TSON text syntax — so [TSON-JSON] §3.4 gives
 implements the first: **out of band**, the application supplies both, and the document is then a bare value
 read directly at that type. The spec calls it "the expected production route". The in-band route — a root
 annotation object carrying `$schema` and `$type` — is not built (`BACKLOG.md`): the annotation object it rides on
-is, below, but `$schema` is refused at every position this stack reads.
+is, below, and so is the scope push at a scoped position, but not at the root.
 
 `Json.withSchemas(loader)` is where a schema identity becomes resolvable, and it takes a `TsonSchemaLoader` —
 `tson-schema`'s interface, so it costs no dependency. **Obtaining a schema is the TSON engine's job**, and
@@ -130,9 +132,10 @@ refusal have already reported, so an invalid document's diagnostics follow its m
 deliberately: holding them back would cost every valid document a buffer to tidy the answer for invalid ones.
 The allocation harness measures what the peek saved (`aSchemaDirectedRecordReadsWithoutLookingAhead`).
 
-- **`$schema` is refused everywhere this can reach.** §8.5 admits it only where the effective type is a
-  `scoped` instance holding EXTERN, and §3.3 makes it a resolver error anywhere else. That is the correct
-  verdict at every position built so far, and the scoped reader is what will admit it.
+- **`$schema` is refused everywhere a scoped reader does not stand.** §8.5 admits it only where the effective
+  type is a `scoped` instance holding EXTERN, and §3.3 makes it a resolver error at a position that is not
+  scoped. The scoped reader is the one place that reads it, and it consumes it, so a record reader never meets
+  one it should admit.
 
 `CompiledReaders` is how a factory reaches another entry's reader, and carries `tson-compiler`'s own hazard: it is
 **rebound exactly once**, from the in-progress compilation to the finished schema, because handing readers the
@@ -368,3 +371,42 @@ entries *first*, so a schema declaring one type over core.tn listed in namespace
 leads with the entries this schema declares and the author wrote, filtering by the origin index and by
 having a source position (the same test that tells a minted entry from an authored one). Imported and minted
 names remain usable root types; the count that follows covers them.
+
+### A scoped position: the open sum, read off the leading members
+
+§8.5's `scoped` constructor is the one position where the *value* names its type. `DispatchScopedReader` serves
+every instance -- `declared`, `extern`, `dynamic`, and every `extern_of`/`extern_type` narrowing -- because what
+separates them is two constraint values, `scope` and `schemas`, and not a shape. It is `ScopedReader`'s peer, and
+`design/scope-push.md` has the model; what follows is what the JSON carrier changes.
+
+**The leading members pick the cell** (`ReservedMembers.lead`, which now keeps `$schema`'s string beside
+`$type`'s). `$schema` leading is EXTERN, `$type` alone is LOCAL, and anything else -- a bare scalar, an array, an
+object leading with none of them, a wrapper with no `$type` -- names no type: a validation error in every mode.
+A cell the instance's `scope` does not hold refuses the value as a validation error, which is also how a
+`$schema` at a `declared` position is refused (`SPEC-FEEDBACK.md` #5: §7.8 states two categories for it, and both
+encodings take the cell rule's).
+
+**LOCAL is wired at compile.** Every name the governing namespace holds is resolved to a `Route` when the scoped
+entry compiles, so a LOCAL read is one map lookup and a route, exactly as a tagged record position's is -- inline
+where the named type reads the object as its own, the wrapper otherwise. A name the namespace does not hold is
+`UNKNOWN_TYPE`, after name hygiene.
+
+**EXTERN is looked up as the value arrives, and the scope opens by consuming `$schema`.** Which schema a value
+names is the document's choice, so the compile is handed `ForeignSchemas`: `JsonCompiledSchemaRegistry` passes its
+own `get`, so a pushed schema compiles once, in the registry's mode, into its cache; a standalone compile passes
+`ForeignSchemas.none()`, whose every lookup is `SCHEMA_NOT_PERMITTED`. A schema nothing supplies is one of the
+`SCHEMA_*` codes and a schema that is wrong is `SCHEMA_ERROR` -- never a verdict on the document. With the foreign
+reader in hand, `JsonReadContext.consumeLeadingMember` drops `$schema` from the stream and leaves the object open:
+what is left is `{"$type": …}` in the foreign namespace, the LOCAL spelling one schema over, and the foreign
+type's route reads it as it reads any tagged value. So no record reader or dispatcher carries a rule admitting a
+`$schema` it did not open, and one nested inside the pushed value is still refused where it stands. There is no
+scope stack: the foreign reader is wired to the foreign schema's entries, and the scope pops by returning.
+
+**Every mode hands back what the selected reader built.** A tree holds the annotated value without the apparatus,
+as a tagged value at a record or choice position does, and a bind read returns the foreign class. TSON text keeps
+the push in the tree (`TsonScopedValue`); a JSON tree keeps no tag of any kind, so dropping the scope is the same
+decision and not a second one.
+
+**A pinned `$schema` is not verified.** `JsonCompiledSchemaRegistry` keys on canonical identity and its loader
+takes nothing else, so a `?sha256=` pin -- on a pushed schema or an out-of-band one -- is dropped before anything
+could check it (`BACKLOG.md`).

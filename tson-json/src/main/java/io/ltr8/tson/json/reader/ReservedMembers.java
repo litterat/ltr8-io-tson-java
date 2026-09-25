@@ -55,19 +55,26 @@ final class ReservedMembers {
      * What an object's leading members say about it.
      *
      * @param schema    whether {@code $schema} leads -- admitted only at a scoped position (§8.5)
+     * @param schemaRef that member's string content, or null where it is absent or not a string
      * @param typed     whether a {@code $type} member leads, whatever its value
      * @param type      that member's string content, or null where it is absent or not a string
      * @param wrapper   whether {@code $value} follows the reserved members -- §3.3's wrapper form
      * @param selectors the scalar value of each requested member found leading after the reserved ones, by
      *                  NFC name; a requested member not among them is absent here
      */
-    record Lead(boolean schema, boolean typed, String type, boolean wrapper, Map<String, JsonEvent> selectors) {
+    record Lead(boolean schema, String schemaRef, boolean typed, String type, boolean wrapper,
+                Map<String, JsonEvent> selectors) {
 
-        static final Lead NONE = new Lead(false, false, null, false, Map.of());
+        static final Lead NONE = new Lead(false, null, false, null, false, Map.of());
 
         /** Whether the object leads with a reserved member -- §3.3's recognition test, and §8.3.1's. */
         boolean present() {
             return schema || typed || wrapper;
+        }
+
+        /** These leading members with {@code $schema} gone -- what a scoped position hands on once the scope is open. */
+        Lead withoutSchema() {
+            return new Lead(false, null, typed, type, wrapper, selectors);
         }
     }
 
@@ -93,13 +100,15 @@ final class ReservedMembers {
             return Lead.NONE;
         }
         boolean schema = false;
+        String schemaRef = null;
         boolean typed = false;
         String type = null;
         JsonEvent event = ctx.next();
         if (named(event, SCHEMA)) {
             schema = true;
+            schemaRef = ctx.peek() instanceof JsonEvent.StringValue string ? string.value() : null;
             if (!skipScalar(ctx)) {
-                return new Lead(true, false, null, false, Map.of());
+                return new Lead(true, null, false, null, false, Map.of());
             }
             event = ctx.next();
         }
@@ -107,12 +116,12 @@ final class ReservedMembers {
             typed = true;
             type = ctx.peek() instanceof JsonEvent.StringValue string ? string.value() : null;
             if (!skipScalar(ctx)) {
-                return new Lead(schema, true, null, false, Map.of());
+                return new Lead(schema, schemaRef, true, null, false, Map.of());
             }
             event = ctx.next();
         }
         if (named(event, VALUE)) {
-            return new Lead(schema, typed, type, true, Map.of());
+            return new Lead(schema, schemaRef, typed, type, true, Map.of());
         }
         Map<String, JsonEvent> selectors = wanted.isEmpty() ? Map.of() : new LinkedHashMap<>();
         while (selectors.size() < wanted.size() && event instanceof JsonEvent.MemberName member) {
@@ -125,7 +134,7 @@ final class ReservedMembers {
             ctx.next();
             event = ctx.next();
         }
-        return new Lead(schema, typed, type, false, selectors);
+        return new Lead(schema, schemaRef, typed, type, false, selectors);
     }
 
     private static boolean named(JsonEvent event, String name) {

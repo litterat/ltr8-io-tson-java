@@ -55,9 +55,9 @@ document stated something and is not missing it, and the message reports the rul
 broke. Sharing the prose is what keeps the two readers from choosing different rules for one document.
 
 **Five families state their rules here**: records, arrays and sets (one class, a set being an array that
-refuses a repeat), tuples, and maps. Choices wait for [TSON-JSON] §8.5 — `tson-compiler` states its dispatch
-diagnostics parameterised over a "candidate noun" so one class serves a choice *and* a scoped position, and
-aligning before the JSON side has the second position would be aligning against a shape about to change.
+refuses a repeat), tuples, and maps. Choices and scoped positions do not: `tson-compiler` states its dispatch
+diagnostics parameterised over a "candidate noun" so one class serves a choice *and* a scoped position, while
+`tson-json` words each in its own dispatcher (`BACKLOG.md`).
 
 **Two boundary calls are finer than "the schema's nouns":**
 
