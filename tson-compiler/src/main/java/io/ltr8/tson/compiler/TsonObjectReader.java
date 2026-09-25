@@ -446,6 +446,33 @@ public final class TsonObjectReader {
         return counted(r -> r.readDocumentPeeked(peek, targetClass));
     }
 
+    /**
+     * {@link #read(TsonDocumentPeek, Class)} against {@code typeName} -- see {@link #readAs(String, String, Class)}.
+     *
+     * <p>The shape a schema stated outside the body takes once its header has been looked at: the schema from
+     * {@link #withSchema}, the root type from the caller, the body read once. Any {@code !!schema} the document
+     * declares is overridden, as it is from a stream; a caller holding both -- a {@code TSON-Schema} field and
+     * the directive -- compares {@code peek.header()} against its own before choosing this reader.
+     */
+    public <T> T readAs(TsonDocumentPeek peek, String typeName, Class<T> targetClass) {
+        return counted(r -> r.readPeekedAs(peek, typeName, targetClass));
+    }
+
+    private <T> T readPeekedAs(TsonDocumentPeek peek, String typeName, Class<T> targetClass) {
+        Objects.requireNonNull(targetClass, "targetClass");
+        requireSchema();
+        if (peek.failure() != null) {
+            return readFailure(peek.failure());
+        }
+        try {
+            TsonReadContext ctx = continuing(peek);
+            requireDataDocument(peek.start());
+            return valueAs(ctx, typeName, targetClass);
+        } catch (RuntimeException e) {
+            return readFailure(e);
+        }
+    }
+
     private <T> TsonObjectDocument<T> readDocumentPeeked(TsonDocumentPeek peek, Class<T> targetClass) {
         Objects.requireNonNull(targetClass, "targetClass");
         if (peek.failure() != null) {
@@ -569,18 +596,30 @@ public final class TsonObjectReader {
 
     private <T> T readDocumentAs(TsonDataStream stream, String typeName, Class<T> type) {
         Objects.requireNonNull(type, "type");
-        if (schemaUri == null) {
-            throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
-        }
+        requireSchema();
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            requireDataDocument(ctx); // any !!schema it declares is overridden by withSchema
-            T result = valueOf(readAgainstSchema(schemaUri, ctx, type, typeName));
-            requireDocumentEnd(ctx);
-            return result;
+            requireDataDocument(ctx);
+            return valueAs(ctx, typeName, type);
         } catch (RuntimeException e) {
             return readFailure(e);
         }
+    }
+
+    private void requireSchema() {
+        if (schemaUri == null) {
+            throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
+        }
+    }
+
+    /**
+     * The document's value at {@code typeName} in {@link #withSchema}'s schema, from a header already read --
+     * shared by the source and peek routes. Any {@code !!schema} the header declares is overridden.
+     */
+    private <T> T valueAs(TsonReadContext ctx, String typeName, Class<T> type) {
+        T result = valueOf(readAgainstSchema(schemaUri, ctx, type, typeName));
+        requireDocumentEnd(ctx);
+        return result;
     }
 
     /**
