@@ -20,6 +20,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -197,5 +198,57 @@ class PeekThenReadTest {
         assertEquals(null, order);
         assertFalse(problems.diagnostics().isEmpty(),
                 "the read owes a diagnostic for what begin declined to throw");
+    }
+
+    // ── A schema stated outside the body: readAs(peek, typeName, targetClass) ──
+
+    /** A body governed from outside -- a {@code TSON-Schema} header -- carries no directive and no root type. */
+    private static final String UNDECLARED_V1 = "{ sku: \"A\"  quantity: 1  code: 7 }";
+
+    /**
+     * The bind-mode read a header-governed body needs: the schema from {@code withSchema}, the root type from
+     * the caller, the body continuing on the peek's stream rather than read twice.
+     */
+    @Test
+    void aBindReadContinuesAPeekAgainstAStatedType() {
+        Tson tson = tson("api-1", V1_SCHEMA);
+        TsonDocumentPeek peek = tson.begin(oneShot(UNDECLARED_V1));
+
+        assertTrue(peek.header().schema().isEmpty());
+        assertEquals(new Order("A", 1, 7, "AUD"),
+                tson.objectReader().withSchema(V1).readAs(peek, "order", Order.class));
+    }
+
+    /** It validates exactly as the stream form does, all-or-nothing, through the continuing reader's receiver. */
+    @Test
+    void aBindReadAgainstAStatedTypeValidatesInFull() {
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
+        Tson tson = tson("api-1", V1_SCHEMA);
+        TsonDocumentPeek peek = tson.begin(oneShot("{ sku: \"A\"  quantity: 1 }"));
+
+        Order order = tson.objectReader().withDiagnostics(problems).withSchema(V1).readAs(peek, "order", Order.class);
+
+        assertEquals(null, order);
+        assertEquals(List.of(Diagnostic.Code.FIELD_REQUIRED),
+                problems.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    /** A body that does declare its schema reads the same way -- agreement is the caller's to check first. */
+    @Test
+    void aBindReadAgainstAStatedTypeReadsADeclaringBodyToo() {
+        Tson tson = tson("api-1", V1_SCHEMA);
+        TsonDocumentPeek peek = tson.begin(oneShot(V1_DOC));
+
+        assertEquals(V1, peek.header().schema().orElseThrow());
+        assertEquals(new Order("A", 1, 7, "AUD"),
+                tson.objectReader().withSchema(V1).readAs(peek, "order", Order.class));
+    }
+
+    @Test
+    void aBindReadAgainstAStatedTypeNeedsASchema() {
+        Tson tson = tson("api-1", V1_SCHEMA);
+        TsonDocumentPeek peek = tson.begin(oneShot(UNDECLARED_V1));
+
+        assertThrows(IllegalStateException.class, () -> tson.objectReader().readAs(peek, "order", Order.class));
     }
 }

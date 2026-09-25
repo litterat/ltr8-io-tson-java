@@ -122,7 +122,10 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
   with no way to obtain one — reading a header means running the lexer, which is the stream's job.
   - **Nothing is rewound, because nothing is re-read.** The peek holds the live stream, positioned just past
     the header, and a reader continues on it: `objectReader().read(peek, Invoice.class)`, `treeReader()
-    .read(peek)`, `readAs(peek, type)`. That is what makes it work on a source that cannot be read twice —
+    .read(peek)`, and `readAs(peek, type)` on both facades (`objectReader().withSchema(uri).readAs(peek, type,
+    Invoice.class)` in bind mode) — the last being the shape a schema stated outside the body takes, a
+    `TSON-Schema` header, with any `!!schema` the body declares overridden and agreement the caller's to check
+    first. That is what makes it work on a source that cannot be read twice —
     an HTTP request body, a socket, a pipe — which is the case the whole surface exists for. There is no
     resumable/non-resumable pair, because every peek continues; a caller who only wants to classify takes
     `header()` and drops the peek, which is what `tson validate` does per file.

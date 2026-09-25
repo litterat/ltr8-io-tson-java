@@ -302,7 +302,7 @@ public final class TsonObjectReader {
     public <T> T                    read(source, Class<T> targetClass);
     public <T> TsonObjectDocument<T> readDocument(source, Class<T> targetClass);
     public <T> T                    readWithoutSchema(source, Class<T> targetClass);
-    public <T> T                    readAs(source, String typeName, Class<T> targetClass);  // not from a peek
+    public <T> T                    readAs(source, String typeName, Class<T> targetClass);
     public <T> T                    read(TsonReadContext ctx, Class<T> targetClass);
 }
 ```
