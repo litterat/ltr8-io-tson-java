@@ -43,7 +43,10 @@ citations and the entry is deleted — nothing here is an archive.
 of a rule on purpose: where a deployment's policy lives (#1), whether a namespace should be a value (#2), how
 a declared field carries a JSON member name that is not an identifier (#3), and how a declared application
 keeps a content-derived identity across the import merge (#4). None is a defect in a rule the spec states.
-#5, raised against Revision 36 itself, is one: two rules in §7.8 give one document two categories.
+#5, raised against Revision 36 itself, is one: two rules in §7.8 give one document two categories. #6–#8
+are directions again: a bounded type slot, which lets one field's type depend on another's; `identifier`
+as a text family, which carries name hygiene to identifier-typed map keys and builds on #6; and a
+constructor each for `value` and `void`, which retires `unit` and dispatch by name.
 
 ---
 
@@ -366,3 +369,294 @@ position the cell rule decides" — and state the cell rule's validation error a
 `declared` position by name, as [TSON-JSON] §8.5 already does ("a `$schema` at a `declared` position").
 
 **Status against Revision 36:** open. [TSON-JSON] §3.3 and §8.5 state the chosen reading.
+
+---
+
+## 6. A type slot cannot be bounded, and a field cannot depend on another field's type
+
+**Section:** [TSON-SCHEMA] §5.2 (which fields may carry a value; value conformance), §5.3 (lifts), §5.7 (facet
+kinds under refinement), §5.10 (template parameters), §7.4 (the enum profile), §8.1 (`record_field`, the
+constructor type slots); the grammar's `type-params` and `field-type` productions.
+
+**Kind:** proposal — one mechanism for two things the kernel states in prose today, and the syntax for it.
+
+**The two gaps.** Every type slot in the series is a field typed `type_ref` — `array.element_type`,
+`map.key_type`, `record_field.type` — and a `type_ref` names *any* type. There is no way to say *a type that
+IS-A `text`*, at a field or at a template parameter (`<T>` is unbounded, §5.10). And no field can refer to the
+type another field names, so a dependency between two fields of one constructor lives in prose: §5.2's value
+conformance exists because `record_field.value: value` cannot point at `record_field.type`, and states the
+dependency normatively for that reason.
+
+**Where it is hit.**
+
+- **`enum` stating its member type.** If `identifier` is declared as a text family — `identifier_type =>
+  text_type & atom_specification & { spec?: = "<[TSON-DATA] §7.7>" }` and `identifier => !identifier_type {}`,
+  the shape `uri_type` already has — then §7.4's profile table becomes derivable from one question, *is the
+  member type `identifier` or a refinement of it?*, and `enum` could state that type in place of `profile`. An
+  author could then write `type: currency_code`, where `currency_code => !text ^ { length: 3  pattern:
+  "[A-Z]{3}" }`, and have every member checked against it, where a `TEXT` enum's members today are any text. The
+  field wants a bound (IS-A `text`), a default (`identifier`, which §5.2 refuses on a record-typed field), and
+  its members typed by it.
+- **A template parameter.** `<T>` admits any type, so a template meaning only text families cannot say so, and a
+  wrong argument fails deep inside the materialised body rather than at the application.
+- **A consumer's meta layer.** `ltr8-io-tson-java-http`'s HTTP vocabulary types a path parameter with a
+  `type_ref`, and a URL segment cannot carry a record; its schema records that nothing enforces the restriction.
+
+**Suggested resolution: a bounded, binding parameter at a field's type.** One production, used in two places:
+
+```
+type-param = param-name [ws ":" ws type-ref]
+type-params = "<" ws type-param *( separator type-param ) [ ws "," ] ws ">"
+field-type  = ( "<" ws type-param ws ">" / type-ref ) ["?"]
+```
+
+At a template, `<T: text>` bounds the parameter: an argument must resolve to `text` or a type that IS-A it, or
+the application is a resolver error. At a field's type, `<T: text>` declares a type slot — a field whose value
+is a reference bounded the same way — and binds `T` for the rest of the body:
+
+```
+enum => atom & {
+  type?:   <T: text> ~ identifier
+  members: set<T>
+}
+
+record_field => {
+  type:   <T>
+  value?: T
+  …
+}
+```
+
+What this settles:
+
+- **Member conformance is structural.** `members: set<T>` checks each member against `type` as a set checks
+  any element; no prose rule states it.
+- **§5.2's value conformance is structural** by the same mechanism, unbounded.
+- **A type slot's default has a place.** `~ identifier` on a type slot is a single type-name token; §5.2 admits
+  it on a field declared with a type-param, and every existing enum resolves unchanged, the default omitted as
+  `profile`'s is today (§8.1).
+- **Refinement gains one facet kind.** A type slot narrows along IS-A: a refinement may restate it only with a
+  subtype of the source's value. For `enum` this replaces `profile`'s one-step chain `IDENTIFIER` inside `TEXT`
+  (§5.7), which is the same relation spelled as a selector.
+- **The bound follows IS-A edges only.** `date` has a text form without being `text`; a bound that followed a
+  type's form or its discrimination class would admit it. The rule must say so.
+
+**Why the colon, and why at the field.** The colon is the bound in Rust, Swift and Kotlin (`<T: Display>`),
+and it reads as TSON's own field syntax does — `name: type`, the values of `type`. Several bounds compose with
+`&`, as Java's `T extends A & B` does. The grammar has room: `type-params` holds bare parameter names today, and
+no alternative of `type-ref` begins with `<`, so a `<` at a field type is decided on one token, the property
+the `instance` production already relies on. Placing the parameter inside the constructor, rather than wrapping
+the constructor in a template as `set => <T> !set_type { element_type: T }` does, is what lets one field refer
+to another: a template's parameters are bound by the application, before the body is read, and a template
+cannot be mixed into a type body.
+
+**What it costs.**
+
+1. **A dependent record, which the series has not had.** A template's `T` is bound by whoever applies it; this
+   `T` is bound by a field value in the data — `!enum { type: currency_code  members: [USD EUR] }` — and a later
+   field's type depends on it. §5.2 and §8.1 must say so.
+2. **Field order.** A streaming reader of a schema document read as data would meet `members` before `type` if
+   the author wrote it so, and would buffer it. Requiring the binding field to precede its uses removes the
+   buffer; §5.4 already puts a dispatch-order requirement on selectors.
+3. **A resolved form.** The sugar needs output the kernel can state: plausibly a lift (§5.3) to a synthetic
+   entry of a bounded-reference constructor carrying `bound: type_ref`, and a record-level statement of which
+   field binds which parameter. Using the field's own name as the binder (`members: set<type>`) saves the name
+   but puts field names in the type namespace, where §5.10's shadowing rule does not reach.
+4. **A meta-kernel change.** `record_field` and `enum` change shape, which a published revision cannot carry.
+
+**Open: what a bound may name.** `<T: text>` is a type bound. §5.2's other restriction — a value only on a field
+typed by an atom-family instance or an enum — and the HTTP layer's "any scalar" are bounds on a **base kind**,
+not on a type. If a bound may name a kind as well as a type, both become structural; if not, they stay in prose
+and the mechanism serves `enum` and template parameters only.
+
+**Interpretation chosen:** none — nothing is built. `enum` keeps `profile`, template parameters are unbounded,
+and §5.2's conformance is enforced by the resolver as prose requires.
+
+**Status against Revision 36:** open.
+
+---
+
+## 7. `identifier` should be a text family — which reaches identifier-typed map keys, and lets `enum` state its type
+
+**Section:** [TSON-SCHEMA] §5.4 (discrimination class), §5.7 (refinement), §7.4 (enum member semantics, the
+`identifier` primitive), §11.4 (name hygiene at the schema layer); [TSON-DATA] §2.6 (map keys are values), §7.7
+(the identifier grammar), §8.2 (name hygiene); the meta-kernel's `unit`, `identifier`, `text_type`,
+`enum_profile` and `enum`. Proposal 2 builds on #6.
+
+**Kind:** proposal, with one gap in the current text underneath it.
+
+**The gap.** [TSON-DATA] §8.2's mechanisms reach *declared names* — a schema's declarations, a record's fields,
+an `IDENTIFIER` enum's members — and §11.4 lists the scopes the look-alike mechanism runs over. A map key is a
+value (§2.6), so none of it reaches one. Two keys of one map with equal UTS #39 skeletons (`admin` and `аdmin`,
+the second with U+0430), or a mixed-script key, are admitted, where the same two names as two fields of a record
+or two declarations of a schema are refused under the default Highly Restrictive identifier policy. That holds
+when the key type is the kernel's `identifier` or a role over it: the key must match §7.7's grammar, and nothing
+else follows. **This implementation runs exactly that:** a value at an `identifier`-typed position is checked
+against §7.7 and against no §8.2 mechanism.
+
+The text is also not clear that this is intended. §8.2 says mechanisms 2 and 3 "reach every identifier position
+— field names, annotation names, type-annotation names, and every naming position of the schema grammar"; §7.4
+says "`identifier` is not used in data values". Yet `identifier`, `type_name` and `field_name` are ordinary
+kernel types, and a meta-layer schema may type a map key by one. Whether a value at such a position is an
+"identifier position" is decided by neither sentence.
+
+**Why it matters.** A map keyed by names is a naming scope in every sense §8.2 means: names a reader must tell
+apart, in one document, where confusing two of them is the attack. An interface's methods, or a service's
+routes, kept as `{method_name => handler}` are that — and a design that moves members from record fields into
+such a map, which is what a borrowed namespace looks like and what §4.1's `data` kind exists to make possible,
+takes the spoofing surface with it and leaves the rules behind.
+
+**Why a type and not a rule about maps.** At a map position `admin` and `аdmin` may be two legitimately distinct
+keys, and nothing about the position says they are names; [TSON-JSON] accepts look-alike keys at every JSON map
+position for that reason. A key whose declared type is an identifier is the schema saying they are names. So
+the line runs through the key's type — `text` keys are data, judged by the token policy; identifier keys are
+names, judged by the identifier policy — and what is missing is that `identifier` has no constraint vocabulary
+for the rules to belong to. The kernel declares it `identifier => !unit {}`, and its grammar and §8.2's rules
+reach the kernel's naming positions through §7.4's prose rather than through the type.
+
+**Proposal 1 — `identifier` becomes a text family.** Declared the way `uri`, `regex` and `email` are: a
+`text_type` composition with its specification pinned.
+
+```
+identifier_type => text_type & atom_specification & {
+  spec?: = "<[TSON-DATA] §7.7>"
+}
+identifier => !identifier_type {}
+```
+
+What follows:
+
+- **`identifier` IS-A `text`.** §7.4's "`IDENTIFIER` is inside `TEXT`" becomes a subtype edge rather than a
+  selector's declared order, so §5.7's narrowing follows IS-A as it does everywhere else.
+- **It inherits the text facets** — `min_length`/`max_length`/`length`, `pattern` (a naming convention such as
+  snake_case, inside §7.7's grammar) and `members`, so `!identifier ^ { members: [...] }` is a closed vocabulary
+  of names, with §7.4's member-coherence rule unchanged.
+- **The per-name mechanisms ride the type.** Every value whose type is `identifier` or refines it meets §8.2's
+  mechanisms 2 and 3 under the **identifier** policy, at a map key and at a field value alike. That reverses
+  §7.4's "`identifier` is not used in data values", and moves §8.2's split from *position* (declared names
+  against data) to *type* (identifier-typed against everything else); §8.2's policy paragraph needs rewording to
+  match. A document admitted today can be refused under it. Both are the point, and the revision should say so.
+- **One scope is added to §11.4:** the key set of a map whose key type is `identifier` or refines it. The
+  look-alike mechanism is a relation over a set, so the type alone cannot carry it; this is the sentence that
+  gives it the set, in the words §11.4 uses for an `IDENTIFIER` enum's members.
+- **`core.tn` gains a sibling**, as it has one for `void`. The kernel's note that "Core declares no sibling of
+  it" is why only a kernel-governed meta layer can type a key by it today; an ordinary schema should be able to
+  write `{identifier => handler}`.
+- **The discrimination class changes (§5.4).** §5.4 lists "the `unit` instances (`value`, `identifier`)" among
+  the types with no class. As a text family, `identifier` is string-class, so a choice holding it can become
+  disjoint — `( identifier | int32 )` from `false` to `true`, `( identifier | text )` staying `false` — and a
+  resolver's recorded `disjoint` changes for such a schema. An identifier-keyed map also leaves §5.4's list of
+  maps with no single key class, which changes how [TSON-JSON] spells one.
+
+The cost to weigh: an identifier becomes a kind of string in the type system. What it adds over `text` — the
+grammar and NFC — is what `spec` pins, which is the arrangement `uri_type` already has.
+
+**Proposal 2 — `enum.profile` becomes `enum.type`, using #6.** Once `identifier` is a text family, `profile`
+states a fact the type system can state itself. With #6's bounded, binding type slot:
+
+```
+enum => atom & {
+  type?:   <T: text> ~ identifier
+  members: set<T>
+}
+```
+
+| §7.4 row | derived from `enum.type` |
+|---|---|
+| members | each member is a value of `type`, by the family's own parsing and facets — structural, through `set<T>` |
+| hygiene | mechanisms 1–3 when `type` IS-A `identifier`; the look-alike mechanism alone otherwise |
+| discrimination class | the members' shared class when `type` IS-A `identifier`; string otherwise |
+| binding | host enum by name guaranteed when `type` IS-A `identifier`; host text otherwise |
+
+It is more expressive than the selector: `type: currency_code`, where `currency_code => !text ^ { length: 3
+pattern: "[A-Z]{3}" }`, checks every member against it, where a `TEXT` enum's members today are any text. The
+default keeps every existing enum unchanged in source and in resolver output, omitted as `profile`'s is (§8.1).
+
+Three rules stay with `enum` rather than moving to the type:
+
+- **The class row is enum-specific.** `boolean => !enum [true false]` is boolean-class because §7.4 reads the
+  class off the members' tokens. Under Proposal 1 the type `identifier` is string-class, so an `identifier`-typed
+  map key holding `true` is string-class while the same member of an enum is boolean-class. The row cannot be
+  inherited from `type`'s own class, and §7.4 must keep stating it.
+- **The look-alike mechanism over the member set.** A `TEXT` enum's members are what a value is matched against,
+  so two that read alike are a hazard whatever `type` is. That is a property of `enum`.
+- **Refinement** narrows `type` along IS-A, #6's facet kind, which replaces `profile`'s one-step chain.
+
+**The alternatives:**
+
+- **Keep `profile`, defined by reference** — `IDENTIFIER` means each member is an `identifier` value, and the
+  rules come from Proposal 1's type rather than being restated in §7.4. No change to `enum`'s shape and no
+  dependence on #6: the minimum that removes the duplication, and the fallback if #6 is not taken.
+- **Collapse `enum` into member sets** — `!identifier ^ { members: [...] }` and `!text ^ { members: [...] }`.
+  Argued against: `enum` carries what a member set does not — the binding row, unquoted spelling, and a class of
+  its own — and Revision 36 kept both deliberately.
+
+**Interpretation chosen:** the current text. `identifier` stays `!unit {}`, a value at an `identifier`-typed
+position is checked against §7.7's grammar only, and no hygiene reaches a map key. A consumer that wanted the
+rule could scan its own keys, but a security rule with a second implementation in each consumer is free to
+drift lenient, so none does.
+
+**Status against Revision 36:** open. Proposal 1 stands alone and closes the map-key gap; Proposal 2 depends on
+it and on #6.
+
+---
+
+## 8. `value` and `void` should each have a constructor, retiring `unit` and dispatch by name
+
+**Section:** [TSON-SCHEMA] §4.2 (the `unit` atom constructor), §5.4 (discrimination class), §6 (bare annotations),
+§7.3 (`void`), §9 and §13.2 (the bundled schemas); the meta-kernel's `unit`, `value` and `void`, and core's `void`
+sibling. Follows from #7.
+
+**Kind:** proposal — consistency of the meta-kernel, and the removal of the one place the series identifies a type
+by its name.
+
+**What §4.2 says today.** `unit => atom & {}` is the atom with no constraint vocabulary, and its instances
+`value`, `identifier` and `void` are all `!unit {}`: "the resolved shapes are identical and deliberately
+uninformative, so implementations MUST dispatch `value`, `identifier`, and `void` by their declared names". Every
+other atom in the kernel is told apart by its constructor — `integer_type`/`integer`, `text_type`/`text`,
+`uri_type`/`uri`, `regex_type`/`regex` — and #7 moves `identifier` to the same pattern, as
+`identifier_type`/`identifier`. That leaves `unit` with two instances and the name rule with two subjects.
+
+**Proposal.** Give each its own constructor, with an empty constraint vocabulary as `unit` has, and retire `unit`:
+
+```
+value_type => atom & {}
+value      => !value_type {}
+
+void_type  => atom & {}
+void       => !void_type {}
+```
+
+and core's sibling becomes `void => !void_type {}`. Every atom in the kernel is then `X => !X_type {…}`, and each
+contract belongs to a constructor rather than to a name.
+
+What follows:
+
+- **§4.2's name rule goes.** A processor recognises `void` and `value` by the constructor their resolved body
+  names, as it recognises every other family. The resolved output carries the distinction structurally, where
+  today it is "deliberately uninformative".
+- **Core's `void` sibling is a `void` by construction.** Today it is "the same `!unit {}` construction and the
+  same contract" (§4.2), and a processor must know that a second entity named `void`, in another schema, carries
+  the kernel's contract. Under the proposal the contract comes with `!void_type`, and no second name needs
+  recognising.
+- **§4.2's "User schemas SHOULD NOT introduce additional unit instances without a documented parsing contract"
+  goes.** `!unit {}` names no contract, which is why the SHOULD exists; with `unit` gone there is nothing to
+  instantiate without one. A schema that wants its own `void` writes `!void_type {}` and gets the kernel's contract.
+- **The prose that names "the `unit` instances" is rewritten to name `value` and `void`:** §5.4's list of types
+  with no class, §5.4's exception for map key types, and §13.2's table row for the kernel.
+- **Neither type gains a facet.** Both vocabularies are empty, as `unit`'s is, so neither becomes narrowable;
+  `value`'s "is not narrowable" stays true.
+
+**What is running.** This implementation dispatches by name, as §4.2 requires: both encodings register one reader
+factory for `unit` and select `void` or `value` inside it by the entry's declared name, and the linker's refusal
+of a `void` variant (§5.4) and the inhabitance check (§5.10.1) compare the terminal of a reference chain against
+the string `"void"`. Under the proposal each of these keys on the constructor instead.
+
+**The cost.** The kernel and core change content, so every bundled schema's pin changes, and a revision carries it.
+Nothing else moves: `value` and `void` keep their names, positions and contracts, and a user schema that types a
+field `void` or `value` is unchanged in source.
+
+**Interpretation chosen:** the current text — `unit` with name dispatch.
+
+**Status against Revision 36:** open. Independent of #6; it completes #7, and is worth taking only with it, since
+alone it leaves `identifier` the one `!unit {}`.
