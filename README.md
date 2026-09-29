@@ -57,9 +57,9 @@ including records, record groups, enums and some in-built types. The `2026/36` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/36/getting-started/person.tn?sha256=f55231951bd8462c5c5ff550ab98a17dcfb393775f849162c16e2bf62d42382b"
-!!meta:"https://tson.io/2026/36/m/meta.tn?sha256=ede51d234992ccf229bf24e53d0e6e53ae30aa6a2c70760ae051e19b4f035cb4"
-!!import:"https://tson.io/2026/36/m/core.tn?sha256=d924ef919b8fab247d7325d8fda9f4fbd4a790a4de696d39cee36d0aa9057c19"
+!!id:"https://example.com/2026/37/getting-started/person.tn?sha256=4ad2999e5d43e23b89f3d13e51b81bf5ea18ebfdd9a64d92e82ac69d5cecc1ee"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=b1439bcfe7c9603b404d1dc7b8ec3e174eb32becaf570495170f8004fd3ec25a"
+!!import:"https://tson.io/2026/37/m/core.tn?sha256=7628c51cb9cd22dd4083ff919cdec627f68b3aee0ea411e637ed7967aeaf7712"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]
@@ -96,7 +96,7 @@ And here's a corresponding `person-data.tn` *data* document. It's *self-describi
 `!!schema` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
-!!schema:"https://example.com/2026/36/getting-started/person.tn"
+!!schema:"https://example.com/2026/37/getting-started/person.tn"
 !person {
   id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
   name: "Ada Lovelace"
@@ -355,9 +355,9 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.standard();
 
 String schema = """
-        !!id:"https://example.com/2026/36/app/server-1.tn"
-        !!meta:"https://tson.io/2026/36/m/meta.tn"
-        !!import:"https://tson.io/2026/36/m/core.tn"
+        !!id:"https://example.com/2026/37/app/server-1.tn"
+        !!meta:"https://tson.io/2026/37/m/meta.tn"
+        !!import:"https://tson.io/2026/37/m/core.tn"
         {
             server => { hostname: text  port: int32 }
         }""";
@@ -365,7 +365,7 @@ String schema = """
 tson.resolve(schema);
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/36/app/server-1.tn")
+        .withSchema("https://example.com/2026/37/app/server-1.tn")
         .readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
 
 value.get("hostname").asString();          // Optional[web-01] — validated against the schema
@@ -397,11 +397,11 @@ Tson tson = Tson.of(ProcessorConfig.defaults()
         // Schemas you already hold, keyed by identity. Not `schemas::get` -- a source says "I cannot
         // supply that" by throwing, where a map returns null, for whichever identity the document names.
         .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(   // the `server` schema from §4
-                Map.of("https://example.com/2026/36/app/server-1.tn", schema)))));
+                Map.of("https://example.com/2026/37/app/server-1.tn", schema)))));
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
 TsonValue server = tson.treeReader().read("""
-        !!schema:"https://example.com/2026/36/app/server-1.tn"
+        !!schema:"https://example.com/2026/37/app/server-1.tn"
         !server { hostname: "web-01"  port: 8080 }""");        // validated as it builds the tree
 
 // No !!schema? The same reader reads schemalessly, straight off the wire.
@@ -678,9 +678,9 @@ nothing to reopen, so piped input is always treated as data.
 For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
-!!id:"https://example.com/2026/36/app/person-1.tn"
-!!meta:"https://tson.io/2026/36/m/meta.tn"
-!!import:"https://tson.io/2026/36/m/core.tn"
+!!id:"https://example.com/2026/37/app/person-1.tn"
+!!meta:"https://tson.io/2026/37/m/meta.tn"
+!!import:"https://tson.io/2026/37/m/core.tn"
 {
     person => { name: text  age: int32 }
 }
@@ -695,7 +695,7 @@ $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person
   "permitting":[]},"token_policy":{"level":"UNRESTRICTED","per_segment":false,"permitting":[]},
   "unicode_data_version":"16.0"},
   "files":[{"file":"bad.tn","outcome":"INVALID","errors":[{"path":"/name",
-  "schema_pointer":"/person/name","schema_id":"example.com/2026/36/app/person-1.tn",
+  "schema_pointer":"/person/name","schema_id":"example.com/2026/37/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(absent)","data_position":"2:9:63",
   "schema_position":"5:5:145"}]}],"errors":[]}
