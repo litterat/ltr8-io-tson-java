@@ -203,14 +203,14 @@ final class TemplateMaterialiser {
      * it. Empty until {@code SchemaResolver} has inferred them, which it cannot do before every declaration
      * has resolved; an application closed on demand before that point classifies as it always did.
      */
-    private Map<String, Map<String, ParameterKinds.Kind>> parameterKinds = Map.of();
+    private Map<String, Map<String, ParameterTypes.Kind>> parameterKinds = Map.of();
 
     /**
      * The same question answered one template at a time, for an application closed before the batch pass
      * could run -- a composition supertype or a refinement source, both of which close during resolution's
      * own driving loop. Memoised because a template is typically applied more than once.
      */
-    private final Map<String, Map<String, ParameterKinds.Kind>> kindsOnDemand = new LinkedHashMap<>();
+    private final Map<String, Map<String, ParameterTypes.Kind>> kindsOnDemand = new LinkedHashMap<>();
 
     /** The governing meta's entries, which is where a slot's declared type is read from. */
     private final Function<String, TypeDefinition> metaTypes;
@@ -226,7 +226,7 @@ final class TemplateMaterialiser {
     }
 
     /** The inferred kinds, once {@code SchemaResolver} has them -- see {@link #parameterKinds}. */
-    void parameterKinds(Map<String, Map<String, ParameterKinds.Kind>> kinds) {
+    void parameterKinds(Map<String, Map<String, ParameterTypes.Kind>> kinds) {
         this.parameterKinds = kinds;
     }
 
@@ -894,9 +894,9 @@ final class TemplateMaterialiser {
      */
     List<TypeArgument> byParameterKind(String head, TypeDefinition template,
                                                 List<String> parameters, List<TypeArgument> arguments) {
-        Map<String, ParameterKinds.Kind> kinds = parameterKinds.get(head);
+        Map<String, ParameterTypes.Kind> kinds = parameterKinds.get(head);
         if (kinds == null) {
-            kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterKinds.inferOne(template, metaTypes));
+            kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, metaTypes));
         }
         if (kinds == null || kinds.isEmpty()) {
             return arguments;
@@ -904,7 +904,7 @@ final class TemplateMaterialiser {
         List<TypeArgument> bound = new ArrayList<>(arguments.size());
         for (int i = 0; i < arguments.size(); i++) {
             bound.add(arguments.get(i) instanceof TypeArgument.Ref ref && ref.ref().arguments().isEmpty()
-                    && kinds.get(parameters.get(i)) == ParameterKinds.Kind.VALUE
+                    && kinds.get(parameters.get(i)) == ParameterTypes.Kind.VALUE
                             ? new TypeArgument.Value(new Token(ref.ref().name(), Token.Form.UNQUOTED))
                             : arguments.get(i));
         }

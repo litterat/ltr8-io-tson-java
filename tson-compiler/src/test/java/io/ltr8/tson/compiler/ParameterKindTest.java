@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §5.10's <b>two parameter kinds, inferred by use</b> ({@code ParameterKinds}) -- and what the
+ * [TSON-SCHEMA] §5.10's <b>two parameter kinds, inferred by use</b> ({@code ParameterTypes}) -- and what the
  * kinds are for: an argument is classified by the parameter it binds, not by the shape of the token that
  * spells it.
  *

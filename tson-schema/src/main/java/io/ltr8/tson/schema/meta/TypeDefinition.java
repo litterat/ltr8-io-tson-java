@@ -85,7 +85,7 @@ public record TypeDefinition(Optional<TypeRef> source, @Unbound TypeKind kind,
      * a closed entry has nowhere to put a parameter list at all.
      */
     public List<String> parameters() {
-        return body instanceof TemplateBody held ? held.parameters() : List.of();
+        return body instanceof TemplateBody held ? held.parameterNames() : List.of();
     }
 
 /** A fresh PRODUCT definition with no source, supertypes or parameters -- {@code integer_size}'s own shape. */

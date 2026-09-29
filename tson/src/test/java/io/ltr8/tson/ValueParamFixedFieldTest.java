@@ -8,6 +8,8 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 
@@ -86,7 +88,9 @@ class ValueParamFixedFieldTest {
         TemplateBody held = assertInstanceOf(TemplateBody.class,
                 linked.schema().entries().get("response").body());
 
-        assertEquals(List.of("T", "S"), held.parameters(), "the entry's own parameter list, as declared");
+        assertEquals(List.of("T", "S"), held.parameterNames(), "the entry's own parameter list, as declared");
+        assertEquals(List.of(TemplateParam.typeParameter("T"), new TemplateParam("S", TypeRef.of("int32"))),
+                held.parameters(), "S is routed into an int32 field, so an argument for it is read as an int32");
         assertTrue(held.template().contains("value: S"),
                 () -> "the parameter stands in the ordinary value slot: " + held.template());
         assertFalse(held.template().contains("FIXED"),

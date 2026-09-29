@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -72,7 +73,10 @@ public final class HeldBody {
         // The parent's extension is derived here because this is the one door every open entry passes
         // through, whatever spelling produced it -- and from the payload's own structure rather than from
         // the text below it, which is not parsed back on this path at all.
-        return new TemplateBody(parameters, WRITER.toTson(application),
+        // Every parameter starts as a type parameter: its type is derived from the body once the whole schema has
+        // resolved (ParameterTypes), which a held body is built well before.
+        return new TemplateBody(parameters.stream().map(TemplateParam::typeParameter).toList(),
+                WRITER.toTson(application),
                 WireForm.parentExtension(application, parameters),
                 WireForm.parentDiscriminators(application, parameters));
     }
@@ -98,7 +102,7 @@ public final class HeldBody {
 
     /** The entry's own parameter names, in declaration order. */
     public List<String> parameters() {
-        return body.parameters();
+        return body.parameterNames();
     }
 
     /** The held application as a value tree -- what substitution rewrites and what identity is derived from. */

@@ -16,6 +16,7 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -143,7 +144,7 @@ class TsonSchemaLinkerTest {
      */
     private static TypeDefinition template(String parameter, String body) {
         return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(),
-                new TemplateBody(List.of(parameter), body, Optional.empty()));
+                new TemplateBody(List.of(TemplateParam.typeParameter(parameter)), body, Optional.empty()));
     }
 
     /**

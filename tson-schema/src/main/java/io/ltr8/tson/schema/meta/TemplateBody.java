@@ -4,14 +4,15 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
  * The meta-kernel's {@code template} body -- the body of an entry that declares type parameters, which
  * [TSON-SCHEMA] §5.10 calls open. {@link #template} is the constructor application as written, held and
- * <em>unread</em> until materialisation substitutes the parameters away; {@link #parameters} are the names
- * it binds.
+ * <em>unread</em> until materialisation substitutes the parameters away; {@link #parameters} are what it
+ * binds, in order, each with the type an argument for it is read as ({@link TemplateParam}).
  *
  * <p><b>It holds in both directions</b>: a {@link TypeDefinition} whose body is one of these declares type
  * parameters, and every entry that declares them has one. §5.10's partial application is no exception --
@@ -53,7 +54,7 @@ import java.util.Optional;
  * mean parsing the held text -- the one thing §1.3 promises a resolved-output consumer never has to do.
  */
 @Typename(name = "template")
-public record TemplateBody(List<String> parameters, String template,
+public record TemplateBody(List<TemplateParam> parameters, String template,
                             Optional<RecordExtensionType> extension,
                             List<String> discriminators) implements Top {
 
@@ -80,8 +81,20 @@ public record TemplateBody(List<String> parameters, String template,
     }
 
     /** The same body with {@code discriminators} unstated -- every producer, until they are wired. */
-    public TemplateBody(List<String> parameters, String template,
+    public TemplateBody(List<TemplateParam> parameters, String template,
                          Optional<RecordExtensionType> extension) {
         this(parameters, template, extension, List.of());
+    }
+
+    /** The parameter names, in order -- what substitution binds and what an application's arity is checked against. */
+    public List<String> parameterNames() {
+        return parameters.stream().map(TemplateParam::name).toList();
+    }
+
+    /** The same body with each parameter's type replaced by {@code types}' entry for it, where there is one. */
+    public TemplateBody withTypes(Map<String, TypeRef> types) {
+        return new TemplateBody(parameters.stream()
+                .map(p -> new TemplateParam(p.name(), types.getOrDefault(p.name(), p.type()))).toList(),
+                template, extension, discriminators);
     }
 }
