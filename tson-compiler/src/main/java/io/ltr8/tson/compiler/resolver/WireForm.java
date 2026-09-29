@@ -36,7 +36,7 @@ import java.util.function.Function;
  * by two phases and read by four: {@code SchemaDesugarer} lifts a sugar form and {@code DefinitionResolver}
  * holds a composition or refinement template; {@code TemplateMaterialiser} closes one, {@link HeldBody}
  * answers §5.10's declaration-time questions about one, {@code SyntheticMerge} asks whether one holds an
- * application, and {@code ParameterKinds} walks one for §5.10's parameter kinds. A second opinion about what
+ * application, and {@code ParameterTypes} walks one for §5.10's parameter types. A second opinion about what
  * an application looks like is what makes one of those wrong.
  *
  * <p><b>Nothing here is canonical output, and {@code DataClassObjectWriter} cannot serve any of it.</b> That

@@ -380,7 +380,7 @@ final class DefinitionResolver {
                     + " -- this entry's body applies '!" + held.application().typeRef().orElse("?")
                     + "' ([TSON-SCHEMA] §5.2)");
         }
-        return resolved.withBody(HeldBody.held(open.parameters(),
+        return resolved.withBody(HeldBody.held(open.parameterNames(),
                 WireForm.heldWithExtension(held.application(), extension)));
     }
 

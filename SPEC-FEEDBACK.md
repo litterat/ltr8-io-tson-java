@@ -793,6 +793,18 @@ template => top & {
 }
 ```
 
+**One reading for both kinds.** `type` is the type an argument is read as, in the vocabulary of the constructor the
+held body applies — the declared type of the slot the parameter stands in. For a count that is
+`non_negative_integer`; for a type reference it is `type_ref`, which is the kernel's type of a type reference and not
+a special case. So the kind is not recorded: it follows from `type` (below), and a separate field would state one
+fact twice.
+
+**Why a list of records.** Arguments are positional, so the order is part of the fact and a map loses it; a parallel
+`parameter_types: [type_ref]` beside `parameters: [param_name]` is two lists free to drift. A record per parameter
+keeps name and type together and leaves room for what a parameter may carry later — a default argument — without
+changing shape again. The list stays inside `template` rather than moving to `type_definition`, where
+`parameters` would be a second statement of what the held body already says.
+
 **Every parameter's type is derived from the positions it stands in.** No parameter lacks one: §5.10 already
 refuses a parameter the body never references, so every parameter has at least one position, and every position
 has a declared type in the applied constructor's vocabulary:
@@ -804,10 +816,32 @@ has a declared type in the applied constructor's vocabulary:
 - **A routed default or fixed value** (`w?: int32 ~ N`) gives the *field's* declared type, `int32`, not the
   declared type of `record_field.value`, which is `value` and says nothing. This is §5.2's value conformance, and
   it is the one derivation that reads a second field; #6's `record_field => { type: <T>  value?: T }` makes it
-  structural.
+  structural. Where the field's type is itself a parameter — `box => <T, N> { w?: T ~ N }` — the derived type is
+  that parameter: `N`'s `type` is `T` (see "A type may name an earlier parameter", below).
 - **An argument to another template** gives that template's recorded `type` for the position, so derivation is a
   fixed point across templates that apply each other. A parameter the fixed point leaves undetermined gets
   `type_ref`, which is §5.10's rule that such a parameter is a type parameter.
+- **A payload in §5.6's positional form** is walked as the one field it binds: `names => <M> !enum [a b M]` puts
+  `M` in `enum.members`, exactly as `!enum { members: [a b M] }` does, and gives `text`. The derivation has to say
+  so, since the positional payload names no field for a walk to match.
+
+**Where a derived type is read.** Each rule reads its type where the held body wrote it, so the body decides the
+namespace and the recorded name is never ambiguous. A slot's declared type belongs to the applied constructor's
+vocabulary — `min_items: N` gives the governing meta's `non_negative_integer`, and core's `extern_type => <S, T>
+!scoped { … schemas: { S => [T] } }` gives `T: type_name`, a kernel role core does not declare. A routed default's
+type is the value of `record_field.type`, which is itself a `type_ref` slot, so it names a type in the schema's own
+namespace by exactly the rule that makes `array.element_type: T`'s argument a local name: `counted => <C> { c?:
+percent ~ C }` gives `C: percent`, which only the schema declares. A type carried from another template keeps the
+reading it had there.
+
+**A type may name an earlier parameter.** A routed default whose field is typed by a parameter has no fixed type to
+record, since its type is whatever that parameter's argument turns out to be. The proposal records the parameter
+itself — `parameters: [ { name: T  type: type_ref } { name: N  type: T } ]` — which needs one scoping rule: inside
+`parameters`, a `type` may name a parameter of the same template declared before it, and nothing else in the
+schema's namespaces by that name. #6 needs the same rule for `record_field => { type: <T>  value?: T }`, so it is not
+a rule of this entry's own. At an application the argument for `N` is read as the type `T`'s argument names. The
+alternative — record `value` for such a parameter — keeps `type` free of references to its siblings and gives up the
+call-site check for exactly the parameters whose type depends on another argument.
 
 **The kind follows from the type.** A parameter whose `type` is `type_ref` or a bounded type slot is a type
 parameter; any other is a value parameter. §5.10's kind inference becomes a consequence rather than a rule of its
@@ -856,26 +890,65 @@ as "the values of `type`" for a field. The alternative is to spell the two apart
 say, and no annotation on value parameters — which keeps one meaning per spelling and loses the narrowing of value
 parameters.
 
-**What is running.** This implementation already derives each parameter's kind from the declared type of the slot
-it stands in (`ParameterKinds`): a slot typed `type_ref` gives a type parameter, a slot resolving to an atom a
-value parameter, and anything else — a parameter standing for a whole collection or record — is refused at the
-declaration, as is a parameter standing in both kinds of position. It runs as a fixed point across templates, and
-a parameter left undetermined is a type parameter, as §5.10 requires. The slot type it reads is then discarded:
-the output carries `parameters: [param_name]`, as §8.1 requires, and an argument is checked by substitution. Under
-the proposal the same walk keeps the type, and the check moves to the application.
+**What is running.** On `main`, the current text: this implementation derives each parameter's kind from the
+declared type of the slot it stands in (`ParameterKinds`), refuses a parameter standing for a whole collection or
+record or in both kinds of position, runs the derivation as a fixed point across templates with an undetermined
+parameter a type parameter, and then discards the slot type. The output carries `parameters: [param_name]`, and an
+argument is checked by substitution.
+
+On `r2026-37-proposal`, the recorded type, as proposed here — the kernel declares `template_param` and
+`template.parameters: [template_param]`, and `ParameterTypes` keeps what the walk finds: a slot's declared type,
+a routed default's field type (an earlier parameter where the field is typed by one), a callee's recorded type
+through the fixed point, `type_ref` where nothing grounds a parameter, and §5.6's positional form walked as the
+field it binds. The kind is read from the type. Several uses must agree by IS-A, or the declaration is refused. A
+held body is built before resolution has typed anything, so every parameter starts as `type_ref`, and the types are
+stamped on each open entry the schema produced — declared and minted by materialisation alike — once everything has
+closed. Not yet running there: the check at the application (arguments are still checked by substitution), the
+restriction syntax, and ingest's verification of a recorded type, since this implementation re-resolves a schema
+from source rather than ingesting resolved output.
+
+**The proposal measured against what exists.** Every template this implementation's tests and the conformance
+corpus declared before the change — 116 distinct ones — was walked with the use types recorded, and the running
+derivation bears it out:
+
+- **No template is newly refused.** One parameter has uses of more than one type, `both => <T> { a: T  b?: int32 ~
+  T }`, which is refused today as standing in both kinds of position; it stays refused, with `type_ref` and `int32`
+  unordered by IS-A as the reason.
+- **One kind changes.** `my_set => <T> array ^ { element_type?: = T … }` routes `T` into a field typed `type_ref`,
+  so the routed-default rule makes `T` a type parameter where today's rule, reading `record_field.value`'s own type
+  `value`, makes it a value parameter. The routed rule is the accurate one; the change is invisible to every
+  application, since an argument substitutes the same text on either channel.
+- **Two templates need the earlier-parameter rule**, both of the form `<T, N> { w?: T ~ N }`.
+- **One template recorded nothing without the positional-form rule.** `names => <M> !enum [a b M]` gave `M` no use
+  at all, so `M` was never a value parameter and `names<c>` looked `c` up as a type — an error on `main` today,
+  which the recorded type makes visible and the positional-form rule removes.
+- **The derived value types are ordinary named types** — `non_negative_integer`, `integer`, `text`, `uri`,
+  `type_name`. No resolver-minted synthetic name reaches a `type`.
+- **The bundled schemas' templates record:** `set`'s `T: type_ref` (meta and core), `extern_of`'s `S: uri`, and
+  `extern_type`'s `S: uri` and `T: type_name`.
 
 **The cost.**
 
 1. **A meta-kernel change.** `template.parameters` changes type and `template_param` is new, so every bundled
    schema's pin changes, and a revision carries it.
-2. **A derived fact in resolved output.** Like `subtypes` and `disjoint`, `type` is computed, so ingest (§10.1)
-   discards and recomputes it from the held text, which ingest already parses; an author-written annotation is
-   what the held text records, and survives.
+2. **A derived fact in resolved output, which ingest verifies rather than recomputes.** `type` is computed, like
+   `subtypes` and `disjoint`, but unlike them it may also carry what an author wrote: `<X: T>` narrows it, and the
+   annotation lives nowhere else. The held text is the body alone — `"!set_type { element_type: T }"` — and the
+   parameter list is not in it, so an ingest (§10.1) that discarded `type` and recomputed it would silently drop
+   every annotation. Ingest derives the type again from the held text and checks that the recorded `type` IS-A it,
+   which is the rule an annotation already meets at the declaration: an annotated narrowing survives, and a stale
+   or altered one is refused. The alternative is a second field, `declared?` beside a derived `type`, which splits
+   one fact across two places.
 3. **The fixed point is normative.** §5.10 states the kind rule for one template; the derivation across templates
    that apply each other must be stated, with its default.
+4. **Two sentences on reading `type`.** A slot's declared type is read in the applied constructor's vocabulary and
+   a `type_ref` slot's value in the schema's own namespace, which is the rule that already governs the held body;
+   and a `type` may name an earlier parameter of the same template.
 
-**Interpretation chosen:** the current text — parameters are names, the kind is inferred and not recorded, and an
-argument is checked by substitution.
+**Interpretation chosen:** on `main`, the current text — parameters are names, the kind is inferred and not
+recorded, and an argument is checked by substitution. On `r2026-37-proposal`, the recorded type (this entry's first
+part); the check at the application and the restriction syntax are its second.
 
 **Status against Revision 36:** open. The recorded type stands without #6; the bound syntax needs #6's production,
-and #6's template bound needs this entry's `type` to be recorded.
+and #6's template bound needs this entry's `type` to be recorded. The earlier-parameter rule is shared with #6
+rather than depending on it.

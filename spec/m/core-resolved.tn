@@ -370,18 +370,18 @@
     """
   extern_of => !type_definition {
     source: scoped
-    body: !template { parameters: [S]  template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }" }
+    body: !template { parameters: [{ name: S  type: uri }]  template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }" }
   }
 
   extern_type => !type_definition {
     source: scoped
-    body: !template { parameters: [S T]  template: "!scoped { scope: [EXTERN]  schemas: { S => [T] } }" }
+    body: !template { parameters: [{ name: S  type: uri } { name: T  type: type_name }]  template: "!scoped { scope: [EXTERN]  schemas: { S => [T] } }" }
   }
 
   @doc:"The set spelling an author writes: a template over meta's parameterless set_type."
   set => !type_definition {
     source: set_type
-    body: !template { parameters: [T]  template: "!set_type { element_type: T }" }
+    body: !template { parameters: [{ name: T  type: type_ref }]  template: "!set_type { element_type: T }" }
   }
 
   @doc:"Marker annotation."

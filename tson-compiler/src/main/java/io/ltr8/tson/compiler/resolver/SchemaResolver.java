@@ -23,6 +23,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
@@ -319,7 +321,7 @@ public final class SchemaResolver {
         // application rather than after substitution. Here because it needs every declaration resolved (a
         // slot's declared type comes from the constructor's own vocabulary) and nothing yet closed.
         Set<String> unkinded = new LinkedHashSet<>();
-        materialiser.parameterKinds(ParameterKinds.inferAll(namespace, declarations.keySet(),
+        materialiser.parameterKinds(ParameterTypes.kinds(ParameterTypes.inferAll(namespace, declarations.keySet(),
                 metaParser.schema().entries()::get,
                 (name, error) -> {
                     if (!problems.collecting()) {
@@ -327,7 +329,7 @@ public final class SchemaResolver {
                     }
                     unkinded.add(name);
                     problems.report(declarations.get(name), "'" + name + "': " + error.getMessage(), error);
-                }));
+                })));
         // Condemned on the same terms as an irregular template: the verdict is in, and closing an application
         // of a template whose parameters cannot be classified only reports the consequence -- the substituted
         // body failing its constructor's vocabulary -- against whichever entry happened to apply it.
@@ -359,6 +361,12 @@ public final class SchemaResolver {
             });
             republish(namespace, resolvedLocals, instantiations);
         }
+
+        // §5.10's parameter types, recorded on every open entry this schema produced -- declared and minted
+        // alike, which is why this runs once everything has closed rather than beside the kinds pass above.
+        // A failure was reported by that pass against the declaration that wrote it; one here is the same
+        // verdict, and the entry keeps its provisional types.
+        recordParameterTypes(namespace, resolvedLocals, instantiations, metaParser.schema().entries()::get);
 
         // §6's name-position annotations. Binding one can fail the way a definition's can (an annotation type
         // §3.3.3 cannot reach), and this loop runs outside the memoized getter that catches those -- so it
@@ -606,6 +614,25 @@ public final class SchemaResolver {
      * on-demand getter both read through. Called after each pass that rewrites either map, since the two are
      * kept in step by hand: the namespace also holds the imported entries, so it cannot simply be replaced.
      */
+    /**
+     * Stamps each local open entry's {@code template_param.type}s ({@link ParameterTypes}), in {@code resolvedLocals},
+     * {@code instantiations} and {@code namespace} alike, so every view of the entry agrees.
+     */
+    private static void recordParameterTypes(Map<String, TypeDefinition> namespace,
+                                             Map<String, TypeDefinition> resolvedLocals,
+                                             Map<String, TypeDefinition> instantiations,
+                                             Function<String, TypeDefinition> meta) {
+        Set<String> local = new LinkedHashSet<>(resolvedLocals.keySet());
+        local.addAll(instantiations.keySet());
+        Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> types =
+                ParameterTypes.inferAll(namespace, local, meta, (name, error) -> { });
+        for (Map<String, TypeDefinition> view : List.of(resolvedLocals, instantiations, namespace)) {
+            view.replaceAll((name, definition) -> local.contains(name) && types.containsKey(name)
+                    && definition.body() instanceof TemplateBody held
+                    ? definition.withBody(held.withTypes(types.get(name))) : definition);
+        }
+    }
+
     private static void republish(Map<String, TypeDefinition> namespace,
                                   Map<String, TypeDefinition> resolvedLocals,
                                   Map<String, TypeDefinition> instantiations) {

@@ -122,11 +122,19 @@
     ] }
   }
 
+  @doc:"One parameter of an open entry: its name, and the type an argument for it is read as — derived from the positions it stands in; a type parameter exactly when that type is `type_ref`."
+  template_param => !type_definition {
+    body: !record { fields: [
+      !record_field { name: name  type: param_name }
+      !record_field { name: type  type: type_ref }
+    ] }
+  }
+
   @doc:"Held body of an open entry — the application as written, unread until its parameters are substituted away."
   template => !type_definition {
     supertypes: [top]
     body: !record { supertypes: [top]  fields: [
-      !record_field { name: parameters      type: array_param_name_xxhash }
+      !record_field { name: parameters      type: array_template_param_xxhash }
       !record_field { name: template        type: text }
       !record_field { name: extension       type: record_extension_type  optional: true }
       !record_field { name: discriminators  type: array_field_name_xxhash  optional: true }
@@ -532,9 +540,9 @@
     body: !array { element_type: field_name }
   }
 
-  @synthetic array_param_name_xxhash => !type_definition {
+  @synthetic array_template_param_xxhash => !type_definition {
     source: array
-    body: !array { element_type: param_name }
+    body: !array { element_type: template_param }
   }
 
   @synthetic array_type_ref_xxhash => !type_definition {

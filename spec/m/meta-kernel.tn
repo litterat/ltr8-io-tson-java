@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ebf59075473d8005eac7095200c9742396c8fa4a1b72f4ba9a31513ee8bcc87f"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=a6740a0e0808da0bd7969f60bbda6768a3739afde09c419394c32215210f32fb"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -63,6 +63,27 @@
   }
 
   @doc:"""
+    One parameter of an open entry: its name, and the type an
+    argument for it is read as — the declared type of the slot it
+    stands in, in the vocabulary of the constructor the held body
+    applies. It is derived from the body and never written: a type
+    slot gives `type_ref`; a scalar slot of the applied constructor
+    gives that slot's declared type (`min_items: N` gives
+    `non_negative_integer`); a routed default or fixed value gives
+    the field's own declared type (`w?: int32 ~ N` gives `int32`);
+    and a parameter passed to another template takes that
+    template's recorded type for the position, with `type_ref` where
+    nothing grounds it. So the kind is not a second field: a
+    parameter is a type parameter exactly when its `type` is
+    `type_ref`. A `type` may name an earlier parameter of the same
+    template, where a routed default's field is typed by one.
+    """
+  template_param => {
+    name: param_name
+    type: type_ref
+  }
+
+  @doc:"""
     Held body — the body of an entry that declares type parameters
     ([TSON-SCHEMA] §5.10). `template` is the constructor application
     as written, unread until materialisation substitutes the
@@ -120,7 +141,7 @@
     dispatch on is dispatched by the tag and states none.
     """
   template => top & {
-    parameters:      [param_name]
+    parameters:      [template_param]
     template:        text
     extension?:      record_extension_type
     discriminators?: [field_name]

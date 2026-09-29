@@ -155,6 +155,12 @@ class DefinitionResolverTest {
 
     // ── DefinitionResolver: the one construct it resolves so far ──────────────
 
+
+    /** How a parameter whose type is still the provisional {@code type_ref} is written. */
+    private static String typeParameter(String name) {
+        return "{ name: \"" + name + "\" type: { name: \"type_ref\" arguments: [] } }";
+    }
+
     @Test
     void resolvesAFreshRecordWithPlainRequiredFields() throws DataBindException {
         SchemaDocument doc = new TsonSchemaParser("""
@@ -569,7 +575,7 @@ class DefinitionResolverTest {
         assertEquals(List.of("A", "B"), pair.parameters());
         assertEquals("{ source: { name: \"record\" arguments: [] } "
                         + "supertypes: [] subtypes: [] "
-                        + "body: !template { parameters: [ \"A\" \"B\" ] "
+                        + "body: !template { parameters: [ " + typeParameter("A") + " " + typeParameter("B") + " ] "
                         + "template: \"!record { fields: [ "
                         + "{ name: first type: A } { name: second type: B } ] }\" "
                         + "extension: \"ABSTRACT\" discriminators: [] } }",
@@ -614,7 +620,7 @@ class DefinitionResolverTest {
         assertEquals(List.of("T"), box.parameters());
         assertEquals(List.of("base"), box.supertypes());
         assertEquals("{ supertypes: [ \"base\" ] "
-                        + "subtypes: [] body: !template { parameters: [ \"T\" ] "
+                        + "subtypes: [] body: !template { parameters: [ " + typeParameter("T") + " ] "
                         + "template: \"!record { supertypes: [ base ] "
                         + "fields: [ { name: value type: T } ] }\" "
                         + "extension: \"ABSTRACT\" discriminators: [] } }",
@@ -636,7 +642,7 @@ class DefinitionResolverTest {
                 """);
 
         assertEquals("{ supertypes: [ \"base\" ] "
-                        + "subtypes: [] body: !template { parameters: [ \"T\" ] "
+                        + "subtypes: [] body: !template { parameters: [ " + typeParameter("T") + " ] "
                         + "template: \"!record { supertypes: [ base ] "
                         + "fields: [ { name: id type: text } { name: value type: T } ] }\" "
                         + "extension: \"ABSTRACT\" discriminators: [] } }",
@@ -725,7 +731,7 @@ class DefinitionResolverTest {
         assertEquals(List.of("T"), sized.parameters());
         assertEquals("{ source: { name: \"record\" arguments: [] } "
                         + "supertypes: [] subtypes: [] "
-                        + "body: !template { parameters: [ \"T\" ] "
+                        + "body: !template { parameters: [ " + typeParameter("T") + " ] "
                         + "template: \"!record { fields: [ "
                         + "{ name: value type: type_ref value: T } ] "
                         + "discriminators: [ value ] }\" "
@@ -743,7 +749,7 @@ class DefinitionResolverTest {
 
         assertEquals("{ source: { name: \"record\" arguments: [] } "
                         + "supertypes: [] subtypes: [] "
-                        + "body: !template { parameters: [ \"N\" ] "
+                        + "body: !template { parameters: [ " + typeParameter("N") + " ] "
                         + "template: \"!record { fields: [ "
                         + "{ name: attempts type: integer optional: true role: DEFAULT value: N } ] }\" "
                         + "extension: \"ABSTRACT\" discriminators: [] } }",
@@ -1515,8 +1521,12 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
                 {
-                  sneaky => !template { parameters: [T]  template: "!array { element_type: T }" }
-                  open_sneaky => <U> !template { parameters: [U]  template: "!array { element_type: U }" }
+                  sneaky => !template {
+                    parameters: [{ name: T  type: type_ref }]  template: "!array { element_type: T }"
+                  }
+                  open_sneaky => <U> !template {
+                    parameters: [{ name: U  type: type_ref }]  template: "!array { element_type: U }"
+                  }
                 }""").parseSchemaDocument().body();
 
         for (String declaration : List.of("sneaky", "open_sneaky")) {
