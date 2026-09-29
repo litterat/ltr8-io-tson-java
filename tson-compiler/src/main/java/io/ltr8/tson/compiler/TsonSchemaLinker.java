@@ -59,10 +59,12 @@ import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.UriType;
+import io.ltr8.tson.schema.meta.VoidType;
+import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.UuidType;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -1057,8 +1059,8 @@ public final class TsonSchemaLinker {
             // refinement) the instance's own already-resolved constructor), both explicitly
             // structure-namespace-eligible, unlike an ordinary type-ref (§3.3.2: "NOT extended by the
             // structure namespace... field types... composition targets"). See #link's own note
-            // on `structureNamespace` for why this matters concretely: `void => !unit {}`'s own
-            // `source: unit` is exactly this case -- `unit` lives in meta-kernel, reachable from
+            // on `structureNamespace` for why this matters concretely: `void => !void_type {}`'s own
+            // `source: void_type` is exactly this case -- `void_type` lives in meta-kernel, reachable from
             // core.tn only via its `!!meta` chain, never a local declaration or `!!import`.
             //
             // The one `source` shape the fallback does *not* cover is an application -- a `source` carrying
@@ -1161,7 +1163,11 @@ public final class TsonSchemaLinker {
             // entry declares, which no argument changes. See checkHeldArity for why that has to be asked
             // here rather than left to an application that may never happen.
             case TemplateBody held -> checkHeldArity(entryName, held, namespace, ownParameters);
-            case Unit ignored -> {
+            case ValueType ignored -> {
+            }
+            case VoidType ignored -> {
+            }
+            case IdentifierType ignored -> {
             }
             case EnumBody ignored -> {
             }
@@ -1276,12 +1282,13 @@ public final class TsonSchemaLinker {
      * A variant must not resolve to {@code void} (§5.4): {@code (T | void)} spells
      * optionality as a choice, and optionality belongs to the position -- a field's {@code ?} state, the
      * {@code _} sentinel -- never to the type occupying it. Judged at the end of the chain, like
-     * distinctness, so an alias of {@code void} is caught under whatever name the author wrote.
+     * distinctness, so an alias of {@code void} is caught under whatever name the author wrote, and by its
+     * {@code !void_type} body, so core's sibling is caught as the kernel's is.
      */
     private static void checkVariantsAreNotVoid(String entryName, ChoiceBody choice,
                                                  Map<String, TypeDefinition> namespace) {
         for (TypeRef variant : choice.variants()) {
-            if (ReferenceChain.terminal(variant.name(), namespace).equals("void")) {
+            if (ReferenceChain.resolvesToVoid(variant.name(), namespace)) {
                 throw new SchemaValidationException("'" + entryName + "' has a variant"
                         + (variant.name().equals("void") ? "" : " '" + variant.name() + "'")
                         + " resolving to 'void' -- optionality is not choice (§5.4): a value's absence is the "
@@ -1447,7 +1454,7 @@ public final class TsonSchemaLinker {
             return;
         }
         Token value = field.value().get();
-        Optional<AtomType<?>> parser = AtomParsers.forType(terminal, target.body());
+        Optional<AtomType<?>> parser = AtomParsers.forType(target.body());
         if (parser.isEmpty()) {
             throw notAScalarType(entryName, field, value, target.body());
         }
@@ -1506,7 +1513,7 @@ public final class TsonSchemaLinker {
             case TupleBody ignored -> "a tuple";
             case RecordBody ignored -> "a record";
             case ChoiceBody ignored -> "a choice";
-            case Unit ignored -> "the void type";
+            case VoidType ignored -> "the void type";
             case Scoped ignored -> "a scoped type, whose values name their own type rather than being a token shape";
             default -> "not a scalar type";
         };

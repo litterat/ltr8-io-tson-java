@@ -6,7 +6,7 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.ValueType;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -25,7 +25,7 @@ class TsonSchemaRegistryTest {
     private static TsonSchema schemaWithARecordField() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("token", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), new Unit()));
+                List.of(), new ValueType()));
         entries.put("set_token", TypeDefinition.product(RecordBody.of(List.of())));
         entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("members", TypeRef.of("set_token"))))));

@@ -583,13 +583,12 @@ names, judged by the identifier policy — and what is missing is that `identifi
 for the rules to belong to. The kernel declares it `identifier => !unit {}`, and its grammar and §8.2's rules
 reach the kernel's naming positions through §7.4's prose rather than through the type.
 
-**Proposal 1 — `identifier` becomes a text family.** Declared the way `uri`, `regex` and `email` are: a
-`text_type` composition with its specification pinned.
+**Proposal 1 — `identifier` becomes a text family.** Declared the way `uri`, `regex` and `email` are, as a
+`text_type` composition, but with no `atom_specification`: the grammar is the kernel's own, stated in its `@doc`,
+and there is no external document for a pinned `spec` to name.
 
 ```
-identifier_type => text_type & atom_specification & {
-  spec?: = "<[TSON-DATA] §7.7>"
-}
+identifier_type => text_type & {}
 identifier => !identifier_type {}
 ```
 
@@ -660,10 +659,21 @@ Three rules stay with `enum` rather than moving to the type:
   Argued against: `enum` carries what a member set does not — the binding row, unquoted spelling, and a class of
   its own — and Revision 36 kept both deliberately.
 
-**Interpretation chosen:** the current text. `identifier` stays `!unit {}`, a value at an `identifier`-typed
+**What is running.** On `main`, the current text: `identifier` is `!unit {}`, a value at an `identifier`-typed
 position is checked against §7.7's grammar only, and no hygiene reaches a map key. A consumer that wanted the
 rule could scan its own keys, but a security rule with a second implementation in each consumer is free to
 drift lenient, so none does.
+
+On `r2026-37-proposal`, Proposal 1's declaration, in the form above. A value is checked against §7.7's grammar
+first — a failure is `ATOM_FORM_INVALID`, the grammar being the type's form — and then against the text facets,
+whose failures are `ATOM_CONSTRAINT_VIOLATION`; so `!identifier_type { pattern: "[a-z][a-z0-9_]*" }` is a naming
+convention and `!identifier_type { members: [north south] }` a closed vocabulary of names. §7.4's members rule
+counts the grammar among the facets beside a member, so `members: [north "2nd"]` fails to load: no value could
+ever be `2nd`, since the grammar refuses it before the member set is asked. The discrimination class is string.
+Core declares its sibling, `identifier => !identifier_type {}`, so an ordinary schema writes
+`{identifier => handler}` and refines `!identifier ^ { … }`. Not yet running there: §8.2's mechanisms at
+identifier-typed values and §11.4's map-key scope, so a map key is held to the grammar and the look-alike gap
+stays open. Proposal 2 is not taken.
 
 **Status against Revision 36:** open. Proposal 1 stands alone and closes the map-key gap; Proposal 2 depends on
 it and on #6.
@@ -716,16 +726,21 @@ What follows:
 - **Neither type gains a facet.** Both vocabularies are empty, as `unit`'s is, so neither becomes narrowable;
   `value`'s "is not narrowable" stays true.
 
-**What is running.** This implementation dispatches by name, as §4.2 requires: both encodings register one reader
-factory for `unit` and select `void` or `value` inside it by the entry's declared name, and the linker's refusal
-of a `void` variant (§5.4) and the inhabitance check (§5.10.1) compare the terminal of a reference chain against
-the string `"void"`. Under the proposal each of these keys on the constructor instead.
+**What is running.** On `main`, name dispatch, as §4.2 requires: both encodings register one reader factory for
+`unit` and select `void` or `value` inside it by the entry's declared name, and the linker's refusal of a `void`
+variant (§5.4) and the inhabitance check (§5.10.1) compare the terminal of a reference chain against the string
+`"void"`.
+
+On `r2026-37-proposal`, the proposal as written, with core's sibling `void => !void_type {}`. `unit` is gone; each
+encoding registers a reader factory for `value_type` and one for `void_type`; the atom vocabulary maps a body to
+its parser with no name in hand; and the `void` variant refusal and the inhabitance check ask whether a chain ends
+at a `!void_type` body, so core's `void` and the kernel's are caught alike.
 
 **The cost.** The kernel and core change content, so every bundled schema's pin changes, and a revision carries it.
 Nothing else moves: `value` and `void` keep their names, positions and contracts, and a user schema that types a
 field `void` or `value` is unchanged in source.
 
-**Interpretation chosen:** the current text — `unit` with name dispatch.
+**Interpretation chosen:** the current text on `main`, and the proposal on `r2026-37-proposal`.
 
 **Status against Revision 36:** open. Independent of #6; it completes #7, and is worth taking only with it, since
 alone it leaves `identifier` the one `!unit {}`.

@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Tree mode: reads the {@code void} unit instance -- the absent sentinel, spelled {@code _} or {@code null}
+ * Tree mode: reads a {@code void_type} instance -- the absent sentinel, spelled {@code _} or {@code null}
  * -- consuming it via a delegate {@link VoidReader} and yielding {@link TsonAbsent}.
  */
 final class AbsentTreeReader implements TsonTypeReader<TsonValue> {

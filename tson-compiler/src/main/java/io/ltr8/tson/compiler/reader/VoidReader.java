@@ -9,7 +9,7 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
 /**
- * Parses meta-kernel's {@code void} instance of the {@code unit} atom constructor -- per its own
+ * Parses a {@code void_type} instance -- the kernel's {@code void} and core's sibling -- per its own
  * kernel doc, "parsing contract admits only the absent sentinel {@code _}. The host value is
  * absent." That contract can't be expressed as an {@code io.ltr8.tson.atom.AtomType<T>} at
  * all ({@code AtomType.read} only ever sees a token's text, and {@code _} has none), so this

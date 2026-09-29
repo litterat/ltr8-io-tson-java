@@ -22,7 +22,8 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.UuidType;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -122,8 +123,13 @@ class AtomValueReaderTest {
     }
 
     @Test
-    void unit() {
-        assertEquals("anything", readValue(new Unit(), "{ value: anything }"));
+    void identifier() {
+        assertEquals("order_id", readValue(IdentifierType.UNCONSTRAINED, "{ value: order_id }"));
+    }
+
+    @Test
+    void value() {
+        assertEquals("anything", readValue(new ValueType(), "{ value: anything }"));
     }
 
     /**

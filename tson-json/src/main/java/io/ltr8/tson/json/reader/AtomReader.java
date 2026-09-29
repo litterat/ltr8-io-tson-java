@@ -34,8 +34,8 @@ import java.util.Optional;
 final class AtomReader<T> implements JsonTypeReader<T> {
 
     /**
-     * Every atom constructor but {@code unit}. The family's parser comes from the declared name and the
-     * resolved body together -- {@code AtomParsers} is the one index both encodings ask, so there is never a
+     * Every atom constructor but {@code value_type} and {@code void_type}. The family's parser comes from the
+     * resolved body -- {@code AtomParsers} is the one index both encodings ask, so there is never a
      * second opinion about which parser reads which body.
      */
     static final ValueReaderFactory ATOM = AtomReader::of;
@@ -51,17 +51,13 @@ final class AtomReader<T> implements JsonTypeReader<T> {
                     AtomForm.BOOLEAN, context.locationOf(name, definition))
             : of(name, definition, context);
 
-    /**
-     * The three {@code unit} instances, dispatched on the declaration's own name -- [TSON-SCHEMA] §4.2 makes
-     * that dispatch normative, their resolved shapes being identical and deliberately uninformative. Two of
-     * the three are the encoding's rather than the vocabulary's, and §5.7 is where JSON states its own
-     * readings of them.
-     */
-    static final ValueReaderFactory UNIT = (name, definition, context) -> switch (name) {
-        case "void" -> new VoidReader(name, context.locationOf(name, definition));
-        case "value" -> new ValuePositionReader(name, context.locationOf(name, definition));
-        default -> of(name, definition, context);
-    };
+    /** {@code void_type}: the absent sentinel and nothing else, read as [TSON-JSON] §5.7 states for JSON. */
+    static final ValueReaderFactory VOID = (name, definition, context) ->
+            new VoidReader(name, context.locationOf(name, definition));
+
+    /** {@code value_type}: read by [TSON-JSON] §5.7's own base-type rule, which is the encoding's, not the vocabulary's. */
+    static final ValueReaderFactory VALUE = (name, definition, context) ->
+            new ValuePositionReader(name, context.locationOf(name, definition));
 
     private final String name;
     private final AtomType<T> parser;
@@ -76,7 +72,7 @@ final class AtomReader<T> implements JsonTypeReader<T> {
     }
 
     private static JsonTypeReader<?> of(String name, TypeDefinition definition, ValueReaderContext context) {
-        AtomType<?> parser = AtomParsers.forType(name, definition.body()).orElseThrow(() -> new IllegalStateException(
+        AtomType<?> parser = AtomParsers.forType(definition.body()).orElseThrow(() -> new IllegalStateException(
                 "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
         return new AtomReader<>(name, parser, AtomForm.of(definition.body()), context.locationOf(name, definition));
     }

@@ -33,10 +33,8 @@ final class ReferenceChain {
     /**
      * Where a chain ends: the name it ends at and that entry's definition.
      *
-     * <p>The <b>name</b> is part of the answer and not a convenience. [TSON-SCHEMA] §4.2 dispatches the three
-     * {@code unit} instances on the declaration's own name, their resolved bodies being identical, so a
-     * caller asking the atom vocabulary for a parser needs the name the chain landed on rather than the one
-     * it started from.
+     * <p>The <b>name</b> is part of the answer and not a convenience: {@link #namesMeaning} indexes aliases by
+     * the entry their chain lands on, which is a name and not a body.
      */
     record Resolved(String name, TypeDefinition definition) {
     }

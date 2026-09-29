@@ -264,7 +264,7 @@ final class RecordExtension {
         if (target == null || !target.parameters().isEmpty() || target.body() instanceof Reference) {
             return Optional.empty();
         }
-        return AtomParsers.forType(terminal, target.body());
+        return AtomParsers.forType(target.body());
     }
 
     /**

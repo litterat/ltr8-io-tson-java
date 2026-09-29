@@ -54,7 +54,7 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
             throw new IllegalStateException("'" + fieldTypeName + "' carries a schema-stated value but is not an "
                     + "atom -- [TSON-SCHEMA] §5.2 admits one only on an atom- or enum-typed field");
         }
-        AtomType<?> parser = AtomParsers.forType(name, atom).orElseThrow(() -> new IllegalStateException(
+        AtomType<?> parser = AtomParsers.forType(atom).orElseThrow(() -> new IllegalStateException(
                 "'" + fieldTypeName + "' carries a schema-stated value but has no parser to read it with"));
         AtomForm form = AtomForm.of(atom);
         Object pinned = parser.read(token.text());

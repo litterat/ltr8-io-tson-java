@@ -17,6 +17,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RegexType;
@@ -25,7 +26,8 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.UriType;
 
 import java.math.BigInteger;
@@ -240,22 +242,30 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * The direct, hand-written construction for one of meta-kernel's own six real constructor
+     * The direct, hand-written construction for one of meta-kernel's own eight real constructor
      * targets (see this class's own Javadoc) -- {@link Optional#empty()} for anything else, left
      * for the caller to decide what that means (today: the declaration is simply left out of the
      * result, rather than failing the whole bootstrap; unexercised against the real fixture, since
-     * all six real targets are covered).
+     * all eight real targets are covered).
      *
      * <p>Package-private, not {@code private} -- {@code MetaKernelBootstrapResolverTest} exercises the
      * unrecognized-target and wrong-shape-body branches directly, since neither is reachable through
-     * the real fixture (every real target is one of the six, and every empty-bodied one really is
+     * the real fixture (every real target is one of the eight, and every empty-bodied one really is
      * empty).
      */
     static Optional<Top> instanceBody(Instance instance) {
         return switch (instance.target()) {
-            case "unit" -> {
+            case "value_type" -> {
                 requireEmptyBody(instance);
-                yield Optional.of(new Unit());
+                yield Optional.of(new ValueType());
+            }
+            case "void_type" -> {
+                requireEmptyBody(instance);
+                yield Optional.of(new VoidType());
+            }
+            case "identifier_type" -> {
+                requireEmptyBody(instance);
+                yield Optional.of(IdentifierType.UNCONSTRAINED);
             }
             case "integer_type" -> {
                 requireEmptyBody(instance);

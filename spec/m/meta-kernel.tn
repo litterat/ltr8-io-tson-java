@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=35bdccef3a95d9da3788072f26959ab3232ea0303eb317c0f79b30722c3743f4"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ebf59075473d8005eac7095200c9742396c8fa4a1b72f4ba9a31513ee8bcc87f"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -127,16 +127,8 @@
   }
 
   @doc:"""
-    Unit atom constructor. An atom with no constraint vocabulary — the
-    atom equivalent of the empty record `{}` for products. Its instances
-    (`value`, `identifier`, `void`, all in the kernel) are
-    opaque atoms distinguished by name and prose-level parsing contract,
-    not by schema shape.
-    """
-  unit => atom & {}
-
-  @doc:"""
-    Escape hatch primitive. Instance of the unit atom constructor. The
+    Escape hatch primitive. The unconstrained instance of value_type,
+    an atom constructor with no constraint vocabulary. The
     token, uninterpreted, read by the type the position hands it to. Under
     a schema every value is typed by its position or by its tag, so a
     value-typed field is read by the declared type it stands for and never
@@ -151,56 +143,26 @@
     meta whose constrained atom is not defined in meta-kernel or meta
     (float_type.min, decimal_type.min, etc.).
     """
-  value => !unit {}
+  value_type => atom & {}
+
+  value => !value_type {}
 
   @doc:"""
-    Identifier primitive. Instance of the unit atom constructor, and the
-    type of every naming position in the series — type names, field
-    names and parameter names, through the three roles below. A rule
-    stated here reaches all of them.
-
-    An identifier is a name, not a lexeme: it is the decoded text of a
-    token, after unquoting, escape processing and normalisation, and it
-    is constrained however it was spelled. Its profile is stated beside
-    the unquoted-token profile of [TSON-DATA] §7.1:
-
-      Start    = XID_Start
-      Continue = XID_Continue + "-"
-
-    and the text MUST be in NFC. The profile is the token profile minus
-    the extensions the number grammar requires — Nd, "-", "+" and "."
-    at Start exist so a *number* can be an unquoted token, and reach
-    names only because names and values share one lexical class — so an
-    identifier never begins with a digit or a sign, which subsumes the
-    rule that numbers are not declarable names. "+" is dropped from
-    Continue as an exponent-only character, and "." is reserved as a
-    future identifier separator. Everything else follows from XID
-    membership: whitespace, control characters, format characters,
-    emoji and unassigned code points are none of them XID_Continue.
-
-    Every part of this profile lies inside the unquoted-token profile,
-    so every identifier is a well-formed unquoted token and none ever
-    needs quoting — which is what lets the type-ref and annotation
-    positions, admitting no quoted form, cost nothing.
-
-    Core declares no sibling of it (no core-level type targets it
-    directly), unlike `void`, whose core sibling exists because
-    annotations in core need it.
-    """
-  identifier => !unit {}
-
-  @doc:"""
-    Void primitive. Instance of the unit atom constructor whose
-    parsing contract admits only the absent sentinel `_`. The host
+    Void primitive. The instance of void_type, an atom constructor with
+    no constraint vocabulary whose parsing contract admits only the
+    absent sentinel `_`. The host
     value is absent. void is the target type for bare annotations
     (`@T` with no value); the resolver fills the implicit `_` and
     validates against this contract. See Part 2 §6.
 
     Core declares its own sibling under the same name — the same
-    construction and contract, a distinct type entity — so that data
-    documents governed by core-importing schemas can target it.
+    !void_type construction, and so the same contract, a distinct type
+    entity — so that data documents governed by core-importing schemas
+    can target it.
     """
-  void => !unit {}
+  void_type => atom & {}
+
+  void => !void_type {}
 
   @doc:"Internal scalar types for constraint fields."
   boolean => !enum [true false]
@@ -331,6 +293,48 @@
   }
 
   text => !text_type {}
+
+  @doc:"""
+    Identifier constraint vocabulary. A text family: it composes
+    text_type's record shape, so it takes the text facets — lengths, a
+    pattern such as a naming convention, and members for a closed
+    vocabulary of names — each applied inside the grammar below. identifier is its unconstrained instance, and the
+    type of every naming position in the series — type names, field
+    names and parameter names, through the three roles below. A rule
+    stated here reaches all of them.
+
+    An identifier is a name, not a lexeme: it is the decoded text of a
+    token, after unquoting, escape processing and normalisation, and it
+    is constrained however it was spelled. Its profile is stated beside
+    the unquoted-token profile of [TSON-DATA] §7.1:
+
+      Start    = XID_Start
+      Continue = XID_Continue + "-"
+
+    and the text MUST be in NFC. The profile is the token profile minus
+    the extensions the number grammar requires — Nd, "-", "+" and "."
+    at Start exist so a *number* can be an unquoted token, and reach
+    names only because names and values share one lexical class — so an
+    identifier never begins with a digit or a sign, which subsumes the
+    rule that numbers are not declarable names. "+" is dropped from
+    Continue as an exponent-only character, and "." is reserved as a
+    future identifier separator. Everything else follows from XID
+    membership: whitespace, control characters, format characters,
+    emoji and unassigned code points are none of them XID_Continue.
+
+    Every part of this profile lies inside the unquoted-token profile,
+    so every identifier is a well-formed unquoted token and none ever
+    needs quoting — which is what lets the type-ref and annotation
+    positions, admitting no quoted form, cost nothing.
+
+    Core declares its own sibling under the same name — the same
+    !identifier_type construction and contract, a distinct type entity —
+    so that core-importing schemas can type a value or a map key as a
+    name.
+    """
+  identifier_type => text_type & {}
+
+  identifier => !identifier_type {}
 
   @doc:"Mixin record contributing the `spec` field to specification-bound atoms."
   atom_specification => { spec: uri }

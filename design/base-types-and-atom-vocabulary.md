@@ -15,8 +15,9 @@ Design notes for what a token means: §4 base type resolution for untyped tokens
 - Three indices, three questions, and no fourth: `BuiltinTypeVocabulary` (name), `AtomParsers` (resolved body),
   `HostAtoms` (host class); a second body→parser table is what drifts.
 - Pattern facets are `String`, validated and matched through `tson-regex` (I-Regexp), never `java.util.regex`.
-- `unit`'s instances resolve to one identical body, so dispatch is keyed on the declaration's own name ([TSON-SCHEMA]
-  §4.2).
+- Every atom is told apart by its body's constructor, never by its declared name — `value`, `void` and
+  `identifier` included, each with a constructor of its own. `boolean` is the one name-keyed read, and only for
+  its host value.
 - Facet comparisons are on the value denoted, never the token: `members` uses §4.3 identity (`compareTo`), and no facet
   counts written digits.
 
@@ -47,8 +48,8 @@ back to the family that produces it, which is what a reader with no type-ref dis
 reader stack, restating `AtomParsers` entry for entry, is what drifts — a `period`-typed field's `~` default
 reported as "not a scalar type" while `duration` beside it works.
 The compiled readers and the linker both ask `AtomParsers`, so there is no second opinion about which parser reads
-which body. Of `unit`'s instances, two are the *encoding's* rather than this vocabulary's: `AtomParsers` answers for
-`identifier` and declines `value` and `void`, whose readings depend on the lexical form and on a sentinel no token is.
+which body. `value_type` and `void_type` are the *encoding's* rather than this vocabulary's: `AtomParsers` declines
+both, their readings depending on the lexical form and on a sentinel no token is.
 
 `HostAtoms` is itself three maps over one question, split by **what may reach the position**.
 `forStringContentHostType` and `forNumberContentHostType` are [TSON-JSON] §5's per-family *kinds*, since
@@ -157,12 +158,15 @@ It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recover
   (not a compiled matcher) is also what lets them bind generically with no `DataBridge`. **Matching** a value
   against a `pattern` constraint (`TextParser`/`UriParser`) runs through `tson-regex`'s `TsonRegex.matches` —
   a Thompson-NFA, linear-time and ReDoS-safe — not `java.util.regex`.
-- **`unit`'s three instances are read three ways**, not one: `value` (`ValueParser`, in `tson-compiler`,
-  runs base-type resolution to the natural host), `identifier` (`IdentifierAtom`, the one `AtomParsers`
-  answers for: the text matched against `IdentifierProfile`), `void` (`VoidReader`, accepts only the absent
-  sentinel `_`). They resolve to the byte-identical `Unit` body — nothing in the *schema* distinguishes them —
-  so dispatch is keyed on the declaration's own name, which [TSON-SCHEMA] §4.2 requires ("implementations
-  MUST dispatch `value`, `identifier`, and `void` by their declared names").
+- **`value`, `void` and `identifier` each have a constructor**, and are read by it: `value_type` by `ValueParser`
+  (in `tson-compiler`, base-type resolution to the natural host), `void_type` by `VoidReader` (the absent sentinel
+  `_` alone), and `identifier_type` by `IdentifierParser` — the text matched against `IdentifierProfile` first, a
+  grammar failure being a parse failure, then `text_type`'s facets through `TextParser`. So a naming convention is a
+  `pattern` and a closed vocabulary of names is `members`, and an identifier is string-class (§5.4).
+  `IdentifierType.coherenceCheck` holds each member to the grammar as well as to the facets, since a member the
+  grammar refuses is one no value can reach. Core declares its own `identifier` sibling, as it does `text`. Core's `void`
+  is `!void_type {}` too, so the linker's refusal of a `void` variant and the inhabitance check ask the body
+  (`ReferenceChain.resolvesToVoid`), not the name.
 - **The network family reuses one grammar per address form, never a second copy.** Both grammars are
   `base.atom.InternetAddress`'s: its IPv6 half parses RFC 4291 §2.2's embedded IPv4 tail through the same
   strict `dec-octet` pattern `Ipv4Parser` reads, and

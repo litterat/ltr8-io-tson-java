@@ -73,7 +73,9 @@ class AtomCoherenceTest {
         assertCoherent(MacType.UNCONSTRAINED);
         assertCoherent(UuidType.UNCONSTRAINED);
         assertCoherent(ComplexType.UNCONSTRAINED);
-        assertCoherent(new Unit());
+        assertCoherent(new ValueType());
+        assertCoherent(new VoidType());
+        assertCoherent(IdentifierType.UNCONSTRAINED);
     }
 
     /** One end alone is a half-open range, which is the normal way to write a floor or a ceiling. */
@@ -453,5 +455,20 @@ class AtomCoherenceTest {
         List<String> inverted =
                 new Cidr4Type("s", some(24), some(8), List.of("10.0.0.0/8"), List.of("10.0.0.0/8")).coherenceCheck();
         assertEquals(1, inverted.size(), () -> "one cause, one message: " + inverted);
+    }
+
+    /** A member no value can reach: the grammar refuses {@code 2fast} before the member set is asked. */
+    @Test
+    void anIdentifierMemberOutsideTheGrammarIsIncoherent() {
+        IdentifierType names = new IdentifierType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.of(List.of("north", "2fast")));
+        assertViolation(names, "member '2fast' is not an identifier");
+        assertEquals(1, names.coherenceCheck().size(), names.coherenceCheck().toString());
+    }
+
+    @Test
+    void identifierMembersInsideTheGrammarAreCoherent() {
+        assertCoherent(new IdentifierType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(List.of("north", "south"))));
     }
 }

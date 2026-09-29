@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=7628c51cb9cd22dd4083ff919cdec627f68b3aee0ea411e637ed7967aeaf7712"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=b1439bcfe7c9603b404d1dc7b8ec3e174eb32becaf570495170f8004fd3ec25a"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=6a27de723085f0efcbdda41bcc0c59b5872f6f766567b5c74f3cba0ddb064121"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=5ee184a558c1a83d8609dc49d44e8bff00e99c3b0ea46a17b7bb3b64fc5df503"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -53,12 +53,12 @@
 {
   @doc:"""
     Void primitive. A fresh sibling of the meta-kernel's `void` under
-    the same name — the same `!unit {}` construction and contract, a
-    distinct type entity — so that data documents governed by
+    the same name — the same `!void_type {}` construction, and so the
+    same contract, a distinct type entity — so that data documents governed by
     core-importing schemas can target it. The atom whose parsing
     contract admits only the absent sentinel `_`. See Part 2 §6 and §7.3.
     """
-  void => !unit {}
+  void => !void_type {}
 
   @doc:"Two-value boolean enumeration."
   boolean => !enum [true false]
@@ -198,6 +198,17 @@
 
   @doc:"Text with at least one character."
   non_empty_text => !text ^ { min_length: 1 }
+
+  @doc:"""
+    A name: text inside [TSON-DATA] §7.7's identifier grammar. A fresh
+    sibling of the meta-kernel's `identifier` under the same name — the
+    same `!identifier_type {}` construction, and so the same contract, a
+    distinct type entity — so that core-importing schemas can type a
+    value or a map key as a name, and refine it with the text facets: a
+    naming convention as `pattern`, a closed vocabulary as `members`.
+    """
+  @ordered:NONE @bounded:false
+  identifier => !identifier_type {}
 
   @doc:"Interoperable regular expression pattern per RFC 9485 (I-Regexp)."
   @ordered:NONE @bounded:false
