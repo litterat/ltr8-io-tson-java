@@ -61,8 +61,8 @@ class AbstractTemplateFamilyTest {
     private static TsonCompiledSchemaRegistry compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/abstract-template.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                 %s
                 }
