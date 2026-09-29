@@ -130,5 +130,5 @@ That is what lets one check serve a caller that owes a parse error and one that 
 identical violation is a `ParseException` from the lexer and a refusal from the linker — where a signature
 that threw forced the lexer's answer on everyone. It is not a parser: nothing here turns a token into a
 host value, and the `identifier` atom is a wrapper over `validate` living with the rest of the vocabulary
-(`atom.parser.IdentifierAtom`). It leaves `tson-compiler`'s `lexer` package exactly `Lexer`, `LexException`, `Token` and
+(`atom.parser.IdentifierParser`). It leaves `tson-compiler`'s `lexer` package exactly `Lexer`, `LexException`, `Token` and
 `TokenType`.

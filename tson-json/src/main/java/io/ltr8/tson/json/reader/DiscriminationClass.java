@@ -24,7 +24,7 @@ import java.util.Optional;
  * one-to-one.
  *
  * <p><b>A type with no class needs no verdict.</b> {@code rational} and {@code complex} (both strings, but
- * §5.4 gives them no class), the {@code unit} instances, a nested choice and the {@code scoped} instances all
+ * §5.4 gives them no class), {@code value} and {@code void}, a nested choice and the {@code scoped} instances all
  * answer empty -- and a choice containing one is not disjoint ([TSON-SCHEMA] §5.4), so §8.2's untagged route never
  * consults them.
  *
@@ -53,10 +53,11 @@ enum DiscriminationClass {
             case MapBody ignored -> Optional.of(BRACE);
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
-            // Every remaining atom family is string-content (§5.6). `rational`, `complex`, the `unit`
-            // instances, a nested choice and `scoped` fall through to empty: §5.4 gives them no class, so
+            // Every remaining atom family is string-content (§5.6). `rational`, `complex`, `value`,
+            // `void`, a nested choice and `scoped` fall through to empty: §5.4 gives them no class, so
             // they can only be reached with a tag.
             case io.ltr8.tson.schema.meta.TextType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.meta.IdentifierType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.UriType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.RegexType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.UuidType ignored -> Optional.of(STRING);

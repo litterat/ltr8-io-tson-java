@@ -51,7 +51,7 @@ import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.ScopeKind;
 import io.ltr8.tson.schema.meta.Scoped;
 import org.junit.jupiter.api.Test;
@@ -78,7 +78,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * a shape that happens to work only because a bespoke writer papered over it.
  *
  * <p>What this confirms works with zero extra code: {@code Top}'s sealed-interface variants
- * each get their own {@code !record}/{@code !reference}/{@code !unit}/{@code !enum}/{@code
+ * each get their own {@code !record}/{@code !reference}/{@code !value_type}/{@code !enum}/{@code
  * !choice}/{@code !array}/{@code !map}/{@code !tuple} type-ref purely from {@code
  * DataClassUnion} auto-detection plus a {@code @Typename} on each variant -- exactly the "body:
  * top" polymorphism the kernel itself describes. {@code BigInteger} fields, {@code
@@ -237,13 +237,13 @@ class DefinitionResolverTest {
     //    diverges, structurally faithfully, from meta-kernel-resolved.tn's own text) ──
 
     @Test
-    void writesAUnitBody() throws DataBindException {
-        // Structurally: value => !type_definition { source: unit body: !unit {} }
-        TypeDefinition value = new TypeDefinition(Optional.of(TypeRef.of("unit")), TypeKind.ATOM, 
-                List.of(), List.of(), new Unit());
+    void writesAValueTypeBody() throws DataBindException {
+        // Structurally: value => !type_definition { source: value_type body: !value_type {} }
+        TypeDefinition value = new TypeDefinition(Optional.of(TypeRef.of("value_type")), TypeKind.ATOM,
+                List.of(), List.of(), new ValueType());
 
-        assertEquals("{ source: { name: \"unit\" arguments: [] } "
-                + "supertypes: [] subtypes: [] body: !unit {} }", write(value));
+        assertEquals("{ source: { name: \"value_type\" arguments: [] } "
+                + "supertypes: [] subtypes: [] body: !value_type {} }", write(value));
     }
 
     @Test

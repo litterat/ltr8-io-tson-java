@@ -117,7 +117,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private static Selector selectorOf(RecordField field, Map<String, TypeDefinition> entries) {
         String terminal = ReferenceChain.terminal(field.type().name(), entries);
         TypeDefinition target = entries.get(terminal);
-        AtomType<?> parser = AtomParsers.forType(terminal, target.body()).orElseThrow(
+        AtomType<?> parser = AtomParsers.forType(target.body()).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
         return new Selector(Nfc.of(field.name()), parser);

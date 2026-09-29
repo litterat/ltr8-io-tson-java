@@ -77,13 +77,13 @@
 !schema {
   @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A."
   top => !type_definition {
-    subtypes: [array atom choice data enum integer_type map product record reference regex_type set_type sum template text_type tuple unit uri_type]
+    subtypes: [array atom choice data enum identifier_type integer_type map product record reference regex_type set_type sum template text_type tuple uri_type value_type void_type]
     body: !record { fields: [] }
   }
 
   atom => !type_definition {
     supertypes: [top]
-    subtypes: [enum integer_type regex_type text_type unit uri_type]
+    subtypes: [enum identifier_type integer_type regex_type text_type uri_type value_type void_type]
     body: !record { supertypes: [top]  fields: [] }
   }
 
@@ -133,34 +133,26 @@
     ] }
   }
 
-  @doc:"""
-    Unit atom constructor. An atom with no constraint vocabulary — the
-    atom equivalent of the empty record `{}` for products. Its instances
-    (`value`, `identifier`, `void`, all in the kernel) are
-    opaque atoms distinguished by name and prose-level parsing contract,
-    not by schema shape.
-    """
-  unit => !type_definition {
+  value_type => !type_definition {
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [] }
   }
 
-  @doc:"Escape hatch primitive: base type resolution's result, uninterpreted. Instance of `unit`."
+  @doc:"Escape hatch primitive: base type resolution's result, uninterpreted. Instance of `value_type`."
   value => !type_definition {
-    source: unit
-    body: !unit {}
+    source: value_type
+    body: !value_type {}
   }
 
-  @doc:"Identifier primitive: the type of every naming position; XID_Start-initial, XID_Continue plus '-', in NFC. Instance of `unit`."
-  identifier => !type_definition {
-    source: unit
-    body: !unit {}
+  void_type => !type_definition {
+    supertypes: [atom top]
+    body: !record { supertypes: [atom]  fields: [] }
   }
 
-  @doc:"Void primitive: admits only the absent sentinel `_`. Instance of `unit`."
+  @doc:"Void primitive: admits only the absent sentinel `_`. Instance of `void_type`."
   void => !type_definition {
-    source: unit
-    body: !unit {}
+    source: void_type
+    body: !void_type {}
   }
 
   @doc:"Internal scalar types for constraint fields."
@@ -209,7 +201,7 @@
 
   text_type => !type_definition {
     supertypes: [atom top]
-    subtypes: [regex_type uri_type]
+    subtypes: [identifier_type regex_type uri_type]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: min_length  type: non_negative_integer  optional: true }
       !record_field { name: max_length  type: non_negative_integer  optional: true }
@@ -222,6 +214,24 @@
   text => !type_definition {
     source: text_type
     body: !text_type {}
+  }
+
+  @doc:"Identifier constraint vocabulary: a text family whose facets apply inside the naming grammar -- XID_Start-initial, XID_Continue plus '-', in NFC."
+  identifier_type => !type_definition {
+    supertypes: [atom text_type top]
+    body: !record { supertypes: [text_type]  fields: [
+      !record_field { name: min_length  type: non_negative_integer  optional: true }
+      !record_field { name: max_length  type: non_negative_integer  optional: true }
+      !record_field { name: length      type: non_negative_integer  optional: true }
+      !record_field { name: pattern     type: regex    optional: true }
+      !record_field { name: members     type: text_member_set  optional: true }
+    ] }
+  }
+
+  @doc:"Identifier primitive: the type of every naming position. Instance of `identifier_type`."
+  identifier => !type_definition {
+    source: identifier_type
+    body: !identifier_type {}
   }
 
   @doc:"Mixin record contributing the `spec` field to specification-bound atoms."

@@ -18,7 +18,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.VoidType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -201,7 +201,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!id:"https://example.test/mini.tn"
             !!meta:"https://tson.io/2026/37/m/meta.tn"
             {
-              void => !unit {}
+              void => !void_type {}
             }
             """;
 
@@ -210,13 +210,13 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
-        // "unit" is neither local to mini.tn nor imported by it -- only reachable if resolveSchema
+        // "void_type" is neither local to mini.tn nor imported by it -- only reachable if resolveSchema
         // itself derived the structure namespace from the loader's own meta.tn entry (which in
         // turn carries meta-kernel's own entries, merged in via meta.tn's real !!import).
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
         TypeDefinition voidDef = resolved.entries().get("void");
-        assertEquals(new Unit(), voidDef.body());
+        assertEquals(new VoidType(), voidDef.body());
     }
 
     @Test
@@ -287,7 +287,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     private static final String MINI_DOCUMENT_NO_ID = """
             !!meta:"https://tson.io/2026/37/m/meta.tn"
             {
-              void => !unit {}
+              void => !void_type {}
             }
             """;
 
@@ -306,7 +306,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!id:"mini.tn"
             !!meta:"https://tson.io/2026/37/m/meta.tn"
             {
-              void => !unit {}
+              void => !void_type {}
             }
             """;
 
@@ -325,7 +325,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!meta:"https://tson.io/2026/37/m/meta.tn"
             !!import:"meta-kernel.tn"
             {
-              void => !unit {}
+              void => !void_type {}
             }
             """;
 
@@ -377,7 +377,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!meta:"https://tson.io/2026/37/m/meta.tn"
             !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
             {
-              void => !unit {}
+              void => !void_type {}
             }
             """;
 
@@ -442,7 +442,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // synthesizes 9 extra entries for argument-bearing type-refs, e.g. enum's own "members:
         // set<token>" -- runs before compiling. Never cached (see the next test) -- only the
         // *quality* of the one-off result changed, not its lifetime.
-        assertEquals(61, compiled.schema().entries().size());
+        assertEquals(63, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
         assertNotNull(compiled.compiledSchema().get("integer_size")

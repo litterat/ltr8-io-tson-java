@@ -24,8 +24,8 @@
 !schema {
   @doc:"Void primitive — a fresh sibling of the meta-kernel's `void`: same construction and contract, distinct type entity. Admits only the absent sentinel `_`."
   void => !type_definition {
-    source: unit
-    body: !unit {}
+    source: void_type
+    body: !void_type {}
   }
 
   @doc:"Two-value boolean enumeration."
@@ -224,6 +224,13 @@
     source: text_type
     supertypes: [text]
     body: !text_type { min_length: 1 }
+  }
+
+  @doc:"A name: text inside the identifier grammar. A fresh sibling of the meta-kernel's `identifier`: same construction and contract, distinct type entity."
+  @ordered:NONE @bounded:false
+  identifier => !type_definition {
+    source: identifier_type
+    body: !identifier_type {}
   }
 
   @doc:"Interoperable regular expression pattern per RFC 9485 (I-Regexp)."

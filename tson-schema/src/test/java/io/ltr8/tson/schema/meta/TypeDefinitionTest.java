@@ -22,7 +22,7 @@ class TypeDefinitionTest {
 
     private static TypeDefinition unit(Optional<SourcePosition> position) {
         return new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), new Unit(), position);
+                List.of(), List.of(), new ValueType(), position);
     }
 
     @Test

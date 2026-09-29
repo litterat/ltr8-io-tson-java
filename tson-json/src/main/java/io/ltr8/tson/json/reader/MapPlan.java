@@ -74,7 +74,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean op
         ReferenceChain.Resolved terminal = ReferenceChain.terminal(schema, keyTypeName).orElseThrow(() ->
                 new IllegalStateException("'" + keyTypeName + "' does not resolve -- linking should have refused it"));
         return terminal.definition().body() instanceof Atom atom
-                ? AtomParsers.forType(terminal.name(), atom)
+                ? AtomParsers.forType(atom)
                 : Optional.empty();
     }
 }

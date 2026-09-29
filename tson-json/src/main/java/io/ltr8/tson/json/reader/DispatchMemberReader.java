@@ -134,7 +134,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         ReferenceChain.Resolved target = ReferenceChain.terminal(schema, field.type().name()).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' names nothing this schema declares"));
-        AtomType<?> parser = AtomParsers.forType(target.name(), target.definition().body()).orElseThrow(
+        AtomType<?> parser = AtomParsers.forType(target.definition().body()).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
         return new Selector(Nfc.of(field.name()), parser, AtomForm.of(target.definition().body()));

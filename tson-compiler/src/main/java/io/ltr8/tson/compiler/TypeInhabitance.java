@@ -165,7 +165,7 @@ final class TypeInhabitance {
         if (field.voidable()) {
             return true;
         }
-        return !ReferenceChain.terminal(field.type().name(), namespace).equals("void")
+        return !ReferenceChain.resolvesToVoid(field.type().name(), namespace)
                 && refInhabited(field.type(), namespace, inhabited);
     }
 

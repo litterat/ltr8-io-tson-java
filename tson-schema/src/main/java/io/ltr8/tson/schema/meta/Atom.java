@@ -4,13 +4,14 @@ import java.util.List;
 
 /**
  * The meta-kernel's {@code atom => top & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
- * Top} variant IS-A this. {@link Unit} backs {@code value}/{@code token}/{@code void} (the "atom
- * with no constraint vocabulary"); {@link EnumBody} backs {@code boolean} and the kernel's other
+ * Top} variant IS-A this. {@link ValueType} and {@link VoidType} back {@code value} and {@code void}, the
+ * two atoms with no constraint vocabulary; {@link EnumBody} backs {@code boolean} and the kernel's other
  * internal enumerations; the remaining variants are the atom constraint-vocabulary families, one
  * per {@code *_type} constructor. {@link Scoped} is the sibling SUM-kind case -- see {@link Sum}, not
  * here.
  */
-public sealed interface Atom extends Top permits Unit, EnumBody, IntegerType, TextType, UriType, RegexType,
+public sealed interface Atom extends Top permits ValueType, VoidType, EnumBody, IntegerType, TextType, IdentifierType,
+        UriType, RegexType,
         DecimalType, FloatType, RationalType, UuidType, BytesType, DateType, TimeType, DateTimeType, DurationType,
         PeriodType,
         Cidr4Type, Cidr6Type, EmailType, MacType, Ipv4Type, Ipv6Type, ComplexType {
@@ -26,7 +27,7 @@ public sealed interface Atom extends Top permits Unit, EnumBody, IntegerType, Te
      * min_length}/{@code max_length} -- so the rule lives on the family rather than in a generic
      * field-by-field comparison, which cannot tell a tightened bound from a replaced one. The
      * default admits everything, which is correct for a family carrying no orderable facet at all
-     * ({@link Unit}); every family that has one overrides it.
+     * ({@link ValueType}, {@link VoidType}); every family that has one overrides it.
      *
      * <p>{@code refined} is the fully merged result of applying a refinement body to this atom, not
      * the body alone (see {@code DefinitionResolver}'s own atom-refinement path), so a facet the
@@ -68,7 +69,7 @@ public sealed interface Atom extends Top permits Unit, EnumBody, IntegerType, Te
      *
      * <p>The same fragment convention as {@link #constraintsCheck} -- each element names one problem,
      * so a body with several reports them all in one pass -- and the same "only where it is decidable
-     * by ordinary value comparison" limit. A family carrying no orderable facet at all ({@link Unit},
+     * by ordinary value comparison" limit. A family carrying no orderable facet at all ({@link ValueType},
      * and every selector-only family) keeps the default; a family whose bounds are unparsed text
      * ({@link DurationType}) records why it does the same.
      */

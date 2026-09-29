@@ -17,7 +17,8 @@ import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.UuidType;
 import org.junit.jupiter.api.Test;
 
@@ -213,10 +214,20 @@ class ChoiceDisjointnessTest {
     }
 
     @Test
-    void aUnitVariantMakesTheChoiceNotDisjoint() {
-        TypeRef token = atom("token", new Unit());
+    void aValueVariantMakesTheChoiceNotDisjoint() {
+        TypeRef value = atom("value", new ValueType());
         TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
-        assertFalse(disjoint(token, i));
+        assertFalse(disjoint(value, i));
+    }
+
+    /** An identifier is a text family, so it is string-class and apart from a number. */
+    @Test
+    void anIdentifierVariantIsStringClass() {
+        TypeRef id = atom("identifier", IdentifierType.UNCONSTRAINED);
+        TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
+        TypeRef t = atom("text", TextType.UNCONSTRAINED);
+        assertTrue(disjoint(id, i));
+        assertFalse(disjoint(id, t));
     }
 
     @Test

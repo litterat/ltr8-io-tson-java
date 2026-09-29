@@ -29,8 +29,8 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
  * constant, one per constructor name -- see {@link ValueReaderFactoryRegistry} for where they
  * actually get registered. Every one of these reaches {@code context} only for
  * {@link ValueReaderContext#locationOf} (an atom never needs to resolve a child), and {@code name}
- * additionally in {@link #ENUM_OBJECT_MODE}/{@link #UNIT}, both keyed on the declaration's own name rather
- * than its resolved shape -- see each one's own note.
+ * additionally in {@link #ENUM_OBJECT_MODE}, keyed on the declaration's own name rather than its resolved
+ * shape -- see its own note.
  */
 final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
@@ -45,7 +45,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * fault rather than an author error -- the registry only routes here for names that are atoms.
      */
     static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
-            .forType(name, definition.body())
+            .forType(definition.body())
             .<TsonTypeReader<?>>map(parser ->
                     new AtomTypeReader<>(name, parser, context.locationOf(name, definition)))
             .orElseThrow(() -> new IllegalStateException(
@@ -53,10 +53,10 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
     /**
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean},
-     * every other enum instance its member text. Dispatch is keyed on the declaration's own name, the same
-     * mechanism {@link #UNIT} uses for {@code value}/{@code identifier}/{@code void}, and the one case
-     * {@link #ATOM} cannot serve -- an enum body maps to {@link io.ltr8.tson.atom.parser.EnumParser}, which
-     * hands back the member's own text, and this one name wants the host value its two members stand for.
+     * every other enum instance its member text. Dispatch is keyed on the declaration's own name -- the one
+     * atom that needs it, and the one case {@link #ATOM} cannot serve: an enum body maps to {@link
+     * io.ltr8.tson.atom.parser.EnumParser}, which hands back the member's own text, and this one name wants the
+     * host value its two members stand for.
      * (Tree mode then wraps the result in a {@code TsonAtom} -- see {@link ValueReaderFactoryRegistry}.)
      *
      * <p><b>The parser is the vocabulary's own</b>, asked for by name through {@link
@@ -71,24 +71,20 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition))
             : ATOM.create(name, definition, context);
     /**
-     * {@code unit}'s three real instances -- {@code value}/{@code identifier}/{@code void} -- all resolve to the
-     * identical empty body, so, per the kernel's own doc ("distinguished by name and prose-level parsing
-     * contract, not by schema shape"), dispatch is keyed on the declaration's own name rather than its
-     * resolved shape. §4.2 makes that dispatch normative.
-     *
-     * <p><b>Two of the three are this encoding's, not the vocabulary's</b>, which is why they are named here
-     * and not left to {@link #ATOM}. {@code void} is not a scalar at all -- its contract admits only the
-     * absent sentinel {@code _}, never a token -- so it bypasses {@link AtomType} via {@link VoidReader}.
-     * {@code value} is decoded by [TSON-DATA] §4 base type resolution, whose §4.4 rule is that a quoted
-     * token is a string: it depends on the lexical form, which an {@link AtomType} deliberately cannot see,
-     * so {@code AtomParsers} declines it and {@link ValueParser} answers here. {@code identifier}, and any
-     * other {@code unit}-constructed name, is a function of the text alone and {@link #ATOM} has it.
+     * {@code void_type}: not a scalar at all -- its contract admits only the absent sentinel {@code _}, never a
+     * token -- so it bypasses {@link AtomType} via {@link VoidReader}. Keyed on the constructor, so the
+     * kernel's {@code void} and core's sibling read alike.
      */
-    static final ValueReaderFactory UNIT = (name, definition, context) -> switch (name) {
-        case "void" -> new VoidReader(context.locationOf(name, definition));
-        case "value" -> new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition));
-        default -> ATOM.create(name, definition, context);
-    };
+    static final ValueReaderFactory VOID = (name, definition, context) ->
+            new VoidReader(context.locationOf(name, definition));
+
+    /**
+     * {@code value_type}: decoded by [TSON-DATA] §4 base type resolution, whose §4.4 rule is that a quoted token
+     * is a string. That depends on the lexical form, which an {@link AtomType} deliberately cannot see, so
+     * {@code AtomParsers} declines it and {@link ValueParser} answers here.
+     */
+    static final ValueReaderFactory VALUE = (name, definition, context) ->
+            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition));
 
     /**
      * The schema entry's own declared name -- the <em>declaration's</em>, not the built-in it refines, so a

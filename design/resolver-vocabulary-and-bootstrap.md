@@ -192,7 +192,7 @@ within meta-kernel.
 
 `MetaKernelBootstrapResolver.getMetaKernelSchema()` (its only public method) produces the resolved
 meta-kernel `TsonSchema` in **three passes** over its declarations: ordinary declarations first
-(`DefinitionResolver`), then the deferred `Instance` declarations (`value => !unit {}`, `boolean
+(`DefinitionResolver`), then the deferred `Instance` declarations (`value => !value_type {}`, `boolean
 => !enum [true false]`, …) once every constructor they reference — including ones declared later in the
 file — has an entry to transfer a kind from, then the deferred atom refinements, whose source is an instance
 and so exists only after the second pass. `TsonSchemaResolver` alone is single-pass, strict source order, so

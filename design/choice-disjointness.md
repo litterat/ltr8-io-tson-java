@@ -38,7 +38,7 @@ class — so `[true false]` is boolean-class — `uuid`, `date`, `bytes`, …) �
 maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a
 discrimination the wire can't deliver) and `bracket` (arrays and tuples). A variant classifies through its
 §8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —
-`rational`/`complex` (whose typed forms straddle classes), `unit`, a mixed-class enum, a scoped instance (its
+`rational`/`complex` (whose typed forms straddle classes), `value`, `void`, a mixed-class enum, a scoped instance (its
 membership is a namespace, not a shape), a nested choice, an unresolved name — makes the choice `false`, the
 conservative side. A `void` variant
 never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`) —
