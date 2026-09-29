@@ -43,10 +43,12 @@ citations and the entry is deleted — nothing here is an archive.
 of a rule on purpose: where a deployment's policy lives (#1), whether a namespace should be a value (#2), how
 a declared field carries a JSON member name that is not an identifier (#3), and how a declared application
 keeps a content-derived identity across the import merge (#4). None is a defect in a rule the spec states.
-#5, raised against Revision 36 itself, is one: two rules in §7.8 give one document two categories. #6–#8
+#5, raised against Revision 36 itself, is one: two rules in §7.8 give one document two categories. #6–#9
 are directions again: a bounded type slot, which lets one field's type depend on another's; `identifier`
-as a text family, which carries name hygiene to identifier-typed map keys and builds on #6; and a
-constructor each for `value` and `void`, which retires `unit` and dispatch by name.
+as a text family, which carries name hygiene to identifier-typed map keys and builds on #6; a
+constructor each for `value` and `void`, which retires `unit` and dispatch by name; and a recorded type
+for each template parameter, derived from its uses, which checks an application at the call site and
+gives #6's bound its home.
 
 ---
 
@@ -243,6 +245,73 @@ One thing Revision 35 changed on this side is worth recording, because it remove
 answering the entry. The `~` marker and `type_definition.constructor` are gone, and applicability is IS-A
 `top` (§3.3.1, §4.2) — so the modelling above, which was written "with no meta layer and no `~` at all" to
 avoid the marker, is now simply how a constructor is declared. The measurement it rests on stands unchanged.
+
+**Read against #6 and #7: filling the cell by reference, not by containment.** #6's bounded type slot and #7's
+identifier-as-text-family change what the 2×2 asks for, and most of the entry can be had without a namespace
+body kind — none of the third grammar recursion point, nested scoping or recursive resolver output.
+
+- **The rows become the key's type.** Under #7, a key is a name exactly when its type is `identifier` or refines
+  it, and meets §8.2 then; otherwise it is data. "Keys are names" against "keys are data" stops being record
+  against map.
+- **The columns become the type slot.** Under #6, a position whose values are declarations is a type slot, and
+  the kernel has many: `record_field.type`, `choice.variants`, `map.value_type`. The empty cell is then a map
+  with data keys whose values are bounded type slots — `{route => <: method>}` — which the kernel can state.
+  This needs #6's bound in an **unnamed** form: a map value cannot bind a name, each entry naming a different
+  type, so the bounded reference exists as its own type (`<: method>`, or a `type_of<method>` template) and
+  `<T: X>` is the sugar that also binds `T`.
+
+Three steps, each usable alone:
+
+1. **The unchecked reference is #6 alone.** The hit above, `method: plaec_order`, is closed by typing the slot:
+
+   ```
+   binding      => { method: <M: method>  verb: http_verb  path: text }
+   create_order => !binding { method: place_order  verb: POST  path: "/orders" }
+   ```
+
+   A name that does not resolve, or does not IS-A `method`, is a resolver error. No namespace and no `data` kind
+   question is involved.
+
+2. **An interface is a record type, reached by projection.**
+
+   ```
+   crud         => <T> { create: method<T, T>  get: method<id, T> }
+   orders       => crud<order> & { cancel: method<id, order> }
+   create_order => orders.create & http & { … }
+   ```
+
+   Points 2 and 3 above hold with no new body kind: `&` extends an interface, `^` pins across it, `-` is the
+   subset exposure, a template is per interface, and the field names are already one of §11.4's scopes. What is
+   added is a **projection type** at type-ref and `!name` positions — `orders.create`, the declared type of
+   `orders`' field `create`, as TypeScript's `Orders["create"]` — which is the `qualified-name` production of the
+   costs paragraph used to reach a field's type rather than a nested scope. The kernel reserves `.` in
+   `identifier` "as a future identifier separator". One gap: an interface's own instances, a record holding one
+   value per method, mean nothing, and `ABSTRACT` does not say so — it means "only subtypes are instances".
+
+3. **The route table is data about types.**
+
+   ```
+   api => { route => { http_verb => <: method> } }
+   ```
+
+   The API description is a value of `api` — a data document, or a fixed value — whose leaves are bounded
+   references (`orders.create`), resolved in the governing namespace as `scoped`'s LOCAL cell resolves a `$type`
+   (§7.8), and checked against the bound. It answers the smell the method-as-type measurement showed: routing
+   facts live in the table, not as fields injected into every instance, so a plan step does not carry its URL.
+   And it keeps point 1: a route key is data, needs no hygiene, and a member addressed by its route needs no
+   invented operation name, since the table names `orders.create` directly.
+
+What this leaves open:
+
+- **The `data` kind.** Methods as record templates, interfaces as records and routes as data cover §4.1's
+  motivating case, which is point 4's consequence arrived at; it is still to be confirmed rather than assumed.
+- **Containment.** By reference, every member has a name. For methods that costs nothing — the interface names
+  them — but a declaration written inline at a route, with no name at all, still needs a namespace body. The
+  open question narrows to whether an anonymous inline member is worth the third recursion point, everything
+  else the entry wanted coming from #6, #7 and projection.
+
+Dependencies: step 1 needs #6; step 2 needs only the projection production and no kernel change; step 3 needs
+#6's unnamed bound and a rule that a type-slot value in a data document resolves in the governing namespace.
 
 ---
 
@@ -660,3 +729,138 @@ field `void` or `value` is unchanged in source.
 
 **Status against Revision 36:** open. Independent of #6; it completes #7, and is worth taking only with it, since
 alone it leaves `identifier` the one `!unit {}`.
+
+---
+
+## 9. A template parameter should carry its type: `template_param => { name: param_name  type: type_ref }`
+
+**Section:** [TSON-SCHEMA] §5.2 (value conformance), §5.10 (two parameter kinds, inferred by use; an argument read
+by the position it lands in), §8.1 (open entries: `template.parameters`), §8.2 (materialisation's deferred checks
+and where they are located), §10.1 (ingest), §12.1 (the argument channel by token shape); the grammar's
+`type-params` production. Builds on #6.
+
+**Kind:** proposal — record what the resolver already has to work out, and give #6's bound somewhere to live.
+
+**What the spec says today.** An open entry's body is `!template { parameters: [param_name]  template: text … }`
+(§8.1): the parameter list carries names and order, and nothing else. §5.10 infers each parameter's kind from its
+use — a parameter in a type-reference position is a type parameter, one in a value position a value parameter —
+but the kind is not recorded, and neither is anything finer. So:
+
+- **An application can be checked only by substitution.** Arity is checked against `parameters`; everything else
+  waits until the held body is substituted and read against the constructor's vocabulary. A literal applied where
+  the body uses a type fails as `type_ref.name` rejecting a non-identifier; a type name routed into a value fails
+  §5.2's value conformance. Both verdicts are real, but they are located inside the template body, with the
+  application as context (§8.2), rather than at the argument that was wrong.
+- **A consumer of resolved output cannot check an application at all** without parsing and re-resolving the held
+  text, which §8.1 otherwise keeps it from needing: "a consumer dispatches on these two fields and never reads the
+  text". An importing schema, a second resolver comparing output, or a host binder generating a generic type has
+  the parameter's name and nothing to check an argument against.
+- **§12.1's channel is decided by token shape**, so an unquoted non-numeric argument arrives as a reference. For
+  `e => <M> !enum { members: [a b M] }` applied as `e<c>`, `c` is a member, and only the held body's use of `M`
+  says so — which a consumer cannot see.
+- **A parameter used in several places** is judged only on kind: "a parameter used in both kinds of position is a
+  resolver error". Two value uses of different types, or two type uses with different bounds once #6 exists, have
+  no rule.
+
+**Proposal.** Record each parameter's type beside its name:
+
+```
+template_param => {
+  name: param_name
+  type: type_ref
+}
+
+template => top & {
+  parameters:      [template_param]
+  template:        text
+  extension?:      record_extension_type
+  discriminators?: [field_name]
+}
+```
+
+**Every parameter's type is derived from the positions it stands in.** No parameter lacks one: §5.10 already
+refuses a parameter the body never references, so every parameter has at least one position, and every position
+has a declared type in the applied constructor's vocabulary:
+
+- **A type slot** — a field declared `type_ref`, such as `array.element_type` or `map.key_type` — gives `type_ref`,
+  or, once #6 lands, the bounded slot it declares (`<: text>`).
+- **A value slot** gives the slot's declared type: `min_items: N` gives `non_negative_integer`, `enum.members`
+  gives the member type, and a selector pinned `type: text = N` gives `text`.
+- **A routed default or fixed value** (`w?: int32 ~ N`) gives the *field's* declared type, `int32`, not the
+  declared type of `record_field.value`, which is `value` and says nothing. This is §5.2's value conformance, and
+  it is the one derivation that reads a second field; #6's `record_field => { type: <T>  value?: T }` makes it
+  structural.
+- **An argument to another template** gives that template's recorded `type` for the position, so derivation is a
+  fixed point across templates that apply each other. A parameter the fixed point leaves undetermined gets
+  `type_ref`, which is §5.10's rule that such a parameter is a type parameter.
+
+**The kind follows from the type.** A parameter whose `type` is `type_ref` or a bounded type slot is a type
+parameter; any other is a value parameter. §5.10's kind inference becomes a consequence rather than a rule of its
+own, and "used in both kinds of position" becomes one case of the rule for several uses.
+
+**Several uses must agree.** A parameter's `type` is the use type that IS-A every other; if the use types are not
+ordered by IS-A, the declaration is a resolver error. `<N> !array { min_items: N  max_items: N }` derives
+`non_negative_integer` twice and is fine; `<T> { a: set<T>  e: enum_of<T> }` derives `type_ref` and `<: text>`, and
+takes the bounded one, which IS-A the other; `<T> { a: enum_of<T>  n: int_of<T> }` with bounds `text` and
+`integer` is refused at the declaration, since no argument could satisfy both. The rule follows IS-A edges only,
+as #6's bound does, so two sibling refinements — `int8` and `int32`, both `!integer ^ {…}` — are refused together
+though a small integer satisfies both. That is the price of a total two-valued rule rather than a value-set
+prover; the author declares the narrower type by name and uses it in both places. The alternative, a list of use
+types checked one by one at application, is exact but moves the verdict from the declaration to every application
+and gives a consumer a list to intersect.
+
+**What this buys.**
+
+- **An application is checked at the call site**, against `parameters` alone: each argument is read as its
+  parameter's `type`, before substitution. `vector<pixel, 1920>` reads `1920` as `non_negative_integer` and
+  `pixel` as a `type_ref`; `vector<pixel, "two">` is refused at the argument, not inside the body.
+- **The channel ambiguity goes.** `e<c>` reads `c` as a member because the recorded type says so, and a consumer
+  sees what the resolver saw.
+- **Resolved output is checkable without the held text.** Import, comparison and ingest check an application
+  against the entry, as §8.1 intends every consumer of an open entry to do.
+- **#6's bound has a home.** `<X: T>` needs somewhere to record `T`; `template_param.type` is it.
+
+**The restriction syntax.** #6's production is taken as it stands:
+
+```
+type-param  = param-name [ws ":" ws type-ref]
+type-params = "<" ws type-param *( separator type-param ) [ ws "," ] ws ">"
+```
+
+A written annotation narrows the derived type and never replaces it: the declared type must IS-A the type derived
+from every use, or the declaration is a resolver error — `<N: text> !array { min_items: N }` is refused, since
+`text` is not a `non_negative_integer`. An unannotated parameter keeps its derived type, so every existing template
+resolves unchanged. For a type parameter, `<T: text>` records the bounded slot `<: text>`, and an argument must
+resolve to `text` or a type that IS-A it; this is #6's template bound. For a value parameter, `<N: int8>` records
+`int8`, and an argument must be an `int8` value.
+
+**Open: one annotation, two readings.** `<X: text>` means "a type that IS-A `text`" on a type parameter and "a
+`text` value" on a value parameter. Since the kind is derived from the use, the reader always knows which, and this
+entry proposes that reading: the annotation is read by the kind the positions give, as TSON's `name: type` reads
+as "the values of `type`" for a field. The alternative is to spell the two apart — a bound only on type parameters,
+say, and no annotation on value parameters — which keeps one meaning per spelling and loses the narrowing of value
+parameters.
+
+**What is running.** This implementation already derives each parameter's kind from the declared type of the slot
+it stands in (`ParameterKinds`): a slot typed `type_ref` gives a type parameter, a slot resolving to an atom a
+value parameter, and anything else — a parameter standing for a whole collection or record — is refused at the
+declaration, as is a parameter standing in both kinds of position. It runs as a fixed point across templates, and
+a parameter left undetermined is a type parameter, as §5.10 requires. The slot type it reads is then discarded:
+the output carries `parameters: [param_name]`, as §8.1 requires, and an argument is checked by substitution. Under
+the proposal the same walk keeps the type, and the check moves to the application.
+
+**The cost.**
+
+1. **A meta-kernel change.** `template.parameters` changes type and `template_param` is new, so every bundled
+   schema's pin changes, and a revision carries it.
+2. **A derived fact in resolved output.** Like `subtypes` and `disjoint`, `type` is computed, so ingest (§10.1)
+   discards and recomputes it from the held text, which ingest already parses; an author-written annotation is
+   what the held text records, and survives.
+3. **The fixed point is normative.** §5.10 states the kind rule for one template; the derivation across templates
+   that apply each other must be stated, with its default.
+
+**Interpretation chosen:** the current text — parameters are names, the kind is inferred and not recorded, and an
+argument is checked by substitution.
+
+**Status against Revision 36:** open. The recorded type stands without #6; the bound syntax needs #6's production,
+and #6's template bound needs this entry's `type` to be recorded.
