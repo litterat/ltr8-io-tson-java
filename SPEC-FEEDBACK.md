@@ -702,6 +702,14 @@ the text must add:
 - **Only `identifier`'s profile lies inside §7.1's unquoted-token profile.** A value under another profile may
   need quoting, which is harmless because the positions that admit no quoted form — type references and
   annotations — are typed by the kernel's roles, which stay on `identifier`.
+- **Each profile is its own type.** Every `!identifier_type { … }` is a distinct type entity: IS-A between two
+  identifier types comes from refinement alone, never from one profile admitting a subset of another's names.
+  All are string-class (§5.4), so a choice over two of them is not disjoint.
+- **A profile's own additions are exempt from §8.2's restricted-character rule** (proposed; not running, since
+  §8.2 does not yet reach identifier-typed values). The kernel's `-` is exempt because the profile adds it, and
+  the same holds for whatever `start_add`, `continue_add` or `medial` names: a profile that admits `$` states
+  that `$` belongs in these names, and the rule would otherwise refuse every name that uses it. The look-alike
+  and mixed-script mechanisms still reach every character.
 - **`medial` is new to the series.** The kernel keeps `-` as a Continue character, so `a-` and `a--b` stay
   names; moving it to `medial` would be a separate change to §7.7.
 

@@ -303,6 +303,15 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   it, and [TSON-DATA] §8.2 says a processor "MUST allow a deployment to relax any of the three". What is
   left to decide is the policy's shape for the set rule -- a switch of its own, or implied by the level.
 
+- [ ] **§8.2's hygiene does not reach a value typed by an identifier** (`r2026-37-proposal`, SPEC-FEEDBACK #7
+  Proposal 1). A value or map key whose type is an `identifier_type` is held to its profile and nothing else:
+  the restricted-character and mixed-script rules run only on field and declared names
+  (`DefaultTsonReadContext`, `NameHygiene`, `DataClassObjectReader`, `TsonSchemaLinker`), and the look-alike
+  rule has no map-key scope. Needs the identifier policy at the atom read -- which `IdentifierParser` cannot see
+  -- in both encodings, the key set of an identifier-keyed map as a §11.4 scope, and an allocation-harness check.
+  Proposal 3's exemption rides with it: characters a profile adds (`start_add`, `continue_add`, `medial`) skip
+  the restricted-character rule, as the kernel's `-` does, so `hygiene` takes the profile.
+
 - [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
   in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a
   reference whose pin does not match its target's bytes is refused, a query parameter that is not a
