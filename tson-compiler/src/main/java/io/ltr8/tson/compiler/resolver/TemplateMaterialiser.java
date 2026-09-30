@@ -1,6 +1,9 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -21,6 +24,7 @@ import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -888,6 +892,9 @@ final class TemplateMaterialiser {
      * <p>Only a bare reference converts. One carrying arguments is an application, which no value parameter
      * could bind (§5.10 confines value parameters to scalars), and is left for the position to refuse.
      *
+     * <p><b>Then each argument is checked against the parameter it binds</b> ({@link #checkArguments}), which is
+     * what makes a wrong argument a verdict at the application rather than inside the substituted body.
+     *
      * <p><b>Shared with the operand path</b>, through {@link ApplicationCloser#byParameterKind}: a
      * composition operand absorbs by value and mints nothing, so it never reaches this pass and would
      * otherwise keep §12.1's token-shape reading of every argument.
@@ -899,6 +906,7 @@ final class TemplateMaterialiser {
             kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, metaTypes));
         }
         if (kinds == null || kinds.isEmpty()) {
+            checkArguments(head, template, arguments);
             return arguments;
         }
         List<TypeArgument> bound = new ArrayList<>(arguments.size());
@@ -908,7 +916,90 @@ final class TemplateMaterialiser {
                             ? new TypeArgument.Value(new Token(ref.ref().name(), Token.Form.UNQUOTED))
                             : arguments.get(i));
         }
+        checkArguments(head, template, bound);
         return bound;
+    }
+
+    /**
+     * Each argument against the parameter it binds ({@code template_param}, [TSON-SCHEMA] §5.10): a type argument
+     * must name a type that IS-A the parameter's {@code bound}, and a value argument must be a value of the
+     * parameter's {@code type} -- or of the type an earlier parameter's argument names, where the type is that
+     * parameter.
+     *
+     * <p>An argument this cannot judge is left for the position to refuse after substitution, as every argument
+     * was before: an application as an argument (its entry is not closed yet), a name nothing declares (the
+     * linker's verdict), and a parameter whose type has no scalar reading.
+     */
+    private void checkArguments(String head, TypeDefinition template, List<TypeArgument> arguments) {
+        if (!(template.body() instanceof TemplateBody held) || held.parameters().size() != arguments.size()) {
+            return;
+        }
+        List<TemplateParam> parameters = held.parameters();
+        for (int i = 0; i < arguments.size(); i++) {
+            TemplateParam parameter = parameters.get(i);
+            TypeArgument argument = arguments.get(i);
+            if (parameter.isTypeParameter()) {
+                if (parameter.bound().isPresent() && argument instanceof TypeArgument.Ref ref
+                        && ref.ref().arguments().isEmpty()) {
+                    checkBound(head, parameter, ref.ref().name(), parameter.bound().get().name());
+                }
+            } else if (argument instanceof TypeArgument.Value value) {
+                checkValue(head, parameter, value.value().text(), valueType(parameters, arguments, parameter));
+            }
+        }
+    }
+
+    private void checkBound(String head, TemplateParam parameter, String argument, String bound) {
+        String terminal = ReferenceChain.terminal(argument, this::lookup);
+        TypeDefinition target = lookup(terminal);
+        if (target == null) {
+            return; // an unresolved argument -- the linker's verdict
+        }
+        // By name, so a core type and the kernel original it copies are one bound, as they are at the declaration.
+        String boundTerminal = ReferenceChain.terminal(bound, this::lookup);
+        boolean admitted = terminal.equals(boundTerminal) || target.supertypes().contains(boundTerminal)
+                || target.supertypes().contains(bound);
+        if (!admitted) {
+            throw new SchemaValidationException("'" + head + "<...>' binds '" + parameter.name() + "' to '"
+                    + argument + "', which is not a type that IS-A " + bound + " -- '" + head + "' declares '"
+                    + parameter.name() + ": " + bound + "' (§5.10)");
+        }
+    }
+
+    /** The type a value parameter's argument is read as, following a type that names an earlier parameter. */
+    private static String valueType(List<TemplateParam> parameters, List<TypeArgument> arguments,
+                                    TemplateParam parameter) {
+        String type = parameter.type().name();
+        for (int i = 0; i < parameters.size(); i++) {
+            if (parameters.get(i).name().equals(type)) {
+                return arguments.get(i) instanceof TypeArgument.Ref ref && ref.ref().arguments().isEmpty()
+                        ? ref.ref().name() : null;
+            }
+        }
+        return type;
+    }
+
+    private void checkValue(String head, TemplateParam parameter, String argument, String type) {
+        if (type == null) {
+            return;
+        }
+        TypeDefinition definition = lookup(ReferenceChain.terminal(type, this::lookup));
+        Optional<AtomType<?>> parser = definition == null ? Optional.empty() : AtomParsers.forType(definition.body());
+        if (parser.isEmpty()) {
+            return; // no scalar reading -- the substituted body's own position judges it
+        }
+        try {
+            parser.get().read(argument);
+        } catch (AtomTypeException e) {
+            throw new SchemaValidationException("'" + head + "<...>' binds '" + parameter.name() + "' to '"
+                    + argument + "', which is not a value of " + type + ": " + e.getMessage() + " (§5.10)");
+        }
+    }
+
+    /** A name in the schema's own namespace first, then in the governing meta's -- a slot type is the meta's. */
+    private TypeDefinition lookup(String name) {
+        TypeDefinition local = namespace.getTypeDefinition(name);
+        return local != null ? local : metaTypes.apply(name);
     }
 
 }

@@ -321,8 +321,7 @@ final class SchemaDesugarer {
                 throw e;
             }
             reporter.reportFailedDeclaration(declaration, e);
-            return new SchemaMap.Declaration(declaration.nameAnnotations(), declaration.name(),
-                    declaration.typeDefAnnotations(), declaration.mark(), absorbed(declaration));
+            return declaration.withTypeDef(absorbed(declaration));
         }
     }
 
@@ -330,9 +329,7 @@ final class SchemaDesugarer {
         currentParameters = typeParams(declaration.typeDef());
         try {
             TypeDef typeDef = typeDef(declaration.typeDef());
-            return typeDef == declaration.typeDef() ? declaration
-                    : new SchemaMap.Declaration(declaration.nameAnnotations(), declaration.name(),
-                            declaration.typeDefAnnotations(), declaration.mark(), typeDef);
+            return typeDef == declaration.typeDef() ? declaration : declaration.withTypeDef(typeDef);
         } finally {
             currentParameters = List.of();
         }

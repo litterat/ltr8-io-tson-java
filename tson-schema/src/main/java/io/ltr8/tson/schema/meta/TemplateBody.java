@@ -91,10 +91,9 @@ public record TemplateBody(List<TemplateParam> parameters, String template,
         return parameters.stream().map(TemplateParam::name).toList();
     }
 
-    /** The same body with each parameter's type replaced by {@code types}' entry for it, where there is one. */
-    public TemplateBody withTypes(Map<String, TypeRef> types) {
-        return new TemplateBody(parameters.stream()
-                .map(p -> new TemplateParam(p.name(), types.getOrDefault(p.name(), p.type()))).toList(),
+    /** The same body with each parameter replaced by {@code settled}'s entry for it, where there is one. */
+    public TemplateBody withParameters(Map<String, TemplateParam> settled) {
+        return new TemplateBody(parameters.stream().map(p -> settled.getOrDefault(p.name(), p)).toList(),
                 template, extension, discriminators);
     }
 }

@@ -122,11 +122,12 @@
     ] }
   }
 
-  @doc:"One parameter of an open entry: its name, and the type an argument for it is read as — derived from the positions it stands in; a type parameter exactly when that type is `type_ref`."
+  @doc:"One parameter of an open entry: its name, and the type an argument for it is read as — derived from the positions it stands in and narrowed by what the declaration writes; a type parameter exactly when that type is `type_ref`, and then `bound` restricts the types an argument may name."
   template_param => !type_definition {
     body: !record { fields: [
-      !record_field { name: name  type: param_name }
-      !record_field { name: type  type: type_ref }
+      !record_field { name: name   type: param_name }
+      !record_field { name: type   type: type_ref }
+      !record_field { name: bound  type: type_ref  optional: true }
     ] }
   }
 

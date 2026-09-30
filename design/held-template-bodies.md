@@ -121,7 +121,18 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       reported, so it reports nothing.
     - **Several uses must agree**: the parameter's type is the use type that IS-A every other, and uses unordered
       by IS-A are refused at the declaration. A slot's type is looked up in the governing meta, a routed type in
-      the schema's own namespace.
+      the schema's own namespace. A core copy and its kernel original (same name, same body) count as one type.
+    - **A written type narrows, read by the derived kind** (`<T: text, N: int8>`, carried on
+      `SchemaMap.Declaration.parameterTypes`): on a value parameter it replaces `type` and must IS-A the derived
+      one; on a type parameter it is `template_param.bound`, and must IS-A every bound the uses inherit. Bounds
+      travel through the fixed point like types (`rebox => <T> boxed<T>` is bounded by `boxed`'s bound), and an
+      imported template is taken as recorded rather than re-walked, since its held body does not carry what its
+      author wrote.
+    - **Stamped before materialisation too**, so `TemplateMaterialiser.byParameterKind` can check each argument
+      as an application closes (`checkArguments`): a type argument must IS-A the bound, following reference
+      chains; a value argument must parse as the parameter's type, or as the type an earlier parameter's argument
+      names. What it cannot judge -- an application as an argument, an unresolved name -- falls to the
+      substituted body as before.
     - **A fixed point, not one walk.** meta-kernel's own `type_argument` puts a parameter of *either* kind on
       the reference channel ("parameters ride the reference channel because a token there is always a
       reference"), so a parameter passed to another template says nothing locally: it takes the callee's kind
