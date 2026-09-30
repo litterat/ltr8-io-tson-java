@@ -386,7 +386,7 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * `enum.members` is typed `set<identifier>`, so members reach the contract by the other route — the
+     * `enum.members` is typed through `enum_set`, so members reach the contract by the other route — the
      * constructor body read back against the kernel's own vocabulary — and pick up `min_items: 1` and the
      * set's uniqueness with it.
      */

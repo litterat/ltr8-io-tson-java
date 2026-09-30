@@ -131,24 +131,20 @@ class MetaKernelBootstrapResolverTest {
     }
 
     /**
-     * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, and closes
-     * its own applications through {@code TemplateMaterialiser}, so its output is the 59 declarations the
-     * fixture writes, plus one injected declaration per distinct sugar form within them -- eight {@code array}
-     * entries from §5.3's {@code [X]} field-type sugar -- plus the four entries closing {@code enum =>
-     * enum_of<identifier>} and {@code text_enum => enum_of<text>} mints: each {@code set<T>} instantiation and
-     * the closed {@code set_type} form it references. They are the same entries ordinary resolution produces;
-     * producing them here is what leaves the linker with nothing to materialize (see {@code
-     * MetaKernelSchemaRegistryTest}).
+     * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
+     * output is the 58 declarations the fixture writes plus one injected declaration per distinct sugar form
+     * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar and one {@code map}
+     * entry from the {@code {K => V}} sugar in {@code instance_template.bindings}. They are the same entries
+     * the linker used to synthesize; producing them here is what leaves the linker with nothing to
+     * materialize (see {@code MetaKernelSchemaRegistryTest}). {@code enum}'s member set is not among them:
+     * it is the fixture's own {@code enum_set} declaration, since {@code set} has no sugar and a {@code !}
+     * form stays prohibited at a field position (§5.2).
      */
     @Test
-    void theFixtureDeclarationsResolveAlongsideTheirDesugaredAndClosedEntries() {
+    void theFiftyEightFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(71, schema.entries().size());
-        for (String head : List.of("set_identifier", "set_type_identifier", "set_text", "set_type_text")) {
-            assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),
-                    "expected a closed entry with head '" + head + "'");
-        }
+        assertEquals(66, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_template_param", "array_field_group",
                 "array_record_field")) {

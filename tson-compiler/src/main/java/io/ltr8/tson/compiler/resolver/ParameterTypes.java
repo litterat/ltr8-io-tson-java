@@ -60,7 +60,7 @@ import java.util.function.Function;
  *
  * <p>Anything else -- a parameter standing where a record, a collection or a choice is declared, as in
  * {@code <T> !enum { members: T }} -- is refused here. §5.10 confines value parameters to scalars and type
- * parameters to references, so a parameter standing for a whole member set is neither, and refusing it
+ * parameters to references, so a parameter standing for a whole {@code enum_set} is neither, and refusing it
  * at the declaration is what turns "every application of this fails" into "this template is wrong".
  *
  * <p><b>Several uses must agree.</b> A parameter's type is the use type that IS-A every other; uses unordered by

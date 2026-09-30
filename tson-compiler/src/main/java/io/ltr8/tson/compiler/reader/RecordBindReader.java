@@ -316,7 +316,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * The schema-driven child reader {@link RecordAbstractReader}'s own constructor already built
      * (via {@code resolver.resolve(field.type().name())}) has no visibility into what Java
      * collection shape the *consuming* field actually wants -- for a synthesized, materialized
-     * array/map type (e.g. {@code enum}'s own {@code members: set<identifier>}), there's no real Java
+     * array/map type (e.g. {@code enum}'s own {@code members: set<token>}), there's no real Java
      * class registered under that synthetic schema name at all, so {@link ArrayBindReader.Factory}/
      * {@link MapBindReader.Factory} have nothing reliable to resolve one from on their own.
      *

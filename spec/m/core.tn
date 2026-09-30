@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=96f5e1e32136b765ac1267e4e05248ad59c92b467cc5b0e20f9e3ed235b472c2"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=d568f4c779622abeb65941008e866bcaba7e10ac283b3cc9cfa2735cf1bc3d03"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=6d1a0862288dc8acaa4116e3a95840842fbce040c67b5fa9fbe17b75856db6b4"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=a01f033526ca37a64dcad3410aea1dee75a319775a591522120f6c0921fdd379"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -405,10 +405,10 @@
     arrives by application rather than by a parameter on the
     constructor itself.
 
-    A sibling of the kernel's declaration under the same name, as
-    `void` is: user schemas reach it through their core import, so
-    `tags: set<text>` resolves without touching the governing
-    namespace.
+    A sibling of meta's declaration under the same name, as `void`
+    is of the kernel's: user schemas reach it through their core
+    import, so `tags: set<text>` resolves without touching the
+    governing namespace.
     """
   set => <T> !set_type { element_type: T }
 

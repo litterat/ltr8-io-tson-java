@@ -40,6 +40,12 @@
     body: !enum { members: [LOCAL EXTERN] }
   }
 
+  @doc:"The set spelling an author writes: a template over the parameterless set_type constructor."
+  set => !type_definition {
+    source: set_type
+    body: !template { parameters: [{ name: T  type: type_ref }]  template: "!set_type { element_type: T }" }
+  }
+
   @doc:"""
     Constructor for open sum types: the value names its own type,
     and the instance names the namespaces that name may be resolved

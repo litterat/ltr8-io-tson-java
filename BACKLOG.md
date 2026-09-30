@@ -46,13 +46,6 @@ own prose (which had gone stale on it):
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
-- [ ] **An enum over a non-identifier family is string-class** ([TSON-SCHEMA] §7.4's discrimination-class row,
-  [TSON-JSON] §5.2). Both `DiscriminationClass` implementations classify an enum by its members' tokens alone,
-  so `!text_enum ["80" "443"]` is number-class in `tson-compiler` and `!text_enum ["true" "false"]`
-  boolean-class in both, where the rule says string. The fix needs the enum's label type
-  (`EnumLabels.membersAreNames`), which lives on its constructor: `ChoiceDisjointness` can be handed the
-  linker's structure-namespace lookup, but `ChoiceReader` and `tson-json`'s `DispatchChoiceReader` classify
-  from the linked schema's own entries, which do not hold the governing meta's constructors.
 
 ## Checked annotations
 

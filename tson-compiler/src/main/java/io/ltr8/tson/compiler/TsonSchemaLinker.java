@@ -31,6 +31,7 @@ import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.EnumProfile;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
@@ -73,7 +74,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 
 /**
  * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link TsonLinkedSchema} -- pass 2, which a schema
@@ -229,8 +229,7 @@ public final class TsonSchemaLinker {
      * record is the case that has no declaration, and is checked by the schemaless readers instead.
      */
     private static void checkNames(DiagnosticsReceiver receiver, TsonSchema schema,
-                                   Map<String, TypeDefinition> merged,
-                                   Function<String, TypeDefinition> constructors, UnicodePolicy identifiers) {
+                                   Map<String, TypeDefinition> merged, UnicodePolicy identifiers) {
         ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> refuse(receiver, schema,
                 collision.second(), merged.get(collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
                 "in the namespace of '" + schema.id() + "': " + collision.describe()));
@@ -253,12 +252,12 @@ public final class TsonSchemaLinker {
                 default -> List.of();
             };
             String noun = body instanceof RecordBody ? "field names" : "members";
-            // An enum whose label type is not an identifier family (`text_enum`) has members that are not
-            // names, so §8.2's two per-name rules do not reach them: nothing is looked up by them. The
-            // collision relation stays -- two members that render alike is the hazard either way, and it is a
-            // property of the set (§7.4).
-            boolean perNameRules = !(body instanceof EnumBody) || definition.source()
-                    .map(source -> EnumLabels.membersAreNames(source.name(), constructors)).orElse(true);
+            // An enum under `profile: TEXT` has members that are values rather than names, so §8.2's two
+            // per-name rules do not reach them: a value set carries whatever its domain carries, and there
+            // is nothing to spoof where nothing is looked up by name. The collision relation stays -- two
+            // members that render alike is the hazard either way, and it is a property of the set.
+            boolean perNameRules = !(body instanceof EnumBody enumBody)
+                    || enumBody.profile() == EnumProfile.IDENTIFIER;
             checkScope(receiver, schema, name, definition, names, noun, identifiers, perNameRules);
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
@@ -278,10 +277,9 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * {@code perNameRules} is false for the one scope whose members are not names -- an enum whose label type
-     * is not an identifier family ({@link EnumLabels}), such as a {@code text_enum}. The collision relation runs
-     * either way; §8.2's restricted-character and restricted-script rules are per-<em>name</em> and lapse with
-     * the declaration.
+     * {@code perNameRules} is false for the one scope whose members are not names -- an enum declaring
+     * {@code profile: TEXT}. The collision relation runs either way; §8.2's restricted-character and
+     * restricted-script rules are per-<em>name</em> and lapse with the declaration.
      */
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
@@ -591,9 +589,7 @@ public final class TsonSchemaLinker {
 
         merged = computeSubtypes(merged, localNames);
         merged = computeDisjointness(merged);
-        Map<String, TypeDefinition> constructors = mergeWithFallback(merged, structureNamespace);
-        checkNames(receiver, schema, merged, constructors::get, identifiers);
-        checkEnumLabels(schema, merged, localNames, origins, constructors::get, receiver);
+        checkNames(receiver, schema, merged, identifiers);
 
         Set<String> blamedOnce = new LinkedHashSet<>();
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
@@ -665,20 +661,6 @@ public final class TsonSchemaLinker {
                     + ", and nothing in that chain can be left out or left empty (§5.10.1). A recursion "
                     + "terminates only where it reaches a base case -- an optional field, a possibly-empty "
                     + "container, or a choice variant that does not recur");
-        }
-    }
-
-    /**
-     * The bound on {@code enum_of}'s argument ({@link EnumLabels}): each local application of the kernel's
-     * {@code enum_of} names a text family, refused at schema load where it does not -- rather than resolving and
-     * failing inside a consumer's bind.
-     */
-    private static void checkEnumLabels(TsonSchema schema, Map<String, TypeDefinition> merged,
-                                        Set<String> localNames, Map<String, String> origins,
-                                        Function<String, TypeDefinition> constructors,
-                                        DiagnosticsReceiver receiver) {
-        for (EnumLabels.Violation violation : EnumLabels.check(merged, localNames, origins, constructors)) {
-            report(receiver, schema, violation.entry(), merged.get(violation.entry()), violation.message());
         }
     }
 

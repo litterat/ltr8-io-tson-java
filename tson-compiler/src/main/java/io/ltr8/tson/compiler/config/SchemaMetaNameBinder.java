@@ -62,7 +62,6 @@ public final class SchemaMetaNameBinder {
             Map.entry("tuple", "tuple_body"),
             Map.entry("choice", "choice_body"),
             Map.entry("enum", "enum_body"),
-            Map.entry("text_enum", "enum_body"),
             Map.entry("template", "template_body"),
             Map.entry("set_type", "array_body"),
             Map.entry("datetime_type", "date_time_type"),
