@@ -16,6 +16,7 @@ history lives in git.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
 - `RecordExtension`'s FINAL check reads `TypeDefinition.supertypes`, never `RecordBody.supertypes`.
+- An enum's label type is read from its constructor's `source` (`enum_of<T>`), never from its members' spelling.
 
 Related: `design/meta-layer-data-kind.md`, `design/choice-disjointness.md`, `design/name-hygiene-and-minted-names.md`,
 `design/class2-compilation.md`, `design/compiled-registries.md`, `design/schema-resolution.md`.
@@ -237,3 +238,25 @@ rest of the closure agrees with it.
   selected, so distinctness is judged in the terms a decoder will compare in.
 - **Group membership is reported instead of the state rule, not beside it.** §5.11 forces a member OPTIONAL,
   so both would fire and the second would name the symptom. One mistake, one verdict.
+
+## An enum's label type (`EnumLabels`, §7.4)
+
+An enum is an instance of an `enum_of<T>` application — the kernel's `enum` is `enum_of<identifier>`, `text_enum` is
+`enum_of<text>`, and a meta layer declares its own — so `T` is a fact about the *constructor*, shared by every enum it
+builds. `EnumBody` carries members only; `EnumLabels` follows an instance's `source` to its constructor (type-name
+namespace first, then the governing meta's structure namespace, as `source` validation does) and reads `T` from that
+constructor's own `source`. Members conform to `T` structurally, through `set<T>`, when the resolver reads the body.
+
+- **Two consumers, both here.** `checkNames` drops §8.2's per-name rules for an enum whose `T` is not an identifier
+  family (the collision relation stays), and `checkEnumLabels` refuses an application of the kernel's `enum_of` whose
+  argument is not a text family — an atom-family instance whose constructor IS-A `text_type`, one hop through
+  `source`.
+- **The bound is checked by name because §5.10 cannot state it yet.** A family instance is a construction and IS-A
+  nothing, so `<T: text>` refuses `identifier`, and a written bound resolves in the type-name namespace, where a
+  constructor cannot be named. So the kernel declares `enum_of => <T> atom & { members: set<T> }` unbounded and this
+  check stands in for a family bound — `SPEC-FEEDBACK.md` #7 Proposal 2 and #9's constructor bound. It fires only
+  for the `enum_of` whose origin is the kernel; a schema declaring its own template of that name is not constrained.
+- **At schema load, not later.** Unchecked, `enum_of<integer>` resolves, and a governed schema's `!int_enum [1 2 3]`
+  fails inside the bind of `EnumBody.members` as an internal error.
+- **An enum whose constructor records no `enum_of` application has names for members** — the stricter reading, so
+  every per-name rule applies.

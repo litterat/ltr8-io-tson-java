@@ -45,7 +45,7 @@ a declared field carries a JSON member name that is not an identifier (#3), and 
 keeps a content-derived identity across the import merge (#4). None is a defect in a rule the spec states.
 #5, raised against Revision 36 itself, is one: two rules in §7.8 give one document two categories. #6–#9
 are directions again: a bounded type slot, which lets one field's type depend on another's; `identifier`
-as a text family, which carries name hygiene to identifier-typed map keys and builds on #6; a
+as a text family, which carries name hygiene to identifier-typed map keys and gives `enum` its label type; a
 constructor each for `value` and `void`, which retires `unit` and dispatch by name; and a recorded type
 for each template parameter, derived from its uses, which checks an application at the call site and
 gives #6's bound its home.
@@ -465,7 +465,8 @@ dependency normatively for that reason.
   author could then write `type: currency_code`, where `currency_code => !text ^ { length: 3  pattern:
   "[A-Z]{3}" }`, and have every member checked against it, where a `TEXT` enum's members today are any text. The
   field wants a bound (IS-A `text`), a default (`identifier`, which §5.2 refuses on a record-typed field), and
-  its members typed by it.
+  its members typed by it. #7's Proposal 2 now takes the label type as a template argument, `enum_of<T>`, which
+  needs neither the slot nor the default; the bound question is the same and is #9's.
 - **A template parameter.** `<T>` admits any type, so a template meaning only text families cannot say so, and a
   wrong argument fails deep inside the materialised body rather than at the application.
 - **A consumer's meta layer.** `ltr8-io-tson-java-http`'s HTTP vocabulary types a path parameter with a
@@ -550,7 +551,7 @@ and §5.2's conformance is enforced by the resolver as prose requires.
 **Section:** [TSON-SCHEMA] §5.4 (discrimination class), §5.7 (refinement), §7.4 (enum member semantics, the
 `identifier` primitive), §11.4 (name hygiene at the schema layer); [TSON-DATA] §2.6 (map keys are values), §7.7
 (the identifier grammar), §8.2 (name hygiene); UAX #31 (R1); the meta-kernel's `unit`, `identifier`, `text_type`,
-`enum_profile` and `enum`. Proposal 2 builds on #6.
+`enum_profile` and `enum`. Proposal 2 builds on Proposal 1 and on #9's constructor bound.
 
 **Kind:** proposal, with one gap in the current text underneath it.
 
@@ -619,45 +620,96 @@ What follows:
 The cost to weigh: an identifier becomes a kind of string in the type system. What it adds over `text` — the
 grammar and NFC — is what `spec` pins, which is the arrangement `uri_type` already has.
 
-**Proposal 2 — `enum.profile` becomes `enum.type`, using #6.** Once `identifier` is a text family, `profile`
-states a fact the type system can state itself. With #6's bounded, binding type slot:
+**Proposal 2 — `enum` becomes an application of `enum_of<T>`, the label type a template argument.** An enum's
+members are *labels drawn from a naming vocabulary*, and everything `profile` switches on is a property of that
+vocabulary rather than of `enum`: which spellings are admitted (the UAX #31 profile, `pattern`), when two labels
+are the same label (`normalization`, and case folding if `identifier_type` gains it), whether hygiene runs over
+the member set, and whether a member is spelled unquoted. `IDENTIFIER` and `TEXT` are the two-point projection of
+that — `identifier` and `text` — and no enumeration of profiles can close: a meta layer describing protobuf's
+names, JSON Schema's property names or HTTP's tokens declares its own `identifier_type` construction (Proposal 3)
+and wants an enum over it. So `profile` is replaced by a type. It is a template argument rather than a field:
 
 ```
-enum => atom & {
-  type?:   <T: text> ~ identifier
-  members: set<T>
-}
+enum_of   => <T: !text_type> atom & { members: set<T> }
+enum      => enum_of<identifier>
+text_enum => enum_of<text>
 ```
 
-| §7.4 row | derived from `enum.type` |
+- **Nothing an author has written changes.** `!enum [OPEN DONE]` is the positional form it is today, `boolean` is
+  `!enum [true false]`, and every enum instance records `source: enum`. Resolver output changes in the kernel
+  alone: `enum` becomes an instantiation entry, `source: enum_of<identifier>`, beside the `set<identifier>` and
+  `set<text>` closures it and `text_enum` mint, and `enum_of` is a family base indexing both (§5.10).
+- **`!text_enum ["new york" "los angeles"]`** is the same positional form: `members` is the one unmarked field
+  (§5.6). A meta layer's enum is one line, `http_method => enum_of<http_token>`.
+- **Member conformance is structural**, through `set<T>`, with no prose rule and no `type` field: a field
+  `type: T` would hold a *value* of `T`, and the label type is already recorded where §8.2 says an application is
+  recoverable — `enum`'s `source`, and the element type of `members`.
+- **Equality is `T`'s.** Members are unique under it at schema load and matched under it at read, so a
+  case-folding facet on `identifier_type` reaches every enum over it with nothing added to `enum`; `[Done DONE]`
+  becomes a duplicate. That equality is what separates the two spellings of a closed set: `!text_enum ["AU" "NZ"]`
+  is two labels, `!text ^ { length: 2  members: ["AU" "NZ"] }` is text with a value restriction, and the binding
+  row keeps the distinction — a host enum for the first, host text for the second.
+- **Refinement** (`!status ^ { members: [OPEN] }`) is unchanged; the label type is fixed by the application and a
+  refinement keeps it, which retires `profile`'s one-step chain and its §5.7 row.
+- **`set` moves into the kernel.** `enum_set` exists because `set<T>` lives in meta, out of the kernel's reach
+  (§5.3, §9); `enum_of` needs it there. Meta's `set` goes, core keeps its sibling, and `enum_set` and
+  `enum_profile` are retired.
+
+**The bound: `T` is a text family, so `enum_of<integer>` is refused at the application.** The line is equality.
+An enum's members are labels, equal only to themselves under a naming vocabulary's equality; an integer's
+equality is a *value* equality (`80` and `0x50` are one value, [TSON-DATA] §4.3), and a value set on it is
+`integer.members`, which is where §7.4's "numbers are never enums" already puts it. The cases that look like
+counter-examples are not: protobuf's `ACTIVE = 1` is a label whose *wire* form is a number, a binding fact for the
+codegen side and not a second label type; JSON Schema's `enum: [1, "a"]` is the choice over member sets §7.4
+already describes. The relation the bound needs is *family membership* — `T` is an atom-family instance whose
+constructor IS-A `text_type`, one hop through `source` — and not IS-A: `identifier` is a construction and records
+no supertypes (§5.5), so `<T: text>` refuses it, and §5.10's bound resolves in the type-name namespace, where a
+constructor cannot be named. That is #9's constructor bound, `<T: !text_type>`, and this proposal is its first
+consumer. **Until it lands, the kernel writes `enum_of => <T> atom & { members: set<T> }` and §7.4 states the
+rule** — an argument to `enum_of` must be an atom-family instance built by a constructor IS-A `text_type`, refused
+at the application as a schema-load error — checked by name, as §4.2 dispatches `unit`'s instances by name, and
+marked as the stand-in for the bound. Refusal at the application is the point: without the rule `enum_of<integer>`
+resolves, and fails inside a consumer's bind as an internal error (below).
+
+The §7.4 rows are then keyed on `T`'s constructor:
+
+| §7.4 row | derived from `T` |
 |---|---|
-| members | each member is a value of `type`, by the family's own parsing and facets — structural, through `set<T>` |
-| hygiene | mechanisms 1–3 when `type` IS-A `identifier`; the look-alike mechanism alone otherwise |
-| discrimination class | the members' shared class when `type` IS-A `identifier`; string otherwise |
-| binding | host enum by name guaranteed when `type` IS-A `identifier`; host text otherwise |
+| members | each member is a value of `T`, by the family's own parsing and facets — structural, through `set<T>` |
+| hygiene | mechanisms 1–3 when `T`'s constructor IS-A `identifier_type`; the look-alike mechanism alone otherwise |
+| discrimination class | the members' shared class under an identifier family; string otherwise |
+| binding | a host enum by mapping, whatever `T` is (below) |
 
-It is more expressive than the selector: `type: currency_code`, where `currency_code => !text ^ { length: 3
-pattern: "[A-Z]{3}" }`, checks every member against it, where a `TEXT` enum's members today are any text. The
-default keeps every existing enum unchanged in source and in resolver output, omitted as `profile`'s is (§8.1).
+**§7.4's binding row overstates what `IDENTIFIER` buys.** "Every member is a host-safe name; host enum generation
+is guaranteed" is not true of any host: §7.7 admits `in-progress`, the kernel's own `boolean` has `true` and
+`false` for members, and both are refused as Java constants; Python and C# refuse other names. Binding is a
+mapping in every case — `in-progress` to `IN_PROGRESS`, `"new york"` to `NEW_YORK` — owned by the binder, which
+reports a mapping that collides or yields no legal constant; a host language is what a schema maps *to*, never a
+constraint on it. The row should say that the members are names, and leave host safety to the implementation.
 
-Three rules stay with `enum` rather than moving to the type:
+Two rules stay with `enum` rather than moving to the type:
 
 - **The class row is enum-specific.** `boolean => !enum [true false]` is boolean-class because §7.4 reads the
   class off the members' tokens. Under Proposal 1 the type `identifier` is string-class, so an `identifier`-typed
   map key holding `true` is string-class while the same member of an enum is boolean-class. The row cannot be
-  inherited from `type`'s own class, and §7.4 must keep stating it.
-- **The look-alike mechanism over the member set.** A `TEXT` enum's members are what a value is matched against,
-  so two that read alike are a hazard whatever `type` is. That is a property of `enum`.
-- **Refinement** narrows `type` along IS-A, #6's facet kind, which replaces `profile`'s one-step chain.
+  inherited from `T`'s own class, and §7.4 must keep stating it.
+- **The look-alike mechanism over the member set.** A `text_enum`'s members are what a value is matched against,
+  so two that read alike are a hazard whatever `T` is. That is a property of `enum_of`.
 
 **The alternatives:**
 
+- **A field, `type?: <T: text> ~ identifier` with `members: set<T>`**, #6's bounded, binding slot. The same
+  derivation, and `text_enum => enum ^ { type?: = text }` by constructor tightening, as `set_type` pins `state`.
+  It needs #6 twice over: `type_ref` is a record, so §5.2 refuses the default on it without the slot, and the
+  slot's bound has the same family-versus-IS-A question as the template's. The template needs neither, and the
+  instantiation machinery it uses is already running. Kept as the fallback if a template may not be applied.
 - **Keep `profile`, defined by reference** — `IDENTIFIER` means each member is an `identifier` value, and the
-  rules come from Proposal 1's type rather than being restated in §7.4. No change to `enum`'s shape and no
-  dependence on #6: the minimum that removes the duplication, and the fallback if #6 is not taken.
+  rules come from Proposal 1's type rather than being restated in §7.4. No change to `enum`'s shape: the minimum
+  that removes the duplication, and what remains if neither type route is taken.
 - **Collapse `enum` into member sets** — `!identifier ^ { members: [...] }` and `!text ^ { members: [...] }`.
   Argued against: `enum` carries what a member set does not — the binding row, unquoted spelling, and a class of
-  its own — and Revision 36 kept both deliberately.
+  its own — and Revision 36 kept both deliberately. The equality bullet above is the same argument from the
+  value side.
 
 **Proposal 3 — `identifier_type` states its profile, as data.** Proposal 1 leaves §7.7's profile in prose,
 fixed, so a meta layer describing an outside system — an API's operation names, a database's column names —
@@ -736,10 +788,20 @@ before the kernel exists, and the bootstrap refuses a kernel `identifier` whose 
 Core declares its sibling, `identifier => !identifier_type { continue_add: "-" }`, so an ordinary schema writes
 `{identifier => handler}` and refines `!identifier ^ { … }`. Not yet running there: §8.2's mechanisms at
 identifier-typed values and §11.4's map-key scope, so a map key is held to the grammar and the look-alike gap
-stays open. Proposal 2 is not taken.
+stays open. Proposal 2 runs as written above, in its interim form: the kernel declares `set`, `enum_of => <T> atom &
+{ members: set<T> }`, `enum => enum_of<identifier>` and `text_enum => enum_of<text>`, with `enum_set`,
+`enum_profile` and meta's `set` retired. The linker checks the stand-in rule by name — an application of the
+kernel's `enum_of` whose argument is not an atom-family instance built by a constructor IS-A `text_type` is
+refused at schema load, so `enum_of<integer>` in a meta layer fails there — and keys §8.2's per-name rules on
+whether `T`'s constructor IS-A `identifier_type`. A member `T` refuses by form carries the §7.4 hint naming
+`!text_enum [...]`. A meta layer's `kebab_enum => enum_of<kebab>`, `kebab` a refinement of `identifier`, is
+admitted. Not yet running: the discrimination-class row. Both classifiers still read an enum's class off its
+members' tokens, so a `text_enum` whose members spell numbers or booleans is not string-class; the classifier
+needs the constructor, which the readers do not hold.
 
 **Status against Revision 36:** open. Proposal 1 stands alone and closes the map-key gap; Proposal 2 depends on
-it and on #6; Proposal 3 depends on Proposal 1 alone.
+it, on `set` moving into the kernel, and on #9's constructor bound for its final form — the interim rule needs
+neither #6 nor #9; Proposal 3 depends on Proposal 1 alone.
 
 ---
 

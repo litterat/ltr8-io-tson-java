@@ -259,8 +259,7 @@ class DefinitionResolverTest {
                  List.of(), List.of(), new EnumBody(List.of("true", "false")));
 
         assertEquals("{ source: { name: \"enum\" arguments: [] } "
-                        + "supertypes: [] subtypes: [] body: !enum { members: [ \"true\" \"false\" ] "
-                        + "profile: \"IDENTIFIER\" } }",
+                        + "supertypes: [] subtypes: [] body: !enum { members: [ \"true\" \"false\" ] } }",
                 write(booleanDef));
     }
 
@@ -976,29 +975,21 @@ class DefinitionResolverTest {
     // ── A field typed by a named constructor application ──────────────────
 
     @Test
-    void resolvesEnumFromTheRealMetaKernelFixtureNamingTheEnumSetEntry() throws IOException, DataBindException {
-        // enum => atom & { members: enum_set  profile: enum_profile ~ IDENTIFIER }, where enum_set is
-        // !set_type { element_type: text }. The named entries exist because `!` forms stay prohibited at
-        // field positions (§5.2) and `set` has no sugar of its own -- there is no generic application
-        // left to write here.
+    void resolvesEnumOfFromTheRealMetaKernelFixtureAsAHeldCompositionTemplate() throws IOException {
+        // enum_of => <T> atom & { members: set<T> }: a composition template, so its body is held -- the record it
+        // closes to, with `set<T>` still an application -- until `enum => enum_of<identifier>` closes it.
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
 
-        TypeDefinition enumDef = resolver.resolve(schemaMap.declarations().get("enum"));
+        TypeDefinition enumOf = resolver.resolve(schemaMap.declarations().get("enum_of"));
 
-        assertEquals(TypeKind.ATOM, enumDef.kind());
-        assertTrue(enumDef.supertypes().contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("atom", "top"), enumDef.supertypes());
-        assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
-                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"profile\" type: { name: \"enum_profile\" arguments: [] } "
-                        + "optional: true voidable: false role: \"DEFAULT\" value: IDENTIFIER } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
-                write(enumDef));
+        assertEquals(TypeKind.TEMPLATE, enumOf.kind());
+        assertEquals(List.of("atom", "top"), enumOf.supertypes());
+        assertEquals(List.of("T"), enumOf.parameters());
+        TemplateBody held = assertInstanceOf(TemplateBody.class, enumOf.body());
+        assertEquals("!record { supertypes: [ atom ] fields: [ { name: members type: { name: set arguments: "
+                + "[ { name: T } ] } } ] }", held.template());
     }
 
     // ── Constructor application (§5.5, §5.6, Phase B step 4) ──────────────
@@ -1012,14 +1003,10 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
-        resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
 
-        // "enum" (the constructor bindAtomInstance needs to read against) is a real fixture
-        // declaration whose own field (`members: set<token>`) is argument-bearing -- compiling a
-        // reader against it needs the *materialized* schema (a synthesized array entry for
-        // `set<token>`), not this test's own narrow, unmaterialized `resolved` map, which doesn't
-        // have one. The full, materialized meta-kernel resolves the identical `enum` declaration,
-        // just reached a different way, so bindAtomInstance's own reader is compiled from that.
+        // "enum" (the constructor bindAtomInstance reads against) is `enum_of<identifier>` -- an application,
+        // whose entry exists only once materialisation has closed it. So its reader is compiled from the
+        // full, materialised meta-kernel rather than from this test's own narrow `resolved` map.
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         TypeDefinition accessType = definitionResolverFor(metaKernelParser, resolved::get).resolve(
                 schemaMap.declarations().get("product_access_type"));
@@ -1599,11 +1586,8 @@ class DefinitionResolverTest {
     }
 
     /**
-     * Meta-kernel, *linked* (via {@link TsonSchemaLinker#linkBootstrap}, purely so object mode's own
-     * {@code TsonParserFactoryRegistry} has a real, synthesized-entries-included schema to validate
-     * against -- an unlinked meta-kernel would resolve {@code enum}'s own {@code members:
-     * set<token>} field to the raw, wrong {@code set} declaration instead of a synthesized "array of
-     * token" entry, the same bug {@code TsonCompiledMetaRegistry}'s own bootstrap had), then compiled.
+     * Meta-kernel, *linked* (via {@link TsonSchemaLinker#linkBootstrap}, so object mode's own
+     * {@code TsonParserFactoryRegistry} has a genuinely linked schema to validate against), then compiled.
      */
     private static TsonCompiledMetaSchema metaKernelCompiled() {
         TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();

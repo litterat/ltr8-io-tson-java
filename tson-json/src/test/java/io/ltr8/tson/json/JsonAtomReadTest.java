@@ -45,7 +45,7 @@ class JsonAtomReadTest {
               day        => date
               blob       => bytes
               colour     => !enum [ RED GREEN BLUE ]
-              activity   => !enum { members: ["sedentary" "lightly active"]  profile: TEXT }
+              activity   => !text_enum ["sedentary" "lightly active"]
               country    => !text ^ { length: 2  members: ["AU" "NZ"] }
               flag       => boolean
               nothing    => void

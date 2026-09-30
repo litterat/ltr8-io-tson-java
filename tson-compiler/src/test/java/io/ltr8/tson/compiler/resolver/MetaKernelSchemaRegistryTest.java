@@ -15,11 +15,14 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -63,8 +66,8 @@ class MetaKernelSchemaRegistryTest {
         // `fields: [record_field]`, `groups: [field_group]?`, `supertypes`/`subtypes`/`parameters:
         // [type_name]?`/`[param_name]?` -- three separate `[type_name]?` uses correctly dedup to a
         // single `array_type_name_*` entry, not three -- `elements: [tuple_element]`, `variants:
-        // [type_ref]`, `members: [field_name]`). `enum`'s member set is not among them: `enum_set` is
-        // a declaration the fixture writes, since `set` has no sugar of its own.
+        // [type_ref]`, `members: [field_name]`). `enum`'s member set is not among them: it is `set<identifier>`,
+        // an application the bootstrap closes rather than a sugar form.
         Set<String> expectedHeads = Set.of("array_tuple_element", "array_field_name",
                 "array_type_ref", "array_type_name", "array_type_argument", "array_template_param",
                 "array_field_group", "array_record_field");
@@ -81,7 +84,13 @@ class MetaKernelSchemaRegistryTest {
         RecordField membersField = enumBody.fields().stream()
                 .filter(f -> f.name().equals("members"))
                 .findFirst().orElseThrow();
-        assertEquals(TypeRef.of("enum_set"), membersField.type());
+        // `enum => enum_of<identifier>` is the application's entry, and its members are typed by the
+        // `set<identifier>` instantiation closing it produced.
+        assertEquals(Optional.of(new TypeRef("enum_of", List.of(new TypeArgument.Ref(TypeRef.of("identifier"))))),
+                enumDef.source());
+        TypeDefinition memberSet = linked.schema().entries().get(membersField.type().name());
+        assertEquals(Optional.of(new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("identifier"))))),
+                memberSet.source());
     }
 
     /**
@@ -117,8 +126,8 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.meta(), linked.schema().meta());
-        assertEquals(66, raw.entries().size());
-        assertEquals(66, linked.schema().entries().size());
+        assertEquals(71, raw.entries().size());
+        assertEquals(71, linked.schema().entries().size());
 
         assertThrows(SchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));
@@ -148,7 +157,7 @@ class MetaKernelSchemaRegistryTest {
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
-        assertEquals(66, registered.schema().entries().size());
+        assertEquals(71, registered.schema().entries().size());
         assertThrows(SchemaValidationException.class, () -> registry.register(registered));
     }
 }

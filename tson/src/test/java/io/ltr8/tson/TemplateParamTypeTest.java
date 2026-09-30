@@ -78,12 +78,13 @@ class TemplateParamTypeTest {
     }
 
     /**
-     * §5.6's positional form: {@code !enum [a b M]} binds {@code members}, so {@code M} is a member and
-     * {@code names<c>} reads {@code c} as one rather than as a type named {@code c}.
+     * §5.6's positional form: {@code !enum [a b M]} binds {@code members}, so {@code M} is a member -- typed
+     * {@code identifier}, {@code enum}'s label type -- and {@code names<c>} reads {@code c} as one rather than as
+     * a type named {@code c}.
      */
     @Test
     void thePositionalFormIsWalkedLikeTheRecordItSpells() {
-        assertEquals(List.of(param("M", "text")), parameters().get("names"));
+        assertEquals(List.of(param("M", "identifier")), parameters().get("names"));
 
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, SCHEMA)))));

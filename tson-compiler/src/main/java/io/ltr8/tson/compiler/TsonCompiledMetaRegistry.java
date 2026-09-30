@@ -268,15 +268,11 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         }
         if (META_KERNEL_IDENTITY.equals(identity)) {
             TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-            // TsonSchemaLinker.linkBootstrap runs its own materialization pass (synthesizing entries
-            // for argument-bearing type-refs like enum's own `members: set<token>`) before compiling,
-            // but persists nothing (not register -- TsonSchemaRegistry refuses a linked bootstrap
-            // schema outright, always), so this is discarded immediately after: every call still
-            // re-bootstraps and re-links from scratch, every time -- only the *quality* of the
-            // one-off result changes (58 entries, not 49), not its lifetime. The permanent, shared
-            // registry entry for meta-kernel comes from an explicit "load it and register it" step
-            // done once elsewhere; until then this one-off bootstrap stands in so nothing is ever
-            // left unable to resolve at all.
+            // The bootstrap's own output, linked and compiled but never registered -- TsonSchemaRegistry
+            // refuses a bootstrap schema outright -- so every call re-bootstraps from scratch. The
+            // permanent, shared registry entry for meta-kernel comes from an explicit "load it and
+            // register it" step done once elsewhere, resolving the kernel ordinarily against this one;
+            // until then this one-off bootstrap stands in so nothing is ever left unable to resolve.
             recordAndVerify(TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID), uri, identity);
             return bootstrap(TsonSchemaLinker.linkBootstrap(metaKernel));
         }
