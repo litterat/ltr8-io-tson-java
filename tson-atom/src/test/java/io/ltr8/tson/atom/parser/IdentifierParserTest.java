@@ -3,6 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.TextType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -24,13 +25,13 @@ class IdentifierParserTest {
 
     @Test
     void readReturnsANameTheProfileAdmits() {
-        assertEquals("order_id", IdentifierParser.UNCONSTRAINED.read("order_id"));
+        assertEquals("order_id", IdentifierParser.IDENTIFIER.read("order_id"));
     }
 
     @Test
     void readRaisesAParseFailureForOneItDoesNot() {
         AtomParseException refused =
-                assertThrows(AtomParseException.class, () -> IdentifierParser.UNCONSTRAINED.read("2fast"));
+                assertThrows(AtomParseException.class, () -> IdentifierParser.IDENTIFIER.read("2fast"));
 
         assertEquals("an identifier", refused.expected());
         assertTrue(refused.getMessage().contains("never begins with a digit"), refused.getMessage());
@@ -40,19 +41,20 @@ class IdentifierParserTest {
     @Test
     void theRefusalCarriesTheProfilesOwnMessage() {
         assertEquals(io.ltr8.tson.base.unicode.IdentifierProfile.validate("2fast").orElseThrow(),
-                assertThrows(AtomParseException.class, () -> IdentifierParser.UNCONSTRAINED.read("2fast")).getMessage());
+                assertThrows(AtomParseException.class, () -> IdentifierParser.IDENTIFIER.read("2fast")).getMessage());
     }
 
     @Test
     void writeIsTheIdentity() {
-        assertEquals("anything", IdentifierParser.UNCONSTRAINED.write("anything"));
+        assertEquals("anything", IdentifierParser.IDENTIFIER.write("anything"));
     }
 
     /** A naming convention is a {@code pattern} facet, asked of a name the grammar already admits. */
     @Test
     void aPatternFacetNarrowsTheNamesAdmitted() {
-        IdentifierParser snakeCase = new IdentifierParser(new IdentifierType(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of("[a-z][a-z0-9_]*"), Optional.empty()));
+        IdentifierParser snakeCase = new IdentifierParser(IdentifierType.IDENTIFIER.withTextConstraints(
+                new TextType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of("[a-z][a-z0-9_]*"),
+                        Optional.empty())));
 
         assertEquals("order_id", snakeCase.read("order_id"));
         assertThrows(AtomTypeException.class, () -> snakeCase.read("orderId"));
@@ -61,8 +63,9 @@ class IdentifierParserTest {
     /** The grammar is refused as a grammar even where a facet would also refuse it. */
     @Test
     void theGrammarIsCheckedBeforeTheFacets() {
-        IdentifierParser closed = new IdentifierParser(new IdentifierType(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(List.of("north", "south"))));
+        IdentifierParser closed = new IdentifierParser(IdentifierType.IDENTIFIER.withTextConstraints(
+                new TextType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                        Optional.of(List.of("north", "south")))));
 
         assertEquals("north", closed.read("north"));
         assertThrows(AtomTypeException.class, () -> closed.read("east"));

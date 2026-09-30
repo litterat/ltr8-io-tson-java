@@ -160,11 +160,23 @@ It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recover
   a Thompson-NFA, linear-time and ReDoS-safe — not `java.util.regex`.
 - **`value`, `void` and `identifier` each have a constructor**, and are read by it: `value_type` by `ValueParser`
   (in `tson-compiler`, base-type resolution to the natural host), `void_type` by `VoidReader` (the absent sentinel
-  `_` alone), and `identifier_type` by `IdentifierParser` — the text matched against `IdentifierProfile` first, a
-  grammar failure being a parse failure, then `text_type`'s facets through `TextParser`. So a naming convention is a
-  `pattern` and a closed vocabulary of names is `members`, and an identifier is string-class (§5.4).
-  `IdentifierType.coherenceCheck` holds each member to the grammar as well as to the facets, since a member the
-  grammar refuses is one no value can reach. Core declares its own `identifier` sibling, as it does `text`. Core's `void`
+  `_` alone), and `identifier_type` by `IdentifierParser` — the text matched against the type's own
+  `IdentifierProfile` first, a profile failure being a parse failure, then `text_type`'s facets through
+  `TextParser`. So a naming convention is a `pattern` and a closed vocabulary of names is `members`, and an
+  identifier is string-class (§5.4).
+- **`identifier_type` is a UAX #31 profile**: `start`/`continue` bases (`XID`, `ID`, `NONE`), `start_add`,
+  `continue_add`, `medial` and `exclude` code-point sets, and a required `normalization` form (`NONE`, `NFC`,
+  `NFKC`; `NFKC_Casefold` is left out, the JDK having no full case folding — see `IdentifierProfile.Normalization`).
+  `IdentifierType.profile()` builds the `IdentifierProfile`; the parser builds it once, so a read builds nothing. The
+  kernel's `identifier` is `!identifier_type { continue_add: "-" }`, whose profile is `IdentifierProfile.NAME` —
+  which the lexer, schema parser, resolver and linker hold statically, since the kernel's own names are read before
+  the kernel exists. `MetaKernelBootstrapResolver` refuses a kernel `identifier` stating any other body, so the two
+  cannot drift. **The profile facets never move under refinement** (`IdentifierType.constraintsCheck`): a refinement
+  restates them or leaves them, and narrows only the text facets. Set-once would not do — setting `start_add` where
+  the source left it unset widens the profile. `coherenceCheck` holds each member to the type's profile as well as
+  to the facets, since a member the profile refuses is one no value can reach, and refuses a profile with an empty
+  Start set or a medial that is also Start or Continue. Core declares its own `identifier` sibling, as it does
+  `text`. Core's `void`
   is `!void_type {}` too, so the linker's refusal of a `void` variant and the inhabitance check ask the body
   (`ReferenceChain.resolvesToVoid`), not the name.
 - **The network family reuses one grammar per address form, never a second copy.** Both grammars are

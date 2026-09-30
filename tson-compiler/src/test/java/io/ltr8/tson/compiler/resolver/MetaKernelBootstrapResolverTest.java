@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
  * {@code integer}, {@code text}/{@code uri}/{@code regex}, and six {@code enum} instances,
  * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
- * resolve to the expected kind/body -- all 56 of the real fixture's declarations resolve, alongside the
+ * resolve to the expected kind/body -- all 58 of the real fixture's declarations resolve, alongside the
  * nine entries {@link SchemaDesugarer} injects for their argument-bearing applications.
  */
 class MetaKernelBootstrapResolverTest {
@@ -72,7 +72,7 @@ class MetaKernelBootstrapResolverTest {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         Map<String, Top> expected = Map.of("value", new ValueType(), "void", new VoidType(),
-                "identifier", IdentifierType.UNCONSTRAINED);
+                "identifier", IdentifierType.IDENTIFIER);
         expected.forEach((name, body) -> {
             TypeDefinition resolved = schema.entries().get(name);
             assertEquals(TypeKind.ATOM, resolved.kind());
@@ -132,7 +132,7 @@ class MetaKernelBootstrapResolverTest {
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is the 56 declarations the fixture writes plus one injected declaration per distinct sugar form
+     * output is the 58 declarations the fixture writes plus one injected declaration per distinct sugar form
      * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar and one {@code map}
      * entry from the {@code {K => V}} sugar in {@code instance_template.bindings}. They are the same entries
      * the linker used to synthesize; producing them here is what leaves the linker with nothing to
@@ -141,10 +141,10 @@ class MetaKernelBootstrapResolverTest {
      * form stays prohibited at a field position (§5.2).
      */
     @Test
-    void theFiftySixFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
+    void theFiftyEightFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(64, schema.entries().size());
+        assertEquals(66, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_template_param", "array_field_group",
                 "array_record_field")) {

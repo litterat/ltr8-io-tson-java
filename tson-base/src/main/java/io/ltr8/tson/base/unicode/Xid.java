@@ -56,6 +56,23 @@ public final class Xid {
     }
 
     /**
+     * {@code ID_Start}, exactly: {@link Character#isUnicodeIdentifierStart} is the property itself, and
+     * {@link #isStart} is it minus {@link #NOT_XID_START}.
+     */
+    public static boolean isIdStart(int cp) {
+        return Character.isUnicodeIdentifierStart(cp);
+    }
+
+    /**
+     * {@code ID_Continue}, exactly -- {@link #isContinue} without the {@link #NOT_XID_CONTINUE} subtraction, the
+     * joiners included on the same terms.
+     */
+    public static boolean isIdContinue(int cp) {
+        return (Character.isUnicodeIdentifierPart(cp) && !Character.isIdentifierIgnorable(cp))
+                || cp == ZWNJ || cp == ZWJ;
+    }
+
+    /**
      * U+200C ZERO WIDTH NON-JOINER -- {@code XID_Continue} , and re-added by {@link #isContinue} because the ignorable
      * subtraction removes it.
      */

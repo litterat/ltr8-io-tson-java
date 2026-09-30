@@ -225,30 +225,50 @@
     body: !text_type {}
   }
 
-  @doc:"Identifier constraint vocabulary: a text family whose facets apply inside the naming grammar -- XID_Start-initial, XID_Continue plus '-', in NFC."
-  identifier_type => !type_definition {
-    supertypes: [atom text_type top]
-    body: !record { supertypes: [text_type]  fields: [
-      !record_field { name: min_length  type: non_negative_integer  optional: true }
-      !record_field { name: max_length  type: non_negative_integer  optional: true }
-      !record_field { name: length      type: non_negative_integer  optional: true }
-      !record_field { name: pattern     type: regex    optional: true }
-      !record_field { name: members     type: text_member_set  optional: true }
-    ] }
-  }
-
-  @doc:"Identifier primitive: the type of every naming position. Instance of `identifier_type`."
-  identifier => !type_definition {
-    source: identifier_type
-    body: !identifier_type {}
-  }
-
   @doc:"Mixin record contributing the `spec` field to specification-bound atoms."
   atom_specification => !type_definition {
-    subtypes: [regex_type uri_type]
+    subtypes: [identifier_type regex_type uri_type]
     body: !record { fields: [
       !record_field { name: spec  type: uri }
     ] }
+  }
+
+  @doc:"The base a UAX #31 Start or Continue set is drawn from."
+  identifier_base => !type_definition {
+    source: enum
+    body: !enum { members: [XID ID NONE] }
+  }
+
+  @doc:"The normalization form an identifier must already be in."
+  normalization => !type_definition {
+    source: enum
+    body: !enum { members: [NONE NFC NFKC] }
+  }
+
+  @doc:"Identifier constraint vocabulary: a UAX #31 identifier profile, with the text facets applied inside it."
+  identifier_type => !type_definition {
+    supertypes: [atom atom_specification text_type top]
+    body: !record { supertypes: [text_type atom_specification]  fields: [
+      !record_field { name: min_length     type: non_negative_integer  optional: true }
+      !record_field { name: max_length     type: non_negative_integer  optional: true }
+      !record_field { name: length         type: non_negative_integer  optional: true }
+      !record_field { name: pattern        type: regex    optional: true }
+      !record_field { name: members        type: text_member_set  optional: true }
+      !record_field { name: spec           type: uri   optional: true  role: FIXED  value: "https://www.unicode.org/reports/tr31/" }
+      !record_field { name: start          type: identifier_base  optional: true  role: DEFAULT  value: XID }
+      !record_field { name: continue       type: identifier_base  optional: true  role: DEFAULT  value: XID }
+      !record_field { name: start_add      type: text  optional: true }
+      !record_field { name: continue_add   type: text  optional: true }
+      !record_field { name: medial         type: text  optional: true }
+      !record_field { name: exclude        type: text  optional: true }
+      !record_field { name: normalization  type: normalization  optional: true  role: DEFAULT  value: NFC }
+    ] }
+  }
+
+  @doc:"Identifier primitive: the type of every naming position, [TSON-DATA] §7.7's profile. Instance of `identifier_type`."
+  identifier => !type_definition {
+    source: identifier_type
+    body: !identifier_type { continue_add: "-" }
   }
 
   @doc:"URI constraint vocabulary. Composes with `text_type` and the `atom_specification` mixin."

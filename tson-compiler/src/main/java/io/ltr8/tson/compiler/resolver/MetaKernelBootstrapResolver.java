@@ -264,8 +264,8 @@ public final class MetaKernelBootstrapResolver {
                 yield Optional.of(new VoidType());
             }
             case "identifier_type" -> {
-                requireEmptyBody(instance);
-                yield Optional.of(IdentifierType.UNCONSTRAINED);
+                requireIdentifierProfile(instance);
+                yield Optional.of(IdentifierType.IDENTIFIER);
             }
             case "integer_type" -> {
                 requireEmptyBody(instance);
@@ -298,6 +298,22 @@ public final class MetaKernelBootstrapResolver {
         if (!(instance.value().coreValue() instanceof EmptyBrace)) {
             throw new IllegalStateException(
                     "expected {} for !" + instance.target() + ", found " + instance.value().coreValue());
+        }
+    }
+
+    /**
+     * {@code identifier => !identifier_type { continue_add: "-" }}, checked to be exactly that: the hand-picked
+     * constant is the profile the lexer, parser, resolver and linker already hold, since the kernel's own names
+     * are read by it before the kernel exists. The kernel stating another would be a kernel that describes a
+     * profile this implementation does not run.
+     */
+    private static void requireIdentifierProfile(Instance instance) {
+        if (!(instance.value().coreValue() instanceof RecordValue record) || record.fields().size() != 1
+                || !record.fields().getFirst().name().equals("continue_add")
+                || !(record.fields().getFirst().value().value().coreValue() instanceof TokenValue token)
+                || !token.text().equals("-")) {
+            throw new IllegalStateException("expected { continue_add: \"-\" } for !identifier_type, found "
+                    + instance.value().coreValue());
         }
     }
 

@@ -58,7 +58,9 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the numeric tiers use: one rule for a position whose other half cannot be narrowed) and **selector** facets
   (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
   rejecting one would reject a documented construct — §5.7 states the rule per facet kind, and a selector is
-  settable where the source leaves it at the constructor's default, identity-only once bound.
+  settable where the source leaves it at the constructor's default, identity-only once bound. An
+  `identifier_type`'s **profile** facets are identity-only outright, default or not: setting an addition set the
+  source left unset widens the profile, so no set-once form of the rule is sound (`IdentifierType`).
 - **A body must also be coherent with itself**, which is the other question about the same facets and
   needs no source to compare against. `checkCoherent` asks `Atom.coherenceCheck()` — one rule per family over
   the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `SchemaValidationException`

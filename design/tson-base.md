@@ -124,11 +124,13 @@ UTS #39 rules over them, read by two engines and knowing nothing about either fo
 in `policy` rather than beside the tables it reads, because the line between the two Unicode packages is
 **who touches them**: a consumer names `policy` to configure a processor and never names `unicode`; the
 engines read `unicode` and never name `policy`.
-**`IdentifierProfile` is here too**, beside the tables it reads: [TSON-DATA] §7.7's grammar (`validate`)
-and §8.2's restricted-character rule (`hygiene`), both **reporting** a violation rather than throwing one.
+**`IdentifierProfile` is here too**, beside the tables it reads: a UAX #31 R1 profile (`of`, `check`), with
+[TSON-DATA] §7.7's as `NAME` (`validate`), and §8.2's restricted-character rule (`hygiene`), all **reporting** a
+violation rather than throwing one. Its `Base` and `Normalization` enums are the meta-kernel's `identifier_base`
+and `normalization`, which `schema.meta.IdentifierType` binds directly rather than mirroring.
 That is what lets one check serve a caller that owes a parse error and one that owes a diagnostic — the
 identical violation is a `ParseException` from the lexer and a refusal from the linker — where a signature
 that threw forced the lexer's answer on everyone. It is not a parser: nothing here turns a token into a
-host value, and the `identifier` atom is a wrapper over `validate` living with the rest of the vocabulary
+host value, and the `identifier_type` atom is a wrapper over `check` living with the rest of the vocabulary
 (`atom.parser.IdentifierParser`). It leaves `tson-compiler`'s `lexer` package exactly `Lexer`, `LexException`, `Token` and
 `TokenType`.

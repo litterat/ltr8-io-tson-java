@@ -124,7 +124,7 @@ class AtomValueReaderTest {
 
     @Test
     void identifier() {
-        assertEquals("order_id", readValue(IdentifierType.UNCONSTRAINED, "{ value: order_id }"));
+        assertEquals("order_id", readValue(IdentifierType.IDENTIFIER, "{ value: order_id }"));
     }
 
     @Test
