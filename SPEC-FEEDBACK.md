@@ -977,6 +977,51 @@ name the kernel's type at all. Two same-named entries with the same body are tak
 declaration check and in the bound check alike. The spec needs a sentence to that effect, or a different way for
 core's copies to relate to the kernel's.
 
+**A bound names a type, and only a type.** `bound` is a `type_ref` into the schema's type-name namespace, checked by
+IS-A there; a name found only among the governing meta's constructors is structure vocabulary (§3.3.1), which no
+type argument can name. So `<T: text_type> { a: T }` admits nothing -- `box<text>` fails IS-A and `box<text_type>`
+does not resolve -- and is refused at the declaration. The spec should say which namespace a written type resolves
+in, since a slot-derived `type` is read in the other one.
+
+**The recorded `type` does not say which namespace it names.** "Where a derived type is read" makes the held body
+decide, which serves the resolver but not a consumer of resolved output: `{ name: N  type: non_negative_integer }`
+reads the same whether the kernel's type or core's copy was meant, and the only way to tell is the held text this
+entry exists to make unnecessary. The core-copy rule above is what makes the ambiguity harmless in practice. A
+cleaner fix is for core's copies to relate to the kernel's by an edge rather than by name and body, after which
+either reading gives the same answer.
+
+**Proposal (not running): a bound on the constructor, `<T: !C>`.** A nominal bound cannot say "any text-valued
+atom". Construction transfers kind and no supertypes (§5.5), so `identifier`, a kebab `!identifier_type { … }`
+profile, and `stock_code => !text_type {}` are IS-A nothing, and `<T: text>`, `<T: atom>` and `<T: identifier_type>`
+all refuse them. That separation is right for values -- a `stock_code` must not pass where a plain `text` is
+declared -- but a bound is a different question: what the body can do with T, not which nominal type T is.
+`box<stock_code>` and `box<text>` stay distinct entries, so admitting both mixes nothing.
+
+The question lives in the structure namespace -- T's definition was built by `C` or by a constructor composing
+`C` -- so it is a second field, never a second reading of `bound`:
+
+```
+template_param => {
+  name:         param_name
+  type:         type_ref
+  bound?:       type_ref   -- type-name namespace: an argument must name a type that IS-A it
+  constructor?: type_ref   -- structure namespace: an argument's definition must be built by it, or by a
+                           -- constructor composing it
+}
+```
+
+- **Spelling** `<T: !text_type>`: `!` already marks a structure-namespace head in `!C { … }`.
+- **The check** follows the argument's reference chain to its definition, takes the constructor it was built
+  with through any refinement, and asks IS-A among constructors -- one two-valued rule. `identifier_type` composes
+  `text_type`, so `identifier` and every identifier profile pass.
+- **What it buys:** `<T: !text_type>` for any text-valued atom; `<T: !atom>` for any scalar, which is what an
+  unbounded `enum_type => <T> atom & { members: set<T> }` would need to keep records out; `<K: !atom, V> { K => V }`,
+  whose every application takes [TSON-JSON]'s object form, since that form is chosen by `K`.
+- **Both fields may be present**: a parameter can inherit one from each of two uses, and each narrows on its own
+  terms through the fixed point -- `constructor` along IS-A among constructors.
+- **A constructor is named by identity in the structure namespace**, not by bare name, and only a schema its meta
+  governs can name one. The kernel's are shared by every meta chain.
+
 **What is running.** On `main`, the current text: this implementation derives each parameter's kind from the
 declared type of the slot it stands in (`ParameterKinds`), refuses a parameter standing for a whole collection or
 record or in both kinds of position, runs the derivation as a fixed point across templates with an undetermined
@@ -994,10 +1039,11 @@ closed. The restriction syntax is parsed on every declaration form; a written ty
 `type` or is a type parameter's `bound`; bounds are inherited through the fixed point; and a core copy and its
 kernel original are one type in both checks. Each application checks its arguments as it closes: a type argument
 must name a type that IS-A the bound, following reference chains, and a value argument must parse as the
-parameter's type, or as the type an earlier parameter's argument names. An argument the check cannot judge — an
-application, an unresolved name — is left to the substituted body, as before. Not yet running there: ingest's
-verification of a recorded type, since this implementation re-resolves a schema from source rather than ingesting
-resolved output.
+parameter's type, or as the type an earlier parameter's argument names. A written bound must name a type in the
+schema or its imports; one naming only a constructor of the governing meta is refused at the declaration. An
+argument the check cannot judge — an application, an unresolved name — is left to the substituted body, as before.
+Not yet running there: ingest's verification of a recorded type, since this implementation re-resolves a schema
+from source rather than ingesting resolved output.
 
 **The proposal measured against what exists.** Every template this implementation's tests and the conformance
 corpus declared before the change — 116 distinct ones — was walked with the use types recorded, and the running

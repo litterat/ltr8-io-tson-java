@@ -112,6 +112,17 @@ class TemplateParamBoundTest {
         assertRefused("  bad => <T: [text]> { a: T }", "names a declared type");
     }
 
+    /**
+     * A bound names a type, in the type-name namespace. A name found only among the governing meta's constructors
+     * is structure vocabulary (§3.3.1), which no argument could satisfy -- a type argument names a type.
+     */
+    @Test
+    void aWrittenBoundNamesATypeInTheTypeNamespace() {
+        assertRefused("  boxed => <T: text_type> { a: T }", "'text_type' is a constructor of the governing meta");
+        assertRefused("  boxed => <T: no_such_type> { a: T }", "'no_such_type' names no type");
+        assertRefused("  boxed => <T: no_such<text>> { a: T }", "'no_such' names no type");
+    }
+
     // ── Enforced at the application ────────────────────────────────────────
 
     @Test

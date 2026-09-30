@@ -127,7 +127,9 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       one; on a type parameter it is `template_param.bound`, and must IS-A every bound the uses inherit. Bounds
       travel through the fixed point like types (`rebox => <T> boxed<T>` is bounded by `boxed`'s bound), and an
       imported template is taken as recorded rather than re-walked, since its held body does not carry what its
-      author wrote.
+      author wrote. A written bound names a type, so it must resolve in the type-name namespace
+      (`ParameterTypes.requireType`): the fallback to the governing meta that a slot's declared type needs would
+      otherwise let `<T: text_type>` bind to a constructor, which no type argument can IS-A.
     - **Stamped before materialisation too**, so `TemplateMaterialiser.byParameterKind` can check each argument
       as an application closes (`checkArguments`): a type argument must IS-A the bound, following reference
       chains; a value argument must parse as the parameter's type, or as the type an earlier parameter's argument
