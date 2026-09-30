@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=575214f61ce51e0e05f34c14919d05fba3df9fe8c1456d413d9bce0a03875ab0"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b79f3f235001e8998a2e2a5b2bc70d72fbb6a2cadee6e988eede48820a20ef30"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -325,19 +325,51 @@
 
   text => !text_type {}
 
-  @doc:"""
-    Identifier constraint vocabulary. A text family: it composes
-    text_type's record shape, so it takes the text facets — lengths, a
-    pattern such as a naming convention, and members for a closed
-    vocabulary of names — each applied inside the grammar below. identifier is its unconstrained instance, and the
-    type of every naming position in the series — type names, field
-    names and parameter names, through the three roles below. A rule
-    stated here reaches all of them.
+  @doc:"Mixin record contributing the `spec` field to specification-bound atoms."
+  atom_specification => { spec: uri }
 
-    An identifier is a name, not a lexeme: it is the decoded text of a
-    token, after unquoting, escape processing and normalisation, and it
-    is constrained however it was spelled. Its profile is stated beside
-    the unquoted-token profile of [TSON-DATA] §7.1:
+  @doc:"""
+    The base a UAX #31 Start or Continue set is drawn from: XID_Start /
+    XID_Continue, ID_Start / ID_Continue, or the empty set.
+    """
+  identifier_base => !enum [XID ID NONE]
+
+  @doc:"The normalization form an identifier must already be in. Text not in it is refused, never rewritten."
+  normalization => !enum [NONE NFC NFKC]
+
+  @doc:"""
+    Identifier constraint vocabulary: a UAX #31 identifier profile, with
+    the text facets applied inside it. It composes text_type's record
+    shape, so it takes lengths, a pattern such as a naming convention,
+    and members for a closed vocabulary of names. The profile is UAX
+    #31's R1 default identifier syntax:
+
+      identifier := Start Continue* (Medial Continue+)*
+      Start      := (start ∪ start_add) − exclude
+      Continue   := (continue ∪ continue_add) − exclude
+      Medial     := medial
+
+    where start and continue name the base each set is drawn from, and
+    each of start_add, continue_add, medial and exclude is the set of
+    code points its text holds. A medial character stands only between
+    two others and never beside another medial, so medial must be
+    disjoint from Start and Continue. The whole text must be in the
+    normalization form given. A join control (U+200C, U+200D) is
+    admitted only in the contexts UTS #39 §3.1.1.1 permits, whatever
+    the profile.
+
+    The profile facets are fixed where the profile is constructed: a
+    refinement restates each or leaves it, and narrows only the text
+    facets. A different profile is a fresh !identifier_type.
+
+    identifier is [TSON-DATA] §7.7's instance, and the type of every
+    naming position in the series — type names, field names and
+    parameter names, through the three roles below. A rule stated here
+    reaches all of them. An identifier is a name, not a lexeme: it is
+    the decoded text of a token, after unquoting, escape processing and
+    normalisation, and it is constrained however it was spelled. Its
+    profile is stated beside the unquoted-token profile of [TSON-DATA]
+    §7.1:
 
       Start    = XID_Start
       Continue = XID_Continue + "-"
@@ -353,22 +385,30 @@
     membership: whitespace, control characters, format characters,
     emoji and unassigned code points are none of them XID_Continue.
 
-    Every part of this profile lies inside the unquoted-token profile,
-    so every identifier is a well-formed unquoted token and none ever
-    needs quoting — which is what lets the type-ref and annotation
-    positions, admitting no quoted form, cost nothing.
+    Every part of identifier's profile lies inside the unquoted-token
+    profile, so every identifier is a well-formed unquoted token and
+    none ever needs quoting — which is what lets the type-ref and
+    annotation positions, admitting no quoted form, cost nothing.
+    Another profile carries no such guarantee, and a value under it may
+    need quoting.
 
     Core declares its own sibling under the same name — the same
     !identifier_type construction and contract, a distinct type entity —
     so that core-importing schemas can type a value or a map key as a
     name.
     """
-  identifier_type => text_type & {}
+  identifier_type => text_type & atom_specification & {
+    spec?:          = "https://www.unicode.org/reports/tr31/"
+    start?:         identifier_base ~ XID
+    continue?:      identifier_base ~ XID
+    start_add?:     text
+    continue_add?:  text
+    medial?:        text
+    exclude?:       text
+    normalization?: normalization ~ NFC
+  }
 
-  identifier => !identifier_type {}
-
-  @doc:"Mixin record contributing the `spec` field to specification-bound atoms."
-  atom_specification => { spec: uri }
+  identifier => !identifier_type { continue_add: "-" }
 
   @doc:"""
     URI constraint vocabulary. Composes with the text_type

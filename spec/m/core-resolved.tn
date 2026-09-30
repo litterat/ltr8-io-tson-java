@@ -230,7 +230,7 @@
   @ordered:NONE @bounded:false
   identifier => !type_definition {
     source: identifier_type
-    body: !identifier_type {}
+    body: !identifier_type { continue_add: "-" }
   }
 
   @doc:"Interoperable regular expression pattern per RFC 9485 (I-Regexp)."

@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=19f4c46d46d1cdde313d3d4f0facc51d9269bf44ac3bc5d4cbb28d38ebdf78a2"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=23fad72bbb4f693fd566824293affcd098e8881fd7b7ee714c60b74bf1f922bf"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=6d1a0862288dc8acaa4116e3a95840842fbce040c67b5fa9fbe17b75856db6b4"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=a01f033526ca37a64dcad3410aea1dee75a319775a591522120f6c0921fdd379"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -208,7 +208,7 @@
     naming convention as `pattern`, a closed vocabulary as `members`.
     """
   @ordered:NONE @bounded:false
-  identifier => !identifier_type {}
+  identifier => !identifier_type { continue_add: "-" }
 
   @doc:"Interoperable regular expression pattern per RFC 9485 (I-Regexp)."
   @ordered:NONE @bounded:false

@@ -75,7 +75,7 @@ class AtomCoherenceTest {
         assertCoherent(ComplexType.UNCONSTRAINED);
         assertCoherent(new ValueType());
         assertCoherent(new VoidType());
-        assertCoherent(IdentifierType.UNCONSTRAINED);
+        assertCoherent(IdentifierType.IDENTIFIER);
     }
 
     /** One end alone is a half-open range, which is the normal way to write a floor or a ceiling. */
@@ -460,15 +460,15 @@ class AtomCoherenceTest {
     /** A member no value can reach: the grammar refuses {@code 2fast} before the member set is asked. */
     @Test
     void anIdentifierMemberOutsideTheGrammarIsIncoherent() {
-        IdentifierType names = new IdentifierType(Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(List.of("north", "2fast")));
+        IdentifierType names = IdentifierType.IDENTIFIER.withTextConstraints(new TextType(Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of("north", "2fast"))));
         assertViolation(names, "member '2fast' is not an identifier");
         assertEquals(1, names.coherenceCheck().size(), names.coherenceCheck().toString());
     }
 
     @Test
     void identifierMembersInsideTheGrammarAreCoherent() {
-        assertCoherent(new IdentifierType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.of(List.of("north", "south"))));
+        assertCoherent(IdentifierType.IDENTIFIER.withTextConstraints(new TextType(Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of("north", "south")))));
     }
 }

@@ -223,7 +223,7 @@ class ChoiceDisjointnessTest {
     /** An identifier is a text family, so it is string-class and apart from a number. */
     @Test
     void anIdentifierVariantIsStringClass() {
-        TypeRef id = atom("identifier", IdentifierType.UNCONSTRAINED);
+        TypeRef id = atom("identifier", IdentifierType.IDENTIFIER);
         TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
         TypeRef t = atom("text", TextType.UNCONSTRAINED);
         assertTrue(disjoint(id, i));

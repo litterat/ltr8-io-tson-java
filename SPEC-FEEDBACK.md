@@ -549,7 +549,7 @@ and §5.2's conformance is enforced by the resolver as prose requires.
 
 **Section:** [TSON-SCHEMA] §5.4 (discrimination class), §5.7 (refinement), §7.4 (enum member semantics, the
 `identifier` primitive), §11.4 (name hygiene at the schema layer); [TSON-DATA] §2.6 (map keys are values), §7.7
-(the identifier grammar), §8.2 (name hygiene); the meta-kernel's `unit`, `identifier`, `text_type`,
+(the identifier grammar), §8.2 (name hygiene); UAX #31 (R1); the meta-kernel's `unit`, `identifier`, `text_type`,
 `enum_profile` and `enum`. Proposal 2 builds on #6.
 
 **Kind:** proposal, with one gap in the current text underneath it.
@@ -659,6 +659,58 @@ Three rules stay with `enum` rather than moving to the type:
   Argued against: `enum` carries what a member set does not — the binding row, unquoted spelling, and a class of
   its own — and Revision 36 kept both deliberately.
 
+**Proposal 3 — `identifier_type` states its profile, as data.** Proposal 1 leaves §7.7's profile in prose,
+fixed, so a meta layer describing an outside system — an API's operation names, a database's column names —
+can narrow the kernel's names by `pattern` but never state a different naming rule. UAX #31's R1 syntax is
+the standard parametrisation, and the kernel can declare it:
+
+```
+identifier_base => !enum [XID ID NONE]
+normalization   => !enum [NONE NFC NFKC]
+
+identifier_type => text_type & atom_specification & {
+  spec?:          = "https://www.unicode.org/reports/tr31/"
+  start?:         identifier_base ~ XID
+  continue?:      identifier_base ~ XID
+  start_add?:     text
+  continue_add?:  text
+  medial?:        text
+  exclude?:       text
+  normalization?: normalization ~ NFC
+}
+
+identifier => !identifier_type { continue_add: "-" }
+```
+
+An identifier is `Start Continue* (Medial Continue+)*`, with `Start = (start ∪ start_add) − exclude`,
+`Continue = (continue ∪ continue_add) − exclude` and `Medial = medial`; each `text` is read as the set of code
+points it holds, and the whole text must already be in the `normalization` form. `identifier`'s body is §7.7's
+profile exactly, so every existing name reads as before. The family now composes `atom_specification`, which
+Proposal 1 left out for want of an external document: UAX #31 is that document once the profile is data. What
+the text must add:
+
+- **The profile facets are fixed where the profile is constructed.** A refinement restates each or leaves it,
+  and narrows only the text facets. §5.7's set-once rule would be unsound here: setting `start_add` on a
+  source that left it unset *widens* the profile, so `!identifier ^ { start_add: "_" }` would admit `_x`
+  without `_x` being an `identifier`. Narrowing a profile has no use a fresh `!identifier_type` does not serve
+  better.
+- **Two coherence rules.** A profile whose Start set is empty admits nothing, and a character that is both
+  medial and Start or Continue leaves the placement rule unable to say where it may stand. Both refuse the
+  body.
+- **Join controls keep §7.7 rule 2's contexts under every profile**, an invisible joiner being as much a
+  spoofing surface in an outside system's names as in the series' own.
+- **Only `identifier`'s profile lies inside §7.1's unquoted-token profile.** A value under another profile may
+  need quoting, which is harmless because the positions that admit no quoted form — type references and
+  annotations — are typed by the kernel's roles, which stay on `identifier`.
+- **`medial` is new to the series.** The kernel keeps `-` as a Continue character, so `a-` and `a--b` stay
+  names; moving it to `medial` would be a separate change to §7.7.
+
+UAX #31's `NFKC_Casefold` form is left out: checking it needs full case folding, which is a Unicode table of
+its own rather than a normalizer call, and it waits for a naming system that needs it. Case-insensitive
+*comparison* is not covered here at all — SQL folds an unquoted name rather than requiring it folded — and
+belongs with the look-alike and duplicate rules of Proposal 1, not with the profile. The profile's parameters
+follow UAX #31's R1 shape; none has yet been validated against a consuming meta layer.
+
 **What is running.** On `main`, the current text: `identifier` is `!unit {}`, a value at an `identifier`-typed
 position is checked against §7.7's grammar only, and no hygiene reaches a map key. A consumer that wanted the
 rule could scan its own keys, but a security rule with a second implementation in each consumer is free to
@@ -670,13 +722,16 @@ whose failures are `ATOM_CONSTRAINT_VIOLATION`; so `!identifier_type { pattern: 
 convention and `!identifier_type { members: [north south] }` a closed vocabulary of names. §7.4's members rule
 counts the grammar among the facets beside a member, so `members: [north "2nd"]` fails to load: no value could
 ever be `2nd`, since the grammar refuses it before the member set is asked. The discrimination class is string.
-Core declares its sibling, `identifier => !identifier_type {}`, so an ordinary schema writes
+Proposal 3 runs as written above, with both coherence rules and the fixed-profile refinement rule; the
+lexer, schema parser, resolver and linker hold §7.7's profile directly, since the kernel's own names are read
+before the kernel exists, and the bootstrap refuses a kernel `identifier` whose body states any other.
+Core declares its sibling, `identifier => !identifier_type { continue_add: "-" }`, so an ordinary schema writes
 `{identifier => handler}` and refines `!identifier ^ { … }`. Not yet running there: §8.2's mechanisms at
 identifier-typed values and §11.4's map-key scope, so a map key is held to the grammar and the look-alike gap
 stays open. Proposal 2 is not taken.
 
 **Status against Revision 36:** open. Proposal 1 stands alone and closes the map-key gap; Proposal 2 depends on
-it and on #6.
+it and on #6; Proposal 3 depends on Proposal 1 alone.
 
 ---
 
