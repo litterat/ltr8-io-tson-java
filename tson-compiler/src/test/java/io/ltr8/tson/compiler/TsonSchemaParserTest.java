@@ -685,6 +685,26 @@ class TsonSchemaParserTest {
                 { box => <9t> { v: 9t } }"""));
     }
 
+    /**
+     * {@code type-param = param-name [ws ":" ws type-ref]} (§12.1): the names stay the type-def's list, and a
+     * written type is the declaration's, keyed by the parameter it follows.
+     */
+    @Test
+    void aTypeParameterMayWriteATypeAfterItsName() {
+        SchemaMap.Declaration declaration = declOf("vec => <T: text, N> !array { element_type: T  min_items: N }");
+
+        assertEquals(List.of("T", "N"), ((Instance) declaration.typeDef()).typeParams());
+        assertEquals(Map.of("T", new SimpleRef("text")), declaration.parameterTypes());
+    }
+
+    /** A colon promises a type, so a list that stops after one is a parse error rather than an unbounded name. */
+    @Test
+    void aColonWithNoTypeAfterItIsAParseError() {
+        assertThrows(ParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                { box => <T:> { v: T } }"""));
+    }
+
     /** And so is the constructor head of an atom refinement or instance, which names a type. */
     @Test
     void aConstructorHeadOutsideTheIdentifierProfileIsAParseError() {

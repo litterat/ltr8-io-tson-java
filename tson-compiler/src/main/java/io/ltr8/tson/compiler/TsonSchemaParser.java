@@ -102,6 +102,9 @@ public final class TsonSchemaParser extends TsonDataParser {
     /** The declaration currently being parsed, or {@code ""} before its name token is reached -- the {@code /name} schema pointer a recovered diagnostic carries. */
     private String declarationInProgress = "";
 
+    /** The types the declaration being parsed wrote in its parameter list, by parameter name ({@link #parseTypeParam}). */
+    private Map<String, TypeRef> parameterTypes = new LinkedHashMap<>();
+
     public TsonSchemaParser(String source) {
         super(source);
     }
@@ -287,9 +290,10 @@ public final class TsonSchemaParser extends TsonDataParser {
         expect(TokenType.MAP_ARROW, "a declaration's '=>'");
         List<Annotation> typeDefAnnotations = parseAnnotationList();
         Optional<DefinitionMark> mark = parseDefinitionMarkOpt();
+        parameterTypes = new LinkedHashMap<>();
         TypeDef typeDef = parseTypeDef(mark);
-        SchemaMap.Declaration declaration =
-                new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations, mark, typeDef);
+        SchemaMap.Declaration declaration = new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations,
+                mark, typeDef, parameterTypes);
         declarationPositions.put(declaration, namePosition);
         declarationInProgress = "";
         return declaration;
@@ -893,18 +897,33 @@ public final class TsonSchemaParser extends TsonDataParser {
         return annotations;
     }
 
+    /**
+     * {@code type-params = "<" ws type-param *( separator type-param ) [ws ","] ws ">"}, with {@code type-param =
+     * param-name [ws ":" ws type-ref]} (§12.1). The names are the list every consumer reads; a written type is
+     * collected into {@link #parameterTypes} for the declaration being parsed, since it narrows what resolution
+     * derives rather than shaping the type-def.
+     */
     private List<String> parseTypeParamsOpt() {
         if (!check(TokenType.LESS_THAN)) {
             return List.of();
         }
         advance();
         List<String> params = new ArrayList<>();
-        params.add(expectTypeName("a type parameter"));
+        params.add(parseTypeParam());
         while (consumeSeparatorOrCloseCheck(TokenType.GREATER_THAN)) {
-            params.add(expectTypeName("a type parameter"));
+            params.add(parseTypeParam());
         }
         expect(TokenType.GREATER_THAN, "a type parameter list's closing '>'");
         return params;
+    }
+
+    private String parseTypeParam() {
+        String name = expectTypeName("a type parameter");
+        if (check(TokenType.COLON)) {
+            advance();
+            parameterTypes.put(name, parseTypeRef());
+        }
+        return name;
     }
 
     /**

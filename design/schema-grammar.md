@@ -54,6 +54,10 @@ materialization, no validation (those are the resolver's/linker's jobs).
     offending token, per declaration like every other schema syntax error.
   - An unquoted non-numeric type-argument always parses as a type reference, never a value literal — a
     deliberate grammar-layer deferral, classified at a later semantic layer.
+- **A parameter may write a type after its name** (`type-param = param-name [ws ":" ws type-ref]`), on every
+  type-def form alike. `parseTypeParamsOpt` still returns the names the type-def records; a written type goes to
+  the declaration being parsed (`SchemaMap.Declaration.parameterTypes`), because it narrows what resolution
+  derives rather than shaping the type-def, and the declaration survives every desugar rewrite of its type-def.
 - **A `!` head behind a parameter list is the same production as one without** (§12.1's `instance =
   [type-params] "!" type-name ws core-value`) -- `vector => <T, N> !array { element_type: T  min_items: N }`.
   §12.1 has one production for both, and its own note says so: "`!` opens an `instance`, with or without a

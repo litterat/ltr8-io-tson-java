@@ -2165,6 +2165,20 @@ final class DefinitionResolver {
     }
 
     /**
+     * The type a declaration's parameter list wrote after {@code parameter} ({@code <T: text>}, §5.10), as a
+     * type-ref. A written type names a type or an application of one; a container sugar form is not lifted at
+     * this position, so it has no entry to name and is refused here in those terms.
+     */
+    io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeRef written) {
+        if (!(written instanceof SimpleRef) && !(written instanceof GenericRef)) {
+            throw new SchemaValidationException("parameter '" + parameter + "' is written with the type "
+                    + written + ", and a parameter's written type names a declared type or an application of one "
+                    + "(§5.10); declare the form under a name and write that name");
+        }
+        return resolveTypeRef(written);
+    }
+
+    /**
      * A field/group-member's type-ref, as one of the two shapes that reach resolution: a bare
      * {@link SimpleRef}, or a {@link GenericRef} -- a §5.10 application, or a constructor's own generic
      * vocabulary such as {@code enum}'s {@code members: set<token>}.

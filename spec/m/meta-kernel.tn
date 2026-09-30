@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=a6740a0e0808da0bd7969f60bbda6768a3739afde09c419394c32215210f32fb"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=575214f61ce51e0e05f34c14919d05fba3df9fe8c1456d413d9bce0a03875ab0"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -77,10 +77,20 @@
     parameter is a type parameter exactly when its `type` is
     `type_ref`. A `type` may name an earlier parameter of the same
     template, where a routed default's field is typed by one.
+
+    A declaration may narrow what it derives by writing a type after
+    the name, `<T: text, N: int8>`, read by the kind the positions
+    give. On a value parameter it narrows `type` itself and must IS-A
+    the derived type. On a type parameter it is `bound`: an argument
+    must name a type that IS-A it. `bound` is present only where
+    `type` is `type_ref`, and a parameter passed to another template
+    inherits that template's bound for the position, so an
+    unannotated parameter is bounded as narrowly as its uses require.
     """
   template_param => {
-    name: param_name
-    type: type_ref
+    name:   param_name
+    type:   type_ref
+    bound?: type_ref
   }
 
   @doc:"""

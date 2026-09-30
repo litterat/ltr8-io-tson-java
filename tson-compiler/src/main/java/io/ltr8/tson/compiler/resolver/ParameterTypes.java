@@ -16,6 +16,7 @@ import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -64,7 +65,19 @@ import java.util.function.Function;
  *
  * <p><b>Several uses must agree.</b> A parameter's type is the use type that IS-A every other; uses unordered by
  * IS-A are a resolver error at the declaration, since no argument could satisfy them all. A parameter standing
- * in both a type slot and a value slot is the commonest such case and keeps its own message.
+ * in both a type slot and a value slot is the commonest such case and keeps its own message. For a type
+ * parameter the same rule runs over the <b>bounds</b> its uses carry -- a parameter passed to {@code box<T>}
+ * inherits {@code box}'s bound for the position -- so an unannotated parameter is bounded as narrowly as its uses
+ * require.
+ *
+ * <p><b>A written type narrows what the positions give</b> ({@code <T: text, N: int8>}), read by the kind they
+ * give: on a value parameter it replaces {@code type} and must IS-A the derived one; on a type parameter it is the
+ * bound and must IS-A any bound the uses carry. Two same-named entries with identical bodies -- a core type and
+ * the kernel original it copies -- count as one type here, so {@code <N: non_negative_integer>} over a slot typed
+ * by the kernel's {@code non_negative_integer} is the narrowing it reads as.
+ *
+ * <p><b>An imported template is taken as recorded</b>, not walked again: its schema resolved it, and its recorded
+ * parameters carry what its author wrote, which its held body does not.
  *
  * <p><b>A parameter the fixed point leaves ungrounded is a type parameter, and that is forced</b> -- being a
  * value parameter <em>means</em> standing in a scalar slot, and a slot is what grounds a parameter. [TSON-SCHEMA]
@@ -91,45 +104,49 @@ final class ParameterTypes {
     }
 
     /**
-     * Every open entry's parameter types, by entry name then parameter name.
+     * Every local open entry's parameters, by entry name then parameter name.
      *
      * <p>{@code entries} is the <b>whole namespace</b>, imports included, because a local template may route a
-     * parameter into an imported one and take its type from there. {@code declared} is the subset this schema
-     * wrote, and the only names a failure is reported against: an imported entry resolved in its own schema, and
-     * reporting it here would put one document's verdict on another's declaration.
+     * parameter into an imported one and take its type from there. {@code local} is the subset this schema
+     * produced: those are walked, and the only names a failure is reported against, since an imported entry
+     * resolved in its own schema. {@code written} is what each local declaration's parameter list wrote.
      */
-    static Map<String, Map<String, TypeRef>> inferAll(Map<String, TypeDefinition> entries, Set<String> declared,
-                                                       Function<String, TypeDefinition> meta,
-                                                       FailureReporter reporter) {
+    static Map<String, Map<String, TemplateParam>> inferAll(Map<String, TypeDefinition> entries, Set<String> local,
+                                                             Map<String, Map<String, TypeRef>> written,
+                                                             Function<String, TypeDefinition> meta,
+                                                             FailureReporter reporter) {
         Map<String, Occurrences> observed = new LinkedHashMap<>();
+        Map<String, Map<String, TemplateParam>> recorded = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
             if (!(definition.body() instanceof TemplateBody held)) {
                 return;
             }
-            Occurrences occurrences = new Occurrences(held.parameterNames());
+            if (!local.contains(name)) {
+                Map<String, TemplateParam> params = new LinkedHashMap<>();
+                held.parameters().forEach(p -> params.put(p.name(), p));
+                recorded.put(name, params);
+                return;
+            }
+            Occurrences occurrences = new Occurrences(held.parameterNames(), written.getOrDefault(name, Map.of()));
             try {
                 new Walk(occurrences, meta).body(HeldBody.of(held));
             } catch (SchemaValidationException e) {
-                if (declared.contains(name)) {
-                    reporter.report(name, e);
-                }
+                reporter.report(name, e);
                 return;
             }
             observed.put(name, occurrences);
         });
-        return settle(observed, entries, declared, reporter, entries::get, meta);
+        return settle(observed, recorded, entries, reporter, entries::get, meta);
     }
 
     /** The same answer as kinds, for the materialiser, which asks only which channel an argument travels on. */
-    static Map<String, Map<String, Kind>> kinds(Map<String, Map<String, TypeRef>> types) {
+    static Map<String, Map<String, Kind>> kinds(Map<String, Map<String, TemplateParam>> parameters) {
         Map<String, Map<String, Kind>> kinds = new LinkedHashMap<>();
-        types.forEach((entry, parameters) -> kinds.put(entry, kindsOf(parameters)));
-        return kinds;
-    }
-
-    private static Map<String, Kind> kindsOf(Map<String, TypeRef> parameters) {
-        Map<String, Kind> kinds = new LinkedHashMap<>();
-        parameters.forEach((parameter, type) -> kinds.put(parameter, Kind.of(type)));
+        parameters.forEach((entry, params) -> {
+            Map<String, Kind> each = new LinkedHashMap<>();
+            params.forEach((name, param) -> each.put(name, Kind.of(param.type())));
+            kinds.put(entry, each);
+        });
         return kinds;
     }
 
@@ -147,7 +164,7 @@ final class ParameterTypes {
         if (!(template.body() instanceof TemplateBody held)) {
             return Map.of();
         }
-        Occurrences occurrences = new Occurrences(held.parameterNames());
+        Occurrences occurrences = new Occurrences(held.parameterNames(), Map.of());
         try {
             new Walk(occurrences, meta).body(HeldBody.of(held));
         } catch (SchemaValidationException e) {
@@ -179,13 +196,13 @@ final class ParameterTypes {
 
     /**
      * Deferred occurrences resolved against the types already known, until nothing moves. A parameter riding
-     * {@code box<T>}'s argument list takes {@code box}'s own parameter type at that position, and {@code box} may
-     * itself be waiting on this one -- §5.10 anticipates the cycle; this pass leaves such a parameter ungrounded,
-     * and ungrounded is a type parameter.
+     * {@code box<T>}'s argument list takes {@code box}'s own parameter at that position -- its type, and its bound
+     * -- and {@code box} may itself be waiting on this one; §5.10 anticipates the cycle, and this pass leaves such
+     * a parameter ungrounded, which is an unbounded type parameter.
      */
-    private static Map<String, Map<String, TypeRef>> settle(Map<String, Occurrences> observed,
-            Map<String, TypeDefinition> entries, Set<String> declared, FailureReporter reporter,
-            Function<String, TypeDefinition> local, Function<String, TypeDefinition> meta) {
+    private static Map<String, Map<String, TemplateParam>> settle(Map<String, Occurrences> observed,
+            Map<String, Map<String, TemplateParam>> recorded, Map<String, TypeDefinition> entries,
+            FailureReporter reporter, Function<String, TypeDefinition> local, Function<String, TypeDefinition> meta) {
         boolean moved = true;
         while (moved) {
             moved = false;
@@ -194,35 +211,37 @@ final class ParameterTypes {
                     if (occurrences.settled.contains(deferred)) {
                         continue;
                     }
-                    Occurrences callee = observed.get(deferred.head());
+                    TypeDefinition callee = entries.get(deferred.head());
                     if (callee == null) {
                         continue;
                     }
-                    List<String> calleeParameters = entries.get(deferred.head()).parameters();
+                    List<String> calleeParameters = callee.parameters();
                     if (deferred.index() >= calleeParameters.size()) {
                         occurrences.settled.add(deferred);
                         continue; // an arity error, which the materialiser reports where it is applied
                     }
-                    List<Use> calleeUses = callee.uses.getOrDefault(calleeParameters.get(deferred.index()),
-                            List.of());
-                    if (calleeUses.isEmpty()) {
+                    String calleeParameter = calleeParameters.get(deferred.index());
+                    TemplateParam known = recorded.containsKey(deferred.head())
+                            ? recorded.get(deferred.head()).get(calleeParameter)
+                            : observed.containsKey(deferred.head())
+                                    ? observed.get(deferred.head()).current(calleeParameter, local, meta)
+                                    : null;
+                    if (known == null) {
                         continue;
                     }
                     occurrences.settled.add(deferred);
-                    occurrences.uses.computeIfAbsent(deferred.parameter(), ignored -> new ArrayList<>())
-                            .addAll(calleeUses);
+                    occurrences.observe(deferred.parameter(),
+                            new Use(known.type(), known.bound(), !recorded.containsKey(deferred.head())));
                     moved = true;
                 }
             }
         }
-        Map<String, Map<String, TypeRef>> result = new LinkedHashMap<>();
+        Map<String, Map<String, TemplateParam>> result = new LinkedHashMap<>();
         observed.forEach((name, occurrences) -> {
             try {
-                result.put(name, occurrences.types(local, meta));
+                result.put(name, occurrences.parameters(local, meta));
             } catch (SchemaValidationException e) {
-                if (declared.contains(name)) {
-                    reporter.report(name, e);
-                }
+                reporter.report(name, e);
             }
         });
         return result;
@@ -233,22 +252,28 @@ final class ParameterTypes {
     }
 
     /**
-     * One position's type, and the namespace its name resolves in: a slot's declared type is the applied
-     * constructor's, and a field's declared type is the schema's own.
+     * One position's type, the bound it carries where it is a type position, and the namespace its names resolve
+     * in first: a slot's declared type is the applied constructor's, and a field's declared type is the schema's.
      */
-    private record Use(TypeRef type, boolean local) {
+    private record Use(TypeRef type, Optional<TypeRef> bound, boolean local) {
+
+        Use(TypeRef type, boolean local) {
+            this(type, Optional.empty(), local);
+        }
     }
 
     /** What one declaration's occurrences have made of its parameters so far. */
     private static final class Occurrences {
 
         private final List<String> parameters;
+        private final Map<String, TypeRef> written;
         private final Map<String, List<Use>> uses = new LinkedHashMap<>();
         private final List<Deferred> deferred = new ArrayList<>();
         private final Set<Deferred> settled = new LinkedHashSet<>();
 
-        Occurrences(List<String> parameters) {
+        Occurrences(List<String> parameters, Map<String, TypeRef> written) {
             this.parameters = parameters;
+            this.written = written;
         }
 
         boolean declares(String name) {
@@ -256,54 +281,144 @@ final class ParameterTypes {
         }
 
         void observe(String parameter, TypeRef type, boolean local) {
-            uses.computeIfAbsent(parameter, ignored -> new ArrayList<>()).add(new Use(type, local));
+            observe(parameter, new Use(type, local));
         }
 
-        /** Each parameter's one type: the use type every other use is a supertype of, {@code type_ref} if none. */
-        Map<String, TypeRef> types(Function<String, TypeDefinition> local, Function<String, TypeDefinition> meta) {
-            Map<String, TypeRef> types = new LinkedHashMap<>();
+        void observe(String parameter, Use use) {
+            uses.computeIfAbsent(parameter, ignored -> new ArrayList<>()).add(use);
+        }
+
+        /** One parameter as far as the fixed point has got, or {@code null} while nothing grounds it. */
+        TemplateParam current(String parameter, Function<String, TypeDefinition> local,
+                              Function<String, TypeDefinition> meta) {
+            if (!uses.containsKey(parameter) && !written.containsKey(parameter)) {
+                return null;
+            }
+            try {
+                return parameter(parameter, local, meta);
+            } catch (SchemaValidationException e) {
+                return null; // reported against this declaration when it settles
+            }
+        }
+
+        /** Every parameter, settled. */
+        Map<String, TemplateParam> parameters(Function<String, TypeDefinition> local,
+                                              Function<String, TypeDefinition> meta) {
+            Map<String, TemplateParam> result = new LinkedHashMap<>();
             for (String parameter : parameters) {
-                types.put(parameter, agree(parameter, uses.getOrDefault(parameter, List.of()), local, meta));
+                result.put(parameter, parameter(parameter, local, meta));
             }
-            return types;
+            return result;
         }
 
-        private static TypeRef agree(String parameter, List<Use> uses, Function<String, TypeDefinition> local,
-                                     Function<String, TypeDefinition> meta) {
-            if (uses.isEmpty()) {
-                return TemplateParam.TYPE_REF;
-            }
+        /**
+         * One parameter: the kind its uses agree on, the narrowest of their types or bounds, then what the
+         * declaration wrote, which must narrow that further. With no use at all it is a type parameter, bounded
+         * by what was written if anything was.
+         */
+        private TemplateParam parameter(String parameter, Function<String, TypeDefinition> local,
+                                        Function<String, TypeDefinition> meta) {
+            List<Use> all = uses.getOrDefault(parameter, List.of());
+            Optional<TypeRef> declared = Optional.ofNullable(written.get(parameter));
             Set<Kind> kinds = new HashSet<>();
-            uses.forEach(use -> kinds.add(Kind.of(use.type())));
+            all.forEach(use -> kinds.add(Kind.of(use.type())));
             if (kinds.size() > 1) {
                 throw new SchemaValidationException("parameter '" + parameter + "' stands in both a type position "
                         + "and a value position, so no argument can satisfy both -- §5.10 gives a parameter one "
                         + "kind, inferred from where it is used");
             }
+            if (all.isEmpty() || kinds.contains(Kind.TYPE)) {
+                List<Use> bounds = all.stream().filter(use -> use.bound().isPresent())
+                        .map(use -> new Use(use.bound().get(), use.local())).toList();
+                Optional<Use> inherited = bounds.isEmpty() ? Optional.empty()
+                        : Optional.of(narrowest(parameter, "bounded by", bounds, local, meta));
+                if (declared.isPresent()) {
+                    Use mine = new Use(declared.get(), true);
+                    if (inherited.isPresent() && !isA(mine, inherited.get(), local, meta)) {
+                        throw new SchemaValidationException("parameter '" + parameter + "' is declared '"
+                                + parameter + ": " + spell(declared.get()) + "', and a template it is passed to "
+                                + "needs a type that IS-A " + spell(inherited.get().type()) + ", which "
+                                + spell(declared.get()) + " is not -- a written bound narrows what the uses "
+                                + "require, and never widens it");
+                    }
+                    return new TemplateParam(parameter, TemplateParam.TYPE_REF, declared);
+                }
+                return new TemplateParam(parameter, TemplateParam.TYPE_REF, inherited.map(Use::type));
+            }
+            Use derived = narrowest(parameter, "read as", all, local, meta);
+            if (declared.isPresent()) {
+                Use mine = new Use(declared.get(), true);
+                if (!isA(mine, derived, local, meta)) {
+                    throw new SchemaValidationException("parameter '" + parameter + "' is declared '" + parameter
+                            + ": " + spell(declared.get()) + "', and the positions it stands in read it as "
+                            + spell(derived.type()) + ", which " + spell(declared.get()) + " does not IS-A -- a "
+                            + "written type narrows what the positions give, and never replaces it");
+                }
+                return new TemplateParam(parameter, declared.get());
+            }
+            return new TemplateParam(parameter, derived.type());
+        }
+
+        /** The use every other use is a supertype of, or a resolver error where no such use exists. */
+        private static Use narrowest(String parameter, String verb, List<Use> uses,
+                                     Function<String, TypeDefinition> local, Function<String, TypeDefinition> meta) {
             for (Use candidate : uses) {
                 if (uses.stream().allMatch(other -> isA(candidate, other, local, meta))) {
-                    return candidate.type();
+                    return candidate;
                 }
             }
             Set<String> named = new LinkedHashSet<>();
-            uses.forEach(use -> named.add(use.type().toString()));
-            throw new SchemaValidationException("parameter '" + parameter + "' is read as " + String.join(" and ",
-                    named) + " by the positions it stands in, and none of them IS-A the others, so no argument "
-                    + "can satisfy them all -- §5.10 gives a parameter one type, derived from where it is used");
+            uses.forEach(use -> named.add(spell(use.type())));
+            throw new SchemaValidationException("parameter '" + parameter + "' is " + verb + " "
+                    + String.join(" and ", named) + " by the positions it stands in, and none of them IS-A the "
+                    + "others, so no argument can satisfy them all -- §5.10 gives a parameter one type, derived "
+                    + "from where it is used");
         }
 
-        /** Whether {@code a}'s type IS-A {@code b}'s: equal, or {@code b} is among the supertypes {@code a} records. */
-        private static boolean isA(Use a, Use b, Function<String, TypeDefinition> local,
-                                   Function<String, TypeDefinition> meta) {
+        /**
+         * Whether {@code a}'s type IS-A {@code b}'s: equal, {@code b} among the supertypes {@code a} records, or
+         * the same name for two entries with the same body -- a core type and the kernel original it copies.
+         */
+        static boolean isA(Use a, Use b, Function<String, TypeDefinition> local, Function<String, TypeDefinition> meta) {
             if (a.type().equals(b.type())) {
                 return true;
             }
             if (!a.type().arguments().isEmpty() || !b.type().arguments().isEmpty()) {
                 return false;
             }
-            TypeDefinition definition = (a.local() ? local : meta).apply(a.type().name());
-            return definition != null && definition.supertypes().contains(b.type().name());
+            TypeDefinition definition = lookup(a, local, meta);
+            if (definition == null) {
+                return false;
+            }
+            if (definition.supertypes().contains(b.type().name())) {
+                return true;
+            }
+            TypeDefinition other = lookup(b, local, meta);
+            return other != null && a.type().name().equals(b.type().name())
+                    && definition.body().equals(other.body());
         }
+
+        private static TypeDefinition lookup(Use use, Function<String, TypeDefinition> local,
+                                             Function<String, TypeDefinition> meta) {
+            String name = use.type().name();
+            TypeDefinition first = (use.local() ? local : meta).apply(name);
+            return first != null ? first : (use.local() ? meta : local).apply(name);
+        }
+    }
+
+    /** A type-ref as the schema spells it -- {@code text}, {@code box<int32, 3>} -- for a message. */
+    static String spell(TypeRef ref) {
+        if (ref.arguments().isEmpty()) {
+            return ref.name();
+        }
+        List<String> arguments = new ArrayList<>();
+        for (TypeArgument argument : ref.arguments()) {
+            arguments.add(switch (argument) {
+                case TypeArgument.Ref nested -> spell(nested.ref());
+                case TypeArgument.Value value -> value.value().text();
+            });
+        }
+        return ref.name() + "<" + String.join(", ", arguments) + ">";
     }
 
     // ── The walk ─────────────────────────────────────────────────────────────────────────────────

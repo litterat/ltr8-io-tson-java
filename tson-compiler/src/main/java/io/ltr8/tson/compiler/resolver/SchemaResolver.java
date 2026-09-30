@@ -24,6 +24,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
@@ -320,16 +321,22 @@ public final class SchemaResolver {
         // position it lands in", and once a parameter's kind is known that position is known at the
         // application rather than after substitution. Here because it needs every declaration resolved (a
         // slot's declared type comes from the constructor's own vocabulary) and nothing yet closed.
+        // The declared templates' parameters are stamped here too, not only their kinds, so an application can
+        // check its arguments against them as it closes (§5.10).
         Set<String> unkinded = new LinkedHashSet<>();
-        materialiser.parameterKinds(ParameterTypes.kinds(ParameterTypes.inferAll(namespace, declarations.keySet(),
-                metaParser.schema().entries()::get,
+        Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> written =
+                writtenParameterTypes(declarations, resolver, problems);
+        Map<String, Map<String, TemplateParam>> declaredParameters = ParameterTypes.inferAll(namespace,
+                declarations.keySet(), written, metaParser.schema().entries()::get,
                 (name, error) -> {
                     if (!problems.collecting()) {
                         throw error;
                     }
                     unkinded.add(name);
                     problems.report(declarations.get(name), "'" + name + "': " + error.getMessage(), error);
-                })));
+                });
+        stampParameters(declaredParameters, List.of(resolvedLocals, namespace));
+        materialiser.parameterKinds(ParameterTypes.kinds(declaredParameters));
         // Condemned on the same terms as an irregular template: the verdict is in, and closing an application
         // of a template whose parameters cannot be classified only reports the consequence -- the substituted
         // body failing its constructor's vocabulary -- against whichever entry happened to apply it.
@@ -362,11 +369,14 @@ public final class SchemaResolver {
             republish(namespace, resolvedLocals, instantiations);
         }
 
-        // §5.10's parameter types, recorded on every open entry this schema produced -- declared and minted
-        // alike, which is why this runs once everything has closed rather than beside the kinds pass above.
-        // A failure was reported by that pass against the declaration that wrote it; one here is the same
-        // verdict, and the entry keeps its provisional types.
-        recordParameterTypes(namespace, resolvedLocals, instantiations, metaParser.schema().entries()::get);
+        // §5.10's parameters, recorded on every open entry this schema produced -- the materialiser mints open
+        // entries of its own, which is why this runs once everything has closed as well as before. A failure was
+        // reported by the first pass against the declaration that wrote it; one here is the same verdict, and
+        // the entry keeps what it had.
+        Set<String> local = new LinkedHashSet<>(resolvedLocals.keySet());
+        local.addAll(instantiations.keySet());
+        stampParameters(ParameterTypes.inferAll(namespace, local, written, metaParser.schema().entries()::get,
+                (name, error) -> { }), List.of(resolvedLocals, instantiations, namespace));
 
         // §6's name-position annotations. Binding one can fail the way a definition's can (an annotation type
         // §3.3.3 cannot reach), and this loop runs outside the memoized getter that catches those -- so it
@@ -610,29 +620,50 @@ public final class SchemaResolver {
     }
 
     /**
+     * What each declaration's parameter list wrote after a name ({@code <T: text>}), as the type-refs resolution
+     * uses, keyed by declaration then parameter.
+     */
+    private static Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> writtenParameterTypes(
+            Map<String, SchemaMap.Declaration> declarations, DefinitionResolver resolver, Problems problems) {
+        Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> written = new LinkedHashMap<>();
+        declarations.forEach((name, declaration) -> {
+            Map<String, io.ltr8.tson.schema.meta.TypeRef> types = new LinkedHashMap<>();
+            declaration.parameterTypes().forEach((parameter, ref) -> {
+                try {
+                    types.put(parameter, resolver.parameterType(parameter, ref));
+                } catch (SchemaValidationException e) {
+                    if (!problems.collecting()) {
+                        throw e;
+                    }
+                    problems.report(declaration, e);
+                }
+            });
+            if (!types.isEmpty()) {
+                written.put(name, types);
+            }
+        });
+        return written;
+    }
+
+    /**
+     * Stamps each local open entry's parameters ({@link ParameterTypes}) -- the entries {@code local} names -- in
+     * {@code resolvedLocals}, {@code instantiations} and {@code namespace} alike, so every view of an entry
+     * agrees.
+     */
+    private static void stampParameters(Map<String, Map<String, TemplateParam>> parameters,
+                                        List<Map<String, TypeDefinition>> views) {
+        for (Map<String, TypeDefinition> view : views) {
+            view.replaceAll((name, definition) -> parameters.containsKey(name)
+                    && definition.body() instanceof TemplateBody held
+                    ? definition.withBody(held.withParameters(parameters.get(name))) : definition);
+        }
+    }
+
+    /**
      * Puts the local and materialised entries back into the namespace, which every later phase and the
      * on-demand getter both read through. Called after each pass that rewrites either map, since the two are
      * kept in step by hand: the namespace also holds the imported entries, so it cannot simply be replaced.
      */
-    /**
-     * Stamps each local open entry's {@code template_param.type}s ({@link ParameterTypes}), in {@code resolvedLocals},
-     * {@code instantiations} and {@code namespace} alike, so every view of the entry agrees.
-     */
-    private static void recordParameterTypes(Map<String, TypeDefinition> namespace,
-                                             Map<String, TypeDefinition> resolvedLocals,
-                                             Map<String, TypeDefinition> instantiations,
-                                             Function<String, TypeDefinition> meta) {
-        Set<String> local = new LinkedHashSet<>(resolvedLocals.keySet());
-        local.addAll(instantiations.keySet());
-        Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> types =
-                ParameterTypes.inferAll(namespace, local, meta, (name, error) -> { });
-        for (Map<String, TypeDefinition> view : List.of(resolvedLocals, instantiations, namespace)) {
-            view.replaceAll((name, definition) -> local.contains(name) && types.containsKey(name)
-                    && definition.body() instanceof TemplateBody held
-                    ? definition.withBody(held.withTypes(types.get(name))) : definition);
-        }
-    }
-
     private static void republish(Map<String, TypeDefinition> namespace,
                                   Map<String, TypeDefinition> resolvedLocals,
                                   Map<String, TypeDefinition> instantiations) {

@@ -781,8 +781,9 @@ but the kind is not recorded, and neither is anything finer. So:
 
 ```
 template_param => {
-  name: param_name
-  type: type_ref
+  name:   param_name
+  type:   type_ref
+  bound?: type_ref     -- only where type is type_ref: an argument must name a type that IS-A it
 }
 
 template => top & {
@@ -876,19 +877,42 @@ type-param  = param-name [ws ":" ws type-ref]
 type-params = "<" ws type-param *( separator type-param ) [ ws "," ] ws ">"
 ```
 
-A written annotation narrows the derived type and never replaces it: the declared type must IS-A the type derived
-from every use, or the declaration is a resolver error — `<N: text> !array { min_items: N }` is refused, since
-`text` is not a `non_negative_integer`. An unannotated parameter keeps its derived type, so every existing template
-resolves unchanged. For a type parameter, `<T: text>` records the bounded slot `<: text>`, and an argument must
-resolve to `text` or a type that IS-A it; this is #6's template bound. For a value parameter, `<N: int8>` records
-`int8`, and an argument must be an `int8` value.
+It is one production for every form a declaration takes, so the written type belongs to the parameter and not to
+the body: `boxed => <T: text> { a: T }`, `vec => <T: text, N> !array { element_type: T  min_items: N }` and
+`rebox => <T: text> boxed<T>` all bound `T` the same way. The body decides only what the parameter derives.
 
-**Open: one annotation, two readings.** `<X: text>` means "a type that IS-A `text`" on a type parameter and "a
-`text` value" on a value parameter. Since the kind is derived from the use, the reader always knows which, and this
-entry proposes that reading: the annotation is read by the kind the positions give, as TSON's `name: type` reads
-as "the values of `type`" for a field. The alternative is to spell the two apart — a bound only on type parameters,
-say, and no annotation on value parameters — which keeps one meaning per spelling and loses the narrowing of value
-parameters.
+**The written type is read by the kind the positions give**, as TSON's `name: type` reads as "the values of `type`"
+for a field. The kind comes from the uses and never from the annotation, which could otherwise contradict them.
+
+- **On a value parameter it narrows `type`.** `<N: int8>` records `type: int8`, and the written type must IS-A the
+  type every use derives, or the declaration is a resolver error: `<N: text> !array { min_items: N }` is refused,
+  since `text` is not a `non_negative_integer`.
+- **On a type parameter it is `bound`.** `<T: text>` records `type: type_ref  bound: text`, and an argument must
+  name `text` or a type that IS-A it; this is #6's template bound.
+- **An unannotated parameter keeps what it derives**, so every existing template resolves unchanged.
+
+**Why `bound` is its own field.** A type parameter carries two facts — its argument is a type reference, and the
+reference is restricted to types that IS-A the bound — and a value parameter one. Narrowing `type` to `text` for a
+type parameter loses the first: `<T: text> { a: T }` and `<M: text> !enum [a b M]` would both record `{ name: …
+type: text }`, one a type and one a text value, and a consumer could not tell which argument each takes without
+reading the held body. Folding the bound into `type` as `type_ref<text>` keeps one field by giving an application
+on `type_ref`, which is not a template, a meaning of its own, and moves the second fact rather than removing it.
+`bound?` states both with ordinary values, at the cost of one rule — present only where `type` is `type_ref` — and
+is the shape #6 already sketches for a bounded field's resolved form.
+
+**A bound is inherited through another template's argument list**, as a type is. `rebox => <T> boxed<T>` over
+`boxed => <T: text> { a: T }` records `T: type_ref  bound: text`: left unbounded, `rebox<int32>` would pass its own
+check and fail only inside `boxed`, which is the deep failure this entry removes. Several bounds agree by the same
+rule as several types, and a written bound must IS-A every inherited one — `<T: non_empty_text> boxed<T>` narrows
+it, and `<T: int32> boxed<T>` is refused at the declaration.
+
+**A core copy and its kernel original are one type here.** A value parameter's written type names a type in the
+schema's own namespace, and a slot-derived type is the meta's: `<N: non_negative_integer> !array { min_items: N }`
+compares core's `non_negative_integer` with the kernel's, which core declares as a fresh copy with no IS-A edge
+between them. Following IS-A edges only would refuse the obvious spelling, and a core-importing schema could not
+name the kernel's type at all. Two same-named entries with the same body are taken as one type, in the
+declaration check and in the bound check alike. The spec needs a sentence to that effect, or a different way for
+core's copies to relate to the kernel's.
 
 **What is running.** On `main`, the current text: this implementation derives each parameter's kind from the
 declared type of the slot it stands in (`ParameterKinds`), refuses a parameter standing for a whole collection or
@@ -896,16 +920,21 @@ record or in both kinds of position, runs the derivation as a fixed point across
 parameter a type parameter, and then discards the slot type. The output carries `parameters: [param_name]`, and an
 argument is checked by substitution.
 
-On `r2026-37-proposal`, the recorded type, as proposed here — the kernel declares `template_param` and
+On `r2026-37-proposal`, the proposal as written here — the kernel declares `template_param` with `bound?` and
 `template.parameters: [template_param]`, and `ParameterTypes` keeps what the walk finds: a slot's declared type,
 a routed default's field type (an earlier parameter where the field is typed by one), a callee's recorded type
 through the fixed point, `type_ref` where nothing grounds a parameter, and §5.6's positional form walked as the
 field it binds. The kind is read from the type. Several uses must agree by IS-A, or the declaration is refused. A
 held body is built before resolution has typed anything, so every parameter starts as `type_ref`, and the types are
 stamped on each open entry the schema produced — declared and minted by materialisation alike — once everything has
-closed. Not yet running there: the check at the application (arguments are still checked by substitution), the
-restriction syntax, and ingest's verification of a recorded type, since this implementation re-resolves a schema
-from source rather than ingesting resolved output.
+closed. The restriction syntax is parsed on every declaration form; a written type narrows a value parameter's
+`type` or is a type parameter's `bound`; bounds are inherited through the fixed point; and a core copy and its
+kernel original are one type in both checks. Each application checks its arguments as it closes: a type argument
+must name a type that IS-A the bound, following reference chains, and a value argument must parse as the
+parameter's type, or as the type an earlier parameter's argument names. An argument the check cannot judge — an
+application, an unresolved name — is left to the substituted body, as before. Not yet running there: ingest's
+verification of a recorded type, since this implementation re-resolves a schema from source rather than ingesting
+resolved output.
 
 **The proposal measured against what exists.** Every template this implementation's tests and the conformance
 corpus declared before the change — 116 distinct ones — was walked with the use types recorded, and the running
@@ -946,8 +975,8 @@ derivation bears it out:
    and a `type` may name an earlier parameter of the same template.
 
 **Interpretation chosen:** on `main`, the current text — parameters are names, the kind is inferred and not
-recorded, and an argument is checked by substitution. On `r2026-37-proposal`, the recorded type (this entry's first
-part); the check at the application and the restriction syntax are its second.
+recorded, and an argument is checked by substitution. On `r2026-37-proposal`, this entry: the recorded type, the
+restriction syntax, and the check at the application.
 
 **Status against Revision 36:** open. The recorded type stands without #6; the bound syntax needs #6's production,
 and #6's template bound needs this entry's `type` to be recorded. The earlier-parameter rule is shared with #6
