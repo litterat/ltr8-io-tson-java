@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=a01f033526ca37a64dcad3410aea1dee75a319775a591522120f6c0921fdd379"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b79f3f235001e8998a2e2a5b2bc70d72fbb6a2cadee6e988eede48820a20ef30"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b79f3f235001e8998a2e2a5b2bc70d72fbb6a2cadee6e988eede48820a20ef30"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=d568f4c779622abeb65941008e866bcaba7e10ac283b3cc9cfa2735cf1bc3d03"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=68b1e45c2fa03044439fb6a784ba70370378e37a038c15d99317ce885f3a3670"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=68b1e45c2fa03044439fb6a784ba70370378e37a038c15d99317ce885f3a3670"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 
@@ -19,7 +19,7 @@
   Hash pins here are real digests over the bytes of this copy; see
   meta-kernel.tn's note.
 
-  Three families of constructors live here:
+  Two families of constructors live here:
 
   1. Structural constructors: `bytes_type` (with the
      `bytes_encoding` enum selecting its text spelling), whose
@@ -30,12 +30,7 @@
      own — `[T; N]` is the spelling, and an intent that deserves a
      name earns a user template.
 
-  2. The `set` template — the `set<T>` spelling of the kernel's
-     `set_type` constructor, declared here for meta's own fields and
-     for meta-layer extensions; core declares a sibling for user
-     schemas.
-
-  3. Constraint vocabulary constructors for atom families that the
+  2. Constraint vocabulary constructors for atom families that the
      kernel itself doesn't need: numeric (`float_type` for the
      approximate tier, with the `ieee_format` enum; `decimal_type`
      for the exact tier; `rational_type`; `complex_type`, with the
@@ -115,22 +110,6 @@
   tier — the numeric tiers shrink the set, `text_type` sets it once.
   """
 {
-  @doc:"""
-    The set spelling an author writes: `set<text>` where the bare
-    construction is `!set_type { element_type: text }`. A §5.10
-    template, not a constructor: it composes with nothing and so is
-    not IS-A `top`, and `set_type` stays parameterless as §4.2
-    requires of every container constructor. The element type
-    arrives by application rather than by a parameter on the
-    constructor itself.
-
-    This copy serves meta's own fields (`scoped.scope`) and meta-layer
-    extensions. Core declares a sibling under the same name, as it
-    does for `void`, so that user schemas reach it through their core
-    import rather than through the governing namespace.
-    """
-  set => <T> !set_type { element_type: T }
-
   @doc:"""
     The base encodings of RFC 4648 — its own term for the family —
     that a text encoding may spell a `bytes` value in (HEX is §8's
@@ -216,9 +195,9 @@
     a resolver already runs over min_items/max_items: `schemas`
     requires EXTERN in `scope`.
 
-    `scope` is written `set<scope_kind>` inline. §5.2 prohibits a `!`
-    constructor application at a field position, which is why the
-    kernel's own set-typed fields are named entries; a §5.10 template
+    `scope` is written `set<scope_kind>` inline, the kernel's `set`
+    template reaching meta through its import. §5.2 prohibits a `!`
+    constructor application at a field position; a §5.10 template
     application is not one, so a schema the resolver materialises can
     write it where it stands.
     """

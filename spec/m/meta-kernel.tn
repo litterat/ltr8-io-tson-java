@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b79f3f235001e8998a2e2a5b2bc70d72fbb6a2cadee6e988eede48820a20ef30"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=68b1e45c2fa03044439fb6a784ba70370378e37a038c15d99317ce885f3a3670"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -209,13 +209,13 @@
   }
 
   @doc:"""
-    A named entry for the same reason enum_set is one, and a set for the
-    same three reasons: uniqueness comes from set's own contract,
-    non-emptiness from min_items (an empty member set is a body admitting
-    no value at all), and member identity is [TSON-DATA] §4.3's, so 80 and
-    0x50 are one member and a duplicate rather than two. An array spelling
-    — which is what an inline form would give, array sugar being the only
-    inline container — loses all three.
+    A named entry, and a set for three reasons: uniqueness comes from
+    set's own contract, non-emptiness from min_items (an empty member
+    set is a body admitting no value at all), and member identity is
+    [TSON-DATA] §4.3's, so 80 and 0x50 are one member and a duplicate
+    rather than two. An array spelling — which is what an inline form
+    would give, array sugar being the only inline container — loses
+    all three.
     """
   integer_member_set => !set_type { element_type: integer }
 
@@ -706,10 +706,8 @@
     set admits fewer values than the array it refines.
 
     Named `set_type`, with the atom constructors' suffix, because the
-    bare name is taken by the template an author actually writes:
-    meta and core each declare `set => <T> !set_type { element_type: T }`,
-    so a field reads `tags: set<text>`. The kernel, below meta, has
-    no such template and applies the constructor directly.
+    bare name is taken by the template an author actually writes,
+    `set` below, so a field reads `tags: set<text>`.
     """
   set_type => array ^ {
     state?:       = REQUIRED
@@ -717,6 +715,21 @@
     unique_items?: = true
     min_items?:    non_negative_integer ~ 1
   }
+
+  @doc:"""
+    The set spelling an author writes: `set<text>` where the bare
+    construction is `!set_type { element_type: text }`. A §5.10
+    template, not a constructor: it composes with nothing and so is
+    not IS-A `top`, and `set_type` stays parameterless as §4.2
+    requires of every container constructor.
+
+    Declared in the kernel because `enum_of` types its members by it.
+    Meta reaches it through its kernel import; core declares a
+    sibling under the same name, as it does for `void`, so that user
+    schemas reach it through their core import rather than through
+    the governing namespace.
+    """
+  set => <T> !set_type { element_type: T }
 
   map => product & {
     access_pattern?: product_access_type = NAMED
@@ -735,27 +748,20 @@
   }
 
   @doc:"""
-    A named entry rather than an inline form, because `!` constructor
-    applications remain prohibited at field positions
-    ([TSON-SCHEMA] §5.2), sets have no bracket sugar, and the `set<T>`
-    template lives in meta, out of the kernel's reach.
+    An enumeration: a closed set of labels drawn from a naming
+    vocabulary T, and T's equality decides when two labels are one
+    member. T is a text family — an atom-family instance whose
+    constructor IS-A text_type ([TSON-SCHEMA] §7.4) — so `enum` is
+    `enum_of<identifier>`, whose members are names and carry the
+    name-hygiene rules, and `text_enum` is `enum_of<text>`, whose
+    members are any text. A meta layer describing another system's
+    names declares its own, as `enum_of<http_token>`. Members conform
+    to T structurally, through `set<T>`.
     """
-  enum_set => !set_type { element_type: text }
+  enum_of => <T> atom & { members: set<T> }
 
-  @doc:"""
-    Which lexical profile an enum's members lie in. IDENTIFIER
-    constrains every member to the identifier grammar ([TSON-DATA]
-    §7.7) and carries the name-hygiene rules that follow from it
-    (§8.2); TEXT admits any text and carries none of them. IDENTIFIER
-    is inside TEXT, which is the narrowing relation a refinement
-    follows ([TSON-SCHEMA] §5.7).
-    """
-  enum_profile => !enum [IDENTIFIER TEXT]
-
-  enum => atom & {
-    members:  enum_set
-    profile?: enum_profile ~ IDENTIFIER
-  }
+  enum      => enum_of<identifier>
+  text_enum => enum_of<text>
 
   @doc:"""
     Closed sum. `disjoint` is a resolver-derived index over the

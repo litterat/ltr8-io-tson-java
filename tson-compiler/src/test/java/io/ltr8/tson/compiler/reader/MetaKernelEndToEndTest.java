@@ -65,7 +65,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(66, registered.entries().size());
+        assertEquals(71, registered.entries().size());
     }
 
     @Test
@@ -95,8 +95,8 @@ class MetaKernelEndToEndTest {
 
     @Test
     void readsEnumsOwnMembersFieldAgainstRealData() {
-        // The exact fix under test: enum => atom & { members: set<token> } -- previously
-        // unbuildable (set<token> fell back to an unusable placeholder), now a genuine ArrayBody.
+        // enum => enum_of<identifier>, whose `members` is typed by the `set<identifier>` instantiation the
+        // bootstrap closed -- a genuine ArrayBody.
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")

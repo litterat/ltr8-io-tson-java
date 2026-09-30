@@ -436,13 +436,10 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // Completing at all is the proof; the assertions below just confirm it's genuinely usable.
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
 
-        // 60, matching a genuinely registered meta-kernel: the one-off bootstrap runs
-        // MetaKernelBootstrapResolver's own raw output through TsonSchemaLinker.linkBootstrap (no
-        // registry involved at all) purely so TsonSchemaLinker's own materialization step -- which
-        // synthesizes 9 extra entries for argument-bearing type-refs, e.g. enum's own "members:
-        // set<token>" -- runs before compiling. Never cached (see the next test) -- only the
-        // *quality* of the one-off result changed, not its lifetime.
-        assertEquals(66, compiled.schema().entries().size());
+        // The same entry set a genuinely registered meta-kernel has: the bootstrap desugars its own document
+        // and closes its own applications (`enum_of<identifier>` and the `set<identifier>` inside it), so
+        // TsonSchemaLinker.linkBootstrap has nothing left to add. Never cached (see the next test).
+        assertEquals(71, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
         assertNotNull(compiled.compiledSchema().get("integer_size")

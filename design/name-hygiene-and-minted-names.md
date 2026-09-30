@@ -107,14 +107,15 @@ restricted-character rule (`Identifier_Status`) where a name is *read* — the s
 positions only some of those reach: an enum member and a group's member labels get checked for reading alike
 and for script mixing, and never for a restricted character, invisibly.
 
-**`enum.profile` is the one scope whose per-name rules are conditional, and the condition is declared.** Under
-`IDENTIFIER` an enum's members are names and all three mechanisms reach them. Under `TEXT` they are values: the
+**An enum's members are the one scope whose per-name rules are conditional, and the condition is declared.**
+When the enum's label type — the `T` of the `enum_of<T>` its constructor is (`EnumLabels`) — is an identifier
+family, its members are names and all three mechanisms reach them. Otherwise (`text_enum`) they are values: the
 restricted-character and restricted-script rules are per-*name* and lapse — a value set carries whatever its
 domain carries, and nothing is looked up by name there — while the look-alike relation stays, because the set
 is still what a value is matched against and two members that render identically is the same hazard either way.
-`checkScope`'s `perNameRules` flag is that split, and it is the enum body's declaration that sets it, never the
-shape of the members: inferring "these look like names, so police them" would switch a spoofing check on and
-off by accident. A scope list
+`checkScope`'s `perNameRules` flag is that split, and it is the constructor the author applied that sets it,
+never the shape of the members: inferring "these look like names, so police them" would switch a spoofing check
+on and off by accident. A scope list
 can be reviewed; three call sites cannot. What stays at the reading positions is §7.7's grammar
 (`IdentifierProfile.validate`), which is validity, is stable across Unicode versions, and really is a parse
 error; `IdentifierProfile.hygiene` returns the restricted-character rule's verdict rather than throwing,
