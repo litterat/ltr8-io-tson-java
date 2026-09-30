@@ -133,6 +133,12 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       chains; a value argument must parse as the parameter's type, or as the type an earlier parameter's argument
       names. What it cannot judge -- an application as an argument, an unresolved name -- falls to the
       substituted body as before.
+    - **An application closed during resolution is checked twice.** A declaration naming one
+      (`held => boxed<int32>`), a composition operand, a refinement source and an argument nested in any of them
+      close in the driving loop, before anything is stamped, so their first check sees no bound. The materialiser
+      records each check that passes then, with the declaration whose resolution ran it, and `recheckEarly`
+      replays them once the parameters are stamped -- one verdict per declaration, and none for a declaration
+      that already failed.
     - **A fixed point, not one walk.** meta-kernel's own `type_argument` puts a parameter of *either* kind on
       the reference channel ("parameters ride the reference channel because a token there is always a
       reference"), so a parameter passed to another template says nothing locally: it takes the callee's kind

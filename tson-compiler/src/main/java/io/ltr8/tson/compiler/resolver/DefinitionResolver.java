@@ -1434,7 +1434,7 @@ final class DefinitionResolver {
      * chain is just {@code [top]}), so "inherit the nearest ancestor's kind" would give the wrong
      * answer even for {@code atom}'s own resolution.
      */
-    private static TypeKind determineKind(String name, List<String> transitiveSupertypes) {
+    static TypeKind determineKind(String name, List<String> transitiveSupertypes) {
         List<String> baseKindsFound = new ArrayList<>();
         for (String supertype : transitiveSupertypes) {
             if (supertype.equals("atom") || supertype.equals("product") || supertype.equals("sum")
