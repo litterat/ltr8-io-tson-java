@@ -273,8 +273,22 @@ class OpenEntryResolvedFormTest {
                   holder => { p: pair<text, int32> }
                 }
                 """);
+        // A meta layer whose templates compose onto a base kind: each application closes to a constructor,
+        // whose kind is its chain's base kind and not its !record body's PRODUCT.
+        tson.resolve("""
+                !!id:"https://example.com/kind-constructors.tn"
+                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/37/m/meta.tn"
+                {
+                  listed      => <T> atom & { members: [T] }
+                  listed_text => listed<text>
+                  payload     => <T> data & { value: T }
+                  payload_uri => payload<uri>
+                }
+                """);
         List<String> ids = List.of(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID,
-                TsonBundledSchemas.CORE_ID, "https://example.com/kinds.tn");
+                TsonBundledSchemas.CORE_ID, "https://example.com/kinds.tn",
+                "https://example.com/kind-constructors.tn");
 
         Map<String, TypeDefinition> universe = new LinkedHashMap<>();
         Map<String, Map<String, TypeDefinition>> perSchema = new LinkedHashMap<>();

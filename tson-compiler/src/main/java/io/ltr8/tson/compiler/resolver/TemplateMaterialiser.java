@@ -39,6 +39,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * §5.10 materialisation: closes a template application by substituting its arguments into the template's
@@ -219,19 +220,65 @@ final class TemplateMaterialiser {
     /** The governing meta's entries, which is where a slot's declared type is read from. */
     private final Function<String, TypeDefinition> metaTypes;
 
+    /** The local declaration resolution is inside, or {@code null} -- who an early check answers to. */
+    private final Supplier<String> resolving;
+
+    /**
+     * The argument checks {@link #byParameterKind} ran before the parameters were stamped, replayed by
+     * {@link #recheckEarly} once they are. An application closed during resolution -- a declaration naming it,
+     * a composition operand, a refinement source, or an argument nested in one -- meets a local template whose
+     * parameters carry no written or inherited bound yet, so its check passes vacuously until then.
+     */
+    private final Set<EarlyCheck> early = new LinkedHashSet<>();
+
+    /** Whether {@link #parameterKinds(Map)} has run, after which every check sees stamped parameters. */
+    private boolean stamped;
+
+    private record EarlyCheck(String declaration, String head, List<TypeArgument> arguments) {
+    }
+
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, TypeDefinition> publish,
             DefinitionMetaReader metaReader, Set<String> generated,
-            Function<String, TypeDefinition> metaTypes) {
+            Function<String, TypeDefinition> metaTypes, Supplier<String> resolving) {
         this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.publish = Objects.requireNonNull(publish, "publish");
         this.metaReader = Objects.requireNonNull(metaReader, "metaReader");
         this.generated = Objects.requireNonNull(generated, "generated");
         this.metaTypes = Objects.requireNonNull(metaTypes, "metaTypes");
+        this.resolving = Objects.requireNonNull(resolving, "resolving");
     }
 
-    /** The inferred kinds, once {@code SchemaResolver} has them -- see {@link #parameterKinds}. */
+    /**
+     * The inferred kinds, once {@code SchemaResolver} has them -- see {@link #parameterKinds}. The parameters
+     * are stamped by then, so from here on a check sees them.
+     */
     void parameterKinds(Map<String, Map<String, ParameterTypes.Kind>> kinds) {
         this.parameterKinds = kinds;
+        this.stamped = true;
+    }
+
+    /**
+     * Replays every argument check that ran before the parameters were stamped, against the stamped template,
+     * reporting a failure against the declaration whose resolution closed the application. One verdict per
+     * declaration, as resolution itself gives: {@code boxed<boxed<int32>>} fails on its inner argument, and the
+     * outer one -- whose argument is that inner entry -- is not judged a second time.
+     */
+    void recheckEarly(BiConsumer<String, SchemaValidationException> reporter) {
+        Set<String> refused = new LinkedHashSet<>();
+        for (EarlyCheck check : early) {
+            TypeDefinition template = namespace.getTypeDefinition(check.head());
+            if (refused.contains(check.declaration()) || template == null
+                    || !(template.body() instanceof TemplateBody)) {
+                continue;
+            }
+            try {
+                classified(check.head(), template, template.parameters(), check.arguments());
+            } catch (SchemaValidationException e) {
+                refused.add(check.declaration());
+                reporter.accept(check.declaration(), e);
+            }
+        }
+        early.clear();
     }
 
     /**
@@ -659,9 +706,10 @@ final class TemplateMaterialiser {
             List<TypeArgument> arguments, Map<String, TypeArgument> bindings) {
         Closed closed = closeHeld(head, template, open, bindings);
         Top body = fixRoutedValues(closed.body());
+        List<String> contract = contractOf(template);
         return new TypeDefinition(Optional.of(new TypeRef(head, arguments)),
-                kindOfClosed(closed.body()),
-                contractOf(template), List.of(),
+                kindOfClosed(head, contract, closed.body()),
+                contract, List.of(),
                 body);
     }
 
@@ -706,10 +754,20 @@ final class TemplateMaterialiser {
      * <p><b>Nor can the constructor's name.</b> A held body's head is structure-namespace vocabulary
      * ({@code record}, {@code set_type}, {@code scoped}) declared by the <em>governing meta</em>, which this
      * pass does not hold -- {@code namespace} is the schema's own type-name namespace (§3.3.1 keeps the two
-     * apart). The closed body is in hand and says the same thing: an entry materialisation mints is never a
-     * constructor, so it does not compose with {@code top}, and for everything that does not, kind is the
-     * branch of {@link Top} its body occupies.
+     * apart). The closed body is in hand and says the same thing for every entry that is not a constructor:
+     * kind is the branch of {@link Top} its body occupies. A constructor is the one exception, and
+     * {@link #kindOfClosed(String, List, Top)} takes it first.
      */
+    /**
+     * A closed record template's kind: its chain's base kind when the chain reaches {@code top} -- a template
+     * composing onto one ({@code <T> atom & { ... }}) closes to a constructor, whose {@code !record} body
+     * describes its instances and whose kind is what those instances will be (§4.1) -- and its body's branch
+     * otherwise. The same rule a declared entry's kind follows ({@code DefinitionResolver.determineKind}).
+     */
+    private static TypeKind kindOfClosed(String head, List<String> supertypes, Top body) {
+        return supertypes.contains("top") ? DefinitionResolver.determineKind(head, supertypes) : kindOfClosed(body);
+    }
+
     private static TypeKind kindOfClosed(Top body) {
         return switch (body) {
             case Atom ignored -> TypeKind.ATOM;
@@ -901,6 +959,16 @@ final class TemplateMaterialiser {
      */
     List<TypeArgument> byParameterKind(String head, TypeDefinition template,
                                                 List<String> parameters, List<TypeArgument> arguments) {
+        List<TypeArgument> classified = classified(head, template, parameters, arguments);
+        String declaration = resolving.get();
+        if (!stamped && declaration != null) {
+            early.add(new EarlyCheck(declaration, head, List.copyOf(arguments)));
+        }
+        return classified;
+    }
+
+    private List<TypeArgument> classified(String head, TypeDefinition template,
+                                          List<String> parameters, List<TypeArgument> arguments) {
         Map<String, ParameterTypes.Kind> kinds = parameterKinds.get(head);
         if (kinds == null) {
             kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, metaTypes));

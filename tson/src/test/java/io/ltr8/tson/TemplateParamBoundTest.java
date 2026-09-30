@@ -124,6 +124,21 @@ class TemplateParamBoundTest {
                   holder => { b: boxed<int32> }""", "binds 'T' to 'int32', which is not a type that IS-A text");
     }
 
+    /**
+     * An application closed while the schema is still resolving -- a declaration naming it, a composition
+     * operand, a refinement source, an argument nested in one of those -- is checked against the same bound as
+     * one at a field, though it closes before the template's parameters are stamped.
+     */
+    @Test
+    void aBoundIsEnforcedOnAnApplicationClosedDuringResolution() {
+        String boxed = "  boxed  => <T: text> { a: T }\n";
+        assertRefused(boxed + "  held   => boxed<int32>", "binds 'T' to 'int32', which is not a type that IS-A text");
+        assertRefused(boxed + "  held   => boxed<int32> & { b: text }", "binds 'T' to 'int32'");
+        assertRefused(boxed + "  held   => boxed<boxed<int32>>", "binds 'T' to 'int32'");
+        assertRefused(boxed + "  rebox  => <T> boxed<T>\n  held   => rebox<int32>", "'rebox<...>' binds 'T' to 'int32'");
+        assertEquals(List.of(), problems(boxed + "  held   => boxed<non_empty_text>"));
+    }
+
     @Test
     void anInheritedBoundIsEnforcedAtTheOuterApplication() {
         assertRefused("""

@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.SequencedSet;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -252,7 +253,7 @@ public final class SchemaResolver {
         // closing and a later batch closing of the same application land on one entry.
         TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put,
                 (type, value) -> (Top) read(metaParser.reader(type), value), generated,
-                metaParser.schema().entries()::get);
+                metaParser.schema().entries()::get, namespaceGetter::current);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
@@ -337,6 +338,17 @@ public final class SchemaResolver {
                 });
         stampParameters(declaredParameters, List.of(resolvedLocals, namespace));
         materialiser.parameterKinds(ParameterTypes.kinds(declaredParameters));
+        // An application closed during the driving loop was checked against parameters carrying no bound yet,
+        // so its check runs again now that they are stamped (§5.10) -- before anything else closes.
+        // A declaration that already failed has its verdict, so a replayed check is not a second one.
+        materialiser.recheckEarly((name, error) -> {
+            if (!problems.collecting()) {
+                throw error;
+            }
+            if (!namespaceGetter.failed(name)) {
+                problems.report(declarations.get(name), error);
+            }
+        });
         // Condemned on the same terms as an irregular template: the verdict is in, and closing an application
         // of a template whose parameters cannot be classified only reports the consequence -- the substituted
         // body failing its constructor's vocabulary -- against whichever entry happened to apply it.
@@ -698,7 +710,10 @@ public final class SchemaResolver {
         private final Problems problems;
 
         /** The chain currently being resolved -- a name arriving twice is a composition/refinement cycle. */
-        private final Set<String> resolving = new LinkedHashSet<>();
+        private final SequencedSet<String> resolving = new LinkedHashSet<>();
+
+        /** The declarations whose resolution failed and was reported. */
+        private final Set<String> failed = new LinkedHashSet<>();
 
         private DefinitionResolver resolver;
 
@@ -707,6 +722,16 @@ public final class SchemaResolver {
             this.entries = entries;
             this.declarations = declarations;
             this.problems = problems;
+        }
+
+        /** Whether {@code name}'s resolution failed and was reported. */
+        boolean failed(String name) {
+            return failed.contains(name);
+        }
+
+        /** The innermost local declaration being resolved, or {@code null} outside the driving loop. */
+        String current() {
+            return resolving.isEmpty() ? null : resolving.getLast();
         }
 
         /** Supplies the resolver this getter drives; called once, immediately after it is built. */
@@ -742,6 +767,7 @@ public final class SchemaResolver {
                     throw e;
                 }
                 problems.report(declaration, e);
+                failed.add(name);
                 entries.put(name, unresolved(position, SchemaDesugarer.typeParams(declaration.typeDef())));
                 return entries.get(name);
             } finally {
