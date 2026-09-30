@@ -333,6 +333,7 @@ final class ParameterTypes {
                 Optional<Use> inherited = bounds.isEmpty() ? Optional.empty()
                         : Optional.of(narrowest(parameter, "bounded by", bounds, local, meta));
                 if (declared.isPresent()) {
+                    requireType(declared.get(), local, meta);
                     Use mine = new Use(declared.get(), true);
                     if (inherited.isPresent() && !isA(mine, inherited.get(), local, meta)) {
                         throw new SchemaValidationException("parameter '" + parameter + "' is declared '"
@@ -357,6 +358,26 @@ final class ParameterTypes {
                 return new TemplateParam(parameter, declared.get());
             }
             return new TemplateParam(parameter, derived.type());
+        }
+
+        /**
+         * A written bound names a type, so its name -- an application's head, where it is one -- resolves in the
+         * type-name namespace and nowhere else. The governing meta's constructors are structure vocabulary
+         * (§3.3.1): a bound naming one would admit no argument, since a type argument names a type, and the
+         * lookup that falls back to the meta for a slot's declared type must not reach it here.
+         */
+        private static void requireType(TypeRef bound, Function<String, TypeDefinition> local,
+                                        Function<String, TypeDefinition> meta) {
+            String name = bound.name();
+            if (local.apply(name) != null) {
+                return;
+            }
+            throw new SchemaValidationException(meta.apply(name) != null
+                    ? "the bound '" + spell(bound) + "' names '" + name + "', and '" + name + "' is a constructor "
+                            + "of the governing meta -- structure vocabulary, not a type (§3.3.1); a bound names a "
+                            + "type, which every argument must IS-A (§5.10)"
+                    : "the bound '" + spell(bound) + "': '" + name + "' names no type in this schema or its "
+                            + "imports (§5.10)");
         }
 
         /** The use every other use is a supertype of, or a resolver error where no such use exists. */
