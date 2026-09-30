@@ -77,13 +77,13 @@
 !schema {
   @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A."
   top => !type_definition {
-    subtypes: [array atom choice data enum identifier_type integer_type map product record reference regex_type set_type sum template text_type tuple uri_type value_type void_type]
+    subtypes: [array atom choice data enum enum_type identifier_type integer_type map product record reference regex_type set_type sum template text_enum text_type tuple uri_type value_type void_type]
     body: !record { fields: [] }
   }
 
   atom => !type_definition {
     supertypes: [top]
-    subtypes: [enum identifier_type integer_type regex_type text_type uri_type value_type void_type]
+    subtypes: [enum enum_type identifier_type integer_type regex_type text_enum text_type uri_type value_type void_type]
     body: !record { supertypes: [top]  fields: [] }
   }
 
@@ -489,11 +489,6 @@
     body: !set_type { element_type: text  min_items: 1 }
   }
 
-  enum_profile => !type_definition {
-    source: enum
-    body: !enum { members: [IDENTIFIER TEXT] }
-  }
-
   @doc:"A count. Refines integer rather than constructing beside it, so it IS-A integer."
   non_negative_integer => !type_definition {
     source: integer_type
@@ -506,11 +501,31 @@
     body: !set_type { element_type: integer  min_items: 1 }
   }
 
-  enum => !type_definition {
+  @doc:"An enumeration: a closed set of labels, and the text family they are drawn from."
+  enum_type => !type_definition {
     supertypes: [atom top]
+    subtypes: [enum text_enum]
     body: !record { supertypes: [atom]  fields: [
+      !record_field { name: type     type: type_name }
       !record_field { name: members  type: enum_set }
-      !record_field { name: profile  type: enum_profile  optional: true  role: DEFAULT  value: IDENTIFIER }
+    ] }
+  }
+
+  enum => !type_definition {
+    source: enum_type
+    supertypes: [atom enum_type top]
+    body: !record { fields: [
+      !record_field { name: type     type: type_name  optional: true  role: FIXED  value: identifier }
+      !record_field { name: members  type: enum_set }
+    ] }
+  }
+
+  text_enum => !type_definition {
+    source: enum_type
+    supertypes: [atom enum_type top]
+    body: !record { fields: [
+      !record_field { name: type     type: type_name  optional: true  role: FIXED  value: text }
+      !record_field { name: members  type: enum_set }
     ] }
   }
 

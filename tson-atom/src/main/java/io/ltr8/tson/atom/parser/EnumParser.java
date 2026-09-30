@@ -9,9 +9,9 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import java.util.List;
 
 /**
- * Parses and validates against meta-kernel's {@code enum} constructor (§4.1, §8.1): {@code
- * members: set<token>}. Holds an {@link EnumBody} -- the pure constraint values, unchanged by this
- * split -- rather than declaring those fields itself.
+ * Parses and validates against an enum -- an instance of meta-kernel's {@code enum_type} or a tightening of it
+ * such as {@code enum} or {@code text_enum} (§7.4). Holds an {@link EnumBody} -- the pure constraint values --
+ * rather than declaring those fields itself.
  *
  * <p><b>Matches on the token's text directly, never through {@code BaseTypeResolver}'s
  * boolean/number/string identification.</b> This is the one thing that makes {@code boolean

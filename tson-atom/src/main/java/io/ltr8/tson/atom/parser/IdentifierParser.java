@@ -12,7 +12,7 @@ import java.util.Optional;
  * Parses and validates against meta-kernel's {@code identifier_type} constructor -- a UAX #31 identifier profile
  * with {@code text_type}'s facets inside it. The kernel's {@code identifier} instance is the type of every
  * naming position in the series: type names, field names and parameter names through the
- * {@code type_name}/{@code field_name}/{@code param_name} roles, and enum members through {@code enum_set}.
+ * {@code type_name}/{@code field_name}/{@code param_name} roles, and {@code enum}'s members, its {@code type}.
  * Other instances name an outside system's positions under that system's own profile.
  *
  * <p><b>The profile comes first, then the text facets.</b> A name the profile refuses is a grammar violation

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b79f3f235001e8998a2e2a5b2bc70d72fbb6a2cadee6e988eede48820a20ef30"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=2b022c7e6edcd76db9b9fcb15f224cc1fc51655903384bbe5c1a7b2d3a09d420"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -743,19 +743,32 @@
   enum_set => !set_type { element_type: text }
 
   @doc:"""
-    Which lexical profile an enum's members lie in. IDENTIFIER
-    constrains every member to the identifier grammar ([TSON-DATA]
-    §7.7) and carries the name-hygiene rules that follow from it
-    (§8.2); TEXT admits any text and carries none of them. IDENTIFIER
-    is inside TEXT, which is the narrowing relation a refinement
-    follows ([TSON-SCHEMA] §5.7).
-    """
-  enum_profile => !enum [IDENTIFIER TEXT]
+    An enumeration: a closed set of labels, and the type they are
+    drawn from ([TSON-SCHEMA] §7.4). `type` names a text family — an
+    atom-family instance whose constructor IS-A text_type — and each
+    member must be a value of it, distinct from the others under its
+    equality. Members are held as text whatever `type` is, so every
+    enum is one body shape with one reader; `type` decides which
+    members may be declared, and whether they are names that carry
+    the name-hygiene rules ([TSON-DATA] §8.2).
 
-  enum => atom & {
-    members:  enum_set
-    profile?: enum_profile ~ IDENTIFIER
+    A value `type` takes from a constructor resolves where that
+    constructor is declared; one an author writes resolves in the
+    author's own namespace, so a schema may enumerate labels of a
+    naming vocabulary it declares itself. `type` is fixed once an enum
+    is constructed: a refinement narrows the members and never the
+    type.
+    """
+  enum_type => atom & {
+    type:    type_name
+    members: enum_set
   }
+
+  @doc:"An enumeration of names: the positional `!enum [OPEN DONE]`."
+  enum => enum_type ^ { type?: = identifier }
+
+  @doc:"An enumeration of arbitrary text: the positional `!text_enum [...]`."
+  text_enum => enum_type ^ { type?: = text }
 
   @doc:"""
     Closed sum. `disjoint` is a resolver-derived index over the

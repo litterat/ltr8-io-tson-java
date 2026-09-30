@@ -31,7 +31,6 @@ import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.EnumProfile;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
@@ -74,6 +73,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link TsonLinkedSchema} -- pass 2, which a schema
@@ -229,7 +229,9 @@ public final class TsonSchemaLinker {
      * record is the case that has no declaration, and is checked by the schemaless readers instead.
      */
     private static void checkNames(DiagnosticsReceiver receiver, TsonSchema schema,
-                                   Map<String, TypeDefinition> merged, UnicodePolicy identifiers) {
+                                   Map<String, TypeDefinition> merged,
+                                   Function<String, TypeDefinition> structure, Set<String> refusedEnums,
+                                   UnicodePolicy identifiers) {
         ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> refuse(receiver, schema,
                 collision.second(), merged.get(collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
                 "in the namespace of '" + schema.id() + "': " + collision.describe()));
@@ -246,18 +248,21 @@ public final class TsonSchemaLinker {
             // A choice's variants are deliberately *not* a scope of their own: a variant is a reference to
             // a declared name, so two confusable variants are two confusable entries in `merged` and the
             // namespace check above has already reported them. A check here could never fire.
+            // An enum whose members its own type refused has had its verdict: judging those members as names
+            // too would report the one mistake twice.
             List<String> names = switch (body) {
                 case RecordBody record -> record.fields().stream().map(RecordField::name).toList();
-                case EnumBody enumBody -> List.copyOf(enumBody.members());
+                case EnumBody enumBody when !refusedEnums.contains(name) -> List.copyOf(enumBody.members());
                 default -> List.of();
             };
             String noun = body instanceof RecordBody ? "field names" : "members";
-            // An enum under `profile: TEXT` has members that are values rather than names, so §8.2's two
-            // per-name rules do not reach them: a value set carries whatever its domain carries, and there
-            // is nothing to spoof where nothing is looked up by name. The collision relation stays -- two
-            // members that render alike is the hazard either way, and it is a property of the set.
-            boolean perNameRules = !(body instanceof EnumBody enumBody)
-                    || enumBody.profile() == EnumProfile.IDENTIFIER;
+            // An enum whose type is not an identifier family (`text_enum`) has members that are values rather
+            // than names, so §8.2's two per-name rules do not reach them: a value set carries whatever its
+            // domain carries, and there is nothing to spoof where nothing is looked up by name. The collision
+            // relation stays -- two members that render alike is the hazard either way, and it is a property of
+            // the set (§7.4).
+            boolean perNameRules = !(body instanceof EnumBody)
+                    || EnumLabels.membersAreNames(definition, merged, structure);
             checkScope(receiver, schema, name, definition, names, noun, identifiers, perNameRules);
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
@@ -277,9 +282,10 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * {@code perNameRules} is false for the one scope whose members are not names -- an enum declaring
-     * {@code profile: TEXT}. The collision relation runs either way; §8.2's restricted-character and
-     * restricted-script rules are per-<em>name</em> and lapse with the declaration.
+     * {@code perNameRules} is false for the one scope whose members are not names -- an enum whose type is not
+     * an identifier family, such as a {@code text_enum} ({@link EnumLabels}). The collision relation runs either
+     * way; §8.2's restricted-character and restricted-script rules are per-<em>name</em> and lapse with the
+     * declaration.
      */
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
@@ -589,7 +595,10 @@ public final class TsonSchemaLinker {
 
         merged = computeSubtypes(merged, localNames);
         merged = computeDisjointness(merged);
-        checkNames(receiver, schema, merged, identifiers);
+        // Before the name checks: a member that is not a value of its enum's type is the more basic verdict,
+        // and the per-name rules would otherwise report it as a restricted character.
+        Set<String> refusedEnums = checkEnumTypes(schema, merged, localNames, structureNamespace::get, receiver);
+        checkNames(receiver, schema, merged, structureNamespace::get, refusedEnums, identifiers);
 
         Set<String> blamedOnce = new LinkedHashSet<>();
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
@@ -662,6 +671,22 @@ public final class TsonSchemaLinker {
                     + "terminates only where it reaches a base case -- an optional field, a possibly-empty "
                     + "container, or a choice variant that does not recur");
         }
+    }
+
+    /**
+     * What each enum's {@code type} obliges ({@link EnumLabels}): a text family, of which every member is a
+     * value, no two of them one. Refused at schema load, against the enum that states it; the names of the
+     * enums refused are returned, so the name checks do not judge the same members a second time.
+     */
+    private static Set<String> checkEnumTypes(TsonSchema schema, Map<String, TypeDefinition> merged,
+                                              Set<String> localNames, Function<String, TypeDefinition> structure,
+                                              DiagnosticsReceiver receiver) {
+        Set<String> refused = new LinkedHashSet<>();
+        for (EnumLabels.Violation violation : EnumLabels.check(merged, localNames, structure)) {
+            report(receiver, schema, violation.entry(), merged.get(violation.entry()), violation.message());
+            refused.add(violation.entry());
+        }
+        return refused;
     }
 
     /**

@@ -143,18 +143,18 @@ class ConfusableNameScopesTest {
     }
 
     /**
-     * <b>{@code profile: TEXT} takes the members out of §8.2's two per-<em>name</em> rules and leaves the
-     * collision relation in place</b>, which is the split the declaration buys (§7.4). A value set carries
-     * whatever its domain carries, so policing its characters and scripts is a category error; two members that
-     * render alike is still the hazard, because the set is still what a value is matched against.
+     * <b>A {@code text_enum} takes the members out of §8.2's two per-<em>name</em> rules and leaves the
+     * collision relation in place</b> (§7.4): its type is {@code text}, not an identifier family, so its members
+     * are not names and policing their characters and scripts is a category error; two members that render alike
+     * is still the hazard, because the set is still what a value is matched against.
      */
     @Test
-    void aTextProfileDropsThePerNameRulesAndKeepsTheCollisionOne() {
+    void aTextEnumDropsThePerNameRulesAndKeepsTheCollisionOne() {
         String restricted = "a" + new String(Character.toChars(0x0132)) + "b";
         // The restricted-character rule is per-name, and these are not names.
-        assertNotNull(compile("  st => !enum { members: [\"" + restricted + "\"]  profile: TEXT }"));
+        assertNotNull(compile("  st => !text_enum [\"" + restricted + "\"]"));
 
-        assertTrue(refused("  st => !enum { members: [\"ACTIVE\" \"" + CYR_CAP_A + "CTIVE\"]  profile: TEXT }")
+        assertTrue(refused("  st => !text_enum [\"ACTIVE\" \"" + CYR_CAP_A + "CTIVE\"]")
                 .contains("has members that read alike"));
     }
 

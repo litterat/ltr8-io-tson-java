@@ -46,6 +46,12 @@ own prose (which had gone stale on it):
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
+- [ ] **An enum whose `type` is not an identifier family is string-class** ([TSON-SCHEMA] §7.4's
+  discrimination-class row, [TSON-JSON] §5.2). Both `DiscriminationClass` implementations classify an enum by its
+  members' tokens alone, so `!text_enum ["80" "443"]` is number-class in `tson-compiler` and
+  `!text_enum ["true" "false"]` boolean-class in both, where the rule says string. `EnumBody.type` is now in
+  the body, so the classifiers can decide locally; what they lack is `EnumLabels`' family test, which follows
+  `type`'s constructor into the governing meta for a meta layer's own identifier family.
 
 ## Checked annotations
 

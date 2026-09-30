@@ -136,10 +136,12 @@ position never reaches. `BooleanParser` is the one statement of what `boolean` r
 stack asks the vocabulary for it rather than keeping a second (`AtomTypeReader.ENUM_OBJECT_MODE`); a token
 that is neither member is the enum miss it is — `ATOM_CONSTRAINT_VIOLATION`, matching every other enum.
 
-**An enum's members are text and `profile` says which kind of enumeration they spell**, which changes nothing
-here: matching is an identity check of the token's decoded text against the members either way, and the host
-value is the natural parse of the member that matched. The profile governs what may be *declared*, so it is a
-schema-load question (`EnumBody.coherenceCheck`) and no reader sees it. `text_type.members` is likewise an
+**An enum's members are text and its `type` says what they are labels of**, which changes nothing here:
+matching is an identity check of the token's decoded text against the members, and the host value is the natural
+parse of the member that matched. `type` governs what may be *declared* — each member a value of it, none two of
+one value — so it is a schema-load question the linker asks (`EnumLabels`), and no reader sees it. A `type` whose
+parser someday compares by more than text (case folding) changes the match too, and the enum reader will have to
+key on that parser's value rather than on the text. `text_type.members` is likewise an
 ordinary facet on the shared parser — `TextParser` checks it last, as the numeric tiers do, a member set naming
 the whole value space so the other facets hold vacuously where it is present.
 It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recovers a boolean from an unquoted
