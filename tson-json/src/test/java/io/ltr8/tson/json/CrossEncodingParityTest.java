@@ -80,6 +80,14 @@ class CrossEncodingParityTest {
               shape     => ( circle | square )
               picked    => { pick: scalars }
               shaped    => { outline: shape }
+              port_label  => !text_enum ["80" "443"]
+              port_slot   => ( port_label | int32 )
+              ported      => { p: port_slot }
+              answer      => !text_enum ["true" "false"]
+              answer_slot => ( answer | boolean )
+              answered    => { a: answer_slot }
+              port_text   => ( port_label | text )
+              labelled    => { l: port_text }
               pet       => abstract { pet_type: text =?  name: text }
               dog       => pet & { pet_type?: = "dog"  breed: text }
               cat       => pet & { pet_type?: = "cat"  indoor: boolean }
@@ -645,6 +653,38 @@ class CrossEncodingParityTest {
         bothAccept("picked", """
                 { pick: true }""", """
                 {"pick": true}""");
+    }
+
+    /**
+     * An enum whose type is not an identifier family is string-class whatever its members spell ([TSON-SCHEMA]
+     * §7.4): {@code !text_enum ["80" "443"]} beside {@code int32}, and {@code !text_enum ["true" "false"]} beside
+     * {@code boolean}, are disjoint, and each value goes to the variant of its own class.
+     */
+    @Test
+    void aTextEnumIsStringClassInBoth() {
+        bothAccept("ported", """
+                { p: "80" }""", """
+                {"p": "80"}""");
+        bothAccept("ported", """
+                { p: 8080 }""", """
+                {"p": 8080}""");
+        bothAccept("answered", """
+                { a: "true" }""", """
+                {"a": "true"}""");
+        bothAccept("answered", """
+                { a: true }""", """
+                {"a": true}""");
+    }
+
+    /** Beside {@code text} it shares the string class, so the choice is not disjoint and needs the tag in both. */
+    @Test
+    void aTextEnumBesideTextNeedsTheTagInBoth() {
+        sameVerdict("labelled", """
+                { l: 80 }""", """
+                {"l": 80}""");
+        sameVerdict("labelled", """
+                { l: "80" }""", """
+                {"l": "80"}""");
     }
 
     /** The variant is selected, then validated as itself -- so an out-of-range value is refused in both. */

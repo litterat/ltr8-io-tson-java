@@ -1,6 +1,7 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.json.stream.JsonEvent;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.DecimalType;
@@ -37,10 +38,16 @@ enum DiscriminationClass {
 
     BOOLEAN, NUMBER, STRING, BRACE, BRACKET;
 
-    /** The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none. */
-    static Optional<DiscriminationClass> of(TsonSchema schema, String name) {
-        return ReferenceChain.terminal(schema, name).map(ReferenceChain.Resolved::definition)
-                .flatMap(DiscriminationClass::classify);
+    /**
+     * The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none.
+     * An enum linking listed in {@link TsonLinkedSchema#textEnums} has texts for members and is {@link #STRING}
+     * whatever their spellings ([TSON-SCHEMA] §7.4).
+     */
+    static Optional<DiscriminationClass> of(TsonLinkedSchema linked, String name) {
+        return ReferenceChain.terminal(linked.schema(), name).flatMap(resolved ->
+                resolved.definition().body() instanceof EnumBody && linked.textEnums().contains(resolved.name())
+                        ? Optional.of(STRING)
+                        : classify(resolved.definition()));
     }
 
     private static Optional<DiscriminationClass> classify(TypeDefinition definition) {
@@ -78,9 +85,9 @@ enum DiscriminationClass {
     }
 
     /**
-     * §5.2: an enum member's form is the form of its own lexical class, so an enum's class is its members'
-     * shared one -- {@code [true false]} is BOOLEAN, {@code [RED GREEN]} is STRING -- and a mixed set has
-     * none, which leaves it reachable only with a tag.
+     * §5.2, for an enum over an identifier family: a member's form is the form of its own lexical class, so the
+     * enum's class is its members' shared one -- {@code [true false]} is BOOLEAN, {@code [RED GREEN]} is
+     * STRING -- and a mixed set has none, which leaves it reachable only with a tag.
      */
     private static Optional<DiscriminationClass> ofEnum(EnumBody members) {
         DiscriminationClass common = null;

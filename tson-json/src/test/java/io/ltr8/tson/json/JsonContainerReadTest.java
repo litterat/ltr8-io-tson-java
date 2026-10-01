@@ -62,6 +62,9 @@ class JsonContainerReadTest {
               pair       => [text, int32]
               maybe_pair => [text?, int32]
               nested     => { who: person  labels: [text] }
+
+              answer     => !text_enum ["true" "false"]
+              survey     => { reply?: answer ~ "true"  agreed?: boolean ~ true }
             }
             """;
 
@@ -185,6 +188,16 @@ class JsonContainerReadTest {
         assertEquals("""
                 {"name":"Ada","tries":0,"kind":"person"}""", json(read("person", """
                 {"name": "Ada"}""").accepted()));
+    }
+
+    /**
+     * §5.2: a member of an enum whose type is not an identifier family is a string, {@code "true"} included --
+     * only an identifier enum's {@code true}/{@code false}, {@code boolean}'s among them, are JSON booleans.
+     */
+    @Test
+    void anInjectedTextEnumMemberIsAStringWhateverItsSpelling() {
+        assertEquals("""
+                {"reply":"true","agreed":true}""", json(read("survey", "{}").accepted()));
     }
 
     /** {@code retired?: void?}: null is the member's one value, and any other is refused by {@code void}. */

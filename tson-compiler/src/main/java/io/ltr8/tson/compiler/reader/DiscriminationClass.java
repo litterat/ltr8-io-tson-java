@@ -67,11 +67,18 @@ public enum DiscriminationClass {
      * an alias and its target one type); a cycle, having no terminal, has no class. An empty result makes
      * the enclosing choice non-disjoint and blocks untagged recovery -- the conservative side, the tag
      * stays required.
+     *
+     * <p>{@code textEnums} is linking's {@code TsonLinkedSchema.textEnums}: the enums whose members are texts
+     * rather than names, which are {@link #STRING} whatever their members' spellings ([TSON-SCHEMA] §7.4).
      */
-    public static Optional<DiscriminationClass> of(String name, Map<String, TypeDefinition> namespace) {
+    public static Optional<DiscriminationClass> of(String name, Map<String, TypeDefinition> namespace,
+                                                   Set<String> textEnums) {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
-        return ReferenceChain.terminalDefinition(name, namespace).flatMap(DiscriminationClass::classify);
+        return ReferenceChain.terminalDefinition(name, namespace).flatMap(definition ->
+                definition.body() instanceof EnumBody && textEnums.contains(ReferenceChain.terminal(name, namespace))
+                        ? Optional.of(STRING)
+                        : classify(definition));
     }
 
     private static Optional<DiscriminationClass> classify(TypeDefinition def) {
@@ -105,7 +112,10 @@ public enum DiscriminationClass {
         };
     }
 
-    /** An enum's class is its members' shared base-type class (e.g. {@code [true false]} is BOOLEAN); mixed -> empty. */
+    /**
+     * An enum over an identifier family: its members are names, written as bare tokens, so its class is their
+     * shared base-type class ({@code [true false]} is BOOLEAN); mixed -> empty.
+     */
     private static Optional<DiscriminationClass> ofEnum(EnumBody enumBody) {
         DiscriminationClass common = null;
         for (String member : enumBody.members()) {

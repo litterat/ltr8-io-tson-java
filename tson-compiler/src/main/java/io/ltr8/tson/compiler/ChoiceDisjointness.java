@@ -35,10 +35,10 @@ final class ChoiceDisjointness {
     private ChoiceDisjointness() {
     }
 
-    static boolean derive(ChoiceBody choice, Map<String, TypeDefinition> namespace) {
+    static boolean derive(ChoiceBody choice, Map<String, TypeDefinition> namespace, Set<String> textEnums) {
         Set<DiscriminationClass> seen = EnumSet.noneOf(DiscriminationClass.class);
         for (TypeRef variant : choice.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(), namespace);
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(), namespace, textEnums);
             if (variantClass.isEmpty() || !seen.add(variantClass.get())) {
                 return false;
             }

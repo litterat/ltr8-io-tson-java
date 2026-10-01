@@ -12,7 +12,8 @@ history lives in git.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds.
 - A reference to a DATA-kinded entry is refused at every position a type-ref occupies.
-- `entryOrigins` is on `TsonLinkedSchema`, never on `TsonSchema` or `TypeDefinition`.
+- `entryOrigins` and `textEnums` are on `TsonLinkedSchema`, never on `TsonSchema` or `TypeDefinition`.
+- An enum's discrimination class is read from `TsonLinkedSchema.textEnums`, never re-derived by a reader.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
 - `RecordExtension`'s FINAL check reads `TypeDefinition.supertypes`, never `RecordBody.supertypes`.
@@ -256,3 +257,8 @@ rules for an enum whose `type` is not an identifier family; the collision relati
 - **Before the name checks, and one verdict.** A member that is not a value of `type` is the more basic error, and
   the per-name rules would otherwise report it as a restricted character; an enum refused here is not judged by name.
 - **An unresolved `type` counts as names** for the per-name rules — the stricter reading — and is reported on its own.
+- **The family is recorded, because no reader can recompute it.** An enum whose `type` is not an identifier family is
+  string-class (§7.4), and the JSON encoding spells its members as strings, `"true"` included. The readers hold only
+  `TsonSchema.entries()`, where a pinned `type` may not resolve, so the linker lists such enums in
+  `TsonLinkedSchema.textEnums` before deriving `disjoint`. Each enum is judged in the schema that declares it, and an
+  import's list is merged with its entries, as `entryOrigins` is.

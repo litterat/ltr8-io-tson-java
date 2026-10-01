@@ -194,6 +194,54 @@ class EnumTypeTest {
                     miss.getFirst().message());
     }
 
+    /**
+     * An enum whose members are texts is string-class whatever they spell ([TSON-SCHEMA] §7.4), so beside an
+     * enum of names that are booleans the choice is disjoint and a value goes to the variant of its own class.
+     * The schema imports nothing: {@code text_enum}'s {@code text} is reached only through the governing meta,
+     * where the constructor pinned it.
+     */
+    @Test
+    void aTextEnumIsStringClassWhereItsTypeIsReachedOnlyThroughTheMeta() {
+        Tson tson = Tson.standard();
+        tson.resolve("""
+                !!id:"https://example.test/answers.tn"
+                !!meta:"%s"
+                { reply  => !text_enum ["true" "false"]
+                  bit    => !enum [true false]
+                  either => ( reply | bit )
+                  rec    => { e: either } }""".formatted(TsonBundledSchemas.META_ID));
+        String head = "!!schema:\"https://example.test/answers.tn\"\n!rec ";
+
+        assertEquals(List.of(), tson.validate(head + "{ e: \"true\" }"));
+        assertEquals(List.of(), tson.validate(head + "{ e: true }"));
+    }
+
+    /** The class is judged where the enum is declared and travels with it through {@code !!import}. */
+    @Test
+    void anImportedTextEnumKeepsItsClass() {
+        String libraryId = "https://example.test/answer-library.tn";
+        String userId = "https://example.test/answer-user.tn";
+        String library = """
+                !!id:"%s"
+                !!meta:"%s"
+                { reply => !text_enum ["true" "false"] }
+                """.formatted(libraryId, TsonBundledSchemas.META_ID);
+        String user = """
+                !!id:"%s"
+                !!meta:"%s"
+                !!import:"%s"
+                !!import:"%s"
+                { either => ( reply | boolean )
+                  rec    => { e: either } }
+                """.formatted(userId, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID, libraryId);
+        Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(
+                Map.of(libraryId, library, userId, user)))));
+        String head = "!!schema:\"" + userId + "\"\n!rec ";
+
+        assertEquals(List.of(), tson.validate(head + "{ e: \"true\" }"));
+        assertEquals(List.of(), tson.validate(head + "{ e: true }"));
+    }
+
     /** {@code boolean} is an enum like any other and stays one. */
     @Test
     void booleanIsStillAnOrdinaryEnum() {

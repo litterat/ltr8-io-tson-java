@@ -2,6 +2,7 @@ package io.ltr8.tson.schema;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * The result of {@code TsonSchemaLinker.link} ({@code tson-compiler}) -- proof, at the type level, that a
@@ -23,7 +24,7 @@ import java.util.Objects;
  * via {@link TsonSchemaRegistry#register}, so every entry is, by construction, linked; there's no other
  * kind of thing to store. {@link TsonSchemaLoader#load} returns this type for the same reason.
  *
- * <p><b>{@code entryOrigins} is the one fact linking establishes that {@link TsonSchema} cannot hold.</b>
+ * <p><b>{@code entryOrigins} is a fact linking establishes that {@link TsonSchema} cannot hold.</b>
  * Merging an {@code !!import} flattens another schema's entries into this one's {@link TsonSchema#entries()},
  * which is what makes every reference resolvable in one namespace -- and also what erases which document each
  * entry was written in. A diagnostic against an imported entry needs that back: {@code /int32} at line 110 is
@@ -36,12 +37,27 @@ import java.util.Objects;
  * spec defines -- §9's {@code type_definition} has no such field, and {@code schema.meta} is a bind target
  * with a hand-written {@code equals} and the {@code @Record} constructor-selection trap. It lives here rather
  * than on the compiled schema because linking is the only phase that still knows it.
+ *
+ * <p><b>{@code textEnums} is the second</b>: the entries of the closure that are enums whose {@code type} is
+ * not an identifier family ([TSON-SCHEMA] §7.4) -- a {@code !text_enum}, or an enum over any other text
+ * family -- so whose members are texts rather than names, and which are string-class whatever their members'
+ * spellings. Every encoding's discrimination class needs the fact, and none can derive it: a {@code type} the
+ * enum's constructor pinned names an entry of the governing meta-schema, which is not in {@link
+ * TsonSchema#entries()} and which linking is the last phase to see. Like {@code entryOrigins} it is carried
+ * through {@code !!import}, each enum judged in the schema that declared it. An enum not listed has names for
+ * members, which is also what a schema assembled by hand gets.
  */
-public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins) {
+public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums) {
 
     public TsonLinkedSchema {
         Objects.requireNonNull(schema, "schema");
         entryOrigins = Map.copyOf(entryOrigins);
+        textEnums = Set.copyOf(textEnums);
+    }
+
+    /** A schema with no enum over a family other than an identifier one. */
+    public TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins) {
+        this(schema, entryOrigins, Set.of());
     }
 
     /**
