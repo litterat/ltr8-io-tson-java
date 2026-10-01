@@ -485,8 +485,8 @@ the application is a resolver error. At a field's type, `<T: text>` declares a t
 is a reference bounded the same way — and binds `T` for the rest of the body:
 
 ```
-enum => atom & {
-  type?:   <T: text> ~ identifier
+enum_type => atom & {
+  type:    <T: text>
   members: set<T>
 }
 
@@ -502,12 +502,11 @@ What this settles:
 - **Member conformance is structural.** `members: set<T>` checks each member against `type` as a set checks
   any element; no prose rule states it.
 - **§5.2's value conformance is structural** by the same mechanism, unbounded.
-- **A type slot's default has a place.** `~ identifier` on a type slot is a single type-name token; §5.2 admits
-  it on a field declared with a type-param, and every existing enum resolves unchanged, the default omitted as
-  `profile`'s is today (§8.1).
+- **A type slot's value has a place.** `enum => enum_type ^ { type?: = identifier }` pins a single type-name
+  token on a type slot; §5.2 admits it on a field declared with a type-param, and every existing enum resolves
+  unchanged, `type` injected as it is under #7 (§5.6).
 - **Refinement gains one facet kind.** A type slot narrows along IS-A: a refinement may restate it only with a
-  subtype of the source's value. `enum` does not need it: #7 fixes an enum's `type` at construction, and
-  `profile`'s one-step chain `IDENTIFIER` inside `TEXT` (§5.7) retires with the selector.
+  subtype of the source's value. `enum_type` does not need it: #7 fixes an enum's `type` at construction.
 - **The bound follows IS-A edges only.** `date` has a text form without being `text`; a bound that followed a
   type's form or its discrimination class would admit it. The rule must say so.
 
@@ -523,7 +522,7 @@ cannot be mixed into a type body.
 **What it costs.**
 
 1. **A dependent record, which the series has not had.** A template's `T` is bound by whoever applies it; this
-   `T` is bound by a field value in the data — `!enum { type: currency_code  members: [USD EUR] }` — and a later
+   `T` is bound by a field value in the data — `!enum_type { type: currency_code  members: [USD EUR] }` — and a later
    field's type depends on it. §5.2 and §8.1 must say so.
 2. **Field order.** A streaming reader of a schema document read as data would meet `members` before `type` if
    the author wrote it so, and would buffer it. Requiring the binding field to precede its uses removes the
@@ -532,15 +531,16 @@ cannot be mixed into a type body.
    entry of a bounded-reference constructor carrying `bound: type_ref`, and a record-level statement of which
    field binds which parameter. Using the field's own name as the binder (`members: set<type>`) saves the name
    but puts field names in the type namespace, where §5.10's shadowing rule does not reach.
-4. **A meta-kernel change.** `record_field` and `enum` change shape, which a published revision cannot carry.
+4. **A meta-kernel change.** `record_field` and `enum_type` change shape, which a published revision cannot carry.
 
 **Open: what a bound may name.** `<T: text>` is a type bound. §5.2's other restriction — a value only on a field
 typed by an atom-family instance or an enum — and the HTTP layer's "any scalar" are bounds on a **base kind**,
 not on a type. If a bound may name a kind as well as a type, both become structural; if not, they stay in prose
 and the mechanism serves `enum` and template parameters only.
 
-**Interpretation chosen:** none — nothing is built. `enum` keeps `profile`, template parameters are unbounded,
-and §5.2's conformance is enforced by the resolver as prose requires.
+**Interpretation chosen:** none — nothing is built. #7's Proposal 2 holds an enum's `type` as a `type_name`
+field and states its bound and member conformance as §7.4 rules the linker checks; template parameters are
+unbounded, and §5.2's conformance is enforced by the resolver as prose requires.
 
 **Status against Revision 36:** open.
 
@@ -970,14 +970,14 @@ own, and "used in both kinds of position" becomes one case of the rule for sever
 
 **Several uses must agree.** A parameter's `type` is the use type that IS-A every other; if the use types are not
 ordered by IS-A, the declaration is a resolver error. `<N> !array { min_items: N  max_items: N }` derives
-`non_negative_integer` twice and is fine; `<T> { a: set<T>  e: enum_of<T> }` derives `type_ref` and `<: text>`, and
-takes the bounded one, which IS-A the other; `<T> { a: enum_of<T>  n: int_of<T> }` with bounds `text` and
-`integer` is refused at the declaration, since no argument could satisfy both. The rule follows IS-A edges only,
-as #6's bound does, so two sibling refinements — `int8` and `int32`, both `!integer ^ {…}` — are refused together
-though a small integer satisfies both. That is the price of a total two-valued rule rather than a value-set
-prover; the author declares the narrower type by name and uses it in both places. The alternative, a list of use
-types checked one by one at application, is exact but moves the verdict from the declaration to every application
-and gives a consumer a list to intersect.
+`non_negative_integer` twice and is fine; with `labels => <L: text> set<L>`, `<T> { a: set<T>  e: labels<T> }`
+derives `type_ref` and `<: text>`, and takes the bounded one, which IS-A the other; with `counts => <N: integer>
+set<N>`, `<T> { a: labels<T>  n: counts<T> }` with bounds `text` and `integer` is refused at the declaration, since
+no argument could satisfy both. The rule follows IS-A edges only, as #6's bound does, so two sibling refinements —
+`int8` and `int32`, both `!integer ^ {…}` — are refused together though a small integer satisfies both. That is the
+price of a total two-valued rule rather than a value-set prover; the author declares the narrower type by name and
+uses it in both places. The alternative, a list of use types checked one by one at application, is exact but moves
+the verdict from the declaration to every application and gives a consumer a list to intersect.
 
 **What this buys.**
 
@@ -1072,7 +1072,7 @@ template_param => {
   with through any refinement, and asks IS-A among constructors -- one two-valued rule. `identifier_type` composes
   `text_type`, so `identifier` and every identifier profile pass.
 - **What it buys:** `<T: !text_type>` for any text-valued atom; `<T: !atom>` for any scalar, which is what an
-  unbounded `enum_type => <T> atom & { members: set<T> }` would need to keep records out; `<K: !atom, V> { K => V }`,
+  unbounded `labels => <T> set<T>` would need to keep records out of a set of labels; `<K: !atom, V> { K => V }`,
   whose every application takes [TSON-JSON]'s object form, since that form is chosen by `K`.
 - **Both fields may be present**: a parameter can inherit one from each of two uses, and each narrows on its own
   terms through the fixed point -- `constructor` along IS-A among constructors.
