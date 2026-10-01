@@ -791,9 +791,9 @@ meta's for a pinned value — refuses one that is not a text family, parses ever
 parser and refuses a member it rejects or two it reads as one value, and keys §8.2's per-name rules on whether
 the type's constructor IS-A `identifier_type`. A member refused under an identifier family names
 `!text_enum [...]`, as §7.4 has the diagnostic name the fix. A processor binds a constructor that tightens another
-as the one it tightens, so `text_enum` and a meta layer's `kebab_enum` need no class of their own. Not yet running:
-the discrimination-class row. Both classifiers still read an enum's class off its members' tokens, so a
-`text_enum` whose members spell numbers or booleans is not string-class.
+as the one it tightens, so `text_enum` and a meta layer's `kebab_enum` need no class of their own. The
+discrimination-class row runs as written: an enum whose type is not an identifier family is string-class, so
+`(!text_enum ["80" "443"] | integer)` is disjoint and `(!text_enum ["80" "443"] | text)` is not.
 
 **Status against Revision 36:** open. Proposal 1 stands alone and closes the map-key gap; Proposal 2 depends on
 it alone, #6 and #9 only letting its rules become structure later; Proposal 3 depends on Proposal 1 alone.

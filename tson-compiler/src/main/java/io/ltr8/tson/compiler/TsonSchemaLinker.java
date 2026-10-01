@@ -526,7 +526,8 @@ public final class TsonSchemaLinker {
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
                                              DiagnosticsReceiver receiver, UnicodePolicy identifiers) {
         Map<String, String> origins = new LinkedHashMap<>();
-        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins);
+        Set<String> textEnums = new LinkedHashSet<>();
+        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins, textEnums);
 
         // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
         // merges another schema's entries into *this* schema's own returned entries()). !!meta only says
@@ -594,7 +595,15 @@ public final class TsonSchemaLinker {
         }
 
         merged = computeSubtypes(merged, localNames);
-        merged = computeDisjointness(merged);
+        // Before disjointness: an enum whose members are texts is string-class, and only here can its `type`
+        // be followed into the governing meta, where a constructor's pinned one was written.
+        for (String name : localNames) {
+            TypeDefinition def = merged.get(name);
+            if (def.body() instanceof EnumBody && !EnumLabels.membersAreNames(def, merged, structureNamespace::get)) {
+                textEnums.add(name);
+            }
+        }
+        merged = computeDisjointness(merged, textEnums);
         // Before the name checks: a member that is not a value of its enum's type is the more basic verdict,
         // and the per-name rules would otherwise report it as a restricted character.
         Set<String> refusedEnums = checkEnumTypes(schema, merged, localNames, structureNamespace::get, receiver);
@@ -635,7 +644,7 @@ public final class TsonSchemaLinker {
         checkDisjointAssertions(schema, annotated, localNames, receiver);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
-                annotated, schema.bootstrap()), origins);
+                annotated, schema.bootstrap()), origins, textEnums);
     }
 
     /**
@@ -988,12 +997,13 @@ public final class TsonSchemaLinker {
      * An entry with no {@code !choice} body has nowhere to put the fact, so "absent on every other
      * definition" stops being a rule anyone can break.
      */
-    private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged) {
+    private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged,
+                                                                   Set<String> textEnums) {
         Map<String, TypeDefinition> result = new LinkedHashMap<>(merged);
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             if (entry.getValue().body() instanceof ChoiceBody choice) {
                 result.put(entry.getKey(), entry.getValue().withBody(new ChoiceBody(choice.variants(),
-                        Optional.of(ChoiceDisjointness.derive(choice, merged)))));
+                        Optional.of(ChoiceDisjointness.derive(choice, merged, textEnums)))));
             }
         }
         return result;
@@ -1021,7 +1031,7 @@ public final class TsonSchemaLinker {
      * schema unify -- which is what lets an author pin their own import while a peer's is unpinned.
      */
     private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader,
-                                                            Map<String, String> origins) {
+                                                            Map<String, String> origins, Set<String> textEnums) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : imports) {
@@ -1052,6 +1062,9 @@ public final class TsonSchemaLinker {
                 }
                 merged.put(name, entry.getValue());
                 origins.put(name, origin);
+                if (imported.textEnums().contains(name)) {
+                    textEnums.add(name);
+                }
             }
         }
         return merged;

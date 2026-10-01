@@ -6,6 +6,7 @@ import io.ltr8.tson.json.tree.JsonBoolean;
 import io.ltr8.tson.json.tree.JsonNumber;
 import io.ltr8.tson.json.tree.JsonString;
 import io.ltr8.tson.json.tree.JsonValue;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Reference;
@@ -35,7 +36,8 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
      * answers for -- the kernel's {@code value} and {@code void}, which have no content grammar of their own
      * -- so the entry becomes a gap rather than compiling a check it could not perform.
      */
-    static FieldValue of(TsonSchema schema, String fieldTypeName, Token token) {
+    static FieldValue of(TsonLinkedSchema linked, String fieldTypeName, Token token) {
+        TsonSchema schema = linked.schema();
         String name = fieldTypeName;
         Top body = null;
         for (int hops = 0; hops < MAX_REFERENCE_HOPS; hops++) {
@@ -58,7 +60,11 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
                 "'" + fieldTypeName + "' carries a schema-stated value but has no parser to read it with"));
         AtomForm form = AtomForm.of(atom);
         Object pinned = parser.read(token.text());
-        return new FieldValue(parser, form, pinned, node(form, pinned, token.text()), token.text());
+        // An enum whose members are texts spells every member as a string, `"true"` included (§5.2).
+        JsonValue node = linked.textEnums().contains(name)
+                ? new JsonString(token.text())
+                : node(form, pinned, token.text());
+        return new FieldValue(parser, form, pinned, node, token.text());
     }
 
     /** How many reference hops before this gives up; linking has already refused a cycle, so this is a guard. */
@@ -83,8 +89,8 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
                     ? new JsonString(special(value))
                     : new JsonNumber(String.valueOf(value));
             case STRING -> new JsonString(text);
-            // §5.2: an enum member's form is the form of its own lexical class, so only the two boolean
-            // literals are booleans and every other member is an identifier, hence a string.
+            // §5.2: a name member's form is the form of its own lexical class, so only the two boolean
+            // literals are booleans and every other name is a string.
             case ENUM -> "true".equals(text) || "false".equals(text)
                     ? JsonBoolean.of(Boolean.parseBoolean(text))
                     : new JsonString(text);

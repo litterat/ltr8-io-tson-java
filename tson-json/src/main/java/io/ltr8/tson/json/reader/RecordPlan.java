@@ -95,7 +95,7 @@ final class RecordPlan {
             omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.members().contains(field.name())));
             schemaReaders[i] = context.readers().resolve(field.type().name());
             if (field.value().isPresent()) {
-                stated[i] = FieldValue.of(context.schema(), field.type().name(), field.value().get());
+                stated[i] = FieldValue.of(context.linked(), field.type().name(), field.value().get());
             }
         }
         this.index = Map.copyOf(byName);

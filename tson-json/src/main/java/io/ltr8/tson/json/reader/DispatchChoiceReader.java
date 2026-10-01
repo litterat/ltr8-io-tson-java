@@ -6,7 +6,7 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -70,7 +70,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         this.name = name;
         this.variants = body.variants().stream().map(TypeRef::name).toList();
         this.schemaLocation = schemaLocation;
-        this.byClass = variantsByClass(context.schema(), body);
+        this.byClass = variantsByClass(context.linked(), body);
         Map<DiscriminationClass, JsonTypeReader<?>> kinds = new LinkedHashMap<>();
         byClass.forEach((kind, variant) -> kinds.put(kind, context.readers().resolve(variant)));
         this.readerByClass = Map.copyOf(kinds);
@@ -112,14 +112,14 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * containing one non-disjoint, so this is unreachable in a linked schema -- and treating it as "the tag is
      * required" is the safe reading if it ever is reached.
      */
-    private static Map<DiscriminationClass, String> variantsByClass(TsonSchema schema, ChoiceBody body) {
+    private static Map<DiscriminationClass, String> variantsByClass(TsonLinkedSchema linked, ChoiceBody body) {
         if (!body.disjoint().orElse(false)) {
             return Map.of();
         }
         Map<DiscriminationClass, String> table = new LinkedHashMap<>();
         for (TypeRef variant : body.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(schema, variant.name());
-            if (variantClass.isEmpty() || !DiscriminationClass.stable(schema, variant.name())
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(linked, variant.name());
+            if (variantClass.isEmpty() || !DiscriminationClass.stable(linked.schema(), variant.name())
                     || table.put(variantClass.get(), variant.name()) != null) {
                 return Map.of();
             }
