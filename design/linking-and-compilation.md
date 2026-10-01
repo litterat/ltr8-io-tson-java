@@ -62,7 +62,8 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   total and two-valued, detailed in `design/choice-disjointness.md`, so a linked choice always
   carries the fact;
   (3a) **check what `record.extension` obliges** (`RecordExtension`, §5.2) — that nothing composes onto a
-  FINAL record, and that a sealed family's selectors are usable and its members pin them distinctly;
+  FINAL record, that a sealed family's selectors are usable and its members pin them distinctly, and that
+  every family member is declared;
   detailed below. It is listed here for what it reads, and runs later:
   `link` goes subtypes → disjointness → `checkNames` → validate → inhabitance → `checkRecordExtension` →
   `withNameAnnotations` → the `@disjoint` check;
@@ -230,9 +231,18 @@ rest of the closure agrees with it.
   inherited field whole, the mark included, so a subtype's copy of its base's selector is indistinguishable
   here from one the subtype wrote. Without the distinction every subtype of every sealed family would be read
   as declaring a family of its own.
-- **A family is re-judged whenever any part of it is local**, base or subtype, which is not the same as
-  judging local entries. §3.3.4 makes `subtypes` open across schemas, so an importer really can add a
-  member: the new sibling can collide with an imported one, and only a closure holding both can see it.
+- **Every family in the closure is judged**, not only one with a part declared here. §3.3.4 makes `subtypes`
+  open across schemas, so an importer can add a member that collides with an imported one, and two imports
+  that each link cleanly can each add a member that collides with the other's. The second is the merge's own
+  fault and is reported against the schema (`""`), naming both origins. A collision inside one import cannot
+  reach here: that import was refused when it linked, so judging the whole closure never re-reports one.
+- **Extending a family is a declaration.** A record a use-site template application minted that composes onto
+  another (`k: dog_of<text>`, or `dog_of<T>` in a template body) is refused, reported at the declaration that
+  wrote it (`reportedAgainst`). A member is what a read reports, a tag names and a binding maps, all by name,
+  and a minted name is unwritable (§8.2). It is also what keeps the content-derived duplicates of §8.2 harmless:
+  two schemas minting one form hold two entries no value can tell apart, and with members declared, no duplicate
+  is ever a family member, so none can collide. A minted member is skipped by the collision check, so one
+  mistake gets one verdict.
 - **Pins compare as values through `ValueIdentity`**, which is why that class is visible outside its own
   package. §4.3 makes `= 255` and `= 0xFF` one pin and §5.5 makes `= 1` and `= 1.0` one, so a comparison of
   tokens accepts a schema whose dispatch table is not a function. They are read **at the base's declared

@@ -78,7 +78,9 @@ recorded open form, and replacing the application with a reference to the entry 
     The pass indexes entries by their own canonical application and folds each owner and its ancestors into
     `supertypes` to a fixed point, so `dogs` reaches `pet` whether it is declared before or after it.
   - **A synthetic still mints, and must.** Only a *declared* application closes into a name; a use-site sugar
-    form has no author-written name for identity to key on, so it keeps its content-derived one (§8.2).
+    form has no author-written name for identity to key on, so it keeps its content-derived one (§8.2). One
+    that composes onto a record would be an unnameable family member, and the linker refuses it
+    (`RecordExtension`, `design/linking-and-compilation.md`).
 - **Arguments close innermost-first**, so `box<box<text>>` builds the inner entry before the outer one names
   it, and no special case is needed for depth.
 - **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head

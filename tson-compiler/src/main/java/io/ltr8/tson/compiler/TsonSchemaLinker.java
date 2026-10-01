@@ -638,7 +638,7 @@ public final class TsonSchemaLinker {
         }
 
         checkEveryEntryIsInhabited(schema, merged, localNames, receiver);
-        checkRecordExtension(schema, merged, localNames, receiver);
+        checkRecordExtension(schema, merged, localNames, origins, receiver);
 
         AnnotatedMap<String, TypeDefinition> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, localNames, receiver);
@@ -701,7 +701,7 @@ public final class TsonSchemaLinker {
     /**
      * What each {@code record.extension} member obliges of the rest of the closure ({@link RecordExtension}) --
      * that nothing composes onto a FINAL record, that a sealed family's selectors are usable and its members
-     * pin them distinctly, and that the two marks agree with each other.
+     * pin them distinctly, that the two marks agree with each other, and that every member is declared.
      *
      * <p><b>Runs on the merged map rather than the annotated one</b>, unlike {@link #checkDisjointAssertions}:
      * the marks are consumed into the body by the resolver, so there is no annotation left to consult and the
@@ -709,12 +709,15 @@ public final class TsonSchemaLinker {
      *
      * <p>Reporting stays here because {@link RecordExtension} hands back the entry each violation belongs to
      * and nothing else -- a checker that knew about {@code DiagnosticsReceiver} would be a checker two callers
-     * could not share, and it is already the shape {@link ChoiceDisjointness} keeps.
+     * could not share, and it is already the shape {@link ChoiceDisjointness} keeps. A minted entry is reported
+     * against the declaration that wrote it ({@link #reportedAgainst}), having no line of its own.
      */
     private static void checkRecordExtension(TsonSchema schema, Map<String, TypeDefinition> merged,
-                                              Set<String> localNames, DiagnosticsReceiver receiver) {
-        for (RecordExtension.Violation violation : RecordExtension.check(merged, localNames)) {
-            report(receiver, schema, violation.entry(), merged.get(violation.entry()), violation.message());
+                                              Set<String> localNames, Map<String, String> origins,
+                                              DiagnosticsReceiver receiver) {
+        for (RecordExtension.Violation violation : RecordExtension.check(merged, localNames, origins)) {
+            String at = reportedAgainst(violation.entry(), merged);
+            report(receiver, schema, at, merged.get(at), violation.message());
         }
     }
 
