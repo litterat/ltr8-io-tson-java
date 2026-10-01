@@ -306,6 +306,65 @@ class SealedFamilyCheckTest {
                 }""").contains("to the same value"));
     }
 
+    // ── A member is declared ─────────────────────────────────────────────
+
+    private static final String MEMBER_TEMPLATE = """
+              pet    => abstract { pet_type: text =?  name: text }
+              dog_of => <T> pet & { pet_type?: = "dog"  breed: T }
+            """;
+
+    /**
+     * An application at a use site that composes onto a family would add a member nothing can name: a read
+     * reports the member it selects, a tag names it and a binding maps it, and a minted name is none of
+     * those (§3.3.4, §8.2). It is reported at the declaration that wrote it, naming the application.
+     */
+    @Test
+    void aMemberAppliedAtAUseSiteIsRefused() {
+        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("use-site", "{\n" + MEMBER_TEMPLATE + """
+                  kennel => { k: dog_of<text> }
+                }"""));
+
+        assertEquals(1, diagnostics.size(), diagnostics.toString());
+        Diagnostic refusal = diagnostics.getFirst();
+        assertTrue(refusal.message().contains("'dog_of<text>' composes onto 'pet'"), refusal.message());
+        assertTrue(refusal.message().contains("'my_name => dog_of<text>'"), refusal.message());
+        assertEquals("/kennel", refusal.schemaPointer().orElse(""), refusal.toString());
+    }
+
+    /** A template body applying a member mints one at each application, and is reported at the application. */
+    @Test
+    void aMemberAppliedInsideATemplateIsRefusedAtItsApplication() {
+        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("in-template", "{\n" + MEMBER_TEMPLATE
+                + """
+                  kennel_of => <T> { d: dog_of<T> }
+                  kt        => kennel_of<text>
+                }"""));
+
+        assertEquals(1, diagnostics.size(), diagnostics.toString());
+        assertTrue(diagnostics.getFirst().message().contains("composes onto 'pet'"), diagnostics.toString());
+        assertEquals("/kt", diagnostics.getFirst().schemaPointer().orElse(""), diagnostics.toString());
+    }
+
+    /** The declared spelling of the same member loads, and a use site writes its name. */
+    @Test
+    void aDeclaredMemberLoads() {
+        isClean(Tson.standard(), "declared", "{\n" + MEMBER_TEMPLATE + """
+                  dogs   => dog_of<text>
+                  kennel => { k: dogs }
+                }""");
+    }
+
+    /** A minted entry that joins no family is untouched -- an application of a family's base included. */
+    @Test
+    void anApplicationThatJoinsNoFamilyLoadsAtAUseSite() {
+        isClean(Tson.standard(), "no-family", """
+                {
+                  outcome => abstract <T> { code: T }
+                  box     => <T> { v: T }
+                  ledger  => { o: outcome<text>  b: box<text>  s: set<text> }
+                }""");
+    }
+
     // ── Across schemas ───────────────────────────────────────────────────
 
     private static final String BASE = """
@@ -341,7 +400,7 @@ class SealedFamilyCheckTest {
                 diagnostics.toString());
     }
 
-    /** And a family is re-judged whenever any part of it is local: the new sibling can collide with an imported one. */
+    /** And the new sibling can collide with an imported one. */
     @Test
     void anImporterCollidingWithAnImportedPinIsRefused() {
         Tson tson = Tson.standard();
@@ -352,6 +411,48 @@ class SealedFamilyCheckTest {
 
         assertTrue(diagnostics.stream().anyMatch(d -> d.message().contains("to the same value")),
                 diagnostics.toString());
+    }
+
+    /**
+     * Two schemas can each add a member to one imported family and each link cleanly, and a schema importing
+     * both holds a family neither did. Its merge is what put the two together, so the collision is its own --
+     * reported against the schema, naming where each member came from.
+     */
+    @Test
+    void twoImportsAddingCollidingMembersAreRefusedAtTheImporter() {
+        Tson tson = Tson.standard();
+        tson.resolve(BASE);
+        tson.resolve(importer("cats", "{ cat => pet & { pet_type?: = \"cat\"  indoor: boolean } }"));
+        tson.resolve(importer("kittens", "{ kitten => pet & { pet_type?: = \"cat\"  age: int32 } }"));
+
+        List<Diagnostic> diagnostics = tson.validateSchema("""
+                !!id:"https://example.test/both.tn"
+                !!meta:"%s"
+                !!import:"https://example.test/cats.tn"
+                !!import:"https://example.test/kittens.tn"
+                { home => { p: pet } }""".formatted(TsonBundledSchemas.META_ID));
+
+        assertEquals(1, diagnostics.size(), diagnostics.toString());
+        String message = diagnostics.getFirst().message();
+        assertTrue(message.contains("to the same value cat"), message);
+        assertTrue(message.contains("'example.test/kittens.tn' and 'example.test/cats.tn'"), message);
+        assertEquals("", diagnostics.getFirst().schemaPointer().orElse("?"), diagnostics.toString());
+    }
+
+    /** And two imports adding distinct members load together. */
+    @Test
+    void twoImportsAddingDistinctMembersLoad() {
+        Tson tson = Tson.standard();
+        tson.resolve(BASE);
+        tson.resolve(importer("cats", "{ cat => pet & { pet_type?: = \"cat\"  indoor: boolean } }"));
+        tson.resolve(importer("birds", "{ bird => pet & { pet_type?: = \"bird\"  wings: int32 } }"));
+
+        assertEquals(List.of(), tson.validateSchema("""
+                !!id:"https://example.test/both.tn"
+                !!meta:"%s"
+                !!import:"https://example.test/cats.tn"
+                !!import:"https://example.test/birds.tn"
+                { home => { p: pet } }""".formatted(TsonBundledSchemas.META_ID)));
     }
 
     /** An importer that adds a well-formed member is not refused, and neither is the family it joins. */

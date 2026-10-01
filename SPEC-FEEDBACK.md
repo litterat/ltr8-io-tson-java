@@ -39,16 +39,16 @@ spanning both stays, and says which half is which.
 for an entry below, where there is no section to point at yet. When an entry closes, its citations become spec
 citations and the entry is deleted — nothing here is an archive.
 
-**What is left is a set of directions rather than defects.** Each of #1–#4 is a place the series stops short
-of a rule on purpose: where a deployment's policy lives (#1), whether a namespace should be a value (#2), how
-a declared field carries a JSON member name that is not an identifier (#3), and how a declared application
-keeps a content-derived identity across the import merge (#4). None is a defect in a rule the spec states.
-#5, raised against Revision 36 itself, is one: two rules in §7.8 give one document two categories. #6–#9
-are directions again: a bounded type slot, which lets one field's type depend on another's; `identifier`
-as a text family, which carries name hygiene to identifier-typed map keys and gives `enum` a label type; a
-constructor each for `value` and `void`, which retires `unit` and dispatch by name; and a recorded type
-for each template parameter, derived from its uses, which checks an application at the call site and
-gives #6's bound its home.
+**What is left is a set of directions rather than defects.** Each of #1–#4 is a place the series stops short of a
+rule on purpose: where a deployment's policy lives (#1), whether a namespace should be a value (#2), how a
+declared field carries a JSON member name that is not an identifier (#3), and where a family member may be
+written, which keeps §8.2's duplicate forms harmless across the import merge (#4). None is a defect in a rule the
+spec states. #5, raised against Revision 36 itself, is one: two rules in §7.8 give one document two categories.
+#6–#9 are directions again: a bounded type slot, which lets one field's type depend on another's; `identifier` as
+a text family, which carries name hygiene to identifier-typed map keys and gives `enum` a label type; a
+constructor each for `value` and `void`, which retires `unit` and dispatch by name; and a recorded type for each
+template parameter, derived from its uses, which checks an application at the call site and gives #6's bound its
+home.
 
 ---
 
@@ -375,11 +375,13 @@ stated above.
 which it needed, is.
 
 ---
-## 4. A declared application has no content-derived name, so the import merge cannot unify it
+## 4. A family member applied at a use site has no name, which is where §8.2's duplicate forms stop being harmless
 
 **Documents:** [TSON-SCHEMA] §8.2 (*Two identities*, determinism, *Non-exposure and the import merge*),
-§2.2.3 (the transitive import merge), §3.3.4 (`subtypes` open across schemas).
-**Kind:** proposal — the one property §8.2's declared-application rule gives up, and a way to keep it.
+§2.2.3 (the transitive import merge), §3.3.4 (`subtypes` open across schemas), §5.2 and §5.7 (a sealed
+family's pins), §6.1.5 (a tag names the selected member).
+**Kind:** proposal — one rule that follows from §3.3.4 and §8.2, and one sentence on where a merged family is
+judged.
 
 **What Revision 36 settled.** A declaration whose body is a fully-bound application **is** that
 application's entry, closed in place under the author's name, with nothing minted beside it; a use-site
@@ -389,25 +391,46 @@ with `source` the canonical application, and no `box_text_…` is ever created. 
 `[dogs, cats]`, a colliding-pin refusal names the declarations, and a read reports `dogs` as the type — not a
 hash-bearing minted name.
 
-**What it gives up, which §8.2 now states.** A content-derived name is a function of the form alone, which
-is what lets two independently resolved namespaces agree on it — §8.2's determinism SHOULD, and the merge by
-structural identity its import-merge paragraph describes. A declared name cannot carry that: a schema writing
-`box<text>` that has never seen the schema declaring `bx` mints the content name while that schema calls it
-`bx`, so the merge sees two names for one form. A use site in another schema cannot name what it has not
-heard of (§3.3.4), so no author's name can close the gap.
+**What it gives up, and where that matters.** A declared name is not a function of the form, so a schema
+writing `box<text>` that has never seen the schema declaring `bx` mints the content name, and a schema
+importing both holds two entries for one form. Outside a family that costs nothing a value can tell: both
+entries admit exactly the same values, and a use site in the importer resolves to the declaration owning the
+form. Inside a family it does. With `pet => abstract { pet_type: text =? … }` and `dog_of => <T> pet & {
+pet_type?: = "dog"  breed: T }`, schema A declares `dogs => dog_of<text>` and schema B writes `kennel => { k:
+dog_of<text> }`. Each links. A schema importing both holds two members of `pet` pinning `"dog"`: the pair §5.7
+refuses inside one schema, and either refused across the merge — two correct schemas that cannot be imported
+together — or dispatched to one of two. B's member is defective on its own as well: a `pet` position in B can
+select it, and a read then reports a minted name, a tag cannot name it (§6.1.5, since a data tag is a bare
+name and a minted one is unwritable), and a binding cannot map it. That is the hash-bearing name Revision 36
+removed from declared applications, reached through a use site.
 
-**Suggested resolution:** keep the content-derived name as a **merge key** beside the declared entry — not
-an entry, not a name a use site may write, but the identity the import merge unifies on — so that an
-importing schema's `box<text>` and an imported `bx` denote one entry, and §8.2's determinism SHOULD keeps
-its subject across the merge. The declared name stays the entry's name for every surface a consumer sees;
-the key is the resolver's.
+**Suggested resolution: extending a family is a declaration.** "A template application at a use site whose
+result composes onto a record — so is a member of that record's family — is a resolver error; a family member
+is declared." It is not a special case but what §3.3.4 and §8.2 already imply together: a member changes what
+every position typed by its base does, in every schema that imports it, and is read, tagged and bound by name,
+while a minted name may never be written. It is drawn at membership rather than at sealing, since a minted
+member of an open family is unreachable too — an untagged value at its base needs a tag it cannot carry — and
+it leaves every other use-site application alone: arrays, sets, choices, and applications of a family's base,
+which compose onto nothing. With it, §8.2's duplicates are never family members, and the "accepted by-product"
+reading of them holds without exception.
 
-**Interpretation chosen:** no merge key. Nothing in this implementation depends on cross-schema
-unification of a declared application today, and no bundled schema or corpus vector exercises an import
-that would need it — so the property is given up exactly as §8.2 says, and the proposal is unmeasured.
+And one sentence for §3.3.4: **a family is judged over the closure that holds it**, so two members brought
+together only by an import merge — each from a schema that linked cleanly — are the importing schema's error.
+Judging only families with a member declared locally lets that schema load and dispatch on a mapping that is
+not a function.
 
-**Status against Revision 36:** open — the rule is taken, the merge key is carried until an import-merge
-path exercises it.
+**Alternative considered: a merge key.** Keeping the content-derived name beside a declared entry as the
+identity the import merge unifies on would make `dogs` and B's `dog_of<text>` one entry. It solves only the
+duplicate, leaves B's member unnameable, and adds a second identity to every declared application; the rule
+above removes the case the key existed for.
+
+**Interpretation chosen:** both, as written. The linker refuses a minted entry that composes onto a record,
+reported at the declaration that wrote the application (`kennel`, or `kt` for `kt => kennel_of<text>` where
+`kennel_of => <T> { d: dog_of<T> }`), naming the application and the fix (`my_name => dog_of<text>`). Every
+sealed family in the closure is checked, and a collision between two imported members is reported against the
+importing schema with both origins named.
+
+**Status against Revision 36:** open.
 
 ## 5. §7.8 gives a scope push at a `declared` position two categories
 
