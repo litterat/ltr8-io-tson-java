@@ -491,7 +491,7 @@ dependency normatively for that reason.
   its members typed by it. #7's Proposal 2 now holds the type as a `type_name` field pinned by two tightenings,
   with the bound and member conformance as §7.4 rules; this slot would make them structure.
 - **A template parameter.** `<T>` admits any type, so a template meaning only text families cannot say so, and a
-  wrong argument fails deep inside the materialised body rather than at the application.
+  wrong argument fails deep inside the materialised body rather than at the application. #9 builds this half.
 - **A consumer's meta layer.** `ltr8-io-tson-java-http`'s HTTP vocabulary types a path parameter with a
   `type_ref`, and a URL segment cannot carry a record; its schema records that nothing enforces the restriction.
 
@@ -561,9 +561,10 @@ typed by an atom-family instance or an enum — and the HTTP layer's "any scalar
 not on a type. If a bound may name a kind as well as a type, both become structural; if not, they stay in prose
 and the mechanism serves `enum` and template parameters only.
 
-**Interpretation chosen:** none — nothing is built. #7's Proposal 2 holds an enum's `type` as a `type_name`
-field and states its bound and member conformance as §7.4 rules the linker checks; template parameters are
-unbounded, and §5.2's conformance is enforced by the resolver as prose requires.
+**Interpretation chosen:** the template half, through #9: `<T: text>` bounds a template parameter, recorded as
+`template_param.bound` and checked at each application. The field half is not built: no field declares a type
+slot, #7's Proposal 2 holds an enum's `type` as a `type_name` field and states its bound and member conformance
+as §7.4 rules the linker checks, and §5.2's conformance is enforced by the resolver as prose requires.
 
 **Status against Revision 36:** open.
 
