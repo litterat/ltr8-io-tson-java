@@ -28,10 +28,10 @@ import java.util.Set;
  * *bare* constructor name (matching the instance side,
  * e.g. {@code RecordBody}'s own is {@code "record"}, not {@code "record_body"}), so this forward
  * (schema-name -> Class) direction needs the {@code "_body"} suffix added explicitly; nothing
- * recovers it mechanically from the bare name alone. {@code set} is a constructor that shares {@code
- * array}'s own resolved shape rather than declaring one of its own -- its own field set
- * is identical to {@code array}'s (refinement never adds or removes fields, only tightens values),
- * so they alias to the same {@code ArrayBody} target rather than needing one of their own.
+ * recovers it mechanically from the bare name alone. A constructor that tightens another -- {@code set_type}
+ * over {@code array}, {@code enum} and {@code text_enum} over {@code enum_type} -- needs no entry here: it
+ * restates fields and adds none, and the bind lookup falls back along its chain to the constructor it
+ * tightens ({@code ValueReaderContext.bindingNamesFor}).
  *
  * <p><b>A handful of real entries resolve to a genuine Java class that isn't a record at all</b> --
  * {@code atom}/{@code product}/{@code sum}/{@code top} (meta-kernel's own empty-bodied base-kind
@@ -61,10 +61,8 @@ public final class SchemaMetaNameBinder {
             Map.entry("map", "map_body"),
             Map.entry("tuple", "tuple_body"),
             Map.entry("choice", "choice_body"),
-            Map.entry("enum", "enum_body"),
-            Map.entry("text_enum", "enum_body"),
+            Map.entry("enum_type", "enum_body"),
             Map.entry("template", "template_body"),
-            Map.entry("set_type", "array_body"),
             Map.entry("datetime_type", "date_time_type"),
             Map.entry("field_name", "identifier"),
             Map.entry("type_name", "identifier"),

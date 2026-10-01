@@ -18,9 +18,8 @@ that resolves meta-kernel itself. Current form only; history lives in git.
   `REFERENCE` entry. `ReferenceChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
 - `@synthetic` goes on the **key** of exactly the sugar-form entries (both channels), never on an instantiation entry
   or a `TypeDefinition` value, and the linker re-attaches it (`withNameAnnotations`), imports included.
-- The bootstrap is four passes — ordinary declarations (templates held), declared applications, instances,
-  atom refinements — over a closed `instanceBody` switch, a hand-written `heldBody` reader and a hand-written
-  `refinedBody` merge, with no compiled reader, and attaches no `@synthetic`.
+- The bootstrap is three passes — ordinary declarations, instances, atom refinements — over a closed `instanceBody`
+  switch and a hand-written `refinedBody` merge, with no compiled reader, and attaches no `@synthetic`.
 
 Related: `design/schema-resolution.md` (definition resolution), `design/template-materialisation.md` and
 `design/held-template-bodies.md` (the callers of `WireForm` and `DerivedName`), `design/constructor-application.md`,
@@ -192,29 +191,17 @@ needs that constructor's vocabulary already known, and every constructor meta-ke
 within meta-kernel.
 
 `MetaKernelBootstrapResolver.getMetaKernelSchema()` (its only public method) produces the resolved
-meta-kernel `TsonSchema` in **four passes** over its declarations: ordinary declarations first
-(`DefinitionResolver`), holding the kernel's templates (`set`, `enum_of`) as they come; then the declarations
-naming a closed application (`enum => enum_of<identifier>`, `text_enum => enum_of<text>`); then the deferred
-`Instance` declarations (`value => !value_type {}`, `boolean => !enum [true false]`, …) once every constructor
-they reference — including ones declared later in the file — has an entry to transfer a kind from; then the
-deferred atom refinements, whose source is an instance. `TsonSchemaResolver` alone is single-pass, strict source
-order, so it can't handle `boolean` preceding `enum`; this ordering lives here. This output only has to be good
-enough to compile the kernel's readers: the registered kernel is the same source resolved ordinarily against
-it, which is why the two must produce the same entries.
+meta-kernel `TsonSchema` in **three passes** over its declarations: ordinary declarations first
+(`DefinitionResolver`), then the deferred `Instance` declarations (`value => !value_type {}`, `boolean
+=> !enum [true false]`, …) once every constructor they reference — including ones declared later in the
+file — has an entry to transfer a kind from, then the deferred atom refinements, whose source is an instance
+and so exists only after the second pass. `TsonSchemaResolver` alone is single-pass, strict source order, so
+it can't handle `boolean` preceding `enum`; this ordering lives here.
 
 - **An open instance is held, not constructed.** An `Instance` with type parameters is a §5.10 template, so
-  the first pass stores it as a `TEMPLATE` entry whose body is `HeldBody.held(…)` — the application as
+  the second pass stores it as a `TEMPLATE` entry whose body is `HeldBody.held(…)` — the application as
   written, applied later by materialisation. Constructing it would resolve `element_type: T` into a reference
-  to a type called `T`.
-- **A declared application closes through `TemplateMaterialiser`, with `heldBody` for a reader.** Closing
-  substitutes into a held body and reads the result through its constructor, and the kernel's constructors
-  have no compiled reader yet. `heldBody` reads the two shapes the kernel's templates hold — the record a
-  composition template closes to, and the `set_type` binding record — and refuses any other by name. The
-  templates' parameters are stamped first (`ParameterTypes.inferAll`), so an argument is classified and
-  checked as an ordinary application's is.
-- **The instances run in two rounds around the application pass.** `ParameterTypes` walks a held body against
-  the vocabulary of the constructors it applies, which needs the containers the desugar phase lifted
-  (`fields: [record_field]`) already built; `!enum [...]` needs `enum`, which the application pass produces.
+  to a type called `T`. Held bodies are the one thing the bootstrap shares with ordinary resolution.
 - **An atom refinement merges through `refinedBody`**, `instanceBody`'s twin and bounded the same way:
   meta-kernel refines exactly one family, so the merge handles that one and refuses any other by name.
 
@@ -233,4 +220,4 @@ it, which is why the two must produce the same entries.
   desugar table is fixed by the sugar forms and nothing is looked up in the governing meta — which for
   meta-kernel would be the entries this class is in the middle of producing. The bootstrap and the general
   case are one mechanism, and meta-kernel's linked form needs no materialization either: its eight sugar
-  forms and its two closed applications are ordinary entries by the time the linker sees them.
+  forms are ordinary declarations by the time the linker sees them.

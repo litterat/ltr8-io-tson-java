@@ -77,13 +77,13 @@
 !schema {
   @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A."
   top => !type_definition {
-    subtypes: [array atom choice data enum enum_of identifier_type integer_type map product record reference regex_type set_type sum template text_enum text_type tuple uri_type value_type void_type]
+    subtypes: [array atom choice data enum enum_type identifier_type integer_type map product record reference regex_type set_type sum template text_enum text_type tuple uri_type value_type void_type]
     body: !record { fields: [] }
   }
 
   atom => !type_definition {
     supertypes: [top]
-    subtypes: [enum enum_of identifier_type integer_type regex_type text_enum text_type uri_type value_type void_type]
+    subtypes: [enum enum_type identifier_type integer_type regex_type text_enum text_type uri_type value_type void_type]
     body: !record { supertypes: [top]  fields: [] }
   }
 
@@ -461,12 +461,6 @@
       !record_field { name: max_items       type: non_negative_integer  optional: true }
     ] }
   }
-
-  @doc:"The set spelling an author writes: a template over the parameterless set_type constructor."
-  set => !type_definition {
-    source: set_type
-    body: !template { parameters: [{ name: T  type: type_ref }]  template: "!set_type { element_type: T }" }
-  }
   map => !type_definition {
     supertypes: [product top]
     body: !record { supertypes: [product]  fields: [
@@ -489,6 +483,12 @@
     ] }
   }
 
+  @doc:"A named entry rather than an inline form: ! constructor applications remain prohibited at field positions (Part 2 Section 5.2) and set_type has no sugar of its own."
+  enum_set => !type_definition {
+    source: set_type
+    body: !set_type { element_type: text  min_items: 1 }
+  }
+
   @doc:"A count. Refines integer rather than constructing beside it, so it IS-A integer."
   non_negative_integer => !type_definition {
     source: integer_type
@@ -501,35 +501,31 @@
     body: !set_type { element_type: integer  min_items: 1 }
   }
 
-  @doc:"""
-    An enumeration: a closed set of labels drawn from a naming
-    vocabulary T. A composition template, so a family base whose
-    members are its applications (Part 2 Section 5.10).
-    """
-  enum_of => !type_definition {
+  @doc:"An enumeration: a closed set of labels, and the text family they are drawn from."
+  enum_type => !type_definition {
     supertypes: [atom top]
     subtypes: [enum text_enum]
-    body: !template {
-      parameters: [{ name: T  type: type_ref }]
-      template: "!record { supertypes: [ atom ] fields: [ { name: members type: { name: set arguments: [ { name: T } ] } } ] }"
-      extension: ABSTRACT
-    }
+    body: !record { supertypes: [atom]  fields: [
+      !record_field { name: type     type: type_name }
+      !record_field { name: members  type: enum_set }
+    ] }
   }
 
-  @doc:"A declaration naming a closed application is that application's entry (Part 2 Section 8.2)."
   enum => !type_definition {
-    source: { name: enum_of  arguments: [ { name: identifier } ] }
-    supertypes: [atom top]
-    body: !record { supertypes: [atom]  fields: [
-      !record_field { name: members  type: set_identifier_xxhash }
+    source: enum_type
+    supertypes: [atom enum_type top]
+    body: !record { fields: [
+      !record_field { name: type     type: type_name  optional: true  role: FIXED  value: identifier }
+      !record_field { name: members  type: enum_set }
     ] }
   }
 
   text_enum => !type_definition {
-    source: { name: enum_of  arguments: [ { name: text } ] }
-    supertypes: [atom top]
-    body: !record { supertypes: [atom]  fields: [
-      !record_field { name: members  type: set_text_xxhash }
+    source: enum_type
+    supertypes: [atom enum_type top]
+    body: !record { fields: [
+      !record_field { name: type     type: type_name  optional: true  role: FIXED  value: text }
+      !record_field { name: members  type: enum_set }
     ] }
   }
 
@@ -608,30 +604,5 @@
   @synthetic array_tuple_element_xxhash => !type_definition {
     source: array
     body: !array { element_type: tuple_element }
-  }
-
-  @synthetic set_type_identifier_xxhash => !type_definition {
-    source: set_type
-    body: !set_type { element_type: identifier  min_items: 1 }
-  }
-
-  @doc:"""
-    Instantiation entries — what a template application closes to. Unlike
-    a synthetic these carry no `@synthetic` marker: their `source` is an
-    application where a synthetic's is a bare constructor (Section 8.2).
-    """
-  set_identifier_xxhash => !type_definition {
-    source: { name: set  arguments: [ { name: identifier } ] }
-    body: !reference { target: set_type_identifier_xxhash }
-  }
-
-  @synthetic set_type_text_xxhash => !type_definition {
-    source: set_type
-    body: !set_type { element_type: text  min_items: 1 }
-  }
-
-  set_text_xxhash => !type_definition {
-    source: { name: set  arguments: [ { name: text } ] }
-    body: !reference { target: set_type_text_xxhash }
   }
 }

@@ -144,9 +144,9 @@ class ConfusableNameScopesTest {
 
     /**
      * <b>A {@code text_enum} takes the members out of §8.2's two per-<em>name</em> rules and leaves the
-     * collision relation in place</b> (§7.4): its label type is {@code text}, not an identifier family, so its
-     * members are not names and policing their characters and scripts is a category error; two members that
-     * render alike is still the hazard, because the set is still what a value is matched against.
+     * collision relation in place</b> (§7.4): its type is {@code text}, not an identifier family, so its members
+     * are not names and policing their characters and scripts is a category error; two members that render alike
+     * is still the hazard, because the set is still what a value is matched against.
      */
     @Test
     void aTextEnumDropsThePerNameRulesAndKeepsTheCollisionOne() {

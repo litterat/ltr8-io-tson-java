@@ -254,12 +254,13 @@ class DefinitionResolverTest {
 
     @Test
     void writesAnEnumBody() throws DataBindException {
-        // Structurally: boolean => !type_definition { source: enum body: !enum { members: [true false] } }
+        // Structurally: boolean => !type_definition { source: enum body: !enum { type: identifier  members: [...] } }
         TypeDefinition booleanDef = new TypeDefinition(Optional.of(TypeRef.of("enum")), TypeKind.ATOM,
                  List.of(), List.of(), new EnumBody(List.of("true", "false")));
 
         assertEquals("{ source: { name: \"enum\" arguments: [] } "
-                        + "supertypes: [] subtypes: [] body: !enum { members: [ \"true\" \"false\" ] } }",
+                        + "supertypes: [] subtypes: [] body: !enum { type: \"identifier\" "
+                        + "members: [ \"true\" \"false\" ] } }",
                 write(booleanDef));
     }
 
@@ -975,21 +976,37 @@ class DefinitionResolverTest {
     // ── A field typed by a named constructor application ──────────────────
 
     @Test
-    void resolvesEnumOfFromTheRealMetaKernelFixtureAsAHeldCompositionTemplate() throws IOException {
-        // enum_of => <T> atom & { members: set<T> }: a composition template, so its body is held -- the record it
-        // closes to, with `set<T>` still an application -- until `enum => enum_of<identifier>` closes it.
+    void resolvesEnumTypeAndEnumFromTheRealMetaKernelFixture() throws IOException, DataBindException {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
+        TypeDefinition enumType = resolver.resolve(schemaMap.declarations().get("enum_type"));
+        resolved.put("enum_type", enumType);
+        TypeDefinition enumDef = resolver.resolve(schemaMap.declarations().get("enum"));
 
-        TypeDefinition enumOf = resolver.resolve(schemaMap.declarations().get("enum_of"));
-
-        assertEquals(TypeKind.TEMPLATE, enumOf.kind());
-        assertEquals(List.of("atom", "top"), enumOf.supertypes());
-        assertEquals(List.of("T"), enumOf.parameters());
-        TemplateBody held = assertInstanceOf(TemplateBody.class, enumOf.body());
-        assertEquals("!record { supertypes: [ atom ] fields: [ { name: members type: { name: set arguments: "
-                + "[ { name: T } ] } } ] }", held.template());
+        // enum_type => atom & { type: type_name  members: enum_set }: the constructor, `type` required.
+        assertEquals(TypeKind.ATOM, enumType.kind());
+        assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
+                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
+                        + "{ name: \"type\" type: { name: \"type_name\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" } "
+                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" } "
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                write(enumType));
+        // enum => enum_type ^ { type?: = identifier }: a constructor tightening, `type` pinned and injected, so
+        // `members` is the one unmarked field and `!enum [A B]` stays the positional form.
+        assertEquals(TypeKind.ATOM, enumDef.kind());
+        assertEquals(List.of("enum_type", "atom", "top"), enumDef.supertypes());
+        assertEquals("{ source: { name: \"enum_type\" arguments: [] } "
+                        + "supertypes: [ \"enum_type\" \"atom\" \"top\" ] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"type\" type: { name: \"type_name\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FIXED\" value: identifier } "
+                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
+                        + "optional: false voidable: false role: \"FREE\" } "
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                write(enumDef));
     }
 
     // ── Constructor application (§5.5, §5.6, Phase B step 4) ──────────────
@@ -1003,10 +1020,12 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
+        resolved.put("enum_type", resolver.resolve(schemaMap.declarations().get("enum_type")));
+        resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
 
-        // "enum" (the constructor bindAtomInstance reads against) is `enum_of<identifier>` -- an application,
-        // whose entry exists only once materialisation has closed it. So its reader is compiled from the
-        // full, materialised meta-kernel rather than from this test's own narrow `resolved` map.
+        // "enum" (the constructor bindAtomInstance reads against) is compiled from the full meta-kernel
+        // rather than from this test's own narrow `resolved` map, which holds none of the entries its
+        // fields name.
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         TypeDefinition accessType = definitionResolverFor(metaKernelParser, resolved::get).resolve(
                 schemaMap.declarations().get("product_access_type"));
@@ -1035,6 +1054,7 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
+        resolved.put("enum_type", resolver.resolve(schemaMap.declarations().get("enum_type")));
         resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
 
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();

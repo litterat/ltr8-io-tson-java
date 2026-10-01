@@ -1000,7 +1000,7 @@ final class DefinitionResolver {
         try {
             body = definitionMetaReader.read(constructorName, value);
         } catch (ReadException e) {
-            throw bodyIsNotValidData(name, constructorName, e, labelTypeHint(constructorName, e));
+            throw bodyIsNotValidData(name, constructorName, e);
         } catch (BindMismatchException e) {
             // The constructor is a meta layer's own and the consumer never registered a class for it, or
             // registered one that disagrees. Either way it is their configuration, and it already says so --
@@ -1080,29 +1080,8 @@ final class DefinitionResolver {
      */
     private static SchemaValidationException bodyIsNotValidData(String name, String constructorName,
                                                                     ReadException cause) {
-        return bodyIsNotValidData(name, constructorName, cause, "");
-    }
-
-    private static SchemaValidationException bodyIsNotValidData(String name, String constructorName,
-                                                                    ReadException cause, String hint) {
         return new SchemaValidationException("'" + name + "': the body is not valid data for '"
-                + constructorName + "', the constructor's own constraint vocabulary -- " + cause.getMessage()
-                + hint, cause);
-    }
-
-    /**
-     * The fix for an enum member its label type refuses by form: [TSON-SCHEMA] §7.4 has the diagnostic name the
-     * spelling for a member that is not a name. An enum is an {@code enum_of<T>} application, and a member that
-     * is any text belongs to {@code text_enum}.
-     */
-    private String labelTypeHint(String constructorName, ReadException cause) {
-        TypeDefinition constructor = metaDefinitions.getTypeDefinition(constructorName);
-        boolean enumOf = constructor != null && constructor.source()
-                .filter(source -> source.name().equals("enum_of") && !source.arguments().isEmpty()).isPresent();
-        return enumOf && cause.diagnostic().code() == Diagnostic.Code.ATOM_FORM_INVALID
-                ? " -- an enum's members are values of its label type; members that are any text are a "
-                        + "'!text_enum [...]'"
-                : "";
+                + constructorName + "', the constructor's own constraint vocabulary -- " + cause.getMessage(), cause);
     }
 
     // ── Top-level constructor application (§5.6) ──────────────────────────
@@ -2202,7 +2181,7 @@ final class DefinitionResolver {
     /**
      * A field/group-member's type-ref, as one of the two shapes that reach resolution: a bare
      * {@link SimpleRef}, or a {@link GenericRef} -- a §5.10 application, or a constructor's own generic
-     * vocabulary such as {@code enum_of}'s {@code members: set<T>}.
+     * vocabulary such as meta's {@code scoped.scope: set<scope_kind>}.
      *
      * <p><b>A container sugar form is the third case and is refused</b>, because by this phase every one of
      * them should already be an entry: {@link SchemaDesugarer} lifts each to a declaration and leaves a bare

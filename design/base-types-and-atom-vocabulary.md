@@ -136,12 +136,14 @@ position never reaches. `BooleanParser` is the one statement of what `boolean` r
 stack asks the vocabulary for it rather than keeping a second (`AtomTypeReader.ENUM_OBJECT_MODE`); a token
 that is neither member is the enum miss it is — `ATOM_CONSTRAINT_VIOLATION`, matching every other enum.
 
-**An enum's members are labels of its label type `T`** — `enum` is `enum_of<identifier>`, `text_enum` is
-`enum_of<text>` — which changes nothing here: matching is an identity check of the token's decoded text against
-the members either way, and the host value is the natural parse of the member that matched. `T` governs what may
-be *declared*, through the constructor's `members: set<T>`, so it is a schema-load question and no reader sees
-it. `text_type.members` is likewise an ordinary facet on the shared parser — `TextParser` checks it last, as the
-numeric tiers do, a member set naming the whole value space so the other facets hold vacuously where it is present.
+**An enum's members are text and its `type` says what they are labels of**, which changes nothing here:
+matching is an identity check of the token's decoded text against the members, and the host value is the natural
+parse of the member that matched. `type` governs what may be *declared* — each member a value of it, none two of
+one value — so it is a schema-load question the linker asks (`EnumLabels`), and no reader sees it. A `type` whose
+parser someday compares by more than text (case folding) changes the match too, and the enum reader will have to
+key on that parser's value rather than on the text. `text_type.members` is likewise an
+ordinary facet on the shared parser — `TextParser` checks it last, as the numeric tiers do, a member set naming
+the whole value space so the other facets hold vacuously where it is present.
 It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recovers a boolean from an unquoted
 `true`, so a writer annotating every one with `!boolean` would be restating what the token already says.
 
