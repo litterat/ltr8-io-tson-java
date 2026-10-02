@@ -15,7 +15,7 @@
   mints versions nobody ever consumed, one for every field added during a development cycle.
 
   diagnostic_code, outcome and restriction_level are hand-written copies of Diagnostic.Code,
-  Outcome and TsonUnicodePolicy.Level. DiagnosticsSchemaTest checks every copy against the Java enum
+  Outcome and ScriptPolicy.Level. DiagnosticsSchemaTest checks every copy against the Java enum
   in both directions, which is what catches a member added to one and forgotten here -- before that
   test existed, two such omissions were noticed only by a version bump.
 
@@ -75,19 +75,30 @@
     schema_position?: text?
   }
   @doc:"""
-    UTS #39 §5.2's restriction levels, a hand-written copy of TsonUnicodePolicy.Level checked against it
+    UTS #39 §5.2's restriction levels, a hand-written copy of ScriptPolicy.Level checked against it
     by DiagnosticsSchemaTest the way diagnostic_code and outcome are.
     """
   restriction_level => !enum [
     ASCII_ONLY SINGLE_SCRIPT HIGHLY_RESTRICTIVE MODERATELY_RESTRICTIVE MINIMALLY_RESTRICTIVE UNRESTRICTED
   ]
   @doc:"""
-    One [TSON-DATA] §8.2 policy surface: the restriction level, whether it applies to each _/- delimited
-    segment rather than to the whole text, and any script combinations admitted over and above the level
-    (UTS #39 §5.2's own device for Latn+Jpan and its siblings). Each entry in `permitting` is one such
-    combination, named by java.lang.Character.UnicodeScript -- Latin, Cyrillic, Han.
+    [TSON-DATA] §8.2's token policy: the restriction level over each whole token, and any script
+    combinations admitted over and above the level (UTS #39 §5.2's own device for Latn+Jpan and its
+    siblings). Each entry in `permitting` is one such combination, named by
+    java.lang.Character.UnicodeScript -- Latin, Cyrillic, Han.
     """
-  unicode_policy => { level: restriction_level  per_segment: boolean  permitting: [[text]] }
+  script_policy => { level: restriction_level  permitting: [[text]] }
+  @doc:"""
+    [TSON-DATA] §8.2's identifier policy: the restriction level, whether it applies to each segment of a
+    name rather than to the whole of it, whether no two names in one scope may share a UTS #39 skeleton,
+    and any script combinations admitted over the level, as script_policy states them.
+    """
+  identifier_policy => {
+    level: restriction_level
+    per_segment: boolean
+    skeleton_distinctness: boolean
+    permitting: [[text]]
+  }
   @doc:"""
     What this processor's configuration does to a document's fate, stated once per run.
 
@@ -118,8 +129,8 @@
   limits => { max_depth: int32 }
 
   policy => {
-    identifier_policy: unicode_policy
-    token_policy: unicode_policy
+    identifier_policy: identifier_policy
+    token_policy: script_policy
     unicode_data_version: text
     limits: limits
   }

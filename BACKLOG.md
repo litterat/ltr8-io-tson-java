@@ -106,12 +106,12 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   TSON registry verifies against the bytes it fetched; the JSON side holds only linked schemas, so what it
   needs is either the digest beside each linked schema or a loader that takes the reference as written.
 
-- [ ] **The look-alike rule reaches no JSON position, and whether it should is now a real question rather
-  than a settled one.** [TSON-DATA] §8.2's two per-name rules run at the schema-directed record and `$type`
+- [ ] **The look-alike rule does not reach a JSON record position's unmatched members, and whether it should is a
+  real question.** [TSON-DATA] §8.2's two per-name rules run at the schema-directed record and `$type`
   positions, so the realistic attack — a homoglyph in a name that matches no declared field — is refused. The
-  third rule, `CONFUSABLE_NAMES`, is a property of a *set*, and `CLAUDE.md` records it as not reaching JSON
-  because a JSON object's members are keys until a position says otherwise. **A schema-directed record position
-  does say otherwise**, which is the fact that changed: its unmatched members are field names, so the set rule
+  third rule, `CONFUSABLE_NAMES`, is a property of a *set*, and reaches one JSON position, an identifier-keyed map's
+  keys, because a JSON object's members are keys until a position says otherwise. **A schema-directed record
+  position does say otherwise**: its unmatched members are field names, so the set rule
   could run over them as `SchemalessTreeReader` runs it for TSON. What it would add over the two per-name rules
   is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
   name — so this is a decision to take deliberately, not a gap to close by reflex.
@@ -330,18 +330,13 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   beside it; what constrains it is that the JSON lexer has to state which kind it raised, and that
   `CrossEncodingParityTest` compares codes, so the two encodings must sort one malformed input the same way.
 
-- [ ] **The look-alike check recomputes every skeleton per record, and ignores the identifier policy.**
+- [ ] **The look-alike check recomputes every skeleton per record.**
   `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of every
   schemaless tree read, which builds a `HashMap` and a UTS #39 skeleton per field name. Field names repeat across the
   records of a document, so the same skeletons are built again for each one; measured, the whole check is ~1,300 bytes
   per read of the harness document even after `Confusables.skeleton` stopped allocating for a name that maps nothing.
   A cache would take most of that, and the design question is its bound: names are attacker-controlled, so a per-read
-  cache is the safe shape and a process-wide one is not. Separately, the check consults **no policy**, which is a
-  conformance gap: a deployment that stated `withIdentifierPolicy(unrestricted())` still gets `CONFUSABLE_NAMES` --
-  over a schemaless record's fields, a schema's scopes and an identifier-keyed map's keys (`MapAbstractReader`, JSON's
-  `MapObjectReader`) -- where the two per-name rules honour it, and [TSON-DATA] §8.2 says a processor "MUST allow a
-  deployment to relax any of the three". What is left to decide is the policy's shape for the set rule -- a switch of
-  its own, or implied by the level.
+  cache is the safe shape and a process-wide one is not.
 
 - [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
   in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a

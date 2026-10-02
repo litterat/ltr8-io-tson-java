@@ -8,12 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * UTS #39 §5.2's restriction levels, and the two axes they are configured on.
+ * UTS #39 §5.2's restriction levels over whole text. The unit is {@link IdentifierPolicy}'s
+ * ({@code IdentifierPolicyTest}).
  *
  * <p>Mixed-script names are built from code points, never typed: the whole subject is spellings that look
  * alike, so a literal would be unreviewable.
  */
-class UnicodePolicyTest {
+class ScriptPolicyTest {
 
     private static final String CYR_A = new String(Character.toChars(0x0430));   // а
     private static final String CYR_P = new String(Character.toChars(0x043F));   // п
@@ -21,19 +22,19 @@ class UnicodePolicyTest {
     private static final String HAN = new String(Character.toChars(0x65E5));     // 日
     private static final String DEVANAGARI = new String(Character.toChars(0x0905));
 
-    private static void accepts(UnicodePolicy policy, String text) {
+    private static void accepts(ScriptPolicy policy, String text) {
         assertTrue(policy.violation(text).isEmpty(),
                 () -> policy + " should accept " + text + " but said " + policy.violation(text).orElse(""));
     }
 
-    private static void refuses(UnicodePolicy policy, String text) {
+    private static void refuses(ScriptPolicy policy, String text) {
         assertFalse(policy.violation(text).isEmpty(), () -> policy + " should refuse " + text);
     }
 
     /** The default: strictest of the practically deployable levels, and a level UTS #39 names. */
     @Test
     void highlyRestrictiveOverAWholeNameIsTheDefaultPosition() {
-        UnicodePolicy policy = UnicodePolicy.highlyRestrictive();
+        ScriptPolicy policy = ScriptPolicy.highlyRestrictive();
 
         accepts(policy, "admin");
         accepts(policy, "пользователь");
@@ -43,22 +44,10 @@ class UnicodePolicyTest {
         refuses(policy, "alpha_" + GREEK_ALPHA);
     }
 
-    /** The first relaxation: the unit, not the level. It keeps every rejection that matters. */
-    @Test
-    void perSegmentKeepsTheHomographsAndAdmitsTheCompounds() {
-        UnicodePolicy policy = UnicodePolicy.highlyRestrictive().perSegment();
-
-        accepts(policy, "id_" + CYR_P);
-        accepts(policy, "alpha_" + GREEK_ALPHA);
-        accepts(policy, HAN + HAN + "id");
-        refuses(policy, CYR_A + "dmin");                      // within one word, still refused
-        refuses(policy, "id_" + CYR_A + "dmin");              // one bad segment is still one bad segment
-    }
-
     /** The narrowest relaxation: name the combination instead of dropping a level. */
     @Test
     void anAdditionalPermittedSetAdmitsOnlyThatCombination() {
-        UnicodePolicy policy = UnicodePolicy.highlyRestrictive().permitting(LATIN, CYRILLIC);
+        ScriptPolicy policy = ScriptPolicy.highlyRestrictive().permitting(LATIN, CYRILLIC);
 
         accepts(policy, "id_" + CYR_P);
         accepts(policy, CYR_A + "dmin");                      // deliberately: the deployment said so
@@ -68,7 +57,7 @@ class UnicodePolicyTest {
     /** Moderately Restrictive: Latin plus one other, except the two §5.2 names. */
     @Test
     void moderatelyRestrictiveAdmitsLatinPlusOneExceptCyrillicAndGreek() {
-        UnicodePolicy policy = UnicodePolicy.moderatelyRestrictive();
+        ScriptPolicy policy = ScriptPolicy.moderatelyRestrictive();
 
         accepts(policy, "id_" + DEVANAGARI);
         refuses(policy, "id_" + CYR_P);
@@ -77,14 +66,14 @@ class UnicodePolicyTest {
 
     @Test
     void singleScriptRefusesEvenTheAugmentedSets() {
-        accepts(UnicodePolicy.singleScript(), "admin");
-        refuses(UnicodePolicy.singleScript(), HAN + HAN + "id");
+        accepts(ScriptPolicy.singleScript(), "admin");
+        refuses(ScriptPolicy.singleScript(), HAN + HAN + "id");
     }
 
     @Test
     void asciiOnlyIsWhatItSays() {
-        accepts(UnicodePolicy.asciiOnly(), "order_id");
-        refuses(UnicodePolicy.asciiOnly(), "café");
+        accepts(ScriptPolicy.asciiOnly(), "order_id");
+        refuses(ScriptPolicy.asciiOnly(), "café");
     }
 
     /**
@@ -93,8 +82,8 @@ class UnicodePolicyTest {
      */
     @Test
     void theTwoOffPositionsDifferOnlyInTheIdentifierProfile() {
-        UnicodePolicy five = UnicodePolicy.scriptsUnchecked();
-        UnicodePolicy six = UnicodePolicy.unrestricted();
+        ScriptPolicy five = ScriptPolicy.scriptsUnchecked();
+        ScriptPolicy six = ScriptPolicy.unrestricted();
 
         assertFalse(five.checksScripts());
         assertFalse(six.checksScripts());

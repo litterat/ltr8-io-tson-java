@@ -4,7 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.base.diagnostics.Refusal;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
 
@@ -62,9 +62,9 @@ public final class JsonReadContext {
         List<JsonEvent> recording;
 
         /** [TSON-DATA] §8.2's identifier policy, for the read positions that carry a name. */
-        final UnicodePolicy identifierPolicy;
+        final IdentifierPolicy identifierPolicy;
 
-        Cursor(JsonEventSource events, DiagnosticsReceiver receiver, UnicodePolicy identifierPolicy) {
+        Cursor(JsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy) {
             this.events = events;
             this.receiver = receiver;
             this.identifierPolicy = identifierPolicy;
@@ -159,21 +159,21 @@ public final class JsonReadContext {
      * applicable and defaulting to Highly Restrictive is right. Here it depends on the position: a JSON object
      * is one syntax for a record and a map both (§4.1), so only a reader holding the position knows whether a
      * member name is a field name or a key -- and a schemaless read holds no position at all, so it applies
-     * nothing. {@link #of(JsonEventSource, DiagnosticsReceiver, UnicodePolicy)} is what a read that does know.
+     * nothing. {@link #of(JsonEventSource, DiagnosticsReceiver, IdentifierPolicy)} is what a read that does know.
      */
     public static JsonReadContext of(JsonEventSource events, DiagnosticsReceiver receiver) {
-        return of(events, receiver, UnicodePolicy.unrestricted());
+        return of(events, receiver, IdentifierPolicy.none());
     }
 
     /** As above, under {@code identifierPolicy} -- what a schema-directed read passes, knowing its positions. */
     public static JsonReadContext of(JsonEventSource events, DiagnosticsReceiver receiver,
-                                     UnicodePolicy identifierPolicy) {
+                                     IdentifierPolicy identifierPolicy) {
         return new JsonReadContext(new Cursor(events, receiver,
                 Objects.requireNonNull(identifierPolicy, "identifierPolicy")), null, null, null);
     }
 
     /** The identifier policy this read judges names under -- [TSON-DATA] §8.2's, never a validity rule. */
-    public UnicodePolicy identifierPolicy() {
+    public IdentifierPolicy identifierPolicy() {
         return cursor.identifierPolicy;
     }
 

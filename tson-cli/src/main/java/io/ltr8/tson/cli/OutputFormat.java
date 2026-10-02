@@ -198,11 +198,18 @@ enum OutputFormat {
                 + ", max depth " + policy.limits().maxDepth();
     }
 
-    private static String summary(CliPolicy.CliUnicodePolicy policy) {
-        return policy.level() + (policy.perSegment() ? " per segment" : "")
-                + (policy.permitting().isEmpty() ? ""
-                        : " permitting " + policy.permitting().stream().map(scripts ->
-                                String.join("+", scripts)).toList());
+    private static String summary(CliPolicy.CliIdentifierPolicy policy) {
+        return policy.level() + (policy.perSegment() ? " per segment" : "") + permitting(policy.permitting())
+                + (policy.skeletonDistinctness() ? "" : " without skeleton distinctness");
+    }
+
+    private static String summary(CliPolicy.CliScriptPolicy policy) {
+        return policy.level() + permitting(policy.permitting());
+    }
+
+    private static String permitting(List<List<String>> permitting) {
+        return permitting.isEmpty() ? ""
+                : " permitting " + permitting.stream().map(scripts -> String.join("+", scripts)).toList();
     }
 
     /**
@@ -317,24 +324,33 @@ enum OutputFormat {
     }
 
     private static void jsonPolicy(StringBuilder json, CliPolicy policy) {
-        json.append("{\"identifier_policy\":");
-        jsonUnicodePolicy(json, policy.identifierPolicy());
+        json.append("{\"identifier_policy\":{\"level\":")
+                .append(jsonString(policy.identifierPolicy().level().name()))
+                .append(",\"per_segment\":").append(policy.identifierPolicy().perSegment())
+                .append(",\"skeleton_distinctness\":").append(policy.identifierPolicy().skeletonDistinctness())
+                .append(',');
+        jsonPermitting(json, policy.identifierPolicy().permitting());
+        json.append('}');
         json.append(",\"token_policy\":");
-        jsonUnicodePolicy(json, policy.tokenPolicy());
+        jsonScriptPolicy(json, policy.tokenPolicy());
         json.append(",\"unicode_data_version\":").append(jsonString(policy.unicodeDataVersion()));
         json.append(",\"limits\":{\"max_depth\":").append(policy.limits().maxDepth()).append("}}");
     }
 
-    private static void jsonUnicodePolicy(StringBuilder json, CliPolicy.CliUnicodePolicy policy) {
-        json.append("{\"level\":").append(jsonString(policy.level().name()))
-                .append(",\"per_segment\":").append(policy.perSegment())
-                .append(",\"permitting\":[");
-        for (int i = 0; i < policy.permitting().size(); i++) {
+    private static void jsonScriptPolicy(StringBuilder json, CliPolicy.CliScriptPolicy policy) {
+        json.append("{\"level\":").append(jsonString(policy.level().name())).append(',');
+        jsonPermitting(json, policy.permitting());
+        json.append('}');
+    }
+
+    private static void jsonPermitting(StringBuilder json, List<List<String>> permitting) {
+        json.append("\"permitting\":[");
+        for (int i = 0; i < permitting.size(); i++) {
             if (i > 0) {
                 json.append(',');
             }
             json.append('[');
-            List<String> scripts = policy.permitting().get(i);
+            List<String> scripts = permitting.get(i);
             for (int j = 0; j < scripts.size(); j++) {
                 if (j > 0) {
                     json.append(',');
@@ -343,7 +359,7 @@ enum OutputFormat {
             }
             json.append(']');
         }
-        json.append("]}");
+        json.append(']');
     }
 
     /**

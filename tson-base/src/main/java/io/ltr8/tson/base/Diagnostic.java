@@ -108,7 +108,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * nothing. A policy has already decided the token is refused; this only shapes that into a diagnostic,
      * and §8.2's rule is the processor's rather than any one encoding's -- both streams report through it.
      *
-     * A token whose scripts the read's {@code UnicodePolicy} does not permit ([TSON-DATA] §8.2's
+     * A token whose scripts the read's {@code ScriptPolicy} does not permit ([TSON-DATA] §8.2's
      * "Values", UTS #39 §5.2).
      *
      * <p><b>Always {@link Diagnostic.Code#RESTRICTED_SCRIPT}.</b> A token is not a name, so it has no identifier profile
@@ -116,7 +116,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * surface can carry.
      *
      * <p><b>{@code why} names the text it judged, so this does not name it again.</b> {@code
-     * UnicodePolicy.violation} opens with the unit it refused ({@code 'аdmin' mixes the scripts ...}),
+     * ScriptPolicy.violation} opens with the unit it refused ({@code 'аdmin' mixes the scripts ...}),
      * which is what makes {@code "the token " + why} read as one sentence -- the same composition {@code
      * DefaultTsonReadContext.refuse} uses for a name.
      *
@@ -210,7 +210,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * would only be a fact the code already fixes, free to disagree with it.
      *
      * <p><b>{@code RESTRICTED_SCRIPT} is a script the policy does not admit, which is wider than a mix.</b>
-     * A script <em>combination</em> is the usual finding, and at {@code UnicodePolicy.Level.ASCII_ONLY}
+     * A script <em>combination</em> is the usual finding, and at {@code ScriptPolicy.Level.ASCII_ONLY}
      * a single-script name is refused with nothing mixed at all -- so the code names what the policy would
      * not admit rather than what the text did, and pairs with {@code RESTRICTED_CHARACTER} as the two halves
      * of one identifier policy. It is also the one of the three a <em>value</em> can carry ({@code

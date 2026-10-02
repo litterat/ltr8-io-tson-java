@@ -5,7 +5,7 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -151,7 +151,7 @@ public final class TsonDataStream implements TsonEventSource {
     private final LimitsPolicy limits;
 
     /** §8.2's token surface, or {@code null} where a read named none -- see {@link #checkTokenPolicy}. */
-    private UnicodePolicy tokenPolicy;
+    private ScriptPolicy tokenPolicy;
     private DiagnosticsReceiver tokenPolicyReceiver;
 
     /**

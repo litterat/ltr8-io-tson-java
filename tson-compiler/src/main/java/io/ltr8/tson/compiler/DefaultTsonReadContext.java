@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.*;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
@@ -33,11 +33,11 @@ final class DefaultTsonReadContext implements TsonReadContext {
         final DiagnosticsReceiver receiver;
 
         /**
-         * [TSON-DATA] §8.2's restricted-script rule over the names this document carries, defaulting to Highly
+         * [TSON-DATA] §8.2's identifier policy over the names this document carries, defaulting to Highly
          * Restrictive as §8.2 says it SHOULD. Per read rather than per context, so every derived context
          * checks against the one a caller named.
          */
-        final UnicodePolicy identifierPolicy;
+        final IdentifierPolicy identifierPolicy;
 
         /**
          * Where the cursor is: the position of the last event {@link #peek()} or {@link #next()} returned,
@@ -60,7 +60,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** Where {@link #next()} records what it consumes while a lookahead is running, else {@code null}. */
         List<TsonEvent> recording;
 
-        Cursor(TsonEventSource events, DiagnosticsReceiver receiver, UnicodePolicy identifierPolicy) {
+        Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy) {
             this.events = events;
             this.receiver = receiver;
             this.identifierPolicy = identifierPolicy;
@@ -117,11 +117,11 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver) {
-        return of(events, receiver, UnicodePolicy.highlyRestrictive());
+        return of(events, receiver, IdentifierPolicy.defaults());
     }
 
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
-                              UnicodePolicy identifierPolicy) {
+                              IdentifierPolicy identifierPolicy) {
         return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy), null, null, null,
                 Optional.empty(), Optional.empty());
     }
@@ -210,29 +210,20 @@ final class DefaultTsonReadContext implements TsonReadContext {
         return judgeName(name, profile);
     }
 
-    private boolean judgeName(String name, IdentifierProfile profile) {
-        boolean refused = false;
-        // Tested rather than `ifPresent`-ed, and measurably so: both rules are allocation-free when a name
-        // passes, which is every name of an ordinary document, but a capturing lambda is not -- it captures
-        // `name` and `this` and so allocates per call whether or not the Optional holds anything. This runs
-        // on every type-ref, annotation and field name of every read, so that was the largest per-name cost
-        // in a check that is otherwise free.
+    @Override
+    public IdentifierPolicy identifierPolicy() {
+        return cursor.identifierPolicy;
+    }
 
-        // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile
-        // too", taking that rule with it. Script mixing gates itself inside violation().
-        if (cursor.identifierPolicy.appliesIdentifierProfile()) {
-            Optional<String> restricted = profile.restrictedCharacter(name);
-            if (restricted.isPresent()) {
-                refuse(name, restricted.get(), Diagnostic.Code.RESTRICTED_CHARACTER);
-                refused = true;
-            }
+    private boolean judgeName(String name, IdentifierProfile profile) {
+        List<IdentifierPolicy.Violation> violations = cursor.identifierPolicy.judge(name, profile);
+        if (violations.isEmpty()) {
+            return false;
         }
-        Optional<String> script = cursor.identifierPolicy.violation(name);
-        if (script.isPresent()) {
-            refuse(name, script.get(), Diagnostic.Code.RESTRICTED_SCRIPT);
-            refused = true;
+        for (IdentifierPolicy.Violation violation : violations) {
+            refuse(name, violation.reason(), violation.code());
         }
-        return refused;
+        return true;
     }
 
     /**

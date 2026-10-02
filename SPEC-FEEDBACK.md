@@ -797,11 +797,16 @@ the text must add:
 - **Each profile is its own type.** Every `!identifier_type { … }` is a distinct type entity: IS-A between two
   identifier types comes from refinement alone, never from one profile admitting a subset of another's names.
   All are string-class (§5.4), so a choice over two of them is not disjoint.
-- **A profile's own additions are exempt from §8.2's restricted-character rule** (proposed; not running, since
-  §8.2 does not yet reach identifier-typed values). The kernel's `-` is exempt because the profile adds it, and
-  the same holds for whatever `start_add`, `continue_add` or `medial` names: a profile that admits `$` states
-  that `$` belongs in these names, and the rule would otherwise refuse every name that uses it. The look-alike
-  and mixed-script mechanisms still reach every character.
+- **A profile's own additions are exempt from §8.2's restricted-character rule.** The kernel's `-` is exempt because
+  the profile adds it, and the same holds for whatever `start_add`, `continue_add` or `medial` names: a profile that
+  admits `$` states that `$` belongs in these names, and the rule would otherwise refuse every name that uses it. The
+  look-alike and mixed-script mechanisms still reach every character.
+- **A per-segment unit divides a name at its profile's own separators.** §8.2 defines the unit as each `_`/`-`
+  delimited segment, which is the kernel profile's answer: `_` by convention, and `-` because the profile adds it.
+  Under another profile the boundaries should be that profile's — `_`, and every character it adds that is not
+  `XID_Continue`, such as a `$` or a medial `.` — since a script change across a profile's own punctuation sits
+  between words, where a homograph cannot. Stated that way, §8.2's unit is one rule for every profile, and reads
+  exactly as it does today for the kernel's.
 - **`medial` is new to the series.** The kernel keeps `-` as a Continue character, so `a-` and `a--b` stay
   names; moving it to `medial` would be a separate change to §7.7.
 
@@ -830,7 +835,8 @@ ordinary schema declares its own, `identifier => !identifier_type { continue_add
 whose type is an identifier family, in both encodings, under the family's own profile — a character the profile
 adds meets no restricted-character rule, as §7.7's `-` does not — and the keys of a map keyed by one are a
 look-alike scope, refused at the second key; a refused value reads as nothing. Under a schema it is the one data
-scope, and like every other scope it does not yet consult the policy (BACKLOG). A field's default or fixed value of
+scope, and like every other scope it is skipped where the identifier policy switches skeleton distinctness off; a
+per-segment level divides such a value at its profile's separators, as proposed above. A field's default or fixed value of
 such a type is judged the same way when the schema links, since a default reaches every document that omits the
 field. The corpus states it at `class2/validate/refused/`, a bucket added for it, and at `class2/schema/refused/`.
 Proposal 2 runs as written above: the kernel declares `enum_type`, `enum` and `text_enum`, and `enum_profile`

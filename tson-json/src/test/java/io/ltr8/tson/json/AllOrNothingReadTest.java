@@ -8,7 +8,7 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import org.junit.jupiter.api.Test;
@@ -117,7 +117,7 @@ class AllOrNothingReadTest {
     @Test
     void aTokenRefusalLeavesNothingInEveryModeAndBothEncodings() {
         String text = "p\u0430ssword";
-        UnicodePolicy ascii = UnicodePolicy.asciiOnly();
+        ScriptPolicy ascii = ScriptPolicy.asciiOnly();
 
         Map<String, Object> read = new LinkedHashMap<>();
         DiagnosticsCollector tsonTree = new DiagnosticsCollector();

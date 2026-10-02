@@ -9,12 +9,13 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 - The per-name rules run in `DefaultTsonReadContext`, only on a freshly pulled event — never on a replayed one.
 - A refused name draws no verdict beside its refusal: both record readers checkpoint `ctx.reported()` across the pull
   and skip their `UNRECOGNIZED_FIELD`.
-- Both surfaces are allocation-free when nothing is refused; the call sites test the `Optional` rather than passing a
-  lambda to `ifPresent`.
+- Both surfaces are allocation-free when nothing is refused: `IdentifierPolicy.judge` answers a passing name with the
+  constant empty list, and the call sites test `isEmpty()` rather than passing a lambda to `forEach`.
 - `Confusables.skeleton` must never skip the table for ASCII: `m → rn` and `1 → l` carry mappings.
-- `withTokenPolicy` defaults to `unrestricted()`, `withIdentifierPolicy` to Highly Restrictive over the whole name; a
-  relaxation is a method, never ambient.
-- The restricted-character rule is gated on the level (`appliesIdentifierProfile()`), at both walks.
+- `withTokenPolicy` defaults to `unrestricted()`, `withIdentifierPolicy` to `IdentifierPolicy.defaults()` — all three
+  mechanisms, Highly Restrictive over the whole name; a relaxation is a method, never ambient.
+- The per-name rules are applied by `IdentifierPolicy.judge(name, profile)` alone, which gates the restricted-character
+  rule on the level; every look-alike scope asks `appliesSkeletonDistinctness()` before it builds one.
 - A value whose type is an identifier family is a name: it meets the per-name rules under its family's own profile and
   is read as nothing when refused, and the keys of a map keyed by one are a look-alike scope checked as each arrives.
 
@@ -78,13 +79,13 @@ stream's check is a field read and a branch, where the name rules §8.2 defaults
 name is actually delivered.
 
 **Both surfaces are allocation-free when nothing is refused**, which is what makes the on-by-default one
-affordable. `UnicodePolicy.violation` and `IdentifierProfile.hygiene` each scan and return
-`Optional.empty()` — no split array, no script set, no stream — and the two call sites test that `Optional`
-rather than passing a lambda to `ifPresent`. That last part is not a style preference: a lambda capturing
-the name and the receiver allocates whether or not the `Optional` holds anything, and at one per rule per
-name it is the whole measured cost of a check that is otherwise free — ~110 bytes per bound record and ~640
-per read on the name surface, and most of what a raised *token* policy would add. `AllocationHarnessTest`
-carries the figures and the ceiling that catches a capturing lambda.
+affordable. `IdentifierPolicy.judge` scans each rule — the script rule over a range, so even a per-segment unit takes
+no substring — and answers a passing name with the constant `List.of()`: no split array, no script set, no stream. The
+call sites test `isEmpty()` rather than passing a lambda to `forEach`. That last part is not a style preference: a
+lambda capturing the name and the receiver allocates whether or not there is anything to report, and at one per rule
+per name it is the whole measured cost of a check that is otherwise free — ~110 bytes per bound record and ~640 per
+read on the name surface, and most of what a raised *token* policy would add. `AllocationHarnessTest` carries the
+figures and the ceiling that catches a capturing lambda.
 
 **The look-alike rule is the expensive one, and `Confusables.skeleton` is where its cost is controlled.** It runs
 per name per record on the schemaless tree path, so normalising, building and re-normalising for every name
@@ -95,17 +96,19 @@ do is skip the table for ASCII**: eight ASCII code points carry a mapping, `m �
 so `payment` and `payrnent` read alike without a single non-ASCII character. `ConfusablesTest`
 pins that pair for exactly this reason.
 
-**Two surfaces, two defaults, and §8.2 sets both.** `withTokenPolicy` defaults to `unrestricted()` because a
-value is data and may legitimately be anything; `withIdentifierPolicy` defaults to Highly Restrictive over
-the whole name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able to
-relax any of the three rules and requires the relaxation not be silent, and a policy read from the
-environment is
-invisible at the call site and absent from review. The relaxation to reach for first is the *unit*
-(`perSegment()`), which still refuses `id_pаy` while admitting `url_адрес`. A token policy stricter than the
-identifier policy subsumes it: a name is a token — which §8.2 asks an implementation's documentation to say,
-and this is where it is said. The two names are §8.2's own: it defines the **identifier policy** and the
-**token policy** as the two parts of a processor's configuration for that section, precisely so that two
-implementations reporting them agree on what they are called, and `ProcessorConfig` uses those names.
+**Two surfaces, two defaults, and §8.2 sets both.** `withTokenPolicy` defaults to `unrestricted()` because a value is
+data and may legitimately be anything; `withIdentifierPolicy` defaults to all three mechanisms with Highly Restrictive
+over the whole name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able
+to relax any of the three rules and requires the relaxation not be silent, and a policy read from the environment is
+invisible at the call site and absent from review. The relaxation to reach for first is the *unit* (`perSegment()`),
+which still refuses `id_pаy` while admitting `url_адрес`; a name's segments are divided at its profile's own
+separators (`IdentifierProfile.separates`), `_` and `-` for §7.7's profile, and `$` or a medial `.` for a family that
+adds one. Skeleton distinctness has a switch of its own (`withSkeletonDistinctness`), reaching every scope — a
+schemaless record, the schema-layer scopes, an identifier-keyed map's keys in either encoding. A token policy stricter
+than the identifier policy subsumes it: a name is a token — which §8.2 asks an implementation's documentation to say,
+and this is where it is said. The two names are §8.2's own: it defines the **identifier policy** and the **token
+policy** as the two parts of a processor's configuration for that section, precisely so that two implementations
+reporting them agree on what they are called, and `ProcessorConfig` uses those names.
 
 **Field** names see all three, being names at every layer (§2.5, §7.7): the two per-name rules in the read
 context beside a type-ref's and an annotation's, and the look-alike rule in `SchemalessTreeReader`, which is

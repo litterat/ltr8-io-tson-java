@@ -5,7 +5,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
@@ -39,11 +39,12 @@ final class DiagnosticsSchema {
         case "validation_report" -> ValidationReport.class;
         case "diagnostic" -> CliDiagnostic.class;
         case "policy" -> CliPolicy.class;
-        case "unicode_policy" -> CliPolicy.CliUnicodePolicy.class;
+        case "identifier_policy" -> CliPolicy.CliIdentifierPolicy.class;
+        case "script_policy" -> CliPolicy.CliScriptPolicy.class;
         case "limits" -> CliPolicy.CliLimits.class;
         case "diagnostic_code" -> Diagnostic.Code.class;
         case "outcome" -> Outcome.class;
-        case "restriction_level" -> UnicodePolicy.Level.class;
+        case "restriction_level" -> ScriptPolicy.Level.class;
         default -> SchemaMetaNameBinder.INSTANCE.resolve(name);
     };
 

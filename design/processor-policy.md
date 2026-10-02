@@ -8,8 +8,8 @@ only; history lives in git.
 
 - The policy is threaded as one value; `withIdentifierPolicy`/`withTokenPolicy`/`withLimits` each change exactly one
   component, deriving from what is already stated.
-- A token policy is never per-segment, and `ProcessorPolicy`'s compact constructor is what refuses one, so no assembly
-  route is a way around it.
+- The two surfaces have two types: an `IdentifierPolicy` (all three §8.2 mechanisms, a unit, a skeleton switch) and a
+  token `ScriptPolicy` (a level over whole text). A per-segment token policy is unwritable, not refused.
 - It is not a diagnostic component: constant for a run, needed before a document is written, and a level says more
   than a version.
 - It is read off the reader that judged, not rebuilt from a configuration object.
@@ -24,11 +24,11 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 
 ## `ProcessorPolicy` — the configuration, stated once
 
-**And threaded as one value.** Every constructor and derivation that needs a `UnicodePolicy`, a
-second `UnicodePolicy` and a `LimitsPolicy` takes the policy
+**And threaded as one value.** Every constructor and derivation that needs an `IdentifierPolicy`, a
+`ScriptPolicy` and a `LimitsPolicy` takes the policy
 instead: both streams, both TSON facades, and `JsonObjectReader`. Three parameters that always travel
 together is how a caller comes to pass a bound from one policy beside a token surface from another, and a
-bare `int` beside a `UnicodePolicy` is the same hazard with less to grep for.
+bare `int` beside a `ScriptPolicy` is the same hazard with less to grep for.
 
 A reader's `withIdentifierPolicy`/`withTokenPolicy`/`withLimits` each change exactly one component, and
 `ProcessorPolicy` has the matching three so a reader's derivation is one call rather than a rebuild.
@@ -46,26 +46,30 @@ contradict. It is also what lets one policy configure both encodings — `Json.o
 off the `ProcessorConfig` that `Tson.of(config)` takes, and a deployment stating its constraints twice has two
 places to get them wrong.
 
-**A token policy is never per-segment, and `ProcessorPolicy` is what refuses one.** `_` and `-` are word
-separators by convention in a name and ordinary characters in a value, so segmenting a value admits
-UTS #39's own `Toys-Я-Us` — the spoof a strict token policy exists to refuse. That is a property of what a
-token policy can *mean*, not of any one way of stating one, so the compact constructor holds it and every route
-that assembles a policy passes through there: the named setters, the withers, and a value a caller composes
-itself. A check on each setter instead is a check every new route has to remember, and one route that
-forgets accepts what all the others refuse.
+**The two surfaces have two types, because they have two shapes.** `IdentifierPolicy` is §8.2's identifier
+policy: a `ScriptPolicy` level, a unit (whole name or `perSegment()`), and `withSkeletonDistinctness`, the switch
+for mechanism 1 that no level reaches — UTS #39 ties `Identifier_Status` to Unrestricted, and nothing ties a relation
+over a set to a level that judges one name. `ScriptPolicy` alone is the token policy: a level and any `permitting`
+combinations over whole text. `_` and `-` are word separators by convention in a name and ordinary characters in a
+value, so segmenting a value would admit UTS #39's own `Toys-Я-Us`; with no unit on the type, no route can state one.
+
+**`IdentifierPolicy.judge(name, profile)` is the one place the per-name rules are applied** — the read contexts of
+both encodings, the bind reader and the linker all call it, each reporting the violations it returns in its own
+shape. It gates the restricted-character rule on the level, exempts the profile's own added characters, and divides
+a per-segment unit at the profile's separators (`IdentifierProfile.separates`: `_` and whatever the profile adds that
+is not `XID_Continue`). The scopes ask `appliesSkeletonDistinctness()` before they build one.
 
 **It carries three settings, not two.** The identifier policy, the token policy and the limits, plus the UCD
 version the first two were computed against. A nesting bound has no business inside a *Unicode* policy,
-which is why the container is the processor's and `UnicodePolicy` is two of its components. A deployment
+which is why the container is the processor's and the two Unicode policies are two of its components. A deployment
 states one policy; the three components stay independent, and changing one still says nothing about the
 others.
 
 The two §8.2 policies (`identifierPolicy` and `tokenPolicy` — `ProcessorConfig`'s own names for them, so a
-configuration and the report it produces are one vocabulary; each a level, a unit, and any `permitting`
-relaxations) and the
-UCD version the rules were computed against, as one value: `Tson.processorPolicy()`, either facade's
-`processorPolicy()`, and `tson policy` on the command line, which prints it as text, JSON, or a TSON
-document. Every `tson-cli` envelope carries one in its `policy` field.
+configuration and the report it produces are one vocabulary; each a level and any `permitting` relaxations, and the
+identifier policy its unit and skeleton switch besides) and the UCD version the rules were computed against, as one
+value: `Tson.processorPolicy()`, either facade's `processorPolicy()`, and `tson policy` on the command line, which
+prints it as text, JSON, or a TSON document. Every `tson-cli` envelope carries one in its `policy` field.
 
 **It is not a diagnostic component, and the three reasons are the shape of the whole design.**
 
@@ -83,7 +87,7 @@ document. Every `tson-cli` envelope carries one in its `policy` field.
 
 **Read off the reader that judged**, not rebuilt from a configuration object: a derived reader (`withIdentifierPolicy`,
 `withTokenPolicy`) is exactly where the two can differ, and a response quoting the wrong one is worse than quoting none.
-`UnicodePolicy.dataVersion()` is the version as a static accessor over `Xid.UNICODE_VERSION`, so a caller holding a
+`ProcessorPolicy.dataVersion()` is the version as a static accessor over `Xid.UNICODE_VERSION`, so a caller holding a
 policy has the data version beside it. §8.2 requires exactly this shape: the policy and the data version are properties
 of the *report*, not of the refusal, and a processor MUST make both available with any report containing one and SHOULD
 make them available with no document in hand.

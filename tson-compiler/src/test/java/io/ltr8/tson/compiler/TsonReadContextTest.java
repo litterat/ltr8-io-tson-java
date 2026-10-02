@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.*;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.compiler.stream.TokenEvent;
@@ -154,7 +154,7 @@ class TsonReadContextTest {
 
     @Test
     void theThrowingReceiverThrowsImmediatelyOnReport() {
-        TsonReadContext ctx = TsonReadContext.throwing(new ListEventSource(List.of()), UnicodePolicy.unrestricted());
+        TsonReadContext ctx = TsonReadContext.throwing(new ListEventSource(List.of()), IdentifierPolicy.none());
 
         ReadException thrown = assertThrows(ReadException.class,
                 () -> ctx.report(Diagnostic.Code.TYPE_MISMATCH, "boom", "a thing", "another thing"));

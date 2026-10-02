@@ -100,7 +100,7 @@ out.
 ```java
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.*;        // Diagnostic, the receivers, ProcessorConfig, the exceptions
-import io.ltr8.tson.base.policy.*; // UnicodePolicy, LimitsPolicy, ProcessorPolicy, FetchPolicy
+import io.ltr8.tson.base.policy.*; // IdentifierPolicy, ScriptPolicy, LimitsPolicy, ProcessorPolicy, FetchPolicy
 import io.ltr8.tson.base.source.*; // SchemaAccess, SchemaSource, the two fetching sources
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
@@ -394,18 +394,21 @@ Two policies, defaulting opposite ways for the same reason in each case:
 
 ```java
 Tson tson = Tson.of(ProcessorConfig.defaults()
-        .withIdentifierPolicy(UnicodePolicy.highlyRestrictive().perSegment())  // names
-        .withTokenPolicy(UnicodePolicy.unrestricted()));                       // values
+        .withIdentifierPolicy(IdentifierPolicy.defaults().perSegment())  // names
+        .withTokenPolicy(ScriptPolicy.unrestricted()));                 // values
 ```
 
-`identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names — and
-defaults to Highly Restrictive over the whole name (§8.2's SHOULD). Reach for `perSegment()`, or
-`permitting(scripts…)`, before loosening the level: both keep the rule everywhere else. `tokenPolicy`
+`identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names, and every
+value whose type is an `identifier_type` family — with all three §8.2 mechanisms on and Highly Restrictive over
+the whole name (§8.2's SHOULD). Reach for `perSegment()`, or `permitting(scripts…)` on the level, before
+loosening the level: both keep the rule everywhere else. A segment ends at `_`, and at whatever a name's profile
+adds that is not a letter or digit (`-` for core names, a `$` or a medial `.` for a family that adds one).
+`withSkeletonDistinctness(false)` drops the look-alike rule over a scope, independently of the level. `tokenPolicy`
 governs **every token a read pulls** and defaults to `unrestricted()`, a value being data that may
 legitimately be anything; raise it when values are more than payload (a service that renders what it
-reads into a UI). A token policy **may not be per-segment**: `ProcessorPolicy` refuses one with
-`IllegalArgumentException` rather than ignoring it: `_` and `-` are ordinary characters in a value
-rather than word separators, and UTS #39's own `Toys-Я-Us` is the spoof segmenting one would admit. Note
+reads into a UI). A token policy is a plain `ScriptPolicy` and has **no unit**: `_` and `-` are ordinary
+characters in a value rather than word separators, and UTS #39's own `Toys-Я-Us` is the spoof segmenting one
+would admit. Note
 also that a token policy stricter than the identifier policy **subsumes it** — the token scan runs before
 anything knows which tokens are names. Either is also settable per reader with `withIdentifierPolicy`/`withTokenPolicy`; the
 six levels and the rest of the surface are in `references/api.md`, and the command-line flags in

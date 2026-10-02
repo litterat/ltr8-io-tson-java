@@ -57,9 +57,9 @@ including records, record groups, enums and some in-built types. The `2026/36` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/37/getting-started/person.tn?sha256=fd77c3d269463bbae5cc6e380c417be951c065d1b8538480e4aab713c1c14e9e"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=2bfab2ba7601e5783fa0bebb700e0f9ec38f2fc6df840ce45a136abeaac28405"
-!!import:"https://tson.io/2026/37/m/core.tn?sha256=e1b7ad03573400546c7c37566a4f3abe74e55dd670e8bf0a0c7a4cb3235b1e4c"
+!!id:"https://example.com/2026/37/getting-started/person.tn?sha256=279d44fe4a87b72213e868c334a4da0a55a2acfbcd559b4fbd80d29451948407"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=bf038df5cae4cb26eb6fea69e46ee3ec3aafafa114a4b5ad5fcc93835b6b7a94"
+!!import:"https://tson.io/2026/37/m/core.tn?sha256=9f27056979c8de2a2421645edfa8c491a60b93a26933782282878c24679846e3"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]
@@ -605,6 +605,7 @@ policy options (validate, compile, policy):
   --identifier-policy <level>   level for identifiers (default: highly-restrictive)
   --identifier-per-segment      apply it per _/- segment rather than the whole identifier
   --identifier-scripts <A+B>    admit one script combination over the level (repeatable)
+  --identifier-allow-look-alikes  drop skeleton distinctness: names in one scope may read alike
   --token-policy <level>        level for values (default: unrestricted, which scans nothing)
   --token-scripts <A+B>         the same for values (repeatable)
   --max-depth <n>               how deeply a document may nest before this refuses it (default: 64)
@@ -647,7 +648,7 @@ Reach for the *unit* or a named combination before dropping a level — both kee
 `--token-scripts` on its own raises the token level from `unrestricted` to `single-script`, since a list of
 combinations is no configuration at all under a level that scans nothing; naming a level that scans nothing
 *and* a relaxation is a usage error rather than a silent no-op. There is no `--token-per-segment`: `_` and `-`
-are ordinary characters in a value, so the library refuses such a policy outright. The flags apply to one
+are ordinary characters in a value, so a token policy has no unit at all. The flags apply to one
 `Tson` per run, so a schema's declared names and your data's names are judged alike.
 
 **`tson hash`** computes a document's content hash ([TSON-DATA] §2.2.1 — SHA-256 of every byte after
@@ -701,7 +702,7 @@ OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
 {"outcome":"INVALID","policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,
-  "permitting":[]},"token_policy":{"level":"UNRESTRICTED","per_segment":false,"permitting":[]},
+  "skeleton_distinctness":true,"permitting":[]},"token_policy":{"level":"UNRESTRICTED","permitting":[]},
   "unicode_data_version":"16.0"},
   "files":[{"file":"bad.tn","outcome":"INVALID","errors":[{"path":"/name",
   "schema_pointer":"/person/name","schema_id":"example.com/2026/37/app/person-1.tn",

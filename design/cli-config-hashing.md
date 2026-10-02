@@ -181,17 +181,18 @@ of it.
 discriminator that could contradict it.
 
 **What §8.2 requires a refusal to name rides on the envelope instead**, as `policy` — a `CliPolicy` on both
-`validation_run` and `validation_report`, carrying `identifier_policy` and `token_policy` (each a level, a
-`per_segment` unit, and any `permitting` relaxations) and the `unicode_data_version` the rules were computed
-against — **plus `limits`, §9.1's bounds on the same terms**, currently a `max_depth` and nothing else. It is
-inside `policy` rather than beside it because the envelope's one question is "what judged this run", and a
-limit refusal answers it as much as a name refusal does; it also inherits `CliPolicy.isDefault()`, so a run
-that raised the depth states it even when nothing was refused. The two surfaces keep `ProcessorConfig`'s own names
-all the way to the wire, so what a deployment set and what its reports say are one vocabulary. It is there rather than
-on each diagnostic because it is a fact about the *processor*: constant for the whole run, so a per-refusal copy is N
-copies of one string; and needed by a sender *before* it writes a document rather than after being refused,
-which a channel that only opens on failure cannot give it. The level is also the half that actually explains
-a disagreement — two deployments at one UCD version differ because one of them set `ASCII_ONLY`.
+`validation_run` and `validation_report`, carrying `identifier_policy` (a level, a `per_segment` unit, a
+`skeleton_distinctness` switch, and any `permitting` relaxations) and `token_policy` (a level and its `permitting`)
+and the `unicode_data_version` the rules were computed against — **plus `limits`, §9.1's bounds on the same terms**,
+currently a `max_depth` and nothing else. It is inside `policy` rather than beside it because the envelope's one
+question is "what judged this run", and a limit refusal answers it as much as a name refusal does; it also inherits
+`CliPolicy.isDefault()`, so a run that raised the depth states it even when nothing was refused. The two surfaces keep
+`ProcessorConfig`'s own names all the way to the wire, so what a deployment set and what its reports say are one
+vocabulary. It is there rather than on each diagnostic because it is a fact about the *processor*: constant for the
+whole run, so a per-refusal copy is N copies of one string; and needed by a sender *before* it writes a document
+rather than after being refused, which a channel that only opens on failure cannot give it. The level is also the half
+that actually explains a disagreement — two deployments at one UCD version differ because one of them set
+`ASCII_ONLY`.
 
 **Both machine formats spell one report one way** — `snake_case` keys, an absent field omitted rather than
 written `null`. `--output tson` is bound through `CliDiagnostic`'s `@Field` names to what `diagnostics.tn`
@@ -218,17 +219,18 @@ person running it which policy refused their document and leave them unable to c
 deployment the report describes.
 
 **The flags themselves:** `--max-depth` takes §9.1's nesting bound, `--identifier-policy`/`--token-policy` take a level
-in either spelling the CLI prints or a person types, `--identifier-per-segment` the unit, and
-`--identifier-scripts`/`--token-scripts` a `Latin+Cyrillic` combination, repeatable.
+in either spelling the CLI prints or a person types, `--identifier-per-segment` the unit,
+`--identifier-allow-look-alikes` drops skeleton distinctness, and `--identifier-scripts`/`--token-scripts` a
+`Latin+Cyrillic` combination, repeatable. `--identifier-allow-look-alikes` is no relaxation of the level, so it is
+valid under every level, including one that scans nothing.
 
 **Two rules keep a flag from meaning nothing.** `--token-scripts` alone raises the token level from its
 `UNRESTRICTED` default to `SINGLE_SCRIPT`, because `permitting(…)` is consulted only by a level that scans and
 the list would otherwise be inert — Single Script being the level at which a list of combinations *is* the
 whole configuration. And a relaxation named against a level the caller *stated* that scans nothing is a usage
 error, not a no-op: `--token-policy unrestricted --token-scripts Latin+Cyrillic` configures nothing whatever,
-and accepting it silently would leave the caller believing a restriction is in force. That is
-`withTokenPolicy`'s own habit — it refuses a per-segment token policy rather than ignoring it — which is also
-why there is no `--token-per-segment` flag: it could only ever be a usage error.
+and accepting it silently would leave the caller believing a restriction is in force. There is no
+`--token-per-segment` flag: a token policy is a `ScriptPolicy`, which has no unit to state.
 
 **`TEXT` prints the policy when it is load-bearing** — something was refused under it, or it was configured.
 A person does not want a configuration dump on every clean run; they do want, at the moment a name is refused,

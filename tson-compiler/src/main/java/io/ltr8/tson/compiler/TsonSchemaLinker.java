@@ -4,7 +4,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;
@@ -171,15 +171,15 @@ public final class TsonSchemaLinker {
         }
         // The bootstrap is this library's own artifact, not user input, so it is linked under the default
         // rather than under whatever a caller configured -- a policy should not be able to break meta-kernel.
-        return linkWith(bootstrap, null, null, UnicodePolicy.highlyRestrictive());
+        return linkWith(bootstrap, null, null, IdentifierPolicy.defaults());
     }
 
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
-        return linkWith(schema, loader, null, UnicodePolicy.highlyRestrictive());
+        return linkWith(schema, loader, null, IdentifierPolicy.defaults());
     }
 
     /** {@link #link(TsonSchema, TsonSchemaLoader)} with the §5.2 restriction level for declared names chosen. */
-    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, UnicodePolicy identifiers) {
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, IdentifierPolicy identifiers) {
         return linkWith(schema, loader, null, identifiers);
     }
 
@@ -203,12 +203,12 @@ public final class TsonSchemaLinker {
      */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
                                         DiagnosticsReceiver receiver) {
-        return link(schema, loader, receiver, UnicodePolicy.highlyRestrictive());
+        return link(schema, loader, receiver, IdentifierPolicy.defaults());
     }
 
     /** The reporting overload with the §5.2 restriction level for declared names chosen. */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
-                                        DiagnosticsReceiver receiver, UnicodePolicy identifiers) {
+                                        DiagnosticsReceiver receiver, IdentifierPolicy identifiers) {
         Objects.requireNonNull(receiver, "receiver");
         return linkWith(schema, loader, receiver, identifiers);
     }
@@ -232,10 +232,12 @@ public final class TsonSchemaLinker {
     private static void checkNames(DiagnosticsReceiver receiver, TsonSchema schema,
                                    Map<String, TypeDefinition> merged,
                                    Function<String, TypeDefinition> structure, Set<String> refusedEnums,
-                                   UnicodePolicy identifiers) {
-        ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> refuse(receiver, schema,
-                collision.second(), merged.get(collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
-                "in the namespace of '" + schema.id() + "': " + collision.describe()));
+                                   IdentifierPolicy identifiers) {
+        if (identifiers.appliesSkeletonDistinctness()) {
+            ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> refuse(receiver, schema,
+                    collision.second(), merged.get(collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
+                    "in the namespace of '" + schema.id() + "': " + collision.describe()));
+        }
 
         // The restricted-character and restricted-script rules over the same names, in the same pass. Where the
         // collision check above is a
@@ -281,22 +283,24 @@ public final class TsonSchemaLinker {
     /** One named scope ([TSON-DATA] §8.2): its own collision relation, then each name's own two rules. */
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
-                                   UnicodePolicy identifiers) {
+                                   IdentifierPolicy identifiers) {
         checkScope(receiver, schema, entry, definition, names, noun, identifiers, true);
     }
 
     /**
-     * {@code perNameRules} is false for the one scope whose members are not names -- an enum whose type is not
-     * an identifier family, such as a {@code text_enum} ({@link EnumLabels}). The collision relation runs either
-     * way; §8.2's restricted-character and restricted-script rules are per-<em>name</em> and lapse with the
-     * declaration.
+     * {@code perNameRules} is false for the one scope whose members are not names -- an enum whose type is not an
+     * identifier family, such as a {@code text_enum} ({@link EnumLabels}). The collision relation runs either way,
+     * where the policy applies it; §8.2's restricted-character and restricted-script rules are per-<em>name</em> and
+     * lapse with the declaration.
      */
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
-                                   UnicodePolicy identifiers, boolean perNameRules) {
-        ConfusableNames.firstCollision(names).ifPresent(collision -> refuse(receiver, schema, entry,
-                definition, Diagnostic.Code.CONFUSABLE_NAMES,
-                "'" + entry + "' has " + noun + " that read alike: " + collision.describe()));
+                                   IdentifierPolicy identifiers, boolean perNameRules) {
+        if (identifiers.appliesSkeletonDistinctness()) {
+            ConfusableNames.firstCollision(names).ifPresent(collision -> refuse(receiver, schema, entry,
+                    definition, Diagnostic.Code.CONFUSABLE_NAMES,
+                    "'" + entry + "' has " + noun + " that read alike: " + collision.describe()));
+        }
         if (!perNameRules) {
             return;
         }
@@ -314,7 +318,7 @@ public final class TsonSchemaLinker {
      */
     private static void checkFieldValues(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                          TypeDefinition definition, RecordBody record,
-                                         Map<String, TypeDefinition> merged, UnicodePolicy identifiers) {
+                                         Map<String, TypeDefinition> merged, IdentifierPolicy identifiers) {
         for (RecordField field : record.fields()) {
             if (field.value().isEmpty()) {
                 continue;
@@ -345,24 +349,21 @@ public final class TsonSchemaLinker {
      */
     private static void perName(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                 TypeDefinition definition, String name, String prefix,
-                                UnicodePolicy identifiers) {
+                                IdentifierPolicy identifiers) {
         perName(receiver, schema, entry, definition, name, prefix, identifiers, IdentifierProfile.NAME);
     }
 
     /** The same under {@code profile}, whose added characters are its own and meet no restricted-character rule. */
     private static void perName(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                 TypeDefinition definition, String name, String prefix,
-                                UnicodePolicy identifiers, IdentifierProfile profile) {
-        // The restricted-character rule is gated on the level: §8.2's Unrestricted "drops the profile too",
-        // taking that rule with it. Script mixing gates itself inside violation(). Each reports under its own
-        // code, since the
-        // two want different fixes -- change the character, against rename or relax the policy.
-        if (identifiers.appliesIdentifierProfile()) {
-            profile.restrictedCharacter(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
-                    Diagnostic.Code.RESTRICTED_CHARACTER, prefix + "'" + name + "': " + why));
+                                IdentifierPolicy identifiers, IdentifierProfile profile) {
+        // Each rule reports under its own code, since the two want different fixes -- change the character, against
+        // rename or relax the policy. The restricted-character message names the name; the script one opens with it.
+        for (IdentifierPolicy.Violation violation : identifiers.judge(name, profile)) {
+            refuse(receiver, schema, entry, definition, violation.code(),
+                    violation.code() == Diagnostic.Code.RESTRICTED_CHARACTER
+                            ? prefix + "'" + name + "': " + violation.reason() : prefix + violation.reason());
         }
-        identifiers.violation(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
-                Diagnostic.Code.RESTRICTED_SCRIPT, prefix + why));
     }
 
     /**
@@ -562,7 +563,7 @@ public final class TsonSchemaLinker {
 
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
-                                             DiagnosticsReceiver receiver, UnicodePolicy identifiers) {
+                                             DiagnosticsReceiver receiver, IdentifierPolicy identifiers) {
         Map<String, String> origins = new LinkedHashMap<>();
         Set<String> textEnums = new LinkedHashSet<>();
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins, textEnums);

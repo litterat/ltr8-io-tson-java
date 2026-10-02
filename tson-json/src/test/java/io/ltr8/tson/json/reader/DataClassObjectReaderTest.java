@@ -4,7 +4,7 @@ import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonStream;
@@ -33,7 +33,7 @@ class DataClassObjectReaderTest {
 
     private static final DataClassObjectReader ENGINE =
             new DataClassObjectReader(DataBindContext.builder().build(), false,
-                    UnicodePolicy.unrestricted());
+                    IdentifierPolicy.none());
 
     @Test
     void it_binds_one_value_and_leaves_the_source_where_that_value_ended() {

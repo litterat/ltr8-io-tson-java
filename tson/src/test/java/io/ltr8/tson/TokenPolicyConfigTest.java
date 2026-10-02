@@ -3,13 +3,12 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ProcessorConfig;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -41,7 +40,7 @@ class TokenPolicyConfigTest {
     /** Raised through the builder, the same document is refused -- so the config really reaches the read. */
     @Test
     void aRaisedPolicyReachesTheTreeReader() {
-        List<Diagnostic> found = Tson.of(ProcessorConfig.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()))
+        List<Diagnostic> found = Tson.of(ProcessorConfig.defaults().withTokenPolicy(ScriptPolicy.asciiOnly()))
                 .validate(DOCUMENT);
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -55,7 +54,7 @@ class TokenPolicyConfigTest {
     @Test
     void aRaisedPolicyReachesTheObjectReader() {
         DiagnosticsCollector collected = new DiagnosticsCollector();
-        Tson.of(ProcessorConfig.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()))
+        Tson.of(ProcessorConfig.defaults().withTokenPolicy(ScriptPolicy.asciiOnly()))
                 .objectReader().withDiagnostics(collected).read("\"" + CYR_A + "dmin\"", String.class);
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -73,7 +72,7 @@ class TokenPolicyConfigTest {
      */
     @Test
     void aDataFieldNameIsSubjectToTheTokenPolicy() {
-        List<Diagnostic> found = Tson.of(ProcessorConfig.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()))
+        List<Diagnostic> found = Tson.of(ProcessorConfig.defaults().withTokenPolicy(ScriptPolicy.asciiOnly()))
                 .validate("{ " + CYRILLIC_NAME + ": 1 }");
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -92,14 +91,6 @@ class TokenPolicyConfigTest {
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
                 found.stream().map(Diagnostic::code).toList(), found.toString());
-    }
-
-    /** Refused where it is configured, rather than silently ignored one layer down. */
-    @Test
-    void aPerSegmentTokenPolicyIsRefusedAtConfiguration() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> ProcessorConfig.defaults().withTokenPolicy(UnicodePolicy.highlyRestrictive().perSegment()));
-        assertTrue(e.getMessage().contains("per-segment"), e.getMessage());
     }
 
 }

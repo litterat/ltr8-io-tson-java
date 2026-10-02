@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.io.ByteSource;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ReadException;
@@ -69,7 +69,7 @@ class TsonObjectReaderStreamingTest {
         TsonDataStream realStream = new TsonDataStream(ByteSource.of(source));
         realStream.next(); // DocumentStart
         CountingEventSource counting = new CountingEventSource(realStream);
-        TsonReadContext ctx = TsonReadContext.throwing(counting, UnicodePolicy.unrestricted());
+        TsonReadContext ctx = TsonReadContext.throwing(counting, IdentifierPolicy.none());
 
         assertThrows(ReadException.class, () -> new TsonObjectReader().read(ctx, Holder.class));
 

@@ -298,6 +298,17 @@ public final class IdentifierProfile {
         return contains(startAdd, cp) || contains(continueAdd, cp) || contains(medial, cp);
     }
 
+    /**
+     * Whether {@code cp} divides a name under this profile into the segments a per-segment restriction level
+     * judges one at a time ([TSON-DATA] §8.2's unit): {@code _}, and every character this profile adds that is
+     * not {@code XID_Continue} -- {@link #NAME}'s {@code -}, which makes §8.2's {@code _}/{@code -} exactly this
+     * profile's answer, and another profile's {@code $} or medial {@code .}. Such a character is the profile's
+     * own punctuation, so a script change across it sits between words, where a homograph cannot.
+     */
+    public boolean separates(int cp) {
+        return cp == '_' || (added(cp) && !Xid.isContinue(cp));
+    }
+
     /** Names the offending code point rather than printing it -- much of what this rejects is invisible. */
     private static String at(String text, int cp, int index) {
         return "'%s': U+%04X at index %d".formatted(text, cp, index);

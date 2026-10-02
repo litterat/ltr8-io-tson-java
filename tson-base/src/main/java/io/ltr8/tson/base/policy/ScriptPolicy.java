@@ -1,7 +1,5 @@
 package io.ltr8.tson.base.policy;
 
-import io.ltr8.tson.base.unicode.Xid;
-
 import java.lang.Character.UnicodeScript;
 import java.util.EnumSet;
 import java.util.List;
@@ -9,14 +7,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * UTS #39 §5.2's restriction levels, as a policy a caller holds -- [TSON-DATA] §8.2's restricted-script rule.
- *
- * <p><b>Two axes, not one ladder.</b> A <em>level</em> says which script combinations a unit may contain; a
- * <em>unit</em> says whether that level applies to the whole text or to each {@code _}/{@code -} delimited
- * segment. They are genuinely independent, because per-segment {@link Level#HIGHLY_RESTRICTIVE} and
- * {@link Level#MODERATELY_RESTRICTIVE} are incomparable: the first admits {@code id_пользователя} (Latin and
- * Cyrillic, never inside one word) and refuses Latin+Devanagari; the second does the opposite. A single
- * ordered knob cannot express both.
+ * UTS #39 §5.2's restriction levels over whole text, as a policy a caller holds -- [TSON-DATA] §8.2's
+ * restricted-script rule. It is the <b>token policy</b> as it stands, and the script half of an {@link
+ * IdentifierPolicy}, which adds what only a name has: a unit that may be each segment, the restricted-character
+ * rule, and skeleton distinctness over a scope.
  *
  * <p><b>Why the level is the rule here at all</b>, having been the second choice for confusable
  * <em>names</em>: {@code ConfusableNames} is a relation and needs a set to hold over, and this is the rule
@@ -24,14 +18,14 @@ import java.util.Set;
  * same reasoning that makes restriction levels right for a browser judging a domain name, which likewise
  * cannot enumerate what it might be confused with.
  *
- * <p>Lives in the root package with the rest of the consumer-facing surface rather than beside {@code Xid}
- * and {@code Confusables}, which are internal machinery in the unexported {@code lexer} package. A caller
- * names this type at their own call site, which is the same thing that earns it the {@code Tson} prefix.
+ * <p><b>No unit, because a value has no segments.</b> {@code _} and {@code -} are word separators by
+ * convention in a name and ordinary characters in a value, so segmenting a value would admit UTS #39's own
+ * {@code Toys-Я-Us}, the spoof a strict token policy exists to refuse. The unit is {@link
+ * IdentifierPolicy#perSegment()}'s, and a token policy cannot state one.
  *
- * <p>Instances are immutable; {@link #perSegment()} and {@link #permitting} return modified copies, so a
- * call site reads as one position rather than three settings.
+ * <p>Instances are immutable; {@link #permitting} returns a modified copy.
  */
-public final class UnicodePolicy {
+public final class ScriptPolicy {
 
     /** UTS #39 §5.2's levels, loosest last. */
     public enum Level {
@@ -80,57 +74,41 @@ public final class UnicodePolicy {
             EnumSet.of(UnicodeScript.CYRILLIC, UnicodeScript.GREEK);
 
     private final Level level;
-    private final boolean perSegment;
     private final List<Set<UnicodeScript>> permitted;
 
-    private UnicodePolicy(Level level, boolean perSegment, List<Set<UnicodeScript>> permitted) {
+    private ScriptPolicy(Level level, List<Set<UnicodeScript>> permitted) {
         this.level = level;
-        this.perSegment = perSegment;
         this.permitted = List.copyOf(permitted);
     }
 
-    public static UnicodePolicy of(Level level) {
-        return new UnicodePolicy(level, false, List.of());
+    public static ScriptPolicy of(Level level) {
+        return new ScriptPolicy(level, List.of());
     }
 
-    public static UnicodePolicy asciiOnly() {
+    public static ScriptPolicy asciiOnly() {
         return of(Level.ASCII_ONLY);
     }
 
-    public static UnicodePolicy singleScript() {
+    public static ScriptPolicy singleScript() {
         return of(Level.SINGLE_SCRIPT);
     }
 
-    public static UnicodePolicy highlyRestrictive() {
+    public static ScriptPolicy highlyRestrictive() {
         return of(Level.HIGHLY_RESTRICTIVE);
     }
 
-    public static UnicodePolicy moderatelyRestrictive() {
+    public static ScriptPolicy moderatelyRestrictive() {
         return of(Level.MODERATELY_RESTRICTIVE);
     }
 
     /** §5.2 level 5: no script restriction, the identifier profile kept. */
-    public static UnicodePolicy scriptsUnchecked() {
+    public static ScriptPolicy scriptsUnchecked() {
         return of(Level.MINIMALLY_RESTRICTIVE);
     }
 
     /** §5.2 level 6: no script restriction and no identifier profile. See {@link Level#UNRESTRICTED}. */
-    public static UnicodePolicy unrestricted() {
+    public static ScriptPolicy unrestricted() {
         return of(Level.UNRESTRICTED);
-    }
-
-    /**
-     * This policy applied to each {@code _}/{@code -} delimited segment rather than to the whole text.
-     *
-     * <p>Programming identifiers are compounds, and their separators are exactly the boundaries at which a
-     * script change is ordinary rather than suspicious: it admits {@code id_пользователя} and {@code alpha_α}
-     * while still refusing {@code аdmin}, {@code pаssword} and {@code id_аdmin}, because a homograph has to
-     * sit <em>inside</em> a word to read as that word. It belongs on identifiers only -- in a value
-     * {@code _} and {@code -} are ordinary characters, and UTS #39's own {@code Toys-Я-Us} is what
-     * segmenting a value would wrongly admit.
-     */
-    public UnicodePolicy perSegment() {
-        return new UnicodePolicy(level, true, permitted);
     }
 
     /**
@@ -138,50 +116,21 @@ public final class UnicodePolicy {
      * and its siblings. The narrowest relaxation available: a deployment that knows it is Russian says
      * {@code permitting(LATIN, CYRILLIC)} rather than dropping a level and losing the rule everywhere else.
      */
-    public UnicodePolicy permitting(UnicodeScript... scripts) {
+    public ScriptPolicy permitting(UnicodeScript... scripts) {
         List<Set<UnicodeScript>> extended = new java.util.ArrayList<>(permitted);
         extended.add(Set.of(scripts));
-        return new UnicodePolicy(level, perSegment, extended);
-    }
-
-    /**
-     * The UTS #39 data version every [TSON-DATA] §8.2 name-hygiene rule is computed against, as this build
-     * carries it.
-     *
-     * <p><b>§8.2 requires a refusal to name it</b>, and the reason is that the three rules read {@code
-     * confusables.txt}, {@code IdentifierStatus.txt} and the script data, none of which the Unicode
-     * Consortium freezes: two conforming processors may legitimately disagree about one name, and the
-     * version is the only thing that explains the disagreement.
-     *
-     * <p><b>It is stated once, not once per refusal</b> ({@code ProcessorPolicy}, which a run or a
-     * response carries beside its diagnostics). It is constant for the life of a process, so a copy on each
-     * problem is N copies of a string that cannot differ; and what a sender needs in order not to be refused
-     * is this fact <em>before</em> it writes a document, which a channel that only opens on failure cannot
-     * give it. What the refusal itself carries is the remedy -- which name, which rule, and what the policy
-     * would admit.
-     *
-     * <p>Lives here rather than beside the tables it describes because {@code io.ltr8.tson.compiler.lexer}
-     * is implementation and is not exported, so the constant is unreachable to a consumer by hand. This is
-     * the exported surface that already owns §8.2's restricted-script rule.
-     *
-     * <p><b>It is the UCD version.</b> §8.2 asks for "the UTS #39 data version" and its detection note for
-     * "the UTS #39 version they were computed against"; UTS #39's data files are versioned with the UCD
-     * release that publishes them, so the two track and this states the one that exists --
-     * [TSON-DATA] §8.2.
-     */
-    public static String dataVersion() {
-        return Xid.UNICODE_VERSION;
+        return new ScriptPolicy(level, extended);
     }
 
     /**
      * The UTS #39 §5.2 restriction level this policy applies.
      *
-     * <p>With {@link #isPerSegment()} and {@link #permittedScripts()}, the whole of what this policy is --
-     * which is what lets a deployment <em>state</em> its configuration rather than only apply it. A document
-     * one processor accepts and another refuses differs by exactly these three, and a reader of the refusal
+     * <p>With {@link #permittedScripts()}, the whole of what this policy is -- which is what lets a deployment
+     * <em>state</em> its configuration rather than only apply it. A document one processor accepts and another
+     * refuses differs by exactly these and an {@link IdentifierPolicy}'s own components, and a reader of the refusal
      * has no other way to learn which one moved: the policy that judged is not in the document, not in the
-     * schema, and not in the diagnostic. See {@code ProcessorPolicy}, which is the three of them plus
-     * {@link #dataVersion()} as one value a run or a response states once.
+     * schema, and not in the diagnostic. See {@link ProcessorPolicy}, which is the policies plus
+     * {@link ProcessorPolicy#dataVersion()} as one value a run or a response states once.
      */
     public Level level() {
         return level;
@@ -209,60 +158,37 @@ public final class UnicodePolicy {
         return level != Level.UNRESTRICTED;
     }
 
-    /**
-     * Whether the level applies to each {@code _}/{@code -} delimited segment rather than to the whole text.
-     * A surface where segmenting has no meaning -- a value, where those are ordinary characters rather than
-     * word separators -- asks this in order to refuse such a policy rather than to quietly ignore it.
-     */
-    public boolean isPerSegment() {
-        return perSegment;
-    }
-
     /** The reason {@code text} fails this policy, or empty when it satisfies it. */
     public Optional<String> violation(String text) {
-        if (!checksScripts()) {
+        if (!checksScripts() || text.isEmpty()) {
             return Optional.empty();
         }
-        if (!perSegment) {
-            return text.isEmpty() ? Optional.empty() : checkUnit(text);
-        }
-        // Segmented by hand rather than by String.split: "[_-]" is not split's single-character fast path, so
-        // it compiles a Pattern per call. This runs per token on the read path, where that is the whole cost.
-        int start = 0;
-        for (int i = 0; i <= text.length(); i++) {
-            if (i < text.length() && text.charAt(i) != '_' && text.charAt(i) != '-') {
-                continue;
-            }
-            if (i > start) {
-                Optional<String> failure = checkUnit(text.substring(start, i));
-                if (failure.isPresent()) {
-                    return failure;
-                }
-            }
-            start = i + 1;
-        }
-        return Optional.empty();
+        return checkUnit(text, 0, text.length(), false);
     }
 
     /**
-     * <b>Allocation-free when the unit passes</b>, which on the token surface is every token of an ordinary
-     * document. A conforming unit is answered by a scan that materialises nothing; only a genuinely
-     * mixed-script one reaches {@link #mixed}, and that one is either an error or a deliberate combination,
-     * so a set and a message there cost nothing that matters.
+     * This level over {@code text[from, to)} -- the unit an {@link IdentifierPolicy} chose, which is the whole
+     * name or one segment of it. {@code segment} says which, for the message.
+     *
+     * <p><b>Allocation-free when the unit passes</b>, which on the token surface is every token of an ordinary
+     * document and on the name surface every name. A conforming unit is answered by a scan over the range that
+     * materialises nothing -- not even the substring; only a genuinely mixed-script one reaches {@link #mixed},
+     * and that one is either an error or a deliberate combination, so a set and a message there cost nothing
+     * that matters.
      */
-    private Optional<String> checkUnit(String unit) {
+    Optional<String> checkUnit(String text, int from, int to, boolean segment) {
         if (level == Level.ASCII_ONLY) {
-            for (int i = 0; i < unit.length(); i++) {
-                if (unit.charAt(i) >= 0x80) {
-                    return Optional.of("'" + unit + "' is not ASCII, and this processor requires ASCII-only "
-                            + (perSegment ? "segments" : "names") + " (UTS #39 §5.2)");
+            for (int i = from; i < to; i++) {
+                if (text.charAt(i) >= 0x80) {
+                    return Optional.of("'" + text.substring(from, to) + "' is not ASCII, and this processor "
+                            + "requires ASCII-only " + (segment ? "segments" : "names") + " (UTS #39 §5.2)");
                 }
             }
             return Optional.empty();
         }
         UnicodeScript only = null;
-        for (int i = 0; i < unit.length(); ) {
-            int codePoint = unit.codePointAt(i);
+        for (int i = from; i < to; ) {
+            int codePoint = text.codePointAt(i);
             i += Character.charCount(codePoint);
             UnicodeScript script = UnicodeScript.of(codePoint);
             if (script == UnicodeScript.COMMON || script == UnicodeScript.INHERITED
@@ -272,7 +198,7 @@ public final class UnicodePolicy {
             if (only == null) {
                 only = script;
             } else if (only != script) {
-                return mixed(unit);
+                return mixed(text.substring(from, to));
             }
         }
         return Optional.empty();
@@ -337,7 +263,7 @@ public final class UnicodePolicy {
     }
 
     /**
-     * Two policies are equal when they would judge every text alike -- the level, the unit, and the admitted
+     * Two policies are equal when they would judge every text alike -- the level and the admitted
      * combinations in the order {@link #permitting} added them.
      *
      * <p>A policy is a value, and the types that report one are records ({@code ProcessorPolicy})
@@ -346,17 +272,16 @@ public final class UnicodePolicy {
      */
     @Override
     public boolean equals(Object o) {
-        return o instanceof UnicodePolicy other && level == other.level && perSegment == other.perSegment
-                && permitted.equals(other.permitted);
+        return o instanceof ScriptPolicy other && level == other.level && permitted.equals(other.permitted);
     }
 
     @Override
     public int hashCode() {
-        return java.util.Objects.hash(level, perSegment, permitted);
+        return java.util.Objects.hash(level, permitted);
     }
 
     @Override
     public String toString() {
-        return level + (perSegment ? " per segment" : "") + (permitted.isEmpty() ? "" : " permitting " + permitted);
+        return level + (permitted.isEmpty() ? "" : " permitting " + permitted);
     }
 }

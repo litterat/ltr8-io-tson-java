@@ -56,8 +56,9 @@ applies with the same defaults", so one record and one refusal serve both encodi
 raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and is the one factory on the
 record — its classifying siblings switch on an encoding's own exception type where it classifies
 nothing at all.
-**`io.ltr8.tson.base.policy`** is what this processor will admit and spend — `ProcessorPolicy` and the two
-it composes, `UnicodePolicy` (§8.2's levels) and `LimitsPolicy` (§9.1's bounds), plus `FetchPolicy`, the
+**`io.ltr8.tson.base.policy`** is what this processor will admit and spend — `ProcessorPolicy` and what it
+composes, `IdentifierPolicy` and `ScriptPolicy` (§8.2's identifier and token policies) and `LimitsPolicy` (§9.1's
+bounds), plus `FetchPolicy`, the
 same statement about *obtaining a schema* (document cap, cache cap, whether a `?sha256=` pin is required)
 — one package because a deployment states one set of constraints, and §8.2 requires a relaxation be code
 rather than ambient: this is where that code points. **`FetchPolicy` is `ProcessorPolicy`'s sibling, not
@@ -120,8 +121,8 @@ flushes explicitly. What stays smaller is the *target* set, not the contract: `A
 different target rather than one spelled twice, so `toTson`'s char path is untouched.
 **`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
 `IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — and the
-UTS #39 rules over them, read by two engines and knowing nothing about either format. `UnicodePolicy` is
-in `policy` rather than beside the tables it reads, because the line between the two Unicode packages is
+UTS #39 rules over them, read by two engines and knowing nothing about either format. The two policies are
+in `policy` rather than beside the tables they read, because the line between the two Unicode packages is
 **who touches them**: a consumer names `policy` to configure a processor and never names `unicode`; the
 engines read `unicode` and never name `policy`.
 **`IdentifierProfile` is here too**, beside the tables it reads: a UAX #31 R1 profile (`of`, `check`), with

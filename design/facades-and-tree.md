@@ -74,8 +74,8 @@ had applied, which is worse than reporting none. `SchemaPolicyRefusalTest` pins 
 **`TsonReadContext` always carries an identifier policy and installs the check itself**, so no context can
 exist whose names went unchecked: the two-argument `of` defaults to Highly Restrictive (§8.2's SHOULD for the
 name surface), and the explicit form refuses `null`. The low-level API cannot skip the policy by saying
-nothing, which is the property that makes it a policy rather than a facade convenience. Naming `unrestricted()` is a fine
-answer and the right one for a synthetic source; it is just not one a caller gives by accident. The three
+nothing, which is the property that makes it a policy rather than a facade convenience. Naming `IdentifierPolicy.none()`
+is a fine answer and the right one for a synthetic source; it is just not one a caller gives by accident. The three
 internal synthetic sites (`AnnotationCapture`, `RecordAbstractReader`, `SchemaResolver`) each pass it with the
 reason written beside them: the first two replay events the real stream already delivered, so checking again
 would report one author token twice, and the third reads a resolved schema value rather than document text.
@@ -87,13 +87,12 @@ needs no set of already-reported positions. `wrap` returns the source unchanged 
 nothing, which is the default — an ordinary read pays not even a predicate.
 
 **A raised policy is not a per-token allocation either**, which is what makes it advisable to turn on. The
-conforming path through `UnicodePolicy.violation` scans and returns `Optional.empty()`: no split array
-(hand-segmented, since `"[_-]"` misses `String.split`'s single-character fast path and compiles a `Pattern`
-per call), no script set (a single-script unit is decided without materialising one — only a genuinely mixed
-token builds the set `covered` and the message need), no stream, and `isPresent`/`get` at the call rather than
-a lambda that would capture three fields per token. What is left is the decorator, once per read:
-`AllocationHarnessTest.aRaisedTokenPolicyCostsAlmostNothingPerRead` pins it at ~100 bytes per read, where
-a scan that splits, builds a script set and captures costs ~2.3 KB.
+conforming path through `ScriptPolicy.violation` scans and returns `Optional.empty()`: no substring (the scan runs
+over a range, which is also how `IdentifierPolicy` judges each segment of a name), no script set (a single-script unit
+is decided without materialising one — only a genuinely mixed token builds the set `covered` and the message need), no
+stream, and `isPresent`/`get` at the call rather than a lambda that would capture three fields per token. What is left
+is the decorator, once per read: `AllocationHarnessTest.aRaisedTokenPolicyCostsAlmostNothingPerRead` pins it at ~100
+bytes per read, where a scan that splits, builds a script set and captures costs ~2.3 KB.
 
 The check sees the four events carrying text — a value, a field name, a type-ref, an annotation name — because
 at that layer nothing yet knows which is which. **So a name is a token**, and a token policy stricter than the
@@ -102,8 +101,8 @@ at it. The setter is named for the surface rather than for the values it mostly 
 visible where it is configured. Document directives are not checked: a `!!schema`/`!!id` token is a URI naming
 an external resource, §2.2.1 governs what an identity may be, and an IRI's scripts are the resource owner's
 business. The diagnostic (`RESTRICTED_SCRIPT`) carries a position and no `path`, which is not an omission —
-there is no path yet at the point the check runs. `perSegment()` is refused rather than ignored here: `_` and
-`-` are word separators by convention in a name and ordinary characters in a value, so segmenting one would
+there is no path yet at the point the check runs. The token policy is a `ScriptPolicy`, which has no unit: `_`
+and `-` are word separators by convention in a name and ordinary characters in a value, so segmenting one would
 admit UTS #39's own `Toys-Я-Us`.
 
 ### What a read does around the value
