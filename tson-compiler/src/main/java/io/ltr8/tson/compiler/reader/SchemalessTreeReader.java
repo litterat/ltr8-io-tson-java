@@ -266,10 +266,14 @@ public final class SchemalessTreeReader {
         if (!ctx.identifierPolicy().appliesSkeletonDistinctness()) {
             return;
         }
-        ConfusableNames.firstCollision(fieldNames).ifPresent(collision ->
-                ctx.field(collision.second()).report(Diagnostic.Code.CONFUSABLE_NAMES,
-                        "this record " + collision.describe(),
-                        "field names a reader can tell apart", "'" + collision.second() + "'"));
+        // Tested rather than `ifPresent`-ed: a lambda capturing `ctx` allocates once per record, refused or not.
+        Optional<ConfusableNames.Collision> found = ConfusableNames.firstCollision(fieldNames);
+        if (found.isPresent()) {
+            ConfusableNames.Collision collision = found.get();
+            ctx.field(collision.second()).report(Diagnostic.Code.CONFUSABLE_NAMES,
+                    "this record " + collision.describe(),
+                    "field names a reader can tell apart", "'" + collision.second() + "'");
+        }
     }
 
     /**

@@ -1,7 +1,7 @@
 package io.ltr8.tson.base.unicode;
 
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -25,14 +25,50 @@ public final class ConfusableNames {
     private ConfusableNames() {
     }
 
-    /** A pair of names in {@code names} that share a skeleton, or empty when every name is distinguishable. */
-    public static Optional<Collision> firstCollision(Iterable<String> names) {
-        Scope scope = new Scope();
-        for (String name : names) {
-            Optional<Collision> collision = scope.add(name);
-            if (collision.isPresent()) {
-                return collision;
+    /**
+     * Up to this many names are compared pairwise rather than through a {@link Scope}: at most 120 string
+     * comparisons, against a map, its table and an entry per name.
+     */
+    private static final int PAIRWISE = 16;
+
+    /**
+     * A pair of names in {@code names} that share a skeleton, or empty when every name is distinguishable --
+     * the earlier name first, and a name equal to an earlier one colliding with nothing, as {@link Scope#add}.
+     *
+     * <p><b>A small scope is compared pairwise.</b> The common scope is one record's field names, a handful,
+     * checked once per record of every schemaless read -- and a skeleton is free for a name that maps nothing,
+     * which is most of them, so a map built per record was nearly the whole cost of the rule. Pairwise, a
+     * record costs one array of its names and their skeletons; past {@link #PAIRWISE} names the map's linear
+     * time wins and a {@link Scope} is used.
+     */
+    public static Optional<Collision> firstCollision(Collection<String> names) {
+        int size = names.size();
+        if (size < 2) {
+            return Optional.empty();
+        }
+        if (size > PAIRWISE) {
+            Scope scope = new Scope();
+            for (String name : names) {
+                Optional<Collision> collision = scope.add(name);
+                if (collision.isPresent()) {
+                    return collision;
+                }
             }
+            return Optional.empty();
+        }
+        // Each name at an even index and its skeleton at the odd one after it: one array per scope.
+        String[] seen = new String[2 * size];
+        int count = 0;
+        for (String name : names) {
+            String skeleton = Confusables.skeleton(name);
+            for (int i = 0; i < count; i += 2) {
+                if (seen[i + 1].equals(skeleton) && !seen[i].equals(name)) {
+                    return Optional.of(new Collision(seen[i], name));
+                }
+            }
+            seen[count] = name;
+            seen[count + 1] = skeleton;
+            count += 2;
         }
         return Optional.empty();
     }
@@ -59,11 +95,6 @@ public final class ConfusableNames {
             return previous == null || previous.equals(name) ? Optional.empty()
                     : Optional.of(new Collision(previous, name));
         }
-    }
-
-    /** The same over a plain list, for call sites that already have one. */
-    public static Optional<Collision> firstCollision(List<String> names) {
-        return firstCollision((Iterable<String>) names);
     }
 
     /**
