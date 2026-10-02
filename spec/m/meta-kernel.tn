@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=2b022c7e6edcd76db9b9fcb15f224cc1fc51655903384bbe5c1a7b2d3a09d420"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=c5e78ffb6754a22e4e4b40ff865484ba3c0ae57de4b88c2f8250b4b44aff1b52"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -624,7 +624,7 @@
   }
 
   @doc:"""
-    Constructors — ~ marks type factories. The container
+    Constructors. The container
     constructors carry no parameters: a type slot (array's
     element_type, map's key_type and value_type) is an ordinary
     REQUIRED field typed type_ref, filled by the construction or by
@@ -637,6 +637,12 @@
     before the body is read against this vocabulary. `map.state`
     governs the entry value, as `array.state` governs the element;
     a map key can never be absent.
+
+    `ordered` says whether order is part of a container's value:
+    true for an array, false for a set and a map. It never changes
+    what a document may write, and output keeps the order written
+    either way ([TSON-SCHEMA] §7.5) — the facet says whether two
+    values differing only in order are one value.
 
     `record.extension` states how the record may be realised, and
     is OPEN unless the record says otherwise. Only `record` carries
@@ -686,7 +692,7 @@
     size_type?:      product_size_type = VARIABLE
     element_type:    type_ref
     state?:          element_state ~ REQUIRED
-    unordered?:      boolean ~ false
+    ordered?:        boolean ~ true
     unique_items?:   boolean ~ false
     min_items?:      non_negative_integer
     max_items?:      non_negative_integer
@@ -713,7 +719,7 @@
     """
   set_type => array ^ {
     state?:       = REQUIRED
-    unordered?:   = true
+    ordered?:      = false
     unique_items?: = true
     min_items?:    non_negative_integer ~ 1
   }
@@ -724,6 +730,7 @@
     key_type:        type_ref
     value_type:      type_ref
     state?:          element_state ~ REQUIRED
+    ordered?:        boolean ~ false
     min_items?:      non_negative_integer
     max_items?:      non_negative_integer
   }

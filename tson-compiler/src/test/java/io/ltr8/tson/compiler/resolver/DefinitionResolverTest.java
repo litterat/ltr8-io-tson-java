@@ -281,7 +281,7 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !array { element_type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" "
-                        + "unordered: false unique_items: false } }",
+                        + "ordered: true unique_items: false } }",
                 write(intList));
     }
 
@@ -291,7 +291,7 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !map { key_type: { name: \"text\" arguments: [] } value_type: { name: \"text\" arguments: [] } "
-                        + "state: \"REQUIRED\" } }",
+                        + "state: \"REQUIRED\" ordered: false } }",
                 write(translations));
     }
 
@@ -785,8 +785,8 @@ class DefinitionResolverTest {
                         + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" value: REQUIRED } "
-                        + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"DEFAULT\" value: false } "
+                        + "{ name: \"ordered\" type: { name: \"boolean\" arguments: [] } "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: true } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } "
                         + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
@@ -825,6 +825,8 @@ class DefinitionResolverTest {
                         + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" value: REQUIRED } "
+                        + "{ name: \"ordered\" type: { name: \"boolean\" arguments: [] } "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: false } "
                         + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
@@ -912,8 +914,8 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesSetFromTheRealMetaKernelFixtureRefiningArray() throws IOException, DataBindException {
-        // set => array ^ { state: = REQUIRED  unordered: = true  unique_items: = true } --
-        // array's own state/unordered/unique_items were REQUIRED_DEFAULT; set's body fixes them,
+        // set => array ^ { state: = REQUIRED  ordered: = false  unique_items: = true } --
+        // array's own state/ordered/unique_items were REQUIRED_DEFAULT; set's body fixes them,
         // an allowed REQUIRED_DEFAULT -> REQUIRED_FIXED transition (§5.7's table).
         resolveUpToArray();
 
@@ -935,8 +937,8 @@ class DefinitionResolverTest {
                         + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: REQUIRED } "
-                        + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: true } "
+                        + "{ name: \"ordered\" type: { name: \"boolean\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FIXED\" value: false } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: true } "
                         + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "

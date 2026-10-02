@@ -88,7 +88,7 @@ class ChoiceDisjointnessTest {
     void aBraceAndABracketVariantAreDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
         TypeRef record = product("point", RecordBody.of(List.of()));
-        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), ElementState.REQUIRED, false, false,
+        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), ElementState.REQUIRED, true, false,
                 Optional.empty(), Optional.empty()));
         assertTrue(disjoint(record, array));
     }
@@ -190,14 +190,15 @@ class ChoiceDisjointnessTest {
     void aRecordAndAMapAreNotDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
         TypeRef record = product("point", RecordBody.of(List.of()));
-        TypeRef map = product("lookup", new MapBody(TypeRef.of("text"), TypeRef.of("text"), ElementState.REQUIRED, Optional.empty(), Optional.empty()));
+        TypeRef map = product("lookup", new MapBody(TypeRef.of("text"), TypeRef.of("text"), ElementState.REQUIRED, false,
+                Optional.empty(), Optional.empty()));
         assertFalse(disjoint(record, map));
     }
 
     @Test
     void anArrayAndATupleAreNotDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
-        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), ElementState.REQUIRED, false, false,
+        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), ElementState.REQUIRED, true, false,
                 Optional.empty(), Optional.empty()));
         TypeRef tuple = product("pair", new TupleBody(List.of()));
         assertFalse(disjoint(array, tuple));

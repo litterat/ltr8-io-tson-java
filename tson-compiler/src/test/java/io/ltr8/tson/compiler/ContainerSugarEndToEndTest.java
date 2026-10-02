@@ -216,12 +216,12 @@ class ContainerSugarEndToEndTest {
     void aSetCarriesItsOwnTightenedDefaultsNotArrays() {
         ArrayBody asSet = assertInstanceOf(ArrayBody.class,
                 compile("  xs => !set_type { element_type: text }").schema().entries().get("xs").body());
-        assertTrue(asSet.unordered());
+        assertFalse(asSet.ordered());
         assertTrue(asSet.uniqueItems());
 
         ArrayBody asArray = assertInstanceOf(ArrayBody.class,
                 compile("  xs => [text]").schema().entries().get("xs").body());
-        assertFalse(asArray.unordered());
+        assertTrue(asArray.ordered());
         assertFalse(asArray.uniqueItems());
     }
 
@@ -245,7 +245,7 @@ class ContainerSugarEndToEndTest {
         assertEquals(TypeRef.of("array"), entry.source().orElseThrow(), "the constructor the sugar names");
 
         // !array { element_type: text  min_items: 1  max_items: 2 } -- only the fields the form binds; the
-        // vocabulary's own defaults (state/unordered/unique_items) stay out of the binding record (§5.6).
+        // vocabulary's own defaults (state/ordered/unique_items) stay out of the binding record (§5.6).
         ArrayBody body = assertInstanceOf(ArrayBody.class, entry.body());
         assertEquals(TypeRef.of("text"), body.elementType());
         assertEquals(Optional.of(BigInteger.ONE), body.minItems());

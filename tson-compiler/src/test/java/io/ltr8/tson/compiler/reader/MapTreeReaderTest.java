@@ -77,7 +77,8 @@ class MapTreeReaderTest {
      */
     @Test
     void emptyBraceIsAZeroEntryMapForMinItemsToo() {
-        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, Optional.of(BigInteger.ONE),
+        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, false,
+                Optional.of(BigInteger.ONE),
                 Optional.empty());
         TsonCompiledSchema compiled = compile(body);
         DiagnosticsCollector problems = new DiagnosticsCollector();
@@ -93,7 +94,8 @@ class MapTreeReaderTest {
     /** The same count against an upper bound: zero entries satisfy any {@code max_items}, and still do. */
     @Test
     void emptyBraceSatisfiesMaxItems() {
-        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, Optional.empty(),
+        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, false,
+                Optional.empty(),
                 Optional.of(BigInteger.ONE));
 
         assertEquals(Map.of(), readMap(compile(body), "{}"));
@@ -110,7 +112,7 @@ class MapTreeReaderTest {
 
     /** A map whose values may be absent -- {@code {K => V?}}, the sugar for {@code state: OPTIONAL}. */
     private static MapBody optionalValues() {
-        return new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.OPTIONAL, Optional.empty(),
+        return new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.OPTIONAL, false, Optional.empty(),
                 Optional.empty());
     }
 
@@ -160,12 +162,12 @@ class MapTreeReaderTest {
      */
     @Test
     void anAbsentEntryValueCountsTowardTheSizeBounds() {
-        MapBody atLeastTwo = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.OPTIONAL,
+        MapBody atLeastTwo = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.OPTIONAL, false,
                 Optional.of(BigInteger.TWO), Optional.empty());
         assertEquals(2, ((TsonMap) compile(atLeastTwo).get("scores")
                 .read(TestDocuments.document("{ 1 => _  2 => _ }"))).entries().size());
 
-        MapBody atMostOne = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.OPTIONAL,
+        MapBody atMostOne = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.OPTIONAL, false,
                 Optional.empty(), Optional.of(BigInteger.ONE));
         ReadException thrown = assertThrows(ReadException.class,
                 () -> compile(atMostOne).get("scores").read(TestDocuments.document("{ 1 => _  2 => _ }")));
@@ -231,7 +233,8 @@ class MapTreeReaderTest {
 
     @Test
     void minItemsRejectsTooFewEntries() {
-        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, Optional.of(BigInteger.TWO), Optional.empty());
+        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, false,
+                Optional.of(BigInteger.TWO), Optional.empty());
         TsonCompiledSchema compiled = compile(body);
 
         assertEquals(2, readMap(compiled, "{ 1 => 1 2 => 2 }").size());
@@ -240,7 +243,8 @@ class MapTreeReaderTest {
 
     @Test
     void maxItemsRejectsTooManyEntries() {
-        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, Optional.empty(), Optional.of(BigInteger.ONE));
+        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, false,
+                Optional.empty(), Optional.of(BigInteger.ONE));
         TsonCompiledSchema compiled = compile(body);
 
         assertEquals(1, readMap(compiled, "{ 1 => 1 }").size());
