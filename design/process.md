@@ -81,8 +81,10 @@ the schemas ship in the library and are read as the normative vocabulary, so an 
   `multiple_of` and `members` rules) is stated once there and an entry refers to it. The exception is the kernel's
   `integer_type`, which keeps its own statement: a schema chained to the kernel alone never reads meta's header.
 - **Form:** open with what the entry is, then fields or facets, then rules. Present tense, plain declarative
-  sentences. A one-sentence doc is `@doc:"…"` on one line; a longer one is a `"""` block indented as the file does,
-  wrapped near 72 columns. A member-set entry says whose members it holds ("The members of an integer_type.").
+  sentences. A one-sentence doc is `@doc:"…"` on one line; a longer one, or one that does not fit in 80 columns, is a
+  `"""` block indented as the file does. Doc text is filled to **80 columns, indentation included**; a backtick code
+  span is never split across lines, and preformatted text (a grammar, the References table, indented examples)
+  keeps its own layout. A member-set entry says whose members it holds ("The members of an integer_type.").
 - **File headers** keep what the file is, how it is reached through `!!meta` and `!!import`, what it contains, rules
   shared by several entries, and the hash-pin note.
 - **Shortening a rule never changes it.** Where tighter wording could strengthen or weaken it, the sentence stays
