@@ -1,19 +1,22 @@
 # The JSON encoding: the two Unicode policies
 
 Design notes for how [TSON-DATA] §8.2's identifier and token policies reach `tson-json` — which positions each judges,
-which reader can apply which, and why the look-alike rule reaches no JSON position. Current form only; history lives in
-git.
+which reader can apply which, and why the look-alike rule reaches one JSON position and no other. Current form only;
+history lives in git.
 
 **Invariants**
 
-- The identifier policy reaches member names read as field names and every `$type`; the token policy reaches map keys and
+- The identifier policy reaches member names read as field names, every `$type`, and every value whose type is an
+  identifier family -- a member name keying a map whose key type is one included; the token policy reaches map keys and
   string values.
 - Under a schema only an **unmatched** name is judged, and it is judged before it is reported as `UNRECOGNIZED_FIELD`:
   declared fields, then hygiene. Nothing collects between them -- a record absorbs no member it does not declare.
-- A map key is not a name, so open-ended data in a declared map-typed field meets no identifier rule.
+- A map key is a name only where its type is an identifier family, so open-ended data in a map keyed by anything else
+  meets no identifier rule.
 - `JsonObjectReader` holds a position and `JsonTreeReader`'s schemaless read does not: that read applies no identifier
   policy (a schema-directed tree read does, through `JsonReadContext`), and `bindMap` applies nothing to keys.
-- The look-alike rule reaches no JSON position; a deployment that will not accept look-alike keys raises the token policy.
+- The look-alike rule reaches one JSON position, the keys of an identifier-keyed map under a schema; elsewhere a
+  deployment that will not accept look-alike keys raises the token policy.
 - A refusal is kept apart by its code — `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT` — and never reported in §8.1's four
   categories.
 - The token policy is built into `JsonStream`, where each token is produced exactly once; a number is checked rather than
@@ -36,12 +39,15 @@ what §9.4's parenthetical means. The one name that reaches the policy fresh is 
 declared field, and it must be tested before it is reported: a homoglyph
 (`pаssword`, Cyrillic а) would otherwise get `UNRECOGNIZED_FIELD` — a *verdict* — where §8.2 requires a
 refusal reported in none of the four categories. That case — and its twin at a tag, a `$type` naming no
-declared type — is the whole of the identifier policy's job
-in a schema-directed JSON read, and it is why the check cannot simply be dropped as redundant.
+declared type — is the identifier policy's job at a name the schema did not declare, and it is why the check
+cannot simply be dropped as redundant. Its other job is a value the schema *types* as a name: a string at a member
+whose type is an identifier family, and a member name keying a map whose key type is one, are judged under that
+family's own profile (`AtomReader`, `MapObjectReader`, through `NameHygiene.refusesValue`).
 
-**A map key is not a name, and that is where foreign material goes.** §9.4 puts map keys under the *token*
-policy, which defaults to `unrestricted()`, so a schema carrying open-ended data in a declared map-typed field
-(§6.1.1) meets no identifier rule at all — the keys were never declared, so nothing about them is a name.
+**A map key is not a name unless its type says so, and that is where foreign material goes.** §9.4 puts map keys
+under the *token* policy, which defaults to `unrestricted()`, so a schema carrying open-ended data in a declared
+map-typed field (§6.1.1) keyed by `text` meets no identifier rule at all. A map keyed by an identifier family is the
+one exception, and the schema states it: the key type is what makes a key a name, never the member name's spelling.
 Nothing flattens into a record, so the record loops go from declared fields straight to hygiene
 (`RecordPlan.unmatched`) with no collection step between.
 
@@ -69,6 +75,7 @@ position:
 |---|---|---|
 | Data (JSON), schemaless | `reader.DataClassObjectReader.checkNameHygiene` | one record's member names — the two per-name rules only |
 | Data (JSON), schema-directed | `reader.NameHygiene`, from the record and choice readers | an **unmatched** member name; a `$type` naming nothing — the two per-name rules only |
+| Data (JSON), schema-directed | `reader.NameHygiene.refusesValue`, from `AtomReader` and `MapObjectReader` | a value typed by an identifier family — the two per-name rules; the keys of one identifier-keyed map — the look-alike rule too |
 
 **The schema-directed reach is narrower than the schemaless one, and deliberately so** ([TSON-JSON] §9.4): a
 member name matching a declared field, or a `$type` naming a declared type, carries that declaration's own
@@ -111,13 +118,15 @@ categories and §9.4 carries those categories here unchanged, so what keeps it a
 `Code.verdict()` stays `true`: the processor looked and declined, and the sender holds the fix, which is
 the question a consumer routes on.
 
-**The third rule does not reach JSON, and that is the answer rather than a gap.** Names that read alike
-is a property of a *set*, which `tson-compiler` asks of a record's field names in its schemaless tree
+**The third rule reaches JSON at one position, where the schema says the set is names.** Names that read
+alike is a property of a *set*, which `tson-compiler` asks of a record's field names in its schemaless tree
 reader — where the grammar has already said those members are *fields*, so two that read alike are
-unambiguously a problem. JSON cannot get there from either reader: a tree has no positions at all, and at
-an object reader's `Map` position the members are keys, where two look-alike keys are two legitimately
-distinct keys. **The dangerous case and the safe case are spelled identically**, which is §4.1 in one
-sentence, so JSON must accept it.
+unambiguously a problem. A schema-directed read gets there by the type instead: the keys of a map whose key
+type is an identifier family are one naming scope ([TSON-SCHEMA] §11.4), and `MapObjectReader` refuses the
+second of a pair at its own member. Without that, JSON cannot get there from either reader: a tree has no
+positions at all, and at an object reader's `Map` position the members are keys, where two look-alike keys are
+two legitimately distinct keys. **The dangerous case and the safe case are spelled identically**, which is §4.1
+in one sentence, so JSON must accept it unless a schema types the keys as names.
 
 A deployment that will not accept it has a surface that does reach these: the **token** policy, which
 governs every JSON token including a map key, and which a stricter deployment raises. That is the honest

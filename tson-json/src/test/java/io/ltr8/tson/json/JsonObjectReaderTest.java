@@ -444,7 +444,7 @@ class JsonObjectReaderTest {
 
         @Test
         void a_map_key_reaches_the_same_parser_as_a_member_value() {
-            // §6.5 reads a member name by the key type's own contract rather than taking it as text, and
+            // §6.4 reads a member name by the key type's own contract rather than taking it as text, and
             // the key path runs through the same JsonAtoms.bind -- so a keyed family binds there too.
             assertEquals(LocalDate.of(2026, 1, 2), READER
                     .read("{\"byDate\": {\"2026-01-02\": 1}}", Diary.class)

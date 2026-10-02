@@ -600,7 +600,7 @@ value (§2.6), so none of it reaches one. Two keys of one map with equal UTS #39
 the second with U+0430), or a mixed-script key, are admitted, where the same two names as two fields of a record
 or two declarations of a schema are refused under the default Highly Restrictive identifier policy. That holds
 when the key type is the kernel's `identifier` or a role over it: the key must match §7.7's grammar, and nothing
-else follows. **This implementation runs exactly that:** a value at an `identifier`-typed position is checked
+else follows. **This implementation runs exactly that on `main`:** a value at an `identifier`-typed position is checked
 against §7.7 and against no §8.2 mechanism.
 
 The text is also not clear that this is intended. §8.2 says mechanisms 2 and 3 "reach every identifier position
@@ -820,24 +820,27 @@ On `r2026-37-proposal`, Proposal 1's declaration, in the form above. A value is 
 first — a failure is `ATOM_FORM_INVALID`, the grammar being the type's form — and then against the text facets,
 whose failures are `ATOM_CONSTRAINT_VIOLATION`; so `!identifier_type { pattern: "[a-z][a-z0-9_]*" }` is a naming
 convention and `!identifier_type { members: [north south] }` a closed vocabulary of names. §7.4's members rule
-counts the grammar among the facets beside a member, so `members: [north "2nd"]` fails to load: no value could
-ever be `2nd`, since the grammar refuses it before the member set is asked. The discrimination class is string.
-Proposal 3 runs as written above, with both coherence rules and the fixed-profile refinement rule; the
-lexer, schema parser, resolver and linker hold §7.7's profile directly, since the kernel's own names are read
-before the kernel exists, and the bootstrap refuses a kernel `identifier` whose body states any other.
-Core declares no sibling (#15): an ordinary schema declares its own, `identifier => !identifier_type
-{ continue_add: "-" }`, and then writes `{identifier => handler}` and refines `!identifier ^ { … }`. Not yet
-running there: §8.2's mechanisms at
-identifier-typed values and §11.4's map-key scope, so a map key is held to the grammar and the look-alike gap
-stays open. Proposal 2 runs as written above: the kernel declares `enum_type`, `enum` and `text_enum`, and
-`enum_profile` retires. The linker resolves each enum's `type` — in the schema's namespace, or in the governing
-meta's for a pinned value — refuses one that is not a text family, parses every member through the type's own
-parser and refuses a member it rejects or two it reads as one value, and keys §8.2's per-name rules on whether
-the type's constructor IS-A `identifier_type`. A member refused under an identifier family names
-`!text_enum [...]`, as §7.4 has the diagnostic name the fix. A processor binds a constructor that tightens another
-as the one it tightens, so `text_enum` and a meta layer's `kebab_enum` need no class of their own. The
-discrimination-class row runs as written: an enum whose type is not an identifier family is string-class, so
-`(!text_enum ["80" "443"] | integer)` is disjoint and `(!text_enum ["80" "443"] | text)` is not.
+counts the grammar among the facets beside a member, so `members: [north "2nd"]` fails to load: no value could ever
+be `2nd`, since the grammar refuses it before the member set is asked. The discrimination class is string. Proposal
+3 runs as written above, with both coherence rules and the fixed-profile refinement rule; the lexer, schema parser,
+resolver and linker hold §7.7's profile directly, since the kernel's own names are read before the kernel exists,
+and the bootstrap refuses a kernel `identifier` whose body states any other. Core declares no sibling (#15): an
+ordinary schema declares its own, `identifier => !identifier_type { continue_add: "-" }`, and then writes
+`{identifier => handler}` and refines `!identifier ^ { … }`. §8.2's per-name mechanisms reach every data value
+whose type is an identifier family, in both encodings, under the family's own profile — a character the profile
+adds meets no restricted-character rule, as §7.7's `-` does not — and the keys of a map keyed by one are a
+look-alike scope, refused at the second key; a refused value reads as nothing. Under a schema it is the one data
+scope, and like every other scope it does not yet consult the policy (BACKLOG). The corpus states it at
+`class2/validate/refused/`, a bucket added for it. Not yet running: the per-name mechanisms at a schema's own
+identifier-typed values, a field's default or fixed value. Proposal 2 runs as written above: the kernel declares
+`enum_type`, `enum` and `text_enum`, and `enum_profile` retires. The linker resolves each enum's `type` — in the
+schema's namespace, or in the governing meta's for a pinned value — refuses one that is not a text family, parses
+every member through the type's own parser and refuses a member it rejects or two it reads as one value, and keys
+§8.2's per-name rules on whether the type's constructor IS-A `identifier_type`. A member refused under an
+identifier family names `!text_enum [...]`, as §7.4 has the diagnostic name the fix. A processor binds a
+constructor that tightens another as the one it tightens, so `text_enum` and a meta layer's `kebab_enum` need no
+class of their own. The discrimination-class row runs as written: an enum whose type is not an identifier family is
+string-class, so `(!text_enum ["80" "443"] | integer)` is disjoint and `(!text_enum ["80" "443"] | text)` is not.
 
 **Status against Revision 36:** open. Proposal 1 stands alone and closes the map-key gap; Proposal 2 depends on
 it alone, #6 and #9 only letting its rules become structure later; Proposal 3 depends on Proposal 1 alone.

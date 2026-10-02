@@ -322,7 +322,7 @@ class JsonAtomReadTest {
     }
 
     /**
-     * §6.5's maps are unbuilt, so that constructor compiles to a gap. A gap is <b>not a verdict</b>
+     * §6.4's maps are unbuilt, so that constructor compiles to a gap. A gap is <b>not a verdict</b>
      * ({@code Code.verdict()} is false), which is what keeps it from being mistaken for a statement about
      * the document -- and it costs that value a verdict and nothing else's.
      */

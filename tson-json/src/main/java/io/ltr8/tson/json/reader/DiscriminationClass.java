@@ -133,7 +133,7 @@ enum DiscriminationClass {
      *   <li>an approximate atom with {@code allow_nan} or {@code allow_infinity} still true has values that
      *       encode as JSON <em>strings</em> (§5.4) -- number-class values in string clothing. Narrowing both
      *       to false restores stability, which is what gives an API author a checkable reason to narrow;</li>
-     *   <li>a map whose key type forces the pairs form (§6.5) encodes as a JSON <em>array</em> -- a
+     *   <li>a map whose key type forces the pairs form (§6.4) encodes as a JSON <em>array</em> -- a
      *       brace-class value in bracket clothing.</li>
      * </ol>
      *

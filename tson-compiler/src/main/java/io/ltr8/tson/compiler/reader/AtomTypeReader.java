@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import java.util.Optional;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -17,6 +18,8 @@ import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.Top;
 
 /**
  * Adapts an {@code atom} {@link AtomType} into a {@link TsonTypeReader} -- this package's own copy
@@ -46,8 +49,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
             .forType(definition.body())
-            .<TsonTypeReader<?>>map(parser ->
-                    new AtomTypeReader<>(name, parser, context.locationOf(name, definition)))
+            .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(name, parser,
+                    context.locationOf(name, definition), namesProfile(definition.body())))
             .orElseThrow(() -> new IllegalStateException(
                     "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
 
@@ -84,7 +87,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * {@code AtomParsers} declines it and {@link ValueParser} answers here.
      */
     static final ValueReaderFactory VALUE = (name, definition, context) ->
-            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition));
+            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition), null);
 
     /**
      * The schema entry's own declared name -- the <em>declaration's</em>, not the built-in it refines, so a
@@ -105,10 +108,22 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     private final AtomType<T> delegate;
     private final SchemaLocation schemaLocation;
 
+    /**
+     * The profile of an identifier family, whose values are names ([TSON-DATA] §8.2), or {@code null} for every
+     * other atom. A name the identifier policy refuses is reported and read as nothing, as a refused field name
+     * is never looked up.
+     */
+    private final IdentifierProfile names;
+
+    /** {@code body}'s profile when it is an identifier family -- its constructor IS-A {@code identifier_type}. */
+    private static IdentifierProfile namesProfile(Top body) {
+        return body instanceof IdentifierType identifier ? identifier.profile() : null;
+    }
+
 
     /** A reader over an {@link AtomType} chosen by the caller rather than by the declaration's own body. */
     static <T> AtomTypeReader<T> of(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
-        return new AtomTypeReader<>(name, delegate, schemaLocation);
+        return new AtomTypeReader<>(name, delegate, schemaLocation, null);
     }
 
     /**
@@ -117,7 +132,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     @Override
     public TsonTypeReader<?> renamed(String displayName) {
-        return new AtomTypeReader<>(displayName, delegate, schemaLocation);
+        return new AtomTypeReader<>(displayName, delegate, schemaLocation, names);
     }
 
     /**
@@ -147,7 +162,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * the entry's own is {@code value}, which names the escape hatch rather than anything the author wrote.
      */
     TsonTypeReader<?> overAtom(String displayName, AtomType<?> replacement) {
-        return new AtomTypeReader<>(displayName, replacement, schemaLocation);
+        return new AtomTypeReader<>(displayName, replacement, schemaLocation, null);
     }
 
     /**
@@ -161,13 +176,15 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * case that does rename, its entry naming the escape hatch rather than anything in the schema.
      */
     Optional<TsonTypeReader<?>> boundTo(Class<?> wire) {
-        return delegate.boundTo(wire).map(bound -> overAtom(name, bound));
+        return delegate.boundTo(wire).map(bound -> new AtomTypeReader<>(name, bound, schemaLocation, names));
     }
 
-    private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
+    private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation,
+                           IdentifierProfile names) {
         this.name = name;
         this.delegate = delegate;
         this.schemaLocation = schemaLocation;
+        this.names = names;
     }
 
 
@@ -193,7 +210,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                 TokenAtomType<T> formSensitive = (TokenAtomType<T>) delegate;
                 return formSensitive.read(tokenValue);
             }
-            return delegate.read(tokenValue.text());
+            T value = delegate.read(tokenValue.text());
+            return names != null && ctx.refusesName(token.text(), names) ? null : value;
         } catch (AtomTypeException ex) {
             // The entry's own name leads the sentence -- see `name` above -- and AtomRefusal decides the
             // code: §8.1 files a contract rejection apart from a range violation, and this reader is not a

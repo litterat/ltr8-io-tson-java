@@ -146,22 +146,23 @@ class Class2ConformanceSuiteTest {
                         "the entries marked @synthetic are not the ones the vector marks");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
-            case "refused" -> assertSchemaRefused(sidecar, problems);
+            case "refused" -> assertRefused(sidecar, problems, "schema");
             default -> fail("unknown schema-layer outcome: " + outcomeOf(sidecar));
         }
     }
 
     /**
-     * §8.1's fifth outcome at the schema layer: the schema is <b>refused by this processor</b> under one of
-     * §8.2's name-hygiene rules, over the scopes [TSON-SCHEMA] §11.4 supplies.
+     * §8.1's fifth outcome at the schema and validate layers: the {@code subject} is <b>refused by this
+     * processor</b> under one of §8.2's name-hygiene rules, over the scopes [TSON-SCHEMA] §11.4 supplies --
+     * a schema's names, or a value that is a name and the keys of a map keyed by one.
      *
      * <p>{@code checkRefusedVector}'s peer, asserting the same two halves for the same reason: something was
-     * refused, and nothing was reported as a verdict on the schema's correctness. A processor that reported a
-     * confusable declaration the way it reports an unresolved reference has not passed the vector -- §8.2
+     * refused, and nothing was reported as a verdict on the document's correctness. A processor that reported
+     * a confusable declaration the way it reports an unresolved reference has not passed the vector -- §8.2
      * keeps these out of validity because they read data the UCD does not freeze, and being able to tell them
      * apart is the whole of it.
      */
-    private static void assertSchemaRefused(RecordValue sidecar, List<Diagnostic> problems) {
+    private static void assertRefused(RecordValue sidecar, List<Diagnostic> problems, String subject) {
         RecordValue refusal = outcomePayload(sidecar);
         String stated = fieldText(refusal, "unicode");
         // Through the public accessor, the way a consumer of this library reads it: `Xid` is in the
@@ -170,11 +171,11 @@ class Class2ConformanceSuiteTest {
                 "vector computed against UTS #39 data for Unicode " + stated + "; this implementation "
                         + "carries " + UnicodePolicy.dataVersion());
 
-        assertFalse(problems.isEmpty(), "the schema is refused, but it loaded without a diagnostic");
+        assertFalse(problems.isEmpty(), "the " + subject + " is refused, but it was read without a diagnostic");
         assertTrue(problems.stream().anyMatch(diagnostic -> isPolicyRefusal(diagnostic.code())),
                 "expected a §8.2 refusal (" + fieldText(refusal, "mechanism") + "); got " + problems);
         problems.forEach(diagnostic -> assertTrue(isPolicyRefusal(diagnostic.code()),
-                "a refused schema must not also be reported invalid: " + diagnostic));
+                "a refused " + subject + " must not also be reported invalid: " + diagnostic));
         assertRefusalMatches(refusal, problems);
     }
 
@@ -320,6 +321,7 @@ class Class2ConformanceSuiteTest {
                         "no diagnostic is a " + category + " error"
                                 + (path == null ? "" : " at path '" + path + "'") + "; got " + reported);
             }
+            case "refused" -> assertRefused(sidecar, reported, "document");
             default -> fail("unknown validate-layer outcome: " + outcomeOf(sidecar));
         }
     }

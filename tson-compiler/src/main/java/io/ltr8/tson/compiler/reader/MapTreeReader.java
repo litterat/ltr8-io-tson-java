@@ -24,9 +24,8 @@ import java.util.Optional;
 final class MapTreeReader extends MapAbstractReader<TsonValue> {
 
     public MapTreeReader(String name, String displayName, MapBody body, TsonTypeReaderResolver resolver,
-                         SchemaLocation schemaLocation,
-                            AnnotationTypes annotationTypes) {
-        super(name, displayName, body, resolver, schemaLocation);
+                         SchemaLocation schemaLocation, AnnotationTypes annotationTypes, boolean keysAreNames) {
+        super(name, displayName, body, resolver, schemaLocation, keysAreNames);
         this.annotationTypes = annotationTypes;
     }
 
@@ -42,8 +41,8 @@ final class MapTreeReader extends MapAbstractReader<TsonValue> {
                 throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition.body());
             }
             return new MapTreeReader(name, EntryDisplayName.of(name, typeDefinition), body, resolver,
-                    context.locationOf(name, typeDefinition),
-                    AnnotationTypes.of(context));
+                    context.locationOf(name, typeDefinition), AnnotationTypes.of(context),
+                    keysAreNames(body, context));
         }
     }
 

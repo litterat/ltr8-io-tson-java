@@ -15,6 +15,8 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 - `withTokenPolicy` defaults to `unrestricted()`, `withIdentifierPolicy` to Highly Restrictive over the whole name; a
   relaxation is a method, never ambient.
 - The restricted-character rule is gated on the level (`appliesIdentifierProfile()`), at both walks.
+- A value whose type is an identifier family is a name: it meets the per-name rules under its family's own profile and
+  is read as nothing when refused, and the keys of a map keyed by one are a look-alike scope checked as each arrives.
 
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
 `design/record-dispatch.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
@@ -114,6 +116,23 @@ single-script. A refusal reports one code per rule —
 `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT` — each a verdict on the document like any other in
 that the caller must change it or relax the policy. What these codes carry that a validity error does not is
 that another processor at another Unicode version may accept the same document.
+
+**A value whose type is an identifier family is a name too**, because the type says so (§8.2, [TSON-SCHEMA]
+§11.4): a field value or a map key typed by any entry whose body `identifier_type` made — the kernel's
+`identifier`, a schema's own, a refinement of either. `AtomTypeReader` holds the family's profile, built once when
+the reader compiles, and after the family parses a value it asks `TsonReadContext.refusesName` — the same two rules
+`checkNameHygiene` applies to the stream's names, through one method, under that profile rather than §7.7's, so a
+character the profile adds (`$` in a JavaScript-name profile) is the profile's and meets no restricted-character
+rule (`IdentifierProfile.restrictedCharacter`), as §7.7's `-` is. A refused value reads as nothing, as a refused
+field name is never looked up, so it is in no scope a later rule judges.
+
+**The keys of an identifier-keyed map are the one data scope under a schema.** `MapAbstractReader` knows from the
+compiled key type whether its keys are names (`keysAreNames`, decided once per reader), and for such a map builds a
+`ConfusableNames.Scope` per read and adds each cleanly-read key as it arrives, so a pair is reported at the second
+key's own position, as §8.2's detection rule asks, and its entry read normally. A repeat is `DUPLICATE_MAP_KEY` and
+nothing else: the scope ignores an equal name. A map keyed by `text` builds nothing — its keys are data. The scope
+costs one small `HashMap` per such map read, and the per-name rules nothing; `AllocationHarnessTest` reports both
+against the same map keyed by `text`. JSON applies the same two rules at the same positions (`json-unicode-policies.md`).
 
 **The restricted-character rule is gated on the level, as the restricted-script rule is.** §8.2's
 Unrestricted "drops the

@@ -448,10 +448,10 @@ public final class DataClassObjectReader {
     }
 
     /**
-     * §6.5's object form: each member name is a key token, its content read by the key type's own
+     * §6.4's object form: each member name is a key token, its content read by the key type's own
      * contract rather than taken as text.
      *
-     * <p>The pairs form is not read here. §6.5 selects it by the key type, and a key type this reader can
+     * <p>The pairs form is not read here. §6.4 selects it by the key type, and a key type this reader can
      * reach is one a JSON member name can spell — so the form a compound key would need never arises from
      * a class whose keys this reader can bind at all, and inventing it would be a rule with no caller.
      */
@@ -465,7 +465,7 @@ public final class DataClassObjectReader {
             // BIND_MISMATCH, not a verdict: the document is fine and the class cannot receive it.
             ctx.report(Diagnostic.Code.BIND_MISMATCH,
                     ("a JSON object's member names are the map's keys, so %s's key type must be one a name "
-                            + "can spell -- §6.5's pairs form, which carries a compound key, is not read here")
+                            + "can spell -- §6.4's pairs form, which carries a compound key, is not read here")
                             .formatted(target.typeClass().getSimpleName()),
                     "a key type a member name can spell", target.keyDataClass().typeClass().getSimpleName());
             EventSkip.value(ctx, first);

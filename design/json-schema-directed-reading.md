@@ -145,11 +145,11 @@ edge, a dispatcher's included, is an object reference wired at compile, and a cy
 
 ### The map form is chosen by the factory, not re-asked per value
 
-§6.5 selects between the object and pairs forms **by `K`, never by inspecting the value**, and that selection
+§6.4 selects between the object and pairs forms **by `K`, never by inspecting the value**, and that selection
 is therefore made once: `MapPlan` records which form the key type names, and the factory returns that form's loop,
 `MapObjectReader` or `MapPairsReader`. Neither carries the other's state or a branch it never takes, and §4.1's
 "nothing is read speculatively" is structural rather than a thing the read remembers to honour. What both forms
-share is `MapEntries` — §6.5's entry-value rule, the size facets, and the wrong-shape refusal — and the form test
+share is `MapEntries` — §6.4's entry-value rule, the size facets, and the wrong-shape refusal — and the form test
 itself is `MapPlan.isObjectForm`, which §8.3 also asks to judge whether a map is class-stable. Both loops resolve a
 repeated key the same way in every mode: reported, and the value filed under the first spelling.
 

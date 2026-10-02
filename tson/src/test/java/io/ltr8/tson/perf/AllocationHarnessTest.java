@@ -64,8 +64,16 @@ class AllocationHarnessTest {
             {
               order => { id: uuid  customer: text  placed: datetime  lines: [line]  note: text }
               line => { sku: text  quantity: int32  price: float64 }
+              identifier => !identifier_type { continue_add: "-" }
+              named => { names: { identifier => text } }
+              labelled => { names: { text => text } }
             }
             """;
+
+    /** The same entries keyed by name and by text, so the difference is the two hygiene rules and nothing else. */
+    private static final String ENTRIES = "{ create => a  read => b  update-all => c  delete => d  list => e }";
+    private static final String NAMED = "!!schema:\"" + ID + "\"\n!named { names: " + ENTRIES + " }";
+    private static final String LABELLED = "!!schema:\"" + ID + "\"\n!labelled { names: " + ENTRIES + " }";
 
     /** The root value on its own, which is what a schemaless read is given -- it names no schema. */
     private static final String ROOT = """
@@ -89,6 +97,9 @@ class AllocationHarnessTest {
     public record Order(UUID id, String customer, OffsetDateTime placed, List<Line> lines, String note) {
     }
 
+    public record Names(Map<String, String> names) {
+    }
+
     private static Tson tson;
     private static TsonObjectReader reader;
     private static TsonObjectReader schemalessReader;
@@ -100,7 +111,8 @@ class AllocationHarnessTest {
         SchemaSource source = uri -> SCHEMA;
         tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext(DataBindContext.builder()
-                        .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "line", Line.class))
+                        .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "line", Line.class,
+                                        "named", Names.class, "labelled", Names.class))
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
         reader = tson.objectReader();
@@ -112,6 +124,8 @@ class AllocationHarnessTest {
         for (int i = 0; i < 2_000; i++) {
             AllocationProbe.sink = reader.read(DOCUMENT, Order.class);
             AllocationProbe.sink = schemalessReader.read(ROOT, Order.class);
+            AllocationProbe.sink = reader.read(NAMED, Names.class);
+            AllocationProbe.sink = reader.read(LABELLED, Names.class);
         }
         AllocationProbe.sink = null;
     }
@@ -221,6 +235,28 @@ class AllocationHarnessTest {
         report("  overhead over the unrestricted default", overhead, "bytes");
         assertTrue(overhead < 300, "a raised token policy added " + overhead + " bytes per read, which is "
                 + "per-token allocation rather than the one decorator a read should cost");
+    }
+
+    /**
+     * <b>Keys that are names cost their scope and nothing per name.</b> An identifier-typed key meets §8.2's two
+     * per-name rules, which scan and return {@code Optional.empty()} for a name that passes, so they allocate
+     * nothing; the keys of an identifier-keyed map are one look-alike scope, a {@code HashMap} of skeletons for
+     * the map being read. The same five entries keyed by {@code text} are the baseline, so the difference is the
+     * identifier grammar's own cost over text's (~550 bytes here) and the scope (~270) -- the per-name rules
+     * measure at nothing. A capturing lambda or a materialised script set per name would add over 100 bytes a
+     * key, which the ceiling catches.
+     */
+    @Test
+    void keysThatAreNamesCostTheirScopeAndNothingPerName() {
+        double named = AllocationProbe.allocatedPerOperation(20_000, () ->
+                AllocationProbe.sink = reader.read(NAMED, Names.class));
+        double labelled = AllocationProbe.allocatedPerOperation(20_000, () ->
+                AllocationProbe.sink = reader.read(LABELLED, Names.class));
+        double overhead = named - labelled;
+
+        report("allocated per read, five identifier keys", named, "bytes");
+        report("  overhead over five text keys", overhead, "bytes");
+        assertTrue(overhead < 1_200, "five identifier keys cost " + overhead + " bytes more than five text keys");
     }
 
     /**

@@ -193,9 +193,25 @@ final class DefaultTsonReadContext implements TsonReadContext {
             case io.ltr8.tson.compiler.stream.FieldName field -> field.name();
             default -> null;
         };
-        if (name == null) {
-            return;
+        if (name != null) {
+            judgeName(name, IdentifierProfile.NAME);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The same two rules {@link #checkNameHygiene} applies to the names the stream carries, under this
+     * value's own profile rather than §7.7's: the characters a profile adds are its own, as {@code -} is
+     * §7.7's ({@link IdentifierProfile#restrictedCharacter}).
+     */
+    @Override
+    public boolean refusesName(String name, IdentifierProfile profile) {
+        return judgeName(name, profile);
+    }
+
+    private boolean judgeName(String name, IdentifierProfile profile) {
+        boolean refused = false;
         // Tested rather than `ifPresent`-ed, and measurably so: both rules are allocation-free when a name
         // passes, which is every name of an ordinary document, but a capturing lambda is not -- it captures
         // `name` and `this` and so allocates per call whether or not the Optional holds anything. This runs
@@ -205,15 +221,18 @@ final class DefaultTsonReadContext implements TsonReadContext {
         // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile
         // too", taking that rule with it. Script mixing gates itself inside violation().
         if (cursor.identifierPolicy.appliesIdentifierProfile()) {
-            Optional<String> restricted = IdentifierProfile.hygiene(name);
+            Optional<String> restricted = profile.restrictedCharacter(name);
             if (restricted.isPresent()) {
                 refuse(name, restricted.get(), Diagnostic.Code.RESTRICTED_CHARACTER);
+                refused = true;
             }
         }
         Optional<String> script = cursor.identifierPolicy.violation(name);
         if (script.isPresent()) {
             refuse(name, script.get(), Diagnostic.Code.RESTRICTED_SCRIPT);
+            refused = true;
         }
+        return refused;
     }
 
     /**

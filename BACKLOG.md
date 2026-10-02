@@ -331,25 +331,23 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `CrossEncodingParityTest` compares codes, so the two encodings must sort one malformed input the same way.
 
 - [ ] **The look-alike check recomputes every skeleton per record, and ignores the identifier policy.**
-  `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of
-  every schemaless tree read, which builds a `HashMap` and a UTS #39 skeleton per field name. Field names
-  repeat across the records of a document, so the same skeletons are built again for each one; measured,
-  the whole check is ~1,300 bytes per read of the harness document even after `Confusables.skeleton` stopped
-  allocating for a name that maps nothing. A cache would take most of that, and the design question is its
-  bound: names are attacker-controlled, so a per-read cache is the safe shape and a process-wide one is not.
-  Separately, the check consults **no policy**, which is a conformance gap: a deployment that stated
-  `withIdentifierPolicy(unrestricted())` still gets `CONFUSABLE_NAMES`, where the two per-name rules honour
-  it, and [TSON-DATA] §8.2 says a processor "MUST allow a deployment to relax any of the three". What is
-  left to decide is the policy's shape for the set rule -- a switch of its own, or implied by the level.
+  `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of every
+  schemaless tree read, which builds a `HashMap` and a UTS #39 skeleton per field name. Field names repeat across the
+  records of a document, so the same skeletons are built again for each one; measured, the whole check is ~1,300 bytes
+  per read of the harness document even after `Confusables.skeleton` stopped allocating for a name that maps nothing.
+  A cache would take most of that, and the design question is its bound: names are attacker-controlled, so a per-read
+  cache is the safe shape and a process-wide one is not. Separately, the check consults **no policy**, which is a
+  conformance gap: a deployment that stated `withIdentifierPolicy(unrestricted())` still gets `CONFUSABLE_NAMES` --
+  over a schemaless record's fields, a schema's scopes and an identifier-keyed map's keys (`MapAbstractReader`, JSON's
+  `MapObjectReader`) -- where the two per-name rules honour it, and [TSON-DATA] §8.2 says a processor "MUST allow a
+  deployment to relax any of the three". What is left to decide is the policy's shape for the set rule -- a switch of
+  its own, or implied by the level.
 
-- [ ] **§8.2's hygiene does not reach a value typed by an identifier** (`r2026-37-proposal`, SPEC-FEEDBACK #7
-  Proposal 1). A value or map key whose type is an `identifier_type` is held to its profile and nothing else:
-  the restricted-character and mixed-script rules run only on field and declared names
-  (`DefaultTsonReadContext`, `NameHygiene`, `DataClassObjectReader`, `TsonSchemaLinker`), and the look-alike
-  rule has no map-key scope. Needs the identifier policy at the atom read -- which `IdentifierParser` cannot see
-  -- in both encodings, the key set of an identifier-keyed map as a §11.4 scope, and an allocation-harness check.
-  Proposal 3's exemption rides with it: characters a profile adds (`start_add`, `continue_add`, `medial`) skip
-  the restricted-character rule, as the kernel's `-` does, so `hygiene` takes the profile.
+- [ ] **§8.2's per-name rules do not reach a schema's own identifier-typed values** (`r2026-37-proposal`,
+  SPEC-FEEDBACK #7). A data value whose type is an identifier family meets them at read, but a default or fixed
+  value of such a field, mixed-script or not, is checked by the linker against the family's parser only.
+  The linker's `perName` walk is where it belongs, keyed on the field's type as `EnumLabels.membersAreNames` keys
+  an enum's members, with a `class2/schema/refused/` vector.
 
 - [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
   in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a

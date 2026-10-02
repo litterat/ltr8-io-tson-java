@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 
@@ -160,6 +161,15 @@ public interface TsonReadContext {
     // one per rule), which is what a consumer routes on. The Unicode data version §8.2 requires a refusal to
     // name is a fact about this processor rather than about the problem, so it is stated once per run beside
     // the diagnostics -- ProcessorPolicy -- rather than stamped onto each one.
+
+    /**
+     * [TSON-DATA] §8.2's restricted-character and restricted-script rules over a value whose type is an
+     * identifier family, under this read's identifier policy and {@code profile}: the per-name rules reach
+     * every identifier-typed value, a map key or a field value alike, as they reach every name the stream
+     * carries. A refusal is reported at this context's position; the answer is whether there was one, so a
+     * caller can leave the value out rather than admit a name the processor declined.
+     */
+    boolean refusesName(String name, IdentifierProfile profile);
 
     /**
      * How many problems have been reported through this read so far, counting every scoped copy since they
