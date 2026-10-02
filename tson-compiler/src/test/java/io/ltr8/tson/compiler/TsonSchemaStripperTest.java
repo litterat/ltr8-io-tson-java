@@ -31,10 +31,12 @@ class TsonSchemaStripperTest {
 
                   @title:"Point"
                   @comment:"Kept in step with shapes-1."
+                  @deprecated
                   point => {
                     @doc:\"""
                       Across.
                       \"""
+                    @examples:[1.0 2.5]
                     x: float64
                     y?: float64 ~ 0.0
                   }
@@ -47,9 +49,29 @@ class TsonSchemaStripperTest {
                 !!import:"https://example.test/shapes-1.tn"
                 {
                 thing => int32
-                @title:"Point" point => { x: float64 y?: float64 ~ 0.0 }
+                @deprecated point => { x: float64 y?: float64 ~ 0.0 }
                 }
                 """, TsonSchemaStripper.strip(schema));
+    }
+
+    /** Keeping the documentation keeps what a reader is shown, and still drops the maintainers' notes. */
+    @Test
+    void keepingDocsDropsOnlyTheComments() {
+        String schema = """
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                @doc:"Shapes."
+                {
+                  @doc:"A point." @title:"Point" @comment:"Kept in step with shapes-1."
+                  point => { @examples:[1.0 2.5] x: float64 }
+                }
+                """;
+
+        assertEquals("""
+                !!meta:"37/meta"
+                @doc:"Shapes." {
+                @doc:"A point." @title:"Point" point => { @examples:[1.0 2.5] x: float64 }
+                }
+                """, TsonSchemaStripper.stripKeepingDocs(schema));
     }
 
     /** Tokens that touched still touch, and a run of whitespace becomes one space wherever it was. */
@@ -79,7 +101,7 @@ class TsonSchemaStripperTest {
                 """;
 
         assertEquals("!!meta:\"37/meta\"\n{\n@title:\"Two \\\"quoted\\\"\\nlines\" thing => int32\n}\n",
-                TsonSchemaStripper.strip(schema));
+                TsonSchemaStripper.stripKeepingDocs(schema));
     }
 
     /** Any revision of the spec's library is shortened; a look-alike outside it keeps its URL, unpinned. */
@@ -114,6 +136,8 @@ class TsonSchemaStripperTest {
             assertTrue(stripped.length() < source.length() / 2, id);
             assertFalse(stripped.contains("@doc"), id);
             assertFalse(stripped.contains("@comment"), id);
+            assertFalse(stripped.contains("@title"), id);
+            assertFalse(stripped.contains("@examples"), id);
             assertFalse(stripped.contains("sha256"), id);
             assertTrue(stripped.lines().allMatch(line -> line.equals("}") || !line.isBlank()), id);
         }
@@ -131,9 +155,9 @@ class TsonSchemaStripperTest {
         assertEquals("""
                 !!meta:"37/meta"
                 {
-                @title:"Pair" pair => <A, B> { first: A second: B }
+                pair => <A, B> { first: A second: B }
                 @deprecated old => int32
-                last => { @examples:{ a => 1 } m?: int32 }
+                last => { m?: int32 }
                 }
                 """, TsonSchemaStripper.strip(schema));
     }

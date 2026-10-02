@@ -36,20 +36,40 @@ class StripCommandTest {
     }
 
     @Test
+    void keepDocsKeepsTheDocumentation(@TempDir Path dir) throws IOException {
+        Path file = Files.writeString(dir.resolve("thing.tn"), SCHEMA);
+
+        String out = capture(true,
+                () -> assertEquals(0, TsonCli.run(new String[] {"strip", "--keep-docs", file.toString()})));
+
+        assertEquals("!!meta:\"37/meta\"\n!!import:\"37/core\"\n{\n@doc:\"A thing.\" thing => int32\n}\n", out);
+    }
+
+    @Test
+    void anUnknownOptionIsAUsageError(@TempDir Path dir) throws IOException {
+        Path file = Files.writeString(dir.resolve("thing.tn"), SCHEMA);
+
+        String err = capture(false,
+                () -> assertEquals(2, TsonCli.run(new String[] {"strip", "--keep-doc", file.toString()})));
+
+        assertTrue(err.contains("usage: tson strip"), err);
+    }
+
+    @Test
     void aMalformedSchemaIsRejectedWhereItBreaks(@TempDir Path dir) throws IOException {
         Path file = Files.writeString(dir.resolve("broken.tn"), """
                 !!meta:"https://tson.io/2026/37/m/meta.tn"
                 { thing => }
                 """);
 
-        String err = capture(false, () -> assertEquals(1, StripCommand.run(file)));
+        String err = capture(false, () -> assertEquals(1, StripCommand.run(file, false)));
 
         assertTrue(err.startsWith(file + ":2:"), err);
     }
 
     @Test
     void anUnreadableFileIsAUsageError(@TempDir Path dir) throws IOException {
-        String err = capture(false, () -> assertEquals(2, StripCommand.run(dir.resolve("missing.tn"))));
+        String err = capture(false, () -> assertEquals(2, StripCommand.run(dir.resolve("missing.tn"), false)));
 
         assertTrue(err.startsWith("cannot read"), err);
     }

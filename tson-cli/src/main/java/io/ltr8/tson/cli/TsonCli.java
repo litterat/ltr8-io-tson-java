@@ -48,7 +48,7 @@ public final class TsonCli {
               compile [<options>] <schema>         check that a schema document resolves and compiles
               policy [<options>]                   print the Unicode policy and limits this run would apply
               hash <file>                          stamp a document's content hash onto its own !!id
-              strip <schema>                       print a schema's reading form, for a model to read
+              strip [--keep-docs] <schema>         print a schema's reading form, for a model to read
 
             options:
               --output text|json|tson    output format (default: text)
@@ -203,18 +203,21 @@ public final class TsonCli {
             schema.""";
 
     private static final String STRIP_USAGE =
-            "usage: tson strip <schema>   (prints the schema's reading form to standard output)";
+            "usage: tson strip [--keep-docs] <schema>   (prints the schema's reading form to standard output)";
 
     private static final String STRIP_HELP = """
-            usage: tson strip <schema>
+            usage: tson strip [--keep-docs] <schema>
 
             Prints a schema document's reading form to standard output: the same declarations in as few
             tokens as the syntax allows, for a reader that reads the schema rather than loading it -- a
-            language model given it in a prompt. The !!id, every !!meta and !!import pin, and every @doc
-            and @comment are removed; a reference to the spec's own library is shortened to its revision and name
-            (!!import:"37/core"). Each directive and each declaration gets one line, with whitespace
-            inside it collapsed to single spaces. Other annotations stay, and other references keep
-            their URLs.
+            language model given it in a prompt. The !!id, every !!meta and !!import pin, and every @doc,
+            @title, @examples and @comment are removed; a reference to the spec's own library is shortened
+            to its revision and name (!!import:"37/core"). Each directive and each declaration gets one
+            line, with whitespace inside it collapsed to single spaces. Other annotations stay, and other
+            references keep their URLs.
+
+            options:
+              --keep-docs    keep @doc, @title and @examples; @comment, a note for maintainers, still goes
 
             The output is valid syntax but not a loadable schema -- nothing resolves "37/core" -- so the
             file is never rewritten.
@@ -421,10 +424,11 @@ public final class TsonCli {
             System.out.println(STRIP_HELP);
             return 0;
         }
-        if (args.size() != 1) {
+        boolean keepDocs = args.remove("--keep-docs");
+        if (args.size() != 1 || args.getFirst().startsWith("-")) {
             throw new UsageException(STRIP_USAGE);
         }
-        return StripCommand.run(Path.of(args.get(0)));
+        return StripCommand.run(Path.of(args.getFirst()), keepDocs);
     }
 
     private static int runValidate(List<String> args) {
