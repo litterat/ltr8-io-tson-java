@@ -75,7 +75,7 @@
     preserves them verbatim.
   """
 !schema {
-  @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A."
+  @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`, except `reference` and `template`, which compose with `top` directly. Construction transfers kind, not IS-A."
   top => !type_definition {
     subtypes: [array atom choice data enum enum_type identifier_type integer_type map product record reference regex_type set_type sum template text_enum text_type tuple uri_type value_type void_type]
     body: !record { fields: [] }
@@ -418,7 +418,7 @@
     ] }
   }
 
-  @doc:"Constructors — ~ marks type factories."
+  @doc:"The container constructors carry no parameters: a type slot is an ordinary required field typed type_ref."
   record => !type_definition {
     supertypes: [product top]
     body: !record { supertypes: [product]  fields: [

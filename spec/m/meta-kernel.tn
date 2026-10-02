@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=485fa3af5ebaa2ec2ed9d6206a2f169f78a92515e89752abcefb26817f430ad7"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=4f745bd936869807b225bcf376553127463ac950c902d00689efc78900258c9f"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -8,13 +8,22 @@
   circularity, closed by pre-loading rather than by resolution:
   implementations ship the kernel's resolved structure, and this
   document describes it.
+
+  Hash pins are real digests: sha256 over every byte of a document
+  past its `!!id` line ([TSON-DATA] §2.2.1), which is what lets an
+  `!!id` carry the digest of the document it identifies. The
+  `!!meta` above is unpinned, since a pin there would be part of the
+  bytes it digests. Meta pins this file and core pins meta, so an
+  edit here moves every pin above it.
   """
 {
   @doc:"""
     Base kinds. `top` is the structural root; every constructor
-    transitively IS-A `atom`, `product`, `sum`  or `data`, each of
-    which IS-A `top`. Construction transfers kind, not IS-A, so
-    instances and fresh records sit under the kinds without supertypes.
+    transitively IS-A `atom`, `product`, `sum` or `data`, each of
+    which IS-A `top`, except `reference` and `template`, which
+    compose with `top` directly. Construction transfers kind, not
+    IS-A, so instances and fresh records sit under the kinds without
+    supertypes.
     The first three describe the shape of a data value; `data`
     describes something that is not one.
     """
@@ -44,7 +53,9 @@
     rather than a bare name so that a partial application
     ([TSON-SCHEMA] §5.10, `uuid_pair => <B> pair<uuid, B>`) can state
     the arguments it already binds: an alias to an application has an
-    argument list, and a name-typed slot has nowhere to put one.
+    argument list, and a name-typed slot has nowhere to put one. A
+    `target` naming a parameter describes the held body as parsed; in
+    resolved output it sits inside the `template.template` text.
 
     That is what lets every open entry be written as a constructor
     application, `<params> !C core-value`, this one included — so
@@ -99,9 +110,11 @@
     as written, unread until materialisation substitutes the
     parameters away, and `parameters` are the names it binds.
 
-    Text, because that is what "held" means. A held body is not a
-    value of this vocabulary and cannot be one: a parameter stands
-    wherever a token stands — `min_items: N` as readily as
+    The text is how a held body is written in resolved output; a
+    processor holds the parsed form, which this vocabulary cannot
+    represent. A held body is not a value of this vocabulary and
+    cannot be one: a parameter stands wherever a token stands —
+    `min_items: N` as readily as
     `element_type: T` — so a body carrying one is not typed by any
     constructor's own record shape until it closes. Writing it as
     though it were leaves the two halves disagreeing, since a value
@@ -439,9 +452,11 @@
   @doc:"""
     Structured type reference ([TSON-SCHEMA] §8.1). `name` is the
     referenced type — or, within a template body, a parameter of
-    either kind, read against the enclosing definition's
+    either kind, read against the enclosing template's
     `parameters` list — and `arguments` carries positional
-    arguments as type_argument records.
+    arguments as type_argument records. A parameter here describes
+    the held body as parsed; in resolved output it sits inside the
+    `template.template` text.
 
     `name` is the only REQUIRED field, so the positional form
     ([TSON-SCHEMA] §5.6, general over schema-backed data) applies
@@ -487,8 +502,10 @@
     (enum members) are never ambiguous with parameter names. The
     split carries the application's open/closed signal:
     substitution replaces a parameter-naming member with the bound
-    argument as parameters close ([TSON-SCHEMA] §8.1). The group
-    is REQUIRED: exactly one member is present.
+    argument as parameters close ([TSON-SCHEMA] §8.1). A parameter
+    here describes the held body as parsed; in resolved output it
+    sits inside the `template.template` text. The group is
+    REQUIRED: exactly one member is present.
     Deliberately no positional form — a bare token cannot
     self-classify as reference or literal, so the braced record is
     load-bearing.
@@ -576,7 +593,9 @@
     token there is a parameter exactly when its text resolves into
     the enclosing entry's `parameters` ([TSON-SCHEMA] §5.10's
     shadowing rule). A closed entry has no parameters for one to
-    resolve into, so the same slot is unambiguous at both ends.
+    resolve into, so the same slot is unambiguous at both ends. This
+    describes the held body as parsed; in resolved output it sits
+    inside the `template.template` text.
 
     [TSON-SCHEMA] §5.7's fixation is what the single channel costs
     and where it is paid: a parametric `= P` is a required FREE
@@ -624,9 +643,8 @@
   }
 
   @doc:"""
-    Constructors. The container
-    constructors carry no parameters: a type slot (array's
-    element_type, map's key_type and value_type) is an ordinary
+    The container constructors carry no parameters: a type slot
+    (array's element_type, map's key_type and value_type) is an ordinary
     REQUIRED field typed type_ref, filled by the construction or by
     a sugar form's desugaring like any other required field, and a
     closed application carries the bound reference as the field's

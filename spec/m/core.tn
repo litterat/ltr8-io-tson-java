@@ -1,16 +1,20 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=da4dad12b9ec059c078f83a54534045993028731fbec8d5ecefbd87bb241c59e"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=3fb671165f786c0dfcafb5e68d088fbf086d95e7148acb8214cf9dc9e9a8203d"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=765332735fa4134e2f01cfedd0baaa3c21e8babaa905d3046fe5c0030054347e"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=82f2a99b477a2f6dc70358cc3fbf13bcfda660e09e519d32baf88fbc8cdee367"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
 
   Every type in core comes from a constructor defined in meta-kernel
-  or meta. Atoms are uniformly defined as empty instances:
+  or meta. Atoms are defined as empty instances:
 
       integer => !integer_type {}
       text    => !text_type {}
       date    => !date_type {}
       ...
+
+  except where an instance states a constructor field: `float32` and
+  `float64` select a `format`, `bytes` an `encoding`, and
+  `identifier` its `continue_add`.
 
   Refinements overlay literal values via the ^ operator:
 
@@ -202,10 +206,11 @@
   @doc:"""
     A name: text inside [TSON-DATA] §7.7's identifier grammar. A fresh
     sibling of the meta-kernel's `identifier` under the same name — the
-    same `!identifier_type {}` construction, and so the same contract, a
-    distinct type entity — so that core-importing schemas can type a
-    value or a map key as a name, and refine it with the text facets: a
-    naming convention as `pattern`, a closed vocabulary as `members`.
+    same `!identifier_type { continue_add: "-" }` construction, and so
+    the same contract, a distinct type entity — so that core-importing
+    schemas can type a value or a map key as a name, and refine it with
+    the text facets: a naming convention as `pattern`, a closed
+    vocabulary as `members`.
     """
   @ordered:NONE @bounded:false
   identifier => !identifier_type { continue_add: "-" }
@@ -227,8 +232,8 @@
     Another alphabet is another type, declared as its own instance of
     the constructor (`hexdigest => !bytes_type { encoding: HEX
     length: 4 }`) — never as a refinement of this one, since a
-    spelling narrows nothing and `hexdigest ^ bytes` would claim an
-    IS-A that no base64 position can honour. An encoding whose values
+    spelling narrows nothing and `!bytes ^ { encoding: HEX }` would
+    claim an IS-A that no base64 position can honour. An encoding whose values
     are octets writes them raw.
     """
   @ordered:NONE @bounded:false
@@ -273,7 +278,8 @@
   datetime => !datetime_type {}
 
   @doc:"""
-    Elapsed time — a signed rational number of seconds. The clock half
+    Elapsed time — a signed exact decimal number of seconds, within
+    the range `duration_type` fixes. The clock half
     of what one ISO 8601 duration used to carry: no Y or month-M
     component, so every value has a fixed length and ordering is TOTAL.
     `P1M` is a month and belongs to `period`; a minute is `PT1M`. A day
