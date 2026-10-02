@@ -825,8 +825,9 @@ ever be `2nd`, since the grammar refuses it before the member set is asked. The 
 Proposal 3 runs as written above, with both coherence rules and the fixed-profile refinement rule; the
 lexer, schema parser, resolver and linker hold §7.7's profile directly, since the kernel's own names are read
 before the kernel exists, and the bootstrap refuses a kernel `identifier` whose body states any other.
-Core declares its sibling, `identifier => !identifier_type { continue_add: "-" }`, so an ordinary schema writes
-`{identifier => handler}` and refines `!identifier ^ { … }`. Not yet running there: §8.2's mechanisms at
+Core declares no sibling (#15): an ordinary schema declares its own, `identifier => !identifier_type
+{ continue_add: "-" }`, and then writes `{identifier => handler}` and refines `!identifier ^ { … }`. Not yet
+running there: §8.2's mechanisms at
 identifier-typed values and §11.4's map-key scope, so a map key is held to the grammar and the look-alike gap
 stays open. Proposal 2 runs as written above: the kernel declares `enum_type`, `enum` and `text_enum`, and
 `enum_profile` retires. The linker resolves each enum's `type` — in the schema's namespace, or in the governing

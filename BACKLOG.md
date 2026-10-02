@@ -267,6 +267,19 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **`!uri` is `java.net.URI`'s RFC 2396 grammar, not [TSON-DATA] §5.5's RFC 3986** (`main` and
+  `r2026-37-proposal`). `UriParser` delegates the whole grammar to `java.net.URI`, which refuses valid URIs —
+  `https://` and `foo://` ("Expected authority": RFC 3986's `reg-name` may be empty, §3.2.2, and an empty
+  host is accepted once anything follows it, as in `https://?q=1`), `a:` (an empty path), `http://[v7.abc]/`
+  (IPvFuture) — and admits an invalid one, `http://a:b/` (a port is digits only). A JSON Schema validator's
+  `format: uri` admits `https://`, so a converted schema refuses data its source accepted. The fix is an RFC
+  3986 recognizer in `tson-atom`, which `!iri`/`!iri_reference` inherit through the URI each maps to. What
+  constrains it is the host value: `UriParser` reads to `java.net.URI`, which cannot hold `https://`, `a:` or
+  an IPvFuture host, so either `java.net.URI` stays the bound type and those few are a binding error, or the
+  atom's natural value becomes text with `java.net.URI` a binding target — validity must not depend on the
+  host class. `CONFORMANCE.md`'s accepted-gap paragraph and the two parsers' Javadoc go with it; Class 1
+  vectors for each case above.
+
 - [ ] **Decide whether `text_type` takes a facet for the text's format.** `@doc` is CommonMark by its type's contract
   (`meta-kernel.tn`, `core.tn`), which a data field cannot state: a `description: text` holding CommonMark, or
   JSON Schema's `contentMediaType` on a string, has no home but prose. The question is whether a format is a facet
