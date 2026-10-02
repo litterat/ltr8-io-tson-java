@@ -230,8 +230,8 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
-  — the fixtures carry `@synthetic` on the keys the resolver minted and `@doc` on many more, and the bound
-  side renders none of them, so the entries would compare equal for the wrong reason;
+  — the fixtures carry `@synthetic` on the keys the resolver minted and `@ordered`/`@bounded`/`@exact` on core's,
+  and the bound side renders none of them, so the entries would compare equal for the wrong reason;
   `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
   test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
   only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers
@@ -279,6 +279,23 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   exception-classification policy: deciding what each site *is* (the first is reachable only by a caller that skipped a
   phase) decides whether it stays `UnsupportedOperationException` or becomes `IllegalStateException`, and with it exit
   70's two halves. `DefinitionResolver`'s class Javadoc lists both sites and moves with them.
+
+- [ ] **A template application is named in a diagnostic by the construction it closes, in array spelling.**
+  `tags: set<text>` given `[a a]` reports `'[text]' requires unique elements`, and `only: tuple1<text>` given `[]`
+  reports `'[text]' has 1 positions, found only 0 elements` — so a set and a one-element tuple both read as the
+  array `[text]`, a type the author never wrote. The instantiation entry carries the application in its `source`
+  (`{ name: set  arguments: [text] }`), but its body is a reference to the synthetic construction it closes
+  (`!set_type { element_type: text }`, sourced from the bare constructor), and the reader that reports is the
+  synthetic's, which `EntryDisplayName` renders from its body. The fix is to keep the application as the display
+  name across that hop, as `UseSite.named` already does for an alias; and where no application is in reach,
+  `EntryDisplayName` should not render a `set_type` body or a one-position tuple as array sugar.
+
+- [ ] **A tuple refused a scalar prints the event record.** `only: tuple1<text>` given `a` reports
+  `expected a tuple (array-shaped) for '[text]', found TokenEvent[text=a, form=UNQUOTED, position=…]`:
+  `TypeRefCheck.describe` names a record, map, array, `{}` and `_` and falls back to `String.valueOf` for anything
+  else, so a scalar token arrives as its `toString`. It has 18 callers, all exposed the same way; a scalar wants its
+  token text (and form, where quoting is the difference). `JsonAtoms.describe` is the JSON side's counterpart and
+  `CrossEncodingParityTest` the check that the two describe one value alike.
 
 - [ ] **A base-syntax diagnostic does not say whether it is a lexer error or a parse error.** [TSON-DATA] §8.1 makes
   them two categories, and [TSON-JSON] §9.4's table sorts JSON's failures into them (malformed text, invalid UTF-8 and

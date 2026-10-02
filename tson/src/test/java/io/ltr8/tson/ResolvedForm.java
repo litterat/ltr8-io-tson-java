@@ -171,8 +171,9 @@ final class ResolvedForm {
     }
 
     /**
-     * Annotation names a key comparison leaves out: {@code doc}, whose text a fixture abbreviates to a summary
-     * of the source's, and {@code synthetic}, which {@link #markedSynthetics} compares on its own terms.
+     * Annotation names a key comparison leaves out: {@code doc}, which the resolver carries from the source and
+     * a fixture leaves out of its entries, being compared rather than read, and {@code synthetic}, which
+     * {@link #markedSynthetics} compares on its own terms.
      */
     private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", "synthetic");
 

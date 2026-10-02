@@ -55,7 +55,7 @@ time, and `spec/tson-part3-json.md` is edited in place.
 `TsonBundledSchemas`' digests on every load, so one stale constant fails `Tson.standard()` and most of the suite.
 `scripts/restamp-bundled-schemas.sh` re-pins everything in dependency order (`--check` reports only); Part 2 §13.2's
 table in `spec/` is the one pin it does not write. Keep `spec/m/*-resolved.tn` in step — `ResolvedFixtureTest` checks
-them. `design/process.md` has the procedure.
+them. `design/process.md` has the procedure, and the rules for what a schema's `@doc` may say.
 
 **Branches.** `main` is the reference implementation of the *published* revision (36); published revisions are tags
 (`r2026-32`, `r2026-34`, `r2026-35`). **`r2026-37-proposal` is open**, with a corpus branch of the same name, for the

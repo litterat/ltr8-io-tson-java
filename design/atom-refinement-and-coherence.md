@@ -79,7 +79,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   template whose bounds were `MIN`/`MAX` until an application supplied both. meta.tn's own header `@doc`
   states the same obligation from the other side: bounds are field
   groups so an inclusive/exclusive pair on one side is unrepresentable, while "value-level coherence (the
-  lower bound not exceeding the upper) remains a schema-load check". `cidr4_type`'s `@doc` adds the family
+  lower bound not exceeding the upper) is a schema-load check". `cidr4_type`'s `@doc` adds the family
   range — prefixes narrow "within the family range 0-32", and "bounds outside that range are invalid at the
   schema level" — so the CIDR pair is judged against its address width as well as against itself.
   - **The linker asks every family, and needs no list to do it.** `TsonSchemaLinker` asks **every** family the
