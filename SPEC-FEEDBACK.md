@@ -51,6 +51,7 @@ template parameter, derived from its uses, which checks an application at the ca
 home.
 #10 makes order a facet every container states, which a map needs before #2's keyed sets can be maps.
 #11 drops `set_type`'s non-empty default, so a set's bounds are an array's and the empty set is a set.
+#12 adds `tuple1<T>` and `optional_tuple1<T>` to core, the one-position tuple the bracket sugar cannot spell.
 
 ---
 
@@ -1249,6 +1250,46 @@ member sets and meta's `scope_set` and `decimal_member_set` state `min_items: 1`
 `set<scope_kind>` and `set<value>` instantiations are gone from resolved output, replaced by the named entries; and
 the bundled schemas are re-pinned. `set<text>` admits `[]`. Every set that was non-empty under the default is
 non-empty still, so no member list, enum or scope changes what it admits.
+
+**Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
+
+**Status against Revision 36:** open.
+
+---
+
+## 12. A one-position tuple has no spelling: core should declare `tuple1<T>` and `optional_tuple1<T>`
+
+**Section:** [TSON-SCHEMA] §5.3 (tuple types: "A tuple requires at least two element type expressions … a single
+type-ref with no semicolon is an unconstrained array — never a one-element tuple"), §9 (core's contents: "Core also
+declares the `scoped` instances … and the templates `extern_of`, `extern_type`").
+
+**Kind:** proposal — two core templates.
+
+**What the spec says today.** The bracket sugar spells a tuple of two or more positions, and `[T]` is an array, so a
+tuple of exactly one position has no sugar. The construction `!tuple { elements: [{ element_type: T }] }` denotes
+one, but §5.2 bars a `!` construction at a field position, so an author must declare a named entry for each element
+type. The need is rare in a schema written as TSON and real in one converted from JSON Schema, where
+`prefixItems` with one entry and `items: false` (or `minItems`/`maxItems` of 1 beside it) is a one-position tuple,
+and a converter needs a spelling it can emit at a field without minting declarations.
+
+**Proposal.** Core declares two templates beside `set`:
+
+```
+tuple1          => <T> !tuple { elements: [{ element_type: T }] }
+optional_tuple1 => <T> !tuple { elements: [{ element_type: T  state: OPTIONAL }] }
+```
+
+`tuple1<text>` admits `[a]` and refuses `[]`, `[a b]` and `[_]`; `optional_tuple1<text>` admits `[a]` and `[_]`.
+Two templates rather than one because a type argument cannot carry the `?` that would make the position OPTIONAL
+(`tuple1<int32?>` is not an argument), and a template application carries no facets an author could set instead.
+Core rather than meta: a type-position name resolves in the schema's own namespace and its imports, so a template
+in meta alone would be out of reach of every user field; and core alone rather than both, as `set` is, because no
+meta-layer declaration needs one. §9's sentence on core's templates names the two beside `extern_of` and
+`extern_type`.
+
+**What is running** (`r2026-37-proposal`): both templates are in the bundled `core.tn`, the resolved fixture states
+them as open entries, and both read as above in tree mode. Nothing else changes: `[T]` remains an array and the
+sugar's two-position minimum stands.
 
 **Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
 

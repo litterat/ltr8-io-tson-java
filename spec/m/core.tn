@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=f28656727a3d751a18298e99d48f8ce9ff580f596a81fbb87f45a9768e3db3ba"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=34ce43c491b5fd68568e128c3a54cf2cebfd89bd1e75e556d673073ce17a37bb"
 !!meta:"https://tson.io/2026/37/m/meta.tn?sha256=545f35360b079e616956c8d45dfdab6ca65550dd3464690d99373e2c04137836"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
@@ -382,6 +382,19 @@
     the governing namespace.
     """
   set => <T> !set_type { element_type: T }
+
+  @doc:"""
+    A tuple of exactly one REQUIRED element: `tuple1<text>` admits `[a]` and
+    refuses `[]`, `[a b]` and `[_]`. `[T]` is an array, and the tuple sugar
+    takes two or more positions.
+    """
+  tuple1 => <T> !tuple { elements: [{ element_type: T }] }
+
+  @doc:"""
+    A tuple of exactly one OPTIONAL element: as `tuple1`, and the element may
+    be the absent sentinel, so `optional_tuple1<text>` admits `[a]` and `[_]`.
+    """
+  optional_tuple1 => <T> !tuple { elements: [{ element_type: T  state: OPTIONAL }] }
 
   @doc:"Marker annotation."
   annotation => @annotation void
