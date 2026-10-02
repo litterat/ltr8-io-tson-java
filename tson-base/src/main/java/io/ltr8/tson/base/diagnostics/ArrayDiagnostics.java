@@ -1,6 +1,7 @@
 package io.ltr8.tson.base.diagnostics;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.unicode.ConfusableNames;
 
 import java.math.BigInteger;
 
@@ -43,6 +44,18 @@ public record ArrayDiagnostics(String typeName) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 "'%s' requires unique elements, '%s' appears more than once".formatted(typeName, rendered),
                 "each element once", rendered);
+    }
+
+    /**
+     * [TSON-DATA] §8.2's look-alike rule over the elements of an array whose elements are unique -- a set, or any
+     * array marked {@code unique_items} -- and whose element type is an identifier family: one naming scope as an
+     * identifier-keyed map's keys are ([TSON-SCHEMA] §11.4): a policy refusal, reported at
+     * the second element.
+     */
+    public Refusal confusableElements(ConfusableNames.Collision collision) {
+        return new Refusal(Diagnostic.Code.CONFUSABLE_NAMES,
+                "'%s' has elements that read alike: %s".formatted(typeName, collision.describe()),
+                "elements a reader can tell apart", "'" + collision.second() + "'");
     }
 
     /**

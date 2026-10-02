@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * [TSON-DATA] §8.2's skeleton distinctness is relaxable on its own, as §8.2 requires of each mechanism, and the
  * one switch reaches every scope the rule runs over: a schemaless record's field names, a schema's declared
- * names and field names, and the keys of an identifier-keyed map in tree and bind reads alike.
+ * names and field names, the keys of an identifier-keyed map in tree and bind reads alike, and a set of names.
  *
  * <p>Each scope is shown with a pair that only this mechanism refuses -- Latin {@code pass} beside an all-Cyrillic
  * look-alike, each single-script -- so the per-name rules have nothing to say and the switch is all that moves.
@@ -43,6 +43,7 @@ class SkeletonDistinctnessPolicyTest {
               identifier => !identifier_type { continue_add: "-" }
               handlers => { identifier => text }
               registry => { handlers: { identifier => text } }
+              team => { roles: set<identifier> }
             }
             """;
 
@@ -97,6 +98,14 @@ class SkeletonDistinctnessPolicyTest {
     @Test
     void theKeysOfAnIdentifierKeyedMap() {
         String document = "!!schema:\"" + ID + "\"\n!handlers { pass => a  " + CYRILLIC_PASS + " => b }";
+        assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES), codes(tson(IdentifierPolicy.defaults())
+                .validate(document)));
+        assertEquals(List.of(), tson(LOOK_ALIKES).validate(document));
+    }
+
+    @Test
+    void theElementsOfASetOfNames() {
+        String document = "!!schema:\"" + ID + "\"\n!team { roles: [pass " + CYRILLIC_PASS + "] }";
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES), codes(tson(IdentifierPolicy.defaults())
                 .validate(document)));
         assertEquals(List.of(), tson(LOOK_ALIKES).validate(document));

@@ -18,13 +18,14 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * [TSON-DATA] §8.2's name hygiene at a value whose type is an identifier family. Each such value meets the two
  * per-name rules under the read's identifier policy and its family's own profile, and the keys of a map whose key
- * type is one are a naming scope ([TSON-SCHEMA] §11.4), so no two may read alike.
+ * type is one, and the elements of a set of one, are a naming scope ([TSON-SCHEMA] §11.4), so no two may read alike.
  *
  * <p>The scope is isolated by a pair of names that are each single-script -- Latin {@code pass} beside Cyrillic
  * {@code раѕѕ} -- since a within-word homograph such as {@code аdmin} is refused as a restricted script before the
@@ -51,11 +52,18 @@ class IdentifierValueHygieneTest {
               labels => { text => text }
               route => { name: identifier }
               registry => { handlers: { identifier => text } }
+              team => { roles: set<identifier> }
+              ranked => !array { element_type: identifier  unique_items: true }
+              lists => { path: [identifier]  tags: set<text>  counts: set<int32> }
             }
             """;
 
     @Typename(name = "registry")
     public record Registry(Map<String, String> handlers) {
+    }
+
+    @Typename(name = "team")
+    public record Team(Set<String> roles) {
     }
 
     private static Tson tson(IdentifierPolicy identifiers) {
@@ -69,7 +77,7 @@ class IdentifierValueHygieneTest {
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withIdentifierPolicy(identifiers)
                 .withDataBindContext(DataBindContext.builder()
-                        .nameBinder(DataNameBinder.ofMap(Map.of("registry", Registry.class))
+                        .nameBinder(DataNameBinder.ofMap(Map.of("registry", Registry.class, "team", Team.class))
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
     }
@@ -194,5 +202,56 @@ class IdentifierValueHygieneTest {
         tson.objectReader().withDiagnostics(problems).read("!!schema:\"" + ID + "\"\n!registry { handlers: { pass => a  "
                 + CYRILLIC_PASS + " => b } }", Registry.class);
         assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, only(problems.diagnostics()).code());
+    }
+
+    /** A set of names is one scope, as an identifier-keyed map's keys are; the pair is refused at the second. */
+    @Test
+    void twoSetElementsThatReadAlikeAreRefusedAtTheSecond() {
+        Diagnostic refused = only(validate("!team { roles: [pass " + CYRILLIC_PASS + "] }"));
+        assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, refused.code());
+        assertEquals(Optional.of("/roles/1"), refused.path());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, only(validate("!team { roles: [pass pass] }")).code(),
+                "a repeat is the duplicate it is, and not also a pair that reads alike");
+    }
+
+    /** Uniqueness makes the scope, not being a set: an ordered array whose elements are unique is one too. */
+    @Test
+    void anOrderedArrayOfUniqueNamesIsAScopeToo() {
+        Diagnostic refused = only(validate("!ranked [pass " + CYRILLIC_PASS + "]"));
+        assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, refused.code());
+        assertEquals(Optional.of("/1"), refused.path());
+        assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, only(validate("!ranked [admin " + MIXED + "]")).code());
+    }
+
+    /** Repetition is admitted in an array, so it claims nothing about its elements; a set of text holds values. */
+    @Test
+    void anArrayOfNamesAndASetOfTextAreNotScopes() {
+        assertEquals(List.of(), validate("!lists { path: [pass " + CYRILLIC_PASS + "]  tags: [pass " + CYRILLIC_PASS
+                + "]  counts: [] }"));
+    }
+
+    /** Object binding reads the set through its own reader, and refuses the same pair. */
+    @Test
+    void bindingRefusesTheSameElements() {
+        DiagnosticsCollector problems = new DiagnosticsCollector();
+        tson(IdentifierPolicy.defaults()).objectReader().withDiagnostics(problems)
+                .read("!!schema:\"" + ID + "\"\n!team { roles: [pass " + CYRILLIC_PASS + "] }", Team.class);
+        assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, only(problems.diagnostics()).code());
+    }
+
+    /**
+     * An element that fails to read is reported as itself and leaves the set's duplicate check alone: it has no
+     * value to compare. Whether it failed its form or was refused as a name, in tree and bind modes alike.
+     */
+    @Test
+    void aSetElementThatFailsIsReportedAndNothingElse() {
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID,
+                only(validate("!lists { path: []  tags: []  counts: [1 x 2] }")).code());
+        assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, only(validate("!team { roles: [admin " + MIXED + "] }")).code());
+
+        DiagnosticsCollector problems = new DiagnosticsCollector();
+        tson(IdentifierPolicy.defaults()).objectReader().withDiagnostics(problems)
+                .read("!!schema:\"" + ID + "\"\n!team { roles: [admin " + MIXED + "] }", Team.class);
+        assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, only(problems.diagnostics()).code());
     }
 }

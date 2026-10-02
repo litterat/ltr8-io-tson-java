@@ -1,14 +1,19 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.annotation.Annotated;
 import io.ltr8.tson.base.diagnostics.ArrayDiagnostics;
+import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.tree.TsonAtom;
 
 import java.math.BigInteger;
 import java.util.Optional;
@@ -58,9 +63,15 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
     /** This array's rules, shared with the JSON reader ([TSON-JSON] §9.4). */
     final ArrayDiagnostics rules;
 
+    /**
+     * Whether this array's elements are unique names -- {@link #elementsAreNames} -- and so one look-alike scope.
+     */
+    final boolean elementsAreNames;
+
     ArrayAbstractReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
-                         SchemaLocation schemaLocation) {
-        this(name, displayName, body, resolver.resolve(body.elementType().name()), schemaLocation);
+                         SchemaLocation schemaLocation, boolean elementsAreNames) {
+        this(name, displayName, body, resolver.resolve(body.elementType().name()), schemaLocation,
+                elementsAreNames);
     }
 
     /**
@@ -70,13 +81,27 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      * them needs.
      */
     ArrayAbstractReader(String name, String displayName, ArrayBody body, TsonTypeReader<?> elementParser,
-                         SchemaLocation schemaLocation) {
+                         SchemaLocation schemaLocation, boolean elementsAreNames) {
         this.name = name;
         this.displayName = displayName;
         this.body = body;
         this.elementParser = elementParser;
         this.schemaLocation = schemaLocation;
         this.rules = new ArrayDiagnostics(displayName);
+        this.elementsAreNames = elementsAreNames;
+    }
+
+    /**
+     * Whether {@code body}'s elements are unique names: {@code unique_items} holds -- a set, or any array marked so
+     * -- and its element type is an identifier family, so the elements are one naming scope as an identifier-keyed
+     * map's keys are ([TSON-SCHEMA] §11.4). Uniqueness is what says two elements name two things, so an array that
+     * admits repetition is not one.
+     */
+    static boolean elementsAreNames(ArrayBody body, ValueReaderContext context) {
+        return body.uniqueItems() && ReferenceChain.terminalDefinition(body.elementType().name(),
+                        context.schema().entries())
+                .map(element -> element.body() instanceof IdentifierType)
+                .orElse(false);
     }
 
     /**
@@ -105,9 +130,17 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      * ArrayEnd} arrives. Keeps decoding every remaining element after one fails (a {@code null}
      * placeholder is handed to {@code sink} for that element, never skipped) so later elements' own
      * {@link TsonReadContext#index} positions stay accurate against the original data.
+     *
+     * <p>A {@code null} element -- absent, or one whose reading refused it -- is no member of a set's duplicate
+     * check, there being no value to compare. Where {@link #elementsAreNames}, an element reading alike with an
+     * earlier one is reported ({@code CONFUSABLE_NAMES}) at its own index, as §8.2 places a refused pair; a
+     * duplicate is the duplicate it is and nothing else. The scope is built only for such a set, and only where
+     * the read's identifier policy applies skeleton distinctness.
      */
     final void readInto(TsonReadContext ctx, Consumer<Object> sink) {
         Set<Object> seen = body.uniqueItems() ? new LinkedHashSet<>() : null;
+        ConfusableNames.Scope names = elementsAreNames && ctx.identifierPolicy().appliesSkeletonDistinctness()
+                ? new ConfusableNames.Scope() : null;
         int index = 0;
         while (!(ctx.peek() instanceof ArrayEnd)) {
             SchemaRef push = ScopePush.notAdmitted(ctx, elementParser);
@@ -116,14 +149,34 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
             }
             Object decoded = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(index, ctx)
                     : elementParser.read(ctx.index(index));
-            if (seen != null && !seen.add(ValueIdentity.of(decoded))) {
-                ctx.index(index).report(rules.repeatedElement(Rendered.value(decoded)));
+            if (seen != null && decoded != null) {
+                if (!seen.add(ValueIdentity.of(decoded))) {
+                    ctx.index(index).report(rules.repeatedElement(Rendered.value(decoded)));
+                } else if (names != null && nameOf(decoded) instanceof String name) {
+                    Optional<ConfusableNames.Collision> collision = names.add(name);
+                    if (collision.isPresent()) {
+                        ctx.index(index).report(rules.confusableElements(collision.get()));
+                    }
+                }
             }
             sink.accept(decoded);
             index++;
         }
         ctx.next(); // ArrayEnd
         validateSize(index, ctx);
+    }
+
+    /**
+     * The name an element of a unique array of names decoded to, whichever mode read it: the text itself in object binding,
+     * boxed where the bound element is {@code Annotated}, and a tree's atom node.
+     */
+    private static String nameOf(Object decoded) {
+        return switch (decoded) {
+            case String text -> text;
+            case TsonAtom atom when atom.value() instanceof String text -> text;
+            case Annotated<?> annotated when annotated.value() instanceof String text -> text;
+            default -> null;
+        };
     }
 
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for the `actual` of an element-state rule. */

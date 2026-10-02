@@ -1,5 +1,6 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
@@ -9,6 +10,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -22,6 +24,10 @@ import java.util.Set;
  * duplicate is depends on what the element reader produced, so bind mode compares the host values its elements
  * decode to, and tree mode the identity its atom elements carry beside their nodes
  * ({@link ValueIdentity.Identified}).
+ *
+ * <p><b>Unique names are a look-alike scope</b> ({@link ArrayPlan#elementsAreNames}): an element reading alike with
+ * an earlier one is refused at its own index, the name being the identity its element decoded to. A refused or
+ * absent element is in neither check, there being no value to compare.
  */
 final class ArrayReader implements JsonTypeReader<Object> {
 
@@ -62,6 +68,8 @@ final class ArrayReader implements JsonTypeReader<Object> {
         int reportedBefore = ctx.reported();
         List<Object> elements = new ArrayList<>();
         Set<Object> seen = plan.unique() ? new HashSet<>() : null;
+        ConfusableNames.Scope names = plan.elementsAreNames() && ctx.identifierPolicy().appliesSkeletonDistinctness()
+                ? new ConfusableNames.Scope() : null;
         while (!(ctx.peek() instanceof JsonEvent.ArrayEnd)) {
             int index = elements.size();
             JsonReadContext at = ctx.index(index);
@@ -87,6 +95,11 @@ final class ArrayReader implements JsonTypeReader<Object> {
                 }
                 if (!seen.add(identity)) {
                     at.report(plan.rules().repeatedElement(Nodes.rendered(value)));
+                } else if (names != null && identity instanceof String name) {
+                    Optional<ConfusableNames.Collision> collision = names.add(name);
+                    if (collision.isPresent()) {
+                        at.report(plan.rules().confusableElements(collision.get()));
+                    }
                 }
             }
             elements.add(value);

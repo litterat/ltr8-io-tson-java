@@ -25,9 +25,8 @@ import java.util.Optional;
 final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
 
     public ArrayTreeReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
-                           SchemaLocation schemaLocation,
-                            AnnotationTypes annotationTypes) {
-        super(name, displayName, body, resolver, schemaLocation);
+                           SchemaLocation schemaLocation, AnnotationTypes annotationTypes, boolean elementsAreNames) {
+        super(name, displayName, body, resolver, schemaLocation, elementsAreNames);
         this.annotationTypes = annotationTypes;
     }
 
@@ -44,7 +43,7 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
             }
             return new ArrayTreeReader(name, EntryDisplayName.of(name, typeDefinition), body, resolver,
                     context.locationOf(name, typeDefinition),
-                    AnnotationTypes.of(context));
+                    AnnotationTypes.of(context), elementsAreNames(body, context));
         }
     }
 
