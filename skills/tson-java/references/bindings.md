@@ -46,7 +46,7 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `uuid`                                          | `UUID`                                          |
 | `date` / `time` / `datetime`                    | `LocalDate` / `OffsetTime` / `OffsetDateTime`   |
 | `duration` / `period`                           | `java.time.Duration` / `java.time.Period`       |
-| `uri`                                           | `URI`                                           |
+| `uri` / `uri_reference` / `iri` / `iri_reference` | `URI`                                         |
 | `ipv4` / `ipv6`                                 | `Inet4Address` / `Inet6Address`                 |
 | `cidr4` / `cidr6`                               | `io.ltr8.tson.base.atom.CidrInet4Network` / `CidrInet6Network` |
 | `bytes` (and any `!bytes_type { encoding: … }` instance) | `byte[]`                               |

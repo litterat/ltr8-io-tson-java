@@ -63,10 +63,10 @@ class TsonTest {
         Tson tson = Tson.standard();
 
         TsonLinkedSchema linked = tson.resolve(TINY_DOCUMENT);
-        // Merged view: the two local declarations, plus core.tn's own 53 imported entries --
+        // Merged view: the two local declarations, plus core.tn's own 56 imported entries --
         // TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved TsonSchema
         // resolve()'s own resolution step produces internally, which stays local-only.
-        assertEquals(55, linked.schema().entries().size());
+        assertEquals(58, linked.schema().entries().size());
         assertTrue(linked.schema().entries().containsKey("my_int"));
         assertTrue(linked.schema().entries().containsKey("my_percentage"));
 

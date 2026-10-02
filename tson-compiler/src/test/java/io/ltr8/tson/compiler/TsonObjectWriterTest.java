@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import org.junit.jupiter.api.Test;
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 import io.ltr8.tson.compiler.TsonObjectReaderTest.BytesHolder;
@@ -29,6 +30,7 @@ import io.ltr8.tson.compiler.TsonObjectReaderTest.UserDurationHolder;
 import io.ltr8.tson.compiler.TsonObjectReaderTest.UserFraction;
 import io.ltr8.tson.compiler.TsonObjectReaderTest.UserFractionBridge;
 import io.ltr8.tson.compiler.TsonObjectReaderTest.UserFractionHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UriHolder;
 import io.ltr8.tson.compiler.TsonObjectReaderTest.UuidHolder;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -120,6 +122,32 @@ class TsonObjectWriterTest {
         String tson = writer.toTson(original);
         assertEquals("{ value: !uuid \"9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09\" }", tson);
         assertEquals(original, reader.read(tson, UuidHolder.class));
+    }
+
+    /**
+     * One host class, two atoms: a {@code java.net.URI} with a scheme is written {@code !uri}, and one
+     * without is written {@code !uri_reference}, which is the atom that reads it back.
+     */
+    @Test
+    void writeUriNamesTheAtomTheValueBelongsTo() throws DataBindException {
+        UriHolder absolute = new UriHolder(URI.create("https://example.com/a?x=1"));
+        UriHolder relative = new UriHolder(URI.create("foo/bar?x=1"));
+
+        assertEquals("{ value: !uri \"https://example.com/a?x=1\" }", writer.toTson(absolute));
+        assertEquals("{ value: !uri_reference \"foo/bar?x=1\" }", writer.toTson(relative));
+        assertEquals(relative, reader.read(writer.toTson(relative), UriHolder.class));
+    }
+
+    /** A value beyond US-ASCII is an IRI, written {@code !iri} or {@code !iri_reference} so that it reads back. */
+    @Test
+    void writeIriNamesTheAtomTheValueBelongsTo() throws DataBindException {
+        UriHolder absolute = new UriHolder(URI.create("https://example.com/caf\u00E9"));
+        UriHolder relative = new UriHolder(URI.create("caf\u00E9/men\u00FC"));
+
+        assertEquals("{ value: !iri \"https://example.com/caf\u00E9\" }", writer.toTson(absolute));
+        assertEquals("{ value: !iri_reference \"caf\u00E9/men\u00FC\" }", writer.toTson(relative));
+        assertEquals(absolute, reader.read(writer.toTson(absolute), UriHolder.class));
+        assertEquals(relative, reader.read(writer.toTson(relative), UriHolder.class));
     }
 
     @Test

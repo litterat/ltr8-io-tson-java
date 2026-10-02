@@ -60,6 +60,7 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.Sum;
+import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.ValueType;
@@ -1217,6 +1218,8 @@ public final class TsonSchemaLinker {
             case TextType ignored -> {
             }
             case UriType ignored -> {
+            }
+            case IriType ignored -> {
             }
             case RegexType ignored -> {
             }

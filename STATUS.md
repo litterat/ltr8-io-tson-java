@@ -16,8 +16,8 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       sentinel `_`
 - [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, `positive_integer` and siblings
 - [x] Decimal/float types — `number`, `float32`, `float64`, `rational`, `complex`
-- [x] Identifier/network/text types — `uuid`, `uri`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `email`,
-      `text`, `regex` (RFC 9485 I-Regexp)
+- [x] Identifier/network/text types — `uuid`, `uri`, `uri_reference`, `iri`, `iri_reference`, `ipv4`, `ipv6`, `cidr4`,
+      `cidr6`, `mac`, `email`, `text`, `regex` (RFC 9485 I-Regexp)
 - [x] Binary type — `bytes`, with its encoding (`base64`, `base64url`, `base32`, `hex`) chosen by the type
 - [x] Temporal types — `date`, `time`, `datetime`, `duration`, `period`
 - [x] Object binding — Java records, hand-written immutable classes, `Map<K, V>`, tuples, plain

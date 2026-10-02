@@ -212,9 +212,31 @@
   }
 
   @ordered:NONE @bounded:false
+  uri_reference => !type_definition {
+    source: uri_type
+    subtypes: [uri]
+    body: !uri_type {}
+  }
+
+  @ordered:NONE @bounded:false
   uri => !type_definition {
     source: uri_type
-    body: !uri_type {}
+    supertypes: [uri_reference]
+    body: !uri_type { allow_relative: false }
+  }
+
+  @ordered:NONE @bounded:false
+  iri_reference => !type_definition {
+    source: iri_type
+    subtypes: [iri]
+    body: !iri_type {}
+  }
+
+  @ordered:NONE @bounded:false
+  iri => !type_definition {
+    source: iri_type
+    supertypes: [iri_reference]
+    body: !iri_type { allow_relative: false }
   }
 
   @ordered:NONE @bounded:false

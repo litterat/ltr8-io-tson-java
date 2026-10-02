@@ -252,19 +252,26 @@
   uri_type => !type_definition {
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length  type: non_negative_integer  optional: true }
-      !record_field { name: max_length  type: non_negative_integer  optional: true }
-      !record_field { name: length      type: non_negative_integer  optional: true }
-      !record_field { name: pattern     type: regex    optional: true }
-      !record_field { name: members     type: text_member_set  optional: true }
-      !record_field { name: spec        type: uri   optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
-      !record_field { name: scheme      type: text  optional: true }
+      !record_field { name: min_length      type: non_negative_integer  optional: true }
+      !record_field { name: max_length      type: non_negative_integer  optional: true }
+      !record_field { name: length          type: non_negative_integer  optional: true }
+      !record_field { name: pattern         type: regex    optional: true }
+      !record_field { name: members         type: text_member_set  optional: true }
+      !record_field { name: spec            type: uri      optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
+      !record_field { name: schemes         type: scheme_set  optional: true }
+      !record_field { name: allow_relative  type: boolean  optional: true  role: DEFAULT  value: true }
+      !record_field { name: allow_fragment  type: boolean  optional: true  role: DEFAULT  value: true }
     ] }
+  }
+
+  scheme_set => !type_definition {
+    source: set_type
+    body: !set_type { element_type: text  min_items: 1 }
   }
 
   uri => !type_definition {
     source: uri_type
-    body: !uri_type {}
+    body: !uri_type { allow_relative: false }
   }
 
   regex_type => !type_definition {

@@ -193,6 +193,19 @@ It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recover
   network must be a subnet of a permitted one and must not overlap an excluded one — the difference being
   that a block partly inside an exclusion is partly excluded, which for a value denoting a whole block is a
   rejection.
+- **`uri`/`uri_reference` (`uri_type`, RFC 3986) and `iri`/`iri_reference` (`iri_type`, RFC 3987) share
+  `java.net.URI`.** Each `_reference` admits a relative reference and its sibling withdraws `allow_relative`; a
+  URI is US-ASCII, and an IRI is judged through the URI it maps to (`IriParser`). Every one of them is an
+  IRI-reference, so `HostAtoms` answers the class with `iri_reference`, the widest — one class over two
+  families answers here, where the CIDR pair's does not, because one family's value space contains the
+  other's. `VocabularyAtoms` names the
+  atom per value — `iri` once a character is beyond US-ASCII, `_reference` where there is no scheme — so a
+  written value reads back. `iri_type`'s facets are `uri_type`'s, compared by `UriType`'s rules through
+  `IriType.uriFacets`. A directive argument is read as `iri_reference` ([TSON-DATA] §3.3: a reference or a file
+  reference, its name free to reach beyond US-ASCII); whether an identity is absolute is §2.2.1's question,
+  asked where the identity is formed.
+  The facets narrow by kind: `schemes` is a member set compared case-insensitively (RFC 3986
+  §3.1), and `allow_relative` and `allow_fragment` are permissions, as `float_type`'s `allow_*` flags are.
 - **A CIDR value is a network, not its text, and a family each** — `cidr4` reads to
   `base.atom.CidrInet4Network` and `cidr6` to `CidrInet6Network` (the prefix octets and the prefix length),
   so two spellings of one network are one value and `2001:0db8:0000:…/32` binds equal to `2001:db8::/32`.

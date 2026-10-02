@@ -66,6 +66,7 @@ enum DiscriminationClass {
             case io.ltr8.tson.schema.meta.TextType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.IdentifierType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.UriType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.meta.IriType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.RegexType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.UuidType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.DateType ignored -> Optional.of(STRING);

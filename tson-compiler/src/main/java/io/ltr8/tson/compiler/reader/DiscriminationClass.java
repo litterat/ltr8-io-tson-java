@@ -28,6 +28,7 @@ import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
@@ -89,6 +90,7 @@ public enum DiscriminationClass {
             case TextType ignored -> Optional.of(STRING);
             case IdentifierType ignored -> Optional.of(STRING);
             case UriType ignored -> Optional.of(STRING);
+            case IriType ignored -> Optional.of(STRING);
             case RegexType ignored -> Optional.of(STRING);
             case UuidType ignored -> Optional.of(STRING);
             case DateType ignored -> Optional.of(STRING);

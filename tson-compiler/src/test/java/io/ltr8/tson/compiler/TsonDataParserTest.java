@@ -153,6 +153,18 @@ class TsonDataParserTest {
     // checked via java.net.URI's own constructor, the same JDK type (and the same accepted
     // RFC-2396-vs-3986 gap) UriParser binds !uri through.
 
+    /** A directive argument is an IRI-reference, so a name beyond US-ASCII is written as itself. */
+    @Test
+    void directiveArgumentsMayCarryCharactersBeyondUsAscii() {
+        Document doc = parse("""
+                !!id:"https://example.com/donn\u00E9es/1042.tn"
+                !!schema:"https://example.com/sch\u00E9mas/order.tn"
+                Alice
+                """);
+        assertEquals("https://example.com/donn\u00E9es/1042.tn", doc.id().orElseThrow());
+        assertEquals("https://example.com/sch\u00E9mas/order.tn", doc.schema().orElseThrow());
+    }
+
     @Test
     void idDirectiveArgumentMustBeAValidUri() {
         // An unescaped space is not valid anywhere in a URI.

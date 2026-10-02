@@ -37,7 +37,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
             // meta.tn
             "bytes_type", "float_type", "decimal_type", "rational_type", "date_type", "time_type",
             "datetime_type", "duration_type", "period_type", "uuid_type", "complex_type", "mac_type",
-            "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type");
+            "iri_type", "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type");
 
     private final Map<String, ValueReaderFactory> factories;
 
