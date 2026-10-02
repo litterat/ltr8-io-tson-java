@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=c5e78ffb6754a22e4e4b40ff865484ba3c0ae57de4b88c2f8250b4b44aff1b52"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=485fa3af5ebaa2ec2ed9d6206a2f169f78a92515e89752abcefb26817f430ad7"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -217,7 +217,7 @@
     — which is what an inline form would give, array sugar being the only
     inline container — loses all three.
     """
-  integer_member_set => !set_type { element_type: integer }
+  integer_member_set => !set_type { element_type: integer  min_items: 1 }
 
   @doc:"""
     Integer constraint vocabulary. Atom constructor whose instance,
@@ -301,7 +301,7 @@
   non_negative_integer => !integer ^ { min: 0 }
 
   @doc:"A named entry for the same reasons integer_member_set is one."
-  text_member_set => !set_type { element_type: text }
+  text_member_set => !set_type { element_type: text  min_items: 1 }
 
   @doc:"""
     Text constraint vocabulary. Atom constructor whose instance,
@@ -699,17 +699,10 @@
   }
 
   @doc:"""
-    The unordered, unique refinement of array. `min_items` carries a
-    default of 1 rather than inheriting array's absent lower bound:
-    the empty set is a set, so this is a default and not a fixed
-    value — `!set_type { element_type: text  min_items: 0 }` spells
-    it — but every set in the meta layer wants a non-empty one, and a
-    default is what makes non-emptiness the thing an author gets
-    without writing it and emptiness the thing they ask for. The
-    restatement `min_items?: non_negative_integer ~ 1` gives the
-    field a DEFAULT where array's is FREE, so omission yields 1
-    rather than nothing ([TSON-SCHEMA] §5.2) — a tightening, since a
-    set admits fewer values than the array it refines.
+    The unordered, unique refinement of array. Its bounds are array's:
+    the empty set is a set, as the empty array and the empty map are
+    values of theirs, and a set that must be non-empty says
+    `min_items: 1`.
 
     Named `set_type`, with the atom constructors' suffix, because the
     bare name is taken by the template an author actually writes:
@@ -718,10 +711,9 @@
     no such template and applies the constructor directly.
     """
   set_type => array ^ {
-    state?:       = REQUIRED
+    state?:        = REQUIRED
     ordered?:      = false
     unique_items?: = true
-    min_items?:    non_negative_integer ~ 1
   }
 
   map => product & {
@@ -747,7 +739,7 @@
     ([TSON-SCHEMA] §5.2), sets have no bracket sugar, and the `set<T>`
     template lives in meta, out of the kernel's reach.
     """
-  enum_set => !set_type { element_type: text }
+  enum_set => !set_type { element_type: text  min_items: 1 }
 
   @doc:"""
     An enumeration: a closed set of labels, and the type they are

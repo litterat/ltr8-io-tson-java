@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=7b326d680954db2e214c737c2ea9cac0ffb745a2a76c9323ce83f8bb734a5b5d"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=c5e78ffb6754a22e4e4b40ff865484ba3c0ae57de4b88c2f8250b4b44aff1b52"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=c5e78ffb6754a22e4e4b40ff865484ba3c0ae57de4b88c2f8250b4b44aff1b52"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=3fb671165f786c0dfcafb5e68d088fbf086d95e7148acb8214cf9dc9e9a8203d"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=485fa3af5ebaa2ec2ed9d6206a2f169f78a92515e89752abcefb26817f430ad7"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=485fa3af5ebaa2ec2ed9d6206a2f169f78a92515e89752abcefb26817f430ad7"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 
@@ -31,9 +31,8 @@
      name earns a user template.
 
   2. The `set` template — the `set<T>` spelling of the kernel's
-     `set_type` constructor, declared here for meta's own fields and
-     for meta-layer extensions; core declares a sibling for user
-     schemas.
+     `set_type` constructor, declared here for meta-layer extensions;
+     core declares a sibling for user schemas.
 
   3. Constraint vocabulary constructors for atom families that the
      kernel itself doesn't need: numeric (`float_type` for the
@@ -124,10 +123,10 @@
     arrives by application rather than by a parameter on the
     constructor itself.
 
-    This copy serves meta's own fields (`scoped.scope`) and meta-layer
-    extensions. Core declares a sibling under the same name, as it
-    does for `void`, so that user schemas reach it through their core
-    import rather than through the governing namespace.
+    This copy serves meta-layer extensions. Core declares a sibling
+    under the same name, as it does for `void`, so that user schemas
+    reach it through their core import rather than through the
+    governing namespace.
     """
   set => <T> !set_type { element_type: T }
 
@@ -194,6 +193,9 @@
     """
   scope_kind => !enum [LOCAL EXTERN]
 
+  @doc:"The namespaces a scoped instance admits; non-empty, as an empty scope admits nothing."
+  scope_set => !set_type { element_type: scope_kind  min_items: 1 }
+
   @doc:"""
     Constructor for open sum types: the value names its own type, and
     the instance names the namespaces that name may be resolved in.
@@ -215,15 +217,9 @@
     min_items: 1 on both collections. One coherence rule, of the family
     a resolver already runs over min_items/max_items: `schemas`
     requires EXTERN in `scope`.
-
-    `scope` is written `set<scope_kind>` inline. §5.2 prohibits a `!`
-    constructor application at a field position, which is why the
-    kernel's own set-typed fields are named entries; a §5.10 template
-    application is not one, so a schema the resolver materialises can
-    write it where it stands.
     """
   scoped => sum & {
-    scope:    set<scope_kind>
+    scope:    scope_set
     schemas?: {uri => [type_name; 1..]?; 1..}
   }
 
@@ -281,6 +277,9 @@
     allow_negative_zero?: boolean ~ true
   }
 
+  @doc:"A named entry for the same reasons the kernel's integer_member_set is one."
+  decimal_member_set => !set_type { element_type: value  min_items: 1 }
+
   @doc:"""
     Exact-numeric constraint vocabulary (SQL's exact tier; ISO/IEC
     11404 `scaled`, radix 10). Instance in core is `number` — the
@@ -320,7 +319,7 @@
     multiple_of?:     value
     total_digits?:    non_negative_integer
     fraction_digits?: non_negative_integer
-    members?:         set<value>
+    members?:         decimal_member_set
   }
 
   @doc:"""

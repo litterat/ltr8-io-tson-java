@@ -40,6 +40,12 @@
     body: !enum { members: [LOCAL EXTERN] }
   }
 
+  @doc:"The namespaces a scoped instance admits; non-empty, as an empty scope admits nothing."
+  scope_set => !type_definition {
+    source: set_type
+    body: !set_type { element_type: scope_kind  min_items: 1 }
+  }
+
   @doc:"The set spelling an author writes: a template over the parameterless set_type constructor."
   set => !type_definition {
     source: set_type
@@ -55,7 +61,7 @@
   scoped => !type_definition {
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
-      !record_field { name: scope    type: set_scope_kind_xxhash }
+      !record_field { name: scope    type: scope_set }
       !record_field { name: schemas  type: map_uri_array_type_name_1_ef020ac1_OPTIONAL_1_xxhash  optional: true }
     ] }
   }
@@ -87,6 +93,12 @@
     ] }
   }
 
+  @doc:"A named entry for the same reasons the kernel's integer_member_set is one."
+  decimal_member_set => !type_definition {
+    source: set_type
+    body: !set_type { element_type: value  min_items: 1 }
+  }
+
   @doc:"Exact-numeric constraint vocabulary (SQL exact tier; ISO/IEC 11404 scaled, radix 10). Instance is `number` in core."
   decimal_type => !type_definition {
     supertypes: [atom top]
@@ -98,7 +110,7 @@
       !record_field { name: multiple_of      type: value    optional: true }
       !record_field { name: total_digits     type: non_negative_integer  optional: true }
       !record_field { name: fraction_digits  type: non_negative_integer  optional: true }
-      !record_field { name: members          type: set_value_xxhash  optional: true }
+      !record_field { name: members          type: decimal_member_set  optional: true }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -399,30 +411,5 @@
   @synthetic map_uri_array_type_name_1_ef020ac1_OPTIONAL_1_xxhash => !type_definition {
     source: map
     body: !map { key_type: uri  value_type: array_type_name_1_xxhash  state: OPTIONAL  min_items: 1 }
-  }
-
-  @synthetic set_type_scope_kind_xxhash => !type_definition {
-    source: set_type
-    body: !set_type { element_type: scope_kind  min_items: 1 }
-  }
-
-  @doc:"""
-    Instantiation entries — what a template application closes to. Unlike
-    a synthetic these carry no `@synthetic` marker: their `source` is an
-    application where a synthetic's is a bare constructor (Section 8.2).
-    """
-  set_scope_kind_xxhash => !type_definition {
-    source: { name: set  arguments: [ { name: scope_kind } ] }
-    body: !reference { target: set_type_scope_kind_xxhash }
-  }
-
-  @synthetic set_type_value_xxhash => !type_definition {
-    source: set_type
-    body: !set_type { element_type: value  min_items: 1 }
-  }
-
-  set_value_xxhash => !type_definition {
-    source: { name: set  arguments: [ { name: value } ] }
-    body: !reference { target: set_type_value_xxhash }
   }
 }
