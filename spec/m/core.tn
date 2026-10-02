@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=34ce43c491b5fd68568e128c3a54cf2cebfd89bd1e75e556d673073ce17a37bb"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=545f35360b079e616956c8d45dfdab6ca65550dd3464690d99373e2c04137836"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=a170e573a531e8e39715ca8e95bcba28fadf347e21236a92efb7ec915c42cf52"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=58d7124b6d4441f967b2648a0011c26036be37422179ab6a79f24626cad1f520"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -211,9 +211,24 @@
   @ordered:NONE @bounded:false
   regex => !regex_type {}
 
-  @doc:"Uniform Resource Identifier per RFC 3986."
+  @doc:"A URI-reference (RFC 3986 §4.1): a URI or a relative reference."
   @ordered:NONE @bounded:false
-  uri => !uri_type {}
+  uri_reference => !uri_type {}
+
+  @doc:"A URI (RFC 3986 §3): the scheme is required."
+  @ordered:NONE @bounded:false
+  uri => !uri_reference ^ { allow_relative: false }
+
+  @doc:"""
+    An IRI-reference (RFC 3987 §2.2): an IRI or a relative reference, its
+    characters drawn from RFC 3987's grammar, beyond US-ASCII included.
+    """
+  @ordered:NONE @bounded:false
+  iri_reference => !iri_type {}
+
+  @doc:"An IRI (RFC 3987 §2.2): the scheme is required."
+  @ordered:NONE @bounded:false
+  iri => !iri_reference ^ { allow_relative: false }
 
   @doc:"""
     Octet sequence. The universal binary type, and the only one: a field is

@@ -52,6 +52,11 @@ home.
 #10 makes order a facet every container states, which a map needs before #2's keyed sets can be maps.
 #11 drops `set_type`'s non-empty default, so a set's bounds are an array's and the empty set is a set.
 #12 adds `tuple1<T>` and `optional_tuple1<T>` to core, the one-position tuple the bracket sugar cannot spell.
+#13 is part defect and part proposal: `uri` cites RFC 3986's URI and was read as its URI-reference, so the two
+become two atoms, `uri` and `uri_reference`, and `uri_type`'s facets take RFC 3986's other distinctions: a scheme
+set in place of one scheme, and a fragment permission.
+#14 adds RFC 3987's IRI as a family of its own, `iri_type`, with core's `iri` and `iri_reference`, holds `uri` to
+US-ASCII, and reads a directive argument as an IRI-reference.
 
 ---
 
@@ -1292,5 +1297,125 @@ them as open entries, and both read as above in tree mode. Nothing else changes:
 sugar's two-position minimum stands.
 
 **Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
+
+**Status against Revision 36:** open.
+
+---
+
+## 13. `uri` should be RFC 3986's URI beside a `uri_reference`, and `uri_type`'s facets should follow RFC 3986
+
+**Section:** [TSON-DATA] §5.5 (the table: "`!uri` | RFC 3986 | URI"), §3.3 (a directive argument "is a URI or file
+reference (RFC 3986)"), §2.2.1 (an identifying URI is absolute); [TSON-SCHEMA] §9 (the meta layer's table:
+"`uri_type`/`uri`"; core's same-named sibling).
+
+**Kind:** defect and proposal — three kernel facets (one replacing `scheme`), a core atom, and a Part 1 vocabulary
+entry.
+
+**What the spec says today.** RFC 3986 names two productions with two value spaces: a **URI** (§3), which has a
+scheme, and a **URI-reference** (§4.1), which is a URI or a relative reference (§4.2). §5.5's table cites RFC 3986
+and names the first, and nothing in either part says which production `!uri` reads. The corpus pinned the second
+(`!uri "foo/bar?x=1"` valid), and so did this implementation, by reading through a URI parser that accepts both.
+`uri_type`'s facets cannot recover the URI from the reference: `scheme` pins one scheme and cannot require some
+scheme, and a `pattern` doing it occupies the one position `pattern` has (§5.7, settable once), so a schema
+converted from JSON Schema — whose `uri`, `iri` and `url` formats require a scheme and whose `uri-reference` does
+not — loses its own pattern wherever it states one beside such a format. The kernel's own uses want the URI:
+`atom_specification.spec` and the keys of `scoped.schemas` are identities, which §2.2.1 already requires to be
+absolute, so the type admits values the identity rule then refuses. Two more of RFC 3986's distinctions have no
+facet either. `scheme: text` states one scheme, where the common constraint is a set ("`http` or `https`" — Pydantic's
+`allowed_schemes`, Joi's `scheme` list, class-validator's `protocols`), and §5.7 gives it no narrowing rule, so a
+refinement may swap one scheme for another. And §4.3's absolute-URI, a URI with no fragment, is the form §2.2.1
+demands of an identity, with no facet to state it.
+
+**Proposal.**
+
+- **`uri_type` gains a permission facet, `allow_relative?: boolean ~ true`.** Left at its default the value space
+  is the URI-reference; withdrawn it is the URI. It narrows as `float_type`'s `allow_*` flags do (§5.7): a
+  refinement may withdraw it and never grant it back.
+- **`scheme: text` becomes `schemes?: scheme_set`**, over a kernel `scheme_set => !set_type { element_type: text
+  min_items: 1 }`. Its members are compared case-insensitively, as §3.1 compares a scheme, and a value with no scheme
+  is outside any set. It narrows as every member set does (§5.7): a refinement's set is a subset of its source's.
+- **`uri_type` gains a second permission, `allow_fragment?: boolean ~ true`.** Withdrawn, it refuses a fragment
+  (§3.5), an empty one included; withdrawn beside `allow_relative`, the value space is §4.3's absolute-URI.
+- **The kernel's `uri` is `!uri_type { allow_relative: false }`.** `spec` and the `scoped.schemas` keys are then
+  typed by the value space §2.2.1 already demands of them.
+- **Core declares both**: `uri_reference => !uri_type {}` and `uri => !uri_reference ^ { allow_relative: false }`,
+  so `uri` IS-A `uri_reference` — every URI is a URI-reference — and §5.4's derived facts see the containment
+  rather than two unrelated text families.
+- **[TSON-DATA] §5.5's table gains `!uri_reference`** (RFC 3986, URI-reference), and `!uri`'s row says the
+  scheme is required. A relative reference under `!uri` is a validation error, not a parse error: the token is
+  inside the family's lexical space and outside the atom's value space, as a negative integer is under `!uint32`.
+- **§3.3's directive argument is a reference, not a URI**: its own text ("a URI or file reference") already admits
+  a relative one, and #14 widens it to an IRI-reference. The identity rule of §2.2.1 is where absoluteness is
+  demanded, unchanged.
+- **[TSON-JSON]'s family table names `uri_reference` beside `uri`**, a string in both cases (edited in place in
+  this repository's draft).
+
+**What is running** (`r2026-37-proposal`): the kernel's `uri_type` carries `schemes`, `allow_relative` and
+`allow_fragment`, and its `uri` withdraws `allow_relative`; core declares `uri_reference` and `uri` as above;
+`!uri_reference` is in the built-in vocabulary; `!uri` refuses `foo/bar` as a validation error; a scheme outside
+`schemes` and a fragment where `allow_fragment` is withdrawn are validation errors; a refinement that adds a scheme
+or restores either permission is a resolver error; directive arguments are read as `iri_reference` (#14); a writer
+names a `java.net.URI` `!uri` when it has a scheme and `!uri_reference` when it has none, so it reads back. The
+bundled schemas are re-pinned, and the corpus moves its relative-reference vector to `!uri_reference`, adds the
+refusal under `!uri`, and adds Class 2 vectors for each facet.
+
+**Interpretation chosen:** on `main`, `!uri` reads the URI-reference, as the corpus pins. On `r2026-37-proposal`,
+this entry.
+
+**Status against Revision 36:** open.
+
+---
+
+## 14. `iri_type` for RFC 3987, `uri` held to US-ASCII, and a directive argument an IRI-reference
+
+**Section:** [TSON-DATA] §5.5 (the table's `!uri` row, citing RFC 3986), §3.3 (a directive argument "is a URI or
+file reference (RFC 3986)"); [TSON-SCHEMA] §9 (meta's atom constructors,
+core's contents); [TSON-JSON] §5.6 (the text-form families).
+
+**Kind:** proposal — a meta constructor, two core atoms, two Part 1 vocabulary entries, and a rule for `uri`.
+
+**What the spec says today.** RFC 3986's URI is US-ASCII (§2); RFC 3987's IRI is the same structure with characters
+beyond it (`ucschar`, and `iprivate` within the query), and every URI is an IRI. The vocabulary names the first only.
+JSON Schema and OpenAPI name both — `iri` and `iri-reference` beside `uri` and `uri-reference` — so a schema
+converted from either has no atom for the IRI pair and must either widen to `text` or narrow to `uri`. Nothing in
+§5.5 says whether `!uri` admits a character beyond US-ASCII; an implementation reading through a lenient URI parser
+admits it, which makes `uri` an IRI type by accident, and one reading strictly refuses it, so the same document
+passes on one processor and fails on another (#13 reports the parallel case for relative references).
+
+**Proposal.**
+
+- **meta.tn declares `iri_type => text_type & atom_specification & { spec?: = "…/rfc3987"  schemes?: scheme_set
+  allow_relative?: boolean ~ true  allow_fragment?: boolean ~ true }`** — a family of its own because its grammar is
+  another RFC's, and `spec` names one grammar per constructor. Its facets are `uri_type`'s (#13), with the same
+  meaning and the same narrowing rules.
+- **Core declares `iri_reference => !iri_type {}` and `iri => !iri_reference ^ { allow_relative: false }`**, the
+  pair #13 gives `uri`. `uri` is not IS-A `iri`: families do not relate, and §5.4's derived facts already treat
+  every text-form family as overlapping, so nothing reads the containment.
+- **§5.5's table gains `!iri` and `!iri_reference`** (RFC 3987), and **`!uri`'s row says a URI is US-ASCII**: a
+  character beyond it is outside the URI grammar, a resolver error, not a validation one.
+- **An IRI is judged through the URI it maps to** (RFC 3987 §3.1): each character beyond US-ASCII is a `ucschar`,
+  or an `iprivate` inside the query, and the text with those characters percent-encoded as UTF-8 is a
+  URI-reference. Value identity is the text's; no normalisation is applied (RFC 3987 §5.3.1's simple string
+  comparison). §4's bidirectional-text rules are a SHOULD and stay one.
+- **§3.3's directive argument is an IRI-reference** rather than a URI or file reference under RFC 3986: a schema
+  published at, or a file named by, a path beyond US-ASCII is written as itself rather than percent-encoded, and
+  every argument valid today stays valid. Canonical identity (§2.2.1) is untouched: it compares the text as
+  written, and its restrictions on the form are §2.2.1's own.
+- **[TSON-JSON]'s family table names `iri` and `iri_reference`**, strings like `uri` (edited in place in this
+  repository's draft).
+
+**What is running** (`r2026-37-proposal`): meta's `iri_type` and core's `iri` and `iri_reference` as above, with
+`!iri` and `!iri_reference` in the built-in vocabulary; `!uri` and `!uri_reference` refuse a character beyond
+US-ASCII as a resolver error; `!iri` refuses a relative reference as a validation error and a character outside
+`ucschar` (or `iprivate` outside the query) as a resolver error; directive arguments are read, and written, as
+`iri_reference`. A host `java.net.URI` holds any of the four atoms'
+values; a writer names the narrowest that admits the value, so it reads back. The one departure from text identity
+is a library limit, not a proposal: the few `ucschar` characters `java.net.URI` reads as spaces are held
+percent-encoded, so the IRI is read rather than refused (`CONFORMANCE.md`). The bundled schemas are re-pinned, and
+the corpus adds Class 1 vectors for the IRI grammar and the US-ASCII rule, and Class 2 vectors for the two core
+atoms.
+
+**Interpretation chosen:** on `main`, `!uri` admits what `java.net.URI` admits, characters beyond US-ASCII included.
+On `r2026-37-proposal`, this entry.
 
 **Status against Revision 36:** open.

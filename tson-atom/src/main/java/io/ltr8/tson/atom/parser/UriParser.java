@@ -7,14 +7,18 @@ import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.schema.meta.UriType;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta-kernel's {@code uri_type} constructor (§5.5's {@code uri}
- * atom). Holds a {@link UriType} -- the pure constraint values, unchanged by this split -- rather
- * than declaring those fields itself.
+ * Parses and validates against meta-kernel's {@code uri_type} constructor (§5.5's {@code uri} and
+ * {@code uri_reference} atoms). Holds a {@link UriType} -- the pure constraint values -- rather than
+ * declaring those fields itself.
  *
- * <p><b>Delegates entirely to {@link java.net.URI}, unlike every other atom type here.</b> Every
+ * <p>A URI is US-ASCII (RFC 3986 §2); text with a character beyond it is refused here and read by {@link
+ * IriParser}, RFC 3987's family.
+ *
+ * <p><b>Delegates the grammar to {@link java.net.URI}, unlike every other atom type here.</b> Every
  * other JDK-backed atom in this package (UUID, base64, the temporal family) validates its own shape
  * first, specifically because the relevant JDK compiler was confirmed empirically to be more lenient
  * than the RFC the spec cites. {@code java.net.URI} is a different situation entirely: its own
@@ -31,17 +35,24 @@ public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
     /** §5.5's built-in annotation name -- {@code !uri}. */
     public static final String TYPENAME = "uri";
 
-    /** {@code uri => !uri_type {}} -- the unconstrained URI, §5.5's {@code !uri}. */
-    public static final UriParser UNCONSTRAINED = new UriParser(UriType.UNCONSTRAINED);
+    /** §5.5's built-in annotation name -- {@code !uri_reference}. */
+    public static final String REFERENCE_TYPENAME = "uri_reference";
+
+    /** {@code uri => !uri_reference ^ { allow_relative: false }} -- §5.5's {@code !uri}, which has a scheme. */
+    public static final UriParser UNCONSTRAINED = new UriParser(UriType.URI);
+
+    /** {@code uri_reference => !uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
+    public static final UriParser REFERENCE = new UriParser(UriType.REFERENCE);
 
     /**
      * Every facet {@code uri_type} carries except {@code spec}, which §5.5 fixes per constructor --
      * every {@link UriParser} cites RFC 3986.
      */
     public UriParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
-                      Optional<String> pattern, Optional<String> scheme) {
-        this(new UriType(UriType.UNCONSTRAINED.spec(), minLength, maxLength, length, pattern,
-                Optional.empty(), scheme));
+                      Optional<String> pattern, Optional<List<String>> schemes, boolean allowRelative,
+                      boolean allowFragment) {
+        this(new UriType(UriType.SPEC, minLength, maxLength, length, pattern,
+                Optional.empty(), schemes, allowRelative, allowFragment));
     }
 
     @Override
@@ -52,7 +63,16 @@ public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
         } catch (URISyntaxException e) {
             throw new AtomParseException("'" + text + "' is not a valid URI (§5.5): " + e.getReason(), "a URI");
         }
-        validate(value, text);
+        // java.net.URI admits characters beyond US-ASCII as its "other" category; RFC 3986 admits none, and
+        // the text that has them is an IRI (RFC 3987), which is iri_type's family.
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) > 0x7F) {
+                throw new AtomParseException("'" + text + "' has U+" + String.format("%04X", text.codePointAt(i))
+                        + " at index " + i + ", beyond the US-ASCII of a URI (RFC 3986 §2); an IRI is written !iri",
+                        "a URI");
+            }
+        }
+        checkFacets(constraints, value, text, "an RFC 3986 URI");
         return value;
     }
 
@@ -85,7 +105,16 @@ public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
         return Optional.empty();
     }
 
-    private void validate(URI value, String text) {
+    /**
+     * {@code uri_type}'s facets judged against one parsed value -- shared with {@link IriParser}, whose facets
+     * are the same and mean the same. {@code absolute} names the form a withdrawn {@code allow_relative}
+     * requires, for {@code expected}. Length and pattern are measured on the text as written.
+     */
+    static void checkFacets(UriType constraints, URI value, String text, String absolute) {
+        if (!constraints.allowRelative() && !value.isAbsolute()) {
+            throw new AtomValidationException(
+                    "'" + text + "' is a relative reference, and the type requires a scheme", absolute);
+        }
         constraints.length().ifPresent(len -> {
             if (text.length() != len) {
                 throw new AtomValidationException(
@@ -115,12 +144,15 @@ public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
                         "matching " + p);
             }
         });
-        constraints.scheme().ifPresent(s -> {
-            if (!s.equalsIgnoreCase(value.getScheme())) {
-                throw new AtomValidationException(
-                        "'" + text + "' has scheme '" + value.getScheme() + "', expected '" + s + "'",
-                        "scheme " + s);
-            }
-        });
+        if (!constraints.admitsScheme(value.getScheme())) {
+            String admitted = "scheme one of (" + String.join(", ", constraints.schemes().orElseThrow()) + ")";
+            throw new AtomValidationException(value.getScheme() == null
+                    ? "'" + text + "' has no scheme, and the type admits " + admitted
+                    : "'" + text + "' has scheme '" + value.getScheme() + "', and the type admits " + admitted,
+                    admitted);
+        }
+        if (!constraints.allowFragment() && value.getRawFragment() != null) {
+            throw new AtomValidationException("'" + text + "' has a fragment, which the type refuses", "no fragment");
+        }
     }
 }

@@ -319,7 +319,7 @@ The families:
 | `float32` / `float64` | number; strings for special values | §5.4 |
 | `rational`, `complex` | string (`"2/3"`, `"3+4i"`) | §5.5 |
 | `text` and refinements | string | §5.6 |
-| `uri`, `regex`, `email`, `uuid`, `mac` | string | §5.6 |
+| `uri`, `uri_reference`, `iri`, `iri_reference`, `regex`, `email`, `uuid`, `mac` | string | §5.6 |
 | `date`, `time`, `datetime`, `duration`, `period` | string | §5.6 |
 | `ipv4`, `ipv6`, `cidr4`, `cidr6` | string | §5.6 |
 | `bytes` and its instances | string, in the type's `encoding` alphabet | §5.6 |
@@ -375,7 +375,7 @@ The string-form specials are the first of the two class leaks (§4.2): a type th
 
 ### 5.6 String-Content Atoms
 
-The remaining families — `text` and its refinements, `uri`, `regex`, `email`, `uuid`, `mac`, the temporal families, the network families, and `bytes` — encode as JSON strings whose content is exactly the token content the family's [TSON-DATA] §5 contract defines: RFC 3339 forms for the temporal atoms, RFC 4648 with required padding for `bytes`, and so on. Nothing family-specific is added; §5.1's boundary rule is the entire specification, and every MUST in the text contracts (padding, the email dot-atom core, nonzero host bits under a CIDR prefix) binds identically here. Three families want a sentence on what the value is, since the value-space clause ([TSON-SCHEMA] §5.5) decides what this encoding compares and what it merely preserves:
+The remaining families — `text` and its refinements, `uri`, `uri_reference`, `iri` and `iri_reference`, `regex`, `email`, `uuid`, `mac`, the temporal families, the network families, and `bytes` — encode as JSON strings whose content is exactly the token content the family's [TSON-DATA] §5 contract defines: RFC 3339 forms for the temporal atoms, RFC 4648 with required padding for `bytes`, and so on. Nothing family-specific is added; §5.1's boundary rule is the entire specification, and every MUST in the text contracts (padding, the email dot-atom core, nonzero host bits under a CIDR prefix) binds identically here. Three families want a sentence on what the value is, since the value-space clause ([TSON-SCHEMA] §5.5) decides what this encoding compares and what it merely preserves:
 
 - **`bytes`** is an octet sequence, and the string is a spelling of it in the alphabet the type's `encoding` selector names — base64 for core's `bytes`, another RFC 4648 alphabet for an instance that selects one (`hexdigest => !bytes_type { encoding: HEX  length: 4 }`). An encoder writes the selected alphabet; a decoder reads it; length facets count octets. Two spellings of one octet string are one value wherever values are compared.
 - **`time` and `datetime`** are instants: the offset is a spelling, `"2026-01-01T10:00:00+01:00"` and `"2026-01-01T09:00:00Z"` are one value, and both families are totally ordered. This encoding preserves the offset as written, as the text encoding does; an encoder re-emitting a decoded value MAY normalise to `Z` and is not required to. The fraction is at most nine digits.

@@ -67,13 +67,19 @@ spec-legal leap-second token as a parse error. There's no reasonable fix short o
 representation built solely for this one case, so it's documented (`TimeParser`'s Javadoc) rather than
 solved.
 
-**One accepted, different-revision gap.** `!uri` (§5.5) is the one atom here that does *not* get an
+**One accepted, different-revision gap.** `!uri_reference` (§5.5) is the one atom here that does *not* get an
 extra shape check ahead of the JDK type it delegates to — the opposite situation from the atoms above.
 §5.5 cites RFC 3986, but `java.net.URI`'s own Javadoc states it implements RFC 2396 (as amended by RFC
 2732), an older revision of the same standard, not a looser/stricter variant of the same grammar. There's
 no simple shape to shim in front of `URI`'s constructor the way a four-group hex pattern works for UUID,
 and writing an RFC 3986 validator from scratch isn't worth it at this stage, so `java.net.URI`'s behavior
-is accepted as `!uri`'s actual contract for now. See `UriParser`'s Javadoc.
+is accepted as `!uri_reference`'s actual contract for now, beside one rule `java.net.URI` does not apply: every
+character is US-ASCII. `!uri` adds only that a scheme is present. See `UriParser`'s Javadoc.
+
+`!iri` and `!iri_reference` (RFC 3987) are judged through the URI each maps to, so they share that gap; RFC 3987
+§4's bidirectional-text rules, a SHOULD, are not checked. A handful of `ucschar` characters that `java.net.URI` reads
+as spaces (U+00A0, U+2000–U+200A, U+3000 and their kin) are held percent-encoded in the host `URI`: the IRI is
+read, not refused, and writing it back gives the encoded spelling. See `IriParser`'s Javadoc.
 
 **The vocabulary is the published one.** §5.6 lists the full `int8`..`int256`/`uint8`..`uint256` ladder plus
 the four bound-only refinements, and §5.5 carries `!email` beside its "Network Types" siblings, so what is

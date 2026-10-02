@@ -17,6 +17,7 @@ import io.ltr8.tson.atom.parser.PeriodParser;
 import io.ltr8.tson.atom.parser.RationalParser;
 import io.ltr8.tson.atom.parser.TextParser;
 import io.ltr8.tson.atom.parser.TimeParser;
+import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
 import io.ltr8.tson.base.atom.CidrInet4Network;
@@ -53,6 +54,10 @@ import java.util.UUID;
  * what it meant. This table is how {@code TokenValue, Class)}
  * asks.
  *
+ * <p>{@code java.net.URI} answers with {@code iri_reference}, the widest of the four atoms it holds: every
+ * URI, URI-reference and IRI is an IRI-reference, and the class holds any of them, so the class alone names
+ * no narrower contract.
+ *
  * <p>The entries are unconstrained instances, deliberately: a bound is a value of the atom's own type, not
  * of the refinement being declared, and asking a half-built refinement to validate its own bound would be
  * circular ({@code min} of an atom whose {@code min} is what is being read).
@@ -79,7 +84,7 @@ public final class HostAtoms {
             Map.entry(Rational.class, RationalParser.UNCONSTRAINED),
             Map.entry(Complex.class, ComplexParser.UNCONSTRAINED),
             Map.entry(UUID.class, UuidParser.UNCONSTRAINED),
-            Map.entry(URI.class, UriParser.UNCONSTRAINED),
+            Map.entry(URI.class, IriParser.REFERENCE),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
@@ -101,7 +106,7 @@ public final class HostAtoms {
             Map.entry(Duration.class, DurationParser.UNCONSTRAINED),
             Map.entry(Period.class, PeriodParser.UNCONSTRAINED),
             Map.entry(UUID.class, UuidParser.UNCONSTRAINED),
-            Map.entry(URI.class, UriParser.UNCONSTRAINED),
+            Map.entry(URI.class, IriParser.REFERENCE),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),

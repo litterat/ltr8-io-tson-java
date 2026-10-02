@@ -226,7 +226,7 @@ public final class DataClassObjectWriter {
     private void writeAtom(Object value, TsonDataEmitter writer) throws DataBindException {
         VocabularyAtoms.Entry vocab = vocabularyAtoms.get(value.getClass());
         if (vocab != null) {
-            writer.typeRef(vocab.typeRef()).quotedString(vocab.write(value));
+            writer.typeRef(vocab.typeRef(value)).quotedString(vocab.write(value));
         } else {
             AtomWriter.writeDefaultAtom(value, writer);
         }

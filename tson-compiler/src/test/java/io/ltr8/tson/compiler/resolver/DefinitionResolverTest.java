@@ -1142,11 +1142,14 @@ class DefinitionResolverTest {
                 { plain_regex   => !regex_type {}
                   bounded_regex => !regex_type { max_length: 40 }
                   plain_uri     => !uri_type {}
-                  https_uri     => !uri_type { scheme: "https" length: 19 } }""").parseSchemaDocument().body();
+                  schemed_uri   => !uri_type { allow_relative: false }
+                  https_uri     => !uri_type {
+                    schemes: [https] allow_fragment: false length: 19 } }""").parseSchemaDocument().body();
         DefinitionResolver resolver = definitionResolverFor(metaKernelCompiled(), EMPTY_NAMESPACE);
 
         assertEquals(RegexType.UNCONSTRAINED, resolver.resolve(schemaMap.declarations().get("plain_regex")).body());
-        assertEquals(UriType.UNCONSTRAINED, resolver.resolve(schemaMap.declarations().get("plain_uri")).body());
+        assertEquals(UriType.REFERENCE, resolver.resolve(schemaMap.declarations().get("plain_uri")).body());
+        assertEquals(UriType.URI, resolver.resolve(schemaMap.declarations().get("schemed_uri")).body());
 
         RegexType bounded = (RegexType) resolver.resolve(schemaMap.declarations().get("bounded_regex")).body();
         assertEquals("https://www.rfc-editor.org/rfc/rfc9485", bounded.spec());
@@ -1155,7 +1158,8 @@ class DefinitionResolverTest {
         // length is the facet UriType declared no component for at all, so it had nowhere to bind.
         UriType https = (UriType) resolver.resolve(schemaMap.declarations().get("https_uri")).body();
         assertEquals("https://www.rfc-editor.org/rfc/rfc3986", https.spec());
-        assertEquals(Optional.of("https"), https.scheme());
+        assertEquals(Optional.of(List.of("https")), https.schemes());
+        assertFalse(https.allowFragment());
         assertEquals(Optional.of(19), https.length());
     }
 
@@ -1322,6 +1326,63 @@ class DefinitionResolverTest {
                 () -> instanceResolver.resolve(schemaMap.declarations().get("escapesMax")));
         assertTrue(widerThanTheBound.getMessage().contains("max 1000 is above the source's own max 100"),
                 widerThanTheBound.getMessage());
+    }
+
+    /**
+     * {@code allow_relative} is a permission: a URI-reference may withdraw it and become a URI, and a URI
+     * may not grant it back, which would admit the relative references its source refuses.
+     */
+    @Test
+    void uriRefinementMayWithdrawRelativeReferencesButNotRestoreThem() {
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                {
+                  reference => !uri_type {}
+                  schemed   => !reference ^ { allow_relative: false }
+                  relaxed   => !uri ^ { allow_relative: true }
+                }""").parseSchemaDocument().body();
+        chainNamespace.put("reference", instanceResolver.resolve(schemaMap.declarations().get("reference")));
+
+        assertEquals(UriType.URI, instanceResolver.resolve(schemaMap.declarations().get("schemed")).body());
+        SchemaValidationException relaxed = assertThrows(SchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("relaxed")));
+        assertTrue(relaxed.getMessage().contains("allow_relative re-enables what the source forbids"),
+                relaxed.getMessage());
+    }
+
+    /**
+     * {@code schemes} is a member set and may only shrink, compared case-insensitively as RFC 3986 §3.1
+     * compares a scheme; {@code allow_fragment} is a permission, withdrawn and never granted back.
+     */
+    @Test
+    void uriRefinementNarrowsSchemesAndMayWithdrawFragmentsButNotRestoreThem() {
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                {
+                  web      => !uri ^ { schemes: [http https] }
+                  secure   => !web ^ { schemes: [HTTPS] }
+                  ftp      => !web ^ { schemes: [https ftp] }
+                  whole    => !uri ^ { allow_fragment: false }
+                  pointing => !whole ^ { allow_fragment: true }
+                }""").parseSchemaDocument().body();
+        chainNamespace.put("web", instanceResolver.resolve(schemaMap.declarations().get("web")));
+        chainNamespace.put("whole", instanceResolver.resolve(schemaMap.declarations().get("whole")));
+
+        UriType secure = (UriType) instanceResolver.resolve(schemaMap.declarations().get("secure")).body();
+        assertEquals(Optional.of(List.of("HTTPS")), secure.schemes());
+        SchemaValidationException ftp = assertThrows(SchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("ftp")));
+        assertTrue(ftp.getMessage().contains("schemes adds [ftp], which the source does not admit"), ftp.getMessage());
+        SchemaValidationException pointing = assertThrows(SchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("pointing")));
+        assertTrue(pointing.getMessage().contains("allow_fragment re-enables what the source forbids"),
+                pointing.getMessage());
     }
 
     /**

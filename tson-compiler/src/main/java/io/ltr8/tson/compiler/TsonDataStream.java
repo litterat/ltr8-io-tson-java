@@ -110,11 +110,14 @@ import java.util.Optional;
 public final class TsonDataStream implements TsonEventSource {
 
     /**
-     * [TSON-DATA] §2.2.1's rules on what a directive's argument may be, asked of the vocabulary by name
-     * rather than by naming a parser: a directive argument is a URI, and {@code uri} is what says so.
+     * [TSON-DATA] §3.3's rule on what a directive's argument may be, asked of the vocabulary by name rather
+     * than by naming a parser: a directive argument is a reference or a file reference, read as an
+     * IRI-reference (RFC 3987) so that a name beyond US-ASCII is written as itself, and {@code iri_reference}
+     * is what says so. Every URI-reference is one. Whether an identity is absolute is §2.2.1's question,
+     * asked where an identity is formed.
      */
-    private static final AtomType<?> URI_ATOM = BuiltinTypeVocabulary.lookup("uri")
-            .orElseThrow(() -> new IllegalStateException("the built-in vocabulary has no 'uri'"));
+    private static final AtomType<?> URI_ATOM = BuiltinTypeVocabulary.lookup("iri_reference")
+            .orElseThrow(() -> new IllegalStateException("the built-in vocabulary has no 'iri_reference'"));
 
     private final Lexer lexer;
 
@@ -660,8 +663,8 @@ public final class TsonDataStream implements TsonEventSource {
         try {
             URI_ATOM.read(arg.text());
         } catch (AtomParseException e) {
-            throw new ParseException(
-                    "'!!" + expectedName + "' argument '" + arg.text() + "' is not a valid URI (§3.3)", arg.start());
+            throw new ParseException("'!!" + expectedName + "' argument '" + arg.text()
+                    + "' is not a valid IRI-reference (§3.3)", arg.start());
         }
         return arg.text();
     }

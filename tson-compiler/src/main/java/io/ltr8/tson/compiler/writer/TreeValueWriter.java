@@ -134,7 +134,7 @@ public final class TreeValueWriter {
         Object value = node.value();
         VocabularyAtoms.Entry vocab = vocabularyAtoms.get(value.getClass());
         if (vocab != null) {
-            out.typeRef(node.typeRef().orElse(vocab.typeRef())).quotedString(vocab.write(value));
+            out.typeRef(node.typeRef().orElseGet(() -> vocab.typeRef(value))).quotedString(vocab.write(value));
         } else {
             node.typeRef().ifPresent(out::typeRef);
             AtomWriter.writeDefaultAtom(value, out);

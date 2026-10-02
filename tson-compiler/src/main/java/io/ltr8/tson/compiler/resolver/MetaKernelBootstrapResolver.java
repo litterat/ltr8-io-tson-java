@@ -276,8 +276,8 @@ public final class MetaKernelBootstrapResolver {
                 yield Optional.of(TextType.UNCONSTRAINED);
             }
             case "uri_type" -> {
-                requireEmptyBody(instance);
-                yield Optional.of(UriType.UNCONSTRAINED);
+                requireSchemeRequired(instance);
+                yield Optional.of(UriType.URI);
             }
             case "regex_type" -> {
                 requireEmptyBody(instance);
@@ -313,6 +313,17 @@ public final class MetaKernelBootstrapResolver {
                 || !(record.fields().getFirst().value().value().coreValue() instanceof TokenValue token)
                 || !token.text().equals("-")) {
             throw new IllegalStateException("expected { continue_add: \"-\" } for !identifier_type, found "
+                    + instance.value().coreValue());
+        }
+    }
+
+    /** meta-kernel's one {@code uri_type} instance, {@code uri}, withdraws {@code allow_relative} and nothing else. */
+    private static void requireSchemeRequired(Instance instance) {
+        if (!(instance.value().coreValue() instanceof RecordValue record) || record.fields().size() != 1
+                || !record.fields().getFirst().name().equals("allow_relative")
+                || !(record.fields().getFirst().value().value().coreValue() instanceof TokenValue token)
+                || !token.text().equals("false")) {
+            throw new IllegalStateException("expected { allow_relative: false } for !uri_type, found "
                     + instance.value().coreValue());
         }
     }

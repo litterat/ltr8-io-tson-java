@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=545f35360b079e616956c8d45dfdab6ca65550dd3464690d99373e2c04137836"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=5e2f1facc47be8bcbc219f794fa9ea2e8d14090509ad6b6abc8f14890344bfd9"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=5e2f1facc47be8bcbc219f794fa9ea2e8d14090509ad6b6abc8f14890344bfd9"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=58d7124b6d4441f967b2648a0011c26036be37422179ab6a79f24626cad1f520"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f581ebad4aca3b84574b5db22d7bbb6ec3bbe968f377c1a6c657887be4dc1000"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f581ebad4aca3b84574b5db22d7bbb6ec3bbe968f377c1a6c657887be4dc1000"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 
@@ -35,8 +35,8 @@
      `ieee_format` enum; `decimal_type` for the exact tier; `rational_type`;
      `complex_type`, with the `complex_component` enum), temporal (`date_type`,
      `time_type`, `datetime_type`, `duration_type`, `period_type`), identifier
-     (`uuid_type`), network (`ipv4_type`, `ipv6_type`, `cidr4_type`,
-     `cidr6_type`, `mac_type`), and text (`email_type`).
+     (`uuid_type`, `iri_type`), network (`ipv4_type`, `ipv6_type`,
+     `cidr4_type`, `cidr6_type`, `mac_type`), and text (`email_type`).
 
   Plus annotation types — the classifying markers `ordered`, `bounded`, `exact`,
   `numeric`; the checked assertion `disjoint`; and the documentary `deprecated`,
@@ -380,6 +380,21 @@
   uuid_type => atom & atom_specification & {
     spec?:    = "https://www.rfc-editor.org/rfc/rfc9562"
     version?: non_negative_integer
+  }
+
+  @doc:"""
+    IRI constraint vocabulary per RFC 3987. Instances are `iri` and
+    `iri_reference` in core. The facets are uri_type's: `schemes` lists the
+    admitted schemes, compared case-insensitively; `allow_relative` admits a
+    relative reference beside an IRI, so its default is an IRI-reference;
+    `allow_fragment` admits a fragment. An IRI's characters beyond US-ASCII are
+    RFC 3987's `ucschar`, and `iprivate` within the query.
+    """
+  iri_type => text_type & atom_specification & {
+    spec?:           = "https://www.rfc-editor.org/rfc/rfc3987"
+    schemes?:        scheme_set
+    allow_relative?: boolean ~ true
+    allow_fragment?: boolean ~ true
   }
 
   @doc:"Email constraint vocabulary. Instance is `email` in core."

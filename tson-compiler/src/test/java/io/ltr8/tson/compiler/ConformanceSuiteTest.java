@@ -684,7 +684,7 @@ class ConformanceSuiteTest {
                 assertEquals(Long.parseLong(((TokenValue) payload).text()), actual.toTotalMonths(),
                         "period months");
             }
-            case "uri" -> {
+            case "uri", "uri_reference", "iri", "iri_reference" -> {
                 URI actual = (URI) atomType.boundTo(URI.class).orElseThrow().read(token);
                 assertEquals(URI.create(((TokenValue) payload).text()), actual, "vocabulary value");
             }

@@ -3,16 +3,22 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code uri_type} constructor (§5.5's {@code uri} atom): {@code text_type}'s length
- * and pattern facets, {@code atom_specification}'s {@code spec} pinned to RFC 3986, and its own {@code
- * scheme} field (meta-kernel: {@code uri_type => ~text_type & atom_specification & { spec: =
- * "https://www.rfc-editor.org/rfc/rfc3986" scheme: text? } }). Pure constraint values, no
- * parsing/validation behavior -- {@code tson-compiler}'s {@code UriParser} holds one of these and does
- * the actual reading/writing.
+ * The meta-kernel's {@code uri_type} constructor (§5.5's {@code uri} and {@code uri_reference} atoms):
+ * {@code text_type}'s length and pattern facets, {@code atom_specification}'s {@code spec} pinned to RFC
+ * 3986, and its own {@code schemes}, {@code allow_relative} and {@code allow_fragment} fields. Pure constraint values, no
+ * parsing/validation behavior -- {@code tson-atom}'s {@code UriParser} holds one of these and does the
+ * actual reading/writing.
+ *
+ * <p>{@code allow_relative} is RFC 3986's own split: left at its default the value space is a
+ * URI-reference (§4.1), a URI or a relative reference; withdrawn it is a URI (§3), which has a scheme.
+ * {@code allow_fragment} withdrawn refuses a fragment (§3.5), so the two withdrawn together are an
+ * absolute-URI (§4.3). {@code schemes} is a member set compared case-insensitively, as §3.1 compares a
+ * scheme, and a value with no scheme is outside it.
  *
  * <p><b>Every field is flat, mirroring the resolved shape rather than the composition that produced
  * it</b> -- composition always flattens (§5.8), so an instance's wire record carries every facet side by
@@ -27,19 +33,32 @@ import java.util.Optional;
  * own source text ({@link String}), not a compiled {@link java.util.regex.Pattern} -- see {@link
  * TextType#pattern()}.
  *
- * <p>{@code uri => !uri_type {}} is a constructor-application instance (§5.5) whose resolved body is
- * exactly {@link #UNCONSTRAINED}.
+ * <p>{@code uri_reference => !uri_type {}} resolves to exactly {@link #REFERENCE}, and {@code uri =>
+ * !uri_reference ^ { allow_relative: false }} to {@link #URI}.
  */
 @Typename(name = "uri_type")
 public record UriType(String spec, @Field("min_length") Optional<Integer> minLength,
                       @Field("max_length") Optional<Integer> maxLength,
                       Optional<Integer> length, Optional<String> pattern,
-                      Optional<List<String>> members, Optional<String> scheme) implements Atom {
+                      Optional<List<String>> members, Optional<List<String>> schemes,
+                      @Field("allow_relative") boolean allowRelative,
+                      @Field("allow_fragment") boolean allowFragment) implements Atom {
 
-    /** {@code uri => !uri_type {}} -- the unconstrained URI, §5.5's {@code !uri}. */
-    public static final UriType UNCONSTRAINED = new UriType(
-            "https://www.rfc-editor.org/rfc/rfc3986", Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+    /** RFC 3986, the one {@code spec} every {@code uri_type} carries. */
+    public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc3986";
+
+    /** {@code uri_reference => !uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
+    public static final UriType REFERENCE = new UriType(SPEC, Optional.empty(), Optional.empty(),
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), true, true);
+
+    /** {@code uri => !uri_reference ^ { allow_relative: false }} -- §5.5's {@code !uri}, which has a scheme. */
+    public static final UriType URI = new UriType(SPEC, Optional.empty(), Optional.empty(),
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true);
+
+    /** Whether {@code scheme} is one {@link #schemes} admits -- §3.1's case-insensitive comparison. */
+    public boolean admitsScheme(String scheme) {
+        return schemes.isEmpty() || scheme != null && schemes.get().stream().anyMatch(scheme::equalsIgnoreCase);
+    }
 
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
     public TextType textConstraints() {
@@ -51,15 +70,21 @@ public record UriType(String spec, @Field("min_length") Optional<Integer> minLen
      *
      * <p>The length facets narrow as {@link TextType}'s own rule says, {@link #length} pinning both ends.
      * {@link #pattern} is undecidable here for the reason {@link TextType#constraintsCheck} gives;
-     * {@link #scheme} is a selector ({@link ComplexType}); {@code spec} is fixed in the
-     * schema, so a refinement cannot move it in the first place.
+     * {@code spec} is fixed in the schema, so a refinement cannot move it in the first place.
+     * {@link #schemes} is a member set and may only shrink, compared as §3.1 compares a scheme;
+     * {@link #allowRelative} and {@link #allowFragment} are permissions, withdrawn but never granted back.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
         if (!(refined instanceof UriType other)) {
             return List.of("refines a uri with " + refined.getClass().getSimpleName());
         }
-        return textConstraints().constraintsCheck(other.textConstraints());
+        List<String> violations = new ArrayList<>(textConstraints().constraintsCheck(other.textConstraints()));
+        AtomNarrowing.checkSubset(violations, "schemes", schemes.orElse(List.of()),
+                other.schemes.orElse(List.of()), String::equalsIgnoreCase);
+        AtomNarrowing.checkOnlyWithdraws(violations, "allow_relative", allowRelative, other.allowRelative);
+        AtomNarrowing.checkOnlyWithdraws(violations, "allow_fragment", allowFragment, other.allowFragment);
+        return List.copyOf(violations);
     }
 
     /** {@inheritDoc} <p>The length facets this composes, judged by {@link TextType#coherenceCheck} that owns them. */

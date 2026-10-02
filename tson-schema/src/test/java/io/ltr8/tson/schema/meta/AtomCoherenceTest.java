@@ -57,7 +57,7 @@ class AtomCoherenceTest {
     void everyUnconstrainedInstanceIsCoherent() {
         assertCoherent(IntegerType.UNCONSTRAINED);
         assertCoherent(TextType.UNCONSTRAINED);
-        assertCoherent(UriType.UNCONSTRAINED);
+        assertCoherent(UriType.REFERENCE);
         assertCoherent(RegexType.UNCONSTRAINED);
         assertCoherent(EmailType.UNCONSTRAINED);
         assertCoherent(DecimalType.UNCONSTRAINED);
@@ -123,7 +123,8 @@ class AtomCoherenceTest {
     /** The three families composing {@code text_type}'s facets delegate rather than restating the rule. */
     @Test
     void theTextComposingFamiliesInheritTheSameLengthRule() {
-        assertViolation(new UriType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty(), Optional.empty()),
+        assertViolation(new UriType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty(),
+                        Optional.empty(), true, true),
                 "min_length 10 is above max_length 3");
         assertViolation(new RegexType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty()),
                 "min_length 10 is above max_length 3");

@@ -123,7 +123,7 @@ class MetaKernelBootstrapResolverTest {
 
         TypeDefinition uri = schema.entries().get("uri");
         assertEquals(TypeKind.ATOM, uri.kind());
-        assertEquals(UriType.UNCONSTRAINED, uri.body());
+        assertEquals(UriType.URI, uri.body());
 
         TypeDefinition regex = schema.entries().get("regex");
         assertEquals(TypeKind.ATOM, regex.kind());
@@ -132,7 +132,7 @@ class MetaKernelBootstrapResolverTest {
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is the 59 declarations the fixture writes plus one injected declaration per distinct sugar form
+     * output is the 60 declarations the fixture writes plus one injected declaration per distinct sugar form
      * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar. They are the same
      * entries the linker used to synthesize; producing them here is what leaves the linker with nothing to
      * materialize (see {@code MetaKernelSchemaRegistryTest}). {@code enum}'s member set is not among them:
@@ -143,7 +143,7 @@ class MetaKernelBootstrapResolverTest {
     void theFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(67, schema.entries().size());
+        assertEquals(68, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_template_param", "array_field_group",
                 "array_record_field")) {

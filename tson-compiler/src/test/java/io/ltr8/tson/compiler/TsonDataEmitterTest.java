@@ -129,13 +129,19 @@ class TsonDataEmitterTest {
         assertTrue(new TsonDataEmitter().documentId("https://example.test/doc-1.tn").toString().endsWith("\n"));
     }
 
-    /** A directive argument MUST be a URI (§3.3), so a caller cannot emit a document that will not read back. */
+    /** A directive argument is an IRI-reference (§3.3), so a caller cannot emit a document that will not read back. */
     @Test
-    void aDirectiveArgumentThatIsNotAUriIsRefused() {
+    void aDirectiveArgumentThatIsNotAnIriReferenceIsRefused() {
         WriteException thrown = assertThrows(WriteException.class,
                 () -> new TsonDataEmitter().schemaRef("not a uri"));
 
-        assertTrue(thrown.getMessage().contains("is not a valid URI"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("is not a valid IRI-reference"), thrown.getMessage());
+    }
+
+    @Test
+    void aDirectiveArgumentBeyondUsAsciiIsWrittenAsItself() {
+        assertEquals("!!schema:\"https://example.test/sch\u00E9ma.tn\"",
+                new TsonDataEmitter().schemaRef("https://example.test/sch\u00E9ma.tn").toString().strip());
     }
 
     // ── At most one type-ref per value (§3.2) ───────────────────────────

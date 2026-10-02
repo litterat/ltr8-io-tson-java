@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=5e2f1facc47be8bcbc219f794fa9ea2e8d14090509ad6b6abc8f14890344bfd9"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f581ebad4aca3b84574b5db22d7bbb6ec3bbe968f377c1a6c657887be4dc1000"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -347,13 +347,25 @@
     URI constraint vocabulary. Composes with the text_type constructor to
     inherit its record shape (length and pattern fields) plus the
     atom_specification mixin's spec field plus uri-specific fields.
+    `schemes` lists the admitted schemes, compared case-insensitively (RFC
+    3986 §3.1); a value with no scheme is outside it. `allow_relative` admits
+    a relative reference (§4.2) beside a URI (§3), so its default is a
+    URI-reference (§4.1); withdrawing it requires a scheme. `allow_fragment`
+    admits a fragment (§3.5); withdrawing it refuses one, which with
+    `allow_relative` withdrawn is an absolute-URI (§4.3).
     """
   uri_type => text_type & atom_specification & {
-    spec?:   = "https://www.rfc-editor.org/rfc/rfc3986"
-    scheme?: text
+    spec?:           = "https://www.rfc-editor.org/rfc/rfc3986"
+    schemes?:        scheme_set
+    allow_relative?: boolean ~ true
+    allow_fragment?: boolean ~ true
   }
 
-  uri => !uri_type {}
+  @doc:"The schemes a uri_type admits."
+  scheme_set => !set_type { element_type: text  min_items: 1 }
+
+  @doc:"A URI (RFC 3986 §3): the scheme is required."
+  uri => !uri_type { allow_relative: false }
 
   @doc:"""
     Regex constraint vocabulary. Same shape pattern as uri_type, pinned to
