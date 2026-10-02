@@ -106,16 +106,6 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   TSON registry verifies against the bytes it fetched; the JSON side holds only linked schemas, so what it
   needs is either the digest beside each linked schema or a loader that takes the reference as written.
 
-- [ ] **The look-alike rule does not reach a JSON record position's unmatched members, and whether it should is a
-  real question.** [TSON-DATA] §8.2's two per-name rules run at the schema-directed record and `$type`
-  positions, so the realistic attack — a homoglyph in a name that matches no declared field — is refused. The
-  third rule, `CONFUSABLE_NAMES`, is a property of a *set*, and reaches one JSON position, an identifier-keyed map's
-  keys, because a JSON object's members are keys until a position says otherwise. **A schema-directed record
-  position does say otherwise**: its unmatched members are field names, so the set rule
-  could run over them as `SchemalessTreeReader` runs it for TSON. What it would add over the two per-name rules
-  is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
-  name — so this is a decision to take deliberately, not a gap to close by reflex.
-
 - [ ] **The JSON reader factories share their per-entry work, and the container loops their remaining rules.**
   Every container reads through a plan, one mode-free loop and a builder per mode
   (`design/json-schema-directed-reading.md`). What is left of that restructure:
@@ -337,6 +327,17 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   per read of the harness document even after `Confusables.skeleton` stopped allocating for a name that maps nothing.
   A cache would take most of that, and the design question is its bound: names are attacker-controlled, so a per-read
   cache is the safe shape and a process-wide one is not.
+
+- [ ] **Decide whether the elements of a `set<identifier>` are a look-alike scope.** The keys of an identifier-keyed
+  map are one ([TSON-SCHEMA] §11.4, `MapAbstractReader`, JSON's `MapObjectReader`); the elements of an array whose
+  element type is an identifier family meet only the two per-name rules (`AtomTypeReader`), so
+  `roles: set<identifier>` admits `pass` beside its all-Cyrillic look-alike. The case for a set: its elements are
+  unique under their equality exactly as map keys are, and a set of names is the data-side twin of an enum's members,
+  which §11.4 already lists. The case against an ordered, non-unique array is that repetition is admitted, so nothing
+  says two elements name two different things. If adopted it is an `ArrayBody` with `unique_items` whose element type
+  is an identifier family, checked in `ArrayAbstractReader` and JSON's `ArrayReader` as each element arrives, gated on
+  `IdentifierPolicy.appliesSkeletonDistinctness()`, with a §11.4 addition proposed in `SPEC-FEEDBACK.md` #7 and
+  corpus vectors beside the map-key ones in `class2/validate/refused/`.
 
 - [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
   in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a

@@ -129,6 +129,13 @@ positions at all, and at an object reader's `Map` position the members are keys,
 two legitimately distinct keys. **The dangerous case and the safe case are spelled identically**, which is §4.1
 in one sentence, so JSON must accept it unless a schema types the keys as names.
 
+**A schema-directed record position's unmatched members are not a scope, and need not be.** They are field names,
+but every one is already §6.1.1's closure error, and the realistic attack among them — a homoglyph of a declared
+name — is refused by the per-name rules before closure speaks. Two unmatched members that read alike leave the
+document invalid either way; refusing the pair would only turn one closure error into a refusal whose remedy, rename
+one of them, is wrong when both must go. A bind read that ignores unknown members discards them unread, and a name
+nothing looks up has nothing to spoof.
+
 A deployment that will not accept it has a surface that does reach these: the **token** policy, which
 governs every JSON token including a map key, and which a stricter deployment raises. That is the honest
 division — §8.2's identifier policy judges names, and where JSON cannot know that a member is a name, what
