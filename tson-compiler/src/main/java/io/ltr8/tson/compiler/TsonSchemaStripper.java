@@ -26,8 +26,9 @@ import java.util.regex.Pattern;
  *   <li><b>A header reference to the spec's own library</b> -- meta-kernel, meta and core at any revision -- is
  *       shortened to its revision and name ({@code "37/meta"}). Any other reference keeps its URL, which is
  *       the only thing that tells a reader which schema it names.</li>
- *   <li><b>{@code @doc}</b> goes, wherever it is written. Every other annotation stays: several are checked
- *       and change what the schema means.</li>
+ *   <li><b>{@code @doc} and {@code @comment}</b> go, wherever they are written: they are prose for the
+ *       schema's readers and its maintainers. Every other annotation stays: several are checked and change
+ *       what the schema means.</li>
  * </ul>
  *
  * <p><b>Whitespace is collapsed, never removed.</b> TSON has no comments, so the token stream is the whole
@@ -141,13 +142,13 @@ public final class TsonSchemaStripper {
         return named && tokens.get(i + 1).type() == TokenType.MAP_ARROW ? i + 1 : 0;
     }
 
-    /** How many tokens from {@code i} are removed -- an {@code !!id} directive or a {@code @doc} annotation -- or 0. */
+    /** How many tokens from {@code i} are removed -- an {@code !!id} directive, a prose annotation -- or 0. */
     private static int removable(List<Token> tokens, int i) {
         Token token = tokens.get(i);
         if (token.type() == TokenType.DIRECTIVE && named(tokens, i + 1, "id")) {
             return 4;   // !! id : "..."
         }
-        if (token.type() == TokenType.AT && named(tokens, i + 1, "doc")) {
+        if (token.type() == TokenType.AT && (named(tokens, i + 1, "doc") || named(tokens, i + 1, "comment"))) {
             return annotationLength(tokens, i);
         }
         return 0;

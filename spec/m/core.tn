@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=b337763424f81610e063b0abe98d1c284441e237511670d5fa164fe7af96f029"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=58d7124b6d4441f967b2648a0011c26036be37422179ab6a79f24626cad1f520"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=e1b7ad03573400546c7c37566a4f3abe74e55dd670e8bf0a0c7a4cb3235b1e4c"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=2bfab2ba7601e5783fa0bebb700e0f9ec38f2fc6df840ce45a136abeaac28405"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -23,11 +23,11 @@
   meta-kernel.tn's note.
 
   Annotation types (`@ordered`, `@bounded`, `@exact`, `@numeric`, `@disjoint`,
-  `@deprecated`, `@since`, `@todo`, `@lang`, `@title`, `@examples`,
-  `@read_only`, `@write_only`) live in meta.tn — annotations resolve one hop
-  against the governing target's namespace (Part 2 §3.3.3, §6), so for this
-  schema document they must be reachable through the `!!meta` chain; they appear
-  here only by use. Core's own `doc` declaration, and its same-named siblings
+  `@deprecated`, `@title`, `@comment`, `@examples`, `@read_only`,
+  `@write_only`) live in meta.tn — annotations resolve one hop against the
+  governing target's namespace (Part 2 §3.3.3, §6), so for this schema document
+  they must be reachable through the `!!meta` chain; they appear here only by
+  use. Core's own `doc` declaration, and its same-named siblings
   of kernel and meta entries (`void`, `boolean`, `integer`, `text`, `regex`,
   `uri` and `set`), face the other direction: they exist so that *data
   documents* and user schemas governed by or importing core can use them.
@@ -379,7 +379,13 @@
     """
   optional_tuple1 => <T> !tuple { elements: [{ element_type: T  state: OPTIONAL }] }
 
-  @doc:"Text-valued documentation annotation."
+  @doc:"""
+    Documentation for a declaration, a field or a document. The text is
+    CommonMark 0.31.2 (https://spec.commonmark.org/0.31.2/) with no extensions.
+    Every string is valid CommonMark, so this refuses nothing and says only how
+    the text is displayed. Raw HTML in it is never executed, and a renderer need
+    not render it.
+    """
   doc => @annotation text
 
 }

@@ -7,7 +7,8 @@ field states, groups, subtraction, and the exception boundary. Current form only
 **Invariants**
 
 - An annotation on a declaration resolves one hop against the governing meta and nowhere else (§3.3.3); a name that
-  misses is a resolver error, the valueless form included. Only the meta-kernel bootstrap skips the check.
+  misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its type. Only
+  the meta-kernel bootstrap skips the check.
 - `abstract`/`final` are grammar, not annotations; `=?` is field syntax; and the definition mark is
   applied once, in `resolve`, not inside whichever `resolve*` built the body.
 - A restated field's annotations concatenate over the inherited ones, restatement first — never replacement by name.
@@ -60,7 +61,9 @@ are kept in step deliberately.
   to prevent — an annotation keeping its name and losing its value lets the schema load clean with the
   metadata not there; §6 makes an unresolved annotation name a resolver error, the valueless
   form included (`SchemaAnnotationScopeTest`). A value that *does*
-  resolve is read by that type's own compiled reader, so `@doc:"..."` arrives as a `String`. **The one
+  resolve is read by that type's own compiled reader, so `@doc:"..."` arrives as a `String`, and a bare mark
+  is read the same way as a synthetic `_` — admitted by a void type, refused by any other, as the data path
+  does (`BareAnnotationTest`). **The one
   resolver that skips the check is the meta-kernel bootstrap**, which passes no `AnnotationValueReader` at
   all: it is producing the very entries such a reader would read through, so every name would fail, and there
   the name is kept and the value dropped. Both annotation sets go through this — the ones after

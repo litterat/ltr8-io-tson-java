@@ -353,14 +353,9 @@
     body: !reference { target: void }
   }
 
-  documentation => @annotation !type_definition {
+  doc => @annotation !type_definition {
     source: text
     body: !reference { target: text }
-  }
-
-  doc => @annotation !type_definition {
-    source: documentation
-    body: !reference { target: documentation }
   }
 
   synthetic => @annotation !type_definition {

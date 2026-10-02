@@ -59,7 +59,11 @@ set in place of one scheme, and a fragment permission.
 US-ASCII, and reads a directive argument as an IRI-reference.
 #15 keeps core to the types a schema cannot do without, since every name core declares is one no importing schema
 may: `identifier`, the four sign-bound integers, `non_empty_text`, `annotation` and `documentation` leave it, and
-the sign bounds leave [TSON-DATA] §5.6's built-in vocabulary with them.
+the sign bounds leave [TSON-DATA] §5.6's built-in vocabulary with them. The kernel's `documentation` goes too, so
+`doc` is `@annotation text` in both.
+#16 reshapes meta's annotation vocabulary: `todo`, `since` and `lang` leave it, `deprecated` becomes a void marker,
+and `comment` joins it for JSON Schema's `$comment`.
+#17 makes `@doc`'s text CommonMark, without extensions and with raw HTML never executed.
 
 ---
 
@@ -1432,8 +1436,10 @@ On `r2026-37-proposal`, this entry.
 ## 15. Core should hold only what a schema cannot do without
 
 **Section:** [TSON-SCHEMA] §9 (core's contents), §2.2.3 (a local declaration may not reuse a name its import
-closure binds), §6 ("Core declares its own `doc`, `documentation`, and `annotation`"), §7.4 (an enum's `type`),
-§1.6 (the complete example's `title: non_empty_text`);
+closure binds), §6 ("Core declares its own `doc`, `documentation`, and `annotation`", and meta "carries the
+kernel's `doc`, `documentation`, and `annotation`"), §7.4 (an enum's `type`), §8.1 (the chain
+`doc → documentation → text`), §13.1 (the kernel's annotation types), §1.6 (the complete example's
+`title: non_empty_text`);
 [TSON-DATA] §5.6 (the sign-bound row of the numeric table), §5.1 (the vocabulary as core's contracts).
 
 **Kind:** proposal — core and the built-in vocabulary shrink — and one sentence for §7.4.
@@ -1457,6 +1463,11 @@ line it can write itself:
 - **`annotation` and `documentation`** leave core, and `doc => @annotation text` stays as its one documentation
   annotation, so a data document governed by a core-importing schema still writes `@doc`. §6's sentence names
   `doc` alone.
+- **The kernel's `documentation`** goes with core's, and the kernel's `doc` becomes `@annotation text`. It was a
+  hop in a chain nothing else named, and §3.3.5 has core's `doc` a sibling of the kernel's — the same
+  construction — which a `doc` one hop shorter than the kernel's would not be. §13.1's row lists `annotation`,
+  `doc` and `synthetic`; §6's meta sentence names `doc` and `annotation`; §8.1's chain example loses its middle
+  entry and needs one of its own.
 - **[TSON-DATA] §5.6's sign-bound row leaves the built-in vocabulary.** §5.1 states the vocabulary as core's
   entries' contracts; keeping the row would leave a schemaless `!positive_integer` that stops resolving the moment
   its document moves under a schema importing core, where the vocabulary does not apply. A name outside the
@@ -1473,11 +1484,86 @@ importing that one still collides; it needs ambiguity reported at use rather tha
 change to name resolution than restraint in one library. An opt-in `core-extras` library reserves its names for
 whoever imports it, and with these entries gone there is nothing yet to put in it.
 
-**What is running** (`r2026-37-proposal`): the bundled `core.tn` without the eight entries (48 remain) and its
-resolved fixture; the built-in vocabulary without the four sign bounds; and the pinned `type` resolved first in
-the governing meta, through a template's held body to the constructor it applies. The corpus states a schema
-importing core declaring `identifier`, `positive_integer`, `non_empty_text` and `documentation`; an enum applied
-through a template; and an enum in a schema that declares its own `identifier`.
+**What is running** (`r2026-37-proposal`): the bundled `core.tn` without the eight entries (48 remain), the bundled
+`meta-kernel.tn` without `documentation`, and their resolved fixtures; the built-in vocabulary without the four
+sign bounds; and the pinned `type` resolved first in the governing meta, through a template's held body to the
+constructor it applies. The corpus states a schema importing core declaring `identifier`, `positive_integer`,
+`non_empty_text` and `documentation`; an enum applied through a template; and an enum in a schema that declares its
+own `identifier`.
+
+**Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
+
+**Status against Revision 36:** open.
+
+---
+
+## 16. Meta's annotation vocabulary: what a schema states, and its maintainers' notes
+
+**Section:** [TSON-SCHEMA] §6 (meta's list of annotation types; the advisory list), §13.1 (meta's row).
+
+**Kind:** proposal.
+
+**What the spec says today.** §6 has `meta.tn` declare `deprecated`, `since`, `todo`, `lang`, `title`, `examples`,
+`read_only`, `write_only`, `ordered`, `bounded`, `exact`, `numeric` and `disjoint`. `todo` and `deprecated` are
+`text`, so `@deprecated` must carry a value, and §6's form rule makes the bare `@deprecated` an author would write
+a resolver error.
+
+**Proposal.**
+
+- **`todo` leaves meta.** It records work on the schema's source, not anything the schema states, and a published
+  schema is immutable (§10), so a `@todo` in one is a note no one can act on.
+- **`since` and `lang` leave meta.** Neither is a fact a processor or a converter acts on: `since` is untyped
+  text whose versions mean whatever the author's release scheme does, and a schema's prose language is not a
+  property of any one declaration. A schema that wants either declares it in a meta-schema of its own. §6's form
+  example `@since:2025-01` needs another (`@title:"Order"`).
+- **`comment => @annotation text` joins meta**, a note for the schema's maintainers rather than its readers:
+  JSON Schema's `$comment`. `@todo` held part of that and goes; folding the rest into `@doc` would show
+  maintainers' notes to everyone reading the documentation. A converter from JSON Schema meets it often — 1,004
+  occurrences across 159 schema families in one SchemaStore conversion run (`ltr8-io-tson-benchmarks`).
+- **`deprecated` becomes `@annotation void`**, a presence marker like `@numeric`. Deprecation is a yes-or-no fact
+  — JSON Schema's `deprecated` is a boolean, and so is every host language's marker — and a reason, where there
+  is one, is `@doc`'s to give.
+
+**What is running** (`r2026-37-proposal`): the bundled `meta.tn` without `todo`, `since` and `lang`, with
+`deprecated => @annotation void` and `comment => @annotation text`, and its resolved fixture. `tson strip` drops
+`@comment` with `@doc`.
+
+**Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
+
+**Status against Revision 36:** open.
+
+---
+
+## 17. `@doc`'s text has no stated format
+
+**Section:** [TSON-SCHEMA] §6 (`doc`, kernel and core), §9 (the kernel's and core's `doc` entries).
+
+**Kind:** proposal.
+
+**What the spec says today.** `doc => @annotation text`, and nothing says what the text is. Every renderer
+picks: plain text, or whichever markdown dialect it knows. The bundled schemas' own docs are written in
+markdown already — backticks, lists, emphasis — and a schema converted from OpenAPI carries `description` text
+OpenAPI states is CommonMark, so the reading is ambiguous from both directions.
+
+**Proposal.** `@doc`'s text is **CommonMark** (0.31.2), stated in the `doc` entry's contract in the kernel and
+in core:
+
+- **CommonMark, not "markdown".** Markdown has no specification; CommonMark is versioned, so two renderers agree
+  on what a doc says. OpenAPI made the same choice for `description`.
+- **No extensions.** GFM's tables, task lists and autolinks are one vendor's dialect over CommonMark; a doc
+  that uses them reads as their literal text.
+- **Raw HTML is never executed, and a renderer need not render it.** CommonMark passes HTML through, and a doc
+  is written by whoever published the schema, so rendering one fetched from elsewhere must not become a way to
+  run its author's code.
+- **The rule refuses nothing.** Every string is valid CommonMark, so no schema stops loading and no processor
+  checks anything: the rule says how the text is displayed, which is all §6 lets an advisory annotation do.
+  Plain prose is almost unaffected — `_` inside a word (`record_field`) is not emphasis — and the occasional
+  leading `#`, `*` or `<` takes a backslash or backticks.
+
+`@title` stays plain text, being a name, and `@comment` is left unstated, as JSON Schema's `$comment` is.
+
+**What is running** (`r2026-37-proposal`): the bundled kernel's and core's `doc` entries state the contract in
+their own `@doc`. Nothing in this library renders a doc, so nothing else changes.
 
 **Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
 

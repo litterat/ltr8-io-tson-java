@@ -11,8 +11,8 @@ import java.nio.file.Path;
 
 /**
  * {@code tson strip <schema>} -- writes a schema document's reading form ({@link TsonSchemaStripper}) to
- * standard output: no {@code !!id}, no pins, no {@code @doc}, the spec's library shortened, whitespace
- * collapsed. The file is never rewritten, since the result is not a loadable schema.
+ * standard output: no {@code !!id}, no pins, no {@code @doc} or {@code @comment}, the spec's library shortened,
+ * whitespace collapsed. The file is never rewritten, since the result is not a loadable schema.
  */
 final class StripCommand {
 

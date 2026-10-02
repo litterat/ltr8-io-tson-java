@@ -267,6 +267,15 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **Decide whether `text_type` takes a facet for the text's format.** `@doc` is CommonMark by its type's contract
+  (`meta-kernel.tn`, `core.tn`), which a data field cannot state: a `description: text` holding CommonMark, or
+  JSON Schema's `contentMediaType` on a string, has no home but prose. The question is whether a format is a facet
+  at all, and the answer may differ by format. A facet narrows a value space (§5.7), and every string is valid
+  CommonMark, so a `COMMONMARK` facet would narrow nothing and fails §6's own test for what an annotation is
+  rather than a facet. A media type that parses (`application/json`) does narrow, and refines like any facet.
+  `bytes_type.encoding` is the nearest precedent and the opposite case: a selector of spelling, not refinable.
+  The outcome is a `meta.tn` change and a SPEC-FEEDBACK entry, or a recorded reason in `design/` not to.
+
 - [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
   `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
   `NOT_IMPLEMENTED` diagnostic carries. `resolveTypeRef`'s, for a sugar form that reaches resolution unlifted, offers two

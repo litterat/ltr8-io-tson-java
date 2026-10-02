@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=58d7124b6d4441f967b2648a0011c26036be37422179ab6a79f24626cad1f520"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f581ebad4aca3b84574b5db22d7bbb6ec3bbe968f377c1a6c657887be4dc1000"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f581ebad4aca3b84574b5db22d7bbb6ec3bbe968f377c1a6c657887be4dc1000"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=2bfab2ba7601e5783fa0bebb700e0f9ec38f2fc6df840ce45a136abeaac28405"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=4ebb4361521db7cd87b087b9880b653bd2957085c844337763cea317f82b2c92"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=4ebb4361521db7cd87b087b9880b653bd2957085c844337763cea317f82b2c92"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 
@@ -40,10 +40,10 @@
 
   Plus annotation types — the classifying markers `ordered`, `bounded`, `exact`,
   `numeric`; the checked assertion `disjoint`; and the documentary `deprecated`,
-  `since`, `todo`, `lang`, `title`, `examples`, `read_only`, `write_only`.
-  Annotation types must reside in the governing target's namespace (per Part 2
-  §6); placing them in meta makes them reachable from core and from every schema
-  that meta governs.
+  `title`, `comment`, `examples`, `read_only`, `write_only`. Annotation types
+  must reside in the governing target's namespace (per Part 2 §6); placing them
+  in meta makes them reachable from core and from every schema that meta
+  governs.
 
   An annotation never changes a value, its type, or whether it is valid:
   validation is over values, and a schema with every annotation erased admits
@@ -499,20 +499,21 @@
     """
   disjoint => @annotation void
 
-  @doc:"Marks a definition or field as deprecated."
-  deprecated => @annotation text
-
-  @doc:"Records when a definition or field was introduced."
-  since => @annotation text
-
-  @doc:"Marks incomplete work requiring attention."
-  todo => @annotation text
-
-  @doc:"BCP 47 language tag (RFC 5646)."
-  lang => @annotation text
+  @doc:"""
+    Marks a definition or field as deprecated. A bare presence marker like
+    `@numeric`; the reason, where there is one, is `@doc`'s to give.
+    """
+  deprecated => @annotation void
 
   @doc:"Short human-readable name for a definition or field."
   title => @annotation text
+
+  @doc:"""
+    A note for a schema's maintainers rather than its readers (JSON Schema's
+    `$comment`): where `@doc` is what a documentation tool shows, `@comment` is
+    what it leaves out.
+    """
+  comment => @annotation text
 
   @doc:"""
     Example values for a definition or field, carried for documentation only.

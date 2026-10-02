@@ -318,26 +318,16 @@
   }
 
   deprecated => @annotation !type_definition {
-    source: text
-    body: !reference { target: text }
-  }
-
-  since => @annotation !type_definition {
-    source: text
-    body: !reference { target: text }
-  }
-
-  todo => @annotation !type_definition {
-    source: text
-    body: !reference { target: text }
-  }
-
-  lang => @annotation !type_definition {
-    source: text
-    body: !reference { target: text }
+    source: void
+    body: !reference { target: void }
   }
 
   title => @annotation !type_definition {
+    source: text
+    body: !reference { target: text }
+  }
+
+  comment => @annotation !type_definition {
     source: text
     body: !reference { target: text }
   }
