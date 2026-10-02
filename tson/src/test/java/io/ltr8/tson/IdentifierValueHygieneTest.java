@@ -139,6 +139,36 @@ class IdentifierValueHygieneTest {
         assertEquals(List.of(), validate(UnicodePolicy.unrestricted(), "!handlers { " + MIXED + " => b }"));
     }
 
+    /**
+     * A value the schema supplies is a name as the same token in a document is: a default reaches every document
+     * that omits the field, so the reader must not inject what it would refuse if written. Judged when the schema
+     * links, under the family's own profile.
+     */
+    @Test
+    void aSchemasOwnIdentifierTypedValueIsAName() {
+        List<Diagnostic> refused = tson(UnicodePolicy.highlyRestrictive()).validateSchema(schemaWith(
+                "account => { role?: identifier ~ " + MIXED + " }"));
+        assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, only(refused).code());
+        assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, only(tson(UnicodePolicy.highlyRestrictive())
+                .validateSchema(schemaWith("account => { kind: identifier = a\u0132b }"))).code());
+
+        assertEquals(List.of(), tson(UnicodePolicy.highlyRestrictive()).validateSchema(schemaWith(
+                "account => { role?: identifier ~ admin  bind?: js_name ~ \"$scope\"  tag?: text ~ " + MIXED + " }")));
+    }
+
+    private static String schemaWith(String declaration) {
+        return """
+                !!id:"https://example.test/names-3.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
+                {
+                  identifier => !identifier_type { continue_add: "-" }
+                  js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
+                  %s
+                }
+                """.formatted(declaration);
+    }
+
     /** Object binding reads the same map through its own reader, and refuses the same keys. */
     @Test
     void bindingRefusesTheSameKeys() {

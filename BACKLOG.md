@@ -343,12 +343,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   deployment to relax any of the three". What is left to decide is the policy's shape for the set rule -- a switch of
   its own, or implied by the level.
 
-- [ ] **§8.2's per-name rules do not reach a schema's own identifier-typed values** (`r2026-37-proposal`,
-  SPEC-FEEDBACK #7). A data value whose type is an identifier family meets them at read, but a default or fixed
-  value of such a field, mixed-script or not, is checked by the linker against the family's parser only.
-  The linker's `perName` walk is where it belongs, keyed on the field's type as `EnumLabels.membersAreNames` keys
-  an enum's members, with a `class2/schema/refused/` vector.
-
 - [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
   in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a
   reference whose pin does not match its target's bytes is refused, a query parameter that is not a

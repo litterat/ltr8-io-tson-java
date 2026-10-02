@@ -830,17 +830,18 @@ ordinary schema declares its own, `identifier => !identifier_type { continue_add
 whose type is an identifier family, in both encodings, under the family's own profile — a character the profile
 adds meets no restricted-character rule, as §7.7's `-` does not — and the keys of a map keyed by one are a
 look-alike scope, refused at the second key; a refused value reads as nothing. Under a schema it is the one data
-scope, and like every other scope it does not yet consult the policy (BACKLOG). The corpus states it at
-`class2/validate/refused/`, a bucket added for it. Not yet running: the per-name mechanisms at a schema's own
-identifier-typed values, a field's default or fixed value. Proposal 2 runs as written above: the kernel declares
-`enum_type`, `enum` and `text_enum`, and `enum_profile` retires. The linker resolves each enum's `type` — in the
-schema's namespace, or in the governing meta's for a pinned value — refuses one that is not a text family, parses
-every member through the type's own parser and refuses a member it rejects or two it reads as one value, and keys
-§8.2's per-name rules on whether the type's constructor IS-A `identifier_type`. A member refused under an
-identifier family names `!text_enum [...]`, as §7.4 has the diagnostic name the fix. A processor binds a
-constructor that tightens another as the one it tightens, so `text_enum` and a meta layer's `kebab_enum` need no
-class of their own. The discrimination-class row runs as written: an enum whose type is not an identifier family is
-string-class, so `(!text_enum ["80" "443"] | integer)` is disjoint and `(!text_enum ["80" "443"] | text)` is not.
+scope, and like every other scope it does not yet consult the policy (BACKLOG). A field's default or fixed value of
+such a type is judged the same way when the schema links, since a default reaches every document that omits the
+field. The corpus states it at `class2/validate/refused/`, a bucket added for it, and at `class2/schema/refused/`.
+Proposal 2 runs as written above: the kernel declares `enum_type`, `enum` and `text_enum`, and `enum_profile`
+retires. The linker resolves each enum's `type` — in the schema's namespace, or in the governing meta's for a
+pinned value — refuses one that is not a text family, parses every member through the type's own parser and refuses
+a member it rejects or two it reads as one value, and keys §8.2's per-name rules on whether the type's constructor
+IS-A `identifier_type`. A member refused under an identifier family names `!text_enum [...]`, as §7.4 has the
+diagnostic name the fix. A processor binds a constructor that tightens another as the one it tightens, so
+`text_enum` and a meta layer's `kebab_enum` need no class of their own. The discrimination-class row runs as
+written: an enum whose type is not an identifier family is string-class, so `(!text_enum ["80" "443"] | integer)`
+is disjoint and `(!text_enum ["80" "443"] | text)` is not.
 
 **Status against Revision 36:** open. Proposal 1 stands alone and closes the map-key gap; Proposal 2 depends on
 it alone, #6 and #9 only letting its rules become structure later; Proposal 3 depends on Proposal 1 alone.
