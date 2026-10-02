@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=765332735fa4134e2f01cfedd0baaa3c21e8babaa905d3046fe5c0030054347e"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=82f2a99b477a2f6dc70358cc3fbf13bcfda660e09e519d32baf88fbc8cdee367"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=191c787b1f69ed750d54ef71225983b9b6d2c957fdd46284bf39d967501f788b"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=b46355e69daf50a4fe78c8e33b614b647783a01e33de37ed4cf2ad1232b70279"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -240,7 +240,7 @@
   bytes => !bytes_type { encoding: BASE64 }
 
   @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
-  @ordered:TOTAL @bounded:false
+  @ordered:TOTAL @bounded:true
   date => !date_type {}
 
   @doc:"""
@@ -274,7 +274,7 @@
     is data — an appointment shown in its booked zone — is a different
     value space, not this type.
     """
-  @ordered:TOTAL @bounded:false
+  @ordered:TOTAL @bounded:true
   datetime => !datetime_type {}
 
   @doc:"""
@@ -286,7 +286,7 @@
     is exactly 86400 s and a week 7 days, so `PT90M`, `PT1H30M` and
     `P0DT5400S` are one value.
     """
-  @ordered:TOTAL @bounded:false
+  @ordered:TOTAL @bounded:true
   duration => !duration_type {}
 
   @doc:"""

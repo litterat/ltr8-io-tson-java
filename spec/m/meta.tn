@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=82f2a99b477a2f6dc70358cc3fbf13bcfda660e09e519d32baf88fbc8cdee367"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=b46355e69daf50a4fe78c8e33b614b647783a01e33de37ed4cf2ad1232b70279"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=4f745bd936869807b225bcf376553127463ac950c902d00689efc78900258c9f"
 !!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=4f745bd936869807b225bcf376553127463ac950c902d00689efc78900258c9f"
 @doc:"""
@@ -575,7 +575,7 @@
   @doc:"Ordering classification (ISO/IEC 11404 / XSD fundamental facet)."
   ordered => @annotation !enum [NONE PARTIAL TOTAL]
 
-  @doc:"Boundedness annotation."
+  @doc:"Boundedness classification (ISO/IEC 11404 / XSD fundamental facet): true when the value space has a finite least and greatest value."
   bounded => @annotation boolean
 
   @doc:"""

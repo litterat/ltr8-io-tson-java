@@ -318,7 +318,7 @@
     body: !enum { members: [NONE PARTIAL TOTAL] }
   }
 
-  @doc:"Boundedness annotation."
+  @doc:"Boundedness classification (ISO/IEC 11404 / XSD fundamental facet): true when the value space has a finite least and greatest value."
   bounded => @annotation !type_definition {
     source: boolean
     body: !reference { target: boolean }
