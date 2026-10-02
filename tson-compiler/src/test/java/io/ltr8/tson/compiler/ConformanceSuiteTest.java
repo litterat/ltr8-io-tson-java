@@ -2,7 +2,8 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.io.ByteSource;
 
 import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.ast.AbsentValue;
 import io.ltr8.tson.compiler.ast.ArrayValue;
@@ -415,7 +416,7 @@ class ConformanceSuiteTest {
      * happened" would pass a processor that refused for the wrong reason.
      *
      * <p><b>The data version §8.2 requires a refusal to name is the processor's, not the diagnostic's</b>
-     * ({@link UnicodePolicy#dataVersion()}, which the caller has already matched against the vector's
+     * ({@link ProcessorPolicy#dataVersion()}, which the caller has already matched against the vector's
      * own {@code unicode} field before running it -- a version this implementation does not carry is a
      * legitimate skip). It is constant for every refusal in a run, so it is stated once beside the
      * diagnostics rather than stamped onto each of them.

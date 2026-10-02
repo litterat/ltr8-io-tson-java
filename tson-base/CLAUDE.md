@@ -14,4 +14,4 @@ Diagnostics, policies, schema sources, host atom values, byte I/O, UCD tables, `
 - `base.diagnostics` prose is the schema's vernacular (fields, *absent*); the encoding's spelling rides in `actual`.
 - `ByteSource`/`ByteSink`: bytes never characters; close releases only what was acquired; closing is not flushing.
 - `IdentifierProfile.validate`/`hygiene` report and never throw. `IdentifierPolicy.judge` is the one place the per-name
-  rules are applied; the token policy is a bare `UnicodePolicy`, which has no unit.
+  rules are applied; the token policy is a bare `ScriptPolicy`, which has no unit.

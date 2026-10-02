@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.tree.TsonValue;
@@ -51,7 +51,7 @@ class TokenPolicyTest {
     @Test
     void aRaisedPolicyRefusesAMixedScriptValue() {
         List<Diagnostic> found = problems(
-                new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
+                new TsonTreeReader().withTokenPolicy(ScriptPolicy.asciiOnly()),
                 "{ note: \"" + CYR_A + "dmin\" }");
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -67,7 +67,7 @@ class TokenPolicyTest {
      */
     @Test
     void aQuotedValueIsCheckedLikeAnyOther() {
-        assertEquals(1, problems(new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
+        assertEquals(1, problems(new TsonTreeReader().withTokenPolicy(ScriptPolicy.asciiOnly()),
                 "{ note: \"" + CYR_A + "\" }").size());
     }
 
@@ -82,7 +82,7 @@ class TokenPolicyTest {
     @Test
     void aFieldNameIsATokenAndIsChecked() {
         List<Diagnostic> found = problems(
-                new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
+                new TsonTreeReader().withTokenPolicy(ScriptPolicy.asciiOnly()),
                 "{ " + CYRILLIC_NAME + ": 1 }");
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -92,7 +92,7 @@ class TokenPolicyTest {
     /** An ASCII document is unaffected at any level -- the rule is about scripts, not about strictness for its own sake. */
     @Test
     void anAsciiDocumentPassesTheStrictestLevel() {
-        assertTrue(problems(new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
+        assertTrue(problems(new TsonTreeReader().withTokenPolicy(ScriptPolicy.asciiOnly()),
                 "{ note: hello  count: 3 }").isEmpty());
     }
 
@@ -102,7 +102,7 @@ class TokenPolicyTest {
      */
     @Test
     void aSingleScriptValuePassesWhereAMixedOneFails() {
-        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(UnicodePolicy.highlyRestrictive());
+        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(ScriptPolicy.highlyRestrictive());
         assertTrue(problems(reader, "{ note: \"админ\" }").isEmpty(), "all-Cyrillic");
         assertEquals(1, problems(reader, "{ note: \"" + CYR_A + "dmin\" }").size(), "Latin with one Cyrillic");
     }
@@ -110,7 +110,7 @@ class TokenPolicyTest {
     /** The policy survives derivation, like every other axis on the facade. */
     @Test
     void thePolicySurvivesWithSchemaAndWithDiagnostics() {
-        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly());
+        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(ScriptPolicy.asciiOnly());
         assertNotNull(reader.withDiagnostics(new DiagnosticsCollector()));
         assertEquals(1, problems(reader, "{ note: \"" + CYR_A + "\" }").size());
     }
@@ -140,7 +140,7 @@ class TokenPolicyTest {
         DiagnosticsCollector collected = new DiagnosticsCollector();
         TsonReadContext ctx = TsonReadContext.of(
                 new TsonDataStream(ByteSource.of("{ note: \"" + CYR_A + "\" }"),
-                        ProcessorPolicy.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()), collected),
+                        ProcessorPolicy.defaults().withTokenPolicy(ScriptPolicy.asciiOnly()), collected),
                 collected);
         try {                                   // the raw context has no end-of-stream predicate; drain it
             while (true) {

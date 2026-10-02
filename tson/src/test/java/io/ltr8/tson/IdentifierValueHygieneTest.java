@@ -9,7 +9,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -152,7 +152,7 @@ class IdentifierValueHygieneTest {
     /** §8.2's relaxation is the deployment's, stated in code, and reaches these values as it reaches names. */
     @Test
     void aRelaxedPolicyAdmitsWhatItRelaxes() {
-        assertEquals(List.of(), validate(IdentifierPolicy.of(UnicodePolicy.unrestricted()),
+        assertEquals(List.of(), validate(IdentifierPolicy.of(ScriptPolicy.unrestricted()),
                 "!handlers { " + MIXED + " => b }"));
     }
 

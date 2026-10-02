@@ -5,7 +5,7 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 
 import java.util.function.Function;
 import java.util.Objects;
@@ -181,9 +181,9 @@ public final class TsonTreeReader {
      *
      * <p>A level over the whole token, never per segment: {@code _} and {@code -} are word separators by
      * convention in a name and ordinary characters in a value, so segmenting one would admit UTS #39's own
-     * {@code Toys-Я-Us}. A {@link UnicodePolicy} has no unit to state.
+     * {@code Toys-Я-Us}. A {@link ScriptPolicy} has no unit to state.
      */
-    public TsonTreeReader withTokenPolicy(UnicodePolicy tokenPolicy) {
+    public TsonTreeReader withTokenPolicy(ScriptPolicy tokenPolicy) {
         Objects.requireNonNull(tokenPolicy, "tokenPolicy");
         return new TsonTreeReader(tree, receiver, schemaUri, schemaless,
                 policy.withTokenPolicy(tokenPolicy));

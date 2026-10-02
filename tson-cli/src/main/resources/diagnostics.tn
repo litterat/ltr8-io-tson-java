@@ -15,7 +15,7 @@
   mints versions nobody ever consumed, one for every field added during a development cycle.
 
   diagnostic_code, outcome and restriction_level are hand-written copies of Diagnostic.Code,
-  Outcome and UnicodePolicy.Level. DiagnosticsSchemaTest checks every copy against the Java enum
+  Outcome and ScriptPolicy.Level. DiagnosticsSchemaTest checks every copy against the Java enum
   in both directions, which is what catches a member added to one and forgotten here -- before that
   test existed, two such omissions were noticed only by a version bump.
 
@@ -75,7 +75,7 @@
     schema_position?: text?
   }
   @doc:"""
-    UTS #39 §5.2's restriction levels, a hand-written copy of UnicodePolicy.Level checked against it
+    UTS #39 §5.2's restriction levels, a hand-written copy of ScriptPolicy.Level checked against it
     by DiagnosticsSchemaTest the way diagnostic_code and outcome are.
     """
   restriction_level => !enum [
@@ -87,11 +87,11 @@
     siblings). Each entry in `permitting` is one such combination, named by
     java.lang.Character.UnicodeScript -- Latin, Cyrillic, Han.
     """
-  unicode_policy => { level: restriction_level  permitting: [[text]] }
+  script_policy => { level: restriction_level  permitting: [[text]] }
   @doc:"""
     [TSON-DATA] §8.2's identifier policy: the restriction level, whether it applies to each segment of a
     name rather than to the whole of it, whether no two names in one scope may share a UTS #39 skeleton,
-    and any script combinations admitted over the level, as unicode_policy states them.
+    and any script combinations admitted over the level, as script_policy states them.
     """
   identifier_policy => {
     level: restriction_level
@@ -130,7 +130,7 @@
 
   policy => {
     identifier_policy: identifier_policy
-    token_policy: unicode_policy
+    token_policy: script_policy
     unicode_data_version: text
     limits: limits
   }

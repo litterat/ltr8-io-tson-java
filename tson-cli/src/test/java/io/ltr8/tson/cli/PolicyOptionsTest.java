@@ -2,7 +2,7 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.lang.Character.UnicodeScript;
@@ -29,9 +29,9 @@ class PolicyOptionsTest {
     void noFlagsIsTheDefaultPair() {
         PolicyOptions options = consume();
 
-        assertEquals(UnicodePolicy.Level.HIGHLY_RESTRICTIVE, options.identifierPolicy().scripts().level());
+        assertEquals(ScriptPolicy.Level.HIGHLY_RESTRICTIVE, options.identifierPolicy().scripts().level());
         assertFalse(options.identifierPolicy().isPerSegment());
-        assertEquals(UnicodePolicy.Level.UNRESTRICTED, options.tokenPolicy().level());
+        assertEquals(ScriptPolicy.Level.UNRESTRICTED, options.tokenPolicy().level());
     }
 
     /**
@@ -62,11 +62,11 @@ class PolicyOptionsTest {
      */
     @Test
     void aLevelIsAcceptedInEitherSpelling() {
-        assertEquals(UnicodePolicy.Level.ASCII_ONLY,
+        assertEquals(ScriptPolicy.Level.ASCII_ONLY,
                 consume("--identifier-policy", "ascii-only").identifierPolicy().scripts().level());
-        assertEquals(UnicodePolicy.Level.ASCII_ONLY,
+        assertEquals(ScriptPolicy.Level.ASCII_ONLY,
                 consume("--identifier-policy", "ASCII_ONLY").identifierPolicy().scripts().level());
-        assertEquals(UnicodePolicy.Level.MODERATELY_RESTRICTIVE,
+        assertEquals(ScriptPolicy.Level.MODERATELY_RESTRICTIVE,
                 consume("--identifier-policy", "Moderately-Restrictive").identifierPolicy().scripts().level());
     }
 
@@ -76,7 +76,7 @@ class PolicyOptionsTest {
                 "--identifier-scripts", "Latin+Cyrillic", "--identifier-scripts", "Latin+Greek");
 
         IdentifierPolicy policy = options.identifierPolicy();
-        assertEquals(UnicodePolicy.Level.HIGHLY_RESTRICTIVE, policy.scripts().level(), "the default is kept");
+        assertEquals(ScriptPolicy.Level.HIGHLY_RESTRICTIVE, policy.scripts().level(), "the default is kept");
         assertTrue(policy.isPerSegment());
         assertTrue(policy.appliesSkeletonDistinctness(), "untouched by the other relaxations");
         assertEquals(List.of(Set.of(UnicodeScript.LATIN, UnicodeScript.CYRILLIC),
@@ -113,25 +113,25 @@ class PolicyOptionsTest {
     void aTokenScriptListRaisesTheLevelThatWouldHaveIgnoredIt() {
         PolicyOptions options = consume("--token-scripts", "Latin+Greek");
 
-        assertEquals(UnicodePolicy.Level.SINGLE_SCRIPT, options.tokenPolicy().level());
+        assertEquals(ScriptPolicy.Level.SINGLE_SCRIPT, options.tokenPolicy().level());
         assertTrue(options.tokenPolicy().checksScripts());
         assertEquals(List.of(Set.of(UnicodeScript.LATIN, UnicodeScript.GREEK)),
                 options.tokenPolicy().permittedScripts());
-        assertEquals(UnicodePolicy.Level.HIGHLY_RESTRICTIVE, options.identifierPolicy().scripts().level(),
+        assertEquals(ScriptPolicy.Level.HIGHLY_RESTRICTIVE, options.identifierPolicy().scripts().level(),
                 "the identifier surface is untouched by a token flag");
     }
 
     /** An identifier list needs no such lift: its default already scans. */
     @Test
     void anIdentifierScriptListKeepsTheDefaultLevel() {
-        assertEquals(UnicodePolicy.Level.HIGHLY_RESTRICTIVE,
+        assertEquals(ScriptPolicy.Level.HIGHLY_RESTRICTIVE,
                 consume("--identifier-scripts", "Latin+Cyrillic").identifierPolicy().scripts().level());
     }
 
     /** A level the caller stated is never overridden -- the lift is for a default, not for a decision. */
     @Test
     void aStatedLevelSurvivesAScriptList() {
-        assertEquals(UnicodePolicy.Level.MODERATELY_RESTRICTIVE,
+        assertEquals(ScriptPolicy.Level.MODERATELY_RESTRICTIVE,
                 consume("--token-policy", "moderately-restrictive", "--token-scripts", "Latin+Han")
                         .tokenPolicy().level());
     }
@@ -180,6 +180,6 @@ class PolicyOptionsTest {
         PolicyOptions options = PolicyOptions.consume(args);
 
         assertEquals(List.of("--output", "json", "schema.tn", "data.tn", "-"), args);
-        assertEquals(UnicodePolicy.Level.ASCII_ONLY, options.identifierPolicy().scripts().level());
+        assertEquals(ScriptPolicy.Level.ASCII_ONLY, options.identifierPolicy().scripts().level());
     }
 }

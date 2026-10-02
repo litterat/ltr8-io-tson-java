@@ -57,7 +57,7 @@ raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and 
 record — its classifying siblings switch on an encoding's own exception type where it classifies
 nothing at all.
 **`io.ltr8.tson.base.policy`** is what this processor will admit and spend — `ProcessorPolicy` and what it
-composes, `IdentifierPolicy` and `UnicodePolicy` (§8.2's identifier and token policies) and `LimitsPolicy` (§9.1's
+composes, `IdentifierPolicy` and `ScriptPolicy` (§8.2's identifier and token policies) and `LimitsPolicy` (§9.1's
 bounds), plus `FetchPolicy`, the
 same statement about *obtaining a schema* (document cap, cache cap, whether a `?sha256=` pin is required)
 — one package because a deployment states one set of constraints, and §8.2 requires a relaxation be code

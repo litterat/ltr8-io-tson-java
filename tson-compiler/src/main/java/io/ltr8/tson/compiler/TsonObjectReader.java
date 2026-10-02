@@ -5,7 +5,7 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -183,9 +183,9 @@ public final class TsonObjectReader {
      *
      * <p>A level over the whole token, never per segment: {@code _} and {@code -} are word separators by
      * convention in a name and ordinary characters in a value, so segmenting one would admit UTS #39's own
-     * {@code Toys-Я-Us}. A {@link UnicodePolicy} has no unit to state.
+     * {@code Toys-Я-Us}. A {@link ScriptPolicy} has no unit to state.
      */
-    public TsonObjectReader withTokenPolicy(UnicodePolicy tokenPolicy) {
+    public TsonObjectReader withTokenPolicy(ScriptPolicy tokenPolicy) {
         Objects.requireNonNull(tokenPolicy, "tokenPolicy");
         return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri,
                 policy.withTokenPolicy(tokenPolicy));

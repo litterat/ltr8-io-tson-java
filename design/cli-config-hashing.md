@@ -230,7 +230,7 @@ the list would otherwise be inert — Single Script being the level at which a l
 whole configuration. And a relaxation named against a level the caller *stated* that scans nothing is a usage
 error, not a no-op: `--token-policy unrestricted --token-scripts Latin+Cyrillic` configures nothing whatever,
 and accepting it silently would leave the caller believing a restriction is in force. There is no
-`--token-per-segment` flag: a token policy is a `UnicodePolicy`, which has no unit to state.
+`--token-per-segment` flag: a token policy is a `ScriptPolicy`, which has no unit to state.
 
 **`TEXT` prints the policy when it is load-bearing** — something was refused under it, or it was configured.
 A person does not want a configuration dump on every clean run; they do want, at the moment a name is refused,

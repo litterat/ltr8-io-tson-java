@@ -15,7 +15,7 @@ class ProcessorPolicyTest {
     /** The unit is the identifier policy's, where it means something; a token policy has none to state. */
     @Test
     void the_identifier_policy_may_be_per_segment() {
-        IdentifierPolicy perSegment = IdentifierPolicy.of(UnicodePolicy.highlyRestrictive()).perSegment();
+        IdentifierPolicy perSegment = IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()).perSegment();
         ProcessorPolicy policy = ProcessorPolicy.defaults().withIdentifierPolicy(perSegment);
         assertEquals(perSegment, policy.identifierPolicy());
     }
@@ -36,7 +36,7 @@ class ProcessorPolicyTest {
         /** Not a choice, so not a parameter: it is a property of the tables this build carries. */
         @Test
         void the_data_version_is_the_builds_own() {
-            assertEquals(UnicodePolicy.dataVersion(), ProcessorPolicy.defaults().unicodeDataVersion());
+            assertEquals(ProcessorPolicy.dataVersion(), ProcessorPolicy.defaults().unicodeDataVersion());
             assertNotNull(ProcessorPolicy.defaults().unicodeDataVersion());
         }
 
@@ -44,7 +44,7 @@ class ProcessorPolicyTest {
         void a_default_policy_names_the_two_surfaces_defaults() {
             ProcessorPolicy defaults = ProcessorPolicy.defaults();
             assertEquals(IdentifierPolicy.defaults(), defaults.identifierPolicy());
-            assertEquals(UnicodePolicy.Level.UNRESTRICTED, defaults.tokenPolicy().level());
+            assertEquals(ScriptPolicy.Level.UNRESTRICTED, defaults.tokenPolicy().level());
             assertEquals(LimitsPolicy.defaults(), defaults.limits());
         }
     }

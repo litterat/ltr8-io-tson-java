@@ -1,6 +1,7 @@
 package io.ltr8.tson.base.policy;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.unicode.Xid;
 
 import java.util.Objects;
 
@@ -49,7 +50,7 @@ import java.util.Objects;
  * nothing about the other, which is exactly why both are stated.
  *
  * <p><b>The two have different types, because they have different shapes.</b> An {@link IdentifierPolicy}
- * has a unit, a restricted-character rule and a scope relation; a token policy is a {@link UnicodePolicy}, a
+ * has a unit, a restricted-character rule and a scope relation; a token policy is a {@link ScriptPolicy}, a
  * level alone. A per-segment token policy -- which would admit UTS #39's own {@code Toys-Я-Us}, {@code -} being
  * an ordinary character in a value -- is not refused here but unwritable.
  *
@@ -65,11 +66,11 @@ import java.util.Objects;
  * @param identifierPolicy    the policy applied to names -- {@code ProcessorConfig.identifierPolicy}
  * @param tokenPolicy         the policy applied to token values -- {@code ProcessorConfig.tokenPolicy}
  * @param limits              what this processor will spend reading a document -- {@code ProcessorConfig.limits}
- * @param unicodeDataVersion  {@link UnicodePolicy#dataVersion()}, the UCD release whose tables the
+ * @param unicodeDataVersion  {@link #dataVersion()}, the UCD release whose tables the
  *                            rules were computed against ([TSON-DATA] §8.2 on why that is the
  *                            version §8.2's "UTS #39 data version" means)
  */
-public record ProcessorPolicy(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolicy,
+public record ProcessorPolicy(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy,
                               LimitsPolicy limits, String unicodeDataVersion) {
 
     public ProcessorPolicy {
@@ -86,14 +87,43 @@ public record ProcessorPolicy(IdentifierPolicy identifierPolicy, UnicodePolicy t
      * into this library, and a caller stating a different one would be describing a processor that does not
      * exist.
      */
-    public static ProcessorPolicy of(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolicy,
+    public static ProcessorPolicy of(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy,
                                      LimitsPolicy limits) {
-        return new ProcessorPolicy(identifierPolicy, tokenPolicy, limits, UnicodePolicy.dataVersion());
+        return new ProcessorPolicy(identifierPolicy, tokenPolicy, limits, dataVersion());
+    }
+
+    /**
+     * The UTS #39 data version every [TSON-DATA] §8.2 name-hygiene rule is computed against, as this build
+     * carries it.
+     *
+     * <p><b>§8.2 requires a refusal to name it</b>, and the reason is that the three rules read {@code
+     * confusables.txt}, {@code IdentifierStatus.txt} and the script data, none of which the Unicode
+     * Consortium freezes: two conforming processors may legitimately disagree about one name, and the
+     * version is the only thing that explains the disagreement.
+     *
+     * <p><b>It is stated once, not once per refusal</b> (as {@link #unicodeDataVersion()}, which a run or a
+     * response carries beside its diagnostics). It is constant for the life of a process, so a copy on each
+     * problem is N copies of a string that cannot differ; and what a sender needs in order not to be refused
+     * is this fact <em>before</em> it writes a document, which a channel that only opens on failure cannot
+     * give it. What the refusal itself carries is the remedy -- which name, which rule, and what the policy
+     * would admit.
+     *
+     * <p>Lives here rather than beside the tables it describes because the {@code unicode} package is the
+     * engines' and not a consumer's, and because it is a fact about all three mechanisms rather than about any
+     * one policy: this is the type that reports it.
+     *
+     * <p><b>It is the UCD version.</b> §8.2 asks for "the UTS #39 data version" and its detection note for
+     * "the UTS #39 version they were computed against"; UTS #39's data files are versioned with the UCD
+     * release that publishes them, so the two track and this states the one that exists --
+     * [TSON-DATA] §8.2.
+     */
+    public static String dataVersion() {
+        return Xid.UNICODE_VERSION;
     }
 
     /** {@link #defaults()} is what a processor applies before a deployment says anything. */
     public static ProcessorPolicy defaults() {
-        return of(IdentifierPolicy.defaults(), UnicodePolicy.unrestricted(), LimitsPolicy.defaults());
+        return of(IdentifierPolicy.defaults(), ScriptPolicy.unrestricted(), LimitsPolicy.defaults());
     }
 
     /**
@@ -107,7 +137,7 @@ public record ProcessorPolicy(IdentifierPolicy identifierPolicy, UnicodePolicy t
         return of(policy, tokenPolicy, limits);
     }
 
-    public ProcessorPolicy withTokenPolicy(UnicodePolicy policy) {
+    public ProcessorPolicy withTokenPolicy(ScriptPolicy policy) {
         return of(identifierPolicy, policy, limits);
     }
 

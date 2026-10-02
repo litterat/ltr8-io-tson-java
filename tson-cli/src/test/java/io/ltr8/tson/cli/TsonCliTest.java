@@ -2,9 +2,10 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.base.Diagnostic;
 
+import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -322,17 +323,17 @@ class TsonCliTest {
      * question is about this processor, and it has an answer whatever the state of anyone's documents.
      */
     @Test
-    void policyPrintsTheUnicodePolicyThisBuildApplies() throws IOException {
+    void policyPrintsTheProcessorPolicyThisBuildApplies() throws IOException {
         String text = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"policy"})));
         assertTrue(text.contains("identifier policy: HIGHLY_RESTRICTIVE"), text);
         assertTrue(text.contains("token policy:      UNRESTRICTED"), text);
-        assertTrue(text.contains("unicode data:      " + UnicodePolicy.dataVersion()), text);
+        assertTrue(text.contains("unicode data:      " + ProcessorPolicy.dataVersion()), text);
         assertTrue(text.contains("max depth:         " + LimitsPolicy.DEFAULT_MAX_DEPTH), text);
 
         String json = captureStdout(() ->
                 assertEquals(0, TsonCli.run(new String[] {"policy", "--output", "json"})));
         assertTrue(json.strip().startsWith("{\"identifier_policy\":{\"level\":\"HIGHLY_RESTRICTIVE\""), json);
-        assertTrue(json.contains("\"unicode_data_version\":\"" + UnicodePolicy.dataVersion() + "\""), json);
+        assertTrue(json.contains("\"unicode_data_version\":\"" + ProcessorPolicy.dataVersion() + "\""), json);
     }
 
     /** A stray argument is a usage error, the same as anywhere else -- this command takes only {@code --output}. */

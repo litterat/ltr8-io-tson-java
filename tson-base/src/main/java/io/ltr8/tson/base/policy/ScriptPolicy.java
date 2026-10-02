@@ -1,7 +1,5 @@
 package io.ltr8.tson.base.policy;
 
-import io.ltr8.tson.base.unicode.Xid;
-
 import java.lang.Character.UnicodeScript;
 import java.util.EnumSet;
 import java.util.List;
@@ -27,7 +25,7 @@ import java.util.Set;
  *
  * <p>Instances are immutable; {@link #permitting} returns a modified copy.
  */
-public final class UnicodePolicy {
+public final class ScriptPolicy {
 
     /** UTS #39 §5.2's levels, loosest last. */
     public enum Level {
@@ -78,38 +76,38 @@ public final class UnicodePolicy {
     private final Level level;
     private final List<Set<UnicodeScript>> permitted;
 
-    private UnicodePolicy(Level level, List<Set<UnicodeScript>> permitted) {
+    private ScriptPolicy(Level level, List<Set<UnicodeScript>> permitted) {
         this.level = level;
         this.permitted = List.copyOf(permitted);
     }
 
-    public static UnicodePolicy of(Level level) {
-        return new UnicodePolicy(level, List.of());
+    public static ScriptPolicy of(Level level) {
+        return new ScriptPolicy(level, List.of());
     }
 
-    public static UnicodePolicy asciiOnly() {
+    public static ScriptPolicy asciiOnly() {
         return of(Level.ASCII_ONLY);
     }
 
-    public static UnicodePolicy singleScript() {
+    public static ScriptPolicy singleScript() {
         return of(Level.SINGLE_SCRIPT);
     }
 
-    public static UnicodePolicy highlyRestrictive() {
+    public static ScriptPolicy highlyRestrictive() {
         return of(Level.HIGHLY_RESTRICTIVE);
     }
 
-    public static UnicodePolicy moderatelyRestrictive() {
+    public static ScriptPolicy moderatelyRestrictive() {
         return of(Level.MODERATELY_RESTRICTIVE);
     }
 
     /** §5.2 level 5: no script restriction, the identifier profile kept. */
-    public static UnicodePolicy scriptsUnchecked() {
+    public static ScriptPolicy scriptsUnchecked() {
         return of(Level.MINIMALLY_RESTRICTIVE);
     }
 
     /** §5.2 level 6: no script restriction and no identifier profile. See {@link Level#UNRESTRICTED}. */
-    public static UnicodePolicy unrestricted() {
+    public static ScriptPolicy unrestricted() {
         return of(Level.UNRESTRICTED);
     }
 
@@ -118,39 +116,10 @@ public final class UnicodePolicy {
      * and its siblings. The narrowest relaxation available: a deployment that knows it is Russian says
      * {@code permitting(LATIN, CYRILLIC)} rather than dropping a level and losing the rule everywhere else.
      */
-    public UnicodePolicy permitting(UnicodeScript... scripts) {
+    public ScriptPolicy permitting(UnicodeScript... scripts) {
         List<Set<UnicodeScript>> extended = new java.util.ArrayList<>(permitted);
         extended.add(Set.of(scripts));
-        return new UnicodePolicy(level, extended);
-    }
-
-    /**
-     * The UTS #39 data version every [TSON-DATA] §8.2 name-hygiene rule is computed against, as this build
-     * carries it.
-     *
-     * <p><b>§8.2 requires a refusal to name it</b>, and the reason is that the three rules read {@code
-     * confusables.txt}, {@code IdentifierStatus.txt} and the script data, none of which the Unicode
-     * Consortium freezes: two conforming processors may legitimately disagree about one name, and the
-     * version is the only thing that explains the disagreement.
-     *
-     * <p><b>It is stated once, not once per refusal</b> ({@code ProcessorPolicy}, which a run or a
-     * response carries beside its diagnostics). It is constant for the life of a process, so a copy on each
-     * problem is N copies of a string that cannot differ; and what a sender needs in order not to be refused
-     * is this fact <em>before</em> it writes a document, which a channel that only opens on failure cannot
-     * give it. What the refusal itself carries is the remedy -- which name, which rule, and what the policy
-     * would admit.
-     *
-     * <p>Lives here rather than beside the tables it describes because {@code io.ltr8.tson.compiler.lexer}
-     * is implementation and is not exported, so the constant is unreachable to a consumer by hand. This is
-     * the exported surface that already owns §8.2's restricted-script rule.
-     *
-     * <p><b>It is the UCD version.</b> §8.2 asks for "the UTS #39 data version" and its detection note for
-     * "the UTS #39 version they were computed against"; UTS #39's data files are versioned with the UCD
-     * release that publishes them, so the two track and this states the one that exists --
-     * [TSON-DATA] §8.2.
-     */
-    public static String dataVersion() {
-        return Xid.UNICODE_VERSION;
+        return new ScriptPolicy(level, extended);
     }
 
     /**
@@ -160,8 +129,8 @@ public final class UnicodePolicy {
      * <em>state</em> its configuration rather than only apply it. A document one processor accepts and another
      * refuses differs by exactly these and an {@link IdentifierPolicy}'s own components, and a reader of the refusal
      * has no other way to learn which one moved: the policy that judged is not in the document, not in the
-     * schema, and not in the diagnostic. See {@code ProcessorPolicy}, which is the three of them plus
-     * {@link #dataVersion()} as one value a run or a response states once.
+     * schema, and not in the diagnostic. See {@link ProcessorPolicy}, which is the policies plus
+     * {@link ProcessorPolicy#dataVersion()} as one value a run or a response states once.
      */
     public Level level() {
         return level;
@@ -303,7 +272,7 @@ public final class UnicodePolicy {
      */
     @Override
     public boolean equals(Object o) {
-        return o instanceof UnicodePolicy other && level == other.level && permitted.equals(other.permitted);
+        return o instanceof ScriptPolicy other && level == other.level && permitted.equals(other.permitted);
     }
 
     @Override

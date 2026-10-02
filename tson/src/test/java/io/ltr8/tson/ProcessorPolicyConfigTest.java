@@ -5,7 +5,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -30,7 +30,7 @@ class ProcessorPolicyConfigTest {
     private static final String CYR_A = new String(Character.toChars(0x0430));
 
     private static final ProcessorPolicy TIGHTENED = ProcessorPolicy.of(
-            IdentifierPolicy.of(UnicodePolicy.asciiOnly()), UnicodePolicy.asciiOnly(),
+            IdentifierPolicy.of(ScriptPolicy.asciiOnly()), ScriptPolicy.asciiOnly(),
             LimitsPolicy.defaults().withMaxDepth(8));
 
     @Test
@@ -63,11 +63,11 @@ class ProcessorPolicyConfigTest {
     void statingOneComponentLeavesTheOthersAlone() {
         ProcessorPolicy stated = Tson.of(ProcessorConfig.defaults()
                         .withLimits(LimitsPolicy.defaults().withMaxDepth(8))
-                        .withIdentifierPolicy(IdentifierPolicy.of(UnicodePolicy.asciiOnly())))
+                        .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.asciiOnly())))
                 .processorPolicy();
 
         assertEquals(8, stated.limits().maxDepth(), "the limit stated first survives the policy stated after it");
-        assertEquals(UnicodePolicy.Level.ASCII_ONLY, stated.identifierPolicy().scripts().level());
+        assertEquals(ScriptPolicy.Level.ASCII_ONLY, stated.identifierPolicy().scripts().level());
         assertEquals(ProcessorPolicy.defaults().tokenPolicy(), stated.tokenPolicy(),
                 "the component nothing stated keeps its default");
     }

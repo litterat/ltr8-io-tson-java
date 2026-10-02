@@ -78,12 +78,12 @@ module io.ltr8.tson.base {
 
     /**
      * What this processor will admit as a name and spend on a document -- {@code ProcessorPolicy} and what
-     * it composes: {@code IdentifierPolicy} and {@code UnicodePolicy} (§8.2's two surfaces) and {@code
+     * it composes: {@code IdentifierPolicy} and {@code ScriptPolicy} (§8.2's two surfaces) and {@code
      * LimitsPolicy} (§9.1's bounds).
      * One package because a deployment states one policy, and §8.2 requires a relaxation be code rather
      * than ambient: this is where that code points.
      *
-     * <p>{@code UnicodePolicy} is here rather than beside the tables it reads, because the line between the
+     * <p>{@code ScriptPolicy} is here rather than beside the tables it reads, because the line between the
      * two Unicode packages is who touches them. A consumer names this to configure a processor and never
      * names {@code unicode}; the engines read {@code unicode} and never name this.
      */

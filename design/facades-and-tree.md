@@ -87,7 +87,7 @@ needs no set of already-reported positions. `wrap` returns the source unchanged 
 nothing, which is the default — an ordinary read pays not even a predicate.
 
 **A raised policy is not a per-token allocation either**, which is what makes it advisable to turn on. The
-conforming path through `UnicodePolicy.violation` scans and returns `Optional.empty()`: no substring (the scan runs
+conforming path through `ScriptPolicy.violation` scans and returns `Optional.empty()`: no substring (the scan runs
 over a range, which is also how `IdentifierPolicy` judges each segment of a name), no script set (a single-script unit
 is decided without materialising one — only a genuinely mixed token builds the set `covered` and the message need), no
 stream, and `isPresent`/`get` at the call rather than a lambda that would capture three fields per token. What is left
@@ -101,7 +101,7 @@ at it. The setter is named for the surface rather than for the values it mostly 
 visible where it is configured. Document directives are not checked: a `!!schema`/`!!id` token is a URI naming
 an external resource, §2.2.1 governs what an identity may be, and an IRI's scripts are the resource owner's
 business. The diagnostic (`RESTRICTED_SCRIPT`) carries a position and no `path`, which is not an omission —
-there is no path yet at the point the check runs. The token policy is a `UnicodePolicy`, which has no unit: `_`
+there is no path yet at the point the check runs. The token policy is a `ScriptPolicy`, which has no unit: `_`
 and `-` are word separators by convention in a name and ordinary characters in a value, so segmenting one would
 admit UTS #39's own `Toys-Я-Us`.
 

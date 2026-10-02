@@ -4,7 +4,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 
 import java.lang.Character.UnicodeScript;
 import java.util.ArrayList;
@@ -25,7 +25,7 @@ import java.util.Locale;
  * <p><b>Every flag is consumed here and nowhere else</b> ({@link #consume}), which is what lets the three
  * subcommands' own argument loops go on seeing only {@code --output} and their positionals.
  */
-record PolicyOptions(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolicy,
+record PolicyOptions(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy,
                      LimitsPolicy limits) {
 
     /**
@@ -34,7 +34,7 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolic
      * {@code PolicyOptionsTest} pins the restatement against a real {@code Tson}.
      */
     static final PolicyOptions DEFAULTS = new PolicyOptions(IdentifierPolicy.defaults(),
-            UnicodePolicy.unrestricted(), LimitsPolicy.defaults());
+            ScriptPolicy.unrestricted(), LimitsPolicy.defaults());
 
     /**
      * The level a script list brings with it on a surface whose default scans nothing.
@@ -45,7 +45,7 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolic
      * passes, and a mixed one passes only where the list names it. Anything stricter (ASCII-only) would
      * refuse the very scripts being admitted; anything looser stops scanning again.
      */
-    private static final UnicodePolicy.Level IMPLIED_BY_SCRIPTS = UnicodePolicy.Level.SINGLE_SCRIPT;
+    private static final ScriptPolicy.Level IMPLIED_BY_SCRIPTS = ScriptPolicy.Level.SINGLE_SCRIPT;
 
     /** This run's policies on a fresh {@link ProcessorConfig}. */
     ProcessorConfig applyTo(ProcessorConfig config) {
@@ -63,8 +63,8 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolic
      *                        a surface whose stated level scans nothing
      */
     static PolicyOptions consume(List<String> args) {
-        UnicodePolicy.Level identifierLevel = null;
-        UnicodePolicy.Level tokenLevel = null;
+        ScriptPolicy.Level identifierLevel = null;
+        ScriptPolicy.Level tokenLevel = null;
         int maxDepth = LimitsPolicy.DEFAULT_MAX_DEPTH;
         boolean perSegment = false;
         boolean lookAlikes = false;
@@ -133,16 +133,16 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolic
      * says is never quietly accepted. {@code --identifier-allow-look-alikes} is not such a relaxation -- skeleton
      * distinctness is no part of the level, and means the same under every one.
      */
-    private static UnicodePolicy assemble(String surface, UnicodePolicy.Level stated,
-                                          UnicodePolicy.Level fallback, boolean perSegment,
-                                          List<UnicodeScript[]> scripts) {
+    private static ScriptPolicy assemble(String surface, ScriptPolicy.Level stated,
+                                         ScriptPolicy.Level fallback, boolean perSegment,
+                                         List<UnicodeScript[]> scripts) {
         boolean relaxed = perSegment || !scripts.isEmpty();
-        UnicodePolicy.Level level = stated;
+        ScriptPolicy.Level level = stated;
         if (level == null) {
-            level = relaxed && !UnicodePolicy.of(fallback).checksScripts() ? IMPLIED_BY_SCRIPTS : fallback;
+            level = relaxed && !ScriptPolicy.of(fallback).checksScripts() ? IMPLIED_BY_SCRIPTS : fallback;
         }
 
-        UnicodePolicy policy = UnicodePolicy.of(level);
+        ScriptPolicy policy = ScriptPolicy.of(level);
         if (relaxed && !policy.checksScripts()) {
             String given = scripts.isEmpty() ? "--" + surface + "-per-segment"
                     : "--" + surface + "-scripts" + (perSegment ? " and --" + surface + "-per-segment" : "");
@@ -162,9 +162,9 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolic
      * because {@code highly-restrictive} is what a person types and {@code HIGHLY_RESTRICTIVE} is what they
      * copy.
      */
-    private static UnicodePolicy.Level level(String value) {
+    private static ScriptPolicy.Level level(String value) {
         try {
-            return UnicodePolicy.Level.valueOf(value.replace('-', '_').toUpperCase(Locale.ROOT));
+            return ScriptPolicy.Level.valueOf(value.replace('-', '_').toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             throw new UsageException("unknown restriction level '" + value + "' -- expected one of "
                     + String.join(", ", levels()));
@@ -188,10 +188,10 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolic
 
     /** The six levels as the flags spell them, for a usage message. */
     private static List<String> levels() {
-        return java.util.Arrays.stream(UnicodePolicy.Level.values()).map(PolicyOptions::spelling).toList();
+        return java.util.Arrays.stream(ScriptPolicy.Level.values()).map(PolicyOptions::spelling).toList();
     }
 
-    private static String spelling(UnicodePolicy.Level level) {
+    private static String spelling(ScriptPolicy.Level level) {
         return level.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 

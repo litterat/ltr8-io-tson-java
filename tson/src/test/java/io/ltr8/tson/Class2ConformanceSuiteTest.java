@@ -1,8 +1,9 @@
 package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 
+import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
-import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentPeek;
@@ -167,9 +168,9 @@ class Class2ConformanceSuiteTest {
         String stated = fieldText(refusal, "unicode");
         // Through the public accessor, the way a consumer of this library reads it: `Xid` is in the
         // unexported `lexer` package, so nothing outside `tson-compiler` can name the constant by hand.
-        Assumptions.assumeTrue(UnicodePolicy.dataVersion().equals(stated),
+        Assumptions.assumeTrue(ProcessorPolicy.dataVersion().equals(stated),
                 "vector computed against UTS #39 data for Unicode " + stated + "; this implementation "
-                        + "carries " + UnicodePolicy.dataVersion());
+                        + "carries " + ProcessorPolicy.dataVersion());
 
         assertFalse(problems.isEmpty(), "the " + subject + " is refused, but it was read without a diagnostic");
         assertTrue(problems.stream().anyMatch(diagnostic -> isPolicyRefusal(diagnostic.code())),
@@ -204,7 +205,7 @@ class Class2ConformanceSuiteTest {
      * happened" would pass a processor that refused for the wrong reason.
      *
      * <p><b>The data version §8.2 requires a refusal to name is the processor's, not the diagnostic's</b>
-     * ({@link UnicodePolicy#dataVersion()}, which the caller has already matched against the vector's
+     * ({@link ProcessorPolicy#dataVersion()}, which the caller has already matched against the vector's
      * own {@code unicode} field before running it -- a version this implementation does not carry is a
      * legitimate skip). It is constant for every refusal in a run, so it is stated once beside the
      * diagnostics rather than stamped onto each of them.

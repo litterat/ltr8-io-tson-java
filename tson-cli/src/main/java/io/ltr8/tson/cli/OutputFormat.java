@@ -203,7 +203,7 @@ enum OutputFormat {
                 + (policy.skeletonDistinctness() ? "" : " without skeleton distinctness");
     }
 
-    private static String summary(CliPolicy.CliUnicodePolicy policy) {
+    private static String summary(CliPolicy.CliScriptPolicy policy) {
         return policy.level() + permitting(policy.permitting());
     }
 
@@ -332,12 +332,12 @@ enum OutputFormat {
         jsonPermitting(json, policy.identifierPolicy().permitting());
         json.append('}');
         json.append(",\"token_policy\":");
-        jsonUnicodePolicy(json, policy.tokenPolicy());
+        jsonScriptPolicy(json, policy.tokenPolicy());
         json.append(",\"unicode_data_version\":").append(jsonString(policy.unicodeDataVersion()));
         json.append(",\"limits\":{\"max_depth\":").append(policy.limits().maxDepth()).append("}}");
     }
 
-    private static void jsonUnicodePolicy(StringBuilder json, CliPolicy.CliUnicodePolicy policy) {
+    private static void jsonScriptPolicy(StringBuilder json, CliPolicy.CliScriptPolicy policy) {
         json.append("{\"level\":").append(jsonString(policy.level().name())).append(',');
         jsonPermitting(json, policy.permitting());
         json.append('}');

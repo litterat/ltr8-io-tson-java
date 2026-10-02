@@ -100,7 +100,7 @@ out.
 ```java
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.*;        // Diagnostic, the receivers, ProcessorConfig, the exceptions
-import io.ltr8.tson.base.policy.*; // IdentifierPolicy, UnicodePolicy, LimitsPolicy, ProcessorPolicy, FetchPolicy
+import io.ltr8.tson.base.policy.*; // IdentifierPolicy, ScriptPolicy, LimitsPolicy, ProcessorPolicy, FetchPolicy
 import io.ltr8.tson.base.source.*; // SchemaAccess, SchemaSource, the two fetching sources
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
@@ -395,7 +395,7 @@ Two policies, defaulting opposite ways for the same reason in each case:
 ```java
 Tson tson = Tson.of(ProcessorConfig.defaults()
         .withIdentifierPolicy(IdentifierPolicy.defaults().perSegment())  // names
-        .withTokenPolicy(UnicodePolicy.unrestricted()));                 // values
+        .withTokenPolicy(ScriptPolicy.unrestricted()));                 // values
 ```
 
 `identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names, and every
@@ -406,7 +406,7 @@ adds that is not a letter or digit (`-` for core names, a `$` or a medial `.` fo
 `withSkeletonDistinctness(false)` drops the look-alike rule over a scope, independently of the level. `tokenPolicy`
 governs **every token a read pulls** and defaults to `unrestricted()`, a value being data that may
 legitimately be anything; raise it when values are more than payload (a service that renders what it
-reads into a UI). A token policy is a plain `UnicodePolicy` and has **no unit**: `_` and `-` are ordinary
+reads into a UI). A token policy is a plain `ScriptPolicy` and has **no unit**: `_` and `-` are ordinary
 characters in a value rather than word separators, and UTS #39's own `Toys-Я-Us` is the spoof segmenting one
 would admit. Note
 also that a token policy stricter than the identifier policy **subsumes it** — the token scan runs before

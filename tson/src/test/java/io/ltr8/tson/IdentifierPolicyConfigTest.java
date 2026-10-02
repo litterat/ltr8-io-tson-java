@@ -1,9 +1,9 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
@@ -67,29 +67,29 @@ class IdentifierPolicyConfigTest {
     /** The first relaxation to reach for: same level, applied per segment. */
     @Test
     void perSegmentAdmitsTheCompoundAndStillRefusesTheHomograph() {
-        accepts(IdentifierPolicy.of(UnicodePolicy.highlyRestrictive()).perSegment(), COMPOUND);
-        assertTrue(refuses(IdentifierPolicy.of(UnicodePolicy.highlyRestrictive()).perSegment(), HOMOGRAPH)
+        accepts(IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()).perSegment(), COMPOUND);
+        assertTrue(refuses(IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()).perSegment(), HOMOGRAPH)
                 .contains("mixes the scripts"));
     }
 
     /** Narrower still: name the combination rather than change the shape of the rule. */
     @Test
     void anExplicitlyPermittedCombinationAdmitsOnlyThat() {
-        accepts(IdentifierPolicy.of(UnicodePolicy.highlyRestrictive().permitting(LATIN, CYRILLIC)), COMPOUND);
+        accepts(IdentifierPolicy.of(ScriptPolicy.highlyRestrictive().permitting(LATIN, CYRILLIC)), COMPOUND);
     }
 
     /** And the off positions reach the linker like any other rung. */
     @Test
     void scriptsUncheckedTurnsTheRuleOff() {
-        accepts(IdentifierPolicy.of(UnicodePolicy.scriptsUnchecked()), COMPOUND);
-        accepts(IdentifierPolicy.of(UnicodePolicy.scriptsUnchecked()), HOMOGRAPH);
+        accepts(IdentifierPolicy.of(ScriptPolicy.scriptsUnchecked()), COMPOUND);
+        accepts(IdentifierPolicy.of(ScriptPolicy.scriptsUnchecked()), HOMOGRAPH);
     }
 
     /** An all-Latin schema is unaffected at every rung, which is what keeps the default deployable. */
     @Test
     void anOrdinarySchemaIsUnaffected() {
         for (IdentifierPolicy policy : new IdentifierPolicy[] {null, IdentifierPolicy.defaults(),
-                IdentifierPolicy.defaults().perSegment(), IdentifierPolicy.of(UnicodePolicy.asciiOnly())}) {
+                IdentifierPolicy.defaults().perSegment(), IdentifierPolicy.of(ScriptPolicy.asciiOnly())}) {
             accepts(policy, schema("order_id"));
         }
     }

@@ -70,7 +70,7 @@ public final class ProcessorConfig {                 // io.ltr8.tson.base
 
     public ProcessorConfig withProcessorPolicy(ProcessorPolicy policy);   // the whole value
     public ProcessorConfig withIdentifierPolicy(IdentifierPolicy policy); // every name, and its scopes
-    public ProcessorConfig withTokenPolicy(UnicodePolicy policy);         // every token a read pulls
+    public ProcessorConfig withTokenPolicy(ScriptPolicy policy);         // every token a read pulls
     public ProcessorConfig withLimits(LimitsPolicy limits);               // §9.1's resource bounds
 
     public SchemaAccess schemaAccess();
@@ -173,13 +173,14 @@ public record SchemaLocation(…)   // io.ltr8.tson.compiler -- id + pointer + p
 
 ```java
 public record ProcessorPolicy(IdentifierPolicy identifierPolicy,    // io.ltr8.tson.base.policy
-                              UnicodePolicy tokenPolicy,
+                              ScriptPolicy tokenPolicy,
                               LimitsPolicy limits,
                               String unicodeDataVersion) {
     public static ProcessorPolicy defaults();
-    public static ProcessorPolicy of(IdentifierPolicy identifier, UnicodePolicy token, LimitsPolicy limits);
+    public static String dataVersion();                // the Unicode data version this build carries, e.g. "16.0"
+    public static ProcessorPolicy of(IdentifierPolicy identifier, ScriptPolicy token, LimitsPolicy limits);
     public ProcessorPolicy withIdentifierPolicy(IdentifierPolicy policy);
-    public ProcessorPolicy withTokenPolicy(UnicodePolicy policy);
+    public ProcessorPolicy withTokenPolicy(ScriptPolicy policy);
     public ProcessorPolicy withLimits(LimitsPolicy limits);
 }
 
@@ -207,35 +208,34 @@ in order not to be refused is this record *before* it writes. `tson policy` prin
 public final class IdentifierPolicy {                       // io.ltr8.tson.base.policy -- §8.2's identifier policy
     public record Violation(Diagnostic.Code code, String reason) {}
 
-    public static IdentifierPolicy of(UnicodePolicy scripts);      // whole name, skeleton distinctness on
+    public static IdentifierPolicy of(ScriptPolicy scripts);      // whole name, skeleton distinctness on
     public static IdentifierPolicy defaults();                    // of(highlyRestrictive())
     public static IdentifierPolicy none();                        // judges nothing -- a synthetic source
 
     public IdentifierPolicy perSegment();                  // the level per segment, split at the profile's separators
     public IdentifierPolicy withSkeletonDistinctness(boolean on);  // mechanism 1, the look-alike rule over a scope
 
-    public UnicodePolicy scripts();
+    public ScriptPolicy scripts();
     public boolean isPerSegment();
     public boolean appliesSkeletonDistinctness();
     public boolean appliesIdentifierProfile();
     public List<Violation> judge(String name, IdentifierProfile profile);   // the per-name rules; empty if none
 }
 
-public final class UnicodePolicy {                          // the token policy, and an identifier policy's level
+public final class ScriptPolicy {                          // the token policy, and an identifier policy's level
     public enum Level { ASCII_ONLY, SINGLE_SCRIPT, HIGHLY_RESTRICTIVE,
                         MODERATELY_RESTRICTIVE, MINIMALLY_RESTRICTIVE, UNRESTRICTED }
 
-    public static UnicodePolicy of(Level level);
-    public static UnicodePolicy asciiOnly();
-    public static UnicodePolicy singleScript();
-    public static UnicodePolicy highlyRestrictive();       // the identifier default
-    public static UnicodePolicy moderatelyRestrictive();
-    public static UnicodePolicy scriptsUnchecked();
-    public static UnicodePolicy unrestricted();            // the token default
+    public static ScriptPolicy of(Level level);
+    public static ScriptPolicy asciiOnly();
+    public static ScriptPolicy singleScript();
+    public static ScriptPolicy highlyRestrictive();       // the identifier default
+    public static ScriptPolicy moderatelyRestrictive();
+    public static ScriptPolicy scriptsUnchecked();
+    public static ScriptPolicy unrestricted();            // the token default
 
-    public UnicodePolicy permitting(UnicodeScript... scripts);
+    public ScriptPolicy permitting(UnicodeScript... scripts);
 
-    public static String dataVersion();                        // the Unicode data version, e.g. "16.0"
     public Level level();                                      // with permittedScripts, the whole of a policy
     public List<Set<UnicodeScript>> permittedScripts();
     public boolean checksScripts();
@@ -292,7 +292,7 @@ public final class TsonTreeReader {
     public TsonTreeReader withSchema(String schemaUri);
     public TsonTreeReader withDiagnostics(DiagnosticsReceiver receiver);
     public TsonTreeReader withProcessorPolicy(ProcessorPolicy policy);
-    public TsonTreeReader withTokenPolicy(UnicodePolicy policy);
+    public TsonTreeReader withTokenPolicy(ScriptPolicy policy);
     public TsonTreeReader withIdentifierPolicy(IdentifierPolicy policy);
     public TsonTreeReader withLimits(LimitsPolicy limits);
     public TsonTreeReader preservingUnknownTypeRefs();
