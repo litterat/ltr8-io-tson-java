@@ -63,6 +63,35 @@ text**, never through the bound document, which drops them, so both sides would 
 wrong reason. They are the only external statement of what a conforming resolver produces. Keep them in step
 with the `.tn` beside them.
 
+### Writing the bundled schemas' docs
+
+A bundled schema's `@doc` states the **contract** of its entry and nothing else. The test for every sentence: would a
+schema author or a processor implementer get something wrong without it? If not, it belongs in the spec, not here —
+the schemas ship in the library and are read as the normative vocabulary, so an argument in them reads as a rule.
+
+- **Stays:** what the entry is, and for a type its value space — which values, how equality and ordering work; what
+  each field or facet means, with its unit; coherence rules and schema-load/resolver errors; refinement rules (what a
+  refinement may set, tighten, never change); defaults and what omission yields; cross-layer name-resolution facts
+  (core declaring a sibling of a kernel type under the same name); how TSON text spells a value, said by name;
+  mappings a converter needs (JSON Schema `number`, a host language's closed-set construct); one short example where
+  the spelling is not obvious; the spec citations attached to sentences that stay.
+- **Goes:** history ("earlier revisions called", "was removed", "unchanged", "now", "remains"); rationale ("because",
+  "which is why", "considered and rejected"); comparisons made to persuade (Java's `BigDecimal.equals`, "as
+  `java.time.Duration` writes it"); restatements — a rule a file header states for several entries (meta's bounds,
+  `multiple_of` and `members` rules) is stated once there and an entry refers to it. The exception is the kernel's
+  `integer_type`, which keeps its own statement: a schema chained to the kernel alone never reads meta's header.
+- **Form:** open with what the entry is, then fields or facets, then rules. Present tense, plain declarative
+  sentences. A one-sentence doc is `@doc:"…"` on one line; a longer one is a `"""` block indented as the file does,
+  wrapped near 72 columns. A member-set entry says whose members it holds ("The members of an integer_type.").
+- **File headers** keep what the file is, how it is reached through `!!meta` and `!!import`, what it contains, rules
+  shared by several entries, and the hash-pin note.
+- **Shortening a rule never changes it.** Where tighter wording could strengthen or weaken it, the sentence stays
+  verbatim. A doc that contradicts its declaration or another doc is reported, never silently reconciled.
+
+Text that leaves a doc is not discarded: it goes to the spec author as a removed-text list, verbatim and categorised,
+so the argument can land in Part 2. The `*-resolved.tn` fixtures carry abbreviations of these docs and follow the same
+rules.
+
 ## Branches and revisions
 
 **`main` is the reference implementation of the published revision, which is Revision 36.** Each published

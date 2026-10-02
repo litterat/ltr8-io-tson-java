@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=b46355e69daf50a4fe78c8e33b614b647783a01e33de37ed4cf2ad1232b70279"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=4f745bd936869807b225bcf376553127463ac950c902d00689efc78900258c9f"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=4f745bd936869807b225bcf376553127463ac950c902d00689efc78900258c9f"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=6c532b7604fec9c8f8ab5cc6912c415b69492455d11690ce4d2b8b81b4307c4b"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=7b9f2a665991a1fc727521d3c290e463891af79ed4680a23739bd037522a30e9"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=7b9f2a665991a1fc727521d3c290e463891af79ed4680a23739bd037522a30e9"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 
@@ -13,9 +13,7 @@
   User schemas normally chain to this file via `!!meta`. The
   meta-kernel is reachable but not typically referenced directly —
   schemas that chain to meta-kernel are either alternative type
-  libraries replacing meta, or extensions of the meta layer itself
-  (the format's sanctioned extension point: new type vocabularies
-  arrive as new meta layers, never as grammar changes).
+  libraries replacing meta, or extensions of the meta layer itself.
 
   Hash pins here are real digests over the bytes of this copy; see
   meta-kernel.tn's note.
@@ -27,9 +25,8 @@
      instance in core is `bytes`; and `scoped` (with
      the `scope_kind` enum), whose instances in core are `declared`,
      `extern` and `dynamic` and whose applications are `extern_of`
-     and `extern_type`. Fixed-size arrays need no constructor of their
-     own — `[T; N]` is the spelling, and an intent that deserves a
-     name earns a user template.
+     and `extern_type`. Fixed-size arrays have no constructor of
+     their own: `[T; N]` is the spelling.
 
   2. The `set` template — the `set<T>` spelling of the kernel's
      `set_type` constructor, declared here for meta-layer extensions;
@@ -62,25 +59,6 @@
   reference to any encoding, and where a doc mentions how TSON text
   spells a value it says so by name.
 
-  No directive is declared, and the one that was is why. `rest`
-  designated the field a flattening encoding should flatten, which
-  gave it force in JSON and none in TSON text — so its class was the
-  encodings that claimed it, which defines nothing, and what it
-  carried was a wire spelling rather than a fact the model holds. A
-  record is closed under its type (Part 2 §7.2) and open-ended data
-  is a map-typed field, written the same way in every encoding. The
-  category stands in §6; nothing here needs it.
-
-  The erasure rule holds here without exception. How a record may be
-  realised once had two annotation spellings, and each stated a fact
-  about the type — which values a position typed by the record
-  admits — so erasing one changed what conforms. Both are now
-  grammar: `abstract` and `final` are words at the declaration and
-  `=?` marks a selector field (Part 2 §5.2, §12.1), all three lowering
-  into the kernel's own `record.extension` and `record.discriminators`.
-  Neither name is declared here, so either written as an annotation is
-  the ordinary unresolved-name error.
-
   Constructors that bind to a governing specification compose with
   the kernel's atom_specification mixin and pin the spec field with
   `=`. Their instances in core are empty, `float_type` aside, whose
@@ -99,9 +77,8 @@
   The ordered numeric families state their bounds as field groups
   ([TSON-SCHEMA] §5.11): one inclusive-or-exclusive group per side,
   so an inclusive and an exclusive bound on the same side is
-  unrepresentable rather than a prose rule. Value-level coherence
-  (the lower bound not exceeding the upper) remains a schema-load
-  check.
+  unrepresentable. Value-level coherence (the lower bound not
+  exceeding the upper) is a schema-load check.
 
   `multiple_of`, wherever it appears (`decimal_type`, `rational_type`,
   `duration_type`, `period_type`, and the kernel's `integer_type`),
@@ -119,27 +96,15 @@
     The set spelling an author writes: `set<text>` where the bare
     construction is `!set_type { element_type: text }`. A §5.10
     template, not a constructor: it composes with nothing and so is
-    not IS-A `top`, and `set_type` stays parameterless as §4.2
-    requires of every container constructor. The element type
-    arrives by application rather than by a parameter on the
-    constructor itself.
+    not IS-A `top`.
 
     This copy serves meta-layer extensions. Core declares a sibling
-    under the same name, as it does for `void`, so that user schemas
-    reach it through their core import rather than through the
-    governing namespace.
+    under the same name, so that user schemas reach it through their
+    core import rather than through the governing namespace.
     """
   set => <T> !set_type { element_type: T }
 
-  @doc:"""
-    The base encodings of RFC 4648 — its own term for the family —
-    that a text encoding may spell a `bytes` value in (HEX is §8's
-    base16). A spelling is not a kind of value: the same
-    octets are `"3q2+7w=="`, `"deadbeef"` and `"3WV37Q======"`, and
-    "abcd" is well-formed hex and well-formed base64 decoding to
-    different octets, which is why a text reader must be told which
-    alphabet is in force.
-    """
+  @doc:"The base encodings of RFC 4648 that a text encoding may spell a `bytes` value in (HEX is §8's base16)."
   bytes_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
 
   @doc:"""
@@ -155,28 +120,14 @@
     and any encoding whose values are character sequences — spells the
     octets in, and an encoding whose values are octets ignores it. A
     selector picks a spelling, so it never changes what two values
-    compare as. It defaults to BASE64 (§4, padded — the choice of JSON
-    Schema's contentEncoding, Protobuf's JSON mapping and CBOR's), so
-    a `bytes` position is base64 in every text encoding, and core
-    declares no spelled subtypes.
+    compare as. It defaults to BASE64 (§4, padded), so a `bytes`
+    position is base64 in every text encoding.
 
-    `encoding` is **not refinable**: an alphabet narrows nothing —
-    every octet string is writable in every one of them — so a
-    refinement that only respells would claim an IS-A carrying no
-    narrowing, and a hex-spelled document is not readable at a base64
-    position. That is the defect four sibling types were removed for.
-    Another alphabet is another type, declared as its own instance —
+    `encoding` is not refinable. Another alphabet is another type,
+    declared as its own instance:
     `hexdigest => !bytes_type { encoding: HEX  length: 4 }`. Refining
-    for *length* is unaffected and inherits the alphabet:
+    for length inherits the alphabet:
     `sha256 => !bytes ^ { length: 32 }` is a base64 sha256.
-
-    It is a facet rather than an annotation because a container
-    element has no annotation position: `[hexdigest]` can only work if
-    the element's own type carries the alphabet. And once the type
-    carries it, two types differing only in alphabet are two types,
-    which is what a reader of either needs them to be.
-
-    No spec pin: RFC 4648 governs spellings, not octets.
     """
   bytes_type => atom & {
     encoding?:   bytes_encoding ~ BASE64
@@ -194,16 +145,12 @@
     """
   scope_kind => !enum [LOCAL EXTERN]
 
-  @doc:"The namespaces a scoped instance admits; non-empty, as an empty scope admits nothing."
+  @doc:"The non-empty set of namespaces a scoped instance admits."
   scope_set => !set_type { element_type: scope_kind  min_items: 1 }
 
   @doc:"""
     Constructor for open sum types: the value names its own type, and
     the instance names the namespaces that name may be resolved in.
-    The distinction against `choice` is closed against open — a choice
-    enumerates its variants, a scoped instance names where variants are
-    drawn from — which is why `disjoint` is absent here as on every
-    non-choice sum ([TSON-SCHEMA] §8.1).
 
     `scope` says which namespaces are admitted. `schemas` narrows the
     foreign ones: absent is any foreign schema, a keyed map is those
@@ -214,10 +161,7 @@
     and an unpinned !!schema in the data match; each pin is verified by
     the loader on its own.
 
-    The state admitting nothing is unspellable rather than refused —
-    min_items: 1 on both collections. One coherence rule, of the family
-    a resolver already runs over min_items/max_items: `schemas`
-    requires EXTERN in `scope`.
+    One coherence rule: `schemas` requires EXTERN in `scope`.
     """
   scoped => sum & {
     scope:    scope_set
@@ -254,14 +198,9 @@
     rounding; they do not bound the special values. Not a narrowing of
     the exact tier: infinities and NaN are not exact numbers.
 
-    Bounds: each side is a field group ([TSON-SCHEMA] §5.11) — the
-    inclusive `min` or the exclusive `exclusive_min`; likewise `max`
-    or `exclusive_max` — so at most one bound per side holds by
-    shape. There is deliberately no
-    `multiple_of` here — a step constraint cannot hold on a binary grid
-    (e.g. 0.05 is not a binary32 value, so nothing is exactly a multiple
-    of it); use the exact tier (`decimal_type`) when a step is required.
-    A text-class token that does not land on the grid is rounded to
+    Bounds follow the header's field-group rule. There is no
+    `multiple_of`; use the exact tier (`decimal_type`) when a step is
+    required. A text-class token that does not land on the grid is rounded to
     nearest, ties to even (IEEE 754-2019 roundTiesToEven), the default
     across the format; loss of precision is expected, not an error. An
     encoding that carries the format's bits delivers a grid value
@@ -278,7 +217,7 @@
     allow_negative_zero?: boolean ~ true
   }
 
-  @doc:"A named entry for the same reasons the kernel's integer_member_set is one."
+  @doc:"The members of a decimal_type."
   decimal_member_set => !set_type { element_type: value  min_items: 1 }
 
   @doc:"""
@@ -286,33 +225,25 @@
     11404 `scaled`, radix 10). Instance in core is `number` — the
     unrestricted exact number, which is also the JSON Schema `number`
     mapping (arbitrary magnitude and precision, finite, no special
-    values). An exact value is exact: nothing is rounded on the way in,
-    so equality is safe and ordering is TOTAL. Scale is not part of
-    the value — `1`, `1.0` and `1.00` are one value (unlike Java's
-    `BigDecimal.equals`), and whether a spelling's trailing zeros
+    values). Nothing is rounded on the way in, so equality is safe and
+    ordering is TOTAL. Scale is not part of the value — `1`, `1.0` and
+    `1.00` are one value, and whether a spelling's trailing zeros
     survive a round trip is an encoding's promise, not the type's.
     `total_digits`/`fraction_digits` are the ISO `scaled` precision and
     scale (SQL `DECIMAL(precision, scale)`): total significant digits
     and digits after the point.
 
-    Bounds: each side is a field group ([TSON-SCHEMA] §5.11) — the
-    inclusive `min` or the exclusive `exclusive_min`; likewise `max`
-    or `exclusive_max` — so at most one bound per side holds by
-    shape. `multiple_of` is exact here (e.g. `multiple_of` 0.05
-    admits only nickel steps) and composes with the other constraints —
-    a value must satisfy all present facets. `fraction_digits` and
-    `multiple_of` overlap but are not equivalent: `fraction_digits` 2
-    admits any hundredth, `multiple_of` 0.05 only multiples of a nickel.
+    Bounds follow the header's field-group rule. `multiple_of` is exact
+    here (e.g. `multiple_of` 0.05 admits only nickel steps).
+    `fraction_digits` and `multiple_of` overlap but are not equivalent:
+    `fraction_digits` 2 admits any hundredth, `multiple_of` 0.05 only
+    multiples of a nickel.
 
-    `members` enumerates the admitted values, as `integer_type.members`
-    does for integers. Its elements are `value`-typed, so the set's
-    own identity test cannot see them as numbers: the resolver reads
-    each member under the constrained atom before the set is formed,
-    so `1` and `1.0` are one member and a duplicate rather than two,
-    and a member that does not parse as a decimal fails at schema
-    load. The header's uniform `members` rule applies —
-    every member inside the bounds and on the step, refinements only
-    shrink the set.
+    `members` enumerates the admitted values. The resolver reads each
+    member under the constrained atom before the set is formed, so `1`
+    and `1.0` are one member and a duplicate rather than two, and a
+    member that does not parse as a decimal fails at schema load. The
+    header's uniform `members` rule applies.
     """
   decimal_type => atom & {
     ( min: value | exclusive_min: value )?
@@ -326,12 +257,10 @@
   @doc:"""
     Rational constraint vocabulary. Instance is `rational` in core.
     Exact (ℚ; ISO/IEC 11404 `rational`), so bounds and `multiple_of`
-    are exact. Bounds: each side is a field group ([TSON-SCHEMA]
-    §5.11) — inclusive `min` or exclusive `exclusive_min`; `max` or
-    `exclusive_max` — at most one bound per side by shape.
-    Constraints operate on the value, not the written
-    token: tokens are not normalized, so `"2/4"` and `"1/2"` satisfy
-    the same constraints.
+    are exact. Bounds follow the header's field-group rule.
+    Constraints operate on the value, not the written token: tokens
+    are not normalized, so `"2/4"` and `"1/2"` satisfy the same
+    constraints.
     """
   rational_type => atom & {
     ( min: value | exclusive_min: value )?
@@ -343,20 +272,16 @@
     Allowed component types for a complex value. A closed vocabulary of
     numeric types (naming their core counterparts): exact `INTEGER`
     (Gaussian integers ℤ+ℤi), `NUMBER` (exact arbitrary precision),
-    `RATIONAL` (ℚ+ℚi); approximate `FLOAT32`, `FLOAT64`. Being an enum,
-    it restricts `complex_type.component` at schema-load time and is
-    self-contained in meta (no dependency on the core type namespace).
+    `RATIONAL` (ℚ+ℚi); approximate `FLOAT32`, `FLOAT64`.
 
     The members are a partial order, not a chain, and a refinement may
     move `component` only to a member whose value set is a subset of
     the source's: `INTEGER ⊂ NUMBER ⊂ RATIONAL` are the exact tiers and
     `FLOAT32 ⊂ FLOAT64` the approximate ones, and the two families are
-    incomparable — binary64 carries ±inf and NaN that no exact decimal
-    represents, and exact values carry precision no binary64 holds. So
-    `!complex ^ { component: INTEGER }` narrows and its IS-A holds,
-    while `!complex ^ { component: FLOAT64 }` is refused: a float64
-    complex is not a `complex`, and is declared as its own type,
-    `!complex_type { component: FLOAT64 }`.
+    incomparable. So `!complex ^ { component: INTEGER }` narrows and
+    its IS-A holds, while `!complex ^ { component: FLOAT64 }` is
+    refused: a float64 complex is not a `complex`, and is declared as
+    its own type, `!complex_type { component: FLOAT64 }`.
     """
   complex_component => !enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]
 
@@ -366,15 +291,12 @@
     `component` selects the type of both parts from the closed
     `complex_component` vocabulary; it defaults to `NUMBER`
     (a DEFAULT, §5.2), so a bare complex has exact components —
-    a defaulted selector.
-    The enum both enforces that a component is numeric (unlike a free
-    `type_name`, which any token would satisfy) and keeps meta free of
-    any reference to core's type names. Complex has no useful total
-    order (`@ordered:NONE`), so the order-based facets of the other
-    numeric tiers do not apply here. Exactness is inherited from
-    `component` rather than fixed: `INTEGER`/`NUMBER`/`RATIONAL`
-    components give an exact complex, `FLOAT32`/`FLOAT64` an approximate
-    one — which is why `complex` carries no `@exact` marker of its own.
+    a defaulted selector. Complex has no useful total order
+    (`@ordered:NONE`), so the order-based facets of the other numeric
+    tiers do not apply here. Exactness is inherited from `component`
+    rather than fixed: `INTEGER`/`NUMBER`/`RATIONAL` components give
+    an exact complex, `FLOAT32`/`FLOAT64` an approximate one, so
+    `complex` carries no `@exact` marker of its own.
     """
   complex_type => atom & {
     component?: complex_component ~ NUMBER
@@ -392,13 +314,10 @@
     is a constraint on the value, not on a spelling: `precision: N`
     admits a value that is a whole number of 10^-N seconds, so
     `precision: 3` is millisecond resolution and `precision: 0` whole
-    seconds, and an encoding that counts nanoseconds checks it as
-    readily as one that counts digits. The atom is exact — nothing is
-    truncated; a value off the grid is rejected ([TSON-SCHEMA] §5.5).
-    A text encoding may spell an admitted value with trailing zeros
-    (`12:00:00.500` under `precision: 1`) and writes at most N digits.
-    No timezone facet: RFC 3339 `full-time` already makes the offset
-    mandatory.
+    seconds. The atom is exact — nothing is truncated; a value off the
+    grid is rejected ([TSON-SCHEMA] §5.5). A text encoding may spell
+    an admitted value with trailing zeros (`12:00:00.500` under
+    `precision: 1`) and writes at most N digits.
     """
   time_type => atom & atom_specification & {
     spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
@@ -411,8 +330,6 @@
     Datetime constraint vocabulary. Instance is `datetime` in core.
     `precision` as for `time_type`: the value is a whole number of
     10^-N seconds, a constraint on the value ([TSON-SCHEMA] §5.5).
-    No timezone facet: RFC 3339 `date-time` already makes the offset
-    mandatory.
     """
   datetime_type => atom & atom_specification & {
     spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
@@ -428,19 +345,16 @@
     fraction on the seconds component only, written with `.` (`PT0.5S`,
     never `PT1.5H` or `PT0,5S`); any subset of D, H, M, S may be omitted
     provided at least one component is present and order is kept
-    (`PT1H30S` is admitted, as `java.time.Duration` writes it); and the
-    Y and month-M components are not admitted — `P1M` is one month and
-    belongs to `period`; a minute is `PT1M`. `PnW` stands alone, as in
-    the ABNF (`P1W2D` is an error). A day is exactly 86400 s and a week
-    7 days.
+    (`PT1H30S` is admitted); and the Y and month-M components are not
+    admitted — `P1M` is one month and belongs to `period`; a minute is
+    `PT1M`. `PnW` stands alone, as in the ABNF (`P1W2D` is an error). A
+    day is exactly 86400 s and a week 7 days.
 
     The value is a signed exact decimal number of seconds — `number`'s
-    value space, in seconds: nothing is rounded, and the lexical form
-    permits a fraction on the seconds component and nowhere else, so no
-    non-terminating fraction is writable and every duration is a
-    terminating decimal count. So `PT90M`, `PT1H30M` and `P0DT5400S` are
-    one value, `PT0S`, `P0D` and `-PT0S` are one value, and ordering is
-    TOTAL. Bounds compare the value, not the token.
+    value space, in seconds: nothing is rounded. So `PT90M`, `PT1H30M`
+    and `P0DT5400S` are one value, `PT0S`, `P0D` and `-PT0S` are one
+    value, and ordering is TOTAL. Bounds compare the value, not the
+    token.
 
     Both ends of that space are fixed at a signed 64-bit count of
     nanoseconds. The seconds component admits at most nine fractional
@@ -448,21 +362,15 @@
     292 years) — stated as a magnitude, so negating an admitted duration
     always yields an admitted one. A processor MUST represent every
     value in that range and MUST reject one outside it whether or not
-    its own representation could hold it: a range that depends on which
-    implementation read the document is not a range. Nothing is lost at
-    either end, only spelled better — a span of centuries is a calendar
-    span and is a `period`, and a quantity finer or wider than the range
-    is a `number` in the unit the schema names.
+    its own representation could hold it.
 
     `precision` as for `time_type`, and it is `fraction_digits` on the
     seconds count: the value is a whole number of 10^-N seconds, so
     `precision: 0` admits whole seconds only and `precision: 9` is the
     nanosecond grid. A constraint on the value and not on a spelling —
-    `PT0.50S` is a whole number of tenths — and it may not exceed 9,
-    there being no tenth digit to constrain. `multiple_of` is
-    `number`'s `multiple_of` on that same count, under the header's
-    uniform rule: `PT15M` admits only quarter-hour values, and `-PT30M`
-    is a multiple of `PT15M`.
+    `PT0.50S` is a whole number of tenths — and it may not exceed 9.
+    `multiple_of` is `number`'s `multiple_of` on that same count, under
+    the header's uniform rule: `PT15M` admits only quarter-hour values.
     """
   duration_type => atom & atom_specification & {
     spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
@@ -537,7 +445,7 @@
     schema level. `within` lists IPv4 networks in CIDR text (quoted):
     the value must be a subnet of at least one. `excluding`: the
     value must not overlap any listed network — overlap, not
-    containment, so a wider value cannot smuggle an excluded block.
+    containment.
     """
   cidr4_type => atom & atom_specification & {
     spec?:       = "https://www.rfc-editor.org/rfc/rfc4632"
@@ -562,12 +470,7 @@
     excluding?:  [value]
   }
 
-  @doc:"""
-    MAC address (EUI-48) constraint vocabulary. Instance is `mac` in
-    core. Deliberately bare beyond the pinned spec: I/G- and U/L-bit
-    predicates and OUI (vendor) prefixes were considered and rejected
-    as niche, and OUI is a living registry.
-    """
+  @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac` in core."
   mac_type => atom & atom_specification & {
     spec?: = "https://www.rfc-editor.org/rfc/rfc9542"
   }
@@ -600,9 +503,8 @@
     void-targeted presence marker like `@numeric`: written bare, and
     presence is the assertion. Carries no decode force — the resolver
     computes disjointness whether or not the annotation is present.
-    The derivation is total, so there is no unprovable state: present
-    and refuted is a schema-load error; present and verified, or
-    absent, is silent.
+    The derivation is total: present and refuted is a schema-load
+    error; present and verified, or absent, is silent.
     """
   disjoint => @annotation void
 

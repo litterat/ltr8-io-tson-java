@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=191c787b1f69ed750d54ef71225983b9b6d2c957fdd46284bf39d967501f788b"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=b46355e69daf50a4fe78c8e33b614b647783a01e33de37ed4cf2ad1232b70279"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=f1ef9a20cdd8a9ec315db99c2ad2d3cbc52151abcfacb5404c90e7798a1e456b"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=6c532b7604fec9c8f8ab5cc6912c415b69492455d11690ce4d2b8b81b4307c4b"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -34,8 +34,7 @@
   `annotation`, `documentation`, and `doc` declarations (and
   its `void` and `set` siblings) face the other direction: they exist
   so that *data documents* and user schemas governed by or importing
-  core can use them — the same one-hop rule, seen from the other
-  side.
+  core can use them.
 
   References:
     ISO/IEC 11404:2007    General Purpose Datatypes
@@ -108,10 +107,8 @@
     `!complex ^ { component: INTEGER }` for Gaussian integers — a
     refinement, ℤ+ℤi sitting inside the exact-decimal complexes — and
     `!complex_type { component: FLOAT64 }` for floating-point complex,
-    which is its own type rather than a refinement: binary64 carries
-    ±inf and NaN that no exact decimal represents, so it narrows
-    nothing and is not a `complex`.
-    Exactness follows the component type, so `complex` carries no
+    which is its own type rather than a refinement and is not a
+    `complex`. Exactness follows the component type, so `complex` carries no
     `@exact` marker. Spellings are the text class's concern (TSON
     text accepts a+bi and a+bj); component representation is host-defined.
     """
@@ -227,14 +224,12 @@
     Octet sequence. The universal binary type, and the only one: a
     field is `avatar: bytes`, a digest `sha256 => !bytes ^ { length: 32 }`.
     Equality and the length facets are over octets; the type says
-    nothing about spelling, as `text` says nothing about UTF-8. The
-    text class of encodings spells `bytes` in base64 (RFC 4648 §4).
-    Another alphabet is another type, declared as its own instance of
-    the constructor (`hexdigest => !bytes_type { encoding: HEX
-    length: 4 }`) — never as a refinement of this one, since a
-    spelling narrows nothing and `!bytes ^ { encoding: HEX }` would
-    claim an IS-A that no base64 position can honour. An encoding whose values
-    are octets writes them raw.
+    nothing about spelling. The text class of encodings spells `bytes`
+    in base64 (RFC 4648 §4). Another alphabet is another type,
+    declared as its own instance of the constructor
+    (`hexdigest => !bytes_type { encoding: HEX  length: 4 }`) — never
+    as a refinement of this one. An encoding whose values are octets
+    writes them raw.
     """
   @ordered:NONE @bounded:false
   bytes => !bytes_type { encoding: BASE64 }
@@ -247,15 +242,12 @@
     Time of day. RFC 3339 full-time HH:MM:SS[.s…] with a mandatory
     offset. The value is the time of day in UTC, on the finite
     interval [00:00:00, 24:00:00), so `10:00:00+01:00` and
-    `09:00:00Z` are one value, and ordering is TOTAL — the offset
-    being mandatory is what makes it so; XSD's partial order is the
-    cost of an optional one. Normalising to UTC wraps at midnight
-    (`23:30:00-02:00` is `01:30:00Z`), which is the price of a time
-    with no date: a local time of day — "09:00 wherever you are" —
-    is not this type. Equality and bounds compare the value. The
-    offset is a spelling, as an alphabet is to `bytes`: TSON text
-    preserves it as written, an encoding that stores the instant may
-    drop it.
+    `09:00:00Z` are one value, and ordering is TOTAL. Normalising to
+    UTC wraps at midnight (`23:30:00-02:00` is `01:30:00Z`): a local
+    time of day — "09:00 wherever you are" — is not this type.
+    Equality and bounds compare the value. The offset is a spelling:
+    TSON text preserves it as written, an encoding that stores the
+    instant may drop it.
     """
   @ordered:TOTAL @bounded:true
   time => !time_type {}
@@ -264,12 +256,11 @@
     Date and time. RFC 3339 date-time with a mandatory offset. The
     value is the instant on the UTC timeline, so
     `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are one
-    value, and ordering is TOTAL for the same reason as `time`. An
-    offset of `-00:00` (offset unknown, RFC 3339 §4.3) is the same
-    instant as `Z` and compares as such. A local datetime — a wall
-    clock with no offset — is not this type. Equality and bounds
-    compare the value. The offset is a spelling, as an alphabet is to
-    `bytes`: TSON text preserves it as written, an encoding that
+    value, and ordering is TOTAL. An offset of `-00:00` (offset
+    unknown, RFC 3339 §4.3) is the same instant as `Z` and compares as
+    such. A local datetime — a wall clock with no offset — is not this
+    type. Equality and bounds compare the value. The offset is a
+    spelling: TSON text preserves it as written, an encoding that
     stores the instant may drop it, and a value for which the offset
     is data — an appointment shown in its booked zone — is a different
     value space, not this type.
@@ -279,10 +270,9 @@
 
   @doc:"""
     Elapsed time — a signed exact decimal number of seconds, within
-    the range `duration_type` fixes. The clock half
-    of what one ISO 8601 duration used to carry: no Y or month-M
-    component, so every value has a fixed length and ordering is TOTAL.
-    `P1M` is a month and belongs to `period`; a minute is `PT1M`. A day
+    the range `duration_type` fixes. No Y or month-M component, so
+    every value has a fixed length and ordering is TOTAL. `P1M` is a
+    month and belongs to `period`; a minute is `PT1M`. A day
     is exactly 86400 s and a week 7 days, so `PT90M`, `PT1H30M` and
     `P0DT5400S` are one value.
     """
@@ -290,10 +280,8 @@
   duration => !duration_type {}
 
   @doc:"""
-    Calendar span — a signed integer number of months. The calendar
-    half, and the reason `duration` can be totally ordered: a month has
-    no fixed length, so months and seconds are two value spaces rather
-    than one partially ordered one. `P1Y` and `P12M` are one value.
+    Calendar span — a signed integer number of months. `P1Y` and
+    `P12M` are one value.
     A span that is genuinely both is a record with a field of each.
     """
   @ordered:TOTAL @bounded:false
@@ -355,8 +343,7 @@
     narrowest of the three scoped instances: the value names its type
     (in TSON text, with a !type-ref) and that name resolves in the
     governing namespace ([TSON-SCHEMA] §2.2.3), exactly as it does
-    anywhere else — what the position adds is that the choice of type
-    is the data's.
+    anywhere else.
     """
   @ordered:NONE @bounded:false
   declared => !scoped { scope: [LOCAL] }
@@ -373,13 +360,11 @@
   extern => !scoped { scope: [EXTERN] }
 
   @doc:"""
-    A type from either namespace — the widest scoped instance, and the
-    successor to what earlier revisions called `unknown`. Named for
-    what it says: the *data* decides the type, from any namespace. Not
-    `any`, which in every language a reader arrives from means a value
-    that is unchecked, where this one is validated in full against the
-    type it names. A value naming no type at all is a validation error
-    here as at every scoped position.
+    A type from either namespace — the widest scoped instance: the
+    *data* decides the type, from any namespace, and the value is
+    validated in full against the type it names. A value naming no
+    type at all is a validation error here as at every scoped
+    position.
     """
   @ordered:NONE @bounded:false
   dynamic => !scoped { scope: [LOCAL EXTERN] }
@@ -406,15 +391,11 @@
     The set spelling an author writes: `set<text>` where the bare
     construction is `!set_type { element_type: text }`. A §5.10
     template, not a constructor: it composes with nothing and so is
-    not IS-A `top`, and `set_type` stays parameterless as §4.2
-    requires of every container constructor. The element type
-    arrives by application rather than by a parameter on the
-    constructor itself.
+    not IS-A `top`.
 
-    A sibling of meta's declaration under the same name, as `void`
-    is of the kernel's: user schemas reach it through their core
-    import, so `tags: set<text>` resolves without touching the
-    governing namespace.
+    A sibling of meta's declaration under the same name: user schemas
+    reach it through their core import, so `tags: set<text>` resolves
+    without touching the governing namespace.
     """
   set => <T> !set_type { element_type: T }
 
