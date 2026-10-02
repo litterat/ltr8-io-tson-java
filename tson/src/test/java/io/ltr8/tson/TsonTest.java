@@ -32,7 +32,7 @@ class TsonTest {
             !!import:"https://tson.io/2026/37/m/core.tn"
             {
               my_int => int32
-              my_percentage => !positive_integer ^ { max: 100 }
+              my_percentage => !integer ^ { min: 1  max: 100 }
             }
             """;
 
@@ -66,7 +66,7 @@ class TsonTest {
         // Merged view: the two local declarations, plus core.tn's own 56 imported entries --
         // TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved TsonSchema
         // resolve()'s own resolution step produces internally, which stays local-only.
-        assertEquals(58, linked.schema().entries().size());
+        assertEquals(50, linked.schema().entries().size());
         assertTrue(linked.schema().entries().containsKey("my_int"));
         assertTrue(linked.schema().entries().containsKey("my_percentage"));
 

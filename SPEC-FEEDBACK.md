@@ -57,6 +57,9 @@ become two atoms, `uri` and `uri_reference`, and `uri_type`'s facets take RFC 39
 set in place of one scheme, and a fragment permission.
 #14 adds RFC 3987's IRI as a family of its own, `iri_type`, with core's `iri` and `iri_reference`, holds `uri` to
 US-ASCII, and reads a directive argument as an IRI-reference.
+#15 keeps core to the types a schema cannot do without, since every name core declares is one no importing schema
+may: `identifier`, the four sign-bound integers, `non_empty_text`, `annotation` and `documentation` leave it, and
+the sign bounds leave [TSON-DATA] §5.6's built-in vocabulary with them.
 
 ---
 
@@ -640,9 +643,10 @@ What follows:
 - **One scope is added to §11.4:** the key set of a map whose key type is `identifier` or refines it. The
   look-alike mechanism is a relation over a set, so the type alone cannot carry it; this is the sentence that
   gives it the set, in the words §11.4 uses for an `IDENTIFIER` enum's members.
-- **`core.tn` gains a sibling**, as it has one for `void`. The kernel's note that "Core declares no sibling of
-  it" is why only a kernel-governed meta layer can type a key by it today; an ordinary schema should be able to
-  write `{identifier => handler}`.
+- **An ordinary schema declares its own.** The kernel's note that "Core declares no sibling of it" is why only a
+  kernel-governed meta layer can type a key by it today. As a constructor/instance pair the kernel's instance is
+  one line, `identifier => !identifier_type { continue_add: "-" }`, which any schema may write to type
+  `{identifier => handler}`; core declares no sibling and leaves the name free (#15).
 - **The discrimination class changes (§5.4).** §5.4 lists "the `unit` instances (`value`, `identifier`)" among
   the types with no class. As a text family, `identifier` is string-class, so a choice holding it can become
   disjoint — `( identifier | int32 )` from `false` to `true`, `( identifier | text )` staying `false` — and a
@@ -682,7 +686,10 @@ text_enum => enum_type ^ { type?: = text }
 - **`type` resolves by who wrote it.** An author-written `type` names a type in the schema's own namespace; the
   value a constructor pinned was written in the governing meta and resolves there, so `!enum [A B]` names the
   kernel's `identifier` in a schema that imports no core. §2.2.3 already puts a merged entry's own references in
-  its defining schema's namespace; this is that rule for a pinned value, and §7.4 must state it.
+  its defining schema's namespace; this is that rule for a pinned value, and §7.4 must state it. The rule holds
+  however the enum is reached — an entry instantiating `names => <M> !enum [a b M]` records the template as its
+  `source`, and its `type` is still the pinned one — and an `identifier` the schema declares is a different type
+  that does not displace it (#15).
 - **`type` is fixed at construction.** A refinement narrows the member set and never restates `type`: narrowing it
   would re-judge members already admitted, widening it would admit labels the source's type refuses, and nothing
   needs either. The set-once rule for `identifier_type`'s profile facets (Proposal 3) is the precedent.
@@ -1060,11 +1067,11 @@ it, and `<T: int32> boxed<T>` is refused at the declaration.
 
 **A core copy and its kernel original are one type here.** A value parameter's written type names a type in the
 schema's own namespace, and a slot-derived type is the meta's: `<N: non_negative_integer> !array { min_items: N }`
-compares core's `non_negative_integer` with the kernel's, which core declares as a fresh copy with no IS-A edge
-between them. Following IS-A edges only would refuse the obvious spelling, and a core-importing schema could not
-name the kernel's type at all. Two same-named entries with the same body are taken as one type, in the
-declaration check and in the bound check alike. The spec needs a sentence to that effect, or a different way for
-core's copies to relate to the kernel's.
+compares the schema's `non_negative_integer` with the kernel's — core declares none (#15), so the schema declares its
+own, `!integer ^ { min: 0 }`, the kernel's body — with no IS-A edge between them. Following IS-A edges only would
+refuse the obvious spelling, and a core-importing schema could not name the kernel's type at all. Two same-named
+entries with the same body are taken as one type, in the declaration check and in the bound check alike. The spec
+needs a sentence to that effect, or a different way for core's copies to relate to the kernel's.
 
 **A bound names a type, and only a type.** `bound` is a `type_ref` into the schema's type-name namespace, checked by
 IS-A there; a name found only among the governing meta's constructors is structure vocabulary (§3.3.1), which no
@@ -1417,5 +1424,61 @@ atoms.
 
 **Interpretation chosen:** on `main`, `!uri` admits what `java.net.URI` admits, characters beyond US-ASCII included.
 On `r2026-37-proposal`, this entry.
+
+**Status against Revision 36:** open.
+
+---
+
+## 15. Core should hold only what a schema cannot do without
+
+**Section:** [TSON-SCHEMA] §9 (core's contents), §2.2.3 (a local declaration may not reuse a name its import
+closure binds), §6 ("Core declares its own `doc`, `documentation`, and `annotation`"), §7.4 (an enum's `type`),
+§1.6 (the complete example's `title: non_empty_text`);
+[TSON-DATA] §5.6 (the sign-bound row of the numeric table), §5.1 (the vocabulary as core's contracts).
+
+**Kind:** proposal — core and the built-in vocabulary shrink — and one sentence for §7.4.
+
+**What the spec says today.** §2.2.3 makes it a resolver error for a local declaration to reuse a name the import
+closure binds, with no hiding. So every name core declares is reserved in every schema that imports it, and a
+name core adds in a later revision breaks every schema already using it, found when that schema migrates. The
+evidence is Revision 37's own draft: core's new `identifier` (#7) stopped twelve SchemaStore conversions and one
+hand conversion compiling (`ltr8-io-tson-benchmarks`, `docs/tson-feedback.md` item 3), because `identifier` is a
+name a schema reaches for its own type.
+
+**Proposal.** Core declares a type a schema cannot reasonably do without — the atoms, the widths, the formats, the
+`scoped` instances and the templates — and leaves to the schema that wants one any name that stands for a single
+line it can write itself:
+
+- **`identifier`** leaves core (Revision 37 draft only): `identifier => !identifier_type { continue_add: "-" }`
+  is the kernel's own instance, and a schema writes it where it wants one (#7).
+- **`positive_integer`, `non_negative_integer`, `negative_integer`, `non_positive_integer` and
+  `non_empty_text`** leave core. A bound is a refinement written where it is wanted: `count: !integer ^ { min: 0 }`
+  at a field, or a declaration of the schema's own.
+- **`annotation` and `documentation`** leave core, and `doc => @annotation text` stays as its one documentation
+  annotation, so a data document governed by a core-importing schema still writes `@doc`. §6's sentence names
+  `doc` alone.
+- **[TSON-DATA] §5.6's sign-bound row leaves the built-in vocabulary.** §5.1 states the vocabulary as core's
+  entries' contracts; keeping the row would leave a schemaless `!positive_integer` that stops resolving the moment
+  its document moves under a schema importing core, where the vocabulary does not apply. A name outside the
+  vocabulary is an uninterpreted marker (§5.1).
+- **§7.4 states where a pinned `type` resolves.** The value a constructor pins resolves in the governing meta
+  however the enum is reached — directly, or through a template's held body, where the instantiating entry
+  records the template as its `source` — and an entry of the same name in the schema's namespace does not
+  displace it. While core declared `identifier` with the kernel's body the two readings agreed; a schema
+  declaring its own `identifier` is where they part.
+
+**The alternatives.** A shadowing rule — a local declaration hides an import — makes core's additions safe for
+the schema that declares the name, but §2.2.3 checks collisions across the whole import closure, so a schema
+importing that one still collides; it needs ambiguity reported at use rather than at import as well, a larger
+change to name resolution than restraint in one library. An opt-in `core-extras` library reserves its names for
+whoever imports it, and with these entries gone there is nothing yet to put in it.
+
+**What is running** (`r2026-37-proposal`): the bundled `core.tn` without the eight entries (48 remain) and its
+resolved fixture; the built-in vocabulary without the four sign bounds; and the pinned `type` resolved first in
+the governing meta, through a template's held body to the constructor it applies. The corpus states a schema
+importing core declaring `identifier`, `positive_integer`, `non_empty_text` and `documentation`; an enum applied
+through a template; and an enum in a schema that declares its own `identifier`.
+
+**Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
 
 **Status against Revision 36:** open.

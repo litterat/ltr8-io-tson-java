@@ -17,8 +17,9 @@ history lives in git.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
 - `RecordExtension`'s FINAL check reads `TypeDefinition.supertypes`, never `RecordBody.supertypes`.
-- An enum's `type` resolves in the schema's namespace, or in the governing meta's only for the value its constructor
-  pinned; the enum checks run before the name checks, and an enum they refuse is not judged by name again.
+- An enum's `type` resolves in the governing meta's namespace for the value its constructor pinned (traced through a
+  template's held body), and otherwise in the schema's; the enum checks run before the name checks, and an enum they
+  refuse is not judged by name again.
 
 Related: `design/meta-layer-data-kind.md`, `design/choice-disjointness.md`, `design/name-hygiene-and-minted-names.md`,
 `design/class2-compilation.md`, `design/compiled-registries.md`, `design/schema-resolution.md`.
@@ -262,8 +263,10 @@ rules for an enum whose `type` is not an identifier family; the collision relati
 
 - **Two namespaces, by who wrote the value.** An author-written `type` resolves in the schema's own namespace, so an
   ordinary schema enumerates a vocabulary it declares (`!enum_type { type: kebab … }`). A value the constructor pinned
-  was written in the governing meta and resolves there when the schema does not have it, so `!enum [A B]` finds the
-  kernel's `identifier` in a schema that imports no core.
+  was written in the governing meta and resolves there **first**, so `!enum [A B]` names the kernel's `identifier`
+  whatever the schema declares — a schema's own `identifier` is a different type and does not displace it (core
+  declares none, leaving the name free). Pinned is found through `source`, and through a template's held body to
+  the constructor it applies: `named => names<c>` records `names` as its source, not `enum`.
 - **Before the name checks, and one verdict.** A member that is not a value of `type` is the more basic error, and
   the per-name rules would otherwise report it as a restricted character; an enum refused here is not judged by name.
 - **An unresolved `type` counts as names** for the per-name rules — the stricter reading — and is reported on its own.

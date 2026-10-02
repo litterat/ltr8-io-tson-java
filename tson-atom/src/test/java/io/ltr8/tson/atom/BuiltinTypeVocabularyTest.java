@@ -20,10 +20,16 @@ class BuiltinTypeVocabularyTest {
     @ValueSource(strings = {
             "int8", "int16", "int32", "int64", "int128", "int256",
             "uint8", "uint16", "uint32", "uint64", "uint128", "uint256",
-            "positive_integer", "non_negative_integer", "negative_integer", "non_positive_integer"
     })
     void fullIntegerFamilyIsRegistered(String name) {
         assertTrue(BuiltinTypeVocabulary.lookup(name).isPresent());
+    }
+
+    /** A sign bound is a refinement written where it is wanted ({@code !integer ^ { min: 1 }}), not a name. */
+    @ParameterizedTest
+    @ValueSource(strings = {"positive_integer", "non_negative_integer", "negative_integer", "non_positive_integer"})
+    void signBoundsAreNotBuiltInNames(String name) {
+        assertTrue(BuiltinTypeVocabulary.lookup(name).isEmpty());
     }
 
     @ParameterizedTest

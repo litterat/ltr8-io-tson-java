@@ -30,6 +30,8 @@ class TemplateParamBoundTest {
 
     private static final String SCHEMA = HEADER + """
             {
+              non_empty_text       => !text ^ { min_length: 1 }
+              non_negative_integer => !integer ^ { min: 0 }
               boxed      => <T: text> { a: T }
               vec        => <T: text, N> !array { element_type: T  min_items: N }
               rebox      => <T> boxed<T>
@@ -129,7 +131,8 @@ class TemplateParamBoundTest {
     void aTypeArgumentMustIsATheBound() {
         assertEquals(List.of(), problems("""
                   boxed  => <T: text> { a: T }
-                  holder => { b: boxed<non_empty_text> }"""));
+                  short  => !text ^ { max_length: 8 }
+                  holder => { b: boxed<short> }"""));
         assertRefused("""
                   boxed  => <T: text> { a: T }
                   holder => { b: boxed<int32> }""", "binds 'T' to 'int32', which is not a type that IS-A text");
@@ -147,7 +150,7 @@ class TemplateParamBoundTest {
         assertRefused(boxed + "  held   => boxed<int32> & { b: text }", "binds 'T' to 'int32'");
         assertRefused(boxed + "  held   => boxed<boxed<int32>>", "binds 'T' to 'int32'");
         assertRefused(boxed + "  rebox  => <T> boxed<T>\n  held   => rebox<int32>", "'rebox<...>' binds 'T' to 'int32'");
-        assertEquals(List.of(), problems(boxed + "  held   => boxed<non_empty_text>"));
+        assertEquals(List.of(), problems(boxed + "  short  => !text ^ { max_length: 8 }\n  held   => boxed<short>"));
     }
 
     @Test

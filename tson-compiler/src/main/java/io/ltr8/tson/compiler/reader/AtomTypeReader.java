@@ -88,7 +88,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
     /**
      * The schema entry's own declared name -- the <em>declaration's</em>, not the built-in it refines, so a
-     * {@code TYPE_MISMATCH} against {@code my_percentage => !positive_integer ^ { max: 100 }} names {@code
+     * {@code TYPE_MISMATCH} against {@code my_percentage => !integer ^ { min: 0  max: 100 }} names {@code
      * my_percentage}, which is what its author wrote and can act on. There is no name on {@link AtomType} to
      * use instead (one {@code IntegerParser} serves {@code int8}..{@code int256} and every refinement of
      * them), so it has to come from the entry, which every {@link ValueReaderFactory} is handed anyway.

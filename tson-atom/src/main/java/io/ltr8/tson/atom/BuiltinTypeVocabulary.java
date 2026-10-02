@@ -23,7 +23,6 @@ import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
 import io.ltr8.tson.schema.meta.IntegerSize;
-import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -34,9 +33,7 @@ import java.util.Optional;
  * closed set (§5.1) that a Class 1 processor never resolves via schema machinery.
  *
  * <p>Seeded with the {@code integer_type} family as §5.6's table lists it and {@code core.tn} defines it:
- * the full {@code int8}..{@code int256}/{@code uint8}..{@code uint256} width ladder plus the
- * {@code positive_integer} / {@code non_negative_integer} / {@code negative_integer} /
- * {@code non_positive_integer} bound-only refinements.
+ * the full {@code int8}..{@code int256}/{@code uint8}..{@code uint256} width ladder.
  *
  * <p>Also seeded with {@code decimal_type} ({@code number}), {@code float_type} ({@code float32}/
  * {@code float64}), {@code rational_type} ({@code rational}), and {@code complex_type} ({@code
@@ -84,10 +81,6 @@ public final class BuiltinTypeVocabulary {
             types.put("int" + bits, new IntegerParser(new IntegerSize(bits, true)));
             types.put("uint" + bits, new IntegerParser(new IntegerSize(bits, false)));
         }
-        types.put("positive_integer", IntegerParser.ofMin(BigInteger.ONE));
-        types.put("non_negative_integer", IntegerParser.ofMin(BigInteger.ZERO));
-        types.put("negative_integer", IntegerParser.ofMax(BigInteger.valueOf(-1)));
-        types.put("non_positive_integer", IntegerParser.ofMax(BigInteger.ZERO));
 
         types.put(DecimalParser.TYPENAME, DecimalParser.UNCONSTRAINED);
         types.put(FloatParser.FLOAT32.typeName(), FloatParser.FLOAT32);
