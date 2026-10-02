@@ -56,19 +56,14 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
     private final DataClassArray descriptor;
 
     public ArrayBindReader(String name, String displayName, ArrayBody body, DataClassArray descriptor,
-                           TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
-        this(name, displayName, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
-    }
-
-    public ArrayBindReader(String name, String displayName, ArrayBody body, DataClassArray descriptor,
-                           TsonTypeReaderResolver resolver,
-                           SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
+                           TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
+                           AnnotationTypes annotationTypes, boolean elementsAreNames) {
         super(name, displayName, body,
                 ElementBridging.wrap(
                         AnnotationBoxing.wrap(resolver.resolve(body.elementType().name()),
                                 descriptor.arrayDataClass(), annotationTypes),
                         descriptor.arrayDataClass()),
-                schemaLocation);
+                schemaLocation, elementsAreNames);
         this.descriptor = descriptor;
     }
 
@@ -178,7 +173,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
             }
             return new ArrayBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
                     context.locationOf(name, typeDefinition),
-                    AnnotationTypes.of(context));
+                    AnnotationTypes.of(context), elementsAreNames(body, context));
         }
 
         /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */

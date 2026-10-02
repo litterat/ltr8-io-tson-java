@@ -17,7 +17,8 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 - The per-name rules are applied by `IdentifierPolicy.judge(name, profile)` alone, which gates the restricted-character
   rule on the level; every look-alike scope asks `appliesSkeletonDistinctness()` before it builds one.
 - A value whose type is an identifier family is a name: it meets the per-name rules under its family's own profile and
-  is read as nothing when refused, and the keys of a map keyed by one are a look-alike scope checked as each arrives.
+  is read as nothing when refused, and the keys of a map keyed by one, and the elements of a set of one, are a
+  look-alike scope checked as each arrives.
 
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
 `design/record-dispatch.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
@@ -104,11 +105,11 @@ invisible at the call site and absent from review. The relaxation to reach for f
 which still refuses `id_pаy` while admitting `url_адрес`; a name's segments are divided at its profile's own
 separators (`IdentifierProfile.separates`), `_` and `-` for §7.7's profile, and `$` or a medial `.` for a family that
 adds one. Skeleton distinctness has a switch of its own (`withSkeletonDistinctness`), reaching every scope — a
-schemaless record, the schema-layer scopes, an identifier-keyed map's keys in either encoding. A token policy stricter
-than the identifier policy subsumes it: a name is a token — which §8.2 asks an implementation's documentation to say,
-and this is where it is said. The two names are §8.2's own: it defines the **identifier policy** and the **token
-policy** as the two parts of a processor's configuration for that section, precisely so that two implementations
-reporting them agree on what they are called, and `ProcessorConfig` uses those names.
+schemaless record, the schema-layer scopes, an identifier-keyed map's keys and a unique array of names in either encoding. A
+token policy stricter than the identifier policy subsumes it: a name is a token — which §8.2 asks an implementation's
+documentation to say, and this is where it is said. The two names are §8.2's own: it defines the **identifier policy**
+and the **token policy** as the two parts of a processor's configuration for that section, precisely so that two
+implementations reporting them agree on what they are called, and `ProcessorConfig` uses those names.
 
 **Field** names see all three, being names at every layer (§2.5, §7.7): the two per-name rules in the read
 context beside a type-ref's and an annotation's, and the look-alike rule in `SchemalessTreeReader`, which is
@@ -129,13 +130,21 @@ character the profile adds (`$` in a JavaScript-name profile) is the profile's a
 rule (`IdentifierProfile.restrictedCharacter`), as §7.7's `-` is. A refused value reads as nothing, as a refused
 field name is never looked up, so it is in no scope a later rule judges.
 
-**The keys of an identifier-keyed map are the one data scope under a schema.** `MapAbstractReader` knows from the
+**The keys of an identifier-keyed map are a data scope under a schema, and the elements of a unique array of
+names the other.** `MapAbstractReader` knows from the
 compiled key type whether its keys are names (`keysAreNames`, decided once per reader), and for such a map builds a
 `ConfusableNames.Scope` per read and adds each cleanly-read key as it arrives, so a pair is reported at the second
 key's own position, as §8.2's detection rule asks, and its entry read normally. A repeat is `DUPLICATE_MAP_KEY` and
 nothing else: the scope ignores an equal name. A map keyed by `text` builds nothing — its keys are data. The scope
 costs one small `HashMap` per such map read, and the per-name rules nothing; `AllocationHarnessTest` reports both
 against the same map keyed by `text`. JSON applies the same two rules at the same positions (`json-unicode-policies.md`).
+
+An array whose elements are unique — a set, or any array marked `unique_items` — and whose element type is an
+identifier family is the same scope over its elements (`ArrayAbstractReader`,
+`elementsAreNames`, decided once per reader): a pair is reported at the second element's index, and a repeat is the
+set's duplicate and nothing else. An array that admits repetition is no scope — nothing says two of its elements
+name two things — and neither is a set of `text`. **An element that fails to read is in neither check**: it reads as
+`null`, which has no identity to compare, whether its form failed or the policy refused it as a name.
 
 **The restricted-character rule is gated on the level, as the restricted-script rule is.** §8.2's
 Unrestricted "drops the

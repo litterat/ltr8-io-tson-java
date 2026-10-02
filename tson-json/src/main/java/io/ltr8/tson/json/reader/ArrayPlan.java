@@ -6,6 +6,7 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.math.BigInteger;
@@ -21,16 +22,23 @@ import java.util.Optional;
  * array; duplicates under the element type's equality contract are validation errors at the repeated occurrence
  * ([TSON-SCHEMA] §7.5), and element order on the wire is meaningless. The resolved body's own {@code unique_items}
  * decides whether the duplicate check runs -- refinement never adds or removes a field, so there is no second shape.
+ *
+ * <p><b>Unique names are a naming scope.</b> Where the elements are unique -- a set, or any array marked so -- and
+ * their type is an identifier family
+ * ({@link #elementsAreNames}), no two may read alike ([TSON-SCHEMA] §11.4), as an identifier-keyed map's keys.
  */
 record ArrayPlan(String displayName, JsonSchemaLocation schemaLocation, boolean optionalElements, boolean unique,
                  Optional<BigInteger> minItems, Optional<BigInteger> maxItems, JsonTypeReader<?> schemaElement,
-                 ArrayDiagnostics rules) {
+                 ArrayDiagnostics rules, boolean elementsAreNames) {
 
     static ArrayPlan of(String name, TypeDefinition definition, ValueReaderContext context) {
         ArrayBody body = (ArrayBody) definition.body();
         String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
         return new ArrayPlan(displayName, context.locationOf(name, definition),
                 body.state() == ElementState.OPTIONAL, body.uniqueItems(), body.minItems(), body.maxItems(),
-                context.readers().resolve(body.elementType().name()), new ArrayDiagnostics(displayName));
+                context.readers().resolve(body.elementType().name()), new ArrayDiagnostics(displayName),
+                body.uniqueItems() && ReferenceChain.terminal(context.schema(), body.elementType().name())
+                        .map(terminal -> terminal.definition().body() instanceof IdentifierType)
+                        .orElse(false));
     }
 }

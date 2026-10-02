@@ -1,7 +1,7 @@
 # The JSON encoding: the two Unicode policies
 
 Design notes for how [TSON-DATA] §8.2's identifier and token policies reach `tson-json` — which positions each judges,
-which reader can apply which, and why the look-alike rule reaches one JSON position and no other. Current form only;
+which reader can apply which, and why the look-alike rule reaches two JSON positions and no other. Current form only;
 history lives in git.
 
 **Invariants**
@@ -15,7 +15,8 @@ history lives in git.
   meets no identifier rule.
 - `JsonObjectReader` holds a position and `JsonTreeReader`'s schemaless read does not: that read applies no identifier
   policy (a schema-directed tree read does, through `JsonReadContext`), and `bindMap` applies nothing to keys.
-- The look-alike rule reaches one JSON position, the keys of an identifier-keyed map under a schema, where the
+- The look-alike rule reaches two JSON positions under a schema, the keys of an identifier-keyed map and the elements
+  of a unique array of names, where the
   identifier policy applies skeleton distinctness; elsewhere a deployment that will not accept look-alike keys raises
   the token policy.
 - A refusal is kept apart by its code — `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT` — and never reported in §8.1's four
@@ -77,6 +78,7 @@ position:
 | Data (JSON), schemaless | `reader.DataClassObjectReader.checkNameHygiene` | one record's member names — the two per-name rules only |
 | Data (JSON), schema-directed | `reader.NameHygiene`, from the record and choice readers | an **unmatched** member name; a `$type` naming nothing — the two per-name rules only |
 | Data (JSON), schema-directed | `reader.NameHygiene.refusesValue`, from `AtomReader` and `MapObjectReader` | a value typed by an identifier family — the two per-name rules; the keys of one identifier-keyed map — the look-alike rule too |
+| Data (JSON), schema-directed | `reader.ArrayReader` | the elements of one unique array of names — the look-alike rule |
 
 **The schema-directed reach is narrower than the schemaless one, and deliberately so** ([TSON-JSON] §9.4): a
 member name matching a declared field, or a `$type` naming a declared type, carries that declaration's own
@@ -119,12 +121,13 @@ categories and §9.4 carries those categories here unchanged, so what keeps it a
 `Code.verdict()` stays `true`: the processor looked and declined, and the sender holds the fix, which is
 the question a consumer routes on.
 
-**The third rule reaches JSON at one position, where the schema says the set is names.** Names that read
+**The third rule reaches JSON where the schema says the set is names.** Names that read
 alike is a property of a *set*, which `tson-compiler` asks of a record's field names in its schemaless tree
 reader — where the grammar has already said those members are *fields*, so two that read alike are
 unambiguously a problem. A schema-directed read gets there by the type instead: the keys of a map whose key
 type is an identifier family are one naming scope ([TSON-SCHEMA] §11.4), and `MapObjectReader` refuses the
-second of a pair at its own member. Without that, JSON cannot get there from either reader: a tree has no
+second of a pair at its own member; the elements of a set whose element type is one are another, and
+`ArrayReader` refuses the second at its own index. Without that, JSON cannot get there from either reader: a tree has no
 positions at all, and at an object reader's `Map` position the members are keys, where two look-alike keys are
 two legitimately distinct keys. **The dangerous case and the safe case are spelled identically**, which is §4.1
 in one sentence, so JSON must accept it unless a schema types the keys as names.

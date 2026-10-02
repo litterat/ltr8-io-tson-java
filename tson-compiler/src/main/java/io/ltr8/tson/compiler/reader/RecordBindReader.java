@@ -345,7 +345,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         // there is nothing a derived display name would add over it.
         if (target.dataClass() instanceof DataClassArray targetArray && parser instanceof ArrayBindReader existing) {
             return new ArrayBindReader(field.schema().name(), field.schema().name(), existing.body, targetArray,
-                    resolver, existing.schemaLocation, annotationTypes);
+                    resolver, existing.schemaLocation, annotationTypes, existing.elementsAreNames);
         }
         if (target.dataClass() instanceof DataClassMap targetMap && parser instanceof MapBindReader existing) {
             return new MapBindReader(field.schema().name(), field.schema().name(), existing.body, targetMap,

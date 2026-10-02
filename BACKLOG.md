@@ -328,17 +328,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   A cache would take most of that, and the design question is its bound: names are attacker-controlled, so a per-read
   cache is the safe shape and a process-wide one is not.
 
-- [ ] **Decide whether the elements of a `set<identifier>` are a look-alike scope.** The keys of an identifier-keyed
-  map are one ([TSON-SCHEMA] §11.4, `MapAbstractReader`, JSON's `MapObjectReader`); the elements of an array whose
-  element type is an identifier family meet only the two per-name rules (`AtomTypeReader`), so
-  `roles: set<identifier>` admits `pass` beside its all-Cyrillic look-alike. The case for a set: its elements are
-  unique under their equality exactly as map keys are, and a set of names is the data-side twin of an enum's members,
-  which §11.4 already lists. The case against an ordered, non-unique array is that repetition is admitted, so nothing
-  says two elements name two different things. If adopted it is an `ArrayBody` with `unique_items` whose element type
-  is an identifier family, checked in `ArrayAbstractReader` and JSON's `ArrayReader` as each element arrives, gated on
-  `IdentifierPolicy.appliesSkeletonDistinctness()`, with a §11.4 addition proposed in `SPEC-FEEDBACK.md` #7 and
-  corpus vectors beside the map-key ones in `class2/validate/refused/`.
-
 - [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
   in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a
   reference whose pin does not match its target's bytes is refused, a query parameter that is not a

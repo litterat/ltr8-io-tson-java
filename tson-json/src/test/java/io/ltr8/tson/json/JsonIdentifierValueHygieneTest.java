@@ -41,6 +41,8 @@ class JsonIdentifierValueHygieneTest {
               handlers => { identifier => text }
               labels => { text => text }
               route => { name: identifier }
+              team => { roles: set<identifier> }
+              counts => set<int32>
             }
             """;
 
@@ -102,5 +104,23 @@ class JsonIdentifierValueHygieneTest {
         Diagnostic refused = only(read("route", "{\"name\": \"" + MIXED + "\"}"));
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, refused.code());
         assertEquals(Optional.of("/name"), refused.path());
+    }
+
+    /** A set of names is one scope; the pair is refused at the second element. */
+    @Test
+    void twoSetElementsThatReadAlikeAreRefusedAtTheSecond() {
+        Diagnostic refused = only(read("team", "{\"roles\": [\"pass\", \"" + CYRILLIC_PASS + "\"]}"));
+        assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, refused.code());
+        assertEquals(Optional.of("/roles/1"), refused.path());
+        assertEquals(List.of(), read(json(IdentifierPolicy.defaults().withSkeletonDistinctness(false)), "team",
+                "{\"roles\": [\"pass\", \"" + CYRILLIC_PASS + "\"]}"));
+    }
+
+    /** An element that fails is reported as itself, whether it failed its form or was refused as a name. */
+    @Test
+    void aSetElementThatFailsIsReportedAndNothingElse() {
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, only(read("counts", "[1, \"x\", 2]")).code());
+        assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT,
+                only(read("team", "{\"roles\": [\"admin\", \"" + MIXED + "\"]}")).code());
     }
 }
