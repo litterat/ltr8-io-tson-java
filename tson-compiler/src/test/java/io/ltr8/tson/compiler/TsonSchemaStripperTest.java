@@ -16,7 +16,7 @@ class TsonSchemaStripperTest {
     private static final String PIN = "?sha256=" + "0123456789abcdef".repeat(4);
 
     @Test
-    void dropsTheIdPinsAndDocsAndShortensTheSpecLibrary() {
+    void dropsTheIdPinsAndProseAndShortensTheSpecLibrary() {
         String schema = """
                 !!id:"https://example.test/thing-1.tn%s"
                 !!meta:"https://tson.io/2026/37/m/meta.tn%s"
@@ -30,6 +30,7 @@ class TsonSchemaStripperTest {
                   thing => int32
 
                   @title:"Point"
+                  @comment:"Kept in step with shapes-1."
                   point => {
                     @doc:\"""
                       Across.
@@ -112,6 +113,7 @@ class TsonSchemaStripperTest {
 
             assertTrue(stripped.length() < source.length() / 2, id);
             assertFalse(stripped.contains("@doc"), id);
+            assertFalse(stripped.contains("@comment"), id);
             assertFalse(stripped.contains("sha256"), id);
             assertTrue(stripped.lines().allMatch(line -> line.equals("}") || !line.isBlank()), id);
         }

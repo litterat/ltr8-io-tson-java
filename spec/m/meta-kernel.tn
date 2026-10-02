@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f581ebad4aca3b84574b5db22d7bbb6ec3bbe968f377c1a6c657887be4dc1000"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=4ebb4361521db7cd87b087b9880b653bd2957085c844337763cea317f82b2c92"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -478,14 +478,26 @@
   record_extension_type => !enum [ABSTRACT FINAL OPEN]
 
   @doc:"""
-    Annotation type markers. `synthetic` is resolver-attached and derived:
-    discarded and recomputed on ingest ([TSON-SCHEMA] §6, §8.1), and marks a
-    resolver-materialised synthetic entry at its schema-map key (§8.2).
+    The annotation type marker: a type carrying it is meant as annotation
+    metadata ([TSON-SCHEMA] §6).
     """
-  annotation    => @annotation void
-  documentation => @annotation text
-  doc           => @annotation documentation
-  synthetic     => @annotation void
+  annotation => @annotation void
+
+  @doc:"""
+    Documentation for a declaration, a field or a document. The text is
+    CommonMark 0.31.2 (https://spec.commonmark.org/0.31.2/) with no extensions.
+    Every string is valid CommonMark, so this refuses nothing and says only how
+    the text is displayed. Raw HTML in it is never executed, and a renderer need
+    not render it.
+    """
+  doc => @annotation text
+
+  @doc:"""
+    Resolver-attached and derived: discarded and recomputed on ingest
+    ([TSON-SCHEMA] §6, §8.1), and marks a resolver-materialised synthetic entry
+    at its schema-map key (§8.2).
+    """
+  synthetic => @annotation void
 
   @doc:"""
     Supporting records. A record field is the four facts a reader consults:

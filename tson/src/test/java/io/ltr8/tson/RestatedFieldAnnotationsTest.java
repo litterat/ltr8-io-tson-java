@@ -58,7 +58,7 @@ class RestatedFieldAnnotationsTest {
               }
 
               archived_account => account & {
-                @todo:"drop in v3"
+                @title:"Legacy id"
                 legacy_id?: ~ "none"
               }
 
@@ -108,7 +108,7 @@ class RestatedFieldAnnotationsTest {
     /** Merge, not replace: the restatement's own leads and the inherited ones follow. */
     @Test
     void aRestatementsOwnAnnotationsLeadTheInheritedOnes() {
-        assertEquals(List.of("todo", "doc", "deprecated"), names("archived_account", "legacy_id"));
+        assertEquals(List.of("title", "doc", "deprecated"), names("archived_account", "legacy_id"));
     }
 
     /**

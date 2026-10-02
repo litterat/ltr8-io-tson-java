@@ -437,7 +437,6 @@ class DefinitionResolverTest {
         TypeDefinition fieldName = resolver.resolve(schemaMap.declarations().get("field_name"));
         TypeDefinition paramName = resolver.resolve(schemaMap.declarations().get("param_name"));
         TypeDefinition annotation = resolver.resolve(schemaMap.declarations().get("annotation"));
-        TypeDefinition documentation = resolver.resolve(schemaMap.declarations().get("documentation"));
         TypeDefinition doc = resolver.resolve(schemaMap.declarations().get("doc"));
 
         // type_name/field_name/param_name => identifier; each is its own fresh REFERENCE entry, not
@@ -446,7 +445,6 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.REFERENCE, fieldName.kind());
         assertEquals(TypeKind.REFERENCE, paramName.kind());
         assertEquals(TypeKind.REFERENCE, annotation.kind());
-        assertEquals(TypeKind.REFERENCE, documentation.kind());
         assertEquals(TypeKind.REFERENCE, doc.kind());
 
         assertEquals("{ source: { name: \"identifier\" arguments: [] } "
@@ -463,14 +461,9 @@ class DefinitionResolverTest {
                 + "supertypes: [] subtypes: [] "
                 + "body: !reference { target: { name: \"void\" arguments: [] } } }", write(annotation));
 
-        // doc => @annotation documentation => @annotation text -- a chain of references, each
-        // resolved independently (no following the chain here, just the immediate target).
         assertEquals("@annotation { source: { name: \"text\" arguments: [] } "
                 + "supertypes: [] subtypes: [] "
-                + "body: !reference { target: { name: \"text\" arguments: [] } } }", write(documentation));
-        assertEquals("@annotation { source: { name: \"documentation\" arguments: [] } "
-                + "supertypes: [] subtypes: [] "
-                + "body: !reference { target: { name: \"documentation\" arguments: [] } } }", write(doc));
+                + "body: !reference { target: { name: \"text\" arguments: [] } } }", write(doc));
     }
 
     // ── A sugar form must be lifted before resolution ────────────────────

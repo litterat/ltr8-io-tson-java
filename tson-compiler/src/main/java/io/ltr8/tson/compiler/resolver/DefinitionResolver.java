@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.ast.AbsentValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
@@ -196,6 +197,9 @@ final class DefinitionResolver {
 
     /** The kernel's open-entry body constructor -- resolver vocabulary, see {@link #requireAuthorable}. */
     private static final String TEMPLATE = "template";
+
+    /** The {@code _} a bare annotation stands for (§6), read against the annotation's type like a written one. */
+    private static final DataValue ABSENT = new DataValue(List.of(), Optional.empty(), new AbsentValue());
 
     /**
      * Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see
@@ -416,11 +420,14 @@ final class DefinitionResolver {
         }
         Annotations.Builder annotations = new Annotations.Builder();
         for (io.ltr8.tson.compiler.ast.Annotation annotation : written) {
-            // The name is checked whether or not a value was written: §6's bare `@T` is shorthand for `@T:_`,
-            // so both forms name a type, and a marker whose type nothing can reach is as unresolved as a
-            // valued one.
+            // §6's bare `@T` is shorthand for `@T:_`, so both forms name a type and both are read against it: a
+            // marker whose type nothing can reach is as unresolved as a valued one, and a bare mark whose type
+            // is not void is refused as `_` would be.
             if (annotationsResolve && metaDefinitions.getTypeDefinition(annotation.name()) == null) {
                 throw unresolvedAnnotation(name, annotation.name());
+            }
+            if (annotation.value().isEmpty()) {
+                bindAnnotationValue(name, annotation.name(), ABSENT);
             }
             annotations.add(new Annotation(annotation.name(), annotation.value().flatMap(
                     value -> Optional.ofNullable(bindAnnotationValue(name, annotation.name(), value)))));
