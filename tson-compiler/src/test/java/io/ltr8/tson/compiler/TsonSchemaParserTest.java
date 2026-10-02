@@ -223,7 +223,7 @@ class TsonSchemaParserTest {
 
     @Test
     void parameterisedRefinementHead() {
-        TypeDef def = declOf("set => <T> array<T> ^ { unordered: = true }").typeDef();
+        TypeDef def = declOf("set => <T> array<T> ^ { ordered: = false }").typeDef();
         StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
         assertEquals(List.of("T"), structural.typeParams());
         RefinedDef refined = assertInstanceOf(RefinedDef.class, structural.body());

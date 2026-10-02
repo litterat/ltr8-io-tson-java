@@ -440,7 +440,7 @@
       !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
       !record_field { name: element_type    type: type_ref }
       !record_field { name: state           type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
-      !record_field { name: unordered       type: boolean  optional: true  role: DEFAULT  value: false }
+      !record_field { name: ordered         type: boolean  optional: true  role: DEFAULT  value: true }
       !record_field { name: unique_items    type: boolean  optional: true  role: DEFAULT  value: false }
       !record_field { name: min_items       type: non_negative_integer  optional: true }
       !record_field { name: max_items       type: non_negative_integer  optional: true }
@@ -455,7 +455,7 @@
       !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
       !record_field { name: element_type    type: type_ref }
       !record_field { name: state           type: element_state  optional: true  role: FIXED  value: REQUIRED }
-      !record_field { name: unordered       type: boolean  optional: true  role: FIXED  value: true }
+      !record_field { name: ordered         type: boolean  optional: true  role: FIXED  value: false }
       !record_field { name: unique_items    type: boolean  optional: true  role: FIXED  value: true }
       !record_field { name: min_items       type: non_negative_integer  optional: true  role: DEFAULT  value: 1 }
       !record_field { name: max_items       type: non_negative_integer  optional: true }
@@ -469,6 +469,7 @@
       !record_field { name: key_type        type: type_ref }
       !record_field { name: value_type      type: type_ref }
       !record_field { name: state           type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
+      !record_field { name: ordered         type: boolean  optional: true  role: DEFAULT  value: false }
       !record_field { name: min_items       type: non_negative_integer  optional: true }
       !record_field { name: max_items       type: non_negative_integer  optional: true }
     ] }

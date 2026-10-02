@@ -49,7 +49,7 @@ class TemplateClosesByApplicationTest {
                 {
                   base       => {}
                   my_bounded => <N> array ^ { max_items?: = N }
-                  my_set     => <T> array ^ { element_type?: = T  unordered?: = true  unique_items?: = true }
+                  my_set     => <T> array ^ { element_type?: = T  ordered?: = false  unique_items?: = true }
                   box        => <T> base & { value: T }
                   %s
                 }

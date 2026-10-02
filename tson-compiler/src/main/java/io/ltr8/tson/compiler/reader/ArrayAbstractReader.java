@@ -31,7 +31,7 @@ import java.util.function.Consumer;
  * OPTIONAL}, where a record field carries a role and a value), so there's nothing here
  * resembling {@link RecordAbstractReader}'s own precomputed-default machinery.
  *
- * <p>{@code unordered} is deliberately never validated here -- there's nothing to check about a
+ * <p>{@code ordered} is deliberately never validated here -- there's nothing to check about a
  * single array value's own ordering in isolation, only meaningful when *comparing* two arrays.
  *
  * <p><b>{@code max_items} is checked once, at {@code ArrayEnd}, not as soon as the count is

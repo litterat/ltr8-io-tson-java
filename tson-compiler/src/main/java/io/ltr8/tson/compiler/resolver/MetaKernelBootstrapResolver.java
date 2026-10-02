@@ -318,9 +318,9 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /** {@code !array { element_type: T }} / {@code !set { element_type: T }} as the body each denotes. */
-    private static ArrayBody toArrayBody(DataValue value, boolean unique) {
+    private static ArrayBody toArrayBody(DataValue value, boolean set) {
         TypeRef element = TypeRef.of(bindingField(value, "element_type"));
-        return new ArrayBody(element, ElementState.REQUIRED, unique, unique, Optional.empty(), Optional.empty());
+        return new ArrayBody(element, ElementState.REQUIRED, !set, set, Optional.empty(), Optional.empty());
     }
 
     /** {@code !map { key_type: K  value_type: V }} as the body it denotes. */

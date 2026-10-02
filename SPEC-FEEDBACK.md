@@ -49,6 +49,7 @@ a text family, which carries name hygiene to identifier-typed map keys and gives
 constructor each for `value` and `void`, which retires `unit` and dispatch by name; and a recorded type for each
 template parameter, derived from its uses, which checks an application at the call site and gives #6's bound its
 home.
+#10 makes order a facet every container states, which a map needs before #2's keyed sets can be maps.
 
 ---
 
@@ -1171,3 +1172,42 @@ restriction syntax, and the check at the application.
 **Status against Revision 36:** open. The recorded type stands without #6; the bound syntax needs #6's production,
 and #6's template bound needs this entry's `type` to be recorded. The earlier-parameter rule is shared with #6
 rather than depending on it.
+
+---
+
+## 10. Order should be a facet every container states: `array.unordered` becomes `ordered`, and `map` gains it
+
+**Section:** [TSON-SCHEMA] §4.2 (the container constructors), §7.5 (sets: element order), §8.1 (binding records:
+`set`'s `unordered: = true` as the worked example of a vocabulary pin), §2.1's illustration of `set_type`;
+[TSON-DATA] §2.6 (map).
+
+**Kind:** proposal — a kernel change.
+
+**What the spec says today.** `array` carries `unordered?: boolean ~ false`, which `set_type` pins `= true`, and
+§7.5 says what it means for a set: unordered as a *value*, with resolved output keeping the order written. `map`
+carries no such facet, and nothing says whether a map's entry order is part of its value or whether output keeps
+it. Order matters to a map in practice: the schema map itself and every record's field list are keyed sets whose
+written order output keeps (§5.8's field order, §7.5 for sets), and a map typed after them has no way to say so.
+
+**Proposal.**
+
+- **`array.unordered?: boolean ~ false` becomes `ordered?: boolean ~ true`**, and `set_type` pins
+  `ordered?: = false`. The facet names the property rather than its absence, so `ordered: false` reads as one
+  negation where `unordered: false` reads as two. Nothing else about `array` or `set_type` changes.
+- **`map` gains `ordered?: boolean ~ false`.** A map is unordered unless it says otherwise, as a JSON object is, so
+  every map written today keeps its meaning; `!map { … ordered: true }` declares one whose entry order is part of
+  its value.
+- **One sentence of meaning for both**, beside §7.5's: `ordered` says whether two values differing only in order
+  are one value; it never changes what a document may write, and output keeps the order written either way.
+  §7.5's output rule then covers maps as it covers sets.
+
+**What is running** (`r2026-37-proposal`): the kernel carries the facet on both constructors, the bundled schemas
+are re-pinned, and resolved output names `ordered` only where it departs from the default (§8.1). Neither value
+is enforced by a check, and none is owed: a reader validates one value at a time and no rule in the series
+compares two compound values by this facet — §7.5's duplicate rule and §2.6's key identity compare compound
+values by host equality ([TSON-SCHEMA] §5.5).
+
+**Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
+
+**Status against Revision 36:** open. It prepares #2's keyed sets, where a record's `fields` becomes a map and has
+to say whether its order is part of its value.
