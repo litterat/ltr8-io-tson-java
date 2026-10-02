@@ -58,10 +58,11 @@ lets a schema change land across several commits with the integrity checks left 
 `@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`
 does it: every entry must read back into `schema.meta`, have a counterpart here and resolve identically,
 and every schema-map key must carry the same annotations (`@ordered`, `@bounded`, `@exact`, `@numeric`,
-`@synthetic`; `@doc` aside, a fixture summarising it). **Key annotations are compared from the parsed
-text**, never through the bound document, which drops them, so both sides would carry none and agree for the
-wrong reason. They are the only external statement of what a conforming resolver produces. Keep them in step
-with the `.tn` beside them.
+`@synthetic`). `@doc` is not compared: a fixture keeps only its header note for the reader and leaves entry
+docs out, since it exists to be compared and a summary of a source doc only drifts from it. **Key annotations
+are compared from the parsed text**, never through the bound document, which drops them, so both sides would
+carry none and agree for the wrong reason. They are the only external statement of what a conforming resolver
+produces. Keep them in step with the `.tn` beside them.
 
 ### Writing the bundled schemas' docs
 
@@ -91,8 +92,7 @@ the schemas ship in the library and are read as the normative vocabulary, so an 
   verbatim. A doc that contradicts its declaration or another doc is reported, never silently reconciled.
 
 Text that leaves a doc is not discarded: it goes to the spec author as a removed-text list, verbatim and categorised,
-so the argument can land in Part 2. The `*-resolved.tn` fixtures carry abbreviations of these docs and follow the same
-rules.
+so the argument can land in Part 2. The `*-resolved.tn` fixtures carry none of these docs.
 
 ## Branches and revisions
 
