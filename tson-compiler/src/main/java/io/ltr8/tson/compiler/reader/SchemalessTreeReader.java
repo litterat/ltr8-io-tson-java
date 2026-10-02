@@ -260,9 +260,12 @@ public final class SchemalessTreeReader {
      * <p>Reported after the record is read, not as each field arrives: the relation is over the whole set,
      * and a collision is a property of the pair rather than of the second name's position. Duplicates are
      * already reported per occurrence above; this is the different rule that two <em>distinct</em> names read
-     * alike.
+     * alike. Skipped where the read's identifier policy has switched skeleton distinctness off.
      */
     private static void reportConfusableFields(TsonReadContext ctx, Set<String> fieldNames) {
+        if (!ctx.identifierPolicy().appliesSkeletonDistinctness()) {
+            return;
+        }
         ConfusableNames.firstCollision(fieldNames).ifPresent(collision ->
                 ctx.field(collision.second()).report(Diagnostic.Code.CONFUSABLE_NAMES,
                         "this record " + collision.describe(),

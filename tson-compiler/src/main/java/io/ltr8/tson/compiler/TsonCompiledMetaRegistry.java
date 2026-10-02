@@ -4,7 +4,7 @@ import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
@@ -98,8 +98,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private static final String UNADDRESSABLE = "";
 
     /**
-     * UTS #39 §5.2's restriction level for declared names, applied by {@link TsonSchemaLinker} wherever a
-     * schema names something ([TSON-DATA] §8.2's restricted-script rule). Held here because this registry is the
+     * [TSON-DATA] §8.2's identifier policy for declared names, applied by {@link TsonSchemaLinker} wherever a
+     * schema names something and over every scope those names form. Held here because this registry is the
      * one object every resolve and every read already passes through, so a policy set on it reaches both
      * without a second channel.
      *
@@ -108,7 +108,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * this project's own documents. A deployment that finds it too strict reaches for the *unit* before the
      * level: {@code perSegment()} still refuses every within-word homograph.
      */
-    private UnicodePolicy identifierPolicy = UnicodePolicy.highlyRestrictive();
+    private IdentifierPolicy identifierPolicy = IdentifierPolicy.defaults();
 
     /**
      * The identities this thread is part-way through resolving, outermost first -- [TSON-DATA] §2.2.3's
@@ -195,20 +195,20 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * it itself, e.g. a test bootstrapping in isolation).
      */
     public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source) {
-        return withStandardLibrary(context, source, UnicodePolicy.highlyRestrictive());
+        return withStandardLibrary(context, source, IdentifierPolicy.defaults());
     }
 
     /** The same, with {@link #identifierPolicy} chosen rather than defaulted. */
     public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source,
-                                                               UnicodePolicy identifierPolicy) {
+                                                               IdentifierPolicy identifierPolicy) {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
         registry.identifierPolicy = identifierPolicy;
         registry.loadStandardLibrary();
         return registry;
     }
 
-    /** The restriction level this registry applies to declared names -- see {@link #identifierPolicy}. */
-    public UnicodePolicy identifierPolicy() {
+    /** The identifier policy this registry applies to declared names -- see {@link #identifierPolicy}. */
+    public IdentifierPolicy identifierPolicy() {
         return identifierPolicy;
     }
 

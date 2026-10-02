@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
@@ -841,10 +841,10 @@ public final class SchemaResolver {
     /** One already-resolved {@code DataValue} replayed through a compiled reader. */
     private static Object read(TsonTypeReader<?> reader,
                                io.ltr8.tson.compiler.ast.DataValue value) {
-        // Unrestricted deliberately: these events come from a resolved schema value, not from document text.
+        // No policy deliberately: these events come from a resolved schema value, not from document text.
         // A schema's own names are the identifier policy's surface, applied by TsonSchemaLinker.
         return reader.read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)),
-                UnicodePolicy.unrestricted()));
+                IdentifierPolicy.none()));
     }
 
     /**

@@ -81,6 +81,7 @@ Three commands take the policy options — `validate`, `compile`, `policy` — w
 --identifier-policy <level>    level for identifiers (default: highly-restrictive)
 --identifier-per-segment       apply it per _/- segment rather than the whole identifier
 --identifier-scripts <A+B>     admit one script combination over the level (repeatable)
+--identifier-allow-look-alikes drop skeleton distinctness: names in one scope may read alike
 --token-policy <level>         level for values (default: unrestricted, which scans nothing)
 --token-scripts <A+B>          the same for values (repeatable)
 --max-depth <n>                how deeply a document may nest before this refuses to read it (default: 64)
@@ -109,8 +110,8 @@ else. Four things are worth knowing before you configure one:
 - **A relaxation named against a level that scans nothing is a usage error**, not a silent no-op —
   `--token-policy unrestricted --token-scripts Latin+Cyrillic` configures nothing whatever.
 - **There is no `--token-per-segment`.** `_` and `-` are ordinary characters in a value rather than word
-  separators, and UTS #39's own `Toys-Я-Us` is the spoof segmenting one would wrongly admit; the library
-  refuses such a policy outright.
+  separators, and UTS #39's own `Toys-Я-Us` is the spoof segmenting one would wrongly admit, so a token
+  policy has no unit at all.
 
 The flags build one `Tson` per run, so a schema's own declared names and your data's names are judged under
 one setting.
@@ -123,8 +124,9 @@ way: `snake_case` keys, and a field with nothing to say left out rather than wri
 
 ```json
 {"outcome":"INVALID",
- "policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,"permitting":[]},
-           "token_policy":{"level":"UNRESTRICTED","per_segment":false,"permitting":[]},
+ "policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,
+                               "skeleton_distinctness":true,"permitting":[]},
+           "token_policy":{"level":"UNRESTRICTED","permitting":[]},
            "unicode_data_version":"16.0","limits":{"max_depth":64}},
  "files":[{"file":"person-data.tn","outcome":"INVALID","errors":[
    {"path":"/age","schema_pointer":"/person/age","schema_id":"example.com/…/person.tn",

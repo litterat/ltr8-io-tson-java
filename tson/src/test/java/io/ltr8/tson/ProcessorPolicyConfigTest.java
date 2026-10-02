@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +30,8 @@ class ProcessorPolicyConfigTest {
     private static final String CYR_A = new String(Character.toChars(0x0430));
 
     private static final ProcessorPolicy TIGHTENED = ProcessorPolicy.of(
-            UnicodePolicy.asciiOnly(), UnicodePolicy.asciiOnly(), LimitsPolicy.defaults().withMaxDepth(8));
+            IdentifierPolicy.of(UnicodePolicy.asciiOnly()), UnicodePolicy.asciiOnly(),
+            LimitsPolicy.defaults().withMaxDepth(8));
 
     @Test
     void theWholePolicyRoundTripsThroughTheInstance() {
@@ -61,11 +63,11 @@ class ProcessorPolicyConfigTest {
     void statingOneComponentLeavesTheOthersAlone() {
         ProcessorPolicy stated = Tson.of(ProcessorConfig.defaults()
                         .withLimits(LimitsPolicy.defaults().withMaxDepth(8))
-                        .withIdentifierPolicy(UnicodePolicy.asciiOnly()))
+                        .withIdentifierPolicy(IdentifierPolicy.of(UnicodePolicy.asciiOnly())))
                 .processorPolicy();
 
         assertEquals(8, stated.limits().maxDepth(), "the limit stated first survives the policy stated after it");
-        assertEquals(UnicodePolicy.Level.ASCII_ONLY, stated.identifierPolicy().level());
+        assertEquals(UnicodePolicy.Level.ASCII_ONLY, stated.identifierPolicy().scripts().level());
         assertEquals(ProcessorPolicy.defaults().tokenPolicy(), stated.tokenPolicy(),
                 "the component nothing stated keeps its default");
     }
@@ -109,19 +111,5 @@ class ProcessorPolicyConfigTest {
         assertEquals(LimitsPolicy.defaults().withMaxDepth(3), tson.limitsPolicy());
         assertEquals(List.of(Diagnostic.Code.LIMIT_EXCEEDED),
                 tson.validate("[[[[1]]]]").stream().map(Diagnostic::code).toList());
-    }
-
-    /**
-     * <b>The per-segment refusal holds on the composed route too.</b> It is an invariant of what a token
-     * policy can mean, so {@link ProcessorPolicy} enforces it and no assembly route is a way around it --
-     * which is what the named setter alone could not promise.
-     */
-    @Test
-    void aPerSegmentTokenPolicyIsRefusedWhicheverSetterCarriesIt() {
-        UnicodePolicy perSegment = UnicodePolicy.highlyRestrictive().perSegment();
-
-        assertThrows(IllegalArgumentException.class, () -> ProcessorConfig.defaults().withTokenPolicy(perSegment));
-        assertThrows(IllegalArgumentException.class,
-                () -> ProcessorConfig.defaults().withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(perSegment)));
     }
 }

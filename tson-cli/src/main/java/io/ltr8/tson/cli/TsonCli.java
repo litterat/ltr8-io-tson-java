@@ -74,6 +74,9 @@ public final class TsonCli {
                                             which admits url_адрес while still refusing id_pаy
               --identifier-scripts <A+B>    admit one script combination over and above the level,
                                             e.g. Latin+Cyrillic (repeatable)
+              --identifier-allow-look-alikes
+                                            drop skeleton distinctness: names in one scope may read
+                                            alike, as Latin pass beside a Cyrillic look-alike does
               --token-policy <level>        level for values (default: unrestricted, which scans nothing)
               --token-scripts <A+B>         the same for values; on its own it raises the token level to
                                             single-script, a list of combinations being no configuration

@@ -2,6 +2,7 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.base.Diagnostic;
@@ -26,14 +27,14 @@ class OutputFormatTest {
      * configuration, so a report that did not state them could not be interpreted anywhere but here.
      */
     private static final CliPolicy POLICY = CliPolicy.from(ProcessorPolicy.of(
-            UnicodePolicy.highlyRestrictive(), UnicodePolicy.unrestricted(),
+            IdentifierPolicy.defaults(), UnicodePolicy.unrestricted(),
             LimitsPolicy.defaults()));
 
     /** {@link #POLICY} as {@code --output json} writes it -- built from the accessor, not pinned to a version. */
     private static final String POLICY_JSON =
             "{\"identifier_policy\":{\"level\":\"HIGHLY_RESTRICTIVE\",\"per_segment\":false,"
-                    + "\"permitting\":[]},\"token_policy\":{\"level\":\"UNRESTRICTED\","
-                    + "\"per_segment\":false,\"permitting\":[]},"
+                    + "\"skeleton_distinctness\":true,\"permitting\":[]},"
+                    + "\"token_policy\":{\"level\":\"UNRESTRICTED\",\"permitting\":[]},"
                     + "\"unicode_data_version\":\"" + UnicodePolicy.dataVersion() + "\","
                     + "\"limits\":{\"max_depth\":" + LimitsPolicy.DEFAULT_MAX_DEPTH + "}}";
 
@@ -233,8 +234,9 @@ class OutputFormatTest {
     @Test
     void tsonOutputRoundTripsARelaxedPolicy() {
         CliPolicy relaxed = CliPolicy.from(ProcessorPolicy.of(
-                UnicodePolicy.moderatelyRestrictive().perSegment()
-                        .permitting(UnicodeScript.LATIN, UnicodeScript.CYRILLIC),
+                IdentifierPolicy.of(UnicodePolicy.moderatelyRestrictive()
+                        .permitting(UnicodeScript.LATIN, UnicodeScript.CYRILLIC)).perSegment()
+                        .withSkeletonDistinctness(false),
                 UnicodePolicy.unrestricted(), LimitsPolicy.defaults()));
         ValidationReport original = ValidationReport.ok(relaxed);
 
@@ -245,6 +247,7 @@ class OutputFormatTest {
         assertEquals(original, reread);
         assertEquals(List.of(List.of("CYRILLIC", "LATIN")), relaxed.identifierPolicy().permitting());
         assertTrue(relaxed.identifierPolicy().perSegment());
+        assertFalse(relaxed.identifierPolicy().skeletonDistinctness());
     }
 
     /**
@@ -303,7 +306,7 @@ class OutputFormatTest {
     @Test
     void textPrintsANonDefaultPolicyEvenWhenNothingWasRefused() {
         CliPolicy relaxed = CliPolicy.from(ProcessorPolicy.of(
-                UnicodePolicy.scriptsUnchecked(), UnicodePolicy.unrestricted(),
+                IdentifierPolicy.of(UnicodePolicy.scriptsUnchecked()), UnicodePolicy.unrestricted(),
                 LimitsPolicy.defaults()));
 
         String rendered = OutputFormat.TEXT.render(ValidationReport.ok(relaxed));

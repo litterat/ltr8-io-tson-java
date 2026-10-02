@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -92,14 +91,6 @@ class TokenPolicyConfigTest {
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
                 found.stream().map(Diagnostic::code).toList(), found.toString());
-    }
-
-    /** Refused where it is configured, rather than silently ignored one layer down. */
-    @Test
-    void aPerSegmentTokenPolicyIsRefusedAtConfiguration() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> ProcessorConfig.defaults().withTokenPolicy(UnicodePolicy.highlyRestrictive().perSegment()));
-        assertTrue(e.getMessage().contains("per-segment"), e.getMessage());
     }
 
 }

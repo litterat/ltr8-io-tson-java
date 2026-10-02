@@ -77,8 +77,9 @@ module io.ltr8.tson.base {
     exports io.ltr8.tson.base.diagnostics;
 
     /**
-     * What this processor will admit as a name and spend on a document -- {@code ProcessorPolicy} and the
-     * two it composes, {@code UnicodePolicy} (§8.2's levels) and {@code LimitsPolicy} (§9.1's bounds).
+     * What this processor will admit as a name and spend on a document -- {@code ProcessorPolicy} and what
+     * it composes: {@code IdentifierPolicy} and {@code UnicodePolicy} (§8.2's two surfaces) and {@code
+     * LimitsPolicy} (§9.1's bounds).
      * One package because a deployment states one policy, and §8.2 requires a relaxation be code rather
      * than ambient: this is where that code points.
      *

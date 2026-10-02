@@ -39,6 +39,7 @@ final class DiagnosticsSchema {
         case "validation_report" -> ValidationReport.class;
         case "diagnostic" -> CliDiagnostic.class;
         case "policy" -> CliPolicy.class;
+        case "identifier_policy" -> CliPolicy.CliIdentifierPolicy.class;
         case "unicode_policy" -> CliPolicy.CliUnicodePolicy.class;
         case "limits" -> CliPolicy.CliLimits.class;
         case "diagnostic_code" -> Diagnostic.Code.class;

@@ -1,11 +1,11 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.json.JsonReadContext;
 
-import java.util.Optional;
+import java.util.List;
 
 /**
  * [TSON-DATA] §8.2's per-name hygiene rules, at the schema-directed positions that carry a name --
@@ -32,12 +32,11 @@ final class NameHygiene {
     }
 
     /**
-     * Judges {@code name}, reporting at most one refusal, and answers whether it refused -- so a caller can
+     * Judges {@code name}, reporting each rule it fails, and answers whether it refused -- so a caller can
      * report the refusal <em>instead of</em> the verdict it was about to give rather than as well as.
      *
-     * <p>Tested rather than {@code ifPresent}-ed, matching the bind reader: both rules are allocation-free
-     * when a name passes, which is every name of an ordinary document, where a capturing lambda allocates per
-     * name whether or not the {@code Optional} holds anything.
+     * <p>Looped rather than {@code forEach}-ed, matching the bind reader: judging is allocation-free when a name
+     * passes, which is every name of an ordinary document, where a capturing lambda allocates per name.
      */
     static boolean refuses(JsonReadContext ctx, String name) {
         return judge(ctx, name, IdentifierProfile.NAME, true);
@@ -53,22 +52,15 @@ final class NameHygiene {
     }
 
     private static boolean judge(JsonReadContext ctx, String name, IdentifierProfile profile, boolean member) {
-        UnicodePolicy policy = ctx.identifierPolicy();
-        // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile too",
-        // taking that rule with it. Script mixing gates itself inside violation().
-        if (policy.appliesIdentifierProfile()) {
-            Optional<String> restricted = profile.restrictedCharacter(name);
-            if (restricted.isPresent()) {
-                refuse(member ? ctx.field(name) : ctx, name, restricted.get(), Diagnostic.Code.RESTRICTED_CHARACTER);
-                return true;
-            }
+        List<IdentifierPolicy.Violation> violations = ctx.identifierPolicy().judge(name, profile);
+        if (violations.isEmpty()) {
+            return false;
         }
-        Optional<String> script = policy.violation(name);
-        if (script.isPresent()) {
-            refuse(member ? ctx.field(name) : ctx, name, script.get(), Diagnostic.Code.RESTRICTED_SCRIPT);
-            return true;
+        JsonReadContext at = member ? ctx.field(name) : ctx;
+        for (IdentifierPolicy.Violation violation : violations) {
+            refuse(at, name, violation.reason(), violation.code());
         }
-        return false;
+        return true;
     }
 
     /**

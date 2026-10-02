@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.base.Diagnostic;
@@ -190,11 +190,11 @@ final class AnnotationCapture {
      * misleading locations.
      */
     private static void checkBareAdmitted(TsonReadContext ctx, AnnotationStart start, TsonTypeReader<?> reader) {
-        // Unrestricted deliberately: this event is synthesised here, not read from the document, so there is
+        // No policy deliberately: this event is synthesised here, not read from the document, so there is
         // no author token to judge -- and the real one it stands for was checked when it left the stream.
         TsonReadContext probe = TsonReadContext.of(
                 new ListEventSource(List.of(new AbsentEvent(start.position()))), diagnostic -> { },
-                UnicodePolicy.unrestricted());
+                IdentifierPolicy.none());
         boolean admitted;
         try {
             reader.read(probe);

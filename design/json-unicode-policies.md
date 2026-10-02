@@ -15,8 +15,9 @@ history lives in git.
   meets no identifier rule.
 - `JsonObjectReader` holds a position and `JsonTreeReader`'s schemaless read does not: that read applies no identifier
   policy (a schema-directed tree read does, through `JsonReadContext`), and `bindMap` applies nothing to keys.
-- The look-alike rule reaches one JSON position, the keys of an identifier-keyed map under a schema; elsewhere a
-  deployment that will not accept look-alike keys raises the token policy.
+- The look-alike rule reaches one JSON position, the keys of an identifier-keyed map under a schema, where the
+  identifier policy applies skeleton distinctness; elsewhere a deployment that will not accept look-alike keys raises
+  the token policy.
 - A refusal is kept apart by its code — `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT` — and never reported in §8.1's four
   categories.
 - The token policy is built into `JsonStream`, where each token is produced exactly once; a number is checked rather than

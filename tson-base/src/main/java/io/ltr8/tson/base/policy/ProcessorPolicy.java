@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /**
  * What this processor will admit, and what it will spend -- everything about a read that is neither in the
- * document nor in the schema. The two {@link UnicodePolicy} surfaces [TSON-DATA] §8.2 defines, the
+ * document nor in the schema. The two surfaces [TSON-DATA] §8.2 defines, the
  * Unicode data version they were computed against, and the {@link LimitsPolicy} bounds of §9.1.
  *
  * <p><b>Three settings, one value, because a deployment states one policy.</b> The limits used to sit
@@ -42,19 +42,16 @@ import java.util.Objects;
  * {@code TsonTreeReader.processorPolicy()}, {@code TsonObjectReader.processorPolicy()}, {@code tson
  * policy}).
  *
- * <p><b>The two policies are the two surfaces, and they are not interchangeable.</b> The identifier policy
- * governs declared names, field names, type-refs and annotation names, where all three of §8.2's rules
- * apply; the token policy governs values, where only the restricted-script rule can -- a token has no
- * identifier profile and no scope to be distinct within. A deployment that has relaxed one has said nothing
- * about the other, which is exactly why both are stated.
+ * <p><b>The two policies are the two surfaces, and they are not interchangeable.</b> The identifier policy governs
+ * names -- declared names, field names, type-refs, annotation names, and every value whose type is an identifier family
+ * -- where all three of §8.2's rules apply; the token policy governs values, where only the restricted-script rule can
+ * -- a token has no identifier profile and no scope to be distinct within. A deployment that has relaxed one has said
+ * nothing about the other, which is exactly why both are stated.
  *
- * <p><b>Which is why the token policy may not be per-segment, and why that is refused here.</b> {@code _}
- * and {@code -} are word separators by convention in a name and ordinary characters in a value, so
- * segmenting a value admits UTS #39's own {@code Toys-Я-Us} -- the spoof a strict token policy exists to
- * refuse. It is a property of what a token policy can <em>mean</em>, not of any one way of stating one, so
- * it is enforced on the value: every route that assembles a policy passes through this constructor, where a
- * check on each named setter is a check each new route has to remember. The identifier surface is
- * unaffected, per-segment being exactly where it means something.
+ * <p><b>The two have different types, because they have different shapes.</b> An {@link IdentifierPolicy}
+ * has a unit, a restricted-character rule and a scope relation; a token policy is a {@link UnicodePolicy}, a
+ * level alone. A per-segment token policy -- which would admit UTS #39's own {@code Toys-Я-Us}, {@code -} being
+ * an ordinary character in a value -- is not refused here but unwritable.
  *
  * <p>The components are named for the {@code ProcessorConfig} settings they report, so a configuration and the
  * report it produces are one vocabulary and one grep.
@@ -72,7 +69,7 @@ import java.util.Objects;
  *                            rules were computed against ([TSON-DATA] §8.2 on why that is the
  *                            version §8.2's "UTS #39 data version" means)
  */
-public record ProcessorPolicy(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
+public record ProcessorPolicy(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolicy,
                               LimitsPolicy limits, String unicodeDataVersion) {
 
     public ProcessorPolicy {
@@ -80,10 +77,6 @@ public record ProcessorPolicy(UnicodePolicy identifierPolicy, UnicodePolicy toke
         Objects.requireNonNull(tokenPolicy, "tokenPolicy");
         Objects.requireNonNull(limits, "limits");
         Objects.requireNonNull(unicodeDataVersion, "unicodeDataVersion");
-        if (tokenPolicy.isPerSegment()) {
-            throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
-                    + "characters in a value, not word separators -- use the whole-text policy instead");
-        }
     }
 
     /**
@@ -93,14 +86,14 @@ public record ProcessorPolicy(UnicodePolicy identifierPolicy, UnicodePolicy toke
      * into this library, and a caller stating a different one would be describing a processor that does not
      * exist.
      */
-    public static ProcessorPolicy of(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
+    public static ProcessorPolicy of(IdentifierPolicy identifierPolicy, UnicodePolicy tokenPolicy,
                                      LimitsPolicy limits) {
         return new ProcessorPolicy(identifierPolicy, tokenPolicy, limits, UnicodePolicy.dataVersion());
     }
 
     /** {@link #defaults()} is what a processor applies before a deployment says anything. */
     public static ProcessorPolicy defaults() {
-        return of(UnicodePolicy.highlyRestrictive(), UnicodePolicy.unrestricted(), LimitsPolicy.defaults());
+        return of(IdentifierPolicy.defaults(), UnicodePolicy.unrestricted(), LimitsPolicy.defaults());
     }
 
     /**
@@ -110,7 +103,7 @@ public record ProcessorPolicy(UnicodePolicy identifierPolicy, UnicodePolicy toke
      * reader deriving one names the component it is changing, at the call site, in a form a reader of that
      * call site can see is a change of exactly one thing.
      */
-    public ProcessorPolicy withIdentifierPolicy(UnicodePolicy policy) {
+    public ProcessorPolicy withIdentifierPolicy(IdentifierPolicy policy) {
         return of(policy, tokenPolicy, limits);
     }
 

@@ -8,7 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * UTS #39 §5.2's restriction levels, and the two axes they are configured on.
+ * UTS #39 §5.2's restriction levels over whole text. The unit is {@link IdentifierPolicy}'s
+ * ({@code IdentifierPolicyTest}).
  *
  * <p>Mixed-script names are built from code points, never typed: the whole subject is spellings that look
  * alike, so a literal would be unreviewable.
@@ -41,18 +42,6 @@ class UnicodePolicyTest {
         refuses(policy, CYR_A + "dmin");                      // the homograph
         refuses(policy, "id_" + CYR_P);                       // and an ordinary compound, which is the cost
         refuses(policy, "alpha_" + GREEK_ALPHA);
-    }
-
-    /** The first relaxation: the unit, not the level. It keeps every rejection that matters. */
-    @Test
-    void perSegmentKeepsTheHomographsAndAdmitsTheCompounds() {
-        UnicodePolicy policy = UnicodePolicy.highlyRestrictive().perSegment();
-
-        accepts(policy, "id_" + CYR_P);
-        accepts(policy, "alpha_" + GREEK_ALPHA);
-        accepts(policy, HAN + HAN + "id");
-        refuses(policy, CYR_A + "dmin");                      // within one word, still refused
-        refuses(policy, "id_" + CYR_A + "dmin");              // one bad segment is still one bad segment
     }
 
     /** The narrowest relaxation: name the combination instead of dropping a level. */

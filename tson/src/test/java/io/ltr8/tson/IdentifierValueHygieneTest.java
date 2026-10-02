@@ -8,6 +8,7 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -57,7 +58,7 @@ class IdentifierValueHygieneTest {
     public record Registry(Map<String, String> handlers) {
     }
 
-    private static Tson tson(UnicodePolicy identifiers) {
+    private static Tson tson(IdentifierPolicy identifiers) {
         SchemaSource source = uri -> {
             if (uri.equals(ID)) {
                 return SCHEMA;
@@ -74,10 +75,10 @@ class IdentifierValueHygieneTest {
     }
 
     private static List<Diagnostic> validate(String body) {
-        return validate(UnicodePolicy.highlyRestrictive(), body);
+        return validate(IdentifierPolicy.defaults(), body);
     }
 
-    private static List<Diagnostic> validate(UnicodePolicy identifiers, String body) {
+    private static List<Diagnostic> validate(IdentifierPolicy identifiers, String body) {
         return tson(identifiers).validate("!!schema:\"" + ID + "\"\n" + body);
     }
 
@@ -133,10 +134,26 @@ class IdentifierValueHygieneTest {
                 only(validate("!handlers { a\u0132b => a }")).code());
     }
 
+    /**
+     * A per-segment level divides a value at its own family's separators: {@code $} is {@code js_name}'s, so a
+     * Latin word and a Cyrillic one either side of it are two segments, while a homograph inside one word is
+     * still refused.
+     */
+    @Test
+    void aPerSegmentPolicyDividesAtTheFamilysOwnSeparators() {
+        IdentifierPolicy perSegment = IdentifierPolicy.defaults().perSegment();
+        String compound = "\"id$\u043F\u0443\u0442\u044C\"";
+        assertEquals(List.of(), validate(perSegment, "!bindings { " + compound + " => a }"));
+        assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, only(validate("!bindings { " + compound + " => a }")).code());
+        assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT,
+                only(validate(perSegment, "!bindings { \"id$" + MIXED + "\" => a }")).code());
+    }
+
     /** §8.2's relaxation is the deployment's, stated in code, and reaches these values as it reaches names. */
     @Test
     void aRelaxedPolicyAdmitsWhatItRelaxes() {
-        assertEquals(List.of(), validate(UnicodePolicy.unrestricted(), "!handlers { " + MIXED + " => b }"));
+        assertEquals(List.of(), validate(IdentifierPolicy.of(UnicodePolicy.unrestricted()),
+                "!handlers { " + MIXED + " => b }"));
     }
 
     /**
@@ -146,13 +163,13 @@ class IdentifierValueHygieneTest {
      */
     @Test
     void aSchemasOwnIdentifierTypedValueIsAName() {
-        List<Diagnostic> refused = tson(UnicodePolicy.highlyRestrictive()).validateSchema(schemaWith(
+        List<Diagnostic> refused = tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
                 "account => { role?: identifier ~ " + MIXED + " }"));
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, only(refused).code());
-        assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, only(tson(UnicodePolicy.highlyRestrictive())
+        assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, only(tson(IdentifierPolicy.defaults())
                 .validateSchema(schemaWith("account => { kind: identifier = a\u0132b }"))).code());
 
-        assertEquals(List.of(), tson(UnicodePolicy.highlyRestrictive()).validateSchema(schemaWith(
+        assertEquals(List.of(), tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
                 "account => { role?: identifier ~ admin  bind?: js_name ~ \"$scope\"  tag?: text ~ " + MIXED + " }")));
     }
 
@@ -173,7 +190,7 @@ class IdentifierValueHygieneTest {
     @Test
     void bindingRefusesTheSameKeys() {
         DiagnosticsCollector problems = new DiagnosticsCollector();
-        Tson tson = tson(UnicodePolicy.highlyRestrictive());
+        Tson tson = tson(IdentifierPolicy.defaults());
         tson.objectReader().withDiagnostics(problems).read("!!schema:\"" + ID + "\"\n!registry { handlers: { pass => a  "
                 + CYRILLIC_PASS + " => b } }", Registry.class);
         assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, only(problems.diagnostics()).code());

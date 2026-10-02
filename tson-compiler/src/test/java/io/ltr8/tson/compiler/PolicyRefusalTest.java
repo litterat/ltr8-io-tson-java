@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.unicode.Xid;
@@ -204,17 +205,19 @@ class PolicyRefusalTest {
      */
     @Test
     void twoPoliciesConfiguredAlikeAreEqual() {
-        UnicodePolicy one = UnicodePolicy.highlyRestrictive().perSegment()
-                .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC);
-        UnicodePolicy same = UnicodePolicy.highlyRestrictive().perSegment()
-                .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC);
+        IdentifierPolicy one = IdentifierPolicy.of(UnicodePolicy.highlyRestrictive()
+                .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC))
+                .perSegment();
+        IdentifierPolicy same = IdentifierPolicy.of(UnicodePolicy.highlyRestrictive()
+                .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC))
+                .perSegment();
 
         assertEquals(one, same);
         assertEquals(one.hashCode(), same.hashCode());
         assertEquals(ProcessorPolicy.of(one, UnicodePolicy.unrestricted(), LimitsPolicy.defaults()),
                 ProcessorPolicy.of(same, UnicodePolicy.unrestricted(), LimitsPolicy.defaults()),
                 "the record that reports them is component-wise, so it inherits this");
-        assertNotEquals(one, UnicodePolicy.highlyRestrictive().perSegment());
+        assertNotEquals(one, IdentifierPolicy.of(UnicodePolicy.highlyRestrictive()).perSegment());
         assertNotEquals(UnicodePolicy.highlyRestrictive(), UnicodePolicy.singleScript());
     }
 
@@ -233,10 +236,10 @@ class PolicyRefusalTest {
     void theProcessorPolicyIsReachableWithoutARefusal() {
         ProcessorPolicy policy = new TsonTreeReader()
                 .withTokenPolicy(UnicodePolicy.asciiOnly())
-                .withIdentifierPolicy(UnicodePolicy.singleScript().perSegment())
+                .withIdentifierPolicy(IdentifierPolicy.of(UnicodePolicy.singleScript()).perSegment())
                 .processorPolicy();
 
-        assertEquals(UnicodePolicy.Level.SINGLE_SCRIPT, policy.identifierPolicy().level());
+        assertEquals(UnicodePolicy.Level.SINGLE_SCRIPT, policy.identifierPolicy().scripts().level());
         assertTrue(policy.identifierPolicy().isPerSegment());
         assertEquals(UnicodePolicy.Level.ASCII_ONLY, policy.tokenPolicy().level());
         assertEquals(Xid.UNICODE_VERSION, policy.unicodeDataVersion());

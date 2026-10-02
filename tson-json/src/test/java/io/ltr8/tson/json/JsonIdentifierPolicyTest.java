@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -157,29 +158,29 @@ class JsonIdentifierPolicyTest {
         void relaxing_it_admits_what_the_default_refuses() {
             // §8.2 requires a relaxation be code rather than ambient, which is what this surface is.
             JsonObjectReader relaxed = READER.withProcessorPolicy(ProcessorPolicy.defaults()
-                    .withIdentifierPolicy(UnicodePolicy.unrestricted()));
+                    .withIdentifierPolicy(IdentifierPolicy.of(UnicodePolicy.unrestricted())));
             assertEquals(List.of(), refusals(relaxed, MIXED_SCRIPT, Person.class));
         }
 
         @Test
         void unrestricted_drops_the_identifier_profile_with_the_level() {
             JsonObjectReader relaxed = READER.withProcessorPolicy(ProcessorPolicy.defaults()
-                    .withIdentifierPolicy(UnicodePolicy.unrestricted()));
+                    .withIdentifierPolicy(IdentifierPolicy.of(UnicodePolicy.unrestricted())));
             assertEquals(List.of(), refusals(relaxed, RESTRICTED_CHARACTER, Person.class));
         }
 
         @Test
         void naming_the_scripts_a_deployment_expects_admits_them() {
             JsonObjectReader cyrillic = READER.withProcessorPolicy(ProcessorPolicy.defaults()
-                    .withIdentifierPolicy(UnicodePolicy.highlyRestrictive()
-                            .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC)));
+                    .withIdentifierPolicy(IdentifierPolicy.of(UnicodePolicy.highlyRestrictive()
+                            .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC))));
             assertEquals(List.of(), refusals(cyrillic, MIXED_SCRIPT, Person.class));
         }
 
         @Test
         void a_derived_reader_leaves_the_original_judging_as_it_did() {
             READER.withProcessorPolicy(ProcessorPolicy.defaults()
-                    .withIdentifierPolicy(UnicodePolicy.unrestricted()));
+                    .withIdentifierPolicy(IdentifierPolicy.of(UnicodePolicy.unrestricted())));
             assertTrue(codes(READER, MIXED_SCRIPT, Person.class).contains(Diagnostic.Code.RESTRICTED_SCRIPT));
         }
     }
@@ -192,8 +193,8 @@ class JsonIdentifierPolicyTest {
 
         /** Both names pass the per-name rules here, so only the set rule could have anything to say. */
         private static final ProcessorPolicy BILINGUAL = ProcessorPolicy.defaults()
-                .withIdentifierPolicy(UnicodePolicy.highlyRestrictive()
-                        .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC));
+                .withIdentifierPolicy(IdentifierPolicy.of(UnicodePolicy.highlyRestrictive()
+                        .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC)));
 
         public record Invoice(int payment) {
         }

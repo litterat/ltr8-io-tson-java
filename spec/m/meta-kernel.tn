@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=4ebb4361521db7cd87b087b9880b653bd2957085c844337763cea317f82b2c92"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b37bc018cf844b88497acd98e50f774f6662351c25e7ee6c97ceeef28dacc5b4"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -233,8 +233,7 @@
     Non-negative integer — the type of every facet that counts something:
     lengths, item counts, digit counts, bit widths, prefix lengths,
     fractional-second precision. That `bits` wants more than zero is a coherence
-    check, not a type. Core declares a sibling under the same name for user
-    schemas.
+    check, not a type.
     """
   non_negative_integer => !integer ^ { min: 0 }
 
@@ -326,9 +325,9 @@
     quoting. Another profile carries no such guarantee, and a value under it may
     need quoting.
 
-    Core declares its own sibling under the same name — the same
-    !identifier_type construction and contract, a distinct type entity — so that
-    core-importing schemas can type a value or a map key as a name.
+    Core declares no sibling: a schema that types a value or a map key as a
+    name declares its own identifier_type instance, such as
+    `identifier => !identifier_type { continue_add: "-" }`.
     """
   identifier_type => text_type & atom_specification & {
     spec?:          = "https://www.unicode.org/reports/tr31/"

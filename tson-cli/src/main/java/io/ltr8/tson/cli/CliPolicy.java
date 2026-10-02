@@ -1,6 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 
@@ -28,7 +29,7 @@ import java.util.Set;
  * <p>The two surfaces keep {@code ProcessorConfig}'s own names, here and on the wire, so a deployment's
  * configuration and the report it produces are one vocabulary.
  */
-public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierPolicy,
+public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifierPolicy,
                         @Field("token_policy") CliUnicodePolicy tokenPolicy,
                         @Field("unicode_data_version") String unicodeDataVersion,
                         CliLimits limits) {
@@ -58,7 +59,7 @@ public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierP
      * conversion is now a field-for-field copy rather than a join of two values.
      */
     static CliPolicy from(ProcessorPolicy policy) {
-        return new CliPolicy(CliUnicodePolicy.from(policy.identifierPolicy()),
+        return new CliPolicy(CliIdentifierPolicy.from(policy.identifierPolicy()),
                 CliUnicodePolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion(),
                 new CliLimits(policy.limits().maxDepth()));
     }
@@ -76,16 +77,29 @@ public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierP
     }
 
     /**
-     * One §8.2 surface: the UTS #39 §5.2 restriction level, whether it is applied per {@code _}/{@code -}
-     * delimited segment rather than to the whole text, and the script combinations admitted over and above
-     * the level. The three together are the whole of a policy, which is what lets a reader of a refusal work
-     * out which of them another deployment set differently.
+     * §8.2's identifier policy: the UTS #39 §5.2 restriction level, whether it applies to each segment of a
+     * name rather than to the whole of it, whether no two names in one scope may share a skeleton, and the script
+     * combinations admitted over and above the level. Together the whole of the policy, which is what lets a
+     * reader of a refusal work out which of them another deployment set differently.
      */
-    public record CliUnicodePolicy(UnicodePolicy.Level level, @Field("per_segment") boolean perSegment,
-                                   List<List<String>> permitting) {
+    public record CliIdentifierPolicy(UnicodePolicy.Level level, @Field("per_segment") boolean perSegment,
+                                      @Field("skeleton_distinctness") boolean skeletonDistinctness,
+                                      List<List<String>> permitting) {
+
+        static CliIdentifierPolicy from(IdentifierPolicy policy) {
+            return new CliIdentifierPolicy(policy.scripts().level(), policy.isPerSegment(),
+                    policy.appliesSkeletonDistinctness(), CliUnicodePolicy.from(policy.scripts()).permitting());
+        }
+    }
+
+    /**
+     * §8.2's token policy: the UTS #39 §5.2 restriction level over each whole token, and the script combinations
+     * admitted over and above it.
+     */
+    public record CliUnicodePolicy(UnicodePolicy.Level level, List<List<String>> permitting) {
 
         static CliUnicodePolicy from(UnicodePolicy policy) {
-            return new CliUnicodePolicy(policy.level(), policy.isPerSegment(),
+            return new CliUnicodePolicy(policy.level(),
                     policy.permittedScripts().stream().map(CliUnicodePolicy::names).toList());
         }
 

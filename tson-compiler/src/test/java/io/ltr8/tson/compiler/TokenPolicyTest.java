@@ -107,17 +107,6 @@ class TokenPolicyTest {
         assertEquals(1, problems(reader, "{ note: \"" + CYR_A + "dmin\" }").size(), "Latin with one Cyrillic");
     }
 
-    /**
-     * Refused rather than ignored. Segmenting a value would admit UTS #39's own {@code Toys-Я-Us}, so a
-     * policy that cannot mean what it says here is rejected where it is configured.
-     */
-    @Test
-    void aPerSegmentPolicyIsRefusedOnThisSurface() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> new TsonTreeReader().withTokenPolicy(UnicodePolicy.highlyRestrictive().perSegment()));
-        assertTrue(e.getMessage().contains("per-segment"), e.getMessage());
-    }
-
     /** The policy survives derivation, like every other axis on the facade. */
     @Test
     void thePolicySurvivesWithSchemaAndWithDiagnostics() {
@@ -137,7 +126,7 @@ class TokenPolicyTest {
         NullPointerException e = assertThrows(NullPointerException.class, () -> TsonReadContext.of(
                 new io.ltr8.tson.compiler.stream.ListEventSource(List.of()),
                 new DiagnosticsCollector(), null));
-        assertTrue(e.getMessage().contains("unrestricted()"), e.getMessage());
+        assertTrue(e.getMessage().contains("IdentifierPolicy.none()"), e.getMessage());
     }
 
     /**

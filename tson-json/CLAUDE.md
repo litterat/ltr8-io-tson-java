@@ -24,4 +24,5 @@ Rules that bite here:
 - `Json` prefixes exported types only; `reader` types are bare, and named mode first where they differ by mode
   (`TreeRecordBuilder`). A dispatcher or a record loop builds nothing of its own, so it has no mode and one serves every
   mode (`DispatchTagReader`, `RecordReader`).
-- The look-alike (confusable) rule reaches no JSON position — settled, not owed.
+- The look-alike (confusable) rule reaches one JSON position, the keys of an identifier-keyed map under a schema, and
+  only where the identifier policy applies skeleton distinctness (`design/json-unicode-policies.md`).

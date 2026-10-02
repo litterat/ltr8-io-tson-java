@@ -5,6 +5,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.policy.FetchPolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -172,33 +173,35 @@ public final class ProcessorConfig {
     }
 
     /**
-     * The UTS #39 §5.2 restriction level applied to every name a schema declares -- type names, record field
-     * names, parameter names and enum members -- [TSON-DATA] §8.2's restricted-script rule, over the schema-layer
-     * scopes [TSON-SCHEMA] §11.4 names.
+     * [TSON-DATA] §8.2's three name-hygiene mechanisms over every name -- type names, field names, parameter
+     * names, enum members, type-refs and annotation names, and every value whose type is an identifier family
+     * -- and over the scopes those names form ([TSON-SCHEMA] §11.4, and the keys of an identifier-keyed map).
      *
-     * <p>The default is {@link UnicodePolicy#highlyRestrictive()} over a whole name: the strictest of §5.2's
-     * practically deployable levels, and one it <em>names</em>, so the default is a position two
-     * implementations agree on without reading this project's documents. It refuses a name that mixes
-     * scripts, which is how a homograph reads as another name.
+     * <p>The default is {@link IdentifierPolicy#defaults()}: all three mechanisms, with {@link
+     * UnicodePolicy#highlyRestrictive()} over a whole name -- the strictest of UTS #39 §5.2's practically
+     * deployable levels, and one it <em>names</em>, so the default is a position two implementations agree on
+     * without reading this project's documents. It refuses a name that mixes scripts, which is how a homograph
+     * reads as another name.
      *
      * <p><b>Reach for the unit before the level.</b> The default rejects ordinary compounds —
      * {@code id_}<i>пользователя</i>, {@code url_}<i>адрес</i>, {@code alpha_α} — because a Latin
-     * abbreviation beside a word in another script is how identifiers are written outside English. Passing
-     * {@code highlyRestrictive().perSegment()} applies the same level to each {@code _}/{@code -} delimited
-     * segment, which admits all of those and still refuses every within-word homograph, because a homograph
-     * has to sit inside a word to read as that word. That is a narrower rule, not a weaker posture, and it is
-     * the relaxation to try first. Narrower still is {@code permitting(LATIN, CYRILLIC)}, for a deployment
-     * that knows exactly which combination it means.
+     * abbreviation beside a word in another script is how identifiers are written outside English. {@link
+     * IdentifierPolicy#perSegment()} applies the same level to each segment of a name, which admits all of
+     * those and still refuses every within-word homograph, because a homograph has to sit inside a word to read
+     * as that word. That is a narrower rule, not a weaker posture, and it is the relaxation to try first.
+     * Narrower still is {@code permitting(LATIN, CYRILLIC)} on the level, for a deployment that knows exactly
+     * which combination it means.
      *
-     * <p>The two ways of switching it off are deliberately distinct: {@link UnicodePolicy#scriptsUnchecked()}
-     * drops the script rule and keeps the identifier profile, while {@link UnicodePolicy#unrestricted()}
-     * drops that too — §5.2's own level 6, which takes {@code Identifier_Status} with it and which §5.2
-     * describes as a diagnostic tool.
+     * <p>The two ways of switching the level off are deliberately distinct: {@link
+     * UnicodePolicy#scriptsUnchecked()} drops the script rule and keeps the identifier profile, while {@link
+     * UnicodePolicy#unrestricted()} drops that too — §5.2's own level 6, which takes {@code Identifier_Status}
+     * with it and which §5.2 describes as a diagnostic tool. Neither touches skeleton distinctness, which is
+     * {@link IdentifierPolicy#withSkeletonDistinctness}'s.
      *
      * <p>One component of {@link #withProcessorPolicy}, which is where a deployment stating all three at once
      * says so.
      */
-    public ProcessorConfig withIdentifierPolicy(UnicodePolicy identifierPolicy) {
+    public ProcessorConfig withIdentifierPolicy(IdentifierPolicy identifierPolicy) {
         return new ProcessorConfig(this.dataBindContext, this.schemaAccess,  policy.withIdentifierPolicy(Objects.requireNonNull(identifierPolicy, "identifierPolicy")), this.metaNameBinder);
     }
 
@@ -232,13 +235,13 @@ public final class ProcessorConfig {
      * <p>{@link UnicodePolicy.Level#MINIMALLY_RESTRICTIVE} and {@link UnicodePolicy.Level#UNRESTRICTED}
      * collapse here: §5.2 says so directly, a token that is not a name having no identifier profile to drop.
      *
+     * <p>A level over the whole token, never per segment: {@code _} and {@code -} are word separators by
+     * convention in a name and ordinary characters in a value, so segmenting one would admit UTS #39's own
+     * {@code Toys-Я-Us}, the spoof a strict token policy exists to refuse. A {@link UnicodePolicy} has no unit
+     * to state.
+     *
      * <p>One component of {@link #withProcessorPolicy}, which is where a deployment stating all three at once
      * says so.
-     *
-     * @throws IllegalArgumentException if {@code tokenPolicy} is per-segment -- {@code _} and {@code -} are
-     *         word separators by convention in a name and ordinary characters in a value, so segmenting one
-     *         admits UTS #39's own {@code Toys-Я-Us}, the spoof a strict token policy exists to refuse.
-     *         {@link ProcessorPolicy} enforces it, so every route to a policy refuses it alike
      */
     public ProcessorConfig withTokenPolicy(UnicodePolicy tokenPolicy) {
         return new ProcessorConfig(this.dataBindContext, this.schemaAccess,  policy.withTokenPolicy(Objects.requireNonNull(tokenPolicy, "tokenPolicy")), this.metaNameBinder);

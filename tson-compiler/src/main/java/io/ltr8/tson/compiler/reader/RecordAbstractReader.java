@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.compiler.Position;
@@ -503,10 +503,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 + displayName + "' is " + schema.describe() + " but the schema carries no value for it -- "
                 + "DefinitionResolver should never produce this"));
         TokenEvent event = new TokenEvent(token.text(), TokenForm.valueOf(token.form().name()), new Position(0, 0, 0));
-        // Unrestricted deliberately: this replays a token the real stream already delivered, so it has been
+        // No policy deliberately: this replays a token the real stream already delivered, so it has been
         // judged once. Checking it again here would report one author token twice.
         TsonReadContext syntheticCtx = TsonReadContext.throwing(new ListEventSource(List.of(event)),
-                UnicodePolicy.unrestricted());
+                IdentifierPolicy.none());
         return field.parser().read(syntheticCtx);
     }
 }

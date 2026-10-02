@@ -4,6 +4,7 @@ import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.io.ByteSource;
 
 import org.junit.jupiter.api.Test;
@@ -43,19 +44,23 @@ class JsonIdentifierValueHygieneTest {
             }
             """;
 
-    private static final Json JSON = json();
+    private static final Json JSON = json(IdentifierPolicy.defaults());
 
-    private static Json json() {
+    private static Json json(IdentifierPolicy identifiers) {
         Tson tson = Tson.standard();
         tson.resolve(SCHEMA);
-        return Json.of(ProcessorConfig.defaults()).withSchemas(tson.schemaRegistry());
+        return Json.of(ProcessorConfig.defaults().withIdentifierPolicy(identifiers)).withSchemas(tson.schemaRegistry());
     }
 
     private static List<Diagnostic> read(String typeName, String source) {
+        return read(JSON, typeName, source);
+    }
+
+    private static List<Diagnostic> read(Json json, String typeName, String source) {
         List<Diagnostic> problems = new ArrayList<>();
         DiagnosticsReceiver receiver = problems::add;
         try (ByteSource bytes = ByteSource.of(source)) {
-            JSON.treeReader().withDiagnostics(receiver).withSchema(ID).readAs(bytes, typeName);
+            json.treeReader().withDiagnostics(receiver).withSchema(ID).readAs(bytes, typeName);
         }
         return problems;
     }
@@ -77,6 +82,13 @@ class JsonIdentifierValueHygieneTest {
         Diagnostic refused = only(read("handlers", "{\"pass\": \"a\", \"" + CYRILLIC_PASS + "\": \"b\"}"));
         assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, refused.code());
         assertEquals(Optional.of("/" + CYRILLIC_PASS), refused.path());
+    }
+
+    /** Skeleton distinctness is the policy's to switch off, and the one switch reaches this scope too. */
+    @Test
+    void keysThatReadAlikeAreAdmittedWithoutSkeletonDistinctness() {
+        assertEquals(List.of(), read(json(IdentifierPolicy.defaults().withSkeletonDistinctness(false)), "handlers",
+                "{\"pass\": \"a\", \"" + CYRILLIC_PASS + "\": \"b\"}"));
     }
 
     @Test

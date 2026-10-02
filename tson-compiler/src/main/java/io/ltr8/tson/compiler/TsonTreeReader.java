@@ -4,6 +4,7 @@ import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 
 import java.util.function.Function;
@@ -178,11 +179,9 @@ public final class TsonTreeReader {
      * the stricter rule by the time the name rule looks at it. That is the honest consequence of where the
      * check sits, and is why this is not called {@code withValuePolicy}.
      *
-     * @throws IllegalArgumentException if {@code policy} is per-segment. {@code _} and {@code -} are word
-     *         separators by convention in a name and ordinary characters in a value, so segmenting one admits
-     *         UTS #39's own {@code Toys-Я-Us} -- the spoof a strict token policy exists to refuse. Refused
-     *         rather than ignored, so a policy that cannot mean what it says is never silently accepted;
-     *         {@link ProcessorPolicy} is where the refusal lives, so every route to one refuses it alike
+     * <p>A level over the whole token, never per segment: {@code _} and {@code -} are word separators by
+     * convention in a name and ordinary characters in a value, so segmenting one would admit UTS #39's own
+     * {@code Toys-Я-Us}. A {@link UnicodePolicy} has no unit to state.
      */
     public TsonTreeReader withTokenPolicy(UnicodePolicy tokenPolicy) {
         Objects.requireNonNull(tokenPolicy, "tokenPolicy");
@@ -192,8 +191,9 @@ public final class TsonTreeReader {
 
     /**
      * This reader applying {@code policy} to the <b>names</b> a document carries -- a type-ref name and an
-     * annotation name -- instead of the default. [TSON-DATA] §8.2's restricted-script rule, whose RECOMMENDED default is
-     * Highly Restrictive over the whole name, which is what a reader carries until this is called.
+     * annotation name -- instead of the default. [TSON-DATA] §8.2's identifier policy, whose RECOMMENDED default is
+     * all three mechanisms with Highly Restrictive over the whole name, which is what a reader carries until this
+     * is called.
      *
      * <p><b>Relaxing it is a code decision, and deliberately not an ambient one.</b> §8.2 requires that a
      * deployment be able to relax any of the three rules and that the relaxation not be silent: a policy
@@ -201,7 +201,7 @@ public final class TsonTreeReader {
      * is greppable, attributable, and scoped to the reader that holds it.
      *
      * <p><b>The relaxation to reach for first is the unit, not the level</b> ({@link
-     * UnicodePolicy#perSegment}). Applied per {@code _}/{@code -} delimited segment, Highly Restrictive
+     * IdentifierPolicy#perSegment}). Applied to each segment of a name, Highly Restrictive
      * still refuses every within-word homograph while admitting the compounds that mix a Latin abbreviation
      * with a name in another script -- {@code id_пользователя}, {@code url_адрес} -- which is the common case
      * for an author working outside Latin script.
@@ -210,7 +210,7 @@ public final class TsonTreeReader {
      * legitimately be anything, so tokens default to Unrestricted, while a name is what a reader has to be
      * able to tell apart. A token policy stricter than this one subsumes it -- a name is a token.
      */
-    public TsonTreeReader withIdentifierPolicy(UnicodePolicy identifierPolicy) {
+    public TsonTreeReader withIdentifierPolicy(IdentifierPolicy identifierPolicy) {
         Objects.requireNonNull(policy, "policy");
         return new TsonTreeReader(tree, receiver, schemaUri, schemaless,
                 policy.withIdentifierPolicy(identifierPolicy));

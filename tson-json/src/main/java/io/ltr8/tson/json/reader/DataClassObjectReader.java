@@ -16,7 +16,7 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -76,10 +75,10 @@ public final class DataClassObjectReader {
      * <p>That is why this lives on the engine rather than on {@code JsonReadContext}: the context is shared
      * with the tree engine, which has no position to consult and so would carry a policy it must ignore.
      */
-    private final UnicodePolicy identifierPolicy;
+    private final IdentifierPolicy identifierPolicy;
 
     public DataClassObjectReader(DataBindContext context, boolean ignoreUnknownMembers,
-                                 UnicodePolicy identifierPolicy) {
+                                 IdentifierPolicy identifierPolicy) {
         this.context = context;
         this.ignoreUnknownMembers = ignoreUnknownMembers;
         this.identifierPolicy = identifierPolicy;
@@ -336,22 +335,14 @@ public final class DataClassObjectReader {
      * class was going to keep the value under it.
      */
     private void checkNameHygiene(JsonReadContext ctx, String name) {
-        // Tested rather than `ifPresent`-ed, and measurably so: both rules are allocation-free when a name
-        // passes, which is every name of an ordinary document, but a capturing lambda is not -- it captures
-        // `ctx` and `name` and so allocates per member name whether or not the Optional holds anything.
-        // Two of those per name cost ~140 bytes per bound record in JsonAllocationHarnessTest.
-
-        // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile
-        // too", taking that rule with it. Script mixing gates itself inside violation().
-        if (identifierPolicy.appliesIdentifierProfile()) {
-            Optional<String> restricted = IdentifierProfile.hygiene(name);
-            if (restricted.isPresent()) {
-                refuse(ctx, name, restricted.get(), Diagnostic.Code.RESTRICTED_CHARACTER);
-            }
+        // Looped rather than `forEach`-ed: judging is allocation-free when a name passes, which is every name of
+        // an ordinary document, where a capturing lambda allocates per member name whatever it is handed.
+        List<IdentifierPolicy.Violation> violations = identifierPolicy.judge(name, IdentifierProfile.NAME);
+        if (violations.isEmpty()) {
+            return;
         }
-        Optional<String> script = identifierPolicy.violation(name);
-        if (script.isPresent()) {
-            refuse(ctx, name, script.get(), Diagnostic.Code.RESTRICTED_SCRIPT);
+        for (IdentifierPolicy.Violation violation : violations) {
+            refuse(ctx, name, violation.reason(), violation.code());
         }
     }
 

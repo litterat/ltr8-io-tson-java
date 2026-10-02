@@ -67,8 +67,10 @@ final class MapObjectReader implements JsonTypeReader<Object> {
         List<Object> keys = new ArrayList<>();
         List<Object> values = new ArrayList<>();
         Map<Object, Integer> byIdentity = new HashMap<>();
-        // The keys of an identifier-keyed map are one naming scope ([TSON-SCHEMA] §11.4), built only for one.
-        ConfusableNames.Scope scope = plan.keysAreNames() ? new ConfusableNames.Scope() : null;
+        // The keys of an identifier-keyed map are one naming scope ([TSON-SCHEMA] §11.4), built only for one and only
+        // where the identifier policy applies skeleton distinctness.
+        ConfusableNames.Scope scope = plan.keysAreNames() && ctx.identifierPolicy().appliesSkeletonDistinctness()
+                ? new ConfusableNames.Scope() : null;
         // Counted apart from the entries, which leave out a member whose key the contract refused: the size facets
         // judge what the document stated, and a member nothing could file is still an entry it wrote.
         int count = 0;

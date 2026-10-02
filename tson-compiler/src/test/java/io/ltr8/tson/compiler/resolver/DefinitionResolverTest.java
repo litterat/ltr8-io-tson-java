@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -145,7 +145,7 @@ class DefinitionResolverTest {
     private static DefinitionResolver definitionResolverFor(TsonCompiledMetaSchema metaParser, DefinitionGetter definitionGetter) {
         return new DefinitionResolver((type, value) -> (Top) metaParser.reader(type)
                         .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)),
-                                UnicodePolicy.unrestricted())),
+                                IdentifierPolicy.none())),
                 metaParser.schema().entries()::get, definitionGetter);
     }
 

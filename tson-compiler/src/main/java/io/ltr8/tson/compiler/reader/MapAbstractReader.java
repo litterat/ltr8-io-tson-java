@@ -162,12 +162,14 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * <p>Where {@link #keysAreNames}, a key reading alike with an earlier one is reported ({@code
      * CONFUSABLE_NAMES}) at its own position, as §8.2 places a refused pair, and its entry read normally. A key
      * whose reading reported -- its policy refusal included -- is no name of the scope, for the reason it is
-     * not in {@code seen}. The scope is built only for such a map.
+     * not in {@code seen}. The scope is built only for such a map, and only where the read's identifier policy
+     * applies skeleton distinctness.
      */
     final void readInto(TsonReadContext ctx, BiConsumer<Object, Object> sink) {
         int count = 0;
         Set<Object> seen = new HashSet<>();
-        ConfusableNames.Scope names = keysAreNames ? new ConfusableNames.Scope() : null;
+        ConfusableNames.Scope names = keysAreNames && ctx.identifierPolicy().appliesSkeletonDistinctness()
+                ? new ConfusableNames.Scope() : null;
         while (!(ctx.peek() instanceof MapEnd)) {
             TsonEvent keyPeek = ctx.peek();
             if (keyPeek instanceof AbsentEvent) {
