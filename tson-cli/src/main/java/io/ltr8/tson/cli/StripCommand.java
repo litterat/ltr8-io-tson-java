@@ -11,8 +11,9 @@ import java.nio.file.Path;
 
 /**
  * {@code tson strip <schema>} -- writes a schema document's reading form ({@link TsonSchemaStripper}) to
- * standard output: no {@code !!id}, no pins, no {@code @doc} or {@code @comment}, the spec's library shortened,
- * whitespace collapsed. The file is never rewritten, since the result is not a loadable schema.
+ * standard output: no {@code !!id}, no pins, no documentary annotations, the spec's library shortened,
+ * whitespace collapsed. {@code --keep-docs} keeps {@code @doc}, {@code @title} and {@code @examples}. The file is
+ * never rewritten, since the result is not a loadable schema.
  */
 final class StripCommand {
 
@@ -20,7 +21,7 @@ final class StripCommand {
     }
 
     /** @return exit code: 0 written, 1 not a well-formed schema document, 2 the file couldn't be read */
-    static int run(Path file) {
+    static int run(Path file, boolean keepDocs) {
         String source;
         try {
             source = Files.readString(file);
@@ -30,7 +31,7 @@ final class StripCommand {
         }
         String stripped;
         try {
-            stripped = TsonSchemaStripper.strip(source);
+            stripped = keepDocs ? TsonSchemaStripper.stripKeepingDocs(source) : TsonSchemaStripper.strip(source);
         } catch (RuntimeException e) {
             Diagnostic syntax = TsonDiagnostics.ofSchemaSyntaxError("", e);
             String at = syntax.schemaPosition().map(StripCommand::location).orElse("");

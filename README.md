@@ -599,7 +599,7 @@ tson validate     [--output text|json|tson] [<policy options>] <file>...
 tson compile      [--output text|json|tson] [<policy options>] <schema>
 tson policy       [--output text|json|tson] [<policy options>]
 tson hash         <file>
-tson strip        <schema>
+tson strip        [--keep-docs] <schema>
 
 policy options (validate, compile, policy):
   --identifier-policy <level>   level for identifiers (default: highly-restrictive)
@@ -658,11 +658,12 @@ hashes the referenced content and errors on a mismatch (the pin is matched by ca
 pinned reference and a plain one still resolve to the same schema).
 
 **`tson strip`** prints a schema's reading form to standard output — the same declarations in as few tokens
-as the syntax allows, for a language model to read in a prompt. It drops the `!!id`, every header pin and
-every `@doc` and `@comment`, shortens the spec's own library to its revision and name (`!!import:"37/core"`), and puts each
-directive and each declaration on one line with its whitespace collapsed; other annotations and other references
-stay. The output is valid syntax but not loadable, so the
-file is never rewritten.
+as the syntax allows, for a language model to read in a prompt. It drops the `!!id`, every header pin and the
+documentary annotations (`@doc`, `@title`, `@examples` and `@comment`), shortens the spec's own library to its
+revision and name (`!!import:"37/core"`), and puts each directive and each declaration on one line with its
+whitespace collapsed; other annotations and other references stay. `--keep-docs` keeps `@doc`, `@title` and
+`@examples`, for a model that should read the documentation too; `@comment`, a note for maintainers, still goes.
+The output is valid syntax but not loadable, so the file is never rewritten.
 
 **`validate` takes a flat list of files** and auto-classifies each as a schema (its header carries
 `!!meta`) or a data document. A data file's own `!!schema` directive selects which schema it's

@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.lexer.TokenType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,8 +27,10 @@ import java.util.regex.Pattern;
  *   <li><b>A header reference to the spec's own library</b> -- meta-kernel, meta and core at any revision -- is
  *       shortened to its revision and name ({@code "37/meta"}). Any other reference keeps its URL, which is
  *       the only thing that tells a reader which schema it names.</li>
- *   <li><b>{@code @doc} and {@code @comment}</b> go, wherever they are written: they are prose for the
- *       schema's readers and its maintainers. Every other annotation stays: several are checked and change
+ *   <li><b>The documentary annotations</b> go, wherever they are written: {@code @doc}, {@code @title} and
+ *       {@code @examples}, which are for the schema's readers, and {@code @comment}, which is for its
+ *       maintainers. {@link #stripKeepingDocs} keeps the first three and drops only {@code @comment}, for a
+ *       reader the documentation is written for. Every other annotation stays: several are checked and change
  *       what the schema means.</li>
  * </ul>
  *
@@ -46,6 +49,12 @@ import java.util.regex.Pattern;
  */
 public final class TsonSchemaStripper {
 
+    /** The annotations {@link #strip} removes: everything written for a person rather than a processor. */
+    private static final Set<String> DOCUMENTARY = Set.of("doc", "title", "examples", "comment");
+
+    /** The annotations {@link #stripKeepingDocs} removes: the maintainers' notes alone. */
+    private static final Set<String> MAINTAINERS = Set.of("comment");
+
     /** A canonical identity in the spec's library: {@code tson.io/<year>/<revision>/m/<name>.tn}. */
     private static final Pattern SPEC_LIBRARY = Pattern.compile("tson\\.io/\\d{4}/(\\d+)/m/(meta-kernel|meta|core)\\.tn");
 
@@ -60,6 +69,20 @@ public final class TsonSchemaStripper {
      *         TsonDiagnostics#ofSchemaSyntaxError(String, RuntimeException)} classifies either
      */
     public static String strip(String source) {
+        return strip(source, DOCUMENTARY);
+    }
+
+    /**
+     * The reading form of {@code source} with its documentation kept -- {@code @doc}, {@code @title} and
+     * {@code @examples} -- for a reader that wants the schema explained; {@code @comment} still goes.
+     *
+     * @throws io.ltr8.tson.base.ParseException as {@link #strip(String)} does
+     */
+    public static String stripKeepingDocs(String source) {
+        return strip(source, MAINTAINERS);
+    }
+
+    private static String strip(String source, Set<String> removedAnnotations) {
         new TsonSchemaParser(source).parseSchemaDocument();
         List<Token> tokens = new Lexer(ByteSource.of(source)).tokenize();
 
@@ -71,7 +94,7 @@ public final class TsonSchemaStripper {
         boolean lineBreak = false;
         for (int i = 0; i < tokens.size() && tokens.get(i).type() != TokenType.EOF; i++) {
             lineBreak |= lineBreaks[i];
-            int removable = removable(tokens, i);
+            int removable = removable(tokens, i, removedAnnotations);
             if (removable > 0) {
                 removed = true;
                 i += removable - 1;
@@ -142,13 +165,13 @@ public final class TsonSchemaStripper {
         return named && tokens.get(i + 1).type() == TokenType.MAP_ARROW ? i + 1 : 0;
     }
 
-    /** How many tokens from {@code i} are removed -- an {@code !!id} directive, a prose annotation -- or 0. */
-    private static int removable(List<Token> tokens, int i) {
+    /** How many tokens from {@code i} are removed -- an {@code !!id} directive or one of {@code annotations} -- or 0. */
+    private static int removable(List<Token> tokens, int i, Set<String> annotations) {
         Token token = tokens.get(i);
         if (token.type() == TokenType.DIRECTIVE && named(tokens, i + 1, "id")) {
             return 4;   // !! id : "..."
         }
-        if (token.type() == TokenType.AT && (named(tokens, i + 1, "doc") || named(tokens, i + 1, "comment"))) {
+        if (token.type() == TokenType.AT && annotations.contains(tokens.get(i + 1).text())) {
             return annotationLength(tokens, i);
         }
         return 0;
