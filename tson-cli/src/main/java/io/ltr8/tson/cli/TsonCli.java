@@ -48,6 +48,7 @@ public final class TsonCli {
               compile [<options>] <schema>         check that a schema document resolves and compiles
               policy [<options>]                   print the Unicode policy and limits this run would apply
               hash <file>                          stamp a document's content hash onto its own !!id
+              strip <schema>                       print a schema's reading form, for a model to read
 
             options:
               --output text|json|tson    output format (default: text)
@@ -201,6 +202,25 @@ public final class TsonCli {
             pin is not identity, so a pinned reference and a plain one still resolve to the same
             schema.""";
 
+    private static final String STRIP_USAGE =
+            "usage: tson strip <schema>   (prints the schema's reading form to standard output)";
+
+    private static final String STRIP_HELP = """
+            usage: tson strip <schema>
+
+            Prints a schema document's reading form to standard output: the same declarations in as few
+            tokens as the syntax allows, for a reader that reads the schema rather than loading it -- a
+            language model given it in a prompt. The !!id, every !!meta and !!import pin, and every @doc
+            are removed; a reference to the spec's own library is shortened to its revision and name
+            (!!import:"37/core"). Each directive and each declaration gets one line, with whitespace
+            inside it collapsed to single spaces. Other annotations stay, and other references keep
+            their URLs.
+
+            The output is valid syntax but not a loadable schema -- nothing resolves "37/core" -- so the
+            file is never rewritten.
+
+            exit codes: 0 printed, 1 not a well-formed schema document, 2 usage error or unreadable file""";
+
     private TsonCli() {
     }
 
@@ -227,9 +247,10 @@ public final class TsonCli {
                 case "compile" -> runCompile(rest);
                 case "policy" -> runPolicy(rest);
                 case "hash" -> runHash(rest);
+                case "strip" -> runStrip(rest);
                 default -> {
                     System.err.println("unknown command '" + subcommand
-                            + "' -- expected init-example, validate, compile, policy, or hash");
+                            + "' -- expected init-example, validate, compile, policy, hash, or strip");
                     System.err.println(USAGE);
                     yield 2;
                 }
@@ -393,6 +414,17 @@ public final class TsonCli {
             throw new UsageException(HASH_USAGE);
         }
         return HashCommand.run(Path.of(args.get(0)));
+    }
+
+    private static int runStrip(List<String> args) {
+        if (hasHelpFlag(args)) {
+            System.out.println(STRIP_HELP);
+            return 0;
+        }
+        if (args.size() != 1) {
+            throw new UsageException(STRIP_USAGE);
+        }
+        return StripCommand.run(Path.of(args.get(0)));
     }
 
     private static int runValidate(List<String> args) {

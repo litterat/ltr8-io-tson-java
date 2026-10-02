@@ -599,6 +599,7 @@ tson validate     [--output text|json|tson] [<policy options>] <file>...
 tson compile      [--output text|json|tson] [<policy options>] <schema>
 tson policy       [--output text|json|tson] [<policy options>]
 tson hash         <file>
+tson strip        <schema>
 
 policy options (validate, compile, policy):
   --identifier-policy <level>   level for identifiers (default: highly-restrictive)
@@ -655,6 +656,13 @@ line is excluded from the hash, so a document can carry its own. A pinned refere
 use: if a data file's `!!schema` (or a schema's `!!import`/`!!meta`) carries `?sha256=…`, `validate`
 hashes the referenced content and errors on a mismatch (the pin is matched by canonical identity, so a
 pinned reference and a plain one still resolve to the same schema).
+
+**`tson strip`** prints a schema's reading form to standard output — the same declarations in as few tokens
+as the syntax allows, for a language model to read in a prompt. It drops the `!!id`, every header pin and
+every `@doc`, shortens the spec's own library to its revision and name (`!!import:"37/core"`), and puts each
+directive and each declaration on one line with its whitespace collapsed; other annotations and other references
+stay. The output is valid syntax but not loadable, so the
+file is never rewritten.
 
 **`validate` takes a flat list of files** and auto-classifies each as a schema (its header carries
 `!!meta`) or a data document. A data file's own `!!schema` directive selects which schema it's
