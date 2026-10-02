@@ -265,6 +265,9 @@ public final class TsonSchemaLinker {
             boolean perNameRules = !(body instanceof EnumBody)
                     || EnumLabels.membersAreNames(definition, merged, structure);
             checkScope(receiver, schema, name, definition, names, noun, identifiers, perNameRules);
+            if (body instanceof RecordBody record) {
+                checkFieldValues(receiver, schema, name, definition, record, merged, identifiers);
+            }
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
             // them as one anyway -- §11.4 declines the scope. A parameter is a name, §11.4's own reasoning for
@@ -303,6 +306,33 @@ public final class TsonSchemaLinker {
     }
 
     /**
+     * §8.2's per-name rules over the values a schema supplies for its data: a field's default or fixed value,
+     * where the field's type is an identifier family. Such a value is a name, as the same token written in a
+     * document is -- and a default reaches every document that omits the field, so a value the reader would
+     * refuse if the document wrote it must not be one the reader injects. Judged under the family's own profile,
+     * as a read judges it.
+     */
+    private static void checkFieldValues(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
+                                         TypeDefinition definition, RecordBody record,
+                                         Map<String, TypeDefinition> merged, UnicodePolicy identifiers) {
+        for (RecordField field : record.fields()) {
+            if (field.value().isEmpty()) {
+                continue;
+            }
+            Optional<IdentifierType> family = ReferenceChain.terminalDefinition(field.type().name(), merged)
+                    .map(TypeDefinition::body)
+                    .filter(IdentifierType.class::isInstance)
+                    .map(IdentifierType.class::cast);
+            if (family.isPresent()) {
+                String what = field.role() == FieldRole.FIXED ? "a fixed value" : "a default";
+                perName(receiver, schema, entry, definition, field.value().get().text(),
+                        "'" + entry + "' has " + what + " for '" + field.name() + "' where ", identifiers,
+                        family.get().profile());
+            }
+        }
+    }
+
+    /**
      * §8.2's two per-name rules over one name: the restricted-character rule ({@code Identifier_Status}) and
      * the restricted-script rule (the restriction level).
      *
@@ -316,12 +346,19 @@ public final class TsonSchemaLinker {
     private static void perName(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                 TypeDefinition definition, String name, String prefix,
                                 UnicodePolicy identifiers) {
+        perName(receiver, schema, entry, definition, name, prefix, identifiers, IdentifierProfile.NAME);
+    }
+
+    /** The same under {@code profile}, whose added characters are its own and meet no restricted-character rule. */
+    private static void perName(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
+                                TypeDefinition definition, String name, String prefix,
+                                UnicodePolicy identifiers, IdentifierProfile profile) {
         // The restricted-character rule is gated on the level: §8.2's Unrestricted "drops the profile too",
         // taking that rule with it. Script mixing gates itself inside violation(). Each reports under its own
         // code, since the
         // two want different fixes -- change the character, against rename or relax the policy.
         if (identifiers.appliesIdentifierProfile()) {
-            IdentifierProfile.hygiene(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
+            profile.restrictedCharacter(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
                     Diagnostic.Code.RESTRICTED_CHARACTER, prefix + "'" + name + "': " + why));
         }
         identifiers.violation(name).ifPresent(why -> refuse(receiver, schema, entry, definition,

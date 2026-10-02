@@ -33,7 +33,7 @@ final class MapEntries {
         return value == null ? Slots.REFUSED : value;
     }
 
-    /** §6.5: size facets count entries -- an entry with an absent value is an entry. */
+    /** §6.4: size facets count entries -- an entry with an absent value is an entry. */
     static void checkSize(MapPlan plan, JsonReadContext ctx, int count) {
         BigInteger size = BigInteger.valueOf(count);
         plan.minItems().filter(min -> size.compareTo(min) < 0)

@@ -37,6 +37,12 @@ holes one walk exists to close. A **choice's variants are deliberately not check
 is a reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
 there could never fire.
 
+**A field's default or fixed value is a name when its type is an identifier family** (`checkFieldValues`), and
+meets the two per-name rules in the same pass, under that family's own profile. It is not a scope — one value
+stands alone — but it is the schema's own copy of a value a read judges: a default reaches every document that
+omits the field, so a value the reader would refuse if written must not be one it injects
+(`design/name-hygiene-read-path.md`).
+
 **The restriction level is refused per name, in the same pass** (`UnicodePolicy`, UTS #39 §5.2). The two
 are complementary rather than overlapping: the confusable check is a *relation* and needs the whole set, so
 it can never fire on a lone name; the level is a *property* of one name, so it is what reaches a name nothing

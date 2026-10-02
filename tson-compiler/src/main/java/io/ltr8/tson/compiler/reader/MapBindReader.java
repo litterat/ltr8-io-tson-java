@@ -45,19 +45,14 @@ final class MapBindReader extends MapAbstractReader<Object> {
     private final DataClassMap descriptor;
 
     public MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor,
-                         TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
-        this(name, displayName, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
-    }
-
-    public MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor,
-                         TsonTypeReaderResolver resolver,
-                         SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
+                         TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
+                         AnnotationTypes annotationTypes, boolean keysAreNames) {
         super(name, displayName, body,
                 ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()),
                         descriptor.keyDataClass(), annotationTypes), descriptor.keyDataClass()),
                 ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.valueType().name()),
                         descriptor.valueDataClass(), annotationTypes), descriptor.valueDataClass()),
-                schemaLocation);
+                schemaLocation, keysAreNames);
         this.descriptor = descriptor;
     }
 
@@ -129,8 +124,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
                         + ", which isn't map-shaped -- can't bind '" + name + "' as one");
             }
             return new MapBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
-                    context.locationOf(name, typeDefinition),
-                    AnnotationTypes.of(context));
+                    context.locationOf(name, typeDefinition), AnnotationTypes.of(context),
+                    keysAreNames(body, context));
         }
 
         /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */

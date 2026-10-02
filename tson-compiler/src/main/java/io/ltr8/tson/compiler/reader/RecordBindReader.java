@@ -349,7 +349,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
         if (target.dataClass() instanceof DataClassMap targetMap && parser instanceof MapBindReader existing) {
             return new MapBindReader(field.schema().name(), field.schema().name(), existing.body, targetMap,
-                    resolver, existing.schemaLocation, annotationTypes);
+                    resolver, existing.schemaLocation, annotationTypes, existing.keysAreNames);
         }
         return parser;
     }

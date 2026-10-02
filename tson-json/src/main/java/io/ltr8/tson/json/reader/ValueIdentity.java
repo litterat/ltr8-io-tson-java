@@ -56,7 +56,7 @@ final class ValueIdentity {
     }
 
     /**
-     * A decoded tree reduced the same way, for a compound map key ([TSON-JSON] §6.5's pairs form): a
+     * A decoded tree reduced the same way, for a compound map key ([TSON-JSON] §6.4's pairs form): a
      * {@code JsonNumber} keeps its literal, so {@code 1} and {@code 1.0} would compare unequal inside a key
      * that §5.3 makes one value. Reduced recursively, since the key may be a record or an array of them.
      *

@@ -1,6 +1,7 @@
 package io.ltr8.tson.base.diagnostics;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.unicode.ConfusableNames;
 
 import java.math.BigInteger;
 
@@ -42,6 +43,16 @@ public record MapDiagnostics(String typeName) {
                 "duplicate key '%s' in '%s' -- a map states each key at most once (§2.6), and the repeat states "
                         .formatted(key, typeName) + "an entry for nothing",
                 "each key stated once", "'" + key + "' stated again");
+    }
+
+    /**
+     * [TSON-DATA] §8.2's look-alike rule over the keys of a map whose key type is an identifier, the scope
+     * [TSON-SCHEMA] §11.4 gives it: a policy refusal, reported at the second key.
+     */
+    public Refusal confusableKeys(ConfusableNames.Collision collision) {
+        return new Refusal(Diagnostic.Code.CONFUSABLE_NAMES,
+                "'%s' has keys that read alike: %s".formatted(typeName, collision.describe()),
+                "keys a reader can tell apart", "'" + collision.second() + "'");
     }
 
     /**

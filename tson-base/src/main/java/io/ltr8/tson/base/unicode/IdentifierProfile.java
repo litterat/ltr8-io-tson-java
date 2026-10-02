@@ -264,22 +264,38 @@ public final class IdentifierProfile {
      * MUST NOT be reported in any of the four categories -- because the table it reads is data the Unicode
      * Consortium declines to freeze.
      *
-     * <p>Two characters are the grammar's rather than this rule's, though the table restricts both.
-     * {@code -} is this profile's own extension, which §8.2 says carries no {@code Identifier_Status} and
-     * participates in no name-hygiene rule. ZWNJ and ZWJ are {@code Identifier_Status=Restricted} and §7.7
-     * rule 2 carves the exception UTS #39 §3.1.1.1 defines, which makes their admission a question of
-     * <em>form</em> and so {@link #validate}'s: a joiner outside those contexts is not an identifier at all,
-     * where a restricted character is an identifier this processor declines to accept.
+     * <p>This is {@link #NAME}'s rule, the one every naming position of the series meets; {@link
+     * #restrictedCharacter} states the exceptions.
      */
     public static Optional<String> hygiene(String text) {
+        return NAME.restrictedCharacter(text);
+    }
+
+    /**
+     * The restricted-character rule over a name this profile admits -- the violation, or empty.
+     *
+     * <p>Some characters are the grammar's rather than this rule's, though the table may restrict them. A
+     * character this profile adds -- {@code start_add}, {@code continue_add} or {@code medial}, as {@link
+     * #NAME} adds {@code -} -- is the profile's own extension, which §8.2 says carries no {@code
+     * Identifier_Status} and participates in no name-hygiene rule: a profile that admits {@code $} has decided
+     * {@code $} belongs in its names. ZWNJ and ZWJ are {@code Identifier_Status=Restricted} and §7.7 rule 2
+     * carves the exception UTS #39 §3.1.1.1 defines, which makes their admission a question of <em>form</em>
+     * and so {@link #check}'s: a joiner outside those contexts is not an identifier at all, where a restricted
+     * character is an identifier this processor declines to accept.
+     */
+    public Optional<String> restrictedCharacter(String text) {
         for (int i = 0; i < text.length(); ) {
             int cp = text.codePointAt(i);
-            if (cp != '-' && cp != Xid.ZWNJ && cp != Xid.ZWJ && !IdentifierStatus.isAllowed(cp)) {
+            if (cp != Xid.ZWNJ && cp != Xid.ZWJ && !IdentifierStatus.isAllowed(cp) && !added(cp)) {
                 return Optional.of(at(text, cp, i) + " is Identifier_Status=Restricted (UTS #39)");
             }
             i += Character.charCount(cp);
         }
         return Optional.empty();
+    }
+
+    private boolean added(int cp) {
+        return contains(startAdd, cp) || contains(continueAdd, cp) || contains(medial, cp);
     }
 
     /** Names the offending code point rather than printing it -- much of what this rejects is invisible. */

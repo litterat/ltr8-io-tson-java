@@ -115,7 +115,7 @@ Each of these is a shape TSON has and a converted schema cannot reach — either
 source for it, or because reaching it would break documents already on the wire.
 
 - **Non-text map keys.** JSON Schema's `additionalProperties`/`patternProperties` are string-keyed, so
-  `{K => V}` with a compound `K` never arises. §6.5's **pairs form is therefore unreachable**, and with it one
+  `{K => V}` with a compound `K` never arises. §6.4's **pairs form is therefore unreachable**, and with it one
   of §8.3's two class-stability leaks.
 - **Annotations on data values.** No JSON carrier exists (§4.3) and JSON Schema has no source for one, so the
   encode-side refusal never fires. It stays implemented, for values that arrive from the text encoding.

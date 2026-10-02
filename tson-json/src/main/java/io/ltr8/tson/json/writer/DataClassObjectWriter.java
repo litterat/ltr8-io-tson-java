@@ -221,7 +221,7 @@ public final class DataClassObjectWriter {
      * A map as a JSON object, its keys as member names.
      *
      * <p><b>A key must be an atom</b>, which is this module's reader's own rule stated from the other side:
-     * a member name is a string, so a key type a name cannot spell has nowhere to go, and §6.5's pairs form
+     * a member name is a string, so a key type a name cannot spell has nowhere to go, and §6.4's pairs form
      * (which carries a compound key) is not read here. The name is the key's own text -- §5.1 hands a
      * string's content to the atom's parser, so a {@code UUID} key writes its {@code uuid} spelling and
      * reads back through the same one.
@@ -230,7 +230,7 @@ public final class DataClassObjectWriter {
         if (!(dataClass.keyDataClass() instanceof DataClassAtom)) {
             throw new WriteException(
                     ("a JSON object's member names are %s's keys, so its key type must be one a name can "
-                            + "spell -- §6.5's pairs form, which carries a compound key, is not written here")
+                            + "spell -- §6.4's pairs form, which carries a compound key, is not written here")
                             .formatted(dataClass.typeClass().getSimpleName()));
         }
         out.beginObject();

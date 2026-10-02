@@ -2,12 +2,15 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.MapDiagnostics;
+import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.*;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
 
 import java.math.BigInteger;
@@ -72,13 +75,19 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
     /** This map's rules, shared with the JSON reader ([TSON-JSON] §9.4). */
     final MapDiagnostics rules;
 
+    /**
+     * Whether the key type is an identifier family, which makes the keys one naming scope ([TSON-SCHEMA]
+     * §11.4): no two may read alike ([TSON-DATA] §8.2). Each key's own per-name rules are its reader's.
+     */
+    final boolean keysAreNames;
+
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for a key's or entry value's state rule. */
     private static final String ABSENT = "_";
 
     MapAbstractReader(String name, String displayName, MapBody body, TsonTypeReaderResolver resolver,
-                       SchemaLocation schemaLocation) {
+                       SchemaLocation schemaLocation, boolean keysAreNames) {
         this(name, displayName, body, resolver.resolve(body.keyType().name()),
-                resolver.resolve(body.valueType().name()), schemaLocation);
+                resolver.resolve(body.valueType().name()), schemaLocation, keysAreNames);
     }
 
     /**
@@ -88,7 +97,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * which both modes share, free of anything only one of them needs.
      */
     MapAbstractReader(String name, String displayName, MapBody body, TsonTypeReader<?> keyParser,
-                      TsonTypeReader<?> valueParser, SchemaLocation schemaLocation) {
+                      TsonTypeReader<?> valueParser, SchemaLocation schemaLocation, boolean keysAreNames) {
         this.name = name;
         this.displayName = displayName;
         this.body = body;
@@ -96,6 +105,18 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
         this.valueParser = valueParser;
         this.schemaLocation = schemaLocation;
         this.rules = new MapDiagnostics(displayName);
+        this.keysAreNames = keysAreNames;
+    }
+
+    /**
+     * Whether {@code body}'s key type is an identifier family: its reference chain ends at an entry whose body
+     * the {@code identifier_type} constructor made, the kernel's {@code identifier}, a schema's own, or a
+     * refinement of either.
+     */
+    static boolean keysAreNames(MapBody body, ValueReaderContext context) {
+        return ReferenceChain.terminalDefinition(body.keyType().name(), context.schema().entries())
+                .map(key -> key.body() instanceof IdentifierType)
+                .orElse(false);
     }
 
     /**
@@ -137,10 +158,16 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * and what leaves the sink holding the last value for the key either way. A key whose own decoding
      * reported is left out of {@code seen} entirely: it is not a key the document stated, so a second
      * equally-undecodable key would otherwise be reported a second time as a repeat of the first.
+     *
+     * <p>Where {@link #keysAreNames}, a key reading alike with an earlier one is reported ({@code
+     * CONFUSABLE_NAMES}) at its own position, as §8.2 places a refused pair, and its entry read normally. A key
+     * whose reading reported -- its policy refusal included -- is no name of the scope, for the reason it is
+     * not in {@code seen}. The scope is built only for such a map.
      */
     final void readInto(TsonReadContext ctx, BiConsumer<Object, Object> sink) {
         int count = 0;
         Set<Object> seen = new HashSet<>();
+        ConfusableNames.Scope names = keysAreNames ? new ConfusableNames.Scope() : null;
         while (!(ctx.peek() instanceof MapEnd)) {
             TsonEvent keyPeek = ctx.peek();
             if (keyPeek instanceof AbsentEvent) {
@@ -154,8 +181,15 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             String keySegment = keySegmentFor(keyPeek);
             int before = ctx.reported();
             Object key = keyParser.read(ctx.field(keySegment));
-            if (ctx.reported() == before && !seen.add(ValueIdentity.of(key))) {
-                ctx.field(keySegment).report(rules.duplicateKey(keySegment));
+            if (ctx.reported() == before) {
+                if (!seen.add(ValueIdentity.of(key))) {
+                    ctx.field(keySegment).report(rules.duplicateKey(keySegment));
+                } else if (names != null) {
+                    Optional<ConfusableNames.Collision> collision = names.add(keySegment);
+                    if (collision.isPresent()) {
+                        ctx.field(keySegment).report(rules.confusableKeys(collision.get()));
+                    }
+                }
             }
             ctx.next(); // MapArrow
             SchemaRef push = ScopePush.notAdmitted(ctx, valueParser);

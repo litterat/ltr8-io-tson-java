@@ -166,7 +166,7 @@ class CrossEncodingParityTest {
      * As {@link #sameVerdict}, comparing the codes alone.
      *
      * <p>For a case where the two documents genuinely have different <em>shapes</em>, the data pointer is not
-     * a fact the two can agree on: §6.5's pairs form makes a compound-keyed map a JSON array of pairs, so a
+     * a fact the two can agree on: §6.4's pairs form makes a compound-keyed map a JSON array of pairs, so a
      * pointer into it names an entry index where the TSON map has a key. What still must agree is which rule
      * fired.
      */
@@ -756,7 +756,7 @@ class CrossEncodingParityTest {
                 {"who": {"$type": "employee", "name": "Ada", "labels": []}, "labels": []}""");
     }
 
-    // ── §6.5 maps ────────────────────────────────────────────────────────
+    // ── §6.4 maps ────────────────────────────────────────────────────────
 
     @Test
     void aMapEntryValueOfTheWrongShape() {
@@ -782,12 +782,12 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * §6.5: identity is over the key type's value space, so {@code 1} and {@code 1.0} under a {@code number}
+     * §6.4: identity is over the key type's value space, so {@code 1} and {@code 1.0} under a {@code number}
      * key are one key in both encodings.
      *
      * <p>What this pins is that the exact tier compares by value and not by scale in both stacks: {@code
      * BigDecimal.equals} tells {@code 1} from {@code 1.0}, so a reader comparing decoded keys with it admits
-     * the pair as two keys. It is a parity case rather than a divergence because §6.5 leaves neither encoding
+     * the pair as two keys. It is a parity case rather than a divergence because §6.4 leaves neither encoding
      * room to answer differently.
      */
     @Test
@@ -799,7 +799,7 @@ class CrossEncodingParityTest {
 
 
     /**
-     * A compound key takes §6.5's pairs form in JSON and the ordinary map form in text -- genuinely different
+     * A compound key takes §6.4's pairs form in JSON and the ordinary map form in text -- genuinely different
      * document shapes -- so the codes must agree and the pointers cannot.
      */
     @Test

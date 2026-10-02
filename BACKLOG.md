@@ -267,6 +267,19 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **`!uri` is `java.net.URI`'s RFC 2396 grammar, not [TSON-DATA] §5.5's RFC 3986** (`main` and
+  `r2026-37-proposal`). `UriParser` delegates the whole grammar to `java.net.URI`, which refuses valid URIs —
+  `https://` and `foo://` ("Expected authority": RFC 3986's `reg-name` may be empty, §3.2.2, and an empty
+  host is accepted once anything follows it, as in `https://?q=1`), `a:` (an empty path), `http://[v7.abc]/`
+  (IPvFuture) — and admits an invalid one, `http://a:b/` (a port is digits only). A JSON Schema validator's
+  `format: uri` admits `https://`, so a converted schema refuses data its source accepted. The fix is an RFC
+  3986 recognizer in `tson-atom`, which `!iri`/`!iri_reference` inherit through the URI each maps to. What
+  constrains it is the host value: `UriParser` reads to `java.net.URI`, which cannot hold `https://`, `a:` or
+  an IPvFuture host, so either `java.net.URI` stays the bound type and those few are a binding error, or the
+  atom's natural value becomes text with `java.net.URI` a binding target — validity must not depend on the
+  host class. `CONFORMANCE.md`'s accepted-gap paragraph and the two parsers' Javadoc go with it; Class 1
+  vectors for each case above.
+
 - [ ] **Decide whether `text_type` takes a facet for the text's format.** `@doc` is CommonMark by its type's contract
   (`meta-kernel.tn`, `core.tn`), which a data field cannot state: a `description: text` holding CommonMark, or
   JSON Schema's `contentMediaType` on a string, has no home but prose. The question is whether a format is a facet
@@ -318,25 +331,17 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `CrossEncodingParityTest` compares codes, so the two encodings must sort one malformed input the same way.
 
 - [ ] **The look-alike check recomputes every skeleton per record, and ignores the identifier policy.**
-  `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of
-  every schemaless tree read, which builds a `HashMap` and a UTS #39 skeleton per field name. Field names
-  repeat across the records of a document, so the same skeletons are built again for each one; measured,
-  the whole check is ~1,300 bytes per read of the harness document even after `Confusables.skeleton` stopped
-  allocating for a name that maps nothing. A cache would take most of that, and the design question is its
-  bound: names are attacker-controlled, so a per-read cache is the safe shape and a process-wide one is not.
-  Separately, the check consults **no policy**, which is a conformance gap: a deployment that stated
-  `withIdentifierPolicy(unrestricted())` still gets `CONFUSABLE_NAMES`, where the two per-name rules honour
-  it, and [TSON-DATA] §8.2 says a processor "MUST allow a deployment to relax any of the three". What is
-  left to decide is the policy's shape for the set rule -- a switch of its own, or implied by the level.
-
-- [ ] **§8.2's hygiene does not reach a value typed by an identifier** (`r2026-37-proposal`, SPEC-FEEDBACK #7
-  Proposal 1). A value or map key whose type is an `identifier_type` is held to its profile and nothing else:
-  the restricted-character and mixed-script rules run only on field and declared names
-  (`DefaultTsonReadContext`, `NameHygiene`, `DataClassObjectReader`, `TsonSchemaLinker`), and the look-alike
-  rule has no map-key scope. Needs the identifier policy at the atom read -- which `IdentifierParser` cannot see
-  -- in both encodings, the key set of an identifier-keyed map as a §11.4 scope, and an allocation-harness check.
-  Proposal 3's exemption rides with it: characters a profile adds (`start_add`, `continue_add`, `medial`) skip
-  the restricted-character rule, as the kernel's `-` does, so `hygiene` takes the profile.
+  `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of every
+  schemaless tree read, which builds a `HashMap` and a UTS #39 skeleton per field name. Field names repeat across the
+  records of a document, so the same skeletons are built again for each one; measured, the whole check is ~1,300 bytes
+  per read of the harness document even after `Confusables.skeleton` stopped allocating for a name that maps nothing.
+  A cache would take most of that, and the design question is its bound: names are attacker-controlled, so a per-read
+  cache is the safe shape and a process-wide one is not. Separately, the check consults **no policy**, which is a
+  conformance gap: a deployment that stated `withIdentifierPolicy(unrestricted())` still gets `CONFUSABLE_NAMES` --
+  over a schemaless record's fields, a schema's scopes and an identifier-keyed map's keys (`MapAbstractReader`, JSON's
+  `MapObjectReader`) -- where the two per-name rules honour it, and [TSON-DATA] §8.2 says a processor "MUST allow a
+  deployment to relax any of the three". What is left to decide is the policy's shape for the set rule -- a switch of
+  its own, or implied by the level.
 
 - [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
   in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a

@@ -5,6 +5,7 @@ import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
@@ -13,9 +14,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
- * [TSON-JSON] §6.5's <b>object form</b>, in every read mode: a map whose key type is denoted by a single scalar
+ * [TSON-JSON] §6.4's <b>object form</b>, in every read mode: a map whose key type is denoted by a single scalar
  * token, so the map is a JSON object and each member name is a <b>key token</b> whose string content faces
  * {@code K}'s own parsing contract, exactly as §5.1 hands value strings. {@code {"2026-07-01": 12.5}} under
  * {@code {date => number}} carries a date key. The mode's {@link MapBuilder} builds the value once.
@@ -65,6 +67,8 @@ final class MapObjectReader implements JsonTypeReader<Object> {
         List<Object> keys = new ArrayList<>();
         List<Object> values = new ArrayList<>();
         Map<Object, Integer> byIdentity = new HashMap<>();
+        // The keys of an identifier-keyed map are one naming scope ([TSON-SCHEMA] §11.4), built only for one.
+        ConfusableNames.Scope scope = plan.keysAreNames() ? new ConfusableNames.Scope() : null;
         // Counted apart from the entries, which leave out a member whose key the contract refused: the size facets
         // judge what the document stated, and a member nothing could file is still an entry it wrote.
         int count = 0;
@@ -92,6 +96,12 @@ final class MapObjectReader implements JsonTypeReader<Object> {
                 values.set(slot, entry);
                 continue;
             }
+            if (scope != null) {
+                Optional<ConfusableNames.Collision> collision = scope.add(member.name());
+                if (collision.isPresent()) {
+                    at.report(plan.rules().confusableKeys(collision.get()));
+                }
+            }
             names.add(member.name());
             keys.add(key);
             values.add(entry);
@@ -100,7 +110,7 @@ final class MapObjectReader implements JsonTypeReader<Object> {
         return builder.build(ctx, names, keys, values, ctx.reported() == reportedBefore);
     }
 
-    /** §6.5: the member name's string content faces {@code K}'s contract. Null where the contract refused it. */
+    /** §6.4: the member name's string content faces {@code K}'s contract. Null where the contract refused it. */
     private Object decodeKey(JsonReadContext at, String memberName) {
         Object key;
         try {
@@ -108,6 +118,9 @@ final class MapObjectReader implements JsonTypeReader<Object> {
         } catch (AtomTypeException e) {
             AtomRefusal refusal = AtomRefusal.of(e, memberName, Object.class).named(plan.displayName() + " key");
             at.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
+            return null;
+        }
+        if (plan.keysAreNames() && NameHygiene.refusesValue(at, memberName, plan.keyProfile())) {
             return null;
         }
         if (keyBridge == null) {

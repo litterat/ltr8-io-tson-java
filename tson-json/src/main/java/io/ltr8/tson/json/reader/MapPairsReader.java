@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * [TSON-JSON] §6.5's <b>pairs form</b>, in every read mode: a map whose key type is a record, tuple, array, map or
+ * [TSON-JSON] §6.4's <b>pairs form</b>, in every read mode: a map whose key type is a record, tuple, array, map or
  * choice -- the compound keys [TSON-DATA] §2.6 admits, which a JSON object's string-only member names cannot spell.
  * The map is a JSON array of two-element arrays, which is the second of §8.3's class-stability leaks. The mode's
  * {@link MapBuilder} builds the value once.
@@ -69,7 +69,7 @@ final class MapPairsReader implements JsonTypeReader<Object> {
         return builder.build(ctx, null, keys, values, ctx.reported() == reportedBefore);
     }
 
-    /** One {@code [k, v]}. §6.5: an element that is not a two-element array is a validation error, and left out. */
+    /** One {@code [k, v]}. §6.4: an element that is not a two-element array is a validation error, and left out. */
     private void readPair(JsonReadContext at, int index, Map<Object, Integer> byIdentity, List<Object> keys,
                           List<Object> values) {
         JsonEvent opening = at.next();

@@ -13,8 +13,8 @@ import java.util.Optional;
  * not.</b> UTS #39's own confusable detection is a relation between strings and so answers nothing about a
  * single identifier — which is why §9.4 could only say "consider it". The series names the sets itself: the
  * fields of one record, the members of one enum, the variants of one choice, the declared names of one
- * schema, and the merged namespace at an {@code !!import}. Each is small, closed, and known at the moment
- * the check runs.
+ * schema, the merged namespace at an {@code !!import}, and the keys of one identifier-keyed map. Each is
+ * closed, and known at the moment the check runs or, for a map's keys, as each arrives.
  *
  * <p>Because it is a relation it has no false positives on a lone name: {@code id_пользователя} collides
  * with nothing and passes. That is the property a per-name restriction level cannot have, and the reason
@@ -27,14 +27,38 @@ public final class ConfusableNames {
 
     /** A pair of names in {@code names} that share a skeleton, or empty when every name is distinguishable. */
     public static Optional<Collision> firstCollision(Iterable<String> names) {
-        Map<String, String> bySkeleton = new HashMap<>();
+        Scope scope = new Scope();
         for (String name : names) {
-            String previous = bySkeleton.putIfAbsent(Confusables.skeleton(name), name);
-            if (previous != null && !previous.equals(name)) {
-                return Optional.of(new Collision(previous, name));
+            Optional<Collision> collision = scope.add(name);
+            if (collision.isPresent()) {
+                return collision;
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * One scope filled a name at a time, for a reader that meets the names as it goes -- the keys of a map
+     * whose key type is an identifier ([TSON-SCHEMA] §11.4) -- and reports a pair at the second name's own
+     * position, as §8.2's detection rule asks.
+     */
+    public static final class Scope {
+
+        private final Map<String, String> bySkeleton = new HashMap<>();
+
+        /** An empty scope. */
+        public Scope() {
+        }
+
+        /**
+         * Adds {@code name}, answering the earlier name it reads alike with, or empty. A name equal to one already
+         * added collides with nothing: a repeat is a duplicate, which is another rule's to report.
+         */
+        public Optional<Collision> add(String name) {
+            String previous = bySkeleton.putIfAbsent(Confusables.skeleton(name), name);
+            return previous == null || previous.equals(name) ? Optional.empty()
+                    : Optional.of(new Collision(previous, name));
+        }
     }
 
     /** The same over a plain list, for call sites that already have one. */
