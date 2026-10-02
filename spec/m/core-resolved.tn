@@ -220,7 +220,7 @@
   @ordered:NONE @bounded:false
   bytes => !type_definition {
     source: bytes_type
-    body: !bytes_type { encoding: BASE64 }
+    body: !bytes_type {}
   }
 
   @ordered:TOTAL @bounded:true
@@ -253,7 +253,7 @@
     body: !period_type {}
   }
 
-  @ordered:NONE @bounded:true
+  @ordered:NONE @bounded:false
   uuid => !type_definition {
     source: uuid_type
     body: !uuid_type {}
@@ -277,19 +277,19 @@
     body: !ipv6_type {}
   }
 
-  @ordered:PARTIAL @bounded:true
+  @ordered:PARTIAL @bounded:false
   cidr4 => !type_definition {
     source: cidr4_type
     body: !cidr4_type {}
   }
 
-  @ordered:PARTIAL @bounded:true
+  @ordered:PARTIAL @bounded:false
   cidr6 => !type_definition {
     source: cidr6_type
     body: !cidr6_type {}
   }
 
-  @ordered:NONE @bounded:true
+  @ordered:NONE @bounded:false
   mac => !type_definition {
     source: mac_type
     body: !mac_type {}

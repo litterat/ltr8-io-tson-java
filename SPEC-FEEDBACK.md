@@ -50,6 +50,7 @@ constructor each for `value` and `void`, which retires `unit` and dispatch by na
 template parameter, derived from its uses, which checks an application at the call site and gives #6's bound its
 home.
 #10 makes order a facet every container states, which a map needs before #2's keyed sets can be maps.
+#11 drops `set_type`'s non-empty default, so a set's bounds are an array's and the empty set is a set.
 
 ---
 
@@ -1211,3 +1212,44 @@ values by host equality ([TSON-SCHEMA] §5.5).
 
 **Status against Revision 36:** open. It prepares #2's keyed sets, where a record's `fields` becomes a map and has
 to say whether its order is part of its value.
+
+---
+
+## 11. A set's bounds should be array's: `set_type` drops its `min_items` default of 1
+
+**Section:** [TSON-SCHEMA] §5.3 (type expressions: "`set_type` … defaults `min_items` to 1, so a set is non-empty
+unless a body writes `min_items: 0`"), §7.4 (the `enum` atom: `enum_set` "non-empty by `set_type`'s default"), §9
+(the meta layer's table: "`set_type` refining `array` with `min_items ~ 1`").
+
+**Kind:** proposal — a kernel change.
+
+**What the spec says today.** `set_type` refines `array` and, beside its pins, defaults `min_items` to 1. A set is
+the one container whose empty value has to be asked for: `[T]` admits `[]` and `{K => V}` admits `{}`, while
+`set<T>` refuses `[]` unless the author writes `!set_type { element_type: T  min_items: 0 }` — a spelling the
+`set<T>` template does not offer. So `tags: set<text>` cannot hold
+"no tags", and the author of a set that may be empty has to leave the template for a named entry. The kernel and
+meta lean on the default instead of stating it: every member set (`enum_set`, `integer_member_set`,
+`text_member_set`, meta's `decimal_type.members`) and `scoped.scope` are non-empty only because `set_type` says so.
+
+**Proposal.**
+
+- **`set_type` loses `min_items?: ~ 1`.** Its bounds are `array`'s: the empty set is a set, and a set that must be
+  non-empty says `min_items: 1`.
+- **Every set the kernel and meta rely on being non-empty says so.** `integer_member_set`, `text_member_set` and
+  `enum_set` become `!set_type { element_type: … min_items: 1 }`. Meta gains two named entries for the same reason,
+  `scope_set => !set_type { element_type: scope_kind  min_items: 1 }` and
+  `decimal_member_set => !set_type { element_type: value  min_items: 1 }`, typing `scoped.scope` and
+  `decimal_type.members`: §5.2 bars a `!C {…}` application at a field position, and the `set<T>` template cannot
+  carry the bound, so a bounded set at a field is a named entry.
+- **§5.3, §7.4 and §9 drop the default from their prose**; §9's table names `set_type` as refining `array` with
+  `state`, `ordered` and `unique_items` pinned.
+
+**What is running** (`r2026-37-proposal`): the kernel's `set_type` has no `min_items` default; the three kernel
+member sets and meta's `scope_set` and `decimal_member_set` state `min_items: 1`; meta's two inline
+`set<scope_kind>` and `set<value>` instantiations are gone from resolved output, replaced by the named entries; and
+the bundled schemas are re-pinned. `set<text>` admits `[]`. Every set that was non-empty under the default is
+non-empty still, so no member list, enum or scope changes what it admits.
+
+**Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
+
+**Status against Revision 36:** open.

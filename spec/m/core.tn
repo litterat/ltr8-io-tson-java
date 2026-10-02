@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=d9a8ee1beeee87769329a7e034c78941ca7dbea01e8e8501af1a5b72a45eaae1"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=3f887b0568edb6a7547a3b38f0d4a459b4964d7d1ab4bcd94e350c3b6497692b"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=f28656727a3d751a18298e99d48f8ce9ff580f596a81fbb87f45a9768e3db3ba"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=545f35360b079e616956c8d45dfdab6ca65550dd3464690d99373e2c04137836"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -13,7 +13,7 @@
       ...
 
   except where an instance states a constructor field: `float32` and `float64`
-  select a `format`, `bytes` an `encoding`, and `identifier` its `continue_add`.
+  select a `format`, and `identifier` states its `continue_add`.
 
   Refinements overlay literal values via the ^ operator:
 
@@ -29,9 +29,10 @@
   against the governing target's namespace (Part 2 §3.3.3, §6), so for this
   schema document they must be reachable through the `!!meta` chain; they appear
   here only by use. Core's own `annotation`, `documentation`, and `doc`
-  declarations (and its `void` and `set` siblings) face the other direction:
-  they exist so that *data documents* and user schemas governed by or importing
-  core can use them.
+  declarations, and its same-named siblings of kernel and meta entries
+  (`void`, `boolean`, `integer`, `non_negative_integer`, `text`, `identifier`,
+  `regex`, `uri` and `set`), face the other direction: they exist so that *data
+  documents* and user schemas governed by or importing core can use them.
 
   References:
     ISO/IEC 11404:2007    General Purpose Datatypes
@@ -98,14 +99,14 @@
 
   @doc:"""
     Complex number, a pair of components (real and imaginary parts). Components
-    default to `NUMBER` (exact); a narrowing may set `component` to another
-    member of the closed vocabulary — e.g. `!complex ^ { component: INTEGER }`
-    for Gaussian integers — a refinement, ℤ+ℤi sitting inside the exact-decimal
-    complexes — and `!complex_type { component: FLOAT64 }` for floating-point
-    complex, which is its own type rather than a refinement and is not a
-    `complex`. Exactness follows the component type, so `complex` carries no
-    `@exact` marker. Spellings are the text class's concern (TSON text accepts
-    a+bi and a+bj); component representation is host-defined.
+    default to `NUMBER` (exact). A refinement may move `component` only to a
+    member whose value set is a subset of the source's:
+    `!complex ^ { component: INTEGER }` is Gaussian integers, ℤ+ℤi sitting
+    inside the exact-decimal complexes, while floating-point complex,
+    `!complex_type { component: FLOAT64 }`, is its own type rather than a
+    refinement and is not a `complex`. Exactness follows the component type, so
+    `complex` carries no `@exact` marker. Spellings are the text class's concern
+    (TSON text accepts a+bi and a+bj); component representation is host-defined.
     """
   @ordered:NONE @bounded:false @numeric
   complex => !complex_type {}
@@ -224,7 +225,7 @@
     refinement of this one. An encoding whose values are octets writes them raw.
     """
   @ordered:NONE @bounded:false
-  bytes => !bytes_type { encoding: BASE64 }
+  bytes => !bytes_type {}
 
   @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
   @ordered:TOTAL @bounded:true
@@ -275,7 +276,7 @@
   period => !period_type {}
 
   @doc:"128-bit identifier per RFC 9562."
-  @ordered:NONE @bounded:true
+  @ordered:NONE @bounded:false
   uuid => !uuid_type {}
 
   @doc:"Email address per RFC 5322."
@@ -305,7 +306,7 @@
     disjoint, and disjoint networks are incomparable. (TSON text: contains `/`,
     so quote it.)
     """
-  @ordered:PARTIAL @bounded:true
+  @ordered:PARTIAL @bounded:false
   cidr4 => !cidr4_type {}
 
   @doc:"""
@@ -313,7 +314,7 @@
     ordering is by containment, as for cidr4. (TSON text: contains colons and
     `/`, so quote it.)
     """
-  @ordered:PARTIAL @bounded:true
+  @ordered:PARTIAL @bounded:false
   cidr6 => !cidr6_type {}
 
   @doc:"""
@@ -322,7 +323,7 @@
     meaningful. (TSON text: the colon form must be quoted; the hyphen form may
     go unquoted.)
     """
-  @ordered:NONE @bounded:true
+  @ordered:NONE @bounded:false
   mac => !mac_type {}
 
   @doc:"""

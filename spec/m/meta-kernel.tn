@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=bc2925236dfbfc9a8398a5d42644d9c4ebdd77372d145f26fc952678a5e64d23"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=5e2f1facc47be8bcbc219f794fa9ea2e8d14090509ad6b6abc8f14890344bfd9"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -199,10 +199,9 @@
     2^(n-1)-1], unsigned n-bit is [0, 2^n-1] — so `size` and the bound groups
     are equivalent ways to state a bound. The two compose: bounds and
     `multiple_of` narrow within the width-derived range, and a bound outside
-    that range is a resolver error. Signedness is two's complement; on the wire
-    an integer is still decimal text — `size` names the target representation a
-    consumer decodes into, not the source form. Resolver output stores `size` as
-    written and does not expand it to bounds.
+    that range is a resolver error. Signedness is two's complement. `size` names
+    the target representation a consumer decodes into, not the source form.
+    Resolver output stores `size` as written and does not expand it to bounds.
 
     Step: `multiple_of` is strictly positive; zero or a negative value is a
     schema-load error. The test ignores the sign of the value, so -30 is a
