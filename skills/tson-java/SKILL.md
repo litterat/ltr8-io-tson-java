@@ -424,6 +424,7 @@ tson validate person.tn data.tn         # also --output json|tson; `-` reads std
 tson compile person.tn                  # does the schema itself resolve and compile?
 tson policy                             # the §8.2 Unicode policy and §9.1 limits this run would apply
 tson hash person.tn                     # stamp ?sha256=… onto its own !!id, in place
+tson strip person.tn                    # print a token-lean reading form for a prompt (not loadable)
 tson validate --schema order.tn --type order data.json        # JSON data, bound out of band
 ```
 

@@ -64,6 +64,13 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
   identity and not per route.
 - **`tson hash <file>`** stamps `?sha256=<hex>` onto the `!!id` in place (idempotent; the hashed bytes
   never change so the pin stays valid).
+- **`tson strip <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read, never to load: the
+  `!!id`, header pins and every `@doc` go, the spec library's `!!meta`/`!!import` shorten to `"37/core"`, and each directive
+  and declaration gets one line. It never re-pins and never rewrites the file — the output claims no identity, because its
+  bytes are not the published document's. **Whitespace collapses to one space and is never removed**, so tokens that touched
+  still touch and adjacency (§7.2) reads the same; a line break goes only before a declaration's first token, after a
+  directive or before the map's closing brace, all places whitespace may stand. The output is re-lexed against the intended
+  tokens and re-parsed, either failure being a fault here. Only `@doc` goes, since other annotations are checked.
 - **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole bundled chain, which no
   single-file command can do: a digest is over a document's own bytes, so an edit to meta.tn moves meta's
   `!!id`, core.tn's `!!meta`, core's own `!!id`, `TsonBundledSchemas`' three constants, and the
@@ -103,7 +110,7 @@ base-syntax failure genuinely locates itself at the data root. `--output json` a
 a present `""` and an absent pointer apart; `--output text` renders them alike, deliberately, since `": msg"`
 is noise to a person looking at the whole document either way. The facade owns the whole per-document decision; the
 CLI just classifies files into a source and calls it. Also `tson compile <schema>` (checks a schema
-compiles, tree mode), `tson hash <file>`, `tson init-example [<dir>]` (writes a working
+compiles, tree mode), `tson hash <file>`, `tson strip <schema>`, `tson init-example [<dir>]` (writes a working
 `person.tn`/`person-data.tn`). The installed command is `tson` (`application.applicationName`), launched on
 the classpath.
 
