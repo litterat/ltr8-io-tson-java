@@ -97,6 +97,12 @@ do is skip the table for ASCII**: eight ASCII code points carry a mapping, `m �
 so `payment` and `payrnent` read alike without a single non-ASCII character. `ConfusablesTest`
 pins that pair for exactly this reason.
 
+**A small scope is compared pairwise** (`ConfusableNames.firstCollision`): with a skeleton free for most names, the
+map a scope used to build per record was nearly the whole cost of the rule, so up to sixteen names are checked as
+one array of names and skeletons, and only a larger scope builds a map. A schemaless read's check is ~420 bytes over
+the harness document's four records (`AllocationHarnessTest`), where the map cost ~1,140. No skeleton is cached
+across records: the few names that map allocate one per record, and a per-read cache would cost a map of its own.
+
 **Two surfaces, two defaults, and §8.2 sets both.** `withTokenPolicy` defaults to `unrestricted()` because a value is
 data and may legitimately be anything; `withIdentifierPolicy` defaults to all three mechanisms with Highly Restrictive
 over the whole name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able

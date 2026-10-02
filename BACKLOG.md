@@ -320,14 +320,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   beside it; what constrains it is that the JSON lexer has to state which kind it raised, and that
   `CrossEncodingParityTest` compares codes, so the two encodings must sort one malformed input the same way.
 
-- [ ] **The look-alike check recomputes every skeleton per record.**
-  `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of every
-  schemaless tree read, which builds a `HashMap` and a UTS #39 skeleton per field name. Field names repeat across the
-  records of a document, so the same skeletons are built again for each one; measured, the whole check is ~1,300 bytes
-  per read of the harness document even after `Confusables.skeleton` stopped allocating for a name that maps nothing.
-  A cache would take most of that, and the design question is its bound: names are attacker-controlled, so a per-read
-  cache is the safe shape and a process-wide one is not.
-
 - [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
   in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a
   reference whose pin does not match its target's bytes is refused, a query parameter that is not a

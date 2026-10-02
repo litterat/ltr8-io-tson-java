@@ -1,5 +1,6 @@
 package io.ltr8.tson.perf;
 import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.io.ByteSource;
 
 import io.ltr8.bind.DataBindContext;
@@ -257,6 +258,33 @@ class AllocationHarnessTest {
         report("allocated per read, five identifier keys", named, "bytes");
         report("  overhead over five text keys", overhead, "bytes");
         assertTrue(overhead < 1_200, "five identifier keys cost " + overhead + " bytes more than five text keys");
+    }
+
+    /**
+     * <b>The look-alike check over a schemaless read's records costs its scopes, not a skeleton per name per
+     * record.</b> A schemaless record is a look-alike scope of its own field names ([TSON-DATA] §8.2), and the
+     * harness document's three {@code line} records repeat one set of names. The same read with skeleton
+     * distinctness switched off is the baseline, so the difference is the whole check: ~420 bytes over four
+     * records, an array of names and skeletons and a key-set iterator per record, and one skeleton for the one
+     * name that maps ({@code customer}, whose {@code m} reads as {@code rn}). A map built per record cost ~1,140,
+     * which the ceiling catches.
+     */
+    @Test
+    void theLookAlikeCheckOverASchemalessReadCostsItsScopes() {
+        TsonTreeReader checked = new TsonTreeReader().preservingUnknownTypeRefs();
+        TsonTreeReader unchecked = checked.withIdentifierPolicy(IdentifierPolicy.defaults()
+                .withSkeletonDistinctness(false));
+        for (int i = 0; i < 2_000; i++) {
+            AllocationProbe.sink = checked.read(ROOT);
+            AllocationProbe.sink = unchecked.read(ROOT);
+        }
+        double with = AllocationProbe.allocatedPerOperation(20_000, () -> AllocationProbe.sink = checked.read(ROOT));
+        double without = AllocationProbe.allocatedPerOperation(20_000, () ->
+                AllocationProbe.sink = unchecked.read(ROOT));
+        double overhead = with - without;
+
+        report("schemaless tree read, look-alike check over 4 records", overhead, "bytes");
+        assertTrue(overhead < 800, "the look-alike check cost " + overhead + " bytes per read");
     }
 
     /**
