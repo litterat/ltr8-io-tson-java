@@ -14,7 +14,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `!!schema`/`!!meta` arguments are validated as URIs, not just single-line tokens)
 - [x] Base types — boolean, string, numbers (integer, float, hex-float, based-integer), and the absent
       sentinel `_`
-- [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, `positive_integer` and siblings
+- [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, and `integer` with its bounds
 - [x] Decimal/float types — `number`, `float32`, `float64`, `rational`, `complex`
 - [x] Identifier/network/text types — `uuid`, `uri`, `uri_reference`, `iri`, `iri_reference`, `ipv4`, `ipv6`, `cidr4`,
       `cidr6`, `mac`, `email`, `text`, `regex` (RFC 9485 I-Regexp)

@@ -37,7 +37,7 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `uint16`, `int32`                               | `Integer`                                       |
 | `uint32`, `int64`                               | `Long`                                          |
 | `uint64`, `int128`/`uint128`, `int256`/`uint256`| `BigInteger`                                    |
-| `positive_integer`, `non_negative_integer`, `negative_integer`, `non_positive_integer` | `BigInteger`  |
+| `integer`, and a bound on it (`!integer ^ { min: 0 }`) | `BigInteger`              |
 | `number`                                        | `BigDecimal`                                    |
 | `float32` / `float64`                           | `Float` / `Double`                              |
 | `rational`                                      | `io.ltr8.tson.base.atom.Rational`               |

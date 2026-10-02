@@ -1802,9 +1802,9 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/36/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/36/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/36/tson-guide |
-| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/37/m/meta-kernel.tn?sha256=2b022c7e6edcd76db9b9fcb15f224cc1fc51655903384bbe5c1a7b2d3a09d420 |
-| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/37/m/meta.tn?sha256=59a6d205e2bfe311c35701ecf39f4388e106f7aaf8fd1565e03031b93476cd98 |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/37/m/core.tn?sha256=78270172410a2fd768f30d91967b72759bf8d404d2987c52f1fb05c08ccc118d |
+| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/37/m/meta-kernel.tn?sha256=f581ebad4aca3b84574b5db22d7bbb6ec3bbe968f377c1a6c657887be4dc1000 |
+| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/37/m/meta.tn?sha256=58d7124b6d4441f967b2648a0011c26036be37422179ab6a79f24626cad1f520 |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/37/m/core.tn?sha256=b337763424f81610e063b0abe98d1c284441e237511670d5fa164fe7af96f029 |
 
 ### 13.3 Informative References
 

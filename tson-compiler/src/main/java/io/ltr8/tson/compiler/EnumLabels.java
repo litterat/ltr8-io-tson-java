@@ -4,16 +4,19 @@ import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
+import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -121,30 +124,44 @@ final class EnumLabels {
     }
 
     /**
-     * {@code type} resolved: in the schema's own namespace, where an author-written one resolves; or, for the
-     * value the enum's constructor pinned, in the governing meta's, where that value was written -- so
-     * {@code !enum [A B]} names the kernel's {@code identifier} in a schema that declares or imports none.
+     * {@code type} resolved: for the value the enum's constructor pinned, in the governing meta's namespace, where
+     * that value was written -- so {@code !enum [A B]} names the kernel's {@code identifier} whatever the schema
+     * declares or imports; otherwise in the schema's own namespace, where an author-written one resolves.
      */
     private static Optional<Label> labelType(TypeDefinition enumeration, EnumBody body,
                                              Map<String, TypeDefinition> merged,
                                              Function<String, TypeDefinition> structure) {
         Function<String, TypeDefinition> local = merged::get;
+        if (pinned(enumeration, body, fallingBackTo(local, structure)) && structure.apply(body.type()) != null) {
+            return Optional.of(new Label(structure.apply(ReferenceChain.terminal(body.type(), structure)), structure));
+        }
         if (merged.containsKey(body.type())) {
             return Optional.of(new Label(merged.get(ReferenceChain.terminal(body.type(), local)),
                     fallingBackTo(local, structure)));
         }
-        boolean pinned = enumeration.source().map(source -> fallingBackTo(local, structure).apply(source.name()))
-                .filter(constructor -> constructor.body() instanceof RecordBody)
-                .flatMap(constructor -> ((RecordBody) constructor.body()).fields().stream()
-                        .filter(field -> field.name().equals(TYPE)).findFirst())
-                .filter(field -> field.role() == FieldRole.FIXED)
-                .flatMap(RecordField::value)
-                .filter(value -> value.text().equals(body.type()))
-                .isPresent();
-        if (!pinned || structure.apply(body.type()) == null) {
-            return Optional.empty();
+        return Optional.empty();
+    }
+
+    /**
+     * Whether {@code type} is the value {@code enumeration}'s constructor pins -- found through its {@code source},
+     * and through a template's held body to the constructor it applies, since an entry instantiating
+     * {@code names => <M> !enum [a b M]} records the template as its source and not {@code enum}.
+     */
+    private static boolean pinned(TypeDefinition enumeration, EnumBody body, Function<String, TypeDefinition> lookup) {
+        Optional<String> head = enumeration.source().map(source -> source.name());
+        Set<String> seen = new HashSet<>();
+        while (head.isPresent() && seen.add(head.get())) {
+            TypeDefinition constructor = lookup.apply(head.get());
+            if (constructor != null && constructor.body() instanceof TemplateBody held) {
+                head = HeldBody.of(held).application().typeRef();
+                continue;
+            }
+            return constructor != null && constructor.body() instanceof RecordBody record && record.fields().stream()
+                    .filter(field -> field.name().equals(TYPE) && field.role() == FieldRole.FIXED)
+                    .flatMap(field -> field.value().stream())
+                    .anyMatch(value -> value.text().equals(body.type()));
         }
-        return Optional.of(new Label(structure.apply(ReferenceChain.terminal(body.type(), structure)), structure));
+        return false;
     }
 
     private static Function<String, TypeDefinition> fallingBackTo(Function<String, TypeDefinition> primary,

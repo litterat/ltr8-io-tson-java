@@ -131,7 +131,7 @@ A schema exercising a sealed record family, defaults, optional fields, and a non
 {
   pet => abstract { pet_type: text =?  name: text  nickname?: text? }
   cat => pet & { pet_type: = cat  hunting_skill?: text ~ lazy }
-  dog => pet & { pet_type: = dog  pack_size: positive_integer }
+  dog => pet & { pet_type: = dog  pack_size: !integer ^ { min: 1 } }
   registration => {
     id:      uuid
     pet:     pet

@@ -15,9 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * {@code identifier_type} end to end: a UAX #31 profile whose text facets apply inside it, so a naming convention
  * is a {@code pattern} and a closed vocabulary of names is {@code members} -- each refused as a facet, where a
- * name outside the profile is refused as the profile. Reached both by refining core's {@code identifier} and by
- * constructing the family directly, with the kernel's profile or another. A refinement narrows the text facets
- * and restates the profile, never moves it.
+ * name outside the profile is refused as the profile. Reached both by refining an {@code identifier} the schema
+ * declares -- core declares none, so a schema importing it is free to -- and by constructing the family directly,
+ * with the kernel's profile or another. A refinement narrows the text facets and restates the profile, never
+ * moves it.
  */
 class IdentifierFamilyTest {
 
@@ -27,6 +28,7 @@ class IdentifierFamilyTest {
             !!meta:"https://tson.io/2026/37/m/meta.tn"
             !!import:"https://tson.io/2026/37/m/core.tn"
             {
+              identifier => !identifier_type { continue_add: "-" }
               snake_name => !identifier ^ { pattern: "[a-z][a-z0-9_]*" }
               direction => !identifier_type { members: [north south] }
               route => { name: snake_name  heading: direction }
@@ -80,7 +82,7 @@ class IdentifierFamilyTest {
         assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, refused.getFirst().code());
     }
 
-    /** Core's {@code identifier} types a map key as a name, so a key outside the grammar is refused. */
+    /** An {@code identifier} types a map key as a name, so a key outside the grammar is refused. */
     @Test
     void anIdentifierKeyedMapRefusesAKeyOutsideTheGrammar() {
         assertEquals(List.of(), validate("!handlers { create => a  delete-all => b }"));
@@ -127,6 +129,7 @@ class IdentifierFamilyTest {
                 !!meta:"https://tson.io/2026/37/m/meta.tn"
                 !!import:"https://tson.io/2026/37/m/core.tn"
                 {
+                  identifier => !identifier_type { continue_add: "-" }
                   %s
                 }
                 """.formatted(declaration);

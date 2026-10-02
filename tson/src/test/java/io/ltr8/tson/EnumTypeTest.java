@@ -56,6 +56,29 @@ class EnumTypeTest {
         assertTrue(messages.contains("'!text_enum [...]'"), messages);
     }
 
+    /**
+     * The {@code identifier} {@code enum} pins was written in the governing meta, and names the kernel's there -- a
+     * schema's own {@code identifier}, however narrow, is a different type and does not take its place.
+     */
+    @Test
+    void aSchemasOwnIdentifierDoesNotRetypeAnEnum() {
+        assertEquals(List.of(), Tson.standard().validateSchema(schema("own-identifier", """
+                { identifier => !identifier_type { pattern: "[a-z]+" }
+                  shout      => !enum [LOUD QUIET] }""")));
+    }
+
+    /** An {@code enum} applied in a template's held body is typed as one applied directly. */
+    @Test
+    void anEnumAppliedThroughATemplateNamesTheKernelsIdentifier() {
+        assertEquals(List.of(), Tson.standard().validateSchema(schema("held-enum", """
+                { names => <M> !enum [a b M]
+                  named => names<c> }""")));
+        List<Diagnostic> refused = Tson.standard().validateSchema(schema("held-enum-bad", """
+                { names => <M> !enum [a b M]
+                  named => names<"not a name"> }"""));
+        assertTrue(messages(refused).contains("is not a value of its type 'identifier'"), messages(refused));
+    }
+
     /** {@code text_enum}'s type is {@code text}, which admits what no identifier rule would. */
     @Test
     void aTextEnumAdmitsMembersNoIdentifierRuleWould() {
@@ -98,7 +121,7 @@ class EnumTypeTest {
     void anOrdinarySchemaEnumeratesItsOwnNamingVocabulary() {
         Tson tson = Tson.standard();
         String kebab = """
-                { kebab => !identifier ^ { pattern: "[a-z]+(-[a-z]+)*" }
+                { kebab => !identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
                   steps => !enum_type { type: kebab  members: [make-tea drink-tea] }
                   rec   => { s: steps } }""";
         tson.resolve(schema("steps", kebab));
@@ -106,7 +129,7 @@ class EnumTypeTest {
         assertEquals(List.of(), tson.validate(head + "{ s: make-tea }"));
 
         List<Diagnostic> refused = Tson.standard().validateSchema(schema("steps-bad", """
-                { kebab => !identifier ^ { pattern: "[a-z]+(-[a-z]+)*" }
+                { kebab => !identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
                   steps => !enum_type { type: kebab  members: [make-tea Drink] } }"""));
         assertTrue(messages(refused).contains("member 'Drink' is not a value of its type 'kebab'"),
                 messages(refused));
@@ -147,7 +170,7 @@ class EnumTypeTest {
                 !!id:"%s"
                 !!meta:"%s"
                 !!import:"%s"
-                { kebab      => !identifier ^ { pattern: "[a-z]+(-[a-z]+)*" }
+                { kebab      => !identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
                   kebab_enum => enum_type ^ { type?: = kebab } }
                 """.formatted(metaId, TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID);
         String user = """

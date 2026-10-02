@@ -40,7 +40,7 @@
   @ordered:TOTAL @bounded:false @exact:true @numeric
   integer => !type_definition {
     source: integer_type
-    subtypes: [int128 int16 int256 int32 int64 int8 negative_integer non_negative_integer non_positive_integer positive_integer uint128 uint16 uint256 uint32 uint64 uint8]
+    subtypes: [int128 int16 int256 int32 int64 int8 uint128 uint16 uint256 uint32 uint64 uint8]
     body: !integer_type {}
   }
 
@@ -146,34 +146,6 @@
     body: !integer_type { size: { bits: 256  signed: false } }
   }
 
-  @ordered:TOTAL @bounded:false @exact:true @numeric
-  positive_integer => !type_definition {
-    source: integer_type
-    supertypes: [integer]
-    body: !integer_type { min: 1 }
-  }
-
-  @ordered:TOTAL @bounded:false @exact:true @numeric
-  non_negative_integer => !type_definition {
-    source: integer_type
-    supertypes: [integer]
-    body: !integer_type { min: 0 }
-  }
-
-  @ordered:TOTAL @bounded:false @exact:true @numeric
-  negative_integer => !type_definition {
-    source: integer_type
-    supertypes: [integer]
-    body: !integer_type { max: -1 }
-  }
-
-  @ordered:TOTAL @bounded:false @exact:true @numeric
-  non_positive_integer => !type_definition {
-    source: integer_type
-    supertypes: [integer]
-    body: !integer_type { max: 0 }
-  }
-
   @ordered:PARTIAL @bounded:false @exact:false @numeric
   float32 => !type_definition {
     source: float_type
@@ -189,20 +161,7 @@
   @ordered:NONE @bounded:false
   text => !type_definition {
     source: text_type
-    subtypes: [non_empty_text]
     body: !text_type {}
-  }
-
-  non_empty_text => !type_definition {
-    source: text_type
-    supertypes: [text]
-    body: !text_type { min_length: 1 }
-  }
-
-  @ordered:NONE @bounded:false
-  identifier => !type_definition {
-    source: identifier_type
-    body: !identifier_type { continue_add: "-" }
   }
 
   @ordered:NONE @bounded:false
@@ -363,18 +322,8 @@
     }
   }
 
-  annotation => @annotation !type_definition {
-    source: void
-    body: !reference { target: void }
-  }
-
-  documentation => @annotation !type_definition {
+  doc => @annotation !type_definition {
     source: text
     body: !reference { target: text }
-  }
-
-  doc => @annotation !type_definition {
-    source: documentation
-    body: !reference { target: documentation }
   }
 }

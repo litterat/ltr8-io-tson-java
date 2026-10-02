@@ -59,12 +59,12 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
         this(new IntegerType(size));
     }
 
-    /** {@code positive_integer => !integer ^ { min: 1 } }. */
+    /** {@code !integer ^ { min: 1 } } -- a lower bound and no width. */
     public static IntegerParser ofMin(BigInteger min) {
         return new IntegerParser(IntegerType.ofMin(min));
     }
 
-    /** {@code negative_integer => !integer ^ { max: -1 } }. */
+    /** {@code !integer ^ { max: -1 } } -- an upper bound and no width. */
     public static IntegerParser ofMax(BigInteger max) {
         return new IntegerParser(IntegerType.ofMax(max));
     }

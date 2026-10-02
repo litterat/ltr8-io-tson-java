@@ -73,8 +73,8 @@ import java.util.function.Function;
  * <p><b>A written type narrows what the positions give</b> ({@code <T: text, N: int8>}), read by the kind they
  * give: on a value parameter it replaces {@code type} and must IS-A the derived one; on a type parameter it is the
  * bound and must IS-A any bound the uses carry. Two same-named entries with identical bodies -- a core type and
- * the kernel original it copies -- count as one type here, so {@code <N: non_negative_integer>} over a slot typed
- * by the kernel's {@code non_negative_integer} is the narrowing it reads as.
+ * the kernel original it copies -- count as one type here, so {@code <S: text>} over a slot typed by the
+ * kernel's {@code text} is the narrowing it reads as.
  *
  * <p><b>An imported template is taken as recorded</b>, not walked again: its schema resolved it, and its recorded
  * parameters carry what its author wrote, which its held body does not.
