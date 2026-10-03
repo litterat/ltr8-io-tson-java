@@ -139,7 +139,7 @@ class SidecarSchemaReadTest {
                   valid: { tokens: [] }
                   error: { category: lexer }
                 }""");
-        assertTrue(message.contains("at most one"), message);
+        assertTrue(message.contains("exactly one option"), message);
     }
 
     @Test
@@ -228,7 +228,7 @@ class SidecarSchemaReadTest {
                     }
                   }
                 }""");
-        assertTrue(message.contains("at most one"), message);
+        assertTrue(message.contains("exactly one option"), message);
     }
 
     @Test

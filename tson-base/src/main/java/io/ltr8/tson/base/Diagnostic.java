@@ -172,7 +172,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * [TSON-SCHEMA] §7.2's record closure, so its {@code expected} is the type's own field list.
      *
      * <p>{@code FIELD_REQUIRED} and {@code FIELD_FIXED} are the two [TSON-SCHEMA] §5.2 field-state rules a
-     * document can break, and they sit together deliberately: neither is anything to do with the field's
+     * document can break, with {@code FIELD_GROUP} beside them for §5.11's group rule, and they sit together
+     * deliberately: neither is anything to do with the field's
      * <em>type</em>. A {@code FIELD_FIXED} value satisfied its atom's grammar and every facet -- it simply
      * isn't the one value the schema permits, whether that is a stated value contradicting {@code = value}
      * or a pinned field written {@code _}.
@@ -241,6 +242,15 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public enum Code {
         FIELD_REQUIRED,
         FIELD_FIXED,
+
+        /**
+         * A field group's presence rule broken ([TSON-SCHEMA] §5.11, SPEC-FEEDBACK.md #18): no option chosen
+         * where the group needs one, more chosen than it admits, or a chosen option missing a member its group
+         * does not mark optional. One code for everything a group decides, so a consumer repairs the group as
+         * one thing rather than as separate field and type problems; a field outside any group keeps
+         * {@link #FIELD_REQUIRED}.
+         */
+        FIELD_GROUP,
 
         /**
          * The value's type is not one the position takes. That covers a written type annotation naming a type

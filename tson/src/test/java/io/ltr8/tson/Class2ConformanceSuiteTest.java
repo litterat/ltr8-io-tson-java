@@ -366,7 +366,7 @@ class Class2ConformanceSuiteTest {
     private static String categoryOf(Diagnostic diagnostic) {
         assertIsAVerdict(diagnostic);
         return switch (diagnostic.code()) {
-            case FIELD_REQUIRED, FIELD_FIXED, TYPE_MISMATCH, WRONG_ARITY, UNRECOGNIZED_FIELD,
+            case FIELD_REQUIRED, FIELD_FIXED, FIELD_GROUP, TYPE_MISMATCH, WRONG_ARITY, UNRECOGNIZED_FIELD,
                  ATOM_CONSTRAINT_VIOLATION, VALIDATION_ERROR -> "validation";
             // ATOM_FORM_INVALID is here and not above because §8.1 puts it here: "a token that a built-in
             // atom's parsing contract rejects (§5.2) -- the structural parser has already accepted the

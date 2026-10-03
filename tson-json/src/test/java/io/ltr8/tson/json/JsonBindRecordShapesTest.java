@@ -129,7 +129,7 @@ class JsonBindRecordShapesTest {
     @Test
     void aLabelledChoiceWithTwoFieldsOrNoneBindsNothing() {
         Map<String, Diagnostic.Code> cases = Map.of("{\"name\": \"width\", \"count\": 3}",
-                Diagnostic.Code.TYPE_MISMATCH, "{}", Diagnostic.Code.FIELD_REQUIRED);
+                Diagnostic.Code.FIELD_GROUP, "{}", Diagnostic.Code.FIELD_GROUP);
         cases.forEach((json, code) -> {
             List<Diagnostic> problems = new ArrayList<>();
             assertNull(JSON.objectReader().withDiagnostics(problems::add).withSchema(ID)

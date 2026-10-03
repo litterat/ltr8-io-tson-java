@@ -111,14 +111,17 @@ than a guess. Per-field schema positions are a separate matter
 (`design/reader-naming-and-schema-location.md`). (Message synthesis from code + params
 is not a gap but a decision — see below.)
 
-**A broken FIXED field is `FIELD_FIXED`, not an atom code.** `field: type = value` (§5.2) is a field-state
-rule, so a value contradicting it has satisfied its atom's grammar and every facet — it is simply not the
-one value permitted. `FIELD_FIXED` sits beside `FIELD_REQUIRED` for that reason: the two §5.2 field-state
-rules a document can break, neither of them about the field's type. Both ways to break one report it
-(`RecordAbstractReader.verifyFixed`): a stated value contradicting `= value`, and a pinned field written
-`_`. The contradiction message also names the fix — `=` reads as "default" to anyone arriving from JSON
-Schema, so `priority?: priority = medium` is a plausible mis-spelling of `~ medium`, and without the hint
-the author discovers it only by watching every differing document get rejected.
+**A broken FIXED field is `FIELD_FIXED`, not an atom code.** `field: type = value` (§5.2) is a field-state rule, so a
+value contradicting it has satisfied its atom's grammar and every facet — it is simply not the one value permitted.
+`FIELD_FIXED` sits beside `FIELD_REQUIRED` for that reason: the two §5.2 field-state rules a document can break,
+neither of them about the field's type. Both ways to break one report it (`RecordAbstractReader.verifyFixed`): a
+stated value contradicting `= value`, and a pinned field written `_`. §5.11's group rule is the third field-state
+code, `FIELD_GROUP`, for every verdict a group gives — no option chosen, too many chosen, a chosen option missing a
+member — so a repair addresses the group as one thing; the count message states the group's own rule (exactly one
+option, at most one, at least one member) and counts options, since an option may hold several fields. The
+contradiction message also names the fix — `=` reads as "default" to anyone arriving from JSON Schema, so `priority?:
+priority = medium` is a plausible mis-spelling of `~ medium`, and without the hint the author discovers it only by
+watching every differing document get rejected.
 
 **`expected` carries the constraint that failed, never the type's name.** `AtomTypeException` holds an
 `expected` alongside its message, filled at each throw site from the facet that rejected the value, and all

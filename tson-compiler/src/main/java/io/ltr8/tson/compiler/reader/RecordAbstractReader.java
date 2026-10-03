@@ -355,11 +355,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     }
                 }
             }
-            if (chosen == 0 && plan.group.state() == ElementState.REQUIRED) {
-                ctx.report(plan.group.atLeastOne() ? rules.groupRequiresAtLeastOne(plan.text)
-                        : rules.groupRequiresOne(plan.text));
-            } else if (chosen > 1) {
-                ctx.report(rules.groupAdmitsAtMostOne(plan.text, chosen));
+            if (plan.group.atLeastOne()) {
+                if (chosen == 0) {
+                    ctx.report(rules.groupRequiresAtLeastOne(plan.text));
+                }
+            } else if (plan.group.state() == ElementState.REQUIRED ? chosen != 1 : chosen > 1) {
+                ctx.report(plan.group.state() == ElementState.REQUIRED
+                        ? rules.groupChoosesExactlyOne(plan.text, chosen)
+                        : rules.groupChoosesAtMostOne(plan.text, chosen));
             }
         }
     }

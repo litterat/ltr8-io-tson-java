@@ -1783,6 +1783,10 @@ the 55 at-least-one sites are the form `+` desugars to. So the counts stand.
   sits in one option of one group.
 - **A chain**: at sarif-1.0.0 `stackFrame`, `column` requires `line` and `line` requires `uri`.
 - **Conditions on values**, such as JSON Schema's `if`/`then`. These stay sealed families or migration cost.
+- **`+` over options of several fields.** One design, claude-code-launch's configuration, would be exact as
+  `( runtimeExecutable: T  runtimeArgs?: A | program: P  args?: A | url: U )+`. `+` takes options of one field
+  each, and lifting that would take a group state of its own rather than sugar, since such a group has no
+  one-option form, and would add rules the one-spelling check would have to cover. One design does not carry it.
 
 **Nested groups are not worth adding.** An option holding a group would spell the chain:
 `( uri: U  uriBaseId?: B  ( line: L  column?: C )? )?`. That is the only site of the 113 that nesting gains. The
