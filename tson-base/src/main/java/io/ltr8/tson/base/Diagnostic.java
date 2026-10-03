@@ -374,5 +374,14 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                 default -> true;
             };
         }
+
+        /**
+         * Whether this code is one of [TSON-DATA] §8.2's three name-hygiene refusals -- {@link #CONFUSABLE_NAMES},
+         * {@link #RESTRICTED_CHARACTER}, {@link #RESTRICTED_SCRIPT}: the processor declined a name under its
+         * identifier policy, which a consumer routes differently from a malformed document or schema.
+         */
+        public boolean isNameRefusal() {
+            return this == CONFUSABLE_NAMES || this == RESTRICTED_CHARACTER || this == RESTRICTED_SCRIPT;
+        }
     }
 }

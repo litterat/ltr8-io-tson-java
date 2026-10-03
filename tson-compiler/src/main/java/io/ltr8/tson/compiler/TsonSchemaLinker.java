@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.BindMismatchException;
@@ -376,7 +377,7 @@ public final class TsonSchemaLinker {
     private static void refuse(DiagnosticsReceiver receiver, TsonSchema schema, String name,
                                TypeDefinition def, Diagnostic.Code code, String message) {
         if (receiver == null) {
-            throw new SchemaValidationException(message);
+            throw new SchemaRefusalException(code, message, null);
         }
         receiver.report(TsonDiagnostics.ofSchemaRefusal(CanonicalIdentity.canonicalize(schema.id()), name,
                 code, message, def == null ? Optional.empty() : def.position()));

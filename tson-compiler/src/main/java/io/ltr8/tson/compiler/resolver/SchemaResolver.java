@@ -19,6 +19,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
@@ -205,6 +206,7 @@ public final class SchemaResolver {
         }
 
         TsonCompiledMetaSchema metaParser = loader.loadMeta(document.meta());
+        IdentifierPolicy names = loader.identifierPolicy();
         Map<String, Annotations> nameAnnotations = new LinkedHashMap<>();
         Map<String, TypeDefinition> namespace = mergeImports(document, nameAnnotations);
 
@@ -252,16 +254,18 @@ public final class SchemaResolver {
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
         // closing and a later batch closing of the same application land on one entry.
         TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put,
-                (type, value) -> (Top) read(metaParser.reader(type), value), generated,
+                (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names)),
+                generated,
                 metaParser.schema().entries()::get, namespaceGetter::current);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
         DefinitionResolver resolver = new DefinitionResolver(
-                (type, value) -> (Top) read(metaParser.reader(type), value),
+                (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names)),
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
-                // compiled schema's own reader for that name rather than the constructor vocabulary.
-                (type, value) -> read(metaParser.get(type), value),
+                // compiled schema's own reader for that name rather than the constructor vocabulary. Its value is
+                // as opaque to the linker as a data body, so it is read under the policy too.
+                (type, value) -> read(metaParser.get(type), value, names),
                 metaParser.schema().entries()::get, namespaceGetter, new ApplicationCloser() {
 
                     @Override
@@ -467,7 +471,8 @@ public final class SchemaResolver {
      * is wired wrong, and it is the one a caller most easily acts on, the message naming one of their own
      * classes. Collapsing it into either of the others is what {@code MissingBindingException} exists to
      * prevent -- its Javadoc records a downstream service turning the library-gap shape into a 501 for what
-     * was a missing line of configuration.
+     * was a missing line of configuration. A {@link SchemaRefusalException} is the author's schema declined
+     * under the identifier policy rather than called wrong, and keeps the §8.2 rule's code.
      *
      * <p>All three are reported per declaration and all three leave a placeholder, so one failing
      * declaration does not cost every other declaration its verdict.
@@ -489,6 +494,8 @@ public final class SchemaResolver {
             receiver.report(switch (error) {
                 case BindMismatchException mismatch ->
                         TsonDiagnostics.ofSchemaBindMismatch(schemaId, declaration.name(), mismatch, position);
+                case SchemaRefusalException refusal ->
+                        TsonDiagnostics.ofSchemaRefusal(schemaId, declaration.name(), refusal.code(), message, position);
                 case UnsupportedOperationException ignored ->
                         TsonDiagnostics.ofSchemaGap(schemaId, declaration.name(), message, position);
                 default -> TsonDiagnostics.ofSchemaError(schemaId, declaration.name(), message, position);
@@ -838,13 +845,28 @@ public final class SchemaResolver {
                 parameters.isEmpty() ? TypeKind.PRODUCT : TypeKind.TEMPLATE, List.of(), List.of(), body, position, Annotations.empty());
     }
 
-    /** One already-resolved {@code DataValue} replayed through a compiled reader. */
-    private static Object read(TsonTypeReader<?> reader,
-                               io.ltr8.tson.compiler.ast.DataValue value) {
-        // No policy deliberately: these events come from a resolved schema value, not from document text.
-        // A schema's own names are the identifier policy's surface, applied by TsonSchemaLinker.
-        return reader.read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)),
-                IdentifierPolicy.none()));
+    /** One already-resolved {@code DataValue} replayed through a compiled reader, judging names under {@code names}. */
+    private static Object read(TsonTypeReader<?> reader, io.ltr8.tson.compiler.ast.DataValue value,
+                               IdentifierPolicy names) {
+        return reader.read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)), names));
+    }
+
+    /**
+     * The identifier policy a constructor's payload is read under: the loader's for a {@code data} constructor,
+     * none for the rest.
+     *
+     * <p><b>A {@code data} body is the one payload the linker cannot see into</b> -- it binds to the consumer's
+     * own class, its fields' types left behind in the meta -- so its identifier-typed values, a key of an
+     * identifier-keyed map among them, are judged here, at the read, as the same values are in a data document.
+     * Every other constructor builds the schema layer's own vocabulary, whose names [TSON-SCHEMA] §11.4's scopes
+     * cover and {@code TsonSchemaLinker} judges: field names, enum members, parameters. Its identifier-typed
+     * values outside those scopes are references -- a choice's variants, a supertype -- whose verdict belongs to
+     * the declaration they name, which may be another schema's.
+     */
+    private static IdentifierPolicy payloadNames(TsonCompiledMetaSchema meta, String constructor,
+                                                 IdentifierPolicy names) {
+        TypeDefinition definition = meta.schema().entries().get(constructor);
+        return definition != null && definition.kind() == TypeKind.DATA ? names : IdentifierPolicy.none();
     }
 
     /**

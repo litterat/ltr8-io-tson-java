@@ -186,8 +186,7 @@ enum OutputFormat {
      * differently would not have. That is the whole of why the policy is worth printing beside them.
      */
     private static boolean isRefusal(Diagnostic.Code code) {
-        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_CHARACTER
-                || code == Diagnostic.Code.RESTRICTED_SCRIPT || code == Diagnostic.Code.LIMIT_EXCEEDED;
+        return code.isNameRefusal() || code == Diagnostic.Code.LIMIT_EXCEEDED;
     }
 
     /** A policy on one line: what differs between two deployments that disagree about one name. */

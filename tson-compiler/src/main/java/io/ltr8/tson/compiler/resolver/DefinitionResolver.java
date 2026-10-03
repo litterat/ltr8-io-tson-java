@@ -477,9 +477,9 @@ final class DefinitionResolver {
             // Same split as bindAtomInstance, for the same reason: an annotation value that does not conform
             // to the type its name refers to (§6) is the author's error, and relabelling it a coverage gap
             // aborts the run over a typo.
-            throw new SchemaValidationException("'" + declaration + "': the value of annotation '@"
-                    + annotationName + "' is not valid data for the type '" + annotationName + "' names -- "
-                    + e.getMessage(), e);
+            throw payloadFailure("'" + declaration + "': the value of annotation '@" + annotationName + "'",
+                    "'" + declaration + "': the value of annotation '@" + annotationName + "' is not valid data "
+                            + "for the type '" + annotationName + "' names -- " + e.getMessage(), e);
         } catch (BindMismatchException e) {
             // The same arm {@link #bindAtomInstance} carries, for the same reason and it is not a stylistic
             // echo: an annotation naming a type the consumer never bound -- the kernel's own `data` among
@@ -1087,8 +1087,24 @@ final class DefinitionResolver {
      */
     private static SchemaValidationException bodyIsNotValidData(String name, String constructorName,
                                                                     ReadException cause) {
-        return new SchemaValidationException("'" + name + "': the body is not valid data for '"
+        return payloadFailure("'" + name + "': the body", "'" + name + "': the body is not valid data for '"
                 + constructorName + "', the constructor's own constraint vocabulary -- " + cause.getMessage(), cause);
+    }
+
+    /**
+     * A payload read's failure restated against the schema. A [TSON-DATA] §8.2 refusal -- a value the payload's
+     * type makes a name, declined under the identifier policy -- stays a refusal with its rule's code, located by
+     * {@code subject} and the value's pointer within the payload, which a name in a map needs to say which key;
+     * any other failure is {@code invalid}, the author's error.
+     */
+    static SchemaValidationException payloadFailure(String subject, String invalid, ReadException cause) {
+        Diagnostic refused = cause.diagnostic();
+        if (!refused.code().isNameRefusal()) {
+            return new SchemaValidationException(invalid, cause);
+        }
+        return new SchemaRefusalException(refused.code(), subject + " has a name this processor refuses"
+                + refused.path().filter(path -> !path.isEmpty()).map(path -> " at " + path).orElse("")
+                + ": " + refused.message(), cause);
     }
 
     // ── Top-level constructor application (§5.6) ──────────────────────────

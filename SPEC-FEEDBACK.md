@@ -846,8 +846,12 @@ encodings, under the family's own profile — a character the profile adds meets
 at the second; a refused value reads as nothing. Under a schema these are the data scopes, and like every other scope
 it is skipped where the identifier policy switches skeleton distinctness off; a per-segment level divides such a value
 at its profile's separators, as proposed above. A field's default or fixed value of such a type is judged the same way
-when the schema links, since a default reaches every document that omits the field. The corpus states it at
-`class2/validate/refused/`, a bucket added for it, and at `class2/schema/refused/`. Proposal 2 runs as written above:
+when the schema links, since a default reaches every document that omits the field. So is a value a schema
+writes in a payload whose types the schema layer's own scopes do not cover — a meta layer's `data` body, such as
+`!iface { methods: {method_name => …} }`, and an annotation value — judged as it is in a data document, under the
+same policy and codes; a kernel constructor's identifier-typed values are §11.4's scopes or references to a
+declaration, and are judged there. The corpus states it at `class2/validate/refused/`, a bucket added for it, and
+at `class2/schema/refused/`. Proposal 2 runs as written above:
 the kernel declares `enum_type`, `enum` and `text_enum`, and `enum_profile` retires. The linker resolves each enum's
 `type` — in the schema's namespace, or in the governing meta's for a pinned value — refuses one that is not a text
 family, parses every member through the type's own parser and refuses a member it rejects or two it reads as one

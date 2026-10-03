@@ -98,8 +98,9 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private static final String UNADDRESSABLE = "";
 
     /**
-     * [TSON-DATA] §8.2's identifier policy for declared names, applied by {@link TsonSchemaLinker} wherever a
-     * schema names something and over every scope those names form. Held here because this registry is the
+     * [TSON-DATA] §8.2's identifier policy for a schema's names, applied by {@link TsonSchemaLinker} wherever a
+     * schema names something and over every scope those names form, and by the resolver to the identifier-typed
+     * values a constructor payload carries. Held here because this registry is the
      * one object every resolve and every read already passes through, so a policy set on it reaches both
      * without a second channel.
      *
@@ -207,7 +208,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         return registry;
     }
 
-    /** The identifier policy this registry applies to declared names -- see {@link #identifierPolicy}. */
+    /** The identifier policy this registry applies to a schema's names -- see {@link #identifierPolicy}. */
+    @Override
     public IdentifierPolicy identifierPolicy() {
         return identifierPolicy;
     }
