@@ -28,7 +28,7 @@ public record IriType(String spec, @Field("min_length") Optional<Integer> minLen
                       Optional<List<String>> members, Optional<List<String>> schemes,
                       @Field("allow_relative") boolean allowRelative,
                       @Field("allow_fragment") boolean allowFragment,
-                      Normalization normalization) implements Atom {
+                      Normalization normalization) implements Atom, TextFamily {
 
     /** RFC 3987, the one {@code spec} every {@code iri_type} carries. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc3987";

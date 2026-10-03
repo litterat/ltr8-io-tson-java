@@ -34,6 +34,9 @@ class TextNormalizationTest {
               name => !identifier_type { continue_add: "-" }
               request => { headers?: {header_name => text}  host?: host  charset?: charset  label?: name }
               idempotent => { header: header_name = Idempotency-Key }
+              safe_header => !enum_type { type: header_name  members: [Accept content-type] }
+              allowed => { h: safe_header }
+              chosen => { h: safe_header = Content-Type }
             }
             """;
 
@@ -135,5 +138,22 @@ class TextNormalizationTest {
                 "members: [UTF-8 utf-8]"));
         assertEquals(1, refused.size(), refused.toString());
         assertTrue(refused.getFirst().message().contains("are one value under NFKC_CASEFOLD"), refused.toString());
+    }
+
+    /** An enum matches its members in its label type's form: here a case-folding identifier's. */
+    @Test
+    void anEnumMatchesInItsLabelTypesForm() {
+        assertEquals(List.of(), codes("!allowed { h: Content-Type }"));
+        assertEquals(List.of(), codes("!allowed { h: ACCEPT }"));
+        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION), codes("!allowed { h: x-trace }"));
+        TsonValue tree = tson().treeReader().read(document("!allowed { h: CONTENT-TYPE }"));
+        assertEquals("content-type", tree.get("h").asString().orElseThrow());
+    }
+
+    /** A pin on an enum field is a value of the enum, so the schema loads and any casing of it matches. */
+    @Test
+    void anEnumPinIsAValueInTheLabelTypesForm() {
+        assertEquals(List.of(), codes("!chosen { h: content-type }"));
+        assertEquals(List.of(Diagnostic.Code.FIELD_FIXED), codes("!chosen { h: accept }"));
     }
 }

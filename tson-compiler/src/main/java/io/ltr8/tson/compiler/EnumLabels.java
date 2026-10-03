@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
@@ -11,6 +12,7 @@ import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TextFamily;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
@@ -65,6 +67,24 @@ final class EnumLabels {
         return labelType(enumeration, body, merged, structure)
                 .map(label -> isFamily(label.definition(), IDENTIFIER_TYPE, label.lookup()))
                 .orElse(true);
+    }
+
+    /**
+     * The form {@code enumeration} matches its members in: its label type's {@code normalization}
+     * (SPEC-FEEDBACK.md #19), followed into the governing meta where the enum's constructor pinned the type.
+     * {@code NONE} for a body that is not an enum, a type that resolves to nothing, or one that is not a text
+     * family -- each refused or reported on its own.
+     */
+    static Normalization labelForm(TypeDefinition enumeration, Map<String, TypeDefinition> merged,
+                                   Function<String, TypeDefinition> structure) {
+        if (!(enumeration.body() instanceof EnumBody body)) {
+            return Normalization.NONE;
+        }
+        return labelType(enumeration, body, merged, structure)
+                .map(label -> label.definition() != null && label.definition().body() instanceof TextFamily family
+                        ? family.normalization()
+                        : Normalization.NONE)
+                .orElse(Normalization.NONE);
     }
 
     /** Every violation among {@code localNames}, in their order. */

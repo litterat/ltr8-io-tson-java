@@ -46,7 +46,7 @@ public record TextType(
         Optional<Integer> length,
         Optional<String> pattern,
         Optional<List<String>> members,
-        Normalization normalization) implements Atom {
+        Normalization normalization) implements Atom, TextFamily {
 
     @Record
     public TextType {

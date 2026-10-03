@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
@@ -78,7 +79,7 @@ final class RecordExtension {
      * collision inside one import cannot reach here, since that import was refused when it linked.
      */
     static List<Violation> check(Map<String, TypeDefinition> merged, Set<String> localNames,
-                                 Map<String, String> origins) {
+                                 Map<String, String> origins, Map<String, Normalization> enumForms) {
         List<Violation> violations = new ArrayList<>();
         for (String name : localNames) {
             TypeDefinition def = merged.get(name);
@@ -101,7 +102,7 @@ final class RecordExtension {
             TypeDefinition def = entry.getValue();
             RecordBody base = familyBodyOf(def, merged);
             if (base != null && FamilySelectors.dispatchesOnMembers(def)) {
-                checkFamily(entry.getKey(), def, merged, localNames, origins, violations);
+                checkFamily(entry.getKey(), def, merged, localNames, origins, enumForms, violations);
             }
         }
         return violations;
@@ -196,7 +197,8 @@ final class RecordExtension {
     // ── The family's obligations, over the closure ───────────────────────
 
     private static void checkFamily(String base, TypeDefinition def, Map<String, TypeDefinition> merged,
-            Set<String> localNames, Map<String, String> origins, List<Violation> violations) {
+            Set<String> localNames, Map<String, String> origins, Map<String, Normalization> enumForms,
+            List<Violation> violations) {
         // The same derivation the dispatchers read, never a second filter over the fields: a check that
         // decided "which fields select" differently from the read could pass a family no reader can place.
         List<RecordField> selectors = FamilySelectors.of(def, merged);
@@ -211,7 +213,7 @@ final class RecordExtension {
                     || isUndeclaredMember(sub)) {
                 continue;
             }
-            List<Object> pins = pinsOf(base, subtype, selectors, record, merged, localNames, violations);
+            List<Object> pins = pinsOf(base, subtype, selectors, record, merged, localNames, enumForms, violations);
             if (pins == null) {
                 continue;
             }
@@ -255,6 +257,7 @@ final class RecordExtension {
      */
     private static List<Object> pinsOf(String base, String subtype, List<RecordField> selectors,
             RecordBody record, Map<String, TypeDefinition> merged, Set<String> localNames,
+            Map<String, Normalization> enumForms,
             List<Violation> violations) {
         List<Object> pins = new ArrayList<>(selectors.size());
         for (RecordField selector : selectors) {
@@ -272,7 +275,7 @@ final class RecordExtension {
                 }
                 return null;
             }
-            Object value = decode(selector, pinned.value().get(), merged);
+            Object value = decode(selector, pinned.value().get(), merged, enumForms);
             if (value == null) {
                 return null; // the pin is not a value of the declared type -- checkFieldValue's verdict
             }
@@ -281,8 +284,9 @@ final class RecordExtension {
         return pins;
     }
 
-    private static Object decode(RecordField selector, Token pin, Map<String, TypeDefinition> merged) {
-        Optional<AtomType<?>> parser = parserFor(selector, merged);
+    private static Object decode(RecordField selector, Token pin, Map<String, TypeDefinition> merged,
+                                 Map<String, Normalization> enumForms) {
+        Optional<AtomType<?>> parser = parserFor(selector, merged, enumForms);
         try {
             return parser.get() instanceof io.ltr8.tson.compiler.atom.TokenAtomType<?> formSensitive
                     ? formSensitive.read(new TokenValue(pin.text(), TokenForm.valueOf(pin.form().name())))
@@ -294,6 +298,12 @@ final class RecordExtension {
 
     /** The parser for a field's type at the end of its reference chain, empty where nothing reads a token. */
     private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, TypeDefinition> merged) {
+        return parserFor(field, merged, Map.of());
+    }
+
+    /** {@link #parserFor(RecordField, Map)}, an enum selector matching in its label type's form. */
+    private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, TypeDefinition> merged,
+                                                   Map<String, Normalization> enumForms) {
         if (!field.type().arguments().isEmpty()) {
             return Optional.empty();
         }
@@ -302,7 +312,7 @@ final class RecordExtension {
         if (target == null || !target.parameters().isEmpty() || target.body() instanceof Reference) {
             return Optional.empty();
         }
-        return AtomParsers.forType(target.body());
+        return AtomParsers.forType(target.body(), enumForms.getOrDefault(terminal, Normalization.NONE));
     }
 
     /**

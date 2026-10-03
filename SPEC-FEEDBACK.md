@@ -1938,8 +1938,11 @@ Because the profile judges the value, `header_name`'s profile lists lowercase le
 - **Refinement and coherence.** A refinement that moves `normalization` is refused; members are judged in the form,
   and two that are one value are refused.
 
+- **Enums.** An enum matches its members in its label type's form, on both encodings' read paths and in the
+  linker's checks of defaults and pins.
+
 Not running: `uri_type.schemes` stays `text` with its prose rule, since the bootstrap reads the kernel's one
-`identifier_type` instance only. And an enum whose `type` normalises still matches a token's text, not its value.
+`identifier_type` instance only.
 
 **Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
 

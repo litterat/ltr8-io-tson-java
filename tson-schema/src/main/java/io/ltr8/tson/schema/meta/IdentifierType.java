@@ -45,7 +45,7 @@ public record IdentifierType(
         @Field("continue_add") Optional<String> continueAdd,
         Optional<String> medial,
         Optional<String> exclude,
-        Normalization normalization) implements Atom {
+        Normalization normalization) implements Atom, TextFamily {
 
     @Record
     public IdentifierType {

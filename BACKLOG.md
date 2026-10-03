@@ -257,12 +257,12 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **An enum matches a token's text, not its label type's value** (`r2026-37-proposal`). `EnumParser` checks
-  `members().contains(text)`, so under a `type` whose `normalization` is not `NONE` (SPEC-FEEDBACK.md #19) a document
-  spelling a member another way -- `Content-Type` for a member `content-type` of a case-folding identifier -- is
-  refused, where `EnumLabels` already judges the declared members on the type's value. The reader needs the label
-  type's parser at compile time (`EnumTypeParserFactory` resolving `enum_type.type`), decoding the token through it and
-  matching the decoded members; both encodings' enum readers move together, with a parity case.
+- [ ] **A template's value argument of an enum type is checked as written.** `TemplateMaterialiser.checkValue` reads
+  the argument through `AtomParsers.forType(body)` with no enum form, so under a case-folding label type
+  (SPEC-FEEDBACK.md #19) `box<Content-Type>` is refused where the member is `content-type`. Materialisation runs in
+  the resolver, before linking records `TsonLinkedSchema.enumForms`, so the fix resolves the label type there
+  (`EnumLabels.labelForm` needs the governing meta's namespace) or defers the check to the linker's re-check of
+  minted entries.
 
 - [ ] **`uri_type.schemes` should be a set of case-folding scheme identifiers** (SPEC-FEEDBACK.md #19). The kernel's
   `scheme_set` holds `text`, and `uri_type`'s `@doc` states the case-insensitive comparison for that field alone;

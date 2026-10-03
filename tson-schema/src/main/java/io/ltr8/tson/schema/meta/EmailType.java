@@ -22,7 +22,7 @@ import java.util.Optional;
 public record EmailType(String spec, @Field("min_length") Optional<Integer> minLength,
                          @Field("max_length") Optional<Integer> maxLength,
                          Optional<Integer> length, Optional<String> pattern,
-                         Optional<List<String>> members, Normalization normalization) implements Atom {
+                         Optional<List<String>> members, Normalization normalization) implements Atom, TextFamily {
 
     /** {@code email => !email_type {}} -- the unconstrained email address, core.tn's own {@code !email}. */
     public static final EmailType UNCONSTRAINED = new EmailType(

@@ -48,7 +48,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * fault rather than an author error -- the registry only routes here for names that are atoms.
      */
     static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
-            .forType(definition.body())
+            .forType(definition.body(), context.linked().enumForm(name))
             .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(name, parser,
                     context.locationOf(name, definition), namesProfile(definition.body())))
             .orElseThrow(() -> new IllegalStateException(

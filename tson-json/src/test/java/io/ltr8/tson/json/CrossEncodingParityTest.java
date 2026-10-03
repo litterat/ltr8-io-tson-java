@@ -119,6 +119,8 @@ class CrossEncodingParityTest {
               pinned      => { h: header_name = Idempotency-Key }
               charset     => !text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
               encoded     => { c: charset }
+              safe_header => !enum_type { type: header_name  members: [Accept content-type] }
+              screened    => { h: safe_header }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -929,5 +931,12 @@ class CrossEncodingParityTest {
     void theJsonTreeKeepsTheSpelling() {
         JsonObject json = (JsonObject) jsonTree("encoded", "{\"c\": \"UTF-8\"}");
         assertEquals("\"UTF-8\"", json.get("c").toString());
+    }
+
+    /** An enum over a case-folding label type matches a member however it is cased, in both encodings. */
+    @Test
+    void anEnumMatchesInItsLabelTypesForm() {
+        bothAdmit("screened", "{ h: Content-Type }", "{\"h\": \"Content-Type\"}");
+        sameRule("screened", "{ h: x-trace }", "{\"h\": \"x-trace\"}");
     }
 }
