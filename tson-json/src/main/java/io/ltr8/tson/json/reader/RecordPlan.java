@@ -92,7 +92,7 @@ final class RecordPlan {
             // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule.
             names[i] = Nfc.of(field.name());
             byName.put(names[i], i);
-            omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.members().contains(field.name())));
+            omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(field.name())));
             schemaReaders[i] = context.readers().resolve(field.type().name());
             if (field.value().isPresent()) {
                 stated[i] = FieldValue.of(context.linked(), field.type().name(), field.value().get());
@@ -100,7 +100,7 @@ final class RecordPlan {
         }
         this.index = Map.copyOf(byName);
         this.groups = List.copyOf(body.groups());
-        this.groupSlots = groups.stream().map(group -> group.members().stream()
+        this.groupSlots = groups.stream().map(group -> group.memberNames().stream()
                 .mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray()).toArray(int[][]::new);
         this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().stream()
                 .map(RecordField::name).toList()));
@@ -194,9 +194,9 @@ final class RecordPlan {
             }
             FieldGroup group = groups.get(g);
             if (present > 1) {
-                ctx.report(rules.groupAdmitsAtMostOne(String.join(" | ", group.members()), present));
+                ctx.report(rules.groupAdmitsAtMostOne(String.join(" | ", group.memberNames()), present));
             } else if (group.state() == ElementState.REQUIRED && present == 0) {
-                ctx.report(rules.groupRequiresOne(String.join(" | ", group.members())));
+                ctx.report(rules.groupRequiresOne(String.join(" | ", group.memberNames())));
             }
         }
     }

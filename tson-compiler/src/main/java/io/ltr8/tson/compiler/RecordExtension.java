@@ -173,7 +173,7 @@ final class RecordExtension {
             Map<String, TypeDefinition> merged, List<Violation> violations) {
         // Group membership is checked first and alone: §5.11 forces a member optional, so the state rule
         // would fire too and report the symptom beside the cause. One mistake, one verdict.
-        if (groups.stream().anyMatch(group -> group.members().contains(field.name()))) {
+        if (groups.stream().anyMatch(group -> group.hasMember(field.name()))) {
             violations.add(new Violation(name, "'" + name + "': discriminator field '" + field.name()
                     + "' is a member of a field group, whose members are mutually exclusive and uniformly "
                     + "optional (§5.11) -- so a conforming value may leave it out, and a selector that may be "

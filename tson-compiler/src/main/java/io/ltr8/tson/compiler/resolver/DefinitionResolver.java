@@ -1400,11 +1400,11 @@ final class DefinitionResolver {
 
         List<FieldGroup> surviving = new ArrayList<>();
         for (FieldGroup group : groups) {
-            List<String> members = group.members().stream().filter(member -> !removed.contains(member)).toList();
-            if (members.size() == group.members().size()) {
+            List<String> members = group.memberNames().stream().filter(member -> !removed.contains(member)).toList();
+            if (members.size() == group.memberNames().size()) {
                 surviving.add(group);
             } else if (members.size() > 1) {
-                surviving.add(new FieldGroup(members, group.state()));
+                surviving.add(FieldGroup.ofSingles(members, group.state()));
             } else if (members.size() == 1) {
                 dissolveInto(fields, members.get(0), group.state());
             }
@@ -1846,7 +1846,8 @@ final class DefinitionResolver {
                     fields.add(field);
                     memberNames.add(field.name());
                 }
-                groups.add(new FieldGroup(memberNames, groupDef.optional() ? ElementState.OPTIONAL : ElementState.REQUIRED));
+                groups.add(FieldGroup.ofSingles(memberNames,
+                        groupDef.optional() ? ElementState.OPTIONAL : ElementState.REQUIRED));
             }
         }
     }
@@ -1867,7 +1868,7 @@ final class DefinitionResolver {
      */
     private RecordField resolveTighteningField(String declarationName, FieldDef fieldDef, RecordField inherited,
                                                 List<FieldGroup> groups, List<String> parameters) {
-        boolean member = groups.stream().anyMatch(group -> group.members().contains(fieldDef.name()));
+        boolean member = groups.stream().anyMatch(group -> group.hasMember(fieldDef.name()));
         if (member && fieldDef.omittable()) {
             throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
                     + "member of a field group, whose presence the group decides (§5.11) -- restate it without "
@@ -2121,7 +2122,7 @@ final class DefinitionResolver {
 
         int index = -1;
         for (int i = 0; i < groups.size(); i++) {
-            if (groups.get(i).members().contains(restated.get(0))) {
+            if (groups.get(i).hasMember(restated.get(0))) {
                 index = i;
                 break;
             }
@@ -2131,9 +2132,9 @@ final class DefinitionResolver {
                     + "a group can only restate one the source declares as a group (§5.11)");
         }
         FieldGroup inherited = groups.get(index);
-        if (!inherited.members().equals(restated)) {
+        if (!inherited.memberNames().equals(restated)) {
             throw new SchemaValidationException(prefix + "does not match the inherited group ("
-                    + String.join(" | ", inherited.members()) + ") -- a restatement MUST have the same member "
+                    + String.join(" | ", inherited.memberNames()) + ") -- a restatement MUST have the same member "
                     + "labels in the same order, and changing membership is a resolver error (§5.11)");
         }
         for (GroupDef.Member member : groupDef.members()) {
@@ -2153,7 +2154,7 @@ final class DefinitionResolver {
             throw new SchemaValidationException(prefix + "loosens a REQUIRED group to OPTIONAL -- a "
                     + "restatement may only tighten OPTIONAL→REQUIRED (§5.11)");
         }
-        groups.set(index, new FieldGroup(inherited.members(), state));
+        groups.set(index, new FieldGroup(inherited.members(), inherited.optional(), state));
         return true;
     }
 

@@ -158,7 +158,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             if (schema.value().isPresent()) {
                 precomputedValue[i] = readSchemaDefault(field);
             }
-            omitted[i] = schema.omitted(groups.stream().anyMatch(group -> group.members().contains(schema.name())));
+            omitted[i] = schema.omitted(groups.stream().anyMatch(group -> group.hasMember(schema.name())));
             if (schema.role() == FieldRole.FIXED) {
                 fixedChecks[i] = new FixedCheck(precomputedValue[i], field.parser());
             }
@@ -337,13 +337,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final void validateGroups(TsonReadContext ctx, boolean[] seen) {
         for (FieldGroup group : groups) {
             int present = 0;
-            for (String member : group.members()) {
+            for (String member : group.memberNames()) {
                 Integer idx = fieldIndex.get(member);
                 if (idx != null && seen[idx]) {
                     present++;
                 }
             }
-            String members = String.join(" | ", group.members());
+            String members = String.join(" | ", group.memberNames());
             if (present > 1) {
                 ctx.report(rules.groupAdmitsAtMostOne(members, present));
             } else if (group.state() == ElementState.REQUIRED && present == 0) {

@@ -75,8 +75,8 @@
       !record_field { name: allow_negative_zero  type: boolean  optional: true  role: DEFAULT  value: true }
     ]
     groups: [
-      !field_group { members: [min exclusive_min]  state: OPTIONAL }
-      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
+      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
     ] }
   }
 
@@ -98,8 +98,8 @@
       !record_field { name: members          type: decimal_member_set  optional: true }
     ]
     groups: [
-      !field_group { members: [min exclusive_min]  state: OPTIONAL }
-      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
+      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
     ] }
   }
 
@@ -113,8 +113,8 @@
       !record_field { name: multiple_of    type: value  optional: true }
     ]
     groups: [
-      !field_group { members: [min exclusive_min]  state: OPTIONAL }
-      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
+      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
     ] }
   }
 
@@ -140,8 +140,8 @@
       !record_field { name: exclusive_max  type: value  optional: true }
     ]
     groups: [
-      !field_group { members: [min exclusive_min]  state: OPTIONAL }
-      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
+      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
     ] }
   }
 
@@ -156,8 +156,8 @@
       !record_field { name: precision         type: non_negative_integer  optional: true }
     ]
     groups: [
-      !field_group { members: [min exclusive_min]  state: OPTIONAL }
-      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
+      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
     ] }
   }
 
@@ -172,8 +172,8 @@
       !record_field { name: precision         type: non_negative_integer  optional: true }
     ]
     groups: [
-      !field_group { members: [min exclusive_min]  state: OPTIONAL }
-      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
+      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
     ] }
   }
 
@@ -189,8 +189,8 @@
       !record_field { name: multiple_of    type: value    optional: true }
     ]
     groups: [
-      !field_group { members: [min exclusive_min]  state: OPTIONAL }
-      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
+      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
     ] }
   }
 
@@ -205,8 +205,8 @@
       !record_field { name: multiple_of    type: value  optional: true }
     ]
     groups: [
-      !field_group { members: [min exclusive_min]  state: OPTIONAL }
-      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
+      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
     ] }
   }
 

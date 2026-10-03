@@ -123,7 +123,7 @@ final class TypeInhabitance {
     private static boolean recordInhabited(RecordBody record, Map<String, TypeDefinition> namespace,
             Set<String> inhabited) {
         Set<String> grouped = new HashSet<>();
-        record.groups().forEach(group -> grouped.addAll(group.members()));
+        record.groups().forEach(group -> grouped.addAll(group.memberNames()));
         for (RecordField field : record.fields()) {
             if (grouped.contains(field.name()) || demandsNothing(field)) {
                 continue;
@@ -136,7 +136,7 @@ final class TypeInhabitance {
             if (group.state() != ElementState.REQUIRED) {
                 continue;
             }
-            boolean any = group.members().stream().anyMatch(member -> record.fields().stream()
+            boolean any = group.memberNames().stream().anyMatch(member -> record.fields().stream()
                     .filter(field -> field.name().equals(member))
                     .anyMatch(field -> satisfiable(field, namespace, inhabited)));
             if (!any) {
@@ -229,7 +229,7 @@ final class TypeInhabitance {
     private static String recordDependency(RecordBody record, Map<String, TypeDefinition> namespace,
             Set<String> inhabited) {
         Set<String> grouped = new HashSet<>();
-        record.groups().forEach(group -> grouped.addAll(group.members()));
+        record.groups().forEach(group -> grouped.addAll(group.memberNames()));
         for (RecordField field : record.fields()) {
             if (!grouped.contains(field.name()) && !demandsNothing(field)
                     && !satisfiable(field, namespace, inhabited)) {
@@ -238,7 +238,7 @@ final class TypeInhabitance {
         }
         return record.groups().stream()
                 .filter(group -> group.state() == ElementState.REQUIRED)
-                .flatMap(group -> group.members().stream())
+                .flatMap(group -> group.memberNames().stream())
                 .flatMap(member -> record.fields().stream().filter(field -> field.name().equals(member)))
                 .filter(field -> !satisfiable(field, namespace, inhabited))
                 .map(field -> field.type().name()).findFirst().orElse(null);

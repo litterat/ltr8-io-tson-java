@@ -65,7 +65,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(67, registered.entries().size());
+        assertEquals(68, registered.entries().size());
     }
 
     @Test
@@ -124,9 +124,10 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("field_group")
-                .read(TestDocuments.document("{ members: [foo bar] state: OPTIONAL }")));
+                .read(TestDocuments.document("{ members: [[foo] [bar baz]] optional: [baz] state: OPTIONAL }")));
 
-        assertEquals(List.of("foo", "bar"), result.get("members"));
+        assertEquals(List.of(List.of("foo"), List.of("bar", "baz")), result.get("members"));
+        assertEquals(List.of("baz"), result.get("optional"));
         assertEquals("OPTIONAL", result.get("state"));
     }
 

@@ -95,8 +95,8 @@ final class BindGroupUnionBuilder implements RecordBuilder {
         if (group.state() != ElementState.REQUIRED) {
             return "its group is optional, so a record with no field present has no member to be";
         }
-        if (group.members().size() != plan.names.length) {
-            return "its group covers " + group.members().size() + " of its " + plan.names.length + " fields";
+        if (group.memberNames().size() != plan.names.length) {
+            return "its group covers " + group.memberNames().size() + " of its " + plan.names.length + " fields";
         }
         if (union.memberTypes().length != plan.names.length) {
             return "the union has " + union.memberTypes().length + " members for " + plan.names.length

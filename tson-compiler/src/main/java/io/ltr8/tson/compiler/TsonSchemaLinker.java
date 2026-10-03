@@ -1195,7 +1195,7 @@ public final class TsonSchemaLinker {
                     checkFieldValue(entryName, field, namespace, ownParameters);
                 }
                 for (FieldGroup group : r.groups()) {
-                    for (String member : group.members()) {
+                    for (String member : group.memberNames()) {
                         if (r.fields().stream().noneMatch(f -> f.name().equals(member))) {
                             throw new SchemaValidationException(
                                     "'" + entryName + "' has a field group referencing unknown field '" + member + "'");

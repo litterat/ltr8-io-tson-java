@@ -175,8 +175,8 @@
       !record_field { name: members        type: integer_member_set  optional: true }
     ]
     groups: [
-      !field_group { members: [min exclusive_min]  state: OPTIONAL }
-      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
+      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
     ] }
   }
 
@@ -319,7 +319,7 @@
       !record_field { name: value  type: value  optional: true }
     ]
     groups: [
-      !field_group { members: [name value] }
+      !field_group { members: [[name] [value]] }
     ] }
   }
 
@@ -383,8 +383,9 @@
 
   field_group => !type_definition {
     body: !record { fields: [
-      !record_field { name: members  type: array_field_name_xxhash }
-      !record_field { name: state    type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
+      !record_field { name: members   type: array_array_field_name_f1a73e72_xxhash }
+      !record_field { name: optional  type: array_field_name_xxhash  optional: true }
+      !record_field { name: state     type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
     ] }
   }
 
@@ -546,6 +547,11 @@
   @synthetic array_record_field_xxhash => !type_definition {
     source: array
     body: !array { element_type: record_field }
+  }
+
+  @synthetic array_array_field_name_f1a73e72_xxhash => !type_definition {
+    source: array
+    body: !array { element_type: array_field_name_xxhash }
   }
 
   @synthetic array_field_group_xxhash => !type_definition {

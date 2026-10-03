@@ -109,6 +109,11 @@ final class WireForm {
 
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
 
+    /** A list of field names as the array of bare names a resolved document writes. */
+    private static ArrayValue names(List<String> names) {
+        return new ArrayValue(names.stream().map(name -> scoped(new TokenValue(name, TokenForm.UNQUOTED))).toList());
+    }
+
     /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
     static ScopedValue scoped(CoreValue value) {
         return scoped(value, List.of());
@@ -220,7 +225,10 @@ final class WireForm {
         for (FieldGroup group : body.groups()) {
             List<RecordValue.Field> members = new ArrayList<>();
             members.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(group.members().stream()
-                    .map(member -> scoped(new TokenValue(member, TokenForm.UNQUOTED))).toList()))));
+                    .map(option -> scoped(names(option))).toList()))));
+            if (!group.optional().isEmpty()) {
+                members.add(new RecordValue.Field(OPTIONAL, scoped(names(group.optional()))));
+            }
             if (group.state() != ElementState.REQUIRED) {
                 members.add(nameField(STATE, group.state().name()));
             }

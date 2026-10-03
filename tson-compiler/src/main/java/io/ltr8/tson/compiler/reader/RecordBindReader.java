@@ -553,7 +553,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             }
             FieldGroup group = body.groups().getFirst();
             if (group.state() != ElementState.REQUIRED
-                    || group.members().size() != body.fields().size()
+                    || group.memberNames().size() != body.fields().size()
                     || union.memberTypes().length != body.fields().size()) {
                 return null;
             }
@@ -569,7 +569,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                     return null;
                 }
                 String label = GroupUnionBindReader.labelOf(record);
-                if (label == null || !group.members().contains(label)) {
+                if (label == null || !group.hasMember(label)) {
                     return null;
                 }
                 byField.put(label, record);
