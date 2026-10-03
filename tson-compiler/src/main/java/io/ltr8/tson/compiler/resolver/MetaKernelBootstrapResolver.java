@@ -32,6 +32,7 @@ import io.ltr8.tson.schema.meta.UriType;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -174,7 +175,7 @@ public final class MetaKernelBootstrapResolver {
             }
             // §5.5: constructor application transfers only the target's kind; no supertypes, no
             // parameters -- this is construction, not composition or refinement.
-            instanceBody(instance).ifPresent(body -> entries.put(declaration.name(),
+            instanceBody(declaration.name(), instance).ifPresent(body -> entries.put(declaration.name(),
                     new TypeDefinition(Optional.of(TypeRef.of(instance.target())), target.kind(),
                             List.of(), List.of(), body)));
         }
@@ -254,6 +255,15 @@ public final class MetaKernelBootstrapResolver {
      * empty).
      */
     static Optional<Top> instanceBody(Instance instance) {
+        return instanceBody("", instance);
+    }
+
+    /**
+     * {@link #instanceBody(Instance)} for the entry named {@code name}: the one target with two instances,
+     * {@code identifier_type}, is told apart by the entry -- {@code identifier} and {@code scheme_name} -- each
+     * checked against the constant this implementation holds for it.
+     */
+    static Optional<Top> instanceBody(String name, Instance instance) {
         return switch (instance.target()) {
             case "value_type" -> {
                 requireEmptyBody(instance);
@@ -264,6 +274,10 @@ public final class MetaKernelBootstrapResolver {
                 yield Optional.of(new VoidType());
             }
             case "identifier_type" -> {
+                if (name.equals("scheme_name")) {
+                    requireSchemeNameProfile(instance);
+                    yield Optional.of(IdentifierType.SCHEME_NAME);
+                }
                 requireIdentifierProfile(instance);
                 yield Optional.of(IdentifierType.IDENTIFIER);
             }
@@ -313,6 +327,29 @@ public final class MetaKernelBootstrapResolver {
                 || !(record.fields().getFirst().value().value().coreValue() instanceof TokenValue token)
                 || !token.text().equals("-")) {
             throw new IllegalStateException("expected { continue_add: \"-\" } for !identifier_type, found "
+                    + instance.value().coreValue());
+        }
+    }
+
+    /**
+     * {@code scheme_name}'s body, checked to be exactly {@link IdentifierType#SCHEME_NAME}'s, field for field: the
+     * constant is what {@code uri_type.schemes} reads its elements through, so a kernel stating another profile
+     * would describe a scheme this implementation does not read.
+     */
+    private static void requireSchemeNameProfile(Instance instance) {
+        Map<String, String> expected = Map.of("start", "NONE", "continue", "NONE",
+                "start_add", "abcdefghijklmnopqrstuvwxyz", "continue_add", "abcdefghijklmnopqrstuvwxyz0123456789+-.",
+                "normalization", "NFKC_CASEFOLD");
+        Map<String, String> stated = new HashMap<>();
+        if (instance.value().coreValue() instanceof RecordValue record) {
+            for (RecordValue.Field field : record.fields()) {
+                if (field.value().value().coreValue() instanceof TokenValue token) {
+                    stated.put(field.name(), token.text());
+                }
+            }
+        }
+        if (!stated.equals(expected)) {
+            throw new IllegalStateException("expected " + expected + " for scheme_name, found "
                     + instance.value().coreValue());
         }
     }

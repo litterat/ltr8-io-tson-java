@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=e3a52fec065a355d7ee8c5d475e52b52d42fee694b0dbaa0dde0296d27ace79a"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b7f6eb260a166e6277aac3bc48ffca876d914dad23f2bf870b7e2ac449026b63"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b7f6eb260a166e6277aac3bc48ffca876d914dad23f2bf870b7e2ac449026b63"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=6ac3455f95e4f2681011d4a1da30b7a14115d5a84b889e10b7355c9d6aba95de"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ff02bc0caa6659961dcac0526215f29374819dc3c67a48f8dd5b9877fd0baf02"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ff02bc0caa6659961dcac0526215f29374819dc3c67a48f8dd5b9877fd0baf02"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 
@@ -385,10 +385,10 @@
   @doc:"""
     IRI constraint vocabulary per RFC 3987. Instances are `iri` and
     `iri_reference` in core. The facets are uri_type's: `schemes` lists the
-    admitted schemes, compared case-insensitively; `allow_relative` admits a
-    relative reference beside an IRI, so its default is an IRI-reference;
-    `allow_fragment` admits a fragment. An IRI's characters beyond US-ASCII are
-    RFC 3987's `ucschar`, and `iprivate` within the query.
+    admitted schemes as scheme_name values, which fold case; `allow_relative`
+    admits a relative reference beside an IRI, so its default is an
+    IRI-reference; `allow_fragment` admits a fragment. An IRI's characters
+    beyond US-ASCII are RFC 3987's `ucschar`, and `iprivate` within the query.
     """
   iri_type => text_type & atom_specification & {
     spec?:           = "https://www.rfc-editor.org/rfc/rfc3987"

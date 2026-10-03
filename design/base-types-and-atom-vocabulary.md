@@ -188,14 +188,15 @@ value, none of them needed a change of its own beyond reading the value rather t
   kernel's `identifier` is `!identifier_type { continue_add: "-" }`, whose profile is `IdentifierProfile.NAME` —
   which the lexer, schema parser, resolver and linker hold statically, since the kernel's own names are read before
   the kernel exists. `MetaKernelBootstrapResolver` refuses a kernel `identifier` stating any other body, so the two
-  cannot drift. **The profile facets never move under refinement** (`IdentifierType.constraintsCheck`): a refinement
-  restates them or leaves them, and narrows only the text facets. Set-once would not do — setting `start_add` where
-  the source left it unset widens the profile. `coherenceCheck` holds each member to the type's profile as well as
-  to the facets, since a member the profile refuses is one no value can reach, and refuses a profile with an empty
-  Start set or a medial that is also Start or Continue. Core declares no `identifier`; a schema wanting one
-  writes the kernel's line. Core's `void`
-  is `!void_type {}` too, so the linker's refusal of a `void` variant and the inhabitance check ask the body
-  (`ReferenceChain.resolvesToVoid`), not the name.
+  cannot drift. The kernel's second instance, `scheme_name` (`IdentifierType.SCHEME_NAME`), is told apart by its
+  entry name and checked the same way. **The profile facets never move under refinement**
+  (`IdentifierType.constraintsCheck`): a refinement restates them or leaves them, and narrows only the text facets.
+  Set-once would not do — setting `start_add` where the source left it unset widens the profile. `coherenceCheck`
+  holds each member to the type's profile as well as to the facets, since a member the profile refuses is one no
+  value can reach, and refuses a profile with an empty Start set or a medial that is also Start or Continue. Core
+  declares no `identifier`; a schema wanting one writes the kernel's line. Core's `void` is `!void_type {}` too, so
+  the linker's refusal of a `void` variant and the inhabitance check ask the body (`ReferenceChain.resolvesToVoid`),
+  not the name.
 - **The network family reuses one grammar per address form, never a second copy.** Both grammars are
   `base.atom.InternetAddress`'s: its IPv6 half parses RFC 4291 §2.2's embedded IPv4 tail through the same
   strict `dec-octet` pattern `Ipv4Parser` reads, and
@@ -219,8 +220,10 @@ value, none of them needed a change of its own beyond reading the value rather t
   `IriType.uriFacets`. A directive argument is read as `iri_reference` ([TSON-DATA] §3.3: a reference or a file
   reference, its name free to reach beyond US-ASCII); whether an identity is absolute is §2.2.1's question,
   asked where the identity is formed.
-  The facets narrow by kind: `schemes` is a member set compared case-insensitively (RFC 3986
-  §3.1), and `allow_relative` and `allow_fragment` are permissions, as `float_type`'s `allow_*` flags are.
+  The facets narrow by kind: `schemes` is a member set of `scheme_name` values — a case-folding identifier, so a
+  scheme is held folded and two casings of one are a duplicate element, and `UriType.admitsScheme` compares a
+  value's scheme in that form (RFC 3986 §3.1) — and `allow_relative` and `allow_fragment` are permissions, as
+  `float_type`'s `allow_*` flags are.
 - **A CIDR value is a network, not its text, and a family each** — `cidr4` reads to
   `base.atom.CidrInet4Network` and `cidr6` to `CidrInet6Network` (the prefix octets and the prefix length),
   so two spellings of one network are one value and `2001:0db8:0000:…/32` binds equal to `2001:db8::/32`.

@@ -57,9 +57,20 @@ public record UriType(String spec, @Field("min_length") Optional<Integer> minLen
     public static final UriType URI = new UriType(SPEC, Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true, Normalization.NONE);
 
-    /** Whether {@code scheme} is one {@link #schemes} admits -- §3.1's case-insensitive comparison. */
+    /**
+     * Whether {@code scheme} is one {@link #schemes} admits: compared in {@code scheme_name}'s form, the scheme
+     * folded as §3.1 compares one, so {@code HTTP} is the element {@code http}.
+     */
     public boolean admitsScheme(String scheme) {
-        return schemes.isEmpty() || scheme != null && schemes.get().stream().anyMatch(scheme::equalsIgnoreCase);
+        if (schemes.isEmpty()) {
+            return true;
+        }
+        if (scheme == null) {
+            return false;
+        }
+        Normalization form = IdentifierType.SCHEME_NAME.normalization();
+        String folded = form.apply(scheme);
+        return schemes.get().stream().anyMatch(admitted -> form.apply(admitted).equals(folded));
     }
 
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */

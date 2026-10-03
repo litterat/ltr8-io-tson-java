@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b7f6eb260a166e6277aac3bc48ffca876d914dad23f2bf870b7e2ac449026b63"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ff02bc0caa6659961dcac0526215f29374819dc3c67a48f8dd5b9877fd0baf02"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -359,8 +359,9 @@
     URI constraint vocabulary. Composes with the text_type constructor to
     inherit its record shape (length and pattern fields) plus the
     atom_specification mixin's spec field plus uri-specific fields.
-    `schemes` lists the admitted schemes, compared case-insensitively (RFC
-    3986 §3.1); a value with no scheme is outside it. `allow_relative` admits
+    `schemes` lists the admitted schemes as scheme_name values, which fold case
+    as RFC 3986 §3.1 compares a scheme, and a value's scheme is compared in that
+    form; a value with no scheme is outside it. `allow_relative` admits
     a relative reference (§4.2) beside a URI (§3), so its default is a
     URI-reference (§4.1); withdrawing it requires a scheme. `allow_fragment`
     admits a fragment (§3.5); withdrawing it refuses one, which with
@@ -374,7 +375,16 @@
   }
 
   @doc:"The schemes a uri_type admits."
-  scheme_set => !set_type { element_type: text  min_items: 1 }
+  scheme_set => !set_type { element_type: scheme_name  min_items: 1 }
+
+  @doc:"""
+    A URI scheme (RFC 3986 §3.1): a letter, then letters, digits, "+", "-" and
+    ".". A scheme compares without case, so its value is the text folded.
+    """
+  scheme_name => !identifier_type { start: NONE  continue: NONE
+    start_add: "abcdefghijklmnopqrstuvwxyz"
+    continue_add: "abcdefghijklmnopqrstuvwxyz0123456789+-."
+    normalization: NFKC_CASEFOLD }
 
   @doc:"A URI (RFC 3986 §3): the scheme is required."
   uri => !uri_type { allow_relative: false }

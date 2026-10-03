@@ -1371,7 +1371,8 @@ class DefinitionResolverTest {
         chainNamespace.put("whole", instanceResolver.resolve(schemaMap.declarations().get("whole")));
 
         UriType secure = (UriType) instanceResolver.resolve(schemaMap.declarations().get("secure")).body();
-        assertEquals(Optional.of(List.of("HTTPS")), secure.schemes());
+        // A scheme is a scheme_name, whose value is folded: `HTTPS` narrows to the source's `https`.
+        assertEquals(Optional.of(List.of("https")), secure.schemes());
         SchemaValidationException ftp = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("ftp")));
         assertTrue(ftp.getMessage().contains("schemes adds [ftp], which the source does not admit"), ftp.getMessage());

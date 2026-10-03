@@ -268,7 +268,12 @@
 
   scheme_set => !type_definition {
     source: set_type
-    body: !set_type { element_type: text  min_items: 1 }
+    body: !set_type { element_type: scheme_name  min_items: 1 }
+  }
+
+  scheme_name => !type_definition {
+    source: identifier_type
+    body: !identifier_type { start: NONE  continue: NONE  start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789+-."  normalization: NFKC_CASEFOLD }
   }
 
   uri => !type_definition {
