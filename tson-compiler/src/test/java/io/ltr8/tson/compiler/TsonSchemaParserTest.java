@@ -534,6 +534,13 @@ class TsonSchemaParserTest {
         assertGroupRefused("( a: text | b: text ) +", "immediately adjacent");
     }
 
+    /** A group has one state, so it takes one mark, and the refusal says so rather than asking for a separator. */
+    @Test
+    void aGroupWithTwoMarksIsAParseError() {
+        assertGroupRefused("( a: text | b: text )+?", "takes one mark");
+        assertGroupRefused("( a: text | b: text )?+", "takes one mark");
+    }
+
     private GroupDef groupOf(String source) {
         RecordDef record = (RecordDef) ((StructuralTypeDef) declOf(source).typeDef()).body();
         return (GroupDef) record.entries().get(0);

@@ -100,25 +100,26 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     }
 
     /**
-     * [TSON-SCHEMA] §5.11: an OPTIONAL group admits at most one chosen option, a REQUIRED group exactly one. An
-     * option is chosen when any of its members is present, so with options of one field this counts members.
+     * [TSON-SCHEMA] §5.11: a REQUIRED group with no option chosen, or more than one. An option is chosen when any
+     * of its members is present; the message counts options, since an option may hold several fields.
      */
-    public Refusal groupAdmitsAtMostOne(String options, int chosen) {
-        return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
-                "at most one of (%s) may be present for '%s', found %d".formatted(options, typeName, chosen),
-                "at most one of (" + options + ")", chosen + " present");
+    public Refusal groupChoosesExactlyOne(String options, int chosen) {
+        return new Refusal(Diagnostic.Code.FIELD_GROUP,
+                "exactly one option of (%s) must be chosen for '%s', found %s".formatted(options, typeName,
+                        chosen == 0 ? "none" : chosen),
+                "exactly one option of (" + options + ")", chosen == 0 ? "none chosen" : chosen + " chosen");
     }
 
-    /** A REQUIRED group with no option chosen -- §5.11 counts presence after ordinary field validation. */
-    public Refusal groupRequiresOne(String options) {
-        return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
-                "exactly one of (%s) must be present for '%s'".formatted(options, typeName),
-                "one of (" + options + ")", "none present");
+    /** An OPTIONAL group with more than one option chosen. */
+    public Refusal groupChoosesAtMostOne(String options, int chosen) {
+        return new Refusal(Diagnostic.Code.FIELD_GROUP,
+                "at most one option of (%s) may be chosen for '%s', found %d".formatted(options, typeName, chosen),
+                "at most one option of (" + options + ")", chosen + " chosen");
     }
 
     /** The at-least-one group ({@code +}, SPEC-FEEDBACK.md #18) with none of its members present. */
     public Refusal groupRequiresAtLeastOne(String members) {
-        return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
+        return new Refusal(Diagnostic.Code.FIELD_GROUP,
                 "at least one of (%s) must be present for '%s'".formatted(members, typeName),
                 "at least one of (" + members + ")", "none present");
     }
@@ -128,7 +129,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
      * member present chose the option, and the option needs the one that is missing.
      */
     public Refusal optionNeeds(String chosenBy, String option, String missing) {
-        return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
+        return new Refusal(Diagnostic.Code.FIELD_GROUP,
                 "'%s' chose (%s) on '%s', which needs '%s'".formatted(chosenBy, option, typeName, missing),
                 "'" + missing + "' beside '" + chosenBy + "'", "missing");
     }

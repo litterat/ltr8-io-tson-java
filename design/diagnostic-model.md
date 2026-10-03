@@ -34,7 +34,7 @@ that are `Diagnostic.ofLimitExceeded` and `Code.of(SchemaFetchException.Reason)`
 `tson-base`'s own exceptions and mean the same thing in every encoding. (`Diagnostic`, root package)
 
 `Diagnostic` is the structured value every `DiagnosticsReceiver` receives, identical shape whichever
-one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`FIELD_FIXED`/`TYPE_MISMATCH`/`WRONG_ARITY`/
+one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`FIELD_FIXED`/`FIELD_GROUP`/`TYPE_MISMATCH`/`WRONG_ARITY`/
 `UNKNOWN_TYPE_REF`/`ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD`/
 `DUPLICATE_MAP_KEY`/`DUPLICATE_FIELD`
 from readers; `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT` for §8.2's three name-hygiene

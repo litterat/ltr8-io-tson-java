@@ -864,17 +864,26 @@ class CrossEncodingParityTest {
         sameRule("contact", "{}", "{}");
     }
 
-    /** The shared rules' words, pinned once here since {@link #sameRule} only compares the two encodings. */
+    /**
+     * The shared rules' words and code, pinned once here since {@link #sameRule} only compares the two encodings:
+     * every group verdict is {@code FIELD_GROUP}, and the count states the group's own rule.
+     */
     @Test
     void theGroupRulesSayWhatWasChosenAndWhatIsMissing() {
-        assertEquals(List.of("'port' chose (host port) on 'endpoint', which needs 'host'",
-                        "at most one of (host port | socket) may be present for 'endpoint', found 2"),
-                jsonDiagnostics("endpoint", "{\"port\": 80, \"socket\": \"s\"}").stream()
-                        .map(Diagnostic::message).toList());
-        assertEquals(List.of("at least one of (email | phone) must be present for 'contact'"),
-                jsonDiagnostics("contact", "{}").stream().map(Diagnostic::message).toList());
-        assertEquals(List.of("exactly one of (include | name? type?) must be present for 'fragment'"),
-                jsonDiagnostics("fragment", "{}").stream().map(Diagnostic::message).toList());
+        assertGroupRule("endpoint", "{\"port\": 80, \"socket\": \"s\"}",
+                "'port' chose (host port) on 'endpoint', which needs 'host'",
+                "at most one option of (host port | socket) may be chosen for 'endpoint', found 2");
+        assertGroupRule("contact", "{}", "at least one of (email | phone) must be present for 'contact'");
+        assertGroupRule("fragment", "{}",
+                "exactly one option of (include | name? type?) must be chosen for 'fragment', found none");
+        assertGroupRule("fragment", "{\"include\": \"a\", \"type\": \"t\"}",
+                "exactly one option of (include | name? type?) must be chosen for 'fragment', found 2");
+    }
+
+    private static void assertGroupRule(String rootType, String json, String... messages) {
+        List<Diagnostic> problems = jsonDiagnostics(rootType, json);
+        assertEquals(List.of(messages), problems.stream().map(Diagnostic::message).toList());
+        assertTrue(problems.stream().allMatch(d -> d.code() == Diagnostic.Code.FIELD_GROUP), problems::toString);
     }
 
     private static void bothAdmit(String rootType, String tsonBody, String jsonBody) {

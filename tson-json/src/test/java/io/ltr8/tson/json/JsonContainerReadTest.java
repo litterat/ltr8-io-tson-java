@@ -288,9 +288,9 @@ class JsonContainerReadTest {
     void aRequiredGroupTakesExactlyOneMember() {
         read("bounded", """
                 {"value": 1, "min": 0}""").accepted();
-        assertEquals(Diagnostic.Code.FIELD_REQUIRED, read("bounded", """
+        assertEquals(Diagnostic.Code.FIELD_GROUP, read("bounded", """
                 {"value": 1}""").refusal().code());
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("bounded", """
+        assertEquals(Diagnostic.Code.FIELD_GROUP, read("bounded", """
                 {"value": 1, "min": 0, "max": 9}""").refusal().code());
     }
 
@@ -300,7 +300,7 @@ class JsonContainerReadTest {
                 {"value": 1}""").accepted();
         read("flagged", """
                 {"value": 1, "cleared": 3}""").accepted();
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("flagged", """
+        assertEquals(Diagnostic.Code.FIELD_GROUP, read("flagged", """
                 {"value": 1, "cleared": 3, "pending": 4}""").refusal().code());
     }
 

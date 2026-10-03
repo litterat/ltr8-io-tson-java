@@ -635,6 +635,11 @@ public final class TsonSchemaParser extends TsonDataParser {
         GroupDef.Quantifier quantifier = consumeAdjacent(TokenType.QUESTION) ? GroupDef.Quantifier.AT_MOST_ONE
                 : consumeAdjacent(TokenType.PLUS) ? GroupDef.Quantifier.AT_LEAST_ONE
                 : GroupDef.Quantifier.EXACTLY_ONE;
+        if (quantifier != GroupDef.Quantifier.EXACTLY_ONE && (check(TokenType.QUESTION) || check(TokenType.PLUS))
+                && lastTokenEnd().equals(peek().start())) {
+            throw parseError("a field group takes one mark after its ')': '?' for at most one option, or '+' for "
+                    + "at least one of its members (§5.11)");
+        }
         GroupDef group = new GroupDef(annotations, options, quantifier);
         checkGroupShape(group, start);
         return group;
