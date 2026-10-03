@@ -57,27 +57,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
 
     /** The facets over a value already in the type's form; {@code IdentifierParser} runs its profile between. */
     void validate(String text) {
-        constraints.length().ifPresent(len -> {
-            if (text.length() != len) {
-                throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, expected exactly " + len,
-                        "exactly " + len + " characters");
-            }
-        });
-        constraints.minLength().ifPresent(min -> {
-            if (text.length() < min) {
-                throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, less than the minimum " + min,
-                        "at least " + min + " characters");
-            }
-        });
-        constraints.maxLength().ifPresent(max -> {
-            if (text.length() > max) {
-                throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, more than the maximum " + max,
-                        "at most " + max + " characters");
-            }
-        });
+        checkLengths(text, constraints.length(), constraints.minLength(), constraints.maxLength());
         // The pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
         // java.util.regex; it was already validated well-formed when the schema resolved (see RegexParser).
         constraints.pattern().ifPresent(p -> {
@@ -101,6 +81,35 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
         return natural(String.class, target);
+    }
+
+
+    /**
+     * {@code text_type}'s three length facets over {@code text}, shared by every family that composes them. A
+     * length counts code points, as {@code text_type} says, so a character outside the Basic Multilingual Plane
+     * is one character and not the two UTF-16 units {@link String#length} would count.
+     */
+    static void checkLengths(String text, Optional<Integer> length, Optional<Integer> minLength,
+                             Optional<Integer> maxLength) {
+        if (length.isEmpty() && minLength.isEmpty() && maxLength.isEmpty()) {
+            return;
+        }
+        int count = text.codePointCount(0, text.length());
+        if (length.isPresent() && count != length.get()) {
+            throw new AtomValidationException(
+                    "'" + text + "' is " + count + " characters, expected exactly " + length.get(),
+                    "exactly " + length.get() + " characters");
+        }
+        if (minLength.isPresent() && count < minLength.get()) {
+            throw new AtomValidationException(
+                    "'" + text + "' is " + count + " characters, less than the minimum " + minLength.get(),
+                    "at least " + minLength.get() + " characters");
+        }
+        if (maxLength.isPresent() && count > maxLength.get()) {
+            throw new AtomValidationException(
+                    "'" + text + "' is " + count + " characters, more than the maximum " + maxLength.get(),
+                    "at most " + maxLength.get() + " characters");
+        }
     }
 
 }

@@ -153,10 +153,12 @@ SPEC-FEEDBACK.md #19). `text_type` carries the facet and every family composing 
 default, `NFC` on `identifier_type`, fixed to `NONE` on `regex_type`, since folding a pattern changes what it
 matches. Each parser puts the text into the form first and judges the result: the lengths, `pattern`, the
 members (normalised the same way, `TextType.normalizedMembers`), an identifier's profile, a URI's or an
-address's grammar. Since every comparison downstream — map keys, set elements, pins, look-alike scopes, hygiene —
-already runs on the parser's value, none of them needed a change of its own beyond reading the value rather than
-the token. `NFKC_CASEFOLD` is `NfkcCasefold`, derived from the JDK's normalizer and case mappings with three
-exceptions and checked against `DerivedNormalizationProps.txt` over every code point.
+address's grammar. The three lengths are one helper, `TextParser.checkLengths`, which the URI and email parsers
+call too, and they count code points, as `text_type` says and `TextType.coherenceCheck` does. Since every
+comparison downstream — map keys, set elements, pins, look-alike scopes, hygiene — already runs on the parser's
+value, none of them needed a change of its own beyond reading the value rather than the token. `NFKC_CASEFOLD` is
+`NfkcCasefold`, derived from the JDK's normalizer and case mappings with three exceptions and checked against
+`DerivedNormalizationProps.txt` over every code point.
 
 - **Each constructor splits into two classes across two modules:** a pure constraint-*values* record in
   `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`, `RegexType`, `DateType`, …, matching the kernel's

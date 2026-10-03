@@ -2,8 +2,11 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
+import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.tson.schema.meta.IriType;
 import org.junit.jupiter.api.Test;
 import java.net.URI;
+import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -64,5 +67,17 @@ class IriParserTest {
         URI value = IriParser.UNCONSTRAINED.read("https://example.com/a\u3000b");
         assertEquals("https://example.com/a%E3%80%80b", value.toString());
         assertEquals(value, IriParser.UNCONSTRAINED.read("https://example.com/a%E3%80%80b"));
+    }
+
+    /** An IRI's lengths count code points too, as the {@code text_type} facets it composes say. */
+    @Test
+    void anIrisLengthCountsCodePoints() {
+        String iri = "https://a.example/\uD83D\uDE00";
+        IriParser upTo19 = new IriParser(new IriType(IriType.SPEC, Optional.empty(), Optional.of(19),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true,
+                Normalization.NONE));
+        assertEquals(19, iri.codePointCount(0, iri.length()));
+        upTo19.read(iri);
+        assertThrows(AtomValidationException.class, () -> upTo19.read(iri + "x"));
     }
 }
