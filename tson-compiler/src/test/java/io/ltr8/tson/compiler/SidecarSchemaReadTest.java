@@ -196,7 +196,7 @@ class SidecarSchemaReadTest {
 
     /** `absent` and `empty-brace` have no payload, so they are typed void and written `_`. */
     @Test
-    void aPayloadlessCoreValueIsWrittenAsTheAbsentSentinel() {
+    void aPayloadlessCoreValueIsWrittenAsTheVoidSentinel() {
         SuiteCheckout.assumeAvailable();
         accepts("parser", """
                 {

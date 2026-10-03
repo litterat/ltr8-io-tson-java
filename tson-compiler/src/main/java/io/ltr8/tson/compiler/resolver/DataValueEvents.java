@@ -1,17 +1,10 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.Position;
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.Annotation;
-import io.ltr8.tson.compiler.ast.ArrayValue;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
-import io.ltr8.tson.compiler.ast.MapValue;
-import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.*;
+import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
-import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
+import io.ltr8.tson.compiler.stream.VoidEvent;
 import io.ltr8.tson.compiler.stream.AnnotationEnd;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
@@ -97,7 +90,7 @@ final class DataValueEvents {
                 events.add(new ArrayEnd(PLACEHOLDER));
             }
             case EmptyBrace ignored -> events.add(new EmptyBraceEvent(PLACEHOLDER));
-            case AbsentValue ignored -> events.add(new AbsentEvent(PLACEHOLDER));
+            case VoidValue ignored -> events.add(new VoidEvent(PLACEHOLDER));
             case TokenValue tv -> events.add(new TokenEvent(tv.text(), tv.form(), PLACEHOLDER));
         }
     }

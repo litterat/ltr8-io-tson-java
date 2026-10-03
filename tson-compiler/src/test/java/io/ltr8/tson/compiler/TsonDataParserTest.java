@@ -1,17 +1,9 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.ArrayValue;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.Document;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
-import io.ltr8.tson.compiler.ast.MapValue;
-import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.*;
+import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
-import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -67,8 +59,8 @@ class TsonDataParserTest {
     }
 
     @Test
-    void absentRoot() {
-        assertInstanceOf(AbsentValue.class, root("_").coreValue());
+    void voidRoot() {
+        assertInstanceOf(VoidValue.class, root("_").coreValue());
     }
 
     @Test
@@ -84,7 +76,7 @@ class TsonDataParserTest {
         Document doc = parse("!!id:\"https://example.com/x.tn\"\n_");
         assertEquals("https://example.com/x.tn", doc.id().orElseThrow());
         assertTrue(doc.schema().isEmpty());
-        assertInstanceOf(AbsentValue.class, doc.root().coreValue());
+        assertInstanceOf(VoidValue.class, doc.root().coreValue());
     }
 
     @Test
@@ -240,9 +232,9 @@ class TsonDataParserTest {
     }
 
     @Test
-    void recordFieldValueCanBeAbsent() {
+    void recordFieldValueCanBeVoid() {
         RecordValue rec = assertInstanceOf(RecordValue.class, root("{ x: _ }").coreValue());
-        assertInstanceOf(AbsentValue.class, rec.fields().get(0).value().value().coreValue());
+        assertInstanceOf(VoidValue.class, rec.fields().get(0).value().value().coreValue());
     }
 
     /**
@@ -292,7 +284,7 @@ class TsonDataParserTest {
         MapValue map = assertInstanceOf(MapValue.class,
                 root("{ WELCOME10 => \"10%\" loyalty => _ }").coreValue());
         assertEquals(2, map.entries().size());
-        assertInstanceOf(AbsentValue.class, map.entries().get(1).value().value().coreValue());
+        assertInstanceOf(VoidValue.class, map.entries().get(1).value().value().coreValue());
     }
 
     @Test
@@ -310,11 +302,11 @@ class TsonDataParserTest {
     }
 
     @Test
-    void absentAsMapKeyParsesStructurally() {
+    void voidAsMapKeyParsesStructurally() {
         // The spec forbids this, but as a resolver-layer rule, not a grammar one (§2.9). The
         // structural compiler must accept it.
         MapValue map = assertInstanceOf(MapValue.class, root("{ _ => 1 }").coreValue());
-        assertInstanceOf(AbsentValue.class, map.entries().get(0).key().coreValue());
+        assertInstanceOf(VoidValue.class, map.entries().get(0).key().coreValue());
     }
 
     /**
@@ -359,11 +351,11 @@ class TsonDataParserTest {
     }
 
     @Test
-    void absentOccupiesPositionalArraySlot() {
+    void voidOccupiesPositionalArraySlot() {
         // [1 _ 3] has three elements (§2.9).
         ArrayValue arr = assertInstanceOf(ArrayValue.class, root("[1 _ 3]").coreValue());
         assertEquals(3, arr.elements().size());
-        assertInstanceOf(AbsentValue.class, arr.elements().get(1).value().coreValue());
+        assertInstanceOf(VoidValue.class, arr.elements().get(1).value().coreValue());
     }
 
     @Test
@@ -687,7 +679,7 @@ class TsonDataParserTest {
         RecordValue item0 = assertInstanceOf(RecordValue.class, items.elements().get(0).value().coreValue());
         assertEquals(".5", token(item0.fields().get(3).value().value()).text());
         RecordValue item1 = assertInstanceOf(RecordValue.class, items.elements().get(1).value().coreValue());
-        assertInstanceOf(AbsentValue.class, item1.fields().get(3).value().value().coreValue());
+        assertInstanceOf(VoidValue.class, item1.fields().get(3).value().value().coreValue());
 
         MapValue discounts = assertInstanceOf(MapValue.class,
                 order.fields().get(7).value().value().coreValue());

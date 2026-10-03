@@ -4,7 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
+import io.ltr8.tson.compiler.stream.VoidEvent;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
@@ -37,7 +37,7 @@ final class VoidReader implements TsonTypeReader<Object> {
         ctx = ctx.underDeclaration(schemaLocation);
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
-        if (!(e instanceof AbsentEvent)) {
+        if (!(e instanceof VoidEvent)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                     "expected the void sentinel '_' for void, found " + TypeRefCheck.describe(e),
                     "the void sentinel '_'", TypeRefCheck.describe(e));

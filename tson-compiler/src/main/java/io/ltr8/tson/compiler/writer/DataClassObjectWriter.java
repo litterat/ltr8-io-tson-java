@@ -78,7 +78,7 @@ public final class DataClassObjectWriter {
     public void write(Object value, TsonDataEmitter out) {
         try {
             if (value == null) {
-                out.absentValue();
+                out.voidValue();
                 return;
             }
             write(value, context.getDescriptor(value.getClass()), out);
@@ -135,7 +135,7 @@ public final class DataClassObjectWriter {
             throws DataBindException {
         try {
             if (value == null) {
-                writer.absentValue();
+                writer.voidValue();
                 return;
             }
             if (dataClass instanceof DataClassAnnotated boxed) {

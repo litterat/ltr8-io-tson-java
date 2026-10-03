@@ -229,10 +229,10 @@ class JsonObjectReaderTest {
     }
 
     @Nested
-    class NullAndAbsence {
+    class NullAndVoid {
 
         @Test
-        void null_at_an_optional_member_is_the_absence_and_binds_null() {
+        void null_at_a_voidable_member_is_void_and_binds_null() {
             // §7: JSON null is the void sentinel's spelling, admitted where the position admits absence.
             assertEquals(new Person(null, 36), READER.read("{\"name\": null, \"age\": 36}", Person.class));
         }
@@ -240,13 +240,13 @@ class JsonObjectReaderTest {
         @Test
         void omitted_and_null_are_indistinguishable_in_the_result() {
             // §6.1.2 says so outright, and a bound object has no third state to tell them apart -- the
-            // asymmetry TsonAbsent exists for on the tree side.
+            // asymmetry TsonVoid exists for on the tree side.
             assertEquals(READER.read("{\"age\": 1}", Person.class),
                     READER.read("{\"name\": null, \"age\": 1}", Person.class));
         }
 
         @Test
-        void null_at_a_required_member_is_refused_as_the_absent_sentinel_is_in_text() {
+        void null_at_a_non_voidable_member_is_refused_as_the_void_sentinel_is_in_text() {
             // [TSON-SCHEMA] §7.6: `_` at a REQUIRED field is an error, and §7 makes null its JSON spelling.
             assertTrue(refused("{\"name\": \"a\", \"age\": null}", Person.class).message()
                     .contains("member 'age' is required and is written null"));

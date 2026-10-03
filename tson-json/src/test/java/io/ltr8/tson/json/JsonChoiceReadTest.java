@@ -114,7 +114,7 @@ class JsonChoiceReadTest {
 
     /** §7: null carries no class at all -- it is the void sentinel, and a choice admits no absence. */
     @Test
-    void nullAtAChoiceIsAnAbsenceAndNotAnUnknownKind() {
+    void nullAtAChoiceIsVoidAndNotAnUnknownKind() {
         assertEquals(Diagnostic.Code.FIELD_REQUIRED, read("scalar_or_list", "null").refusal().code());
     }
 

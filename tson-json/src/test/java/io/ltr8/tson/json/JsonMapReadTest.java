@@ -114,7 +114,7 @@ class JsonMapReadTest {
 
     /** §6.4: `{K => V?}` admits null as an entry's void value; under `{K => V}` it is a validation error. */
     @Test
-    void anEntryValueIsAbsentOnlyWhereTheMapAdmitsOne() {
+    void anEntryValueIsVoidOnlyWhereTheMapAdmitsOne() {
         assertEquals("""
                 {"a":null}""", read("optional", """
                 {"a": null}""").accepted().toString());

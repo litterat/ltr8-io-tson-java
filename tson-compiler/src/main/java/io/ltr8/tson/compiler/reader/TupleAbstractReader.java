@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.TupleDiagnostics;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -25,7 +24,7 @@ import java.util.List;
  * <p>Each position carries its own type *and* its own {@code voidable} (§5.3) -- unlike {@link
  * ArrayAbstractReader}, where every element shares one type and one fact -- so void-position handling
  * stays per-slot here rather than shared with arrays; the logic is analogous, not identical, so it's
- * duplicated rather than forced through one shared method (matching how {@code isAbsent} is
+ * duplicated rather than forced through one shared method (matching how {@code isVoid} is
  * duplicated, not shared, across every structural kind in this package).
  *
  * <p><b>Arity is fixed and exact</b>, unlike {@link ArrayAbstractReader}/{@link MapAbstractReader}'s
@@ -53,7 +52,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
     final TupleDiagnostics rules;
 
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for a position's state rule. */
-    private static final String ABSENT = "_";
+    private static final String VOID = "_";
 
     TupleAbstractReader(String name, String displayName, TupleBody body, TsonTypeReaderResolver resolver,
                          SchemaLocation schemaLocation) {
@@ -127,7 +126,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
             if (push != null) {
                 ScopePush.refuse(ctx.index(index), slot.schema().elementType().name(), push);
             }
-            result[index] = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(slot, index, ctx)
+            result[index] = ctx.peek() instanceof VoidEvent ? defaultOrRequire(slot, index, ctx)
                     : slot.parser().read(ctx.index(index));
             index++;
         }
@@ -139,9 +138,9 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     private Object defaultOrRequire(CompiledSlot slot, int index, TsonReadContext ctx) {
-        ctx.next(); // consume the AbsentEvent whether or not the position is voidable
+        ctx.next(); // consume the VoidEvent whether or not the position is voidable
         if (!slot.schema().voidable()) {
-            ctx.index(index).report(rules.absentPosition(index, ABSENT));
+            ctx.index(index).report(rules.voidPosition(index, VOID));
         }
         return null;
     }

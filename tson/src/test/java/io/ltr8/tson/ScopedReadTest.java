@@ -320,7 +320,7 @@ class ScopedReadTest {
     /**
      * <b>Bind mode reads the pushed value and hands back the object, unwrapped.</b> A bound class has nowhere
      * to carry a schema URI, and inventing somewhere would change what a consumer's own class means -- so the
-     * scope is a tree-mode fact, the same asymmetry {@code TsonAbsent} already makes for [TSON-DATA] §2.9.
+     * scope is a tree-mode fact, the same asymmetry {@code TsonVoid} already makes for [TSON-DATA] §2.9.
      *
      * <p>{@code extern_type<S, T>} is the shape bind mode can state: one type in one schema, so the component
      * has a static type to be. The wider instances are read the same way and land in an {@code Object}

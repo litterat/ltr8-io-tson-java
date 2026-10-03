@@ -321,7 +321,7 @@ class JsonContainerReadTest {
 
     /** §6.3: `[T?]` admits null at any slot as the absent element -- the slot exists and counts. */
     @Test
-    void anElementOptionalArrayAdmitsNullAsAnAbsentElement() {
+    void anElementVoidableArrayAdmitsNullAsAVoidElement() {
         assertEquals("""
                 ["a",null,"c"]""", json(read("maybe_tags", """
                 ["a", null, "c"]""").accepted()));

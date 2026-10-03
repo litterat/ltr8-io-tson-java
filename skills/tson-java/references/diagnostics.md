@@ -142,7 +142,7 @@ leaves the original fail-fast.
 
 **Mode asymmetry, deliberate, not an inconsistency:** collecting mode always keeps reading, and **bind
 mode is all-or-nothing** (a `ConstructionGuard` — a partially-filled object is worse than none) while
-**tree mode keeps everything it built** (a `TsonAbsent` stands where a value failed).
+**tree mode keeps everything it built** (a `TsonVoid` stands where a value failed).
 
 ## Exceptions
 

@@ -2,35 +2,13 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.Annotation;
-import io.ltr8.tson.compiler.ast.ArrayValue;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.Document;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
-import io.ltr8.tson.compiler.ast.MapValue;
-import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.*;
+import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.AnnotationEnd;
-import io.ltr8.tson.compiler.stream.AnnotationStart;
-import io.ltr8.tson.compiler.stream.ArrayEnd;
-import io.ltr8.tson.compiler.stream.ArrayStart;
-import io.ltr8.tson.compiler.stream.DocumentStart;
-import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
-import io.ltr8.tson.compiler.stream.FieldName;
-import io.ltr8.tson.compiler.stream.MapEnd;
-import io.ltr8.tson.compiler.stream.RecordEnd;
-import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.MapStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
-import io.ltr8.tson.compiler.stream.TokenEvent;
-import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.compiler.stream.TypeRef;
+import io.ltr8.tson.compiler.stream.*;
+import io.ltr8.tson.compiler.stream.VoidEvent;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -45,7 +23,7 @@ import java.util.function.BiConsumer;
  * Tier 3: builds a full {@code Document} AST (§2, §3, §7.4) by pulling {@link TsonEvent}s from a
  * {@link TsonDataStream} (Tier 2) and reducing that flat sequence back into the nested {@code
  * ast} tree ({@link RecordValue}, {@link MapValue}, {@link ArrayValue}, {@link EmptyBrace}, {@link
- * AbsentValue}, {@link TokenValue}). This class holds no independent implementation of the data
+ * VoidValue}, {@link TokenValue}). This class holds no independent implementation of the data
  * grammar -- {@link TsonDataStream} is the one place that walks source text and resolves things
  * like {@code {}} record/map disambiguation; everything here is reduction (event sequence -&gt;
  * tree), the streaming counterpart of a DOM builder sitting on top of a SAX/StAX reader.
@@ -89,7 +67,7 @@ public class TsonDataParser {
      * {@code .equals()}-keyed lookup would not. This is only sound because every {@code CoreValue}
      * constructed by this parser (see {@link #recordPosition}) is a fresh {@code new} at its own
      * occurrence, never cached or reused as a singleton -- a future optimization that shares a
-     * single {@code EmptyBrace}/{@code AbsentValue} instance across occurrences would silently
+     * single {@code EmptyBrace}/{@code VoidValue} instance across occurrences would silently
      * corrupt this table.
      */
     final Map<CoreValue, Position> positions = new IdentityHashMap<>();
@@ -286,7 +264,7 @@ public class TsonDataParser {
             Position position = e.position();
             CoreValue value = switch (e) {
                 case TokenEvent t -> new TokenValue(t.text(), t.form());
-                case AbsentEvent ignored -> new AbsentValue();
+                case VoidEvent ignored -> new VoidValue();
                 case EmptyBraceEvent ignored -> new EmptyBrace();
                 case RecordStart ignored -> record();
                 case MapStart ignored -> map();

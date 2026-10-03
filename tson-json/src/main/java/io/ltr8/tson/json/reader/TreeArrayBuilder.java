@@ -36,7 +36,7 @@ final class TreeArrayBuilder implements ArrayBuilder {
             return null;
         }
         for (int i = 0; i < elements.size(); i++) {
-            if (elements.get(i) == Slots.ABSENT) {
+            if (elements.get(i) == Slots.VOID) {
                 elements.set(i, JsonNull.INSTANCE);
             }
         }

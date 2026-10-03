@@ -31,7 +31,7 @@ public record MapDiagnostics(String typeName) {
      * <p>"The void sentinel" is the series' noun for the concept (§2.9, SPEC-FEEDBACK.md #21) and so belongs in
      * the prose; what stays out is the <em>spelling</em>, which is each encoding's and rides in {@code actual}.
      */
-    public Refusal absentKey(String spelling) {
+    public Refusal voidKey(String spelling) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 "'%s': the void sentinel must not appear as a map key (§2.9)".formatted(typeName),
                 "a real map key, never the void sentinel", spelling);
@@ -59,7 +59,7 @@ public record MapDiagnostics(String typeName) {
      * Absence at an entry value the schema does not admit one at -- {@code {K => V}} rather than
      * {@code {K => V?}} ([TSON-SCHEMA] §7.6). The entry is present either way and counts toward the bounds.
      */
-    public Refusal absentEntryValue(String key, String spelling) {
+    public Refusal voidEntryValue(String key, String spelling) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
                 "'%s' entry '%s' is absent, but values are required".formatted(typeName, key),
                 "a value", spelling);

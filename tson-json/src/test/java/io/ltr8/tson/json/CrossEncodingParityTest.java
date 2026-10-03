@@ -12,7 +12,7 @@ import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonObject;
 import io.ltr8.tson.json.tree.JsonValue;
-import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonRecord;
 import org.junit.jupiter.api.Test;
 
@@ -233,7 +233,7 @@ class CrossEncodingParityTest {
 
     /** {@code nickname?: text} may be omitted and refuses {@code _}: one rule, stated once, in both encodings. */
     @Test
-    void anOptionalFieldRefusesAbsenceInBothEncodings() {
+    void anOptionalFieldRefusesTheVoidSentinelInBothEncodings() {
         sameRule("marks", """
                 { nickname: _  from: 1  version: "2.0" }""", """
                 {"nickname": null, "from": 1, "version": "2.0"}""");
@@ -255,7 +255,7 @@ class CrossEncodingParityTest {
 
     /**
      * Both trees keep the spelling of absence (§7.2): a field written {@code _} or null stands as the absent
-     * node, and one never written is not there -- the text tree's {@code TsonAbsent} and the JSON tree's
+     * node, and one never written is not there -- the text tree's {@code TsonVoid} and the JSON tree's
      * {@code JsonNull} at the same fields, in both directions.
      */
     @Test
@@ -266,7 +266,7 @@ class CrossEncodingParityTest {
         JsonObject json = (JsonObject) jsonTree("marks", """
                 {"from": null, "timeout": null, "version": "2.0"}""");
         for (String field : List.of("from", "timeout")) {
-            assertInstanceOf(TsonAbsent.class, text.get(field), field);
+            assertInstanceOf(TsonVoid.class, text.get(field), field);
             assertInstanceOf(JsonNull.class, json.get(field), field);
         }
         assertFalse(text.fields().containsKey("nickname"));
@@ -585,7 +585,7 @@ class CrossEncodingParityTest {
 
     /** The void sentinel at a field that admits none: `_` in text, null in JSON, one verdict. */
     @Test
-    void theAbsentSentinelAtARequiredField() {
+    void theVoidSentinelAtARequiredField() {
         sameRule("person", """
                 { name: _  labels: [] }""", """
                 {"name": null, "labels": []}""");
@@ -593,7 +593,7 @@ class CrossEncodingParityTest {
 
     /** §6.1.2: at REQUIRED_DEFAULT the fix is omission, and stating absence is refused in both encodings. */
     @Test
-    void theAbsentSentinelAtADefaultedField() {
+    void theVoidSentinelAtADefaultedField() {
         sameRule("person", """
                 { name: "Ada"  tries: _  labels: [] }""", """
                 {"name": "Ada", "tries": null, "labels": []}""");
@@ -608,7 +608,7 @@ class CrossEncodingParityTest {
 
     /** An absent element where the array admits none: `_` in text, null in JSON, one verdict at one index. */
     @Test
-    void anAbsentElementInARequiredElementArray() {
+    void aVoidElementInANonVoidableArray() {
         sameRule("person", """
                 { name: "Ada"  labels: [ "x", _ ] }""", """
                 {"name": "Ada", "labels": ["x", null]}""");
@@ -783,7 +783,7 @@ class CrossEncodingParityTest {
 
     /** An entry value absent where the map admits none: `_` in text, null in JSON, one verdict at one key. */
     @Test
-    void anAbsentEntryValueWhereValuesAreRequired() {
+    void aVoidEntryValueWhereValuesAreNotVoidable() {
         sameRule("counts", """
                 { "a" => _ }""", """
                 {"a": null}""");

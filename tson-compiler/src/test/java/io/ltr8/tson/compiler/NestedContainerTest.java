@@ -8,7 +8,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -157,7 +157,7 @@ class NestedContainerTest {
      * exactly that reading: {@code _} is admitted at an element position and still counts toward the size.
      */
     @Test
-    void anOptionalElementAdmitsTheAbsentSentinelAndItCountsTowardTheSize() {
+    void aVoidableElementAdmitsTheVoidSentinelAndItCountsTowardTheSize() {
         TsonCompiledSchema compiled = compile("""
                   triple => [integer?; 3]
                   strict => [integer; 3]""");
@@ -179,14 +179,14 @@ class NestedContainerTest {
                 .getMessage().contains("elements are required"));
     }
 
-    /** An absent element reaches the tree as {@code TsonAbsent}, in its own positional slot. */
+    /** An absent element reaches the tree as {@code TsonVoid}, in its own positional slot. */
     @Test
-    void anAbsentElementReadsAsTsonAbsentInItsOwnSlot() {
+    void aVoidElementReadsAsTsonVoidInItsOwnSlot() {
         TsonCompiledSchema compiled = compile("  slots => [integer?]");
 
         TsonArray array = (TsonArray) compiled.get("slots").read(TestDocuments.document("[1 _ 3]"));
         assertEquals(3, array.elements().size());
-        assertInstanceOf(TsonAbsent.class, array.get(1));
+        assertInstanceOf(TsonVoid.class, array.get(1));
     }
 
     /** Nesting recurses: a third bracket is no special case, because the hoist is bottom-up. */

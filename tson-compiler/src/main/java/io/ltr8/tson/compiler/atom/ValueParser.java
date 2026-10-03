@@ -130,7 +130,7 @@ public final class ValueParser implements TokenAtomType<Object> {
     private static Object narrow(BaseValue value) {
         return switch (value) {
             // Unreachable: BaseTypeResolver resolves a token, and no token is the void sentinel.
-            case BaseValue.AbsentValue ignored -> throw new IllegalStateException("base resolution produced absence");
+            case BaseValue.VoidValue ignored -> throw new IllegalStateException("base resolution produced absence");
             case BaseValue.BooleanValue b -> b.value();
             case BaseValue.StringValue s -> s.text();
             case BaseValue.NumberValue n -> narrowNumber(n.form());

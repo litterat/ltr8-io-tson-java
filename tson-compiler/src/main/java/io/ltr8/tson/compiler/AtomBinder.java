@@ -36,7 +36,7 @@ public final class AtomBinder {
 
     public static Object bind(BaseValue value, Class<?> target) throws DataBindException {
         return switch (value) {
-            case BaseValue.AbsentValue ignored -> bindAbsent(target);
+            case BaseValue.VoidValue ignored -> bindVoid(target);
             case BaseValue.BooleanValue b -> bindBoolean(b.value(), target);
             case BaseValue.StringValue s -> bindString(s.text(), target);
             case BaseValue.NumberValue n -> bindNumber(n.form(), target);
@@ -44,7 +44,7 @@ public final class AtomBinder {
     }
 
     /** {@code _} binds to {@code null}, the host's only no-value representation -- so no primitive can take it. */
-    private static Object bindAbsent(Class<?> target) throws DataBindException {
+    private static Object bindVoid(Class<?> target) throws DataBindException {
         if (target.isPrimitive()) {
             throw new DataBindException("cannot bind the void sentinel '_' to primitive type " + target);
         }

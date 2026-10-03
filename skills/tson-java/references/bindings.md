@@ -51,7 +51,7 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `cidr4` / `cidr6`                               | `io.ltr8.tson.base.atom.CidrInet4Network` / `CidrInet6Network` |
 | `bytes` (and any `!bytes_type { encoding: … }` instance) | `byte[]`                               |
 | an untyped token (§4 base resolution)           | `Boolean`, `BigInteger`, `BigDecimal`, `String` |
-| `_` (the only no-value spelling)                | a `TsonAbsent` node / `null`                    |
+| `_` (the only no-value spelling)                | a `TsonVoid` node / `null`                    |
 
 An integer's host type is the **narrowest** that holds its declared range, so `int8` never hands back a
 `BigInteger` for a value that fits a `Byte`.

@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.MapDiagnostics;
 import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.SchemaLocation;
@@ -80,7 +79,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
     final boolean keysAreNames;
 
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for a key's or entry value's state rule. */
-    private static final String ABSENT = "_";
+    private static final String VOID = "_";
 
     MapAbstractReader(String name, String displayName, MapBody body, TsonTypeReaderResolver resolver,
                        SchemaLocation schemaLocation, boolean keysAreNames) {
@@ -170,9 +169,9 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
                 ? new ConfusableNames.Scope() : null;
         while (!(ctx.peek() instanceof MapEnd)) {
             TsonEvent keyPeek = ctx.peek();
-            if (keyPeek instanceof AbsentEvent) {
+            if (keyPeek instanceof VoidEvent) {
                 ctx.next(); // the absent key itself
-                ctx.report(rules.absentKey(ABSENT));
+                ctx.report(rules.voidKey(VOID));
                 ctx.next(); // MapArrow
                 EventSkip.scopedValue(ctx); // no meaningful key to associate the value with -- discard it
                 count++;
@@ -213,15 +212,15 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * element before reaching for the element parser.
      *
      * <p>{@code null} is what both subclasses already turn into their own no-value form ({@link
-     * MapTreeReader} a {@code TsonAbsent}, {@link MapBindReader} a null map value), which is also what a
+     * MapTreeReader} a {@code TsonVoid}, {@link MapBindReader} a null map value), which is also what a
      * soft-failed value read hands them in collecting mode -- the same conflation an absent array element
      * carries, and for the same reason: what went wrong is the diagnostic's to say, not the value's.
      */
     private Object decodedValue(String keySegment, TsonReadContext ctx) {
-        if (ctx.peek() instanceof AbsentEvent) {
+        if (ctx.peek() instanceof VoidEvent) {
             ctx.next(); // consumed whether or not the value is voidable, so the entry keeps its place either way
             if (!body.voidable()) {
-                ctx.field(keySegment).report(rules.absentEntryValue(keySegment, ABSENT));
+                ctx.field(keySegment).report(rules.voidEntryValue(keySegment, VOID));
             }
             return null;
         }

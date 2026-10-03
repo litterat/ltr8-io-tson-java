@@ -31,7 +31,7 @@ final class TreeTupleBuilder implements TupleBuilder {
             return null;
         }
         for (int i = 0; i < positions.size(); i++) {
-            if (positions.get(i) == Slots.ABSENT) {
+            if (positions.get(i) == Slots.VOID) {
                 positions.set(i, JsonNull.INSTANCE);
             }
         }

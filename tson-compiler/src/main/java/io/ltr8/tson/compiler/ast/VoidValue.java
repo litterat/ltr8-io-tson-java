@@ -8,5 +8,5 @@ package io.ltr8.tson.compiler.ast;
  * a grammar one ("the map-entry production accepts any value in key position, and the resolver
  * rejects absent keys", §2.9). The structural compiler deliberately does not reject it here.
  */
-public record AbsentValue() implements CoreValue {
+public record VoidValue() implements CoreValue {
 }

@@ -123,7 +123,7 @@ class ArrayTreeReaderTest {
     }
 
     @Test
-    void optionalElementStateToleratesTheAbsentSentinel() {
+    void aVoidableElementToleratesTheVoidSentinel() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), true, true, false,
                 Optional.empty(), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
@@ -135,7 +135,7 @@ class ArrayTreeReaderTest {
     }
 
     @Test
-    void requiredElementStateRejectsTheAbsentSentinel() {
+    void aNonVoidableElementRejectsTheVoidSentinel() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
                 Optional.empty(), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));

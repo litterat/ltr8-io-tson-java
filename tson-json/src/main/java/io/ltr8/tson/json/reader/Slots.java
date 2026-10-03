@@ -8,7 +8,7 @@ package io.ltr8.tson.json.reader;
 final class Slots {
 
     /** Stated as absent -- JSON null where the position decodes to absence: seen, and holding no value. */
-    static final Object ABSENT = marker("ABSENT");
+    static final Object VOID = marker("VOID");
 
     /** A child that refused its value. */
     static final Object REFUSED = marker("REFUSED");

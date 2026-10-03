@@ -3,18 +3,10 @@ import io.ltr8.tson.base.io.ByteSource;
 
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.ArrayValue;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.Document;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
-import io.ltr8.tson.compiler.ast.MapValue;
-import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.*;
+import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.compiler.lexer.Token;
@@ -36,12 +28,8 @@ import io.ltr8.tson.suite.Sidecar;
 import io.ltr8.tson.suite.Vectors;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.atom.Rational;
-import io.ltr8.tson.tree.TsonAbsent;
-import io.ltr8.tson.tree.TsonArray;
-import io.ltr8.tson.tree.TsonAtom;
-import io.ltr8.tson.tree.TsonMap;
-import io.ltr8.tson.tree.TsonRecord;
-import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.tree.*;
+import io.ltr8.tson.tree.TsonVoid;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -198,7 +186,7 @@ class ConformanceSuiteTest {
             case SINGLE_LINE_STRING -> "single-line-token";
             case MULTI_LINE_STRING -> "multi-line-token";
             case UNQUOTED -> "unquoted-token";
-            case ABSENT -> "absent-token";
+            case VOID -> "absent-token";
             case LBRACE, RBRACE, LBRACKET, RBRACKET, COLON, COMMA -> "structural-delimiter";
             case MAP_ARROW -> "map-arrow-token";
             case DIRECTIVE -> "directive-token";
@@ -244,7 +232,7 @@ class ConformanceSuiteTest {
             assertEquals(fieldText(expAnn, "name"), actAnn.name(), "annotation[" + i + "].name");
 
             DataValue expAnnValue = fieldValue(expAnn, "value");
-            boolean expectsValue = !(expAnnValue.coreValue() instanceof AbsentValue);
+            boolean expectsValue = !(expAnnValue.coreValue() instanceof VoidValue);
             assertEquals(expectsValue, actAnn.value().isPresent(), "annotation[" + i + "].value presence");
             if (expectsValue) {
                 assertDataValueMatches((RecordValue) expAnnValue.coreValue(), actAnn.value().orElseThrow());
@@ -275,7 +263,7 @@ class ConformanceSuiteTest {
                 assertEquals(expForm, actForm, "token form");
                 assertEquals(fieldText(payload, "text"), tv.text(), "token text");
             }
-            case "absent" -> assertInstanceOf(AbsentValue.class, actual, "core-value kind 'absent'");
+            case "absent" -> assertInstanceOf(VoidValue.class, actual, "core-value kind 'absent'");
             case "empty-brace" -> assertInstanceOf(EmptyBrace.class, actual, "core-value kind 'empty-brace'");
             case "record" -> {
                 RecordValue rv = assertInstanceOf(RecordValue.class, actual, "core-value kind 'record'");
@@ -431,7 +419,7 @@ class ConformanceSuiteTest {
         RecordValue.Field member = soleField(expected, "reader-value");
         CoreValue payload = member.value().value().coreValue();
         switch (member.name()) {
-            case "absent" -> assertInstanceOf(TsonAbsent.class, actual, "reader-value 'absent'");
+            case "absent" -> assertInstanceOf(TsonVoid.class, actual, "reader-value 'absent'");
             case "atom" -> assertAtomMatches((RecordValue) payload,
                     assertInstanceOf(TsonAtom.class, actual, "reader-value 'atom'"));
             case "record" -> {
@@ -544,7 +532,7 @@ class ConformanceSuiteTest {
                 assertEquals(fieldTextOrAbsent(expected, "fraction-digits"), f.fractionDigits().orElse(null), "float fraction-digits");
 
                 DataValue expExponent = fieldValue(expected, "exponent");
-                boolean expectsExponent = !(expExponent.coreValue() instanceof AbsentValue);
+                boolean expectsExponent = !(expExponent.coreValue() instanceof VoidValue);
                 assertEquals(expectsExponent, f.exponent().isPresent(), "float exponent presence");
                 if (expectsExponent) {
                     RecordValue expExpRecord = (RecordValue) expExponent.coreValue();

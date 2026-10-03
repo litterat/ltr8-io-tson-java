@@ -45,7 +45,7 @@ class TsonValueTest {
         assertTrue(TsonArray.of().isArray());
         assertTrue(TsonTuple.of().isTuple());
         assertTrue(TsonAtom.of("x").isAtom());
-        assertTrue(TsonAbsent.instance().isAbsent());
+        assertTrue(TsonVoid.instance().isVoid());
         assertTrue(TsonMissing.atField("nope").isMissing());
         // array and tuple are structurally alike but distinct kinds
         assertFalse(TsonTuple.of().isArray());
@@ -102,7 +102,7 @@ class TsonValueTest {
         assertEquals(Optional.of("/nope"), missing.get("deeper").get(0).at("/further").missingPath());
         // a present node has no missing path, whichever kind it is
         assertEquals(Optional.empty(), person.at("/name").missingPath());
-        assertEquals(Optional.empty(), TsonAbsent.instance().missingPath());
+        assertEquals(Optional.empty(), TsonVoid.instance().missingPath());
     }
 
     @Test
@@ -171,7 +171,7 @@ class TsonValueTest {
         // a non-atom, and a node that isn't there at all
         assertEquals(OptionalInt.empty(), sample().asInt());
         assertEquals(OptionalLong.empty(), sample().get("nope").asLong());
-        assertEquals(OptionalDouble.empty(), TsonAbsent.instance().asDouble());
+        assertEquals(OptionalDouble.empty(), TsonVoid.instance().asDouble());
         // rounding to the nearest double is what a double accessor means...
         assertEquals(0.1d, TsonAtom.of(new BigDecimal("0.1")).asDouble().orElseThrow());
         assertEquals(0.1d, TsonAtom.of(0.1f).asDouble().orElseThrow());
@@ -180,12 +180,12 @@ class TsonValueTest {
     }
 
     @Test
-    void absentAndMissingAreDistinct() {
+    void voidAndMissingAreDistinct() {
         // "written, but holds no value" and "not in the tree at all" -- the two kinds the model keeps. A
-        // read that produced no value lands on TsonAbsent whatever it was written as.
-        assertTrue(TsonAbsent.instance().isAbsent());
-        assertFalse(TsonAbsent.instance().isMissing());
-        assertFalse(TsonMissing.atField("nope").isAbsent());
+        // read that produced no value lands on TsonVoid whatever it was written as.
+        assertTrue(TsonVoid.instance().isVoid());
+        assertFalse(TsonVoid.instance().isMissing());
+        assertFalse(TsonMissing.atField("nope").isVoid());
         assertTrue(TsonMissing.atField("nope").isMissing());
     }
 

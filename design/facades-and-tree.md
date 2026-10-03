@@ -166,7 +166,7 @@ admit UTS #39's own `Toys-Я-Us`.
   target answers to no wire name, so `!tags [ "a" ]` into a `List<String>` is `UNKNOWN_TYPE_REF`.
 - **Reporting never stops the read, and the facade returns nothing for a document that reported.** A
   reported type-ref's children are still read, so one collecting pass finds everything; the engine keeps
-  building (a leaf whose atom rejected the token stands as a `TsonAbsent`), and the facade's per-read
+  building (a leaf whose atom rejected the token stands as a `TsonVoid`), and the facade's per-read
   `CountingReceiver` discards the result — every read is all-or-nothing. The engine's placeholder is seen
   only by a caller reading one value through a context it owns (`read(TsonReadContext)`). `SchemalessTreeReader`
   scopes `ctx.field`/`ctx.index` as it descends, so a diagnostic carries a real RFC 6901 path.
@@ -183,7 +183,7 @@ admit UTS #39's own `Toys-Я-Us`.
 - **The schema-driven readers capture by hoisting, not by widening signatures.** A compiled tree reader
   shares its `*AbstractReader` base with the bind subclass, and the base consumes the framing where the node
   isn't built. Rather than thread annotations out of four shared shape-check methods (making bind mode carry
-  a field only tree mode reads), each tree reader — and the `AtomTreeReader`/`AbsentTreeReader` wrappers —
+  a field only tree mode reads), each tree reader — and the `AtomTreeReader`/`VoidTreeReader` wrappers —
   captures *first*, then calls the base/delegate, whose own framing call then finds nothing left. That's a
   no-op precisely because every one of those readers **discards** the framing result rather than using it.
   Bind mode is untouched.

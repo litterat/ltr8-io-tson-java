@@ -3,17 +3,12 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
-import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.ast.*;
+import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
-import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
@@ -197,7 +192,7 @@ final class DefinitionResolver {
     private static final String TEMPLATE = "template";
 
     /** The {@code _} a bare annotation stands for (§6), read against the annotation's type like a written one. */
-    private static final DataValue ABSENT = new DataValue(List.of(), Optional.empty(), new AbsentValue());
+    private static final DataValue VOID = new DataValue(List.of(), Optional.empty(), new VoidValue());
 
     /**
      * Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see
@@ -425,7 +420,7 @@ final class DefinitionResolver {
                 throw unresolvedAnnotation(name, annotation.name());
             }
             if (annotation.value().isEmpty()) {
-                bindAnnotationValue(name, annotation.name(), ABSENT);
+                bindAnnotationValue(name, annotation.name(), VOID);
             }
             annotations.add(new Annotation(annotation.name(), annotation.value().flatMap(
                     value -> Optional.ofNullable(bindAnnotationValue(name, annotation.name(), value)))));

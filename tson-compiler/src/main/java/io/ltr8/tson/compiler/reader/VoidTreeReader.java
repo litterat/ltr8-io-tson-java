@@ -10,14 +10,14 @@ import java.util.Optional;
 
 /**
  * Tree mode: reads a {@code void_type} instance -- the void sentinel, spelled {@code _} or {@code null}
- * -- consuming it via a delegate {@link VoidReader} and yielding {@link TsonAbsent}.
+ * -- consuming it via a delegate {@link VoidReader} and yielding {@link TsonVoid}.
  */
-final class AbsentTreeReader implements TsonTypeReader<TsonValue> {
+final class VoidTreeReader implements TsonTypeReader<TsonValue> {
 
     private final TsonTypeReader<?> delegate;
     private final AnnotationTypes annotationTypes;
 
-    AbsentTreeReader(TsonTypeReader<?> delegate, AnnotationTypes annotationTypes) {
+    VoidTreeReader(TsonTypeReader<?> delegate, AnnotationTypes annotationTypes) {
         this.delegate = delegate;
         this.annotationTypes = annotationTypes;
     }
@@ -31,6 +31,6 @@ final class AbsentTreeReader implements TsonTypeReader<TsonValue> {
         if (ConstructionGuard.abandoned(ctx, mark)) {
             return null;
         }
-        return annotations.isEmpty() ? TsonAbsent.instance() : new TsonAbsent(Optional.empty(), annotations);
+        return annotations.isEmpty() ? TsonVoid.instance() : new TsonVoid(Optional.empty(), annotations);
     }
 }

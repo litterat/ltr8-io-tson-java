@@ -2099,8 +2099,8 @@ groups, §7.6's table, §8.1's binding-record examples, and §9's core template 
   flag is `voidable`, as a field type's already was.
 - **Prose.** "Void sentinel" and "void value" throughout this implementation's Javadoc, diagnostics, design notes
   and [TSON-JSON]; quotations of Parts 1 and 2 keep their text.
-- **Not yet renamed:** the Java identifiers that carry the old noun (`TsonAbsent`, `AbsentEvent`,
-  `AbsentTreeReader`, the `absent…` diagnostic rules).
+- **Names.** The identifiers carry the new noun as well: the tree's `TsonVoid` and `isVoid()`, the AST's
+  `VoidValue`, the stream's `VoidEvent`, the lexer's `TokenType.VOID`, and the `void…` diagnostic rules.
 
 **Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
 

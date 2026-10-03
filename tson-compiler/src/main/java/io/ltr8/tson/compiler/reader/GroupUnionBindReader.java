@@ -42,7 +42,7 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
 
     /** {@code null}, a bind-mode reader having nowhere to put §2.9's "present with a void value". */
     @Override
-    Object statedAbsentValue() {
+    Object statedVoidValue() {
         return null;
     }
 

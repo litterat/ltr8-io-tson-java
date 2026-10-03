@@ -5,7 +5,7 @@ import java.util.Optional;
 
 /**
  * The result of navigating to something that isn't in the tree -- a query artifact, not a real value, so
- * {@link #get}/{@link #at} keep returning it and a deep chain never throws. Distinct from {@link TsonAbsent}
+ * {@link #get}/{@link #at} keep returning it and a deep chain never throws. Distinct from {@link TsonVoid}
  * (the sentinel {@code _}/{@code null}), which is a position the document actually wrote.
  *
  * <p><b>It carries {@link #path()}, the RFC 6901 pointer of the step that failed</b>, so a chain that comes

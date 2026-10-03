@@ -129,7 +129,7 @@ final class BindGroupUnionBuilder implements RecordBuilder {
             if (slot == null) {
                 continue;
             }
-            Object value = slot == Slots.ABSENT ? null : slot;
+            Object value = slot == Slots.VOID ? null : slot;
             try {
                 Object built = members[i].constructor().invoke(new Object[] {value});
                 return members[i].bridge().isPresent() ? members[i].bridge().get().toObject().invoke(built) : built;

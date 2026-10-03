@@ -126,7 +126,7 @@ class TupleReadTest {
 
     /** A declaration-position `?` makes that position OPTIONAL, which is what admits the void sentinel. */
     @Test
-    void anOptionalPositionAdmitsTheAbsentSentinel() {
+    void aVoidablePositionAdmitsTheVoidSentinel() {
         TsonValue pair = read("[integer?, text]", "pair", "[_ \"hello\"]");
 
         TsonTuple tuple = assertInstanceOf(TsonTuple.class, pair);
@@ -136,19 +136,19 @@ class TupleReadTest {
     /**
      * A tuple is the one shape where an absent position is <em>visible</em> in the tree -- a record omits an
      * absent field and an array has no per-element state, so neither has a slot to misrepresent. It holds a
-     * {@code TsonAbsent}, so {@code _} round-trips through {@link TsonTreeWriter} as {@code _}.
+     * {@code TsonVoid}, so {@code _} round-trips through {@link TsonTreeWriter} as {@code _}.
      */
     @Test
-    void anAbsentPositionIsATsonAbsentAndRoundTripsAsTheSentinel() {
+    void aVoidPositionIsATsonVoidAndRoundTripsAsTheSentinel() {
         TsonValue pair = read("[integer?, text]", "pair", "[_ \"hello\"]");
 
-        assertTrue(pair.get(0).isAbsent());
+        assertTrue(pair.get(0).isVoid());
         assertEquals("!pair [ _ !text \"hello\" ]", new TsonTreeWriter().toTson(pair));
     }
 
     /** And a REQUIRED one does not -- the default state, since a tuple element's `state` defaults to REQUIRED. */
     @Test
-    void aRequiredPositionRejectsTheAbsentSentinel() {
+    void aNonVoidablePositionRejectsTheVoidSentinel() {
         ReadException thrown = assertThrows(ReadException.class,
                 () -> read("[integer, text]", "pair", "[_ \"hello\"]"));
 

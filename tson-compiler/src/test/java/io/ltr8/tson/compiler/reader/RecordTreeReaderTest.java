@@ -93,7 +93,7 @@ class RecordTreeReaderTest {
     }
 
     @Test
-    void absentOptionalFieldReadsAsNull() {
+    void missingOrVoidOptionalFieldReadsAsNull() {
         RecordField optional = RecordField.optionalVoidable("value", TypeRef.of("integer"));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), optional));
 
@@ -225,7 +225,7 @@ class RecordTreeReaderTest {
 
     /** §5.2: "At a plain REQUIRED or a REQUIRED_FIXED field, `_` is a validation error." */
     @Test
-    void requiredFixedFieldRejectsTheAbsentSentinel() {
+    void requiredFixedFieldRejectsTheVoidSentinel() {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
                 fixed("7")));
 
@@ -250,7 +250,7 @@ class RecordTreeReaderTest {
      * The default is still what the field decodes to -- only the verdict changes.
      */
     @Test
-    void requiredDefaultFieldRejectsAWrittenAbsentSentinelWhileOmissionStillInjects() {
+    void requiredDefaultFieldRejectsAWrittenVoidSentinelWhileOmissionStillInjects() {
         RecordField defaulted = RecordField.defaulted("value", TypeRef.of("integer"),
                 new Token("7", Token.Form.UNQUOTED));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), defaulted));

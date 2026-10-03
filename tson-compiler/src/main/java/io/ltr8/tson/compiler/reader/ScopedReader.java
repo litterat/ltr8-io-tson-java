@@ -49,7 +49,7 @@ import java.util.function.BiFunction;
  * schema a value belongs to, and a tree that dropped that could not be written back -- so tree mode wraps an
  * EXTERN value in a {@link TsonScopedValue}. A bound object has nowhere to carry a URI, and inventing
  * somewhere would be a change to what a consumer's own class means, so bind mode hands the object back as it
- * is. That is the same asymmetry {@code TsonAbsent} already makes for [TSON-DATA] §2.9.
+ * is. That is the same asymmetry {@code TsonVoid} already makes for [TSON-DATA] §2.9.
  */
 final class ScopedReader implements TsonTypeReader<Object> {
 

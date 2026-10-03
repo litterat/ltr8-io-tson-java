@@ -12,7 +12,7 @@ interface ArrayBuilder {
 
     /**
      * The array, from its elements in order: each a child's value or a {@link Slots} marker -- {@link
-     * Slots#ABSENT} for an absent element, {@link Slots#REFUSED} for a refused one.
+     * Slots#VOID} for an absent element, {@link Slots#REFUSED} for a refused one.
      *
      * @param clean whether nothing was reported while the array was read
      */

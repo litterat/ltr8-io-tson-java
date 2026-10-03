@@ -1936,7 +1936,7 @@ class DefinitionResolverTest {
 
     /** A modifier-only {@code = _} is a pin to {@code _}, refused whatever the field it restates. */
     @Test
-    void rejectsAModifierOnlyPinToAbsent() {
+    void rejectsAModifierOnlyPinToVoid() {
         assertRefused("""
                 base => { name: text  nickname?: text? }
                 anonymous => base ^ { nickname?: = _ }

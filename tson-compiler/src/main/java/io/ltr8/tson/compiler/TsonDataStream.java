@@ -17,7 +17,7 @@ import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
+import io.ltr8.tson.compiler.stream.VoidEvent;
 import io.ltr8.tson.compiler.stream.AnnotationEnd;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
@@ -540,7 +540,7 @@ public final class TsonDataStream implements TsonEventSource {
     /** Every token type a {@code {} can be immediately followed by that can only ever be a map key (never a bare field name). */
     private static boolean isAlwaysMapStart(TokenType type) {
         return switch (type) {
-            case AT, BANG, LBRACE, LBRACKET, ABSENT -> true;
+            case AT, BANG, LBRACE, LBRACKET, VOID -> true;
             default -> false;
         };
     }
@@ -849,9 +849,9 @@ public final class TsonDataStream implements TsonEventSource {
                     ready.add(new ArrayStart(t.start()));
                     pushFrame(new ArrayFrame(true));
                 }
-                case ABSENT -> {
+                case VOID -> {
                     advance();
-                    ready.add(new AbsentEvent(t.start()));
+                    ready.add(new VoidEvent(t.start()));
                 }
                 case UNQUOTED, SINGLE_LINE_STRING, MULTI_LINE_STRING -> {
                     advance();

@@ -78,7 +78,7 @@ class TupleTreeReaderTest {
     }
 
     @Test
-    void optionalPositionToleratesTheAbsentSentinel() {
+    void aVoidablePositionToleratesTheVoidSentinel() {
         TupleBody body = new TupleBody(List.of(
                 TupleElement.required(TypeRef.of("integer")),
                 new TupleElement(TypeRef.of("text"), true)));
@@ -90,7 +90,7 @@ class TupleTreeReaderTest {
     }
 
     @Test
-    void requiredPositionRejectsTheAbsentSentinel() {
+    void aNonVoidablePositionRejectsTheVoidSentinel() {
         TsonCompiledSchema compiled = compile(twoRequiredSlots());
 
         assertThrows(ReadException.class, () -> readTuple(compiled, "[42 _]"));

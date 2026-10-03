@@ -71,7 +71,7 @@ class TsonTreeReaderTest {
         assertEquals(Optional.of("b"), node.at("/skills/1").asString());
         assertEquals(Boolean.TRUE, node.get("active").asBoolean().orElseThrow());
         assertEquals(Optional.of("null"), node.get("note").asString());               // `null` is a token like any other
-        assertTrue(node.get("nickname").isAbsent());                                  // `_`, the one no-value node
+        assertTrue(node.get("nickname").isVoid());                                  // `_`, the one no-value node
     }
 
     @Test

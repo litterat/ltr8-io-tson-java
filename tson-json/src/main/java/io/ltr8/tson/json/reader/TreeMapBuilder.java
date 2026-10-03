@@ -56,6 +56,6 @@ final class TreeMapBuilder implements MapBuilder {
 
     /** A clean read's slot as a node: a value, or the absence {@code {K => V?}} admits. */
     private static JsonValue node(Object slot) {
-        return slot == Slots.ABSENT ? JsonNull.INSTANCE : (JsonValue) slot;
+        return slot == Slots.VOID ? JsonNull.INSTANCE : (JsonValue) slot;
     }
 }

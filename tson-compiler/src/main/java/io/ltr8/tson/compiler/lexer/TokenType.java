@@ -17,7 +17,7 @@ public enum TokenType {
     UNQUOTED,
 
     /** {@code _} — the void sentinel (§2.9). */
-    ABSENT,
+    VOID,
 
     // Structural delimiters (§7.2 rule 4)
     LBRACE, RBRACE, LBRACKET, RBRACKET, COLON, COMMA,

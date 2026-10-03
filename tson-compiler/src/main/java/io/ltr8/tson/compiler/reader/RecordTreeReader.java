@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.tree.*;
-import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonRecord;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -75,7 +75,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
         TsonReadContext anchoredCtx = ctx.withPosition(shapeResult.anchor());
         for (int i = 0; i < fields.size(); i++) {
             if (!seen[i]) {
-                putField(result, i, valueForAbsentField(i, anchoredCtx));
+                putField(result, i, valueForMissingField(i, anchoredCtx));
             }
         }
         validateGroups(anchoredCtx, seen);
@@ -87,13 +87,13 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
     /**
      * [TSON-DATA] §2.9's "present with a void value", which a tree can hold and so does: {@code
-     * { x: _  y: "h" }} reads with {@code x} present as a {@code TsonAbsent}, where {@code { y: "h" }} reads
-     * with no {@code x} at all. {@code get("x")} answers the two apart -- {@code isAbsent()} against {@code
+     * { x: _  y: "h" }} reads with {@code x} present as a {@code TsonVoid}, where {@code { y: "h" }} reads
+     * with no {@code x} at all. {@code get("x")} answers the two apart -- {@code isVoid()} against {@code
      * isMissing()} -- and {@code TsonTreeWriter} writes the first back as {@code _}.
      */
     @Override
-    Object statedAbsentValue() {
-        return TsonAbsent.instance();
+    Object statedVoidValue() {
+        return TsonVoid.instance();
     }
 
     /** Puts a decoded field value into {@code result} as a node, omitting a {@code null} (a missing field -- already reported). */

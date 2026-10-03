@@ -9,5 +9,5 @@ package io.ltr8.tson.compiler.ast;
  * (§1.2 principle 1: "Value interpretation is deferred to base type resolution").
  */
 public sealed interface CoreValue
-        permits RecordValue, MapValue, ArrayValue, EmptyBrace, AbsentValue, TokenValue {
+        permits RecordValue, MapValue, ArrayValue, EmptyBrace, VoidValue, TokenValue {
 }

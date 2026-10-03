@@ -95,7 +95,7 @@ class TsonObjectReaderTest {
     }
 
     @Test
-    void absentSentinelBindsSameAsMissingForOptionalField() throws DataBindException {
+    void voidSentinelBindsSameAsMissingForOptionalField() throws DataBindException {
         WithOptional w = mapper.read("{ required: 1 nickname: _ }", WithOptional.class);
         assertTrue(w.nickname().isEmpty());
     }
@@ -352,7 +352,7 @@ class TsonObjectReaderTest {
     }
 
     @Test
-    void mapRejectsAbsentSentinelAsKey() {
+    void mapRejectsTheVoidSentinelAsKey() {
         // §2.9: "_" MUST NOT appear as a map key -- a resolver-layer constraint, not a grammar
         // one, so the compiler itself accepts { _ => 1 } (see TsonDataParserTest); toMap is where it's
         // actually rejected.
@@ -360,7 +360,7 @@ class TsonObjectReaderTest {
     }
 
     @Test
-    void mapAllowsAbsentSentinelAsValue() throws DataBindException {
+    void mapAllowsTheVoidSentinelAsValue() throws DataBindException {
         // §2.9 only restricts the key position -- a value of "_" is legitimately "present with
         // a void value" (distinct from the entry not existing at all), so this must still bind.
         CountsHolder h = mapper.read("{ counts: { apples => _ } }", CountsHolder.class);
@@ -463,7 +463,7 @@ class TsonObjectReaderTest {
      * takes both, which is what made the two confusable and why the notation keeps one spelling.
      */
     @Test
-    void theNullTokenBindsAsAStringAndOnlyTheSentinelAsAbsence() throws DataBindException {
+    void theNullTokenBindsAsAStringAndOnlyTheSentinelAsVoid() throws DataBindException {
         assertEquals("null", mapper.read("{ text: null }", Nullable.class).text());
         assertNull(mapper.read("{ text: _ }", Nullable.class).text());
     }
@@ -472,7 +472,7 @@ class TsonObjectReaderTest {
     }
 
     @Test
-    void cannotBindTheAbsentSentinelToPrimitive() throws DataBindException {
+    void cannotBindTheVoidSentinelToPrimitive() throws DataBindException {
         assertThrows(ReadException.class, () -> mapper.read("{ x: _ }", RequiresInt.class));
     }
 

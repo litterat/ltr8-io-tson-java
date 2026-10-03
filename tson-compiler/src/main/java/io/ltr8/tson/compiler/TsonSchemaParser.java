@@ -598,7 +598,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             advance();
             return new FieldDef.Modifier(kind, new FieldDef.Modifier.Value.Deferred());
         }
-        if (check(TokenType.ABSENT)) {
+        if (check(TokenType.VOID)) {
             advance();
             value = new FieldDef.Modifier.Value.Absent();
         } else {
@@ -893,7 +893,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (t.type() == TokenType.LBRACE) {
             return new TypeArg.Ref(parseMap());
         }
-        if (t.type() == TokenType.ABSENT) {
+        if (t.type() == TokenType.VOID) {
             throw parseError("the void sentinel '_' is not valid in a type argument position (§7.6)");
         }
         throw mismatch("a type argument (a type reference or a scalar value)");

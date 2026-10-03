@@ -58,7 +58,7 @@ final class TreeRecordBuilder implements RecordBuilder {
             if (slot == null) {
                 continue;
             }
-            members.put(names[i], slot == Slots.ABSENT ? JsonNull.INSTANCE : (JsonValue) slot);
+            members.put(names[i], slot == Slots.VOID ? JsonNull.INSTANCE : (JsonValue) slot);
         }
         return members.build();
     }

@@ -76,9 +76,9 @@ final class TupleReader implements JsonTypeReader<Object> {
         if (at.peek() instanceof JsonEvent.NullValue) {
             at.next();
             if (!plan.voidable()[position]) {
-                at.report(plan.rules().absentPosition(position, NULL));
+                at.report(plan.rules().voidPosition(position, NULL));
             }
-            return Slots.ABSENT;
+            return Slots.VOID;
         }
         Object value = slots[position].read(at);
         return value == null ? Slots.REFUSED : value;
