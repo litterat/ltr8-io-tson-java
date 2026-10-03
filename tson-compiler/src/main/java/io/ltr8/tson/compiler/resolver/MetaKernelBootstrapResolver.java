@@ -339,7 +339,7 @@ public final class MetaKernelBootstrapResolver {
     private static void requireSchemeNameProfile(Instance instance) {
         Map<String, String> expected = Map.of("start", "NONE", "continue", "NONE",
                 "start_add", "abcdefghijklmnopqrstuvwxyz", "continue_add", "abcdefghijklmnopqrstuvwxyz0123456789+-.",
-                "normalization", "NFKC_CASEFOLD");
+                "normalization", "ASCII_CASEFOLD");
         Map<String, String> stated = new HashMap<>();
         if (instance.value().coreValue() instanceof RecordValue record) {
             for (RecordValue.Field field : record.fields()) {

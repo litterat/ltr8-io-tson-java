@@ -41,6 +41,11 @@ class TextNormalizationTest {
               picked => { p: typed_by<safe_header, Content-Type> }
               web => !uri ^ { schemes: [HTTP https] }
               link => { to: web }
+              field_name => !identifier_type { start: NONE  continue: NONE
+                start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
+                normalization: ASCII_CASEFOLD }
+              accent => !text_type { members: ["\u00e9"]  normalization: ASCII_CASEFOLD }
+              message => { fields?: {field_name => text}  accent?: accent }
             }
             """;
 
@@ -181,6 +186,43 @@ class TextNormalizationTest {
                 "typed_by<safe_header, X-Trace>"));
         assertEquals(1, refused.size(), refused.toString());
         assertTrue(refused.getFirst().message().contains("not a value of safe_header"), refused.toString());
+    }
+
+    /** {@code ASCII_CASEFOLD} folds A..Z, so any casing of an ASCII name is the one value. */
+    @Test
+    void anAsciiFoldAdmitsANameHoweverItIsCased() {
+        assertEquals(List.of(), codes("!message { fields: { Content-Type => a  ACCEPT => b } }"));
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                codes("!message { fields: { Content-Type => a  content-type => b } }"));
+        TsonValue tree = tson().treeReader().read(document("!message { fields: { Content-Type => a } }"));
+        assertEquals("a", tree.get("fields").get("content-type").asString().orElseThrow());
+    }
+
+    /**
+     * Nothing outside A..Z moves: a full-width spelling and one with the Kelvin sign U+212A stay what they are,
+     * and an ASCII profile refuses them, as RFC 9110 refuses them as field names.
+     */
+    @Test
+    void anAsciiFoldLeavesACompatibilityCharacterAlone() {
+        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID),
+                codes("!message { fields: { \"\uff23ontent-\uff34ype\" => a } }"));
+        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID),
+                codes("!message { fields: { \"\u212aeep-Alive\" => a } }"));
+    }
+
+    /** No Unicode normalization runs either, so a decomposed spelling is not its composed member. */
+    @Test
+    void anAsciiFoldDoesNotComposeADecomposedSpelling() {
+        assertEquals(List.of(), codes("!message { accent: \"\u00e9\" }"));
+        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION), codes("!message { accent: \"e\u0301\" }"));
+    }
+
+    /** {@code scheme_name} folds ASCII only, so a full-width scheme is not a scheme at all. */
+    @Test
+    void aSchemeSetRefusesAFullWidthScheme() {
+        List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace("schemes: [HTTP https]",
+                "schemes: [\"\uff28\uff34\uff34\uff30\" https]"));
+        assertEquals(1, refused.size(), refused.toString());
     }
 
     private static String message(String body) {

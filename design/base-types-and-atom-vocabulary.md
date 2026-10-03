@@ -164,7 +164,11 @@ the token as written and then the value it was judged as — `'PUT' (read as 'pu
 member of this type` — through `TextParser.subject`, threaded into every facet's message: the written spelling is
 the text a reader or a repair loop has to find, and the value is what the facet compared. `NFKC_CASEFOLD` is
 `NfkcCasefold`, derived from the JDK's normalizer and case mappings with three exceptions and checked against
-`DerivedNormalizationProps.txt` over every code point.
+`DerivedNormalizationProps.txt` over every code point. `ASCII_CASEFOLD` lowercases A..Z and touches nothing
+else — no NFC either — so a profile of ASCII letters under it refuses the full-width and Kelvin-sign spellings
+`NFKC_CASEFOLD` would fold into the profile. It is the form of the case-insensitive ASCII naming systems (field
+names, schemes, DNS names), and `scheme_name` uses it; `NFKC_CASEFOLD` is for names compared without case across
+Unicode.
 
 - **Each constructor splits into two classes across two modules:** a pure constraint-*values* record in
   `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`, `RegexType`, `DateType`, …, matching the kernel's

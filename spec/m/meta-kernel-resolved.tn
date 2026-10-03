@@ -223,7 +223,7 @@
 
   normalization => !type_definition {
     source: enum
-    body: !enum { members: [NONE NFC NFKC NFKC_CASEFOLD] }
+    body: !enum { members: [NONE NFC NFKC NFKC_CASEFOLD ASCII_CASEFOLD] }
   }
 
   identifier_type => !type_definition {
@@ -273,7 +273,7 @@
 
   scheme_name => !type_definition {
     source: identifier_type
-    body: !identifier_type { start: NONE  continue: NONE  start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789+-."  normalization: NFKC_CASEFOLD }
+    body: !identifier_type { start: NONE  continue: NONE  start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789+-."  normalization: ASCII_CASEFOLD }
   }
 
   uri => !type_definition {
