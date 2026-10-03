@@ -57,11 +57,15 @@ public final class IdentifierParser implements AtomTypeParser<String> {
     @Override
     public String read(String text) {
         String value = constraints.normalization().apply(text);
+        String subject = TextParser.subject(text, value, constraints.normalization());
         Optional<String> violation = profile.check(value);
         if (violation.isPresent()) {
-            throw new AtomParseException(violation.get(), EXPECTED);
+            // The profile locates a character by its index in the value, so the value stays in its sentence; the
+            // written spelling leads it wherever the form changed the text.
+            throw new AtomParseException(value.equals(text) ? violation.get() : subject + ": " + violation.get(),
+                    EXPECTED);
         }
-        this.text.validate(value);
+        this.text.validate(value, subject);
         return value;
     }
 

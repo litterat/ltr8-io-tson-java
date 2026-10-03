@@ -159,7 +159,10 @@ members (normalised the same way, `TextType.normalizedMembers`), an identifier's
 address's grammar. The three lengths are one helper, `TextParser.checkLengths`, which the URI and email parsers
 call too, and they count code points, as `text_type` says and `TextType.coherenceCheck` does. Since every
 comparison downstream — map keys, set elements, pins, look-alike scopes, hygiene — already runs on the parser's
-value, none of them needed a change of its own beyond reading the value rather than the token. `NFKC_CASEFOLD` is
+value, none of them needed a change of its own beyond reading the value rather than the token. A refusal names
+the token as written and then the value it was judged as — `'PUT' (read as 'put' under NFKC_CASEFOLD) is not a
+member of this type` — through `TextParser.subject`, threaded into every facet's message: the written spelling is
+the text a reader or a repair loop has to find, and the value is what the facet compared. `NFKC_CASEFOLD` is
 `NfkcCasefold`, derived from the JDK's normalizer and case mappings with three exceptions and checked against
 `DerivedNormalizationProps.txt` over every code point.
 

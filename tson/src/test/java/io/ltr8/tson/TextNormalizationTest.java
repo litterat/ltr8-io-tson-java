@@ -182,4 +182,32 @@ class TextNormalizationTest {
         assertEquals(1, refused.size(), refused.toString());
         assertTrue(refused.getFirst().message().contains("not a value of safe_header"), refused.toString());
     }
+
+    private static String message(String body) {
+        List<Diagnostic> problems = tson().validate(document(body));
+        assertEquals(1, problems.size(), problems.toString());
+        return problems.getFirst().message();
+    }
+
+    /**
+     * A refusal quotes the token as written, then the value the facets judged: the written spelling is what a
+     * reader -- or a repair of a generated document -- has to find in the document.
+     */
+    @Test
+    void aRefusalQuotesTheWrittenSpellingThenTheValue() {
+        assertTrue(message("!request { charset: LATIN1 }").contains(
+                "'LATIN1' (read as 'latin1' under NFKC_CASEFOLD) is not a member of this type"));
+        assertTrue(message("!request { host: \"Exa_mple\" }").contains(
+                "'Exa_mple' (read as 'exa_mple' under NFKC_CASEFOLD) does not match the required pattern"));
+        assertTrue(message("!allowed { h: X-Trace }").contains(
+                "'X-Trace' (read as 'x-trace' under NFKC_CASEFOLD) is not a member of this enum"));
+        assertTrue(message("!link { to: \"FTP://example.com/\" }").startsWith("'web': 'FTP://example.com/' "));
+    }
+
+    /** A token its form leaves alone is quoted once. */
+    @Test
+    void aTokenTheFormLeavesAloneIsQuotedOnce() {
+        String refused = message("!request { charset: latin1 }");
+        assertTrue(refused.contains("'latin1' is not a member of this type"), refused);
+    }
 }

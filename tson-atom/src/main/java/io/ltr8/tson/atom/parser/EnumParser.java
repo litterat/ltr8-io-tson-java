@@ -66,7 +66,8 @@ public record EnumParser(EnumBody constraints, Normalization form) implements At
             }
         }
         throw new AtomValidationException(
-                "'" + text + "' is not a member of this enum -- expected one of " + constraints.members(),
+                TextParser.subject(text, value, form) + " is not a member of this enum -- expected one of "
+                        + constraints.members(),
                 "one of (" + String.join(", ", constraints.members()) + ")");
     }
 
