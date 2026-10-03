@@ -37,6 +37,8 @@ class TextNormalizationTest {
               safe_header => !enum_type { type: header_name  members: [Accept content-type] }
               allowed => { h: safe_header }
               chosen => { h: safe_header = Content-Type }
+              typed_by => <T, N> { w?: T ~ N }
+              picked => { p: typed_by<safe_header, Content-Type> }
               web => !uri ^ { schemes: [HTTP https] }
               link => { to: web }
             }
@@ -167,5 +169,17 @@ class TextNormalizationTest {
         assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION), codes("!link { to: \"ftp://example.com/\" }"));
         assertEquals(1, tson().validateSchema(SCHEMA.replace("schemes: [HTTP https]", "schemes: [HTTP http]")).size());
         assertEquals(1, tson().validateSchema(SCHEMA.replace("schemes: [HTTP https]", "schemes: [\"ht tp\"]")).size());
+    }
+
+    /** A template's value argument of an enum type is a value of the enum, matched in the label type's form. */
+    @Test
+    void aTemplateValueArgumentOfAnEnumTypeIsMatchedInTheLabelTypesForm() {
+        assertEquals(List.of(), tson().validateSchema(SCHEMA));
+        TsonValue tree = tson().treeReader().read(document("!picked { p: {} }"));
+        assertEquals("content-type", tree.get("p").get("w").asString().orElseThrow());
+        List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace("typed_by<safe_header, Content-Type>",
+                "typed_by<safe_header, X-Trace>"));
+        assertEquals(1, refused.size(), refused.toString());
+        assertTrue(refused.getFirst().message().contains("not a value of safe_header"), refused.toString());
     }
 }

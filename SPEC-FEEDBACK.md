@@ -1937,8 +1937,8 @@ Because the profile judges the value, `header_name`'s profile lists lowercase le
   offset; bind mode's value is the normalised text.
 - **Refinement and coherence.** A refinement that moves `normalization` is refused; members are judged in the form,
   and two that are one value are refused.
-- **Enums.** An enum matches its members in its label type's form, on both encodings' read paths and in the
-  linker's checks of defaults and pins.
+- **Enums.** An enum matches its members in its label type's form, on both encodings' read paths, in the
+  linker's checks of defaults and pins, and in a template's value argument.
 - **Schemes.** `uri_type.schemes` is a set of the kernel's `scheme_name`, a case-folding identifier, so a scheme is
   held folded and `[HTTP http]` is a duplicate; `uri_type`'s prose comparison rule is gone.
 

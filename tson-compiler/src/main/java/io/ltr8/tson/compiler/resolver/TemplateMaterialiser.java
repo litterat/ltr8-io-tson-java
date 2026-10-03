@@ -1052,7 +1052,9 @@ final class TemplateMaterialiser {
             return;
         }
         TypeDefinition definition = lookup(ReferenceChain.terminal(type, this::lookup));
-        Optional<AtomType<?>> parser = definition == null ? Optional.empty() : AtomParsers.forType(definition.body());
+        // An enum's argument is matched in its label type's form, which the governing meta may hold.
+        Optional<AtomType<?>> parser = definition == null ? Optional.empty() : AtomParsers.forType(definition.body(),
+                EnumLabelType.form(definition, namespace::getTypeDefinition, metaTypes));
         if (parser.isEmpty()) {
             return; // no scalar reading -- the substituted body's own position judges it
         }
