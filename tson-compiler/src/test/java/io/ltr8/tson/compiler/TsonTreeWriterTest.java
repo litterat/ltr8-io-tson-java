@@ -72,7 +72,7 @@ class TsonTreeWriterTest {
         assertEquals(BigInteger.valueOf(3), second.at("/scores/2").asBigInteger().orElseThrow());
         assertEquals(Boolean.TRUE, second.at("/active").asBoolean().orElseThrow());
         assertEquals(Optional.of("null"), second.at("/note").asString());  // an ordinary unquoted string token
-        assertTrue(second.at("/nickname").isAbsent());                     // `_` round-trips as `_`
+        assertTrue(second.at("/nickname").isVoid());                     // `_` round-trips as `_`
     }
 
     @Test

@@ -183,7 +183,7 @@ formats defeat it, and both are the shape of the JSON-superset claim Revision 35
   way of giving it one — a hint call, a schema-walking stream, readers that accept either shape — puts the
   JSON encoding's problem inside the TSON reader stack.
 - **`null` is two things.** In a plain JSON tree it is a value, and JEP 540 has a `JsonNull` for it. Under a
-  schema it is the void sentinel and nothing else (§7). Mapping it to `AbsentEvent` in the event layer
+  schema it is the void sentinel and nothing else (§7). Mapping it to `VoidEvent` in the event layer
   settles that question one layer too early, and forces the schemaless reading to inherit a schema's answer.
 
 So: `tson-json` has its own lexer, its own structural layer, its own tree, and its own readers.

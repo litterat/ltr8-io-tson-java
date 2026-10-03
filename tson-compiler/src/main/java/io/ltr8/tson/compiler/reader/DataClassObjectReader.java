@@ -241,9 +241,9 @@ public final class DataClassObjectReader {
     private Object bindAtom(TsonReadContext ctx, DataClassAtom dataClass) {
         Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
-        if (e instanceof AbsentEvent) {
+        if (e instanceof VoidEvent) {
             ctx.next();
-            return bindBaseValue(ctx, new BaseValue.AbsentValue(), dataClass.dataClass());
+            return bindBaseValue(ctx, new BaseValue.VoidValue(), dataClass.dataClass());
         }
         if (!(e instanceof TokenEvent token)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
@@ -463,7 +463,7 @@ public final class DataClassObjectReader {
      * is a {@code FIELD_REQUIRED} problem), anything else binds recursively.
      */
     private Object bindField(TsonReadContext ctx, DataClassField field) {
-        if (ctx.peek() instanceof AbsentEvent) {
+        if (ctx.peek() instanceof VoidEvent) {
             ctx.next();
             if (field.isRequired()) {
                 ctx.field(field.name()).report(Diagnostic.Code.FIELD_REQUIRED,
@@ -553,7 +553,7 @@ public final class DataClassObjectReader {
             DataClass valueClass = dataClass.valueDataClass();
             Set<Object> statedKeys = new HashSet<>();
             while (!(ctx.peek() instanceof MapEnd)) {
-                if (ctx.peek() instanceof AbsentEvent) {
+                if (ctx.peek() instanceof VoidEvent) {
                     ctx.next(); // the absent key itself
                     ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the void sentinel '_' must not appear as a map key "
                             + "(§2.9) for " + dataClass.typeClass(), "a real map key", "_");

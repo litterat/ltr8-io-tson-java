@@ -20,7 +20,7 @@ import java.util.stream.Stream;
  *
  * <p><b>Navigation never throws.</b> {@link #get}/{@link #at} return {@link TsonMissing} for an absent
  * field/index, so a deep {@code node.at("/orders/3/total").asBigDecimal()} chain is null-safe. "Absent"
- * (a position that was written but holds no value -- the {@code _} sentinel, {@link TsonAbsent}) and
+ * (a position that was written but holds no value -- the {@code _} sentinel, {@link TsonVoid}) and
  * "missing" (no such node in the tree at all, {@link TsonMissing})
  * are distinct kinds. A lenient chain still says <em>where</em> it
  * failed: the missing carries the pointer of the step that failed, readable via {@link #missingPath()}.
@@ -29,7 +29,7 @@ import java.util.stream.Stream;
  * {@code "person"}) and {@link #annotations()}.
  */
 public sealed interface TsonValue
-        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonAbsent, TsonMissing,
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonVoid, TsonMissing,
                 TsonScopedValue {
 
     /** This value's own type-ref (e.g. {@code "int32"}, {@code "uuid"}, {@code "person"}), if the wire or schema gave one. */
@@ -65,7 +65,7 @@ public sealed interface TsonValue
             case TsonArray n -> new TsonArray(n.elements(), n.typeRef(), merged);
             case TsonTuple n -> new TsonTuple(n.elements(), n.typeRef(), merged);
             case TsonAtom n -> new TsonAtom(n.value(), n.typeRef(), merged);
-            case TsonAbsent n -> new TsonAbsent(n.typeRef(), merged);
+            case TsonVoid n -> new TsonVoid(n.typeRef(), merged);
             case TsonMissing n -> n;
             // The annotations belong to the value the directive governs, not to the scope around it.
             case TsonScopedValue n -> new TsonScopedValue(n.schema(), n.root().withAnnotations(leading));
@@ -79,7 +79,7 @@ public sealed interface TsonValue
     default boolean isArray()     { return false; }
     default boolean isTuple()     { return false; }
     default boolean isAtom()      { return false; }
-    default boolean isAbsent()    { return false; }
+    default boolean isVoid()    { return false; }
     default boolean isMissing()   { return false; }
     default boolean isContainer() { return isRecord() || isMap() || isArray() || isTuple(); }
 

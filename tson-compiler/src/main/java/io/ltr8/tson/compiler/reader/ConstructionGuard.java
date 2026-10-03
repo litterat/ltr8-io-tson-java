@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
  * <b>A read is all-or-nothing, in both modes:</b> a value whose read reported anything is not assembled, and
  * reads to {@code null} instead. Shared by every reader that builds something -- the tree readers ({@link
  * RecordTreeReader}, {@link ArrayTreeReader}, {@link MapTreeReader}, {@link TupleTreeReader}, {@link
- * AtomTreeReader}, {@link AbsentTreeReader}) and the bind readers ({@link RecordBindReader}, {@link
+ * AtomTreeReader}, {@link VoidTreeReader}) and the bind readers ({@link RecordBindReader}, {@link
  * TupleBindReader}, {@link ArrayBindReader}, {@link MapBindReader} and {@link DataClassObjectReader}'s own
  * four) -- so the policy has one statement. The facades apply it once more at the document boundary, over
  * every route a problem takes ({@code CountingReceiver}).

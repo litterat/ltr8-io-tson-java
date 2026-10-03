@@ -142,7 +142,7 @@ final class BindRecordBuilder implements RecordBuilder {
         }
         for (int i = 0; i < slots.length; i++) {
             Object slot = slots[i];
-            if (argument[i] >= 0 && slot != Slots.ABSENT) {
+            if (argument[i] >= 0 && slot != Slots.VOID) {
                 arguments[argument[i]] = slot;
             }
         }

@@ -299,9 +299,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                         fields.get(schemaIndex).schema().type().name(), push);
             }
             Object decoded;
-            if (ctx.peek() instanceof AbsentEvent) {
+            if (ctx.peek() instanceof VoidEvent) {
                 ctx.next();
-                decoded = valueForStatedAbsentField(schemaIndex, ctx);
+                decoded = valueForVoidField(schemaIndex, ctx);
             } else {
                 decoded = fields.get(schemaIndex).parser()
                         .read(ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position()));
@@ -325,7 +325,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for the `actual` of a field-state rule. */
-    private static final String ABSENT = "_";
+    private static final String VOID = "_";
 
     /**
      * Field-group presence check (§5.11, SPEC-FEEDBACK.md #18). The group's members flatten into ordinary
@@ -402,7 +402,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * The value a field takes when the document wrote {@code _} at it, which differs from never mentioning
-     * it at all ({@link #valueForAbsentField}). A voidable field admits it; at any other, §7.6 makes an
+     * it at all ({@link #valueForMissingField}). A voidable field admits it; at any other, §7.6 makes an
      * explicit {@code _} a validation error. At a defaulted field this reports it and injects anyway:
      * omission is the injection route, and injecting silently would substitute a value the document
      * explicitly disclaimed -- for the retry loop the format targets, {@code _} at a defaulted field means
@@ -414,26 +414,26 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * field never reaches here: {@link #readFields} routes it through {@link #verifyFixed}, which answers
      * {@code _} for itself.
      */
-    final Object valueForStatedAbsentField(int schemaIndex, TsonReadContext ctx) {
+    final Object valueForVoidField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
         if (schema.voidable()) {
             // [TSON-DATA] §2.9: "A field or entry set to `_` is present with a void value -- distinct from
-            // not appearing at all." Answering `valueForAbsentField`'s `null` here would collapse the two,
+            // not appearing at all." Answering `valueForMissingField`'s `null` here would collapse the two,
             // and a voidable field is one where both are legal, so it is where the distinction has anything
             // to carry.
-            return statedAbsentValue();
+            return statedVoidValue();
         }
         if (schema.role() == FieldRole.DEFAULT) {
             ctx.schemaField(schema.name(), schema.position())
-                    .report(rules.absenceAtDefaultedField(schema.name(), ABSENT));
+                    .report(rules.voidAtDefaultedField(schema.name(), VOID));
             return precomputedValue[schemaIndex];
         }
         // A required field: the document *stated* absence, so it is not missing. Delegating to
-        // valueForAbsentField reported "missing required field", which tells an author they forgot a field
+        // valueForMissingField reported "missing required field", which tells an author they forgot a field
         // they can see themselves writing -- §5.2's rule is that `_` asserts absence at a position the schema
         // always fills, and that is what the diagnostic should say.
         ctx.schemaField(schema.name(), schema.position())
-                .report(rules.absenceAtRequiredField(schema.name(), ABSENT));
+                .report(rules.voidAtRequiredField(schema.name(), VOID));
         return null;
     }
 
@@ -441,14 +441,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * The no-value form this reader's own output mode uses for a field the document wrote {@code _} at.
      *
      * <p>Per subclass because the two modes can represent different things. A tree has a node for it
-     * ({@code TsonAbsent}), so it keeps [TSON-DATA] §2.9's distinction between a field written {@code _} and
+     * ({@code TsonVoid}), so it keeps [TSON-DATA] §2.9's distinction between a field written {@code _} and
      * one never written -- which an array element and a tuple slot keep too, the record being the one
      * container of the four that would otherwise lose it. A bound object has no third state between {@code null} and a
      * component that was never set, so bind mode answers {@code null} and the two collapse there; that is a
      * limit of the target, not a reading of §2.9, and it is why this is a subclass's answer rather than one
      * shared here.
      */
-    abstract Object statedAbsentValue();
+    abstract Object statedVoidValue();
 
     /**
      * The value a field takes when the document never stated it -- {@link RecordField#omitted} answered here,
@@ -463,7 +463,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * TsonReadContext#withPosition}) for the second "never mentioned at all" pass, where the live
      * cursor has already moved past the whole record.
      */
-    final Object valueForAbsentField(int schemaIndex, TsonReadContext ctx) {
+    final Object valueForMissingField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
         return switch (omitted[schemaIndex]) {
             case MISSING -> {
@@ -502,10 +502,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             // always refused here -- but it is refused rather than ignored, which is the point.
             ScopePush.refuse(fieldCtx, schema.type().name(), push);
         }
-        if (ctx.peek() instanceof AbsentEvent) {
+        if (ctx.peek() instanceof VoidEvent) {
             // A pinned field is never voidable -- `_` is not the pin -- so absence here is always the refusal.
             ctx.next();
-            fieldCtx.report(rules.fixedFieldAbsent(fieldName, String.valueOf(check.value()), ABSENT));
+            fieldCtx.report(rules.voidAtFixedField(fieldName, String.valueOf(check.value()), VOID));
             return;
         }
         int before = ctx.reported();

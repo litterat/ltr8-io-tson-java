@@ -12,7 +12,7 @@ import java.util.Optional;
  * built-in- or schema-typed one; {@link #typeRef()} names the TSON type when known (e.g. {@code "int32"}).
  * Typed access is via {@link #as(Class)} and the {@code asString}/{@code asBigInteger}/… conveniences.
  *
- * <p>The value is never {@code null} -- {@link TsonAbsent} is the node for a position holding no value.
+ * <p>The value is never {@code null} -- {@link TsonVoid} is the node for a position holding no value.
  *
  * <p><b>{@link #toString()} renders the value alone</b>, not the record's own components, and that is
  * load-bearing rather than cosmetic: a reader reporting on a decoded value stringifies whatever it decoded,
@@ -29,7 +29,7 @@ public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotati
         implements TsonValue {
 
     public TsonAtom {
-        Objects.requireNonNull(value, "TsonAtom value must not be null -- use TsonAbsent");
+        Objects.requireNonNull(value, "TsonAtom value must not be null -- use TsonVoid");
         annotations = List.copyOf(annotations);
     }
 

@@ -13,14 +13,14 @@ import io.ltr8.tson.compiler.Position;
  * <p>Every value position (document root, record field, map key/value, array element, an
  * annotation's own value) has the same self-delimiting shape in the stream: zero or more
  * {@link AnnotationStart}/{@link AnnotationEnd} pairs, an optional {@link TypeRef}, then exactly
- * one core-value -- either a single leaf event ({@link TokenEvent}, {@link AbsentEvent}, {@link
+ * one core-value -- either a single leaf event ({@link TokenEvent}, {@link VoidEvent}, {@link
  * EmptyBraceEvent}) or a matched {@link RecordStart}/{@link RecordEnd}, {@link MapStart}/{@link
  * MapEnd}, or {@link ArrayStart}/{@link ArrayEnd} pair.
  */
 public sealed interface TsonEvent
         permits DocumentStart, DocumentEnd, AnnotationStart, AnnotationEnd, TypeRef, SchemaRef,
         RecordStart, FieldName, RecordEnd, MapStart, MapArrow, MapEnd, ArrayStart, ArrayEnd,
-        TokenEvent, AbsentEvent, EmptyBraceEvent {
+        TokenEvent, VoidEvent, EmptyBraceEvent {
 
     Position position();
 }

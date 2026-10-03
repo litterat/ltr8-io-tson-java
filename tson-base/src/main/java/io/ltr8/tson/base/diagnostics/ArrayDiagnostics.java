@@ -29,7 +29,7 @@ public record ArrayDiagnostics(String typeName) {
      * is how the document said it, and appears in {@code actual} rather than in the prose -- the rule is about
      * the element's state, not about how absence was spelled.
      */
-    public Refusal absentElement(int index, String spelling) {
+    public Refusal voidElement(int index, String spelling) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
                 "'%s' element [%d] is absent, but elements are required".formatted(typeName, index),
                 "a value", spelling);

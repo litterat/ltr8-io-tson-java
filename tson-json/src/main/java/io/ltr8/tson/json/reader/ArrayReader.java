@@ -76,11 +76,11 @@ final class ArrayReader implements JsonTypeReader<Object> {
             if (at.peek() instanceof JsonEvent.NullValue) {
                 at.next();
                 if (!plan.voidableElements()) {
-                    at.report(plan.rules().absentElement(index, NULL));
+                    at.report(plan.rules().voidElement(index, NULL));
                 }
                 // The slot exists and counts either way, so it stays rather than shifting every later element's
                 // index against the document ([TSON-DATA] §2.9).
-                elements.add(Slots.ABSENT);
+                elements.add(Slots.VOID);
                 continue;
             }
             Object value = element.read(at);

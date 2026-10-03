@@ -25,9 +25,9 @@ final class MapEntries {
         if (at.peek() instanceof JsonEvent.NullValue) {
             at.next();
             if (!plan.voidableValues()) {
-                at.report(plan.rules().absentEntryValue(keySegment, NULL));
+                at.report(plan.rules().voidEntryValue(keySegment, NULL));
             }
-            return Slots.ABSENT;
+            return Slots.VOID;
         }
         Object value = reader.read(at);
         return value == null ? Slots.REFUSED : value;

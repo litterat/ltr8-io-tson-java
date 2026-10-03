@@ -79,8 +79,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     /**
      * Tree mode: reads into an immutable {@link TsonValue}. The container factories
      * build node containers; every atom-family/enum factory is wrapped ({@link AtomTreeFactory}) so its leaf
-     * yields a {@code TsonAtom} (or a {@code TsonAbsent} where it produced no value), and {@code void_type}
-     * yields a {@code TsonAbsent} (see {@link #TREE_VOID}). Uses the object-binding enum factory so {@code
+     * yields a {@code TsonAtom} (or a {@code TsonVoid} where it produced no value), and {@code void_type}
+     * yields a {@code TsonVoid} (see {@link #TREE_VOID}). Uses the object-binding enum factory so {@code
      * boolean} reads a real {@code Boolean} rather than the text {@code "true"}/{@code "false"}.
      */
     public static ValueReaderFactoryRegistry tree() {
@@ -91,9 +91,9 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
                 ChoiceReader.FACTORY, ScopedReader.TREE));
     }
 
-    /** Tree mode's {@code void_type} factory: {@link AbsentTreeReader} over {@link AtomTypeReader#VOID}'s reader. */
+    /** Tree mode's {@code void_type} factory: {@link VoidTreeReader} over {@link AtomTypeReader#VOID}'s reader. */
     private static final ValueReaderFactory TREE_VOID = (name, definition, context) ->
-            new AbsentTreeReader(AtomTypeReader.VOID.create(name, definition, context), AnnotationTypes.of(context));
+            new VoidTreeReader(AtomTypeReader.VOID.create(name, definition, context), AnnotationTypes.of(context));
 
     /** Tree mode's {@code value_type} factory: {@link AtomTreeReader} over {@link AtomTypeReader#VALUE}'s reader. */
     private static final ValueReaderFactory TREE_VALUE = (name, definition, context) ->

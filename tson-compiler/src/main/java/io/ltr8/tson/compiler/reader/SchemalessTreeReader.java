@@ -48,7 +48,7 @@ import java.util.Set;
  * decides its fate exactly as it does for the schema-driven readers: fail-fast throws {@code
  * ReadException} at the first, a collector gathers them all. Reporting never stops the read -- the node is
  * still built and its children are still read, so one pass finds everything, and a leaf whose atom rejected
- * the token stands as a {@link TsonAbsent} -- and the facade then hands back no tree for a document that
+ * the token stands as a {@link TsonVoid} -- and the facade then hands back no tree for a document that
  * reported anything ({@code CountingReceiver}), so the placeholder reaches only a caller reading one value
  * through a context it owns.
  *
@@ -109,9 +109,9 @@ public final class SchemalessTreeReader {
                 ctx.next();
                 yield new TsonRecord(Map.of(), typeRef, annotations);
             }
-            case AbsentEvent ignored -> {
+            case VoidEvent ignored -> {
                 ctx.next();
-                yield new TsonAbsent(typeRef, annotations);
+                yield new TsonVoid(typeRef, annotations);
             }
             case TokenEvent token -> {
                 ctx.next();
@@ -195,7 +195,7 @@ public final class SchemalessTreeReader {
         Set<Object> seen = new HashSet<>();
         while (!(ctx.peek() instanceof MapEnd)) {
             TsonValue key = readNode(ctx);
-            if (key instanceof TsonAbsent) {
+            if (key instanceof TsonVoid) {
                 // §2.9, and a resolver-layer constraint rather than a grammar one: the map-entry
                 // production accepts any data-value in key position, so no tier below this one can
                 // refuse it. The entry is still kept -- tree mode keeps everything it built -- and the
@@ -224,7 +224,7 @@ public final class SchemalessTreeReader {
      *
      * <p>A token is always a value: §4 resolves every one of them to boolean, number or string, {@code null}
      * included, which is the string {@code null}. The one no-value outcome here is a token the atom rejected,
-     * kept as a {@link TsonAbsent} so the read carries on -- the facade discards a document that reported
+     * kept as a {@link TsonVoid} so the read carries on -- the facade discards a document that reported
      * anything, so the diagnostic rather than the placeholder is what a caller sees. Absence proper is
      * {@code _}, which is never a token and reaches the tree through its own event.
      */
@@ -237,7 +237,7 @@ public final class SchemalessTreeReader {
                 value = atom.get().read(tokenValue.text());
             } catch (AtomTypeException e) {
                 TypeRefCheck.violation(ctx, typeRef.orElseThrow(), e, token.text());
-                return new TsonAbsent(typeRef, annotations);
+                return new TsonVoid(typeRef, annotations);
             }
         } else {
             value = ValueParser.INSTANCE.read(tokenValue);
@@ -306,7 +306,7 @@ public final class SchemalessTreeReader {
             // a no-value key apart from the string `null`, which is what that token now resolves to. A `_`
             // key never reaches here at all -- readMap refuses it first, §2.9 -- so this identity is only
             // ever a compound key's own element.
-            case TsonAbsent ignored -> KeyKind.ABSENT;
+            case TsonVoid ignored -> KeyKind.VOID;
             case TsonMissing ignored -> KeyKind.MISSING;
             // A map key is a data-value, never a scoped-value (§2.3), so no key this reader builds is one.
             // Identity is still the value's -- a scope says where a type name resolves, not what a key is.
@@ -315,5 +315,5 @@ public final class SchemalessTreeReader {
     }
 
     /** Identity stand-ins for the payload-free node kinds -- see {@link #keyIdentity}. */
-    private enum KeyKind { ABSENT, MISSING }
+    private enum KeyKind { VOID, MISSING }
 }

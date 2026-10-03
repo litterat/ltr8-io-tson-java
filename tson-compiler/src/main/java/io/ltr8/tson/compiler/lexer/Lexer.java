@@ -215,7 +215,7 @@ public final class Lexer {
         }
         if (cp == '_') {
             advance();
-            return finish(TokenType.ABSENT, "_");
+            return finish(TokenType.VOID, "_");
         }
         if (cp == '{') {
             advance();

@@ -1,11 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.MapValue;
-import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.ast.*;
+import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -108,7 +104,7 @@ class DerivedNameTest {
         MapValue map = new MapValue(List.of(new MapValue.MapEntry(
                 new DataValue(List.of(), java.util.Optional.empty(),
                         new TokenValue(uri, TokenForm.SINGLE_LINE_QUOTED)),
-                WireForm.scoped(new AbsentValue()))));
+                WireForm.scoped(new VoidValue()))));
         return new RecordValue.Field("schemas", WireForm.scoped(map));
     }
 

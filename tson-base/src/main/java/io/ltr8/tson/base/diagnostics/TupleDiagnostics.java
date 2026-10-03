@@ -43,7 +43,7 @@ public record TupleDiagnostics(String typeName, int positions) {
      * Absence at a position the schema does not admit one at ([TSON-SCHEMA] §7.6). {@code spelling} is how the
      * document said it and rides in {@code actual}, the rule being about the position's state.
      */
-    public Refusal absentPosition(int index, String spelling) {
+    public Refusal voidPosition(int index, String spelling) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
                 "'%s' position [%d] is absent, but this position is required".formatted(typeName, index),
                 "a value", spelling);

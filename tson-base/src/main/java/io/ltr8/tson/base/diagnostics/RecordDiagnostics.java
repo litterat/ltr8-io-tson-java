@@ -64,7 +64,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
      * appears in {@code actual} rather than in the prose, because the rule is about the field and not
      * about how absence was spelled.
      */
-    public Refusal absenceAtRequiredField(String field, String spelling) {
+    public Refusal voidAtRequiredField(String field, String spelling) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
                 "'%s' on '%s' admits no absence".formatted(field, typeName),
                 "a value for '" + field + "'", spelling);
@@ -75,7 +75,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
      * the fix is to omit the field rather than to disclaim its value -- and the default is still what the
      * field decodes to, only the verdict changes.
      */
-    public Refusal absenceAtDefaultedField(String field, String spelling) {
+    public Refusal voidAtDefaultedField(String field, String spelling) {
         return new Refusal(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
                 "'%s' on '%s' is always filled from the schema and cannot be written as absent -- omit the field "
                         .formatted(field, typeName) + "to take its default (§5.2)",
@@ -83,7 +83,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     }
 
     /** Absence written at a field pinned to a value, which the schema settles and which is never absent. */
-    public Refusal fixedFieldAbsent(String field, String pinned, String spelling) {
+    public Refusal voidAtFixedField(String field, String pinned, String spelling) {
         return new Refusal(Diagnostic.Code.FIELD_FIXED,
                 "'%s' is fixed on '%s' and cannot be absent".formatted(field, typeName), pinned, spelling);
     }

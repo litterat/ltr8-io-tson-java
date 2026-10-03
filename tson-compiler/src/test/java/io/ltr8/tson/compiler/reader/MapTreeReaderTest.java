@@ -13,7 +13,7 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonAtom;
 import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonValue;
@@ -101,7 +101,7 @@ class MapTreeReaderTest {
     }
 
     @Test
-    void absentSentinelAsKeyThrows() {
+    void voidSentinelAsKeyThrows() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
 
         ReadException thrown = assertThrows(ReadException.class,
@@ -121,7 +121,7 @@ class MapTreeReaderTest {
      * [TSON-SCHEMA] §7.6's permission, now conditional on the declaration the way an array element's is.
      */
     @Test
-    void anAbsentEntryValueIsPermittedUnderOptional() {
+    void aVoidEntryValueIsPermittedWhereVoidable() {
         TsonCompiledSchema compiled = compile(optionalValues());
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
@@ -129,7 +129,7 @@ class MapTreeReaderTest {
 
         assertEquals(List.of(), problems.diagnostics(), problems.diagnostics().toString());
         assertEquals(2, result.entries().size());
-        assertEquals(TsonAbsent.instance(), result.entries().get(0).value());
+        assertEquals(TsonVoid.instance(), result.entries().get(0).value());
         assertEquals(BigInteger.ONE, ((TsonAtom) result.entries().get(0).key()).value());
     }
 
@@ -140,7 +140,7 @@ class MapTreeReaderTest {
      * ArrayAbstractReader} gives a required element.
      */
     @Test
-    void anAbsentEntryValueIsRefusedUnderTheDefaultRequired() {
+    void aVoidEntryValueIsRefusedByDefault() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
@@ -160,7 +160,7 @@ class MapTreeReaderTest {
      * verdict, not the entry its place.
      */
     @Test
-    void anAbsentEntryValueCountsTowardTheSizeBounds() {
+    void aVoidEntryValueCountsTowardTheSizeBounds() {
         MapBody atLeastTwo = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), true, false,
                 Optional.of(BigInteger.TWO), Optional.empty());
         assertEquals(2, ((TsonMap) compile(atLeastTwo).get("scores")
@@ -175,7 +175,7 @@ class MapTreeReaderTest {
 
     /** The permission is the value position's alone -- §2.9's own rule still refuses the sentinel as a key. */
     @Test
-    void anAbsentKeyIsStillRefusedWhenTheValueIsAbsentToo() {
+    void aVoidKeyIsStillRefusedWhenTheValueIsVoidToo() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
 
         ReadException thrown = assertThrows(ReadException.class,

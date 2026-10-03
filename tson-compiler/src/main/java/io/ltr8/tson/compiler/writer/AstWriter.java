@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.writer;
 
 import io.ltr8.tson.compiler.TsonDataEmitter;
 
-import io.ltr8.tson.compiler.ast.AbsentValue;
+import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -91,7 +91,7 @@ public final class AstWriter {
 				}
 				emitter.endArray();
 			}
-			case AbsentValue ignored -> emitter.absentValue();
+			case VoidValue ignored -> emitter.voidValue();
 			// `{}` is the empty container of whatever the position's own type is ([TSON-DATA] §2.8), and it is
 			// spelled the same way whichever that turns out to be.
 			case EmptyBrace ignored -> {

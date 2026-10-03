@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * bind mode has nothing to decode for it ahead of a read: the component receives {@code null} whether the
  * document omits the field or writes {@code _}, and a written value is the pin contradicted.
  */
-class FixedToAbsentBindTest {
+class FixedToVoidBindTest {
 
     private static final String ID = "https://example.test/retired.tn";
 
@@ -54,7 +54,7 @@ class FixedToAbsentBindTest {
     }
 
     @Test
-    void omittedOrWrittenAbsentTheComponentIsNull() {
+    void omittedOrWrittenVoidTheComponentIsNull() {
         assertEquals(new Person("Ada", null), read("{ name: Ada }"));
         assertEquals(new Person("Ada", null), read("{ name: Ada  retired: _ }"));
     }

@@ -308,7 +308,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * inventing somewhere would be a change to what a consumer's own class means.
      */
     @Override
-    Object statedAbsentValue() {
+    Object statedVoidValue() {
         return null;
     }
 
@@ -398,7 +398,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 continue;
             }
             DataClassField target = targetField[i];
-            Object defaulted = valueForAbsentField(i, anchoredCtx);
+            Object defaulted = valueForMissingField(i, anchoredCtx);
             if (target != null) {
                 arguments[target.index()] = defaulted;
             }

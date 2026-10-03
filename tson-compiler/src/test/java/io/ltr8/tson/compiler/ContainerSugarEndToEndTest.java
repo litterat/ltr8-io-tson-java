@@ -345,7 +345,7 @@ class ContainerSugarEndToEndTest {
      * the map's own value state.
      */
     @Test
-    void anAbsentMapValueIsAcceptedOnlyWhereTheSchemaMarkedItOptional() {
+    void aVoidMapValueIsAcceptedOnlyWhereTheSchemaMarkedItVoidable() {
         TsonCompiledSchema compiled = compile("""
                   loose => {text => text?}
                   strict => {text => text}

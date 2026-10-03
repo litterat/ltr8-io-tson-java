@@ -55,7 +55,7 @@ public record TsonScopedValue(String schema, TsonValue root) implements TsonValu
     @Override public boolean isArray()     { return root.isArray(); }
     @Override public boolean isTuple()     { return root.isTuple(); }
     @Override public boolean isAtom()      { return root.isAtom(); }
-    @Override public boolean isAbsent()    { return root.isAbsent(); }
+    @Override public boolean isVoid()    { return root.isVoid(); }
     @Override public boolean isMissing()   { return root.isMissing(); }
     @Override public boolean isContainer() { return root.isContainer(); }
 

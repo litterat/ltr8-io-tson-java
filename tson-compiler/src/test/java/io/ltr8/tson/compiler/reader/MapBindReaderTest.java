@@ -63,7 +63,7 @@ class MapBindReaderTest {
      * {@code null}, distinguishable from a key the document never stated.
      */
     @Test
-    void anAbsentEntryValueBindsAsAKeyPresentWithNoValue() {
+    void aVoidEntryValueBindsAsAKeyPresentWithNoValue() {
         Catalogue catalogue = read("{ entries: { \"a\" => _  \"b\" => \"two\" } }");
 
         assertEquals(2, catalogue.entries().size());

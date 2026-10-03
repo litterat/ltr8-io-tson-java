@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>What {@code _} means is [TSON-DATA] §2.9's distinction</b>, and the tree keeps it: a field written
  * {@code _} is present with a void value, and a field never written is not there.
  */
-class AbsenceHasOneSpellingTest {
+class VoidHasOneSpellingTest {
 
     private static final String ID = "https://example.test/person-1.tn";
     private static final String SCHEMA = """
@@ -66,11 +66,11 @@ class AbsenceHasOneSpellingTest {
     // ── Schemaless: §4 applies, and it resolves three classes ──
 
     @Test
-    void schemalessNullIsAStringAndOnlyTheSentinelIsAbsent() {
+    void schemalessNullIsAStringAndOnlyTheSentinelIsVoid() {
         TsonValue node = tson().treeReader().read("{ a: null  b: _  c: \"null\" }");
 
         assertEquals(Optional.of("null"), node.at("/a").asString());
-        assertTrue(node.at("/b").isAbsent());
+        assertTrue(node.at("/b").isVoid());
         assertEquals(Optional.of("null"), node.at("/c").asString(), "quoted or not, it is the same string");
     }
 
@@ -92,20 +92,20 @@ class AbsenceHasOneSpellingTest {
      * a tuple slot already kept it.
      *
      * <p>{@code get} answers the two apart without throwing, which is the whole of the tree model's
-     * navigation contract: a written {@code _} is a {@code TsonAbsent} that is present, and a field never
+     * navigation contract: a written {@code _} is a {@code TsonVoid} that is present, and a field never
      * written is a {@code TsonMissing} carrying the pointer of the step that failed.
      *
      * <p><b>Bind mode still collapses them</b>, and deliberately: a Java component has no third state between
      * "set to nothing" and "never set", so both readings arrive as {@code null}. That is a limit of the
-     * target rather than a reading of §2.9 -- {@code RecordBindReader.statedAbsentValue} says so -- and it is
+     * target rather than a reading of §2.9 -- {@code RecordBindReader.statedVoidValue} says so -- and it is
      * why the tree's answer is a subclass's rather than one shared between them.
      */
     @Test
-    void underASchemaAFieldWrittenAbsentIsPresentAndOneNeverWrittenIsNot() {
+    void underASchemaAFieldWrittenVoidIsPresentAndOneNeverWrittenIsNot() {
         TsonValue written = readPerson("nickname: _");
         TsonValue omitted = readPerson("");
 
-        assertTrue(written.get("nickname").isAbsent(),
+        assertTrue(written.get("nickname").isVoid(),
                 () -> "written '_': present with a void value -- " + written);
         assertTrue(omitted.get("nickname").isMissing(),
                 () -> "never written: not there at all -- " + omitted);
@@ -114,7 +114,7 @@ class AbsenceHasOneSpellingTest {
 
     /** And it survives the round trip, which is what makes the distinction usable rather than merely read. */
     @Test
-    void underASchemaAFieldWrittenAbsentWritesBackAsTheSentinel() {
+    void underASchemaAFieldWrittenVoidWritesBackAsTheSentinel() {
         String rewritten = new TsonTreeWriter().toTson(readPerson("nickname: _"));
 
         assertTrue(rewritten.contains("nickname: _"), rewritten);

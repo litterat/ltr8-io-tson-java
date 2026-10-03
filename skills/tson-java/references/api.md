@@ -451,12 +451,12 @@ everything, are fail-fast by design.
 ### Exported sub-packages
 
 - `io.ltr8.tson.compiler.ast` — the parse-preserving AST: `Document`, `DataValue`, `CoreValue` and its
-  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `AbsentValue`, `EmptyBrace`,
+  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `VoidValue`, `EmptyBrace`,
   `ScopedValue`), `Annotation`, `TokenForm`.
 - `io.ltr8.tson.compiler.ast.schema` — `SchemaDocument` and the schema-grammar nodes.
 - `io.ltr8.tson.compiler.stream` — the Tier 2 event vocabulary: `TsonEvent` (sealed) with
   `DocumentStart`/`End`, `RecordStart`/`End`, `MapStart`/`MapArrow`/`MapEnd`, `ArrayStart`/`End`,
-  `FieldName`, `TokenEvent`, `AbsentEvent`, `EmptyBraceEvent`, `TypeRef`, `SchemaRef`,
+  `FieldName`, `TokenEvent`, `VoidEvent`, `EmptyBraceEvent`, `TypeRef`, `SchemaRef`,
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
 - `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`:
   the schema pipeline's own bind context), `SchemaMetaNameBinder` (`INSTANCE`, `defaultContext()`,
@@ -471,10 +471,10 @@ A true leaf — depends on **nothing**, not even `tson-annotation`.
 
 ```java
 public sealed interface TsonValue
-        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonAbsent, TsonMissing,
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonVoid, TsonMissing,
                 TsonScopedValue {
 
-    default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isAbsent() / isMissing();
+    default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isVoid() / isMissing();
     default boolean isContainer();
     default Optional<String> missingPath();          // the pointer up to the step that FAILED
 

@@ -144,7 +144,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
             if (push != null) {
                 ScopePush.refuse(ctx.index(index), body.elementType().name(), push);
             }
-            Object decoded = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(index, ctx)
+            Object decoded = ctx.peek() instanceof VoidEvent ? defaultOrRequire(index, ctx)
                     : elementParser.read(ctx.index(index));
             if (seen != null && decoded != null) {
                 if (!seen.add(ValueIdentity.of(decoded))) {
@@ -163,12 +163,12 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         validateSize(index, ctx);
     }
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for the `actual` of an element-state rule. */
-    private static final String ABSENT = "_";
+    private static final String VOID = "_";
 
     private Object defaultOrRequire(int index, TsonReadContext ctx) {
-        ctx.next(); // consume the AbsentEvent whether or not the element is voidable
+        ctx.next(); // consume the VoidEvent whether or not the element is voidable
         if (!body.voidable()) {
-            ctx.index(index).report(rules.absentElement(index, ABSENT));
+            ctx.index(index).report(rules.voidElement(index, VOID));
         }
         return null;
     }

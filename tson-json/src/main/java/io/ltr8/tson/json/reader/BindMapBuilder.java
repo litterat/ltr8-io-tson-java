@@ -105,6 +105,6 @@ final class BindMapBuilder implements MapBuilder {
     }
 
     private static Object value(Object slot) {
-        return slot == Slots.ABSENT ? null : slot;
+        return slot == Slots.VOID ? null : slot;
     }
 }

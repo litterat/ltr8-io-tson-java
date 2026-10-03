@@ -12,20 +12,20 @@ import java.util.Optional;
  * <p>Also the placeholder a tree-mode reader leaves where a value failed to read in collecting mode -- what
  * went wrong is carried by the diagnostic, not by the node standing in for it.
  */
-public record TsonAbsent(Optional<String> typeRef, List<TsonAnnotation> annotations) implements TsonValue {
+public record TsonVoid(Optional<String> typeRef, List<TsonAnnotation> annotations) implements TsonValue {
 
-    private static final TsonAbsent BARE = new TsonAbsent(Optional.empty(), List.of());
+    private static final TsonVoid BARE = new TsonVoid(Optional.empty(), List.of());
 
-    public TsonAbsent {
+    public TsonVoid {
         annotations = List.copyOf(annotations);
     }
 
-    public static TsonAbsent instance() {
+    public static TsonVoid instance() {
         return BARE;
     }
 
     @Override
-    public boolean isAbsent() {
+    public boolean isVoid() {
         return true;
     }
 }

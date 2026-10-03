@@ -85,15 +85,15 @@ is small and parsed once.)
   `groupChoosesAtMostOne`, `groupRequiresAtLeastOne` for the `+` group), every one of them `FIELD_GROUP`. A pinned
   field is never voidable (`type? = value` is refused), because the written-`_` decision runs before the pin is
   consulted, so a `_` at a FIXED field is always `FIELD_FIXED`. Nothing is pre-seeded: every field the document
-  didn't state goes through one `valueForAbsentField` switch over the three `Omitted` answers, and the JSON reader's
-  `fillAbsent` switches over the same three.
+  didn't state goes through one `valueForMissingField` switch over the three `Omitted` answers, and the JSON reader's
+  `fillMissing` switches over the same three.
 - **An array element's one fact is `voidable`, and a void element occupies its slot.**
   Under `[T?]` (`voidable: true`) an element may be the void sentinel `_`; under the default it
-  is `FIELD_REQUIRED`. Either way `ArrayAbstractReader` consumes the `AbsentEvent` and advances the index, so
+  is `FIELD_REQUIRED`. Either way `ArrayAbstractReader` consumes the `VoidEvent` and advances the index, so
   `[a _ c]` has three elements and satisfies a `[T?; 3]` size constraint — §5.3's own stated equivalence,
   which falls out of counting rather than being checked for. Elements have no default/fixed concept at all
   (`voidable` is their one fact, where a record field carries a role and a value), so none of the
-  `valueForAbsentField` machinery above has an array counterpart.
+  `valueForMissingField` machinery above has an array counterpart.
 - **A name's identity is its NFC form, and normalising happens where a token becomes a name.** §2.5 and
   §2.6 define field-name and scalar-key identity by NFC-normalised text, whichever spelling produced it, so
   `café` precomposed and decomposed are one name, and §7.2.1 mandates it directly — "quoted tokens that
@@ -130,7 +130,7 @@ is small and parsed once.)
   sentinel (`_` is a value of no atom type) — absence is the container's question, the same place `ArrayAbstractReader`
   asks it. The entry is present with a void value (§2.9) whichever answer it gets, so it counts toward
   `min_items`/`max_items` and the refusal costs the value its verdict, not the entry its place; both subclasses already
-  had the no-value form to put there — a `TsonAbsent` in tree mode, a `null` the bound `Map` really holds in bind mode.
+  had the no-value form to put there — a `TsonVoid` in tree mode, a `null` the bound `Map` really holds in bind mode.
   The **key** is the opposite and unconditional: §2.9 forbids the sentinel there whatever a declaration says, and the
   parser refuses a `?` on that side for the same reason. **The schemaless reader enforces it too**, which is where the
   rule most needs enforcing: §2.9 is a Part 1 rule, so Class 1 data is exactly the case it governs, and the map-entry
@@ -224,14 +224,14 @@ is small and parsed once.)
   does the stripping explicitly; the other two readers compare bound host values, which strips both by
   construction.
 - **A written `_` at an `OPTIONAL` field is present with a void value** (§2.9: "distinct from not
-  appearing at all"), and tree mode keeps that: `{ x: _ }` reads with `x` a `TsonAbsent` where `{ }` reads
+  appearing at all"), and tree mode keeps that: `{ x: _ }` reads with `x` a `TsonVoid` where `{ }` reads
   with no `x` at all, and `TsonTreeWriter` writes the first back as `_`. It is the mode's own answer
-  (`statedAbsentValue`, per subclass) because bind mode has nowhere to put it — a Java component has no third
+  (`statedVoidValue`, per subclass) because bind mode has nowhere to put it — a Java component has no third
   state between "set to nothing" and "never set", so both readings arrive as `null` there. A limit of the
   target rather than a reading of §2.9, and the reason the tree's answer is not aligned down to it. An array
   element and a tuple slot keep the same distinction, so the containers agree.
 - **A written `_` at a defaulted field is an error**, where plain omission still injects the
-  default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 makes an explicit `_` a
+  default silently (`valueForVoidField` against `valueForMissingField`). §5.2 makes an explicit `_` a
   validation error at every REQUIRED-family field — "`_` asserts absence at a position the schema always
   fills; at REQUIRED_DEFAULT the fix is to omit the field" — which is §7.6's table read down its own column.
   The default is still what the field decodes to — only the verdict changes, the same split `verifyFixed`

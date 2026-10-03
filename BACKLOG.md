@@ -270,14 +270,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   host class. `CONFORMANCE.md`'s accepted-gap paragraph and the two parsers' Javadoc go with it; Class 1
   vectors for each case above.
 
-- [ ] **The Java identifiers still say "absent" where the series now says "void"** (SPEC-FEEDBACK.md #21). The
-  prose, the diagnostics and the kernel moved; the names did not: `TsonAbsent` (the tree's void node, the
-  consumer-facing one), `AbsentValue` and `AbsentEvent` (the AST node and the stream event), `AbsentTreeReader`,
-  and the diagnostic rules `absentElement`, `absentEntryValue`, `absentPosition` and `absentKey`, about 130 uses
-  over 57 files. It is an IDE rename — `TsonVoid`, `VoidValue`, `VoidEvent`, `VoidTreeReader`, `voidElement` and
-  so on — then a sweep of the Javadoc that names the old classes in prose. `JsonNull` stays: it is JSON's node for
-  its own token, which is the void sentinel's spelling there.
-
 - [ ] **An ordered map is constructible and nothing honours it.** `!map { … ordered: true }` resolves, and
   meta-kernel's `map` `@doc` says its entry order is part of its value and a host binds it to a map that keeps its
   order. No reader consults the facet, so each mode gets one half wrong. Bind mode builds every map through

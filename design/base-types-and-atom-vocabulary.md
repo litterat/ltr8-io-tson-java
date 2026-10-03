@@ -111,11 +111,11 @@ schema is the oracle rather than a literal in a test.
       the spec requires it to accept.
       `FieldValueConformanceTest.aQuotedNumericIsAValueOfAnIntegerFieldBecauseFormIsNotMeaning` pins it.
 - **There is no `null`, and the order has three steps rather than four.** Absence has one spelling, `_`,
-  and it is lexical: the lexer gives it `TokenType.ABSENT`, the stream an `AbsentEvent` and the parser an
-  `ast.AbsentValue`, so it is never a `TokenValue` and no order here could reach it. The unquoted token
+  and it is lexical: the lexer gives it `TokenType.VOID`, the stream a `VoidEvent` and the parser a
+  `ast.VoidValue`, so it is never a `TokenValue` and no order here could reach it. The unquoted token
   `null` is the string `null`, as `frobnicate` is — §7.7 rule 3 holds with no word to except, and the
   token stays available to `enum`/`token`/FIXED-`text` positions like any other. `BaseValue` carries an
-  `AbsentValue` member all the same, and `BaseTypeResolver` never returns it: binding an identified value
+  `VoidValue` member all the same, and `BaseTypeResolver` never returns it: binding an identified value
   to a host type is one switch (`AtomBinder.bind`), and a schemaless bind reaching `_` needs a way into
   it. A JSON document's `null` reaches absence through a JSON reader, which maps it in the model, where
   the position's own state decides whether absence is admitted at all.

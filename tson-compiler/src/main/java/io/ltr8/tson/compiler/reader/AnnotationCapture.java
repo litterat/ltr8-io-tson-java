@@ -193,7 +193,7 @@ final class AnnotationCapture {
         // No policy deliberately: this event is synthesised here, not read from the document, so there is
         // no author token to judge -- and the real one it stands for was checked when it left the stream.
         TsonReadContext probe = TsonReadContext.of(
-                new ListEventSource(List.of(new AbsentEvent(start.position()))), diagnostic -> { },
+                new ListEventSource(List.of(new VoidEvent(start.position()))), diagnostic -> { },
                 IdentifierPolicy.none());
         boolean admitted;
         try {

@@ -170,7 +170,7 @@ Where schemas come from is one value, `SchemaAccess` — the source plus the `Fe
 ## Reading into a tree
 
 `TsonValue` is a sealed interface over eight pure immutable node types — `TsonRecord`, `TsonMap`,
-`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonAbsent`, `TsonMissing`, `TsonScopedValue` (no `Node` suffix,
+`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonVoid`, `TsonMissing`, `TsonScopedValue` (no `Node` suffix,
 deliberately). **Every accessor is total — nothing throws.** `TsonScopedValue(schema, root)` is a value
 read under a foreign schema at an `extern`/`dynamic` position (§7.8): it names that schema and is transparent
 to navigation, so `get`/`at` look straight through it.
@@ -188,8 +188,8 @@ A failed step yields a `TsonMissing` whose `missingPath()` is the pointer *up to
 that failed* — `at("/nope/deeper").missingPath()` is `Optional[/nope]` — and every further `get`/`at`
 returns that same node, so the first failure stays the informative one.
 
-**`TsonMissing` (nothing there) is not `TsonAbsent` (the document wrote `_`).** There is one no-value
-node because there is one no-value spelling: `TsonAbsent` carries `_` and a collecting-mode read failure.
+**`TsonMissing` (nothing there) is not `TsonVoid` (the document wrote `_`).** There is one no-value
+node because there is one no-value spelling: `TsonVoid` carries `_` and a collecting-mode read failure.
 The token `null` is not absence — §4 resolves it to the string `null`, so it arrives as a `TsonAtom`.
 
 **Casting and converting are different questions.** `as(Class)`/`asString`/`asBigDecimal` only ever
@@ -506,7 +506,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | expecting a collecting read to throw on a syntax error          | it collects; an empty list is the only "valid"                      | check `problems.diagnostics().isEmpty()`                    |
 | matching diagnostic `message` text                              | messages are not API                                                | switch on `Diagnostic.Code`                                 |
 | `!type` on a schemaless read                                    | schemaless reads resolve built-ins only, and report the rest        | `.withSchema(uri)`, or `preservingUnknownTypeRefs()`        |
-| treating `TsonMissing` and `TsonAbsent` as the same             | `TsonAbsent` was written (`_`); `TsonMissing` is a failed lookup    | `isAbsent()` / `isMissing()`, or `missingPath()`            |
+| treating `TsonMissing` and `TsonVoid` as the same             | `TsonVoid` was written (`_`); `TsonMissing` is a failed lookup    | `isVoid()` / `isMissing()`, or `missingPath()`            |
 | `asInt()` to assert which host type a read produced             | it converts; `234.56E2` answers too                                 | `as(Integer.class)`                                         |
 | `SchemaAccess.of(schemas::get)`                                 | a `null` carries no `Reason`; refused as a fault                    | `SchemaSource.ofMap(schemas)`                               |
 | `SchemaAccess.httpSchemas()` with no host                       | deny by default means nothing is permitted                          | name the hosts explicitly                                   |
