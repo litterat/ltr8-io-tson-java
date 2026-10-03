@@ -152,23 +152,24 @@ It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recover
 `true`, so a writer annotating every one with `!boolean` would be restating what the token already says.
 
 **A text family's value is its text in the type's `normalization` form** (`base.unicode.Normalization`;
-SPEC-FEEDBACK.md #19). `text_type` carries the facet and every family composing it inherits it — `NONE` by
-default, `NFC` on `identifier_type`, fixed to `NONE` on `regex_type`, since folding a pattern changes what it
-matches. Each parser puts the text into the form first and judges the result: the lengths, `pattern`, the
-members (normalised the same way, `TextType.normalizedMembers`), an identifier's profile, a URI's or an
-address's grammar. The three lengths are one helper, `TextParser.checkLengths`, which the URI and email parsers
-call too, and they count code points, as `text_type` says and `TextType.coherenceCheck` does. Since every
-comparison downstream — map keys, set elements, pins, look-alike scopes, hygiene — already runs on the parser's
-value, none of them needed a change of its own beyond reading the value rather than the token. A refusal names
-the token as written and then the value it was judged as — `'PUT' (read as 'put' under NFKC_CASEFOLD) is not a
-member of this type` — through `TextParser.subject`, threaded into every facet's message: the written spelling is
-the text a reader or a repair loop has to find, and the value is what the facet compared. `NFKC_CASEFOLD` is
-`NfkcCasefold`, derived from the JDK's normalizer and case mappings with three exceptions and checked against
-`DerivedNormalizationProps.txt` over every code point. `ASCII_CASEFOLD` lowercases A..Z and touches nothing
-else — no NFC either — so a profile of ASCII letters under it refuses the full-width and Kelvin-sign spellings
-`NFKC_CASEFOLD` would fold into the profile. It is the form of the case-insensitive ASCII naming systems (field
-names, schemes, DNS names), and `scheme_name` uses it; `NFKC_CASEFOLD` is for names compared without case across
-Unicode.
+SPEC-FEEDBACK.md #19). `text_type` carries the facet and every family composing it inherits it — `NONE` by default,
+`NFC` on `identifier_type`, fixed to `NONE` on `regex_type`, since folding a pattern changes what it matches, and
+on `uri_type`, `iri_type` and `email_type`, since a URI's path and query and a mailbox's local part compare with
+case and a form over the whole text would change what the value names. Each parser puts the text into the form
+first and judges the result: the lengths, `pattern`, the members (normalised the same way,
+`TextType.normalizedMembers`), an identifier's profile, a URI's or an address's grammar. The three lengths are one
+helper, `TextParser.checkLengths`, which the URI and email parsers call too, and they count code points, as
+`text_type` says and `TextType.coherenceCheck` does. Since every comparison downstream — map keys, set elements,
+pins, look-alike scopes, hygiene — already runs on the parser's value, none of them needed a change of its own
+beyond reading the value rather than the token. A refusal names the token as written and then the value it was
+judged as — `'PUT' (read as 'put' under NFKC_CASEFOLD) is not a member of this type` — through
+`TextParser.subject`, threaded into every facet's message: the written spelling is the text a reader or a repair
+loop has to find, and the value is what the facet compared. `NFKC_CASEFOLD` is `NfkcCasefold`, derived from the
+JDK's normalizer and case mappings with three exceptions and checked against `DerivedNormalizationProps.txt` over
+every code point. `ASCII_CASEFOLD` lowercases A..Z and touches nothing else — no NFC either — so a profile of ASCII
+letters under it refuses the full-width and Kelvin-sign spellings `NFKC_CASEFOLD` would fold into the profile. It
+is the form of the case-insensitive ASCII naming systems (field names, schemes, DNS names), and `scheme_name` uses
+it; `NFKC_CASEFOLD` is for names compared without case across Unicode.
 
 - **Each constructor splits into two classes across two modules:** a pure constraint-*values* record in
   `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`, `RegexType`, `DateType`, …, matching the kernel's
@@ -276,12 +277,11 @@ Unicode.
 - **No facet counts written digits, because scale is not part of the value.** meta.tn says it for both
   families that carry a digit-count facet — `decimal_type`'s "`1`, `1.0` and `1.00` are one value… whether a
   spelling's trailing zeros survive a round trip is an encoding's promise, not the type's", and
-  `time_type`'s worked example, "a text encoding may spell an admitted value with trailing zeros
-  (`12:00:00.500` under `precision: 1`)". So `precision: N` tests that the value is a whole number of 10⁻ᴺ
-  seconds (`FractionalSeconds`, over the parsed nanosecond field for `time`/`datetime` and over the seconds
-  count's own scale for `duration`), and `total_digits`/`fraction_digits` measure `stripTrailingZeros()`
-  (`DecimalParser`). The value handed back is still exactly as written — only the measurement strips, the
-  same split `members` already makes.
+  `time_type`'s worked example, "`12:00:00.500` is admitted under `precision: 1`". So `precision: N` tests that
+  the value is a whole number of 10⁻ᴺ seconds (`FractionalSeconds`, over the parsed nanosecond field for
+  `time`/`datetime` and over the seconds count's own scale for `duration`), and `total_digits`/`fraction_digits`
+  measure `stripTrailingZeros()` (`DecimalParser`). The value handed back is still exactly as written — only the
+  measurement strips, the same split `members` already makes.
 - **`duration` is a signed exact decimal number of seconds, bounded at both ends by a signed 64-bit count of
   nanoseconds.** The lexical form puts a fraction on the seconds component and nowhere else, so no
   non-terminating fraction is writable and every duration is a terminating decimal count — `number`'s value
@@ -292,6 +292,10 @@ Unicode.
   is the range `toNanos` has — and `coherenceCheck` refuses a bound or a `precision` outside it, so a
   `DurationType` built in Java cannot carry one either. Longer spans are `period`, finer or wider quantities
   are `number` in the unit the schema names. [TSON-SCHEMA] §5.5 and §5.4 here state both ends.
+- **A leap second is refused.** RFC 3339's grammar admits second 60, but `time` is the time of day on
+  `[00:00:00, 24:00:00)` and `datetime` an instant on the UTC timeline, so `23:59:60Z` is neither, as core's docs
+  say (SPEC-FEEDBACK.md #20). `java.time` refuses it as well, so `TimeParser` and `DateTimeParser` report it as a
+  parse error with no check of their own.
 - The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.
 - **The atom vocabulary is complete** — `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` all have parsers, the
   CIDR pair reusing the two address grammars and validating §5.5's family-range and host-bits-zero rules on top. All

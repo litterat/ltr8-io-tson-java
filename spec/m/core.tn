@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=9f897dcf4a2808fd613afdcc0683f3f6c740e0d6a1228631accc2bd769129376"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=85ca0f7545e12b5d1e2e2fb302580210c7b28935279dafd2f21395d277559469"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=47f2029e3eb7f7d99387e84f132a84c97c2b0efde30fc31f3a5016d545af1582"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=80bde97ac97a6df9553779b27eeb2273d1c52e64b233cbc1d4c4d6eb8e7b4c4c"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -25,7 +25,7 @@
   Annotation types (`@ordered`, `@bounded`, `@exact`, `@numeric`, `@disjoint`,
   `@deprecated`, `@title`, `@comment`, `@examples`, `@read_only`,
   `@write_only`) live in meta.tn — annotations resolve one hop against the
-  governing target's namespace (Part 2 §3.3.3, §6), so for this schema document
+  governing target's namespace ([TSON-SCHEMA] §3.3.3, §6), so for this schema
   they must be reachable through the `!!meta` chain; they appear here only by
   use. Core's own `doc` declaration, and its same-named siblings
   of kernel and meta entries (`void`, `boolean`, `integer`, `text`, `regex`,
@@ -43,11 +43,12 @@
     RFC 9562              UUID format
     RFC 4648              Base encodings (text spellings of `bytes`)
     RFC 3986              URI syntax (incl. IPv4address grammar)
+    RFC 3987              Internationalized Resource Identifiers (IRIs)
+    RFC 9485              I-Regexp, the interoperable regular expression
     RFC 4291              IPv6 addressing architecture
     RFC 4632              Classless Inter-domain Routing (CIDR)
     RFC 9542              IEEE 802 parameters (EUI-48 format)
     RFC 5322              Email address format
-    RFC 5646              BCP 47 language tags
   """
 {
   @doc:"""
@@ -55,7 +56,7 @@
     name — the same `!void_type {}` construction, and so the same contract, a
     distinct type entity — so that data documents governed by core-importing
     schemas can target it. The atom whose parsing contract admits only the
-    absent sentinel `_`. See Part 2 §6 and §7.3.
+    absent sentinel `_`. See [TSON-SCHEMA] §6 and §7.3.
     """
   void => !void_type {}
 
@@ -222,7 +223,8 @@
     `01:30:00Z`): a local time of day — "09:00 wherever you are" — is not this
     type. Equality and bounds compare the value. The offset is a spelling: TSON
     text preserves it as written, an encoding that stores the instant may drop
-    it.
+    it. A leap second, `23:59:60`, which RFC 3339's grammar admits, lies outside
+    the interval and is refused.
     """
   @ordered:TOTAL @bounded:true
   time => !time_type {}
@@ -236,7 +238,9 @@
     this type. Equality and bounds compare the value. The offset is a spelling:
     TSON text preserves it as written, an encoding that stores the instant may
     drop it, and a value for which the offset is data — an appointment shown in
-    its booked zone — is a different value space, not this type.
+    its booked zone — is a different value space, not this type. A leap second,
+    second 60, which RFC 3339's grammar admits, is not an instant on that
+    timeline and is refused.
     """
   @ordered:TOTAL @bounded:true
   datetime => !datetime_type {}
@@ -349,9 +353,7 @@
   @doc:"""
     One named type in one named foreign schema. As `extern_of`, with `T`
     standing inside [type_name] — also an atom, so also a value parameter, and
-    one type per application. A no-argument reference is spelled positionally
-    ([TSON-SCHEMA] §5.6), so `T` lands in the type_name slot as the identifier
-    it is.
+    one type per application.
     """
   extern_type => <S, T> !scoped { scope: [EXTERN]  schemas: { S => [T] } }
 

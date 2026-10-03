@@ -11,8 +11,8 @@ import java.util.Optional;
  *
  * <p><b>It is a constraint on the value, not on the spelling</b>, which meta.tn's own {@code @doc} for
  * {@code time_type} states and gives the example for: {@code precision: N} admits a value that is a whole
- * number of 10⁻ᴺ seconds, and "a text encoding may spell an admitted value with trailing zeros ({@code
- * 12:00:00.500} under {@code precision: 1}) and writes at most N digits". So the test is on the
+ * number of 10⁻ᴺ seconds, and reading "admits any spelling of an admitted value, trailing zeros included, so
+ * {@code 12:00:00.500} is admitted under {@code precision: 1}". So the test is on the
  * fractional-second field of the parsed value and never on how many digits the author happened to type --
  * counting the token would refuse {@code 12:00:00.500} at {@code precision: 1}, which denotes exactly the
  * half-second {@code 12:00:00.5} does.

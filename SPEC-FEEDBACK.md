@@ -70,6 +70,8 @@ or another group.
 #19 moves `normalization` to `text_type` and makes it the form a value is put into, rather than one it must
 already be in, with `ASCII_CASEFOLD` and `NFKC_CASEFOLD` so a case-insensitive naming system's names are one value
 however they are cased.
+#20 states what a leap second is, which [TSON-DATA] §5.4 leaves between RFC 3339's grammar and the time-of-day
+interval, and rewords §5.5's `precision` sentence so reading and writing are told apart.
 
 ---
 
@@ -976,7 +978,7 @@ template => top & {
   parameters:      [template_param]
   template:        text
   extension?:      record_extension_type
-  discriminators?: [field_name]
+  discriminators?: [field_name; 1..]
 }
 ```
 
@@ -1237,16 +1239,17 @@ written order output keeps (§5.8's field order, §7.5 for sets), and a map type
   negation where `unordered: false` reads as two. Nothing else about `array` or `set_type` changes.
 - **`map` gains `ordered?: boolean ~ false`.** A map is unordered unless it says otherwise, as a JSON object is, so
   every map written today keeps its meaning; `!map { … ordered: true }` declares one whose entry order is part of
-  its value.
+  its value, which a host binds to a map that keeps its order.
 - **One sentence of meaning for both**, beside §7.5's: `ordered` says whether two values differing only in order
   are one value; it never changes what a document may write, and output keeps the order written either way.
   §7.5's output rule then covers maps as it covers sets.
 
 **What is running** (`r2026-37-proposal`): the kernel carries the facet on both constructors, the bundled schemas
-are re-pinned, and resolved output names `ordered` only where it departs from the default (§8.1). Neither value
-is enforced by a check, and none is owed: a reader validates one value at a time and no rule in the series
-compares two compound values by this facet — §7.5's duplicate rule and §2.6's key identity compare compound
-values by host equality ([TSON-SCHEMA] §5.5).
+are re-pinned, and resolved output names `ordered` only where it departs from the default (§8.1). No reader
+consults the facet yet, so each mode honours one value of it: bind mode compares maps by an order-blind host
+equality, and the tree compares a map's entries in order. §7.5's duplicate rule and §2.6's compound-key identity
+are where it shows, and making both follow the facet, with an ordered map bound to an order-keeping host map, is
+outstanding work here rather than a question for the spec.
 
 **Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
 
@@ -1710,14 +1713,16 @@ is always its options written as separate groups or plain fields.
 
 ```
 field_group => {
-  members:   [[field_name]]
-  optional?: [field_name]
+  members:   [[field_name; 1..]; 1..]
+  optional?: [field_name; 1..]
   state?:    element_state ~ REQUIRED
 }
 ```
 
-- `members` holds one list per option, options and their members in source order.
-- `optional` names the members marked `?`.
+- `members` holds one list per option, options and their members in source order. A group has an option and an
+  option a field, so neither list is ever empty.
+- `optional` names the members marked `?`, and is absent rather than empty where none is marked, so a group has one
+  spelling.
 - Every member's `record_field` stays `optional: true`, as today.
 - `element_state` keeps its two values. At least one is the desugared `+`, and the rest of the rules table comes
   from options holding several fields, not from a third state.
@@ -1803,9 +1808,9 @@ recursive sum types for code generators.
 
 **What is running** (`r2026-37-proposal`):
 
-- **Kernel.** `field_group` is `{ members: [[field_name]]  optional?: [field_name]  state? }`, and the bundled
-  schemas are re-pinned. Every group the bundled schemas declare is options of one field, so what they admit is
-  unchanged.
+- **Kernel.** `field_group` is `{ members: [[field_name; 1..]; 1..]  optional?: [field_name; 1..]  state? }`, and
+  the bundled schemas are re-pinned. Every group the bundled schemas declare is options of one field, so what
+  they admit is unchanged.
 - **Lexer.** `+` is a special token under `-`'s boundary rule; a bare `+` in a data value is a parse error.
 - **Grammar and resolver.** Options, a member's `?` and `+` parse; every restating shape is refused with the
   spelling it restates; `+` lowers to the one-option form; group and member restatement and removal follow the
@@ -1892,7 +1897,10 @@ NFC normalisation. A form *requirement* is the outlier, and §7.4 states both re
   set-once rule would be unsound: turning folding on in a refinement changes what a token means, rather than
   narrowing which values are admitted.
 - **`regex_type` fixes it to `NONE`**, since putting a pattern into another form changes what it matches
-  (`[A-Z]` folds to `[a-z]`).
+  (`[A-Z]` folds to `[a-z]`). **So do `uri_type`, `iri_type` and `email_type`**: past the scheme and the host a
+  URI compares with case (RFC 3986 §6.2.2.1), as an IRI does (RFC 3987 §5.3.2.1) and a mailbox's local part does
+  (RFC 5321 §2.4), so a form over the whole text would change what the value names. Left open, `!uri_type {
+  normalization: NFKC_CASEFOLD }` constructs, admits a full-width scheme, and reads `/Path` as `/path`.
 - **A schema's members and pins are values too**, decoded like data, as `= 0x10` is. Two members that are one
   value are refused.
 - **`uri_type.schemes` becomes structure**: a set of an ASCII-folding scheme identifier in place of a comparison
@@ -1911,6 +1919,7 @@ normalization => !enum [NONE NFC NFKC NFKC_CASEFOLD ASCII_CASEFOLD]
 
 identifier_type => text_type & atom_specification & { …  normalization?: normalization ~ NFC }
 regex_type      => text_type & atom_specification & { spec?: = "…/rfc9485"  normalization?: = NONE }
+uri_type        => text_type & atom_specification & { …  normalization?: = NONE }   # iri_type, email_type alike
 
 header_name => !identifier_type { start: NONE  continue: NONE
   start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
@@ -1946,7 +1955,8 @@ Because the profile judges the value, `header_name`'s profile lists lowercase le
 
 **What is running** (`r2026-37-proposal`):
 - **Kernel.** `text_type.normalization` with the five members, `identifier_type` defaulting to `NFC`, and
-  `regex_type` fixing `NONE`. Every bundled schema is re-pinned, and every value they admit is unchanged.
+  `regex_type`, `uri_type`, `iri_type` and `email_type` fixing `NONE`. Every bundled schema is re-pinned, and
+  every value they admit is unchanged.
 - **`NFKC_CASEFOLD`** is derived from the JDK's normalizer and case mappings with three exceptions (dotless `ı`,
   and two Cherokee ranges, which fold to uppercase). It matches `DerivedNormalizationProps.txt`'s `NFKC_CF` for
   Unicode 16.0 at every one of the 1,112,064 non-surrogate code points.
@@ -1963,5 +1973,41 @@ Because the profile judges the value, `header_name`'s profile lists lowercase le
   comparison rule is gone.
 
 **Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
+
+**Status against Revision 36:** open.
+
+---
+
+## 20. A leap second has no stated value, and §5.5's `precision` sentence reads as a contradiction
+
+**Sections:** [TSON-DATA] §5.4 (the temporal atoms: `!time` is RFC 3339 `full-time`, and under *Instants* the
+time of day in UTC on `[00:00:00, 24:00:00)`); [TSON-SCHEMA] §5.5 (`precision` on the temporal families); core's
+`time` and `datetime` and meta's `time_type`.
+
+**Kind:** two defects of wording; no rule changes.
+
+**A leap second.** §5.4 gives `!time` two statements that disagree at one point. RFC 3339's `time-second` admits
+`60`, so `23:59:60Z` is a `full-time`; the value is a time of day on `[00:00:00, 24:00:00)`, which has no second
+60. `!datetime` meets the same token as an instant on the UTC timeline, which counts no leap seconds. Nothing says
+whether such a token is a value, what value it is, or that it is refused.
+
+**`precision`.** §5.5 says `precision: N` constrains the value, and then that "a text encoding may spell an
+admitted value with trailing zeros (`12:00:00.500` under `precision: 1`) and writes at most N digits". The two
+halves are reading and writing, but the sentence does not say so, and "writes at most N digits" next to a
+three-digit example reads as the example breaking the rule.
+
+**Interpretation chosen.** A leap second is refused: it lies outside both value spaces, so `23:59:60Z` is a parse
+error at `!time` and `!datetime`. `precision` is judged on the value, so `12:00:00.500` is admitted under
+`precision: 1`, and a writer writes `12:00:00.5`.
+
+**Suggested resolution.**
+- §5.4, after *Instants*: "Second 60, which RFC 3339's grammar admits for a leap second, is neither a time of day
+  on that interval nor an instant on the UTC timeline, and is refused."
+- §5.5: "Reading admits any spelling of an admitted value, trailing zeros included, so `12:00:00.500` is admitted
+  under `precision: 1`; a text encoding writing the value writes at most N fractional digits."
+
+**What is running** (`main` and `r2026-37-proposal`): the leap-second refusal and the value-judged `precision`.
+On `r2026-37-proposal`, core's `time` and `datetime` docs state the refusal and meta's `time_type` doc carries the
+reworded sentence.
 
 **Status against Revision 36:** open.

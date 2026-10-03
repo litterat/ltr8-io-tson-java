@@ -51,8 +51,7 @@ class TimeParserTest {
 
     @Test
     void leapSecondIsRejected() {
-        // RFC 3339's grammar permits time-second up to 60 for leap-second accommodation, but
-        // java.time has no leap-second concept at all -- documented limitation, not fixed here.
+        // RFC 3339's grammar admits second 60, but a time of day lies on [00:00:00, 24:00:00).
         assertThrows(AtomParseException.class, () -> TimeParser.UNCONSTRAINED.read(token("23:59:60Z")));
     }
 
@@ -84,9 +83,8 @@ class TimeParserTest {
     /**
      * <b>{@code precision} constrains the value, not the spelling</b> (§5.5): {@code precision: N} admits an
      * instant that is a whole number of 10⁻ᴺ seconds. meta.tn's own {@code @doc} gives the example this
-     * turns on -- "a text encoding may spell an admitted value with trailing zeros ({@code 12:00:00.500}
-     * under {@code precision: 1})". The atom is exact either way: an instant genuinely off the grid is
-     * refused rather than rounded onto it.
+     * turns on -- "{@code 12:00:00.500} is admitted under {@code precision: 1}". The atom is exact either way: an
+     * instant genuinely off the grid is refused rather than rounded onto it.
      */
     @Test
     void precisionConstrainsTheValueNotTheSpelling() {

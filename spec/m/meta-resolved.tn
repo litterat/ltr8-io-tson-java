@@ -226,7 +226,7 @@
       !record_field { name: length          type: non_negative_integer  optional: true }
       !record_field { name: pattern         type: regex       optional: true }
       !record_field { name: members         type: text_member_set  optional: true }
-      !record_field { name: normalization   type: normalization  optional: true  role: DEFAULT  value: NONE }
+      !record_field { name: normalization   type: normalization  optional: true  role: FIXED  value: NONE }
       !record_field { name: spec            type: uri         optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3987" }
       !record_field { name: schemes         type: scheme_set  optional: true }
       !record_field { name: allow_relative  type: boolean     optional: true  role: DEFAULT  value: true }
@@ -242,7 +242,7 @@
       !record_field { name: length         type: non_negative_integer  optional: true }
       !record_field { name: pattern        type: regex  optional: true }
       !record_field { name: members        type: text_member_set  optional: true }
-      !record_field { name: normalization  type: normalization  optional: true  role: DEFAULT  value: NONE }
+      !record_field { name: normalization  type: normalization  optional: true  role: FIXED  value: NONE }
       !record_field { name: spec           type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc5322" }
     ] }
   }

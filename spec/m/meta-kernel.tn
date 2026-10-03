@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=7dda4ea780e1374a085b67a24c5507b1a644e4085f50e56ad5315db1b42c64d4"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=3e594d225f9fa92847cf2358a747aaaa0724fe8e692fb60760ddd14abb0f11b9"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -15,19 +15,32 @@
   """
 {
   @doc:"""
-    Base kinds. `top` is the structural root; every constructor transitively
-    IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`, except
-    `reference` and `template`, which compose with `top` directly. Construction
-    transfers kind, not IS-A, so instances and fresh records sit under the kinds
-    without supertypes. The first three describe the shape of a data value;
-    `data` describes something that is not one.
+    The structural root. Every constructor transitively IS-A `atom`, `product`,
+    `sum` or `data`, each of which IS-A `top`, except `reference` and
+    `template`, which compose with `top` directly. Construction transfers kind,
+    not IS-A, so instances and fresh records sit under the kinds without
+    supertypes. The first three describe the shape of a data value; `data`
+    describes something that is not one.
     """
   top       => {}
+
+  @doc:"""
+    The kind of a scalar: a value written as one token, which its atom family
+    reads into a value.
+    """
   atom      => top & {}
+
+  @doc:"""
+    The kind of a compound value of parts: a record, an array, a map or a tuple.
+    `access_pattern` says whether a part is reached by position or by name, and
+    `size_type` whether the number of parts is fixed by the type.
+    """
   product   => top & {
     access_pattern: product_access_type
     size_type:      product_size_type
   }
+
+  @doc:"The kind of a value that is one of several types: a choice or a scope."
   sum       => top & {}
 
   @doc:"""
@@ -36,7 +49,7 @@
     whose instances ride along in a schema map without being types. No data
     value ever has such an entry as its type.
 
-    An entry whose kind is DATA is declared by its schema but is not a type:
+    An entry whose body IS-A data is declared by its schema but is not a type:
     naming one where a type is expected is a resolver error.
     """
   data      => top & {}
@@ -113,18 +126,16 @@
     *instantiation's* fact and travels inside the held text above.
 
     `discriminators` says which fields the members are selected by, in the order
-    the pins are compared as a tuple, and **whether it is empty is what says how
-    they are selected** — by the tag where it is, by reading those fields where
-    it is not. It is `record.discriminators` for a base that is a template.
-
-    Optional, and non-empty where present: a family with nothing to dispatch on
-    is dispatched by the tag and states none.
+    the pins are compared as a tuple. It is `record.discriminators` for a base
+    that is a template, and on the same terms: **whether it is present is what
+    says how the members are selected** — by reading those fields where it is,
+    by the tag where it is not.
     """
   template => top & {
     parameters:      [template_param]
     template:        text
     extension?:      record_extension_type
-    discriminators?: [field_name]
+    discriminators?: [field_name; 1..]
   }
 
   @doc:"""
@@ -150,7 +161,7 @@
     constraint vocabulary whose parsing contract admits only the absent sentinel
     `_`. The host value is absent. void is the target type for bare annotations
     (`@T` with no value); the resolver fills the implicit `_` and validates
-    against this contract. See Part 2 §6.
+    against this contract. See [TSON-SCHEMA] §6.
 
     Core declares its own sibling under the same name — the same !void_type
     construction, and so the same contract, a distinct type entity — so that
@@ -160,7 +171,7 @@
 
   void => !void_type {}
 
-  @doc:"Internal scalar types for constraint fields."
+  @doc:"The two-valued type of a constraint field that is a switch."
   boolean => !enum [true false]
 
   @doc:"""
@@ -237,7 +248,11 @@
     """
   non_negative_integer => !integer ^ { min: 0 }
 
-  @doc:"The members of a text_type."
+  @doc:"""
+    The members of a text_type. The set's own uniqueness compares the text as
+    written; each member is then put into the constrained type's normalization
+    form, and two that are one value there are a duplicate, as text_type says.
+    """
   text_member_set => !set_type { element_type: text  min_items: 1 }
 
   @doc:"""
@@ -332,8 +347,8 @@
     digit or a sign, which subsumes the rule that numbers are not declarable
     names. "+" is dropped from Continue, and "." is reserved as a future
     identifier separator. Everything else follows from XID membership:
-    whitespace, control characters, format characters, emoji and unassigned code
-    points are none of them XID_Continue.
+    whitespace, control characters, emoji, unassigned code points and every
+    format character but the two join controls are none of them XID_Continue.
 
     Every part of identifier's profile lies inside the unquoted-token profile,
     so every identifier is a well-formed unquoted token and none ever needs
@@ -368,12 +383,17 @@
     URI-reference (§4.1); withdrawing it requires a scheme. `allow_fragment`
     admits a fragment (§3.5); withdrawing it refuses one, which with
     `allow_relative` withdrawn is an absolute-URI (§4.3).
+
+    A URI is its text as written: RFC 3986 says which of its parts compare
+    without case, and a form over the whole text would fold a path or a query
+    that is case-sensitive.
     """
   uri_type => text_type & atom_specification & {
     spec?:           = "https://www.rfc-editor.org/rfc/rfc3986"
     schemes?:        scheme_set
     allow_relative?: boolean ~ true
     allow_fragment?: boolean ~ true
+    normalization?:  = NONE
   }
 
   @doc:"The schemes a uri_type admits."
@@ -403,12 +423,13 @@
 
   regex => !regex_type {}
 
-  @doc:"""
-    Identifier roles — distinct naming positions referencing the identifier
-    primitive.
-    """
+  @doc:"A type's name: a schema-map key, and the name a type_ref holds."
   type_name  => identifier
+
+  @doc:"A field's name, in a record or a field group."
   field_name => identifier
+
+  @doc:"A template parameter's name."
   param_name => identifier
 
   @doc:"""
@@ -465,10 +486,25 @@
     ( name: type_ref | value: value )
   }
 
-  @doc:"Internal enumerations."
+  @doc:"How a product's parts are reached: by position, or by name."
   product_access_type => !enum [INDEX NAMED]
+
+  @doc:"Whether a product's number of parts is fixed by its type."
   product_size_type   => !enum [FIXED VARIABLE]
+
+  @doc:"""
+    What a record field's `value` is for: FREE has none, DEFAULT is injected
+    when the field is omitted and may be overridden, and FIXED is the only value
+    the field admits.
+    """
   field_role          => !enum [FREE DEFAULT FIXED]
+
+  @doc:"""
+    Whether a part must be there. At an array's element, a map entry's value or
+    a tuple position, OPTIONAL admits the absent sentinel `_` written in its
+    place, and nothing is ever left out. At a field group, REQUIRED chooses
+    exactly one option and OPTIONAL at most one.
+    """
   element_state       => !enum [REQUIRED OPTIONAL]
 
   @doc:"""
@@ -547,8 +583,9 @@
     field with the parameter in `value`, and becomes optional and FIXED when
     substitution makes the value concrete.
 
-    Which fields a sealed family dispatches on is the enclosing record's own
-    statement, `record.discriminators`, and no field says it of itself. A field
+    Which fields a member-dispatched family dispatches on is the enclosing
+    record's own statement, `record.discriminators`, and no field says it of
+    itself. A field
     it names is required and not voidable, no member of a field group, typed by
     an atom or an enum, and carries no value of its own; each subtype restates
     it FIXED, the pins pairwise distinct under the field type's own equality.
@@ -562,6 +599,10 @@
     value?:    value
   }
 
+  @doc:"""
+    One position of a tuple: its type, and whether `_` may stand in it
+    (element_state).
+    """
   tuple_element => {
     element_type: type_ref
     state?:       element_state ~ REQUIRED
@@ -570,10 +611,11 @@
   @doc:"""
     Field group — a presence rule over fields of a record ([TSON-SCHEMA]
     §5.11). `members` lists the group's options in source order, each the
-    fields it holds. Every member is declared in the enclosing record's
-    `fields` list, OPTIONAL there and carrying no value, and sits in one option
-    of one group. `optional` names the members that may be left out once their
-    option is chosen, and never the only member of an option. An option is
+    fields it holds; a group has at least one option, and an option at least
+    one field. Every member is declared in the enclosing record's `fields`
+    list, `optional` there and carrying no value, and sits in one option of one
+    group. `optional` names the members that may be left out once their option
+    is chosen, and never the only member of an option; absent, it names none. An option is
     chosen when any of its members is present, and a chosen option holds every
     member `optional` does not name. REQUIRED admits exactly one chosen option,
     OPTIONAL at most one. A group of one option is REQUIRED with every member
@@ -582,46 +624,36 @@
     is canonical.
     """
   field_group => {
-    members:   [[field_name]]
-    optional?: [field_name]
+    members:   [[field_name; 1..]; 1..]
+    optional?: [field_name; 1..]
     state?:    element_state ~ REQUIRED
   }
 
   @doc:"""
-    The container constructors carry no parameters: a type slot (array's
-    element_type, map's key_type and value_type) is an ordinary REQUIRED field
-    typed type_ref, filled by the construction or by a sugar form's desugaring
-    like any other required field, and a closed application carries the bound
-    reference as the field's value (!array { element_type: person }), its
-    binding record being ordinary data of this vocabulary. Inside a held
-    template body ([TSON-SCHEMA] §5.10) any slot — type, scalar, or collection —
-    may hold a parameter token, substituted away before the body is read against
-    this vocabulary. `map.state` governs the entry value, as `array.state`
-    governs the element; a map key can never be absent.
+    A record: named fields, fixed by the type, with the field groups over them.
 
-    `ordered` says whether order is part of a container's value: true for an
-    array, false for a set and a map. It never changes what a document may
-    write, and output keeps the order written either way ([TSON-SCHEMA] §7.5) —
-    the facet says whether two values differing only in order are one value.
+    `extension` states how the record may be realised, and is OPEN unless the
+    record says otherwise. Of the constructors, only `record` carries it; a
+    record-bodied template carries the parent's, always ABSTRACT, as `template`
+    says.
 
-    `record.extension` states how the record may be realised, and is OPEN unless
-    the record says otherwise. Only `record` carries it.
-
-    `record.supertypes` holds type_ref: a supertype may be written as an
-    application, and inside a held template body a parent may still be open —
+    `supertypes` holds type_ref: a supertype may be written as an application,
+    and inside a held template body a parent may still be open —
     `<T> result<T> & { ... }`. It is substituted and closed with every other
     reference the body holds, so `ok<text>` reaches an IS-A edge to
     `result<text>` and not to `result<int32>`. A closed supertype carries no
     arguments and is written as a bare token. The derived index
     `type_definition.supertypes` is type_name: it is computed once every parent
-    is a type, and a template never is ([TSON-SCHEMA] §5.10).
+    is closed and names an entry. A record-bodied template is such an entry, the
+    ABSTRACT family base its members are IS-A; a template with no `extension`
+    is not a type and never stands there ([TSON-SCHEMA] §5.10).
 
-    `record.discriminators` names the fields this record's members are selected
-    by, in the order their pins are compared as a tuple, and a non-empty list is
-    what makes the family member-dispatched rather than tag-dispatched. Every
-    name must name a field the enclosing record declares, and the record must be
-    ABSTRACT. The author writes `=?` on the field, which is what lowers into
-    this list ([TSON-SCHEMA] §5.2).
+    `discriminators` names the fields this record's members are selected by, in
+    the order their pins are compared as a tuple, and its presence is what makes
+    the family member-dispatched rather than tag-dispatched. Every name must
+    name a field the enclosing record declares, and the record must be ABSTRACT.
+    The author writes `=?` on the field, which is what lowers into this list
+    ([TSON-SCHEMA] §5.2).
     """
   record => product & {
     access_pattern?: product_access_type = NAMED
@@ -630,9 +662,27 @@
     groups?:         [field_group]
     extension?:      record_extension_type ~ OPEN
     supertypes?:     [type_ref]
-    discriminators?: [field_name]
+    discriminators?: [field_name; 1..]
   }
 
+  @doc:"""
+    A sequence of elements of one type. The container constructors carry no
+    parameters: a type slot (array's element_type, map's key_type and
+    value_type) is an ordinary REQUIRED field typed type_ref, filled by the
+    construction or by a sugar form's desugaring like any other required field,
+    and a closed application carries the bound reference as the field's value
+    (!array { element_type: person }), its binding record being ordinary data
+    of this vocabulary. Inside a held template body ([TSON-SCHEMA] §5.10) any
+    slot — type, scalar, or collection — may hold a parameter token, substituted
+    away before the body is read against this vocabulary. `state` governs the
+    element.
+
+    `ordered` says whether order is part of a container's value: true for an
+    array unless it says otherwise, false for a set. It never changes what a
+    document may write, and output keeps the order written either way
+    ([TSON-SCHEMA] §7.5) — the facet says whether two values differing only in
+    order are one value.
+    """
   array => product & {
     access_pattern?: product_access_type = INDEX
     size_type?:      product_size_type = VARIABLE
@@ -659,6 +709,16 @@
     unique_items?: = true
   }
 
+  @doc:"""
+    Entries keyed by distinct values of one type. `state` governs the entry
+    value, as array's governs the element; a map key can never be absent.
+
+    `ordered` is false unless the map says otherwise, as for a JSON object: two
+    maps holding the same entries in different orders are one value. An ordered
+    map, `!map { … ordered: true }`, is one whose entry order is part of its
+    value, so those two are distinct, and a host binds it to a map that keeps
+    its order. Either way output keeps the order written ([TSON-SCHEMA] §7.5).
+    """
   map => product & {
     access_pattern?: product_access_type = NAMED
     size_type?:      product_size_type = VARIABLE
@@ -670,13 +730,18 @@
     max_items?:      non_negative_integer
   }
 
+  @doc:"A fixed sequence of positions, each with a type of its own."
   tuple => product & {
     access_pattern?: product_access_type = INDEX
     size_type?:      product_size_type = FIXED
     elements:        [tuple_element]
   }
 
-  @doc:"The members of an enum_type."
+  @doc:"""
+    The members of an enum_type. The set's own uniqueness compares the text as
+    written; each member is then read as a value of the enum's `type`, and two
+    that are one value under that type's equality are a duplicate.
+    """
   enum_set => !set_type { element_type: text  min_items: 1 }
 
   @doc:"""

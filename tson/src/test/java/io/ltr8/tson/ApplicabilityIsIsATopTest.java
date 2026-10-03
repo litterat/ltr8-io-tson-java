@@ -148,7 +148,7 @@ class ApplicabilityIsIsATopTest {
     @Test
     void aComponentOfATypeIsRefusedWhereItIsWritten() {
         for (String component : List.of("record_field { name: x  type: text }", "type_ref { name: text }",
-                "field_group { name: g  members: [] }", "integer_size { bits: 32  signed: true }")) {
+                "field_group { members: [[g]] }", "integer_size { bits: 32  signed: true }")) {
             List<Diagnostic> problems = problems("  bad => !" + component);
 
             assertEquals(1, problems.size(), problems::toString);
