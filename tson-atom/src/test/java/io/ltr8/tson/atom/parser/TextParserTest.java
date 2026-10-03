@@ -78,4 +78,17 @@ class TextParserTest {
     void noNormalizationKeepsTheTextAsWritten() {
         assertEquals("Content-Type", TextParser.UNCONSTRAINED.read(token("Content-Type")));
     }
+
+    /** A length counts code points: a character outside the Basic Multilingual Plane is one, not two UTF-16 units. */
+    @Test
+    void aLengthCountsCodePoints() {
+        String grin = "\uD83D\uDE00";
+        TextParser one = new TextParser(Optional.empty(), Optional.of(1), Optional.empty(), Optional.empty());
+        assertEquals(grin, one.read(token(grin)));
+        assertThrows(AtomValidationException.class, () -> one.read(token("a" + grin)));
+        TextParser exactlyTwo = new TextParser(Optional.empty(), Optional.empty(), Optional.of(2), Optional.empty());
+        assertEquals("a" + grin, exactlyTwo.read(token("a" + grin)));
+        TextParser atLeastTwo = new TextParser(Optional.of(2), Optional.empty(), Optional.empty(), Optional.empty());
+        assertThrows(AtomValidationException.class, () -> atLeastTwo.read(token(grin)));
+    }
 }

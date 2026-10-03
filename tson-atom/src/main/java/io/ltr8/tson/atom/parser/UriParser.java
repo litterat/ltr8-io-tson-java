@@ -117,27 +117,7 @@ public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
             throw new AtomValidationException(
                     "'" + text + "' is a relative reference, and the type requires a scheme", absolute);
         }
-        constraints.length().ifPresent(len -> {
-            if (text.length() != len) {
-                throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, expected exactly " + len,
-                        "exactly " + len + " characters");
-            }
-        });
-        constraints.minLength().ifPresent(min -> {
-            if (text.length() < min) {
-                throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, less than the minimum " + min,
-                        "at least " + min + " characters");
-            }
-        });
-        constraints.maxLength().ifPresent(max -> {
-            if (text.length() > max) {
-                throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, more than the maximum " + max,
-                        "at most " + max + " characters");
-            }
-        });
+        TextParser.checkLengths(text, constraints.length(), constraints.minLength(), constraints.maxLength());
         // Pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
         // java.util.regex; already validated well-formed at schema resolution (see RegexParser).
         constraints.pattern().ifPresent(p -> {
