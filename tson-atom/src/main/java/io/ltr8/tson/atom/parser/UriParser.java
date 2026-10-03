@@ -59,22 +59,23 @@ public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
     @Override
     public URI read(String written) {
         String text = constraints.normalization().apply(written);
+        String subject = TextParser.subject(written, text, constraints.normalization());
         URI value;
         try {
             value = new URI(text);
         } catch (URISyntaxException e) {
-            throw new AtomParseException("'" + text + "' is not a valid URI (§5.5): " + e.getReason(), "a URI");
+            throw new AtomParseException(subject + " is not a valid URI (§5.5): " + e.getReason(), "a URI");
         }
         // java.net.URI admits characters beyond US-ASCII as its "other" category; RFC 3986 admits none, and
         // the text that has them is an IRI (RFC 3987), which is iri_type's family.
         for (int i = 0; i < text.length(); i++) {
             if (text.charAt(i) > 0x7F) {
-                throw new AtomParseException("'" + text + "' has U+" + String.format("%04X", text.codePointAt(i))
+                throw new AtomParseException(subject + " has U+" + String.format("%04X", text.codePointAt(i))
                         + " at index " + i + ", beyond the US-ASCII of a URI (RFC 3986 §2); an IRI is written !iri",
                         "a URI");
             }
         }
-        checkFacets(constraints, value, text, "an RFC 3986 URI");
+        checkFacets(constraints, value, text, subject, "an RFC 3986 URI");
         return value;
     }
 
@@ -110,31 +111,33 @@ public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
     /**
      * {@code uri_type}'s facets judged against one parsed value -- shared with {@link IriParser}, whose facets
      * are the same and mean the same. {@code absolute} names the form a withdrawn {@code allow_relative}
-     * requires, for {@code expected}. Length and pattern are measured on the text as written.
+     * requires, for {@code expected}. Length and pattern are measured on {@code text}, the value's text in the
+     * type's form, and a refusal names it as {@code subject} ({@link TextParser#subject}).
      */
-    static void checkFacets(UriType constraints, URI value, String text, String absolute) {
+    static void checkFacets(UriType constraints, URI value, String text, String subject, String absolute) {
         if (!constraints.allowRelative() && !value.isAbsolute()) {
             throw new AtomValidationException(
-                    "'" + text + "' is a relative reference, and the type requires a scheme", absolute);
+                    subject + " is a relative reference, and the type requires a scheme", absolute);
         }
-        TextParser.checkLengths(text, constraints.length(), constraints.minLength(), constraints.maxLength());
+        TextParser.checkLengths(text, subject, constraints.length(), constraints.minLength(),
+                constraints.maxLength());
         // Pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
         // java.util.regex; already validated well-formed at schema resolution (see RegexParser).
         constraints.pattern().ifPresent(p -> {
             if (!TsonRegex.parse(p).matches(text)) {
-                throw new AtomValidationException("'" + text + "' does not match the required pattern " + p,
+                throw new AtomValidationException(subject + " does not match the required pattern " + p,
                         "matching " + p);
             }
         });
         if (!constraints.admitsScheme(value.getScheme())) {
             String admitted = "scheme one of (" + String.join(", ", constraints.schemes().orElseThrow()) + ")";
             throw new AtomValidationException(value.getScheme() == null
-                    ? "'" + text + "' has no scheme, and the type admits " + admitted
-                    : "'" + text + "' has scheme '" + value.getScheme() + "', and the type admits " + admitted,
+                    ? subject + " has no scheme, and the type admits " + admitted
+                    : subject + " has scheme '" + value.getScheme() + "', and the type admits " + admitted,
                     admitted);
         }
         if (!constraints.allowFragment() && value.getRawFragment() != null) {
-            throw new AtomValidationException("'" + text + "' has a fragment, which the type refuses", "no fragment");
+            throw new AtomValidationException(subject + " has a fragment, which the type refuses", "no fragment");
         }
     }
 }

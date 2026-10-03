@@ -2,6 +2,7 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.schema.meta.TextType;
 import java.util.Optional;
@@ -20,7 +21,8 @@ import java.util.Optional;
  *
  * <p><b>The value is the token's text in the type's {@code normalization} form</b>, and the facets judge that
  * value: under {@code NFKC_CASEFOLD}, {@code Content-Type} reads as {@code content-type} and matches a member
- * written either way.
+ * written either way. A refusal quotes the token as written and then the value it was read as
+ * ({@link #subject}), since the written spelling is what a reader of the message has to find.
  *
  * <p><b>No reverse mapping.</b> {@code VocabularyAtoms} maps a host class to the name a writer annotates it
  * with, and this one's host class is {@code String} -- what both writers emit bare. An entry there would put
@@ -46,7 +48,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
     @Override
     public String read(String text) {
         String value = constraints.normalization().apply(text);
-        validate(value);
+        validate(value, subject(text, value, constraints.normalization()));
         return value;
     }
 
@@ -55,14 +57,17 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
         return value;
     }
 
-    /** The facets over a value already in the type's form; {@code IdentifierParser} runs its profile between. */
-    void validate(String text) {
-        checkLengths(text, constraints.length(), constraints.minLength(), constraints.maxLength());
+    /**
+     * The facets over a value already in the type's form, a refusal naming it as {@code subject};
+     * {@code IdentifierParser} runs its profile between.
+     */
+    void validate(String text, String subject) {
+        checkLengths(text, subject, constraints.length(), constraints.minLength(), constraints.maxLength());
         // The pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
         // java.util.regex; it was already validated well-formed when the schema resolved (see RegexParser).
         constraints.pattern().ifPresent(p -> {
             if (!TsonRegex.parse(p).matches(text)) {
-                throw new AtomValidationException("'" + text + "' does not match the required pattern " + p,
+                throw new AtomValidationException(subject + " does not match the required pattern " + p,
                         "matching " + p);
             }
         });
@@ -71,7 +76,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
         constraints.normalizedMembers().ifPresent(members -> {
             if (!members.contains(text)) {
                 throw new AtomValidationException(
-                        "'" + text + "' is not a member of this type -- expected one of " + members,
+                        subject + " is not a member of this type -- expected one of " + members,
                         "one of (" + String.join(", ", members) + ")");
             }
         });
@@ -85,11 +90,23 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
 
 
     /**
-     * {@code text_type}'s three length facets over {@code text}, shared by every family that composes them. A
-     * length counts code points, as {@code text_type} says, so a character outside the Basic Multilingual Plane
-     * is one character and not the two UTF-16 units {@link String#length} would count.
+     * How a refusal names a token: {@code 'written'}, and where the type's form changed it, the value it was
+     * read as -- {@code 'PUT' (read as 'put' under NFKC_CASEFOLD)}. The facets judge the value, so the message
+     * states it; the written spelling leads because it is the text a reader has to find in the document, and a
+     * repair of a generated document starts from what was emitted.
      */
-    static void checkLengths(String text, Optional<Integer> length, Optional<Integer> minLength,
+    static String subject(String written, String value, Normalization form) {
+        return written.equals(value) ? "'" + written + "'"
+                : "'" + written + "' (read as '" + value + "' under " + form + ")";
+    }
+
+    /**
+     * {@code text_type}'s three length facets over {@code text}, a refusal naming it as {@code subject}, shared
+     * by every family that composes them. A length counts code points, as {@code text_type} says, so a character
+     * outside the Basic Multilingual Plane is one character and not the two UTF-16 units {@link String#length}
+     * would count.
+     */
+    static void checkLengths(String text, String subject, Optional<Integer> length, Optional<Integer> minLength,
                              Optional<Integer> maxLength) {
         if (length.isEmpty() && minLength.isEmpty() && maxLength.isEmpty()) {
             return;
@@ -97,17 +114,17 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
         int count = text.codePointCount(0, text.length());
         if (length.isPresent() && count != length.get()) {
             throw new AtomValidationException(
-                    "'" + text + "' is " + count + " characters, expected exactly " + length.get(),
+                    subject + " is " + count + " characters, expected exactly " + length.get(),
                     "exactly " + length.get() + " characters");
         }
         if (minLength.isPresent() && count < minLength.get()) {
             throw new AtomValidationException(
-                    "'" + text + "' is " + count + " characters, less than the minimum " + minLength.get(),
+                    subject + " is " + count + " characters, less than the minimum " + minLength.get(),
                     "at least " + minLength.get() + " characters");
         }
         if (maxLength.isPresent() && count > maxLength.get()) {
             throw new AtomValidationException(
-                    "'" + text + "' is " + count + " characters, more than the maximum " + maxLength.get(),
+                    subject + " is " + count + " characters, more than the maximum " + maxLength.get(),
                     "at most " + maxLength.get() + " characters");
         }
     }

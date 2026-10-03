@@ -53,12 +53,13 @@ public record EmailParser(EmailType constraints) implements AtomTypeParser<Strin
     @Override
     public String read(String written) {
         String text = constraints.normalization().apply(written);
+        String subject = TextParser.subject(written, text, constraints.normalization());
         if (!ADDR_SPEC.matcher(text).matches()) {
-            throw new AtomParseException("'" + text + "' is not a valid email address -- expected RFC 5322's "
+            throw new AtomParseException(subject + " is not a valid email address -- expected RFC 5322's "
                     + "dot-atom form, local@domain (quoted local parts, domain literals and comments are not "
                     + "accepted; see EmailParser)", "an RFC 5322 dot-atom address");
         }
-        validate(text);
+        validate(text, subject);
         return text;
     }
 
@@ -68,13 +69,14 @@ public record EmailParser(EmailType constraints) implements AtomTypeParser<Strin
     }
 
     /** The same length and pattern facets {@link TextParser} applies, on the same terms -- {@code email_type} composes {@code text_type}. */
-    private void validate(String text) {
-        TextParser.checkLengths(text, constraints.length(), constraints.minLength(), constraints.maxLength());
+    private void validate(String text, String subject) {
+        TextParser.checkLengths(text, subject, constraints.length(), constraints.minLength(),
+                constraints.maxLength());
         // I-Regexp (RFC 9485) via tson-regex -- linear-time and ReDoS-safe, not java.util.regex; already
         // validated well-formed when the schema resolved (see RegexParser).
         constraints.pattern().ifPresent(p -> {
             if (!TsonRegex.parse(p).matches(text)) {
-                throw new AtomValidationException("'" + text + "' does not match the required pattern " + p,
+                throw new AtomValidationException(subject + " does not match the required pattern " + p,
                         "matching " + p);
             }
         });

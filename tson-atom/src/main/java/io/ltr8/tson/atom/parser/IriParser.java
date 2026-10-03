@@ -42,11 +42,12 @@ public record IriParser(IriType constraints) implements AtomTypeParser<URI> {
     @Override
     public URI read(String written) {
         String text = constraints.normalization().apply(written);
-        checkCharacters(text);
+        String subject = TextParser.subject(written, text, constraints.normalization());
+        checkCharacters(text, subject);
         try {
             new URI(encoded(text, false));
         } catch (URISyntaxException e) {
-            throw new AtomParseException("'" + text + "' is not a valid IRI (RFC 3987): " + e.getReason(), "an IRI");
+            throw new AtomParseException(subject + " is not a valid IRI (RFC 3987): " + e.getReason(), "an IRI");
         }
         URI value;
         try {
@@ -54,7 +55,7 @@ public record IriParser(IriType constraints) implements AtomTypeParser<URI> {
         } catch (URISyntaxException e) {
             throw new IllegalStateException("'" + text + "' maps to a URI and still cannot be held as one", e);
         }
-        UriParser.checkFacets(constraints.uriFacets(), value, text, "an RFC 3987 IRI");
+        UriParser.checkFacets(constraints.uriFacets(), value, text, subject, "an RFC 3987 IRI");
         return value;
     }
 
@@ -75,8 +76,11 @@ public record IriParser(IriType constraints) implements AtomTypeParser<URI> {
         return Optional.empty();
     }
 
-    /** Every character beyond US-ASCII is a {@code ucschar}, or an {@code iprivate} inside the query (§2.2). */
-    private static void checkCharacters(String text) {
+    /**
+     * Every character beyond US-ASCII is a {@code ucschar}, or an {@code iprivate} inside the query (§2.2). An index
+     * is into {@code text}, the value in the type's form; a refusal names it as {@code subject}.
+     */
+    private static void checkCharacters(String text, String subject) {
         int fragment = text.indexOf('#');
         int query = text.indexOf('?');
         if (fragment >= 0 && query > fragment) {
@@ -91,7 +95,7 @@ public record IriParser(IriType constraints) implements AtomTypeParser<URI> {
             if (isIprivate(c) && inQuery) {
                 continue;
             }
-            throw new AtomParseException("'" + text + "' has U+" + String.format("%04X", c) + " at index " + i
+            throw new AtomParseException(subject + " has U+" + String.format("%04X", c) + " at index " + i
                     + (isIprivate(c) ? ", a private-use character RFC 3987 admits only in the query"
                             : ", which RFC 3987 admits nowhere in an IRI"), "an IRI");
         }
