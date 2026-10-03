@@ -26,6 +26,27 @@ public record FieldGroup(List<List<String>> members, List<String> optional, Elem
         return members.stream().flatMap(List::stream).toList();
     }
 
+    /**
+     * Whether this is the at-least-one group: one REQUIRED option, which the grammar writes only as {@code +}
+     * over its members (SPEC-FEEDBACK.md #18).
+     */
+    public boolean atLeastOne() {
+        return members.size() == 1 && state == ElementState.REQUIRED;
+    }
+
+    /**
+     * The group as its spelling reads, for a message: options separated by {@code |}, a member marked {@code ?}
+     * where it is optional within its option, and the at-least-one group as its members -- {@code include |
+     * name? type?}, {@code email | phone}.
+     */
+    public String describe() {
+        if (atLeastOne()) {
+            return String.join(" | ", members.getFirst());
+        }
+        return String.join(" | ", members.stream().map(option -> String.join(" ", option.stream()
+                .map(member -> optional.contains(member) ? member + "?" : member).toList())).toList());
+    }
+
     /** Whether {@code field} is a member of this group. */
     public boolean hasMember(String field) {
         return members.stream().anyMatch(option -> option.contains(field));

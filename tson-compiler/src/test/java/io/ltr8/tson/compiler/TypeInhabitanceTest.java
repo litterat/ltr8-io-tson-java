@@ -108,6 +108,24 @@ class TypeInhabitanceTest {
     }
 
     /**
+     * An option is chosen whole (SPEC-FEEDBACK.md #18): it needs every member its group does not mark, so one
+     * recurring unmarked member blocks it, while a recurring marked one can be left out.
+     */
+    @Test
+    void anOptionIsChoosableWhenEveryUnmarkedMemberIs() {
+        rejection("  g => { ( a: g  b: text | c: g ) }");
+        accepted("  g => { ( a: text  b?: g | c: g ) }");
+        accepted("  g => { ( a: g | b: text  c: text ) }");
+    }
+
+    /** At least one of the members is enough, so one that terminates is. */
+    @Test
+    void anAtLeastOneGroupNeedsOneMemberThatTerminates() {
+        rejection("  g => { ( a: g | b: g )+ }");
+        accepted("  g => { ( a: g | b: text )+ }");
+    }
+
+    /**
      * A template is judged when it closes, not where it is written: its body is held until materialisation
      * substitutes, so the bounds and element types this rule reads are tokens meaning nothing until an
      * application supplies the arguments. The closure is an ordinary entry by the time linking runs, so

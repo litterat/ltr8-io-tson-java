@@ -212,8 +212,12 @@ field the document contradicts, refused by the selected reader. TSON text still 
 dispatched member in the dispatcher; the parity test pins that divergence until `BACKLOG.md`'s port closes it.
 
 **What is specialised beyond the dispatch** is what the compiler already knows and the reader was re-deriving:
-a record with no field group skips the group pass entirely (§5.11's groups are the exception, and the pass
-indexes every member of every group).
+a record with no field group skips the group pass entirely (§5.11's groups are the exception). A group is
+compiled once to slot arrays (`RecordPlan.GroupPlan`): each option's members, and the subset its group does not
+mark `?`. The pass is one walk over each group's members: an option is chosen at its first stated member, each
+chosen option reports the members it lacks, in option order, and the count of chosen options is judged last.
+`RecordAbstractReader` on the TSON side does the same over field indexes, and `CrossEncodingParityTest` pins the
+two to one order.
 
 ### A concrete record: one loop for every mode, and a mode's factory and builder
 
@@ -262,11 +266,12 @@ position can hold. `tson-compiler` checks membership on every read instead; with
 compile, the check can be made once.
 
 **A record with no subtypes binds to a union only as a labelled choice** (`BindGroupUnionBuilder`): one REQUIRED
-group over every field, each member of the sealed interface a record whose one component's wire name is the field
-it labels — the kernel's `type_argument`, `{ ( name: type_ref | value: value ) }`, is the shape. The present field
-is the discriminator, so the record is read by the ordinary loop, the group rule admits exactly one member, and the
-builder constructs the member whose field arrived. Every part of the match is checked at compile; a near-miss is a
-`BindMismatchException` naming it rather than a guess.
+group of one-field options over every field (neither the `+` group, which admits several fields at once, nor an
+option holding several fields, which a one-component member could not carry), each member of the sealed interface a
+record whose one component's wire name is the field it labels — the kernel's `type_argument`, `{ ( name: type_ref |
+value: value ) }`, is the shape. The present field is the discriminator, so the record is read by the ordinary loop,
+the group rule admits exactly one member, and the builder constructs the member whose field arrived. Every part of
+the match is checked at compile; a near-miss is a `BindMismatchException` naming it rather than a guess.
 
 **A bound class is always what a record reader builds.** A class with a bridge over a record — `ToData`, or
 `@Transparent` over one — constructs its data form, and `BindRecordBuilder` passes it through the bridge. A

@@ -114,7 +114,8 @@ final class TypeInhabitance {
     }
 
     /**
-     * A record needs every part it cannot do without, and one member of every group it must choose from.
+     * A record needs every part it cannot do without, and one option it can choose in every group it must
+     * choose from.
      *
      * <p><b>The groups are walked separately because their members hide from the field walk</b>: §5.11 makes a
      * group's members uniformly optional in {@code fields}, with the requirement carried by the group's own
@@ -133,17 +134,36 @@ final class TypeInhabitance {
             }
         }
         for (FieldGroup group : record.groups()) {
-            if (group.state() != ElementState.REQUIRED) {
-                continue;
-            }
-            boolean any = group.memberNames().stream().anyMatch(member -> record.fields().stream()
-                    .filter(field -> field.name().equals(member))
-                    .anyMatch(field -> satisfiable(field, namespace, inhabited)));
-            if (!any) {
+            if (group.state() == ElementState.REQUIRED && group.members().stream()
+                    .noneMatch(option -> choosable(option, group, record, namespace, inhabited))) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Whether some document can choose this option (SPEC-FEEDBACK.md #18): it states every member the group does
+     * not mark {@code ?}, and at least one member, so an option whose members are all marked needs one of them.
+     */
+    private static boolean choosable(List<String> option, FieldGroup group, RecordBody record,
+            Map<String, TypeDefinition> namespace, Set<String> inhabited) {
+        boolean anyStated = false;
+        for (String member : option) {
+            boolean stated = memberSatisfiable(member, record, namespace, inhabited);
+            if (!stated && !group.optional().contains(member)) {
+                return false;
+            }
+            anyStated |= stated;
+        }
+        return anyStated;
+    }
+
+    /** The member's field can be stated; a member naming no field is the linker's to report, and counts as one. */
+    private static boolean memberSatisfiable(String member, RecordBody record, Map<String, TypeDefinition> namespace,
+            Set<String> inhabited) {
+        return record.fields().stream().filter(field -> field.name().equals(member)).findFirst()
+                .map(field -> satisfiable(field, namespace, inhabited)).orElse(true);
     }
 
     /**
@@ -222,9 +242,9 @@ final class TypeInhabitance {
 
     /**
      * The part of a record nothing satisfies: a required field, or -- when every one of those is fine -- the
-     * first member of a group that has to be chosen from and has nothing to choose. Following the group
-     * matters because its members are optional in {@code fields}, so a chain that walked only required fields
-     * would stop at the record and explain nothing.
+     * first unsatisfiable member of a group that has to be chosen from and has no option to choose. Following
+     * the group matters because its members are optional in {@code fields}, so a chain that walked only
+     * required fields would stop at the record and explain nothing.
      */
     private static String recordDependency(RecordBody record, Map<String, TypeDefinition> namespace,
             Set<String> inhabited) {
@@ -237,7 +257,8 @@ final class TypeInhabitance {
             }
         }
         return record.groups().stream()
-                .filter(group -> group.state() == ElementState.REQUIRED)
+                .filter(group -> group.state() == ElementState.REQUIRED && group.members().stream()
+                        .noneMatch(option -> choosable(option, group, record, namespace, inhabited)))
                 .flatMap(group -> group.memberNames().stream())
                 .flatMap(member -> record.fields().stream().filter(field -> field.name().equals(member)))
                 .filter(field -> !satisfiable(field, namespace, inhabited))

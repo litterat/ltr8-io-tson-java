@@ -121,6 +121,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final List<CompiledField> fields;
     final Map<String, Integer> fieldIndex;
     final List<FieldGroup> groups;
+
+    /** Each field group as field indexes, compiled once ({@link GroupPlan}). */
+    private final GroupPlan[] groupPlans;
     final Object[] precomputedValue;
     /** What each field yields when the document never writes it ({@link RecordField#omitted}). */
     private final RecordField.Omitted[] omitted;
@@ -168,6 +171,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
         }
         this.fixedCheck = fixedChecks;
+        this.groupPlans = groups.stream().map(group -> GroupPlan.of(group, fieldIndex)).toArray(GroupPlan[]::new);
         this.positionalFieldIndex = requiredCount == 1 ? solePositionalField : -1;
         this.declaredFields = fields.stream().map(field -> field.schema().name()).collect(Collectors.joining(" | "));
         this.rules = new RecordDiagnostics(displayName, declaredFields);
@@ -325,30 +329,72 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private static final String ABSENT = "_";
 
     /**
-     * Field-group presence check (§5.11): a bare (REQUIRED) group must have exactly one member
-     * present, a {@code ?} (OPTIONAL) group at most one -- the group's members flatten into ordinary
-     * optional fields (§5.11's own resolution), so this is the only place the group's own
-     * "at most/exactly one" multiplicity is actually enforced at read time. "Present" means the
-     * member's field name appeared in the data ({@code seen}); a voidable member written as the absent
-     * sentinel {@code _} counts as appearing, which is what selects its alternative. Reported
-     * through {@code ctx} like any other problem, so both readers gain it by calling this once after
-     * their own field pass, and collecting mode surfaces a group violation alongside sibling ones.
+     * Field-group presence check (§5.11, SPEC-FEEDBACK.md #18). The group's members flatten into ordinary
+     * optional fields, so this is the only place a group is enforced at read time. "Present" means the member's
+     * field name appeared in the data ({@code seen}); a voidable member written as the absent sentinel {@code _}
+     * counts as appearing, which is what chooses its option. Per group: an option is chosen when any member
+     * appeared, each chosen option reports every member it needs and lacks, in option order, and then the count
+     * of chosen options is judged -- exactly one for a REQUIRED group, at most one for an OPTIONAL group, at
+     * least one for the {@code +} group. Reported through {@code ctx} like any other problem, so both readers
+     * gain it by calling this once after their own field pass, and collecting mode surfaces a group violation
+     * alongside sibling ones.
      */
     final void validateGroups(TsonReadContext ctx, boolean[] seen) {
-        for (FieldGroup group : groups) {
-            int present = 0;
-            for (String member : group.memberNames()) {
-                Integer idx = fieldIndex.get(member);
-                if (idx != null && seen[idx]) {
-                    present++;
+        for (GroupPlan plan : groupPlans) {
+            int chosen = 0;
+            for (int o = 0; o < plan.options.length; o++) {
+                int by = firstSeen(plan.options[o], seen);
+                if (by < 0) {
+                    continue;
+                }
+                chosen++;
+                for (int at : plan.required[o]) {
+                    if (at >= 0 && !seen[at]) {
+                        ctx.report(rules.optionNeeds(fields.get(by).schema().name(), plan.optionText[o],
+                                fields.get(at).schema().name()));
+                    }
                 }
             }
-            String members = String.join(" | ", group.memberNames());
-            if (present > 1) {
-                ctx.report(rules.groupAdmitsAtMostOne(members, present));
-            } else if (group.state() == ElementState.REQUIRED && present == 0) {
-                ctx.report(rules.groupRequiresOne(members));
+            if (chosen == 0 && plan.group.state() == ElementState.REQUIRED) {
+                ctx.report(plan.group.atLeastOne() ? rules.groupRequiresAtLeastOne(plan.text)
+                        : rules.groupRequiresOne(plan.text));
+            } else if (chosen > 1) {
+                ctx.report(rules.groupAdmitsAtMostOne(plan.text, chosen));
             }
+        }
+    }
+
+    /** The first index of {@code option} the document wrote, or -1. */
+    private static int firstSeen(int[] option, boolean[] seen) {
+        for (int at : option) {
+            if (at >= 0 && seen[at]) {
+                return at;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * One field group as field indexes: each option's members, and the subset its group does not mark
+     * {@code ?}. A member naming no field of this record is -1. The texts are the option and the group as
+     * messages show them, built once so a read builds none.
+     */
+    private record GroupPlan(FieldGroup group, int[][] options, int[][] required, String[] optionText,
+                             String text) {
+
+        static GroupPlan of(FieldGroup group, Map<String, Integer> fieldIndex) {
+            List<List<String>> members = group.members();
+            int[][] options = new int[members.size()][];
+            int[][] required = new int[members.size()][];
+            String[] optionText = new String[members.size()];
+            for (int o = 0; o < members.size(); o++) {
+                List<String> option = members.get(o);
+                options[o] = option.stream().mapToInt(member -> fieldIndex.getOrDefault(member, -1)).toArray();
+                required[o] = option.stream().filter(member -> !group.optional().contains(member))
+                        .mapToInt(member -> fieldIndex.getOrDefault(member, -1)).toArray();
+                optionText[o] = String.join(" ", option);
+            }
+            return new GroupPlan(group, options, required, optionText, group.describe());
         }
     }
 

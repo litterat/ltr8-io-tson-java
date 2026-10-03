@@ -175,7 +175,7 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   - **The bind builder** — construct from slots, fill a carrier, all-or-nothing, report a constructor's refusal.
   - **The field decisions** — what a stated absence and a written FIXED member become. The wording is already one
     (`base.diagnostics`), and so is what an omitted field yields (`RecordField.omitted`); the other two decisions
-    are two copies.
+    are two copies, and so is the field-group judgement (each reader's `GroupPlan` and its pass over chosen options).
   - **The dispatch tables built at compile** — a sealed family's pin table keyed by `ValueIdentity`, the deeper
     names, the alias index (`ReferenceChain.namesMeaning` beside `Subsumption.admitting`), and
     `DiscriminationClass`. The lookahead that reads them stays with each encoding.

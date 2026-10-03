@@ -1790,14 +1790,29 @@ absence-triggered shape and the field under two rules need the same field in two
 provide. Against one site, nesting costs a recursive grammar, a recursive kernel type, nested diagnostics, and
 recursive sum types for code generators.
 
-**What is running.** Nothing in this library. In `ltr8-io-tson-benchmarks`:
+**What is running** (`r2026-37-proposal`):
+
+- **Kernel.** `field_group` is `{ members: [[field_name]]  optional?: [field_name]  state? }`, and the bundled
+  schemas are re-pinned. Every group the bundled schemas declare is options of one field, so what they admit is
+  unchanged.
+- **Lexer.** `+` is a special token under `-`'s boundary rule; a bare `+` in a data value is a parse error.
+- **Grammar and resolver.** Options, a member's `?` and `+` parse; every restating shape is refused with the
+  spelling it restates; `+` lowers to the one-option form; group and member restatement and removal follow the
+  rules above, a group in a template body included.
+- **Readers.** Both the TSON text reader and the [TSON-JSON] reader judge chosen options, reporting each chosen
+  option's missing members before the count, and a parity test holds them to one verdict, pointer and message.
+  Inhabitance reads a REQUIRED group as satisfiable when one option can be chosen, and a bind target takes a
+  group as a labelled choice only when every option is one field.
+- **Corpus.** The lexer, parser, schema and validate vectors on the corpus branch of the same name.
+
+The coverage evidence is in `ltr8-io-tson-benchmarks`:
 - the census and `presence_rule.py`, as above;
 - ajv probes at 4 sites (`compile-commands-entry`, `gitleaks-allowlist`, `codex-plugin-interface`,
-  `enonic-cms-form-fragment`), through spellings available today. Their only disagreements with ajv are the
-  presence combinations this proposal decides.
+  `enonic-cms-form-fragment`), through spellings available before this proposal. Their only disagreements
+  with ajv are the presence combinations this proposal decides.
 
 The coverage table compares the rule with the presence logic read from the source, not with ajv on documents.
 
-**Interpretation chosen:** the current text, on both branches.
+**Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
 
 **Status against Revision 36:** open.

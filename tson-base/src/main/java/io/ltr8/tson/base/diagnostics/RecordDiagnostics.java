@@ -99,17 +99,37 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
                 pinned, written);
     }
 
-    /** [TSON-SCHEMA] §5.11: an OPTIONAL group admits at most one member, a REQUIRED group exactly one. */
-    public Refusal groupAdmitsAtMostOne(String members, int present) {
+    /**
+     * [TSON-SCHEMA] §5.11: an OPTIONAL group admits at most one chosen option, a REQUIRED group exactly one. An
+     * option is chosen when any of its members is present, so with options of one field this counts members.
+     */
+    public Refusal groupAdmitsAtMostOne(String options, int chosen) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
-                "at most one of (%s) may be present for '%s', found %d".formatted(members, typeName, present),
-                "at most one of (" + members + ")", present + " present");
+                "at most one of (%s) may be present for '%s', found %d".formatted(options, typeName, chosen),
+                "at most one of (" + options + ")", chosen + " present");
     }
 
-    /** A REQUIRED group with no member present -- §5.11 counts presence after ordinary field validation. */
-    public Refusal groupRequiresOne(String members) {
+    /** A REQUIRED group with no option chosen -- §5.11 counts presence after ordinary field validation. */
+    public Refusal groupRequiresOne(String options) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
-                "exactly one of (%s) must be present for '%s'".formatted(members, typeName),
-                "one of (" + members + ")", "none present");
+                "exactly one of (%s) must be present for '%s'".formatted(options, typeName),
+                "one of (" + options + ")", "none present");
+    }
+
+    /** The at-least-one group ({@code +}, SPEC-FEEDBACK.md #18) with none of its members present. */
+    public Refusal groupRequiresAtLeastOne(String members) {
+        return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
+                "at least one of (%s) must be present for '%s'".formatted(members, typeName),
+                "at least one of (" + members + ")", "none present");
+    }
+
+    /**
+     * A chosen option missing a member its group does not mark {@code ?} (§5.11, SPEC-FEEDBACK.md #18): the
+     * member present chose the option, and the option needs the one that is missing.
+     */
+    public Refusal optionNeeds(String chosenBy, String option, String missing) {
+        return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
+                "'%s' chose (%s) on '%s', which needs '%s'".formatted(chosenBy, option, typeName, missing),
+                "'" + missing + "' beside '" + chosenBy + "'", "missing");
     }
 }

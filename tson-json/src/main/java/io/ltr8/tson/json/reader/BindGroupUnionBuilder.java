@@ -79,8 +79,9 @@ final class BindGroupUnionBuilder implements RecordBuilder {
         if (!mismatches.isEmpty()) {
             throw new BindMismatchException("'" + plan.displayName + "' is a record, and "
                     + union.typeClass().getName() + ", which is bound to it, is a union: a record with no subtypes "
-                    + "binds to one only as a labelled choice -- one REQUIRED group over every field, each member "
-                    + "a record carrying one of them -- and " + String.join("; ", mismatches));
+                    + "binds to one only as a labelled choice -- one REQUIRED group of one-field options over "
+                    + "every field, each member a record carrying one of them -- and "
+                    + String.join("; ", mismatches));
         }
         return new RecordReader(plan, readers, new Object[readers.length], new BindGroupUnionBuilder(members));
     }
@@ -94,6 +95,12 @@ final class BindGroupUnionBuilder implements RecordBuilder {
         FieldGroup group = groups.getFirst();
         if (group.state() != ElementState.REQUIRED) {
             return "its group is optional, so a record with no field present has no member to be";
+        }
+        if (group.atLeastOne()) {
+            return "its group admits several of its fields at once, so a record may be more than one member";
+        }
+        if (group.members().stream().anyMatch(option -> option.size() != 1)) {
+            return "an option of its group holds several fields, so a member would need several components";
         }
         if (group.memberNames().size() != plan.names.length) {
             return "its group covers " + group.memberNames().size() + " of its " + plan.names.length + " fields";

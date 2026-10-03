@@ -1594,7 +1594,7 @@ final class DefinitionResolver {
             if (entry instanceof GroupDef groupDef) {
                 if (!restatesInheritedGroup(name, groupDef, fields, groups, inheritedFieldIndex)) {
                     throw new SchemaValidationException("'" + name + "': the group ("
-                            + describe(groupDef.fieldGroup()) + ") names no inherited group -- a "
+                            + groupDef.fieldGroup().describe() + ") names no inherited group -- a "
                             + "refinement copies its source's whole field set and admits no new fields or "
                             + "groups; composition (`&`) is what adds one (§5.7, §5.11)");
                 }
@@ -1930,7 +1930,7 @@ final class DefinitionResolver {
             if (!group.hasMember(fieldDef.name())) {
                 continue;
             }
-            boolean atLeastOne = group.members().size() == 1 && group.state() == ElementState.REQUIRED;
+            boolean atLeastOne = group.atLeastOne();
             boolean marked = group.optional().contains(fieldDef.name());
             if (fieldDef.omittable() && (atLeastOne || !marked)) {
                 throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
@@ -2163,7 +2163,7 @@ final class DefinitionResolver {
             return false;
         }
         String prefix = (declarationName == null ? "" : "'" + declarationName + "': ") + "the restated group ("
-                + describe(restatement) + ") ";
+                + restatement.describe() + ") ";
         if (inheritedMembers.size() != restated.size()) {
             throw new SchemaValidationException(prefix + "adds a member the source does not declare -- "
                     + "changing membership is a resolver error (§5.11)");
@@ -2183,7 +2183,7 @@ final class DefinitionResolver {
         FieldGroup inherited = groups.get(index);
         if (!inherited.members().equals(restatement.members())) {
             throw new SchemaValidationException(prefix + "does not match the inherited group ("
-                    + describe(inherited) + ") -- a restatement MUST have the same options, their members in "
+                    + inherited.describe() + ") -- a restatement MUST have the same options, their members in "
                     + "the same order, and changing membership is a resolver error (§5.11)");
         }
         List<String> added = restatement.optional().stream()
@@ -2213,11 +2213,6 @@ final class DefinitionResolver {
         return true;
     }
 
-    /** A group as its options read: {@code (a | b c?)}'s members, each option's separated by {@code |}. */
-    private static String describe(FieldGroup group) {
-        return String.join(" | ", group.members().stream().map(option -> String.join(" ", option.stream()
-                .map(member -> group.optional().contains(member) ? member + "?" : member).toList())).toList());
-    }
 
     /**
      * §12.1 gives a group member its own annotation position ({@code group-member = *annotation field-name ws
