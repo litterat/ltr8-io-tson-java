@@ -112,7 +112,7 @@ class JsonMapReadTest {
         assertNull(read.value());
     }
 
-    /** §6.4: `{K => V?}` admits null as an entry's absent value; under `{K => V}` it is a validation error. */
+    /** §6.4: `{K => V?}` admits null as an entry's void value; under `{K => V}` it is a validation error. */
     @Test
     void anEntryValueIsAbsentOnlyWhereTheMapAdmitsOne() {
         assertEquals("""
@@ -122,7 +122,7 @@ class JsonMapReadTest {
                 {"a": null}""").refusal().code());
     }
 
-    /** §6.4: size facets count entries -- and an entry with an absent value is an entry. */
+    /** §6.4: size facets count entries -- and an entry with a void value is an entry. */
     @Test
     void sizeFacetsCountEntries() {
         read("sized", """

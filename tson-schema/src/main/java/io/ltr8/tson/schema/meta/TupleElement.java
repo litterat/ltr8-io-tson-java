@@ -4,14 +4,14 @@ import io.ltr8.annotation.Field;
 
 /**
  * The meta-kernel's {@code tuple_element} record (Part 2 §5.3, §8.1): one position of a resolved
- * {@link TupleBody}. {@code state} shares the two-member {@code element_state} enumeration with
- * array elements; bound through plain generic binding it always appears in output, even at its nominal
- * {@link ElementState#REQUIRED} default.
+ * {@link TupleBody}. {@code voidable} says whether the void sentinel {@code _} may stand in the position, the fact
+ * an array element and a map value carry; a position is never left out. Bound through plain generic binding it
+ * always appears in output, even at its default {@code false}.
  */
-public record TupleElement(@Field("element_type") TypeRef elementType, ElementState state) {
+public record TupleElement(@Field("element_type") TypeRef elementType, boolean voidable) {
 
-    /** A plain {@code REQUIRED} position. */
+    /** A position the void sentinel may not stand in. */
     public static TupleElement required(TypeRef elementType) {
-        return new TupleElement(elementType, ElementState.REQUIRED);
+        return new TupleElement(elementType, false);
     }
 }

@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.DecimalType;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -88,7 +87,7 @@ class ChoiceDisjointnessTest {
     void aBraceAndABracketVariantAreDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
         TypeRef record = product("point", RecordBody.of(List.of()));
-        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), ElementState.REQUIRED, true, false,
+        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), false, true, false,
                 Optional.empty(), Optional.empty()));
         assertTrue(disjoint(record, array));
     }
@@ -190,7 +189,7 @@ class ChoiceDisjointnessTest {
     void aRecordAndAMapAreNotDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
         TypeRef record = product("point", RecordBody.of(List.of()));
-        TypeRef map = product("lookup", new MapBody(TypeRef.of("text"), TypeRef.of("text"), ElementState.REQUIRED, false,
+        TypeRef map = product("lookup", new MapBody(TypeRef.of("text"), TypeRef.of("text"), false, false,
                 Optional.empty(), Optional.empty()));
         assertFalse(disjoint(record, map));
     }
@@ -198,7 +197,7 @@ class ChoiceDisjointnessTest {
     @Test
     void anArrayAndATupleAreNotDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
-        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), ElementState.REQUIRED, true, false,
+        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), false, true, false,
                 Optional.empty(), Optional.empty()));
         TypeRef tuple = product("pair", new TupleBody(List.of()));
         assertFalse(disjoint(array, tuple));

@@ -6,7 +6,6 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TupleBody;
@@ -82,7 +81,7 @@ class TupleTreeReaderTest {
     void optionalPositionToleratesTheAbsentSentinel() {
         TupleBody body = new TupleBody(List.of(
                 TupleElement.required(TypeRef.of("integer")),
-                new TupleElement(TypeRef.of("text"), ElementState.OPTIONAL)));
+                new TupleElement(TypeRef.of("text"), true)));
         TsonCompiledSchema compiled = compile(body);
 
         List<Object> result = readTuple(compiled, "[42 _]");

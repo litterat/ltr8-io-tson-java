@@ -18,7 +18,7 @@ import java.util.Optional;
  * routes on one rule rather than on which one refused.
  *
  * <p><b>This is a faithful JSON model, not a TSON one.</b> {@link JsonNull} is a value here, because at
- * this layer it is one; [TSON-JSON] §7 makes JSON null the absent sentinel's spelling <em>at a typed
+ * this layer it is one; [TSON-JSON] §7 makes JSON null the void sentinel's spelling <em>at a typed
  * position</em>, and a tree read with no schema binding has none. That reading arrives with the
  * schema-directed decode of §5–§8 and nowhere earlier.
  *

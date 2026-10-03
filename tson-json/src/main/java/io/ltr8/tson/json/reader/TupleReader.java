@@ -10,12 +10,12 @@ import java.util.List;
 
 /**
  * A tuple as a JSON array of exactly its declared length, in every read mode: [TSON-JSON] §6.4. Each position
- * decodes at its own reader; an OPTIONAL position's absent value is null in its slot, and at a REQUIRED position
- * null is a validation error (§7). The mode's {@link TupleBuilder} builds the value once.
+ * decodes at its own reader; a voidable position's void value is null in its slot, and at any other position null
+ * is a validation error (§7). The mode's {@link TupleBuilder} builds the value once.
  *
- * <p><b>Short or long arrays are validation errors regardless of trailing-optional positions</b> ([TSON-SCHEMA]
- * §5.3). A tuple's arity is part of its type -- an optional position means it may hold no value, never that it
- * may be missing -- so the count is judged once the array has closed.
+ * <p><b>Short or long arrays are validation errors regardless of trailing voidable positions</b> ([TSON-SCHEMA]
+ * §5.3). A tuple's arity is part of its type -- a voidable position may hold no value, and is never missing -- so
+ * the count is judged once the array has closed.
  */
 final class TupleReader implements JsonTypeReader<Object> {
 
@@ -75,7 +75,7 @@ final class TupleReader implements JsonTypeReader<Object> {
     private Object readPosition(JsonReadContext at, int position) {
         if (at.peek() instanceof JsonEvent.NullValue) {
             at.next();
-            if (!plan.optional()[position]) {
+            if (!plan.voidable()[position]) {
                 at.report(plan.rules().absentPosition(position, NULL));
             }
             return Slots.ABSENT;

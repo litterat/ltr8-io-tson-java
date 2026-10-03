@@ -51,7 +51,7 @@ template parameter, derived from its uses, which checks an application at the ca
 home.
 #10 makes order a facet every container states, which a map needs before #2's keyed sets can be maps.
 #11 drops `set_type`'s non-empty default, so a set's bounds are an array's and the empty set is a set.
-#12 adds `tuple1<T>` and `optional_tuple1<T>` to core, the one-position tuple the bracket sugar cannot spell.
+#12 adds `tuple1<T>` and `voidable_tuple1<T>` to core, the one-position tuple the bracket sugar cannot spell.
 #13 is part defect and part proposal: `uri` cites RFC 3986's URI and was read as its URI-reference, so the two
 become two atoms, `uri` and `uri_reference`, and `uri_type`'s facets take RFC 3986's other distinctions: a scheme
 set in place of one scheme, and a fragment permission.
@@ -72,6 +72,8 @@ already be in, with `ASCII_CASEFOLD` and `NFKC_CASEFOLD` so a case-insensitive n
 however they are cased.
 #20 states what a leap second is, which [TSON-DATA] §5.4 leaves between RFC 3339's grammar and the time-of-day
 interval, and rewords §5.5's `precision` sentence so reading and writing are told apart.
+#21 gives the series' two kinds of nothing one name each — `optional` for a slot that may be missing, `voidable`
+for one whose value may be void — retiring `element_state`, and makes the prose's "absent" the type's "void".
 
 ---
 
@@ -1299,7 +1301,7 @@ non-empty still, so no member list, enum or scope changes what it admits.
 
 ---
 
-## 12. A one-position tuple has no spelling: core should declare `tuple1<T>` and `optional_tuple1<T>`
+## 12. A one-position tuple has no spelling: core should declare `tuple1<T>` and `voidable_tuple1<T>`
 
 **Section:** [TSON-SCHEMA] §5.3 (tuple types: "A tuple requires at least two element type expressions … a single
 type-ref with no semicolon is an unconstrained array — never a one-element tuple"), §9 (core's contents: "Core also
@@ -1318,11 +1320,13 @@ and a converter needs a spelling it can emit at a field without minting declarat
 
 ```
 tuple1          => <T> !tuple { elements: [{ element_type: T }] }
-optional_tuple1 => <T> !tuple { elements: [{ element_type: T  state: OPTIONAL }] }
+voidable_tuple1 => <T> !tuple { elements: [{ element_type: T  voidable: true }] }
 ```
 
-`tuple1<text>` admits `[a]` and refuses `[]`, `[a b]` and `[_]`; `optional_tuple1<text>` admits `[a]` and `[_]`.
-Two templates rather than one because a type argument cannot carry the `?` that would make the position OPTIONAL
+`tuple1<text>` admits `[a]` and refuses `[]`, `[a b]` and `[_]`; `voidable_tuple1<text>` admits `[a]` and `[_]`.
+The position is written in #21's vocabulary; under Revision 36's it is `state: OPTIONAL`, and the template
+`optional_tuple1`.
+Two templates rather than one because a type argument cannot carry the `?` that would make the position voidable
 (`tuple1<int32?>` is not an argument), and a template application carries no facets an author could set instead.
 Core rather than meta: a type-position name resolves in the schema's own namespace and its imports, so a template
 in meta alone would be out of reach of every user field; and core alone rather than both, as `set` is, because no
@@ -1661,11 +1665,11 @@ Three rules decide validity:
 
 - An option is **chosen** when any of its members is present.
 - A chosen option must contain every member not marked `?`.
-- The group's state counts chosen options: a bare group (REQUIRED) admits exactly one, `?` (OPTIONAL) at most one.
+- A bare group admits exactly one chosen option, and an optional group (`?`) at most one.
 
 **`+` is sugar.** It is allowed only where every option is one unmarked member, and
-`( email: E | phone: P )+` desugars to `( email?: E  phone?: P )`: a REQUIRED group of one option whose members are
-all marked. That option must be chosen, and it is chosen when any of its members is present, so the group admits
+`( email: E | phone: P )+` desugars to `( email?: E  phone?: P )`: a non-optional group of one option whose members
+are all marked. That option must be chosen, and it is chosen when any of its members is present, so the group admits
 any non-empty subset of its members. The desugared form is the kernel's, and `+` is the only way to write it.
 
 The first example admits `include`, `name`, `type`, and `name` with `type`. It refuses an empty record, and `include`
@@ -1690,7 +1694,7 @@ group already state, so each presence rule has one spelling:
   disjoint and a field sits in one option of one group.
 - **The only member of an option takes no `?`.** The member is present exactly when its option is chosen, so the
   mark changes nothing: `( a?: A | b: B )` is `( a: A | b: B )`.
-- **A written group of one option is OPTIONAL, with at least two members and one of them unmarked**, as in
+- **A written group of one option is optional, with at least two members and one of them unmarked**, as in
   `( b: B  a?: A )?`. Every other group of one option restates something:
   - bare with an unmarked member is plain fields: `( b: B  a?: A )` is `b: B  a?: A`;
   - bare with every member marked is what `+` desugars to, and is written that way: `( a?: A  b?: B )` is
@@ -1713,19 +1717,21 @@ is always its options written as separate groups or plain fields.
 
 ```
 field_group => {
-  members:   [[field_name; 1..]; 1..]
-  optional?: [field_name; 1..]
-  state?:    element_state ~ REQUIRED
+  members:           [[field_name; 1..]; 1..]
+  optional_members?: [field_name; 1..]
+  optional?:         boolean ~ false
 }
 ```
 
 - `members` holds one list per option, options and their members in source order. A group has an option and an
   option a field, so neither list is ever empty.
-- `optional` names the members marked `?`, and is absent rather than empty where none is marked, so a group has one
-  spelling.
+- `optional_members` names the members marked `?`, and is absent rather than empty where none is marked, so a group
+  has one spelling.
+- `optional` is the group's own `?`: the group may be missing as a whole. These are #21's names; under Revision 36's
+  vocabulary the list is `optional` and the flag `state: element_state ~ REQUIRED`.
 - Every member's `record_field` stays `optional: true`, as today.
-- `element_state` keeps its two values. At least one is the desugared `+`, and the rest of the rules table comes
-  from options holding several fields, not from a third state.
+- The group keeps two states. At least one is the desugared `+`, and the rest of the rules table comes from options
+  holding several fields, not from a third state.
 
 **Why the mark belongs to the group, not the field.** The alternative records the in-option `?` in each member's
 `record_field.optional`. That saves a field and costs three things:
@@ -1744,7 +1750,7 @@ Kept in the group, the mark is presence logic stated where presence logic lives.
 - **Refinement and composition.** A restated member stays a member, in its own option. It may drop its `?`, which
   narrows, and may not add one. A restated unmarked member narrowed to `void` makes its option unchoosable, and a
   marked one narrowed to `void` drops out of its option. A group with no choosable option is unsatisfiable, as a
-  REQUIRED group with every member narrowed to `void` is today. A member of a `+` group is restated as it is
+  non-optional group with every member narrowed to `void` is today. A member of a `+` group is restated as it is
   written there, without a `?`, and that changes nothing. Anywhere else, dropping a `?` never yields a group the
   declaration rules refuse, since they only ever ask for an unmarked member or forbid a mark.
 - **Removal (§5.8 rule 7).** A removed member leaves its option, and an emptied option leaves the group. A group
@@ -1808,9 +1814,9 @@ recursive sum types for code generators.
 
 **What is running** (`r2026-37-proposal`):
 
-- **Kernel.** `field_group` is `{ members: [[field_name; 1..]; 1..]  optional?: [field_name; 1..]  state? }`, and
-  the bundled schemas are re-pinned. Every group the bundled schemas declare is options of one field, so what
-  they admit is unchanged.
+- **Kernel.** `field_group` is `{ members: [[field_name; 1..]; 1..]  optional_members?: [field_name; 1..]
+  optional? }`, in #21's names, and the bundled schemas are re-pinned. Every group the bundled schemas declare is
+  options of one field, so what they admit is unchanged.
 - **Lexer.** `+` is a special token under `-`'s boundary rule; a bare `+` in a data value is a parse error.
 - **Grammar and resolver.** Options, a member's `?` and `+` parse; every restating shape is refused with the
   spelling it restates; `+` lowers to the one-option form; group and member restatement and removal follow the
@@ -2009,5 +2015,93 @@ error at `!time` and `!datetime`. `precision` is judged on the value, so `12:00:
 **What is running** (`main` and `r2026-37-proposal`): the leap-second refusal and the value-judged `precision`.
 On `r2026-37-proposal`, core's `time` and `datetime` docs state the refusal and meta's `time_type` doc carries the
 reworded sentence.
+
+**Status against Revision 36:** open.
+
+---
+
+## 21. The series' two kinds of nothing should each have one name: `optional` for missing, `voidable` for void
+
+**Sections:** [TSON-DATA] §2.9 (the absent sentinel: "present with an absent value — distinct from not appearing at
+all"); [TSON-SCHEMA] §5.2 (the field's three slots, `name?: type? ~ value`), §5.3 (`[T?]`, `{K => V?}`, tuple
+positions, `element_state`), §5.11 (field groups), §7.6 (where `_` is admitted), §8.1 (resolved binding records);
+the meta-kernel's `element_state`, `tuple_element`, `array`, `set_type`, `map` and `field_group`; core's
+`optional_tuple1`. Builds on #12 and #18, whose kernel shapes it renames.
+
+**Kind:** proposal — a kernel change and a terminology change, no change to what any schema admits.
+
+**What the spec says today.** A slot can be empty in two ways: its key is not written, or it is written as `_`. The
+field syntax already keeps them apart, one mark each — the name's `?` and the type's `?` — and `record_field`
+names them `optional` and `voidable`. Everywhere else one enum, `element_state`, serves both, under the word the
+record uses for the other fact:
+
+- at an array's element, a map's value and a tuple position, OPTIONAL means `_` may stand there, and nothing is
+  ever left out — `record_field`'s `voidable`. `optional_tuple1<T>` admits `[_]` and refuses `[]`;
+- at a field group, OPTIONAL means no option need be chosen — the group may be missing, `record_field`'s
+  `optional`.
+
+So a reader who learns `optional` from a record reads `[T?]` as "an element may be omitted", which it never means.
+The prose has a second split: the value is "the absent sentinel" and "an absent value", the type is `void`, and
+"absent" in plain English is what a missing key is, which is why §2.9 must say "present with an absent value".
+
+**Proposal.** One name per fact, on every constructor where the fact can apply, and nowhere else:
+
+- **`optional`: the slot may be missing.** A record field (the name's `?`), and a field group (the group's `?`).
+- **`voidable`: the slot's value may be void**, `_` written in its place. A record field (the type's `?`), an
+  array's element (`[T?]`), a map's value (`{K => V?}`) and a tuple position.
+- **`element_state` is retired**, and each fact is a boolean, as `record_field` already states both.
+
+```
+tuple_element => { element_type: type_ref  voidable?: boolean ~ false }
+array         => product & { element_type  voidable?: boolean ~ false  ordered?  unique_items?  min_items?  max_items? }
+set_type      => array ^ { voidable?: = false  ordered?: = false  unique_items?: = true }
+map           => product & { key_type  value_type  voidable?: boolean ~ false  ordered?  min_items?  max_items? }
+field_group   => { members: [[field_name; 1..]; 1..]  optional_members?: [field_name; 1..]  optional?: boolean ~ false }
+voidable_tuple1 => <T> !tuple { elements: [{ element_type: T  voidable: true }] }   # core; was optional_tuple1
+```
+
+A container's part is never missing, so a container has no `optional`; a map key is never void, so a map has no
+key `voidable`. Both stay structural, and no rule has to refuse them. The group's in-option `?` list becomes
+`optional_members`, since `optional` is now the group's own flag, and that `?` too means "may be missing".
+
+**And the prose follows the type.** The value is **void** and the token **the void sentinel**: "a field set to the
+void sentinel is present with a void value". A key is **missing** or present. That gives each fact one word in the
+data model, the kernel and the prose alike — missing/`optional`, void/`voidable` — and retires "absent", whose
+everyday sense is the other fact.
+
+**The alternatives.**
+- **Give `optional` to the value and rename the key fact** (`omittable`), as Swift's, Rust's, Java's and Python's
+  `Optional` name a value that may be nothing. It is as consistent, and it loses on two counts. Schema systems use
+  the other convention almost without exception — JSON Schema's `required`, JSON Type Definition's
+  `optionalProperties` beside `nullable`, XML Schema's `minOccurs="0"` beside `nillable`, OpenAPI 3.0's `required`
+  beside `nullable`, TypeScript's `a?:`, Zod's `.optional()` beside `.nullable()` — and [TSON-JSON] maps `required`
+  onto `optional` directly. And it moves a word rather than retiring one: a binding record written today with
+  `optional: true` would still read and would mean the other fact, where retiring `state: OPTIONAL` makes every
+  stale record a refusal.
+- **Make voidability part of the type**, `T?` as T's value set with void added, as JSON Schema's
+  `type: [T, "null"]` spells it. It deletes `voidable` everywhere, and costs a synthetic choice entry per `T?`, a
+  binding special case to read a choice with void as nullable, an IS-A rule between `T` and `T?`, and a rule
+  refusing void map keys that is structural today. §2.9 also makes `_` presence with no value rather than a value
+  of `T`.
+- **`nullable`**, the JSON-facing word, names the concept after one encoding's spelling of it, the notation holding
+  no null since Revision 35. `nillable` is XML Schema's alone; `empty` collides with empty text and empty
+  containers.
+
+**What the text must change.** [TSON-DATA] §2.9 and every use of "absent sentinel" and "absent value" in Parts 1
+and 2 (about forty), [TSON-SCHEMA] §5.3's `element_state` and its `state` fields, §5.11's REQUIRED and OPTIONAL
+groups, §7.6's table, §8.1's binding-record examples, and §9's core template name.
+
+**What is running** (`r2026-37-proposal`):
+- **Kernel and core** as above; the bundled schemas are re-pinned and the resolved fixtures restated. A minted
+  name that rendered a state now renders the boolean (`…_true_…` for `…_OPTIONAL_…`).
+- **Model and readers.** `ElementState` is gone: `ArrayBody`, `MapBody` and `TupleElement` carry `voidable`, and
+  `FieldGroup` carries `optionalMembers` and `optional`, in both encodings' readers. The parser's `ElementType`
+  flag is `voidable`, as a field type's already was.
+- **Prose.** "Void sentinel" and "void value" throughout this implementation's Javadoc, diagnostics, design notes
+  and [TSON-JSON]; quotations of Parts 1 and 2 keep their text.
+- **Not yet renamed:** the Java identifiers that carry the old noun (`TsonAbsent`, `AbsentEvent`,
+  `AbsentTreeReader`, the `absent…` diagnostic rules).
+
+**Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
 
 **Status against Revision 36:** open.

@@ -14,7 +14,7 @@ package io.ltr8.tson.atom.number;
 public sealed interface BaseValue
         permits BaseValue.AbsentValue, BaseValue.BooleanValue, BaseValue.NumberValue, BaseValue.StringValue {
 
-    /** The absent sentinel {@code _} (§2.9): no value occupies the position. Never produced by base resolution. */
+    /** The void sentinel {@code _} (§2.9): no value occupies the position. Never produced by base resolution. */
     record AbsentValue() implements BaseValue {}
 
     /** {@code true} or {@code false} (§4.2). */

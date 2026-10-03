@@ -10,7 +10,6 @@ import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.IdentifierType;
 
 import java.math.BigInteger;
@@ -25,13 +24,13 @@ import java.util.function.Consumer;
  * {@code ArrayStart}, and decoding elements one at a time straight off the event stream --
  * validating {@code min_items}/{@code max_items} (against the final count, known only once {@code
  * ArrayEnd} arrives -- a stream has no up-front length the way an already-built element list did),
- * tolerating (or rejecting) an absent element per {@link ElementState}, and rejecting a duplicate
+ * tolerating (or rejecting) a void element per {@code voidable}, and rejecting a duplicate
  * *decoded* element when {@code unique_items} says to -- handing each decoded element to a {@link
  * Consumer} rather than assembling a result itself, since how a decoded element gets stored (a plain
  * {@code List.add}, or a {@code tson-bind} {@code DataClassArray}'s own {@code put()} {@link
  * java.lang.invoke.MethodHandle}) differs completely between the two subclasses. Array elements have
- * no default/fixed-value concept at all ({@link ElementState} has only {@code REQUIRED}/{@code
- * OPTIONAL}, where a record field carries a role and a value), so there's nothing here
+ * no default/fixed-value concept at all ({@code voidable} is the element's one fact, where a record field
+ * carries a role and a value), so there's nothing here
  * resembling {@link RecordAbstractReader}'s own precomputed-default machinery.
  *
  * <p>{@code ordered} is deliberately never validated here -- there's nothing to check about a
@@ -167,8 +166,8 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
     private static final String ABSENT = "_";
 
     private Object defaultOrRequire(int index, TsonReadContext ctx) {
-        ctx.next(); // consume the AbsentEvent regardless of REQUIRED/OPTIONAL
-        if (body.state() == ElementState.REQUIRED) {
+        ctx.next(); // consume the AbsentEvent whether or not the element is voidable
+        if (!body.voidable()) {
             ctx.index(index).report(rules.absentElement(index, ABSENT));
         }
         return null;

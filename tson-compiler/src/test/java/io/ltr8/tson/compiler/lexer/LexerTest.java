@@ -225,7 +225,7 @@ class LexerTest {
 
     @Test
     void leadingUnderscoreIsAbsentThenSeparateToken() {
-        // Underscore cannot start an unquoted token; it's always the absent sentinel.
+        // Underscore cannot start an unquoted token; it's always the void sentinel.
         List<Token> ts = tokens("_id");
         assertEquals(2, ts.size());
         assertToken(ts.get(0), TokenType.ABSENT, "_");

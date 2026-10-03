@@ -350,7 +350,7 @@ public final class TsonDataStream implements TsonEventSource {
                     + "(expected '!!schema', '!!meta' or the start of the document's value)");
         }
         return parseError("expected a value (record, map, array, empty braces, "
-                + "the absent sentinel '_', or a token), found " + describe(t));
+                + "the void sentinel '_', or a token), found " + describe(t));
     }
 
     /**
@@ -909,7 +909,7 @@ public final class TsonDataStream implements TsonEventSource {
             }
 
             throw parseError("expected a value (record, map, array, empty braces, "
-                    + "the absent sentinel '_', or a token), found " + describe(t1));
+                    + "the void sentinel '_', or a token), found " + describe(t1));
         }
     }
 

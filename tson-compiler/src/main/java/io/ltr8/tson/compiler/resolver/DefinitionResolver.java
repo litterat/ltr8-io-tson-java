@@ -33,7 +33,6 @@ import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.Product;
@@ -160,11 +159,10 @@ import java.util.Set;
  * record has an empty chain by construction, so it is always {@code PRODUCT}.
  *
  * <p><b>Field groups (§5.11) flatten</b>: each member becomes an ordinary {@link RecordField} in
- * source position, optional and voidable, regardless of the group's own state (a REQUIRED
- * group still means each <em>member</em> is individually optional, since at most one is guaranteed, not
- * which), and the group itself is recorded as a {@link FieldGroup} (state {@link ElementState#REQUIRED}/
- * {@link ElementState#OPTIONAL} from the group's own {@code ?}). A composed supertype's groups are
- * inherited whole, in supertype order, ahead of the body's own.
+ * source position, optional and voidable, whether or not the group is optional (a group that is not
+ * still means each <em>member</em> is individually optional, since an option is guaranteed, not which), and
+ * the group itself is recorded as a {@link FieldGroup}, {@code optional} from the group's own {@code ?}. A composed
+ * supertype's groups are inherited whole, in supertype order, ahead of the body's own.
  *
  * <p><b>{@code subtypes} is never populated here</b> -- it is a reverse index over the whole namespace (who
  * lists me as a supertype, transitively), imports included, so {@code TsonSchemaLinker} computes it.
@@ -1422,14 +1420,14 @@ final class DefinitionResolver {
                     .map(option -> option.stream().filter(member -> !removed.contains(member)).toList())
                     .filter(option -> !option.isEmpty()).toList();
             // A member left alone in its option is present exactly when the option is chosen, so its mark goes.
-            List<String> optional = group.optional().stream()
+            List<String> optionalMembers = group.optionalMembers().stream()
                     .filter(member -> options.stream().anyMatch(option -> option.size() > 1
                             && option.contains(member))).toList();
-            if (options.size() > 1 || options.size() == 1 && keepsOneOption(options.getFirst(), optional,
-                    group.state())) {
-                surviving.add(new FieldGroup(options, optional, group.state()));
+            if (options.size() > 1 || options.size() == 1 && keepsOneOption(options.getFirst(), optionalMembers,
+                    group.optional())) {
+                surviving.add(new FieldGroup(options, optionalMembers, group.optional()));
             } else if (options.size() == 1) {
-                dissolveInto(fields, options.getFirst(), optional, group.state());
+                dissolveInto(fields, options.getFirst(), optionalMembers, group.optional());
             }
         }
         groups.clear();
@@ -1439,31 +1437,33 @@ final class DefinitionResolver {
     }
 
     /**
-     * Whether a group reduced to one option is still one a schema could write (SPEC-FEEDBACK.md #18): REQUIRED
-     * with at least two members, every one marked -- the {@code +} group -- or OPTIONAL with at least two
-     * members, one unmarked. Any other one option is plain fields.
+     * Whether a group reduced to one option is still one a schema could write (SPEC-FEEDBACK.md #18): not
+     * optional with at least two members, every one marked -- the {@code +} group -- or optional with at least
+     * two members, one unmarked. Any other one option is plain fields.
      */
-    private static boolean keepsOneOption(List<String> option, List<String> optional, ElementState state) {
+    private static boolean keepsOneOption(List<String> option, List<String> optionalMembers,
+                                          boolean optionalGroup) {
         if (option.size() < 2) {
             return false;
         }
-        boolean anyUnmarked = option.stream().anyMatch(member -> !optional.contains(member));
-        return state == ElementState.REQUIRED ? !anyUnmarked : anyUnmarked;
+        boolean anyUnmarked = option.stream().anyMatch(member -> !optionalMembers.contains(member));
+        return optionalGroup ? anyUnmarked : !anyUnmarked;
     }
 
     /**
-     * §5.11: a group reduced to one option it may not keep becomes the plain fields it equals. Under REQUIRED
-     * the option is always chosen, so its unmarked members are required and its marked ones optional; under
-     * OPTIONAL every member is optional. A sole member takes the group's own state for both its marks.
+     * §5.11: a group reduced to one option it may not keep becomes the plain fields it equals. In a group that
+     * is not optional the option is always chosen, so its unmarked members are required and its marked ones
+     * optional; in an optional group every member is optional. A sole member takes the group's own
+     * {@code optional} for both its marks.
      */
     private static void dissolveInto(List<RecordField> fields, List<String> option, List<String> optional,
-                                     ElementState groupState) {
+                                     boolean optionalGroup) {
         for (int i = 0; i < fields.size(); i++) {
             RecordField field = fields.get(i);
             if (!option.contains(field.name())) {
                 continue;
             }
-            boolean omittable = groupState == ElementState.OPTIONAL || optional.contains(field.name());
+            boolean omittable = optionalGroup || optional.contains(field.name());
             fields.set(i, field.withFacts(omittable, option.size() == 1 ? omittable : field.voidable(),
                     FieldRole.FREE));
         }
@@ -1947,7 +1947,7 @@ final class DefinitionResolver {
                 continue;
             }
             boolean atLeastOne = group.atLeastOne();
-            boolean marked = group.optional().contains(fieldDef.name());
+            boolean marked = group.optionalMembers().contains(fieldDef.name());
             if (fieldDef.omittable() && (atLeastOne || !marked)) {
                 throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
                         + "member of a field group " + (atLeastOne
@@ -1955,9 +1955,9 @@ final class DefinitionResolver {
                         : "without a '?' on its name, and adding one loosens its option") + " (§5.11)");
             }
             if (!fieldDef.omittable() && marked && !atLeastOne) {
-                List<String> optional = new ArrayList<>(group.optional());
-                optional.remove(fieldDef.name());
-                groups.set(i, new FieldGroup(group.members(), optional, group.state()));
+                List<String> optionalMembers = new ArrayList<>(group.optionalMembers());
+                optionalMembers.remove(fieldDef.name());
+                groups.set(i, new FieldGroup(group.members(), optionalMembers, group.optional()));
             }
             return;
         }
@@ -2202,8 +2202,8 @@ final class DefinitionResolver {
                     + inherited.describe() + ") -- a restatement MUST have the same options, their members in "
                     + "the same order, and changing membership is a resolver error (§5.11)");
         }
-        List<String> added = restatement.optional().stream()
-                .filter(member -> !inherited.optional().contains(member)).toList();
+        List<String> added = restatement.optionalMembers().stream()
+                .filter(member -> !inherited.optionalMembers().contains(member)).toList();
         if (!added.isEmpty()) {
             throw new SchemaValidationException(prefix + "marks " + String.join(", ", added) + " '?' where "
                     + "the source does not -- a restatement may drop a member's '?' and never add one, which "
@@ -2221,9 +2221,9 @@ final class DefinitionResolver {
             }
         }
 
-        if (inherited.state() == ElementState.REQUIRED && restatement.state() == ElementState.OPTIONAL) {
-            throw new SchemaValidationException(prefix + "loosens a REQUIRED group to OPTIONAL -- a "
-                    + "restatement may only tighten OPTIONAL→REQUIRED (§5.11)");
+        if (!inherited.optional() && restatement.optional()) {
+            throw new SchemaValidationException(prefix + "makes the group optional where the source's is not -- "
+                    + "a restatement may drop a group's '?' and never add one (§5.11)");
         }
         groups.set(index, restatement);
         return true;

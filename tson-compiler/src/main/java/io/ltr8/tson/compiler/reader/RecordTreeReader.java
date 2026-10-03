@@ -86,7 +86,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
     }
 
     /**
-     * [TSON-DATA] §2.9's "present with an absent value", which a tree can hold and so does: {@code
+     * [TSON-DATA] §2.9's "present with a void value", which a tree can hold and so does: {@code
      * { x: _  y: "h" }} reads with {@code x} present as a {@code TsonAbsent}, where {@code { y: "h" }} reads
      * with no {@code x} at all. {@code get("x")} answers the two apart -- {@code isAbsent()} against {@code
      * isMissing()} -- and {@code TsonTreeWriter} writes the first back as {@code _}.

@@ -51,7 +51,7 @@
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
       !record_field { name: scope    type: scope_set }
-      !record_field { name: schemas  type: map_uri_array_type_name_1_ef020ac1_OPTIONAL_1_xxhash  optional: true }
+      !record_field { name: schemas  type: map_uri_array_type_name_1_ef020ac1_true_1_xxhash  optional: true }
     ] }
   }
 
@@ -75,8 +75,8 @@
       !record_field { name: allow_negative_zero  type: boolean  optional: true  role: DEFAULT  value: true }
     ]
     groups: [
-      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
-      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  optional: true }
+      !field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
   }
 
@@ -98,8 +98,8 @@
       !record_field { name: members          type: decimal_member_set  optional: true }
     ]
     groups: [
-      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
-      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  optional: true }
+      !field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
   }
 
@@ -113,8 +113,8 @@
       !record_field { name: multiple_of    type: value  optional: true }
     ]
     groups: [
-      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
-      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  optional: true }
+      !field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
   }
 
@@ -140,8 +140,8 @@
       !record_field { name: exclusive_max  type: value  optional: true }
     ]
     groups: [
-      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
-      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  optional: true }
+      !field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
   }
 
@@ -156,8 +156,8 @@
       !record_field { name: precision         type: non_negative_integer  optional: true }
     ]
     groups: [
-      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
-      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  optional: true }
+      !field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
   }
 
@@ -172,8 +172,8 @@
       !record_field { name: precision         type: non_negative_integer  optional: true }
     ]
     groups: [
-      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
-      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  optional: true }
+      !field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
   }
 
@@ -189,8 +189,8 @@
       !record_field { name: multiple_of    type: value    optional: true }
     ]
     groups: [
-      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
-      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  optional: true }
+      !field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
   }
 
@@ -205,8 +205,8 @@
       !record_field { name: multiple_of    type: value  optional: true }
     ]
     groups: [
-      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
-      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  optional: true }
+      !field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
   }
 
@@ -359,8 +359,8 @@
     body: !array { element_type: type_name  min_items: 1 }
   }
 
-  @synthetic map_uri_array_type_name_1_ef020ac1_OPTIONAL_1_xxhash => !type_definition {
+  @synthetic map_uri_array_type_name_1_ef020ac1_true_1_xxhash => !type_definition {
     source: map
-    body: !map { key_type: uri  value_type: array_type_name_1_xxhash  state: OPTIONAL  min_items: 1 }
+    body: !map { key_type: uri  value_type: array_type_name_1_xxhash  voidable: true  min_items: 1 }
   }
 }

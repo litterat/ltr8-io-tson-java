@@ -10,7 +10,6 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.*;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -331,11 +330,11 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     /**
      * Field-group presence check (§5.11, SPEC-FEEDBACK.md #18). The group's members flatten into ordinary
      * optional fields, so this is the only place a group is enforced at read time. "Present" means the member's
-     * field name appeared in the data ({@code seen}); a voidable member written as the absent sentinel {@code _}
+     * field name appeared in the data ({@code seen}); a voidable member written as the void sentinel {@code _}
      * counts as appearing, which is what chooses its option. Per group: an option is chosen when any member
      * appeared, each chosen option reports every member it needs and lacks, in option order, and then the count
-     * of chosen options is judged -- exactly one for a REQUIRED group, at most one for an OPTIONAL group, at
-     * least one for the {@code +} group. Reported through {@code ctx} like any other problem, so both readers
+     * of chosen options is judged -- exactly one for a group, at most one for an optional group, at least one
+     * for the {@code +} group. Reported through {@code ctx} like any other problem, so both readers
      * gain it by calling this once after their own field pass, and collecting mode surfaces a group violation
      * alongside sibling ones.
      */
@@ -359,10 +358,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 if (chosen == 0) {
                     ctx.report(rules.groupRequiresAtLeastOne(plan.text));
                 }
-            } else if (plan.group.state() == ElementState.REQUIRED ? chosen != 1 : chosen > 1) {
-                ctx.report(plan.group.state() == ElementState.REQUIRED
-                        ? rules.groupChoosesExactlyOne(plan.text, chosen)
-                        : rules.groupChoosesAtMostOne(plan.text, chosen));
+            } else if (plan.group.optional() ? chosen > 1 : chosen != 1) {
+                ctx.report(plan.group.optional()
+                        ? rules.groupChoosesAtMostOne(plan.text, chosen)
+                        : rules.groupChoosesExactlyOne(plan.text, chosen));
             }
         }
     }
@@ -393,7 +392,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             for (int o = 0; o < members.size(); o++) {
                 List<String> option = members.get(o);
                 options[o] = option.stream().mapToInt(member -> fieldIndex.getOrDefault(member, -1)).toArray();
-                required[o] = option.stream().filter(member -> !group.optional().contains(member))
+                required[o] = option.stream().filter(member -> !group.optionalMembers().contains(member))
                         .mapToInt(member -> fieldIndex.getOrDefault(member, -1)).toArray();
                 optionText[o] = String.join(" ", option);
             }
@@ -418,7 +417,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final Object valueForStatedAbsentField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
         if (schema.voidable()) {
-            // [TSON-DATA] §2.9: "A field or entry set to `_` is present with an absent value -- distinct from
+            // [TSON-DATA] §2.9: "A field or entry set to `_` is present with a void value -- distinct from
             // not appearing at all." Answering `valueForAbsentField`'s `null` here would collapse the two,
             // and a voidable field is one where both are legal, so it is where the distinction has anything
             // to carry.

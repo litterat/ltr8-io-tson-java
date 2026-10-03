@@ -136,7 +136,7 @@ every other number, and no third spelling of infinity enters the series.
 **What is dropped is what the reader cannot produce.** Wire annotations: §3.3's annotation object belongs to
 the schema-directed decode, and `DataClassObjectReader` binds every carrier to `Annotations.empty()`, so
 writing them would emit members no reader here takes back. An absent field is left out rather than written
-`null` — §7 makes JSON null the absent sentinel at a typed position, so the two say the same thing and the
+`null` — §7 makes JSON null the void sentinel at a typed position, so the two say the same thing and the
 shorter one is what a reader of any strictness takes.
 
 **`WriteException` is `tson-base`'s**, shared by both encodings for `ParseException`'s reason: a value the

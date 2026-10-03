@@ -27,7 +27,6 @@ import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -387,7 +386,7 @@ class TsonSchemaParserTest {
     void aQuestionMarkOnAMapValueMarksItOptional() {
         MapRef map = mapOf("m => {text => integer?}");
 
-        assertTrue(map.valueType().optional());
+        assertTrue(map.valueType().voidable());
         assertEquals(new SimpleRef("integer"), map.valueType().typeRef());
     }
 
@@ -504,14 +503,14 @@ class TsonSchemaParserTest {
         GroupDef group = groupOf("contact => { ( email: text | phone: text )+ }");
         assertEquals(GroupDef.Quantifier.AT_LEAST_ONE, group.quantifier());
         assertEquals(new FieldGroup(List.of(List.of("email", "phone")), List.of("email", "phone"),
-                ElementState.REQUIRED), group.fieldGroup());
+                false), group.fieldGroup());
     }
 
     /** A group with one option and an unmarked member, under {@code ?}, is the one-option shape a schema writes. */
     @Test
     void anOptionalGroupOfOneOptionWithAnUnmarkedMemberParses() {
         GroupDef group = groupOf("pair => { ( b: text  a?: text )? }");
-        assertEquals(new FieldGroup(List.of(List.of("b", "a")), List.of("a"), ElementState.OPTIONAL),
+        assertEquals(new FieldGroup(List.of(List.of("b", "a")), List.of("a"), true),
                 group.fieldGroup());
     }
 
@@ -554,7 +553,7 @@ class TsonSchemaParserTest {
     @Test
     void anElementQuestionMarkIsLegalAtAFieldPosition() {
         ArrayRef array = (ArrayRef) fieldTypeOf("a => { x: [text?] }", "x");
-        assertTrue(array.elementType().optional());
+        assertTrue(array.elementType().voidable());
     }
 
     /** The one place the two {@code ?} positions meet: the inner is the element's, the outer the field's. */
@@ -562,7 +561,7 @@ class TsonSchemaParserTest {
     void anElementQuestionMarkAndAFieldQuestionMarkDoNotCollide() {
         FieldDef field = fieldOf("a => { x: [text?]? }", "x");
         assertTrue(field.type().orElseThrow().voidable(), "the field's own '?'");
-        assertTrue(((ArrayRef) field.type().orElseThrow().typeRef()).elementType().optional(), "the element's");
+        assertTrue(((ArrayRef) field.type().orElseThrow().typeRef()).elementType().voidable(), "the element's");
     }
 
     /** Nesting is the recursion in {@code element-type}, so a sized form nests at a field like anywhere else. */
@@ -647,7 +646,7 @@ class TsonSchemaParserTest {
     @ValueSource(strings = {
             "t => !integer ^ 5",                      // a bare token where a record-def is required
             "t => !integer ^ \"5\"",                   // ... quoted, in case form were mistaken for shape
-            "t => !integer ^ _",                      // ... the absent sentinel
+            "t => !integer ^ _",                      // ... the void sentinel
             "t => !integer ^ [1 2]",                  // ... an array: a core-value, still not a record-def
             "t => !integer ^ !integer_type { min: 1 }",   // a second, competing type-ref on the payload
             "t => !integer ^ @doc:\"d\" { min: 1 }"})     // an annotation layer on the payload
@@ -733,7 +732,7 @@ class TsonSchemaParserTest {
 
     /**
      * Identifier-Start is {@code XID_Start} and deliberately does not add {@code _}: the bare token {@code _} is
-     * §2.9's absent sentinel, and admitting the character would buy only {@code !_id} and {@code @_note} while
+     * §2.9's void sentinel, and admitting the character would buy only {@code !_id} and {@code @_note} while
      * costing the invariant that every identifier is a well-formed unquoted token. A leading underscore is a
      * <em>field</em> name, spelled quoted, and never a declared type name.
      */
@@ -840,7 +839,7 @@ class TsonSchemaParserTest {
     @Test
     void metaKernelParses() throws IOException {
         SchemaDocument doc = parse(readFixture("meta-kernel.tn"));
-        assertEquals(60, doc.body().declarations().size());
+        assertEquals(59, doc.body().declarations().size());
     }
 
     @Test

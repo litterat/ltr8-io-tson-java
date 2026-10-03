@@ -87,12 +87,12 @@ is small and parsed once.)
   consulted, so a `_` at a FIXED field is always `FIELD_FIXED`. Nothing is pre-seeded: every field the document
   didn't state goes through one `valueForAbsentField` switch over the three `Omitted` answers, and the JSON reader's
   `fillAbsent` switches over the same three.
-- **An array element's own state is the two-member `ElementState`, and an absent element occupies its slot.**
-  Under `[T?]` (`state: OPTIONAL`) an element may be the absent sentinel `_`; under the default `REQUIRED` one
+- **An array element's one fact is `voidable`, and a void element occupies its slot.**
+  Under `[T?]` (`voidable: true`) an element may be the void sentinel `_`; under the default it
   is `FIELD_REQUIRED`. Either way `ArrayAbstractReader` consumes the `AbsentEvent` and advances the index, so
   `[a _ c]` has three elements and satisfies a `[T?; 3]` size constraint — §5.3's own stated equivalence,
   which falls out of counting rather than being checked for. Elements have no default/fixed concept at all
-  (`ElementState` has two members where a record field carries a role and a value), so none of the
+  (`voidable` is their one fact, where a record field carries a role and a value), so none of the
   `valueForAbsentField` machinery above has an array counterpart.
 - **A name's identity is its NFC form, and normalising happens where a token becomes a name.** §2.5 and
   §2.6 define field-name and scalar-key identity by NFC-normalised text, whichever spelling produced it, so
@@ -123,12 +123,12 @@ is small and parsed once.)
   TSON text preserve the offset as written, so this is an identity and never what a reader hands back.
   `Rendered` is the other half: `byte[]` inherits `Object.toString`, so a diagnostic naming one renders it
   through `Rendered` rather than as `[B@6d06d69c`.
-- **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody` carries an
-  `ElementState` governing the value — `{K => V?}`, §5.3's own row and the `state` field the kernel gives `map` — so
-  `MapAbstractReader.decodedValue` gives the array element's two answers: the sentinel under `OPTIONAL`,
-  `FIELD_REQUIRED` under the default `REQUIRED`. It answers above the value's own reader, which is right to refuse the
+- **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody` carries
+  `voidable` governing the value — `{K => V?}`, §5.3's own row and the field the kernel gives `map` — so
+  `MapAbstractReader.decodedValue` gives the array element's two answers: the sentinel where it is set,
+  `FIELD_REQUIRED` under the default. It answers above the value's own reader, which is right to refuse the
   sentinel (`_` is a value of no atom type) — absence is the container's question, the same place `ArrayAbstractReader`
-  asks it. The entry is present with an absent value (§2.9) whichever answer it gets, so it counts toward
+  asks it. The entry is present with a void value (§2.9) whichever answer it gets, so it counts toward
   `min_items`/`max_items` and the refusal costs the value its verdict, not the entry its place; both subclasses already
   had the no-value form to put there — a `TsonAbsent` in tree mode, a `null` the bound `Map` really holds in bind mode.
   The **key** is the opposite and unconditional: §2.9 forbids the sentinel there whatever a declaration says, and the
@@ -223,7 +223,7 @@ is small and parsed once.)
   `SchemalessTreeReader.keyIdentity`
   does the stripping explicitly; the other two readers compare bound host values, which strips both by
   construction.
-- **A written `_` at an `OPTIONAL` field is present with an absent value** (§2.9: "distinct from not
+- **A written `_` at an `OPTIONAL` field is present with a void value** (§2.9: "distinct from not
   appearing at all"), and tree mode keeps that: `{ x: _ }` reads with `x` a `TsonAbsent` where `{ }` reads
   with no `x` at all, and `TsonTreeWriter` writes the first back as `_`. It is the mode's own answer
   (`statedAbsentValue`, per subclass) because bind mode has nowhere to put it — a Java component has no third

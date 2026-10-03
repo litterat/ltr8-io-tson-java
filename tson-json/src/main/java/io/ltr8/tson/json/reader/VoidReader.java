@@ -9,7 +9,7 @@ import io.ltr8.tson.json.stream.JsonEvent;
 
 /**
  * A {@code void}-typed position: [TSON-JSON] §5.7. The atom whose sole value is absence, whose JSON spelling
- * is null (§7) -- so this accepts null and nothing else, and produces the absent sentinel.
+ * is null (§7) -- so this accepts null and nothing else, and produces the void sentinel.
  *
  * <p>It is one instance of §7's general rule rather than a concession to JSON: [TSON-SCHEMA] §7.3 admits
  * {@code _} and nothing else at {@code void}, and this is where JSON-shaped data meets that rule. The one
@@ -25,7 +25,7 @@ final class VoidReader implements JsonTypeReader<Object> {
         this.schemaLocation = schemaLocation;
     }
 
-    /** Null -- the absent sentinel, which is what a {@code void} position always produces when it conforms. */
+    /** Null -- the void sentinel, which is what a {@code void} position always produces when it conforms. */
     @Override
     public Object read(JsonReadContext ctx) {
         ctx = ctx.underDeclaration(schemaLocation);

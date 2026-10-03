@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=47f2029e3eb7f7d99387e84f132a84c97c2b0efde30fc31f3a5016d545af1582"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=80bde97ac97a6df9553779b27eeb2273d1c52e64b233cbc1d4c4d6eb8e7b4c4c"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=4fef190e3111420bc4992e3dc51aa788a815fb1f61288c19a3ccd5011b64e16a"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=8df0771b72d26310873aa954a3fab7d094cea2cb64c8f6594d40ffe25944fea6"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -56,7 +56,7 @@
     name — the same `!void_type {}` construction, and so the same contract, a
     distinct type entity — so that data documents governed by core-importing
     schemas can target it. The atom whose parsing contract admits only the
-    absent sentinel `_`. See [TSON-SCHEMA] §6 and §7.3.
+    void sentinel `_`. See [TSON-SCHEMA] §6 and §7.3.
     """
   void => !void_type {}
 
@@ -369,17 +369,17 @@
   set => <T> !set_type { element_type: T }
 
   @doc:"""
-    A tuple of exactly one REQUIRED element: `tuple1<text>` admits `[a]` and
+    A tuple of exactly one element: `tuple1<text>` admits `[a]` and
     refuses `[]`, `[a b]` and `[_]`. `[T]` is an array, and the tuple sugar
     takes two or more positions.
     """
   tuple1 => <T> !tuple { elements: [{ element_type: T }] }
 
   @doc:"""
-    A tuple of exactly one OPTIONAL element: as `tuple1`, and the element may
-    be the absent sentinel, so `optional_tuple1<text>` admits `[a]` and `[_]`.
+    A tuple of exactly one voidable element: as `tuple1`, and the element may
+    be void, so `voidable_tuple1<text>` admits `[a]` and `[_]`.
     """
-  optional_tuple1 => <T> !tuple { elements: [{ element_type: T  state: OPTIONAL }] }
+  voidable_tuple1 => <T> !tuple { elements: [{ element_type: T  voidable: true }] }
 
   @doc:"""
     Documentation for a declaration, a field or a document. The text is

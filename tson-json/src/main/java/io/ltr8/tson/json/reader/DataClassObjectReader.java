@@ -273,7 +273,7 @@ public final class DataClassObjectReader {
         JsonEvent value = at.next();
         if (value instanceof JsonEvent.NullValue && field.isRequired()) {
             at.report(Diagnostic.Code.FIELD_REQUIRED,
-                    "member '%s' is required and is written null, which is the absent value"
+                    "member '%s' is required and is written null, which is the void value"
                             .formatted(field.name()),
                     "a value for '" + field.name() + "'", "null");
             return null;

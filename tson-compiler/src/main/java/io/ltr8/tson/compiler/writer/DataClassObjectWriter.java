@@ -100,7 +100,7 @@ public final class DataClassObjectWriter {
     // ── Core dispatch ────────────────────────────────────────────────────
 
     /**
-     * A host {@code null} aside -- which writes {@code _}, the absent sentinel, and reaches here only where
+     * A host {@code null} aside -- which writes {@code _}, the void sentinel, and reaches here only where
      * there is no field to omit it from (see {@link #writeRecord}): a bridge, if present, is unwrapped once, up front -- covers plain Java
      * {@code enum}s and {@code Rational}/{@code Complex}/{@code Duration} reached through a
      * caller's own {@code DataBridge} (all via {@code DataBindContext#registerAtom(Class,

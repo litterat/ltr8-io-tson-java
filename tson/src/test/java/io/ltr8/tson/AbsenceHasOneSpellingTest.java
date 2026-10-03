@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * admitted at all.
  *
  * <p><b>What {@code _} means is [TSON-DATA] §2.9's distinction</b>, and the tree keeps it: a field written
- * {@code _} is present with an absent value, and a field never written is not there.
+ * {@code _} is present with a void value, and a field never written is not there.
  */
 class AbsenceHasOneSpellingTest {
 
@@ -86,7 +86,7 @@ class AbsenceHasOneSpellingTest {
 
     /**
      * <b>[TSON-DATA] §2.9's distinction, kept by the tree.</b> "A field or entry set to {@code _} is present
-     * with an absent value — distinct from not appearing at all." Both readings used to produce a tree with
+     * with a void value — distinct from not appearing at all." Both readings used to produce a tree with
      * no {@code nickname} at all, so a document that said something about the field and one that said nothing
      * read alike — the record being the one container of the four that dropped it, where an array element and
      * a tuple slot already kept it.
@@ -106,7 +106,7 @@ class AbsenceHasOneSpellingTest {
         TsonValue omitted = readPerson("");
 
         assertTrue(written.get("nickname").isAbsent(),
-                () -> "written '_': present with an absent value -- " + written);
+                () -> "written '_': present with a void value -- " + written);
         assertTrue(omitted.get("nickname").isMissing(),
                 () -> "never written: not there at all -- " + omitted);
         assertFalse(written.get("nickname").isMissing(), written::toString);

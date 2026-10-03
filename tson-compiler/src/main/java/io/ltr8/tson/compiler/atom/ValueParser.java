@@ -129,7 +129,7 @@ public final class ValueParser implements TokenAtomType<Object> {
 
     private static Object narrow(BaseValue value) {
         return switch (value) {
-            // Unreachable: BaseTypeResolver resolves a token, and no token is the absent sentinel.
+            // Unreachable: BaseTypeResolver resolves a token, and no token is the void sentinel.
             case BaseValue.AbsentValue ignored -> throw new IllegalStateException("base resolution produced absence");
             case BaseValue.BooleanValue b -> b.value();
             case BaseValue.StringValue s -> s.text();
@@ -159,7 +159,7 @@ public final class ValueParser implements TokenAtomType<Object> {
     public String write(Object value) {
         return switch (value) {
             // `value` has no null inhabitant to write: absence is `_`, and an emitter writes it as absence.
-            case null -> throw new IllegalArgumentException("the absent sentinel is not a 'value'; emit '_' instead");
+            case null -> throw new IllegalArgumentException("the void sentinel is not a 'value'; emit '_' instead");
             case Boolean b -> b.toString();
             case Double d when d.isNaN() -> ".nan";
             case Double d when d == Double.POSITIVE_INFINITY -> ".inf";

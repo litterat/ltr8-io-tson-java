@@ -38,7 +38,7 @@ import java.util.NoSuchElementException;
  *     only the declared key type relates the pair -- which is a fact no grammar layer holds. The tree
  *     applies the rule where JEP 540 does, and the schema-directed decode applies it with a category.
  * <li><b>It does not interpret a value.</b> A number is its source lexeme (§5.3), a string is its
- *     decoded content, and {@code null} is a JSON value rather than the absent sentinel -- §7 turns it
+ *     decoded content, and {@code null} is a JSON value rather than the void sentinel -- §7 turns it
  *     into one, at a typed position, which this layer has none of.
  * <li><b>It reserves no member name.</b> §3.2's {@code $}-namespace is reserved where an object is read
  *     as a record or an annotation object, which is a question about the position's type.

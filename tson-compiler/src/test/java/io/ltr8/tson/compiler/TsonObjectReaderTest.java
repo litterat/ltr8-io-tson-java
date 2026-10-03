@@ -362,7 +362,7 @@ class TsonObjectReaderTest {
     @Test
     void mapAllowsAbsentSentinelAsValue() throws DataBindException {
         // §2.9 only restricts the key position -- a value of "_" is legitimately "present with
-        // an absent value" (distinct from the entry not existing at all), so this must still bind.
+        // a void value" (distinct from the entry not existing at all), so this must still bind.
         CountsHolder h = mapper.read("{ counts: { apples => _ } }", CountsHolder.class);
         assertEquals(1, h.counts().size());
         assertNull(h.counts().get("apples"));

@@ -28,13 +28,13 @@ final class BindArrayBuilder implements ArrayBuilder {
 
     /**
      * {@code array} read again for {@code target} -- a component's {@code List<Long>}, {@code long[]} or
-     * {@code Set<UUID>} -- its element bound to the target's element. An optional element cannot reach a
+     * {@code Set<UUID>} -- its element bound to the target's element. A voidable element cannot reach a
      * primitive array, which has nowhere to put the absence.
      */
     static JsonTypeReader<?> forTarget(ArrayReader array, DataClassArray target, String what,
                                        List<String> mismatches) {
         ArrayPlan plan = array.plan();
-        if (plan.optionalElements() && target.typeClass().isArray()
+        if (plan.voidableElements() && target.typeClass().isArray()
                 && target.arrayDataClass().typeClass().isPrimitive()) {
             mismatches.add(what + " admits absent elements, and " + target.typeClass().getSimpleName()
                     + " has no absence to hold one");

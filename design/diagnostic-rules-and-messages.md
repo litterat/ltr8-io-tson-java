@@ -61,8 +61,8 @@ diagnostics parameterised over a "candidate noun" so one class serves a choice *
 
 **Two boundary calls are finer than "the schema's nouns":**
 
-- **"The absent sentinel" is the schema's noun and stays in the prose**; only the *spelling* is the format's.
-  [TSON-DATA] §2.9 names the concept, and a message
+- **"The void sentinel" is the schema's noun and stays in the prose**; only the *spelling* is the format's.
+  [TSON-DATA] §2.9 names the concept (as the absent sentinel until SPEC-FEEDBACK.md #21 lands), and a message
   that will not say it loses the word the spec uses for the thing it is refusing.
 - **A message about a value renders the value, not the wire form.** A set duplicate reads `'a'` and not
   `'"a"'`. That is harder on the JSON side than it sounds, because tree mode discards the host value by
@@ -153,7 +153,7 @@ such an overload is how a diagnostic ends up with a blank structured half). `mes
 is free to do what a template could not: cite the spec, or name the fix.
 
 ```
-annotation '@title' is written bare, which §6 treats as '@title:_', but 'title' does not admit the absent sentinel
+annotation '@title' is written bare, which §6 treats as '@title:_', but 'title' does not admit the void sentinel
 'contact' has no variant matching this untagged value -- expected a value of one of
     (email, phone), or an explicit type annotation
 ```

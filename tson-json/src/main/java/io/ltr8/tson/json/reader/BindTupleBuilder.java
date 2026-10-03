@@ -30,7 +30,7 @@ final class BindTupleBuilder implements TupleBuilder {
 
     /**
      * {@code tuple} read again for {@code target}, each position bound to the target's element at the same index.
-     * The target's arity must be the tuple's, and an optional position cannot reach a primitive element.
+     * The target's arity must be the tuple's, and a voidable position cannot reach a primitive element.
      */
     static JsonTypeReader<?> forTarget(TupleReader tuple, DataClassTuple target, String what,
                                        List<String> mismatches) {
@@ -43,7 +43,7 @@ final class BindTupleBuilder implements TupleBuilder {
         JsonTypeReader<?>[] slots = new JsonTypeReader<?>[plan.arity()];
         for (int i = 0; i < slots.length; i++) {
             Class<?> element = target.elements()[i].dataClass().typeClass();
-            if (plan.optional()[i] && element.isPrimitive()) {
+            if (plan.voidable()[i] && element.isPrimitive()) {
                 mismatches.add(what + "'s position " + i + " admits absence, and " + element.getName()
                         + " has none to hold it");
             }

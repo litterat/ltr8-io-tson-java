@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.ast;
 
 /**
- * {@code absent = "_"} (§2.9): the explicitly-absent sentinel, distinct from any typed value
+ * {@code absent = "_"} (§2.9): the explicitly-void sentinel, distinct from any typed value
  * including base-type null.
  *
  * <p>The spec forbids {@code _} in map-key position, but as a <em>resolver-layer</em> rule, not

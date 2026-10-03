@@ -221,7 +221,7 @@ class JsonObjectWriterTest {
 
         @Test
         void an_absent_field_is_left_out_rather_than_written_null() {
-            // §7 makes JSON null the absent sentinel at a typed position, so the two say the same thing and
+            // §7 makes JSON null the void sentinel at a typed position, so the two say the same thing and
             // the shorter one is what a reader of any strictness takes.
             assertEquals("{\"name\":\"a\"}", WRITER.toJson(new Optional("a", null)));
         }

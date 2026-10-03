@@ -542,7 +542,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * carries, or {@code null} when this is not one -- see {@link GroupUnionBindReader}.
          *
          * <p>Three things must line up, and all three are checked rather than assumed: the Java target is a
-         * sealed union, the schema body is one REQUIRED group of one-field options covering every field it
+         * sealed union, the schema body is one non-optional group of one-field options covering every field it
          * declares -- exclusive alternatives, so neither the {@code +} group nor an option of several fields --
          * and each member carries exactly one component whose wire name is one of those fields. A near-miss falls
          * through to the ordinary record path, where {@link #requireRecord} reports it -- guessing at a
@@ -553,7 +553,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 return null;
             }
             FieldGroup group = body.groups().getFirst();
-            if (group.state() != ElementState.REQUIRED
+            if (group.optional()
                     || group.members().stream().anyMatch(option -> option.size() != 1)
                     || group.memberNames().size() != body.fields().size()
                     || union.memberTypes().length != body.fields().size()) {

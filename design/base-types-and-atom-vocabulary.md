@@ -185,7 +185,7 @@ it; `NFKC_CASEFOLD` is for names compared without case across Unicode.
   against a `pattern` constraint (`TextParser`/`UriParser`) runs through `tson-regex`'s `TsonRegex.matches` —
   a Thompson-NFA, linear-time and ReDoS-safe — not `java.util.regex`.
 - **`value`, `void` and `identifier` each have a constructor**, and are read by it: `value_type` by `ValueParser`
-  (in `tson-compiler`, base-type resolution to the natural host), `void_type` by `VoidReader` (the absent sentinel
+  (in `tson-compiler`, base-type resolution to the natural host), `void_type` by `VoidReader` (the void sentinel
   `_` alone), and `identifier_type` by `IdentifierParser` — the text put into its `normalization` form, then
   matched against the type's own `IdentifierProfile`, a profile failure being a parse failure, then `text_type`'s
   facets through `TextParser`. So a naming convention is a `pattern` and a closed vocabulary of names is

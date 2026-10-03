@@ -9,7 +9,6 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -93,7 +92,7 @@ final class BindGroupUnionBuilder implements RecordBuilder {
             return "the record has " + groups.size() + " groups";
         }
         FieldGroup group = groups.getFirst();
-        if (group.state() != ElementState.REQUIRED) {
+        if (group.optional()) {
             return "its group is optional, so a record with no field present has no member to be";
         }
         if (group.atLeastOne()) {

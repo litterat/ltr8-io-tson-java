@@ -20,7 +20,7 @@
   likewise name meta- and kernel-level entries.
 
   The open entries (`extern_of`, `extern_type`, `set`, `tuple1`,
-  `optional_tuple1`) hold their bodies — the application as written,
+  `voidable_tuple1`) hold their bodies — the application as written,
   unread until materialisation substitutes the parameters away — so a
   token in one is a parameter reference rather than a value of the
   slot's declared type (Section 8.1's shadowing rule). A processor comparing these compares wire
@@ -314,11 +314,11 @@
     body: !template { parameters: [{ name: T  type: type_ref }]  template: "!tuple { elements: [{ element_type: T }] }" }
   }
 
-  optional_tuple1 => !type_definition {
+  voidable_tuple1 => !type_definition {
     source: tuple
     body: !template {
       parameters: [{ name: T  type: type_ref }]
-      template: "!tuple { elements: [{ element_type: T  state: OPTIONAL }] }"
+      template: "!tuple { elements: [{ element_type: T  voidable: true }] }"
     }
   }
 

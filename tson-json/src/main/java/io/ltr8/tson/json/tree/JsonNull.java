@@ -5,7 +5,7 @@ import java.util.Optional;
 /**
  * JSON's {@code null}.
  *
- * <p><b>A value at this layer, and the absent sentinel only at a typed position.</b> [TSON-JSON] §7
+ * <p><b>A value at this layer, and the void sentinel only at a typed position.</b> [TSON-JSON] §7
  * makes JSON null the spelling of absence, but that is a rule about reading a value <em>against a
  * declared state</em> -- which a tree with no schema binding has none of, there being no Class 1 in
  * this encoding (§1.3 principle 1). Resolving it here would settle a schema's question in a layer that

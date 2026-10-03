@@ -109,7 +109,7 @@ final class TypeRefCheck {
             case MapStart ignored -> "a map";
             case ArrayStart ignored -> "an array";
             case EmptyBraceEvent ignored -> "{}";
-            case AbsentEvent ignored -> "the absent sentinel '_'";
+            case AbsentEvent ignored -> "the void sentinel '_'";
             default -> String.valueOf(core);
         };
     }

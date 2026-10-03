@@ -608,8 +608,8 @@ public final class TsonSchemaParser extends TsonDataParser {
                 case SINGLE_LINE_STRING -> TokenForm.SINGLE_LINE_QUOTED;
                 case MULTI_LINE_STRING -> TokenForm.MULTI_LINE_QUOTED;
                 default -> throw mismatch(kind == FieldDef.Modifier.Kind.DEFAULT
-                        ? "a scalar token or the absent sentinel '_' after '~'"
-                        : "a scalar token, the absent sentinel '_', or '?' after '='");
+                        ? "a scalar token or the void sentinel '_' after '~'"
+                        : "a scalar token, the void sentinel '_', or '?' after '='");
             };
             advance();
             value = new FieldDef.Modifier.Value.Literal(recordPosition(new TokenValue(t.text(), form), t.start()));
@@ -829,7 +829,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * A map's <em>key</em> never admits {@code ?}. [TSON-DATA] §2.9 forbids the absent sentinel in key
+     * A map's <em>key</em> never admits {@code ?}. [TSON-DATA] §2.9 forbids the void sentinel in key
      * position outright and [TSON-SCHEMA] §7.6 restates it, so there is no state for the marker to bind and
      * no reading under which one could be wanted -- unlike the value side, which takes it ({@link
      * #parseMapBody}).
@@ -894,7 +894,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             return new TypeArg.Ref(parseMap());
         }
         if (t.type() == TokenType.ABSENT) {
-            throw parseError("the absent sentinel '_' is not valid in a type argument position (§7.6)");
+            throw parseError("the void sentinel '_' is not valid in a type argument position (§7.6)");
         }
         throw mismatch("a type argument (a type reference or a scalar value)");
     }

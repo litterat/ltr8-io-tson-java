@@ -5,7 +5,6 @@ import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -20,6 +19,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -88,7 +88,7 @@ class NestedContainerTest {
         TsonCompiledSchema compiled = compile("  grid => [[integer; 2], text]");
 
         TupleBody outer = assertInstanceOf(TupleBody.class, entry(compiled, "grid").body());
-        assertEquals(ElementState.REQUIRED, outer.elements().get(0).state());
+        assertFalse(outer.elements().get(0).voidable());
         assertEquals(TypeRef.of("text"), outer.elements().get(1).elementType());
 
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
@@ -163,7 +163,7 @@ class NestedContainerTest {
                   strict => [integer; 3]""");
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, entry(compiled, "triple").body());
-        assertEquals(ElementState.OPTIONAL, body.state());
+        assertTrue(body.voidable());
         assertEquals(Optional.of(new BigInteger("3")), body.minItems());
 
         assertNotNull((TsonValue) compiled.get("triple").read(TestDocuments.document("[1 _ 3]")));
@@ -172,9 +172,8 @@ class NestedContainerTest {
                 () -> compiled.get("triple").read(TestDocuments.document("[1 _]")))
                 .getMessage().contains("minimum 3"), "an absent element occupies a slot, it does not vacate one");
 
-        assertEquals(ElementState.REQUIRED,
-                assertInstanceOf(ArrayBody.class, entry(compiled, "strict").body()).state(),
-                "the unmarked form keeps REQUIRED from the vocabulary's own default");
+        assertFalse(assertInstanceOf(ArrayBody.class, entry(compiled, "strict").body()).voidable(),
+                "the unmarked form keeps the vocabulary's own default, not voidable");
         assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("strict").read(TestDocuments.document("[1 _ 3]")))
                 .getMessage().contains("elements are required"));

@@ -177,7 +177,7 @@ public final class Sidecar {
         return assertInstanceOf(TokenValue.class, fieldCore(record, name), "field '" + name + "'").text();
     }
 
-    /** Like {@link #fieldText}, but the field may be the absent sentinel {@code _}, returning null then. */
+    /** Like {@link #fieldText}, but the field may be the void sentinel {@code _}, returning null then. */
     public static String fieldTextOrAbsent(RecordValue record, String name) {
         DataValue value = fieldValue(record, name);
         return (value.coreValue() instanceof AbsentValue) ? null : fieldText(record, name);

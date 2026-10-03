@@ -28,7 +28,7 @@ import java.math.BigInteger;
  * encodings.
  *
  * <p>An object or array here is a validation error -- {@code value} admits scalars -- and so is JSON null at
- * this REQUIRED position, §7 having spent it as the absent sentinel. A {@code value} position is a single
+ * this REQUIRED position, §7 having spent it as the void sentinel. A {@code value} position is a single
  * token and not a scope, so {@code $schema} at one is a resolver error ([TSON-SCHEMA] §7.8); nothing here
  * admits an object at all, which is that rule already met.
  *

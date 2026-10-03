@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler.ast.schema;
 
 import io.ltr8.tson.compiler.ast.Annotation;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 
 import java.util.List;
@@ -44,17 +43,17 @@ public record GroupDef(List<Annotation> annotations, List<List<Member>> options,
 
     /**
      * The kernel's {@code field_group} for this group. {@code +} is sugar: {@code ( a: A | b: B )+} is the
-     * REQUIRED group of one option whose members are all optional within it, so at least one is present.
+     * non-optional group of one option whose members are all optional within it, so at least one is present.
      */
     public FieldGroup fieldGroup() {
         if (quantifier == Quantifier.AT_LEAST_ONE) {
             List<String> names = members().stream().map(Member::name).toList();
-            return new FieldGroup(List.of(names), names, ElementState.REQUIRED);
+            return new FieldGroup(List.of(names), names, false);
         }
         return new FieldGroup(
                 options.stream().map(option -> option.stream().map(Member::name).toList()).toList(),
                 members().stream().filter(Member::omittable).map(Member::name).toList(),
-                quantifier == Quantifier.AT_MOST_ONE ? ElementState.OPTIONAL : ElementState.REQUIRED);
+                quantifier == Quantifier.AT_MOST_ONE);
     }
 
     /**

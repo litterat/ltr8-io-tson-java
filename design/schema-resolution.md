@@ -186,14 +186,14 @@ are kept in step deliberately.
   materialisation closes it to FIXED, keeping the name's mark, so the parameter branch sits ahead of the
   literal pin.
 - **A field group is options of members** (`GroupDef`, the kernel's `field_group`; SPEC-FEEDBACK.md #18). An
-  option is chosen when any member is present, a chosen option holds every member `field_group.optional` does
-  not name, and the state counts chosen options. `GroupDef.fieldGroup` is the one lowering, used by a fresh body
-  and by a held one alike: `+` becomes the REQUIRED group of one option whose members are all optional, which
-  is why a one-option REQUIRED group is always a `+` group. The parser refuses every shape that restates plain
-  fields or another group (`TsonSchemaParser.checkGroupShape`).
+  option is chosen when any member is present, a chosen option holds every member `field_group.optional_members`
+  does not name, and `field_group.optional` decides whether no option may be chosen. `GroupDef.fieldGroup` is the
+  one lowering, used by a fresh body and by a held one alike: `+` becomes the non-optional group of one option
+  whose members are all optional, which is why a one-option non-optional group is always a `+` group. The parser
+  refuses every shape that restates plain fields or another group (`TsonSchemaParser.checkGroupShape`).
 - **A restated group member stays a member** (`resolveTighteningField`, `restateMemberMark`). Its presence is
   the group's, so the member field stays optional whatever it writes. Its name `?` speaks for its option: as at
-  any field it is never inherited, so leaving it off removes the member from `optional`, and adding one where
+  any field it is never inherited, so leaving it off removes the member from `optional_members`, and adding one where
   the group has none is refused as a loosening. A `+` group's members were written without a `?` and are
   restated that way. A default is refused; and a pin is admitted and **never supplied**
   (`RecordField.omitted` answers NOTHING for a member), since an injected member would be present and
@@ -222,9 +222,9 @@ are kept in step deliberately.
   field sets. Subtract first and compose second where an author wants partial retention.
   Groups follow §5.11: a removed member leaves its option, an emptied option leaves the group, and a member
   left alone in its option loses its `?`. A group down to one option that no schema could write is dissolved
-  into the plain fields it equals (`keepsOneOption`, `dissolveInto`): under REQUIRED its unmarked members
-  become required and its marked ones optional, under OPTIONAL every member optional, and a sole survivor
-  takes the group's state for both marks, as it always has. A group with no members left is dropped.
+  into the plain fields it equals (`keepsOneOption`, `dissolveInto`): in a group that is not optional its
+  unmarked members become required and its marked ones optional, in an optional group every member optional,
+  and a sole survivor takes the group's `optional` for both marks. A group with no members left is dropped.
 - **Two exception types, and which one is deliberate.** `UnsupportedOperationException` means *this library
   hasn't implemented that yet*. No schema construct reaches one: the sites left in `DefinitionResolver` are the
   catch-alls around the compiled meta reader and the re-serialisation of a body (a failure that is not a
