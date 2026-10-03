@@ -109,6 +109,28 @@ final class WireForm {
 
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
 
+    /**
+     * A {@code field_group} as a held body writes it: {@code optional} only where it names a member, and
+     * {@code state} only where it is not the default {@code REQUIRED}.
+     */
+    static ScopedValue group(FieldGroup group, List<Annotation> annotations) {
+        List<RecordValue.Field> fields = new ArrayList<>();
+        fields.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(group.members().stream()
+                .map(option -> scoped(names(option))).toList()))));
+        if (!group.optional().isEmpty()) {
+            fields.add(new RecordValue.Field(OPTIONAL, scoped(names(group.optional()))));
+        }
+        if (group.state() != ElementState.REQUIRED) {
+            fields.add(nameField(STATE, group.state().name()));
+        }
+        return scoped(new RecordValue(fields), annotations);
+    }
+
+    /** A list of field names as the array of bare names a resolved document writes. */
+    private static ArrayValue names(List<String> names) {
+        return new ArrayValue(names.stream().map(name -> scoped(new TokenValue(name, TokenForm.UNQUOTED))).toList());
+    }
+
     /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
     static ScopedValue scoped(CoreValue value) {
         return scoped(value, List.of());
@@ -218,13 +240,7 @@ final class WireForm {
         }
         List<ScopedValue> groups = new ArrayList<>();
         for (FieldGroup group : body.groups()) {
-            List<RecordValue.Field> members = new ArrayList<>();
-            members.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(group.members().stream()
-                    .map(member -> scoped(new TokenValue(member, TokenForm.UNQUOTED))).toList()))));
-            if (group.state() != ElementState.REQUIRED) {
-                members.add(nameField(STATE, group.state().name()));
-            }
-            groups.add(scoped(new RecordValue(members)));
+            groups.add(group(group, List.of()));
         }
         List<RecordValue.Field> binding = new ArrayList<>();
         if (!body.supertypes().isEmpty()) {

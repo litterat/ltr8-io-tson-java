@@ -64,6 +64,9 @@ the sign bounds leave [TSON-DATA] §5.6's built-in vocabulary with them. The ker
 #16 reshapes meta's annotation vocabulary: `todo`, `since` and `lang` leave it, `deprecated` becomes a void marker,
 and `comment` joins it for JSON Schema's `$comment`.
 #17 makes `@doc`'s text CommonMark, without extensions and with raw HTML never executed.
+#18 lets a field group's option hold several fields, with `+` as sugar for "at least one of", so that rule,
+both-or-neither and one key requiring another have a spelling, and refuses any group that restates plain fields
+or another group.
 
 ---
 
@@ -1577,6 +1580,238 @@ in core:
 
 **What is running** (`r2026-37-proposal`): the bundled kernel's and core's `doc` entries state the contract in
 their own `@doc`. Nothing in this library renders a doc, so nothing else changes.
+
+**Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
+
+**Status against Revision 36:** open.
+
+---
+
+## 18. A field group's option should hold several fields, which spells "at least one of" and its neighbours
+
+**Section:** [TSON-SCHEMA] §5.11 (field groups: "a bare group is REQUIRED — exactly one member MUST be present; a
+group with `?` is OPTIONAL — at most one member MAY be present. These are the only group states", and "a `?` on the
+member's *name* … [is a] parse error on a member"), §5.8 (removal, rule 7: "a group reduced to one member is
+dissolved per §5.11"), §12.1 (`group-def`, `group-member`), and the meta-kernel's `field_group` and its doc;
+[TSON-DATA] §7.2.4 and §7.2.5 (the special-token set: "Fourteen characters qualify").
+
+**Kind:** proposal — a kernel change, a grammar extension, and a fifteenth special token in [TSON-DATA].
+
+**What the spec says today.** A group admits exactly one member (REQUIRED) or at most one (OPTIONAL), and a member
+is one field. "A contact needs an email, a phone, or both" — at least one of a set of keys — has no spelling, and
+neither do the presence rules beside it:
+
+- a REQUIRED group refuses both present;
+- optional fields admit none present;
+- a choice of records needs one variant per non-empty subset of the keys (3 for a pair, 7 for three, 31 for five).
+  Every variant is brace-class, so under [TSON-JSON] each value needs a `$type`. That changes the data, so it is
+  not a spelling.
+
+The rule is a domain constraint, not a JSON artefact, and JSON Schema states it often: `anyOf` over `required`
+lists, `dependencies`, `dependentRequired`.
+
+**Evidence, from a consumer.** The SchemaStore census in `ltr8-io-tson-benchmarks`
+(`corpus/schemastore/manual/union-with-siblings/`, SchemaStore at `bdbec4c`) hand-classifies the sites. The
+classification rows overlap, so each site is counted once, by file and pointer. A site count weights a design by
+how often SchemaStore copies it, so design counts are given where they are known.
+
+| Shape | Sites | Note |
+| --- | ---: | --- |
+| at least one of a set of keys | 55 | 22 designs. 36 of the sites are 4 SARIF definitions, repeated across SchemaStore's 9 copies of that schema. The set has 2 keys at 38 sites, 3 at 11, 4 at 4 and 5 at 2. Every site has the same shape: a few keys always required (one site has any: feed's `id`), any non-empty subset of a set S, the rest free. |
+| compound | 31 | 20 sites are one enonic rule: "`include` alone, or at least one of `name` and `type`". The rest are co-required pairs and similar conditions. |
+| one key requires another | 27 | 26 draft-04 `dependencies`, 1 `dependentRequired`. Some name a schema rather than keys. |
+
+**Proposal: an option of a group may hold several fields.** In the surface syntax, `|` separates options and
+whitespace separates the fields of one option. A `?` on a member's name marks it optional *within its option*. A
+group takes `?` for at most one option, as today, and `+` is sugar for "at least one of":
+
+```
+( include: I | name?: N  type?: T )
+( email: E | phone: P )+
+```
+
+```
+group-def    = *annotation "(" ws group-option *( ws "|" ws group-option ) ws ")" ["?" / "+"]
+group-option = group-member *( separator group-member )
+group-member = *annotation field-name ["?"] ws ":" ws type-ref ["?"]
+```
+
+The `~`, `=` and `=?` modifiers stay parse errors on a member, since a member is never supplied. `+`, like `?`,
+is adjacent to the `)` it marks.
+
+**`+` becomes [TSON-DATA]'s fifteenth special token.** §7.2.5's set is closed: a character is a special token
+exactly when it has a grammar role somewhere in the series, and `+` has none today. §7.2.4 lexes a `+` followed by
+an unquoted-continuation character as the start of an unquoted token, and a bare `+` is a lexer error. Under this
+proposal `+` takes `-`'s boundary rule exactly: followed by a continuation character it begins an unquoted token,
+so `+5` and `+0.5` are unchanged, and otherwise it is emitted as a special token. In a data value it is then
+reserved by the schema grammar like the other twelve, so a bare `+` stays an error there, a parse error rather
+than a lexer error. §7.2.5's list gains `+`, and its parenthetical on `-` covers both signs.
+
+Three rules decide validity:
+
+- An option is **chosen** when any of its members is present.
+- A chosen option must contain every member not marked `?`.
+- The group's state counts chosen options: a bare group (REQUIRED) admits exactly one, `?` (OPTIONAL) at most one.
+
+**`+` is sugar.** It is allowed only where every option is one unmarked member, and
+`( email: E | phone: P )+` desugars to `( email?: E  phone?: P )`: a REQUIRED group of one option whose members are
+all marked. That option must be chosen, and it is chosen when any of its members is present, so the group admits
+any non-empty subset of its members. The desugared form is the kernel's, and `+` is the only way to write it.
+
+The first example admits `include`, `name`, `type`, and `name` with `type`. It refuses an empty record, and `include`
+beside either of the others. A voidable member written `_` is present and chooses its option, as §5.11 has it
+today; JSON Schema's `required` counts a null-valued key the same way.
+
+| Rule | Spelling | Today |
+| --- | --- | --- |
+| exactly one of `a` and `b` | `( a: A \| b: B )` | same text, same meaning |
+| at most one of `a` and `b` | `( a: A \| b: B )?` | same text, same meaning |
+| at least one of `email` and `phone` | `( email: E \| phone: P )+` | no spelling |
+| `include` alone, or at least one of `name` and `type` | `( include: I \| name?: N  type?: T )` | no spelling |
+| both `a` and `b`, or neither | `( a: A  b: B )?` | no spelling |
+| `a` requires `b`; `b` may appear alone | `( b: B  a?: A )?` | no spelling |
+| `a` and `c` each require `b` | `( b: B  a?: A  c?: C )?` | no spelling |
+| either `host` and `port`, or `socket` | `( host: H  port: P \| socket: S )` | no spelling |
+
+**Declaration rules,** checked at load. A group is refused wherever it restates what plain fields or another
+group already state, so each presence rule has one spelling:
+
+- A member's name is unique across the record's fields and every group's members, as today, so options are
+  disjoint and a field sits in one option of one group.
+- **The only member of an option takes no `?`.** The member is present exactly when its option is chosen, so the
+  mark changes nothing: `( a?: A | b: B )` is `( a: A | b: B )`.
+- **A written group of one option is OPTIONAL, with at least two members and one of them unmarked**, as in
+  `( b: B  a?: A )?`. Every other group of one option restates something:
+  - bare with an unmarked member is plain fields: `( b: B  a?: A )` is `b: B  a?: A`;
+  - bare with every member marked is what `+` desugars to, and is written that way: `( a?: A  b?: B )` is
+    `( a: A | b: B )+`;
+  - `?` with every member marked is optional fields: `( a?: A  b?: B )?` is `a?: A  b?: B`, and `( a: A )?` is
+    `a?: A`.
+- **`+` takes options of one unmarked member each.** `( a?: A | b: B )+` and `( host: H  port: P | socket: S )+`
+  are refused.
+
+These replace §5.11's "at least two members", and imply it. They were checked by enumerating every group over two,
+three and four members: every split into options, every set of marks, bare, `?` and `+`. No accepted group equals
+plain fields, splits into independent parts, or equals another accepted group. Every refused bare or `?` group
+equals plain fields or an accepted group; a refused `+` group is a rule this proposal does not spell. Every option
+can be chosen on its own, so a declared group is never unsatisfiable, and loading needs no search.
+
+There is no form for any number of options. Options free to be chosen together are independent, so such a group
+is always its options written as separate groups or plain fields.
+
+**In the kernel:**
+
+```
+field_group => {
+  members:   [[field_name]]
+  optional?: [field_name]
+  state?:    element_state ~ REQUIRED
+}
+```
+
+- `members` holds one list per option, options and their members in source order.
+- `optional` names the members marked `?`.
+- Every member's `record_field` stays `optional: true`, as today.
+- `element_state` keeps its two values. At least one is the desugared `+`, and the rest of the rules table comes
+  from options holding several fields, not from a third state.
+
+**Why the mark belongs to the group, not the field.** The alternative records the in-option `?` in each member's
+`record_field.optional`. That saves a field and costs three things:
+
+- **The field contract.** `record_field`'s doc defines `optional` as "the key may be omitted", and that stops being
+  true of a member.
+- **Failing safe.** A consumer that ignores groups would read `include` and `type` as required, and refuse
+  `{ include: … }`. Today such a consumer reads every member as optional, which is loose but never refuses a valid
+  document.
+- **§5.11's principle.** A member's presence would no longer be the group's alone.
+
+Kept in the group, the mark is presence logic stated where presence logic lives.
+
+**Refinement, composition and removal.**
+
+- **Refinement and composition.** A restated member stays a member, in its own option. It may drop its `?`, which
+  narrows, and may not add one. A restated unmarked member narrowed to `void` makes its option unchoosable, and a
+  marked one narrowed to `void` drops out of its option. A group with no choosable option is unsatisfiable, as a
+  REQUIRED group with every member narrowed to `void` is today. A member of a `+` group is restated as it is
+  written there, without a `?`, and that changes nothing. Anywhere else, dropping a `?` never yields a group the
+  declaration rules refuse, since they only ever ask for an unmarked member or forbid a mark.
+- **Removal (§5.8 rule 7).** A removed member leaves its option, and an emptied option leaves the group. A group
+  the declaration rules would then refuse is rewritten as the spelling it equals, plain fields or an accepted
+  group, which the enumeration shows always exists. Today's dissolution of a group of one member is the simplest
+  case.
+
+**Diagnostics stay local.** For example: "`port` chose (host, port), which needs `host`", "`include` and `type`
+choose two options; exactly one allowed", and "none of (email, phone) is present; at least one is required".
+
+**What it costs:**
+
+- **`?` on a member's name gains a second reading:** optional once its option is chosen.
+- **The resolved form shows at least one as a group of one option**, not as a state, as any sugar's kernel form
+  differs from its surface.
+- **Resolved form.** Every existing group's `members` becomes a list of one-member lists. So the resolved form and
+  the pin change for every schema with a group, meta's ordered numeric families among them. Their text and value
+  sets do not change.
+- **Code generators.** An option is a variant whose fields are its members, and an all-marked option carries a
+  not-empty check. §5.11's labelled-sum pattern still holds: a host binding that lowers a single REQUIRED group to
+  a native sum gets record-shaped variants where an option holds several fields.
+- **[TSON-JSON] §6.1.4** counts present members per group. It would count chosen options instead, a Part 3 edit
+  made on adoption.
+
+**Coverage, checked against each site's presence logic.** `presence_rule.py` (same directory) takes the presence
+sets each site admits:
+- union sites come from the census;
+- dependency sites are built from `dependencies` and `dependentRequired`.
+
+It then searches for a grouping that admits exactly those sets, no more and no fewer.
+
+| Row | Sites | Spelled | Not spelled |
+| --- | ---: | --- | --- |
+| at least one | 55 | **55** | — |
+| compound | 31 | **25**: enonic (20), bxci, mapehr, servicehub, warp-themes, and web-types `source` (`file offset \| symbol module?`) | 3 are "X, or else all of Y": minecraft-pack-mcmeta ×2 (`pack_format`, or both `min_format` and `max_format`) and odgs (`comment`, or all four others). 2 are irregular: github-action and ti8m. 1 is not checked: web-types `name-pattern`, 12 keys, past the search's limit of 10. |
+| one key requires another | 27 | **17**: single-target and mutual dependencies, and schema dependencies that only require keys | 6 depend on a value (nodemon requires `exec` to be a string), or on several targets (the draft-07 metaschema). 3 are presence logic: the sarif-1.0.0 `stackFrame` chain, rust-toolchain, and tmlanguage, which is not yet classified among the shapes below. 1 is not resolved: netlify. |
+
+So 97 of the 113 sites are spelled, and the at-least-one shape is spelled at every one of its 55. The search
+tries bare and `?` groups only. Every shape it found that the declaration rules now refuse has an accepted equal:
+the 55 at-least-one sites are the form `+` desugars to. So the counts stand.
+
+**What it does not cover:**
+
+- **A requirement triggered by a key's absence**, "X, or else all of Y" (3 sites). When X is present, Y's fields
+  are free, so they would belong to both alternatives, and options are exclusive.
+- **A field under two rules.** rust-toolchain makes `channel` exclude `path`, and also count toward `profile`'s
+  at-least-one. A key requiring two others that are otherwise free (`a: [b, c]`) fails the same way, since a field
+  sits in one option of one group.
+- **A chain**: at sarif-1.0.0 `stackFrame`, `column` requires `line` and `line` requires `uri`.
+- **Conditions on values**, such as JSON Schema's `if`/`then`. These stay sealed families or migration cost.
+
+**Nested groups are not worth adding.** An option holding a group would spell the chain:
+`( uri: U  uriBaseId?: B  ( line: L  column?: C )? )?`. That is the only site of the 113 that nesting gains. The
+absence-triggered shape and the field under two rules need the same field in two places, which nesting does not
+provide. Against one site, nesting costs a recursive grammar, a recursive kernel type, nested diagnostics, and
+recursive sum types for code generators.
+
+**What is running** (`r2026-37-proposal`):
+
+- **Kernel.** `field_group` is `{ members: [[field_name]]  optional?: [field_name]  state? }`, and the bundled
+  schemas are re-pinned. Every group the bundled schemas declare is options of one field, so what they admit is
+  unchanged.
+- **Lexer.** `+` is a special token under `-`'s boundary rule; a bare `+` in a data value is a parse error.
+- **Grammar and resolver.** Options, a member's `?` and `+` parse; every restating shape is refused with the
+  spelling it restates; `+` lowers to the one-option form; group and member restatement and removal follow the
+  rules above, a group in a template body included.
+- **Readers.** Both the TSON text reader and the [TSON-JSON] reader judge chosen options, reporting each chosen
+  option's missing members before the count, and a parity test holds them to one verdict, pointer and message.
+  Inhabitance reads a REQUIRED group as satisfiable when one option can be chosen, and a bind target takes a
+  group as a labelled choice only when every option is one field.
+- **Corpus.** The lexer, parser, schema and validate vectors on the corpus branch of the same name.
+
+The coverage evidence is in `ltr8-io-tson-benchmarks`:
+- the census and `presence_rule.py`, as above;
+- ajv probes at 4 sites (`compile-commands-entry`, `gitleaks-allowlist`, `codex-plugin-interface`,
+  `enonic-cms-form-fragment`), through spellings available before this proposal. Their only disagreements
+  with ajv are the presence combinations this proposal decides.
+
+The coverage table compares the rule with the presence logic read from the source, not with ajv on documents.
 
 **Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
 

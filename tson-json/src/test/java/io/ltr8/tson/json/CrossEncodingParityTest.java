@@ -109,6 +109,9 @@ class CrossEncodingParityTest {
               crate      => { b: box }
               local_box  => { v: declared }
               extern_box => { v: extern }
+              fragment   => { ( include: text | name?: text  type?: text ) }
+              endpoint   => { ( host: text  port: int32 | socket: text )? }
+              contact    => { ( email: text | phone: text )+ }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -814,5 +817,68 @@ class CrossEncodingParityTest {
         sameRule("bounded", """
                 { value: 1  min: 0  max: 9 }""", """
                 {"value": 1, "min": 0, "max": 9}""");
+    }
+
+    // ── Field groups whose options hold several fields (SPEC-FEEDBACK.md #18) ──
+
+    /** Documents both encodings admit: each option chosen alone, its marked members left out or not. */
+    @Test
+    void groupOptionsBothEncodingsAdmit() {
+        bothAdmit("fragment", "{ include: \"a\" }", "{\"include\": \"a\"}");
+        bothAdmit("fragment", "{ type: \"t\" }", "{\"type\": \"t\"}");
+        bothAdmit("fragment", "{ name: \"n\"  type: \"t\" }", "{\"name\": \"n\", \"type\": \"t\"}");
+        bothAdmit("endpoint", "{}", "{}");
+        bothAdmit("endpoint", "{ host: \"h\"  port: 80 }", "{\"host\": \"h\", \"port\": 80}");
+        bothAdmit("contact", "{ email: \"e\"  phone: \"p\" }", "{\"email\": \"e\", \"phone\": \"p\"}");
+    }
+
+    @Test
+    void twoOptionsChosen() {
+        sameRule("fragment", """
+                { include: "a"  name: "n" }""", """
+                {"include": "a", "name": "n"}""");
+    }
+
+    @Test
+    void noOptionChosenInARequiredGroup() {
+        sameRule("fragment", "{}", "{}");
+    }
+
+    @Test
+    void aChosenOptionMissingAMember() {
+        sameRule("endpoint", """
+                { port: 80 }""", """
+                {"port": 80}""");
+    }
+
+    /** Both refusals, the missing member first: each chosen option is judged, then the count. */
+    @Test
+    void anIncompleteOptionBesideAnother() {
+        sameRule("endpoint", """
+                { port: 80  socket: "s" }""", """
+                {"port": 80, "socket": "s"}""");
+    }
+
+    @Test
+    void noMemberOfAnAtLeastOneGroup() {
+        sameRule("contact", "{}", "{}");
+    }
+
+    /** The shared rules' words, pinned once here since {@link #sameRule} only compares the two encodings. */
+    @Test
+    void theGroupRulesSayWhatWasChosenAndWhatIsMissing() {
+        assertEquals(List.of("'port' chose (host port) on 'endpoint', which needs 'host'",
+                        "at most one of (host port | socket) may be present for 'endpoint', found 2"),
+                jsonDiagnostics("endpoint", "{\"port\": 80, \"socket\": \"s\"}").stream()
+                        .map(Diagnostic::message).toList());
+        assertEquals(List.of("at least one of (email | phone) must be present for 'contact'"),
+                jsonDiagnostics("contact", "{}").stream().map(Diagnostic::message).toList());
+        assertEquals(List.of("exactly one of (include | name? type?) must be present for 'fragment'"),
+                jsonDiagnostics("fragment", "{}").stream().map(Diagnostic::message).toList());
+    }
+
+    private static void bothAdmit(String rootType, String tsonBody, String jsonBody) {
+        assertEquals(List.of(), tson(rootType, tsonBody), "TSON refused " + tsonBody);
+        assertEquals(List.of(), json(rootType, jsonBody), "JSON refused " + jsonBody);
     }
 }

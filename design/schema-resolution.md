@@ -13,7 +13,8 @@ field states, groups, subtraction, and the exception boundary. Current form only
   applied once, in `resolve`, not inside whichever `resolve*` built the body.
 - A restated field's annotations concatenate over the inherited ones, restatement first — never replacement by name.
 - A field's name `?`, type `?` and modifier each set one fact; the name's is never inherited, and a modifier-only
-  tightening inherits the type's with the elided type. A restated group member stays a member: no name `?`, no
+  tightening inherits the type's with the elided type. A restated group member stays a member: its name `?`
+  speaks for its option and may be dropped, never added (a `+` group's members are restated as written), no
   default, and a pin that is never supplied.
 - Refinement of a field is three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
   omission yields, so the order on it is checked on `RecordField.omitted`.
@@ -169,9 +170,9 @@ are kept in step deliberately.
   `@Typename`; a kernel body is a leaf of the sealed hierarchy, and a meta-schema's own constructor is an
   implementation of the open `Data` branch, admitted by the same lookup); atom refinement (`!I ^ { ... }`, §5.5/§5.7);
   subtraction (`A & { ... } - { f }`, §5.9);
-  restating a field group in a refinement or composition body (§5.11 — same member labels in the same order,
-  types verbatim, state tightening OPTIONAL→REQUIRED only; only the *group's* state moves, since members
-  flatten as optional regardless).
+  restating a field group in a refinement or composition body (§5.11 — the same options, their members in the
+  same order, types verbatim, a member's `?` dropped but never added, state tightening OPTIONAL→REQUIRED only;
+  the member fields never change, since members flatten as optional regardless).
 - **A resolved field is four facts, not a state** (`RecordField`, the kernel's `record_field`), and §5.2's
   spelling `name?: type? ~ value` has one mark per fact: the name's `?` is `optional` (the key may be omitted),
   the type's `?` is `voidable` (a written `_` is admitted), and `~`/`=` give the `role` (DEFAULT or FIXED) and
@@ -184,10 +185,19 @@ are kept in step deliberately.
   `RecordField`. A **parametric** `= P` is FREE with the parameter in `value` (§5.7's "Open modifiers") until
   materialisation closes it to FIXED, keeping the name's mark, so the parameter branch sits ahead of the
   literal pin.
-- **A restated group member stays a member** (`resolveTighteningField`). Its presence is the group's, so the
-  restatement takes no name `?` and the member stays optional whatever it writes; a default is refused; and a
-  pin is admitted and **never supplied** (`RecordField.omitted` answers NOTHING for a member), since an
-  injected member would be present and presence is what selects the alternative. So no member is ever always
+- **A field group is options of members** (`GroupDef`, the kernel's `field_group`; SPEC-FEEDBACK.md #18). An
+  option is chosen when any member is present, a chosen option holds every member `field_group.optional` does
+  not name, and the state counts chosen options. `GroupDef.fieldGroup` is the one lowering, used by a fresh body
+  and by a held one alike: `+` becomes the REQUIRED group of one option whose members are all optional, which
+  is why a one-option REQUIRED group is always a `+` group. The parser refuses every shape that restates plain
+  fields or another group (`TsonSchemaParser.checkGroupShape`).
+- **A restated group member stays a member** (`resolveTighteningField`, `restateMemberMark`). Its presence is
+  the group's, so the member field stays optional whatever it writes. Its name `?` speaks for its option: as at
+  any field it is never inherited, so leaving it off removes the member from `optional`, and adding one where
+  the group has none is refused as a loosening. A `+` group's members were written without a `?` and are
+  restated that way. A default is refused; and a pin is admitted and **never supplied**
+  (`RecordField.omitted` answers NOTHING for a member), since an injected member would be present and
+  presence is what selects the alternative. So no member is ever always
   present, and §5.11's rule against two always-present members has nothing left to refuse: there is no check
   for it.
 - **Refinement is three orders** (`refines`), one per question a field answers, each least to most
@@ -210,11 +220,11 @@ are kept in step deliberately.
   at composition's own precision ("subtraction revokes IS-A for every parent while keeping lineage") and
   §5.9 gives the reason: the clause is head-level, so its effect is readable without scanning the parents'
   field sets. Subtract first and compose second where an author wants partial retention.
-  Groups follow §5.11: a removed member leaves `members`, a group down to one member is
-  dissolved into a plain field taking the *group's* state (members flatten as optional whatever the group
-  says, so the survivor would otherwise silently lose a REQUIRED group's "exactly one"), and a group with no
-  members left is dropped — §5.11 runs the arity ladder to zero and states the two-member minimum as an
-  invariant of resolved output.
+  Groups follow §5.11: a removed member leaves its option, an emptied option leaves the group, and a member
+  left alone in its option loses its `?`. A group down to one option that no schema could write is dissolved
+  into the plain fields it equals (`keepsOneOption`, `dissolveInto`): under REQUIRED its unmarked members
+  become required and its marked ones optional, under OPTIONAL every member optional, and a sole survivor
+  takes the group's state for both marks, as it always has. A group with no members left is dropped.
 - **Two exception types, and which one is deliberate.** `UnsupportedOperationException` means *this library
   hasn't implemented that yet*. No schema construct reaches one: the sites left in `DefinitionResolver` are the
   catch-alls around the compiled meta reader and the re-serialisation of a body (a failure that is not a

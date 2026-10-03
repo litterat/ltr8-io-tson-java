@@ -114,8 +114,11 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **A field has one slot per question** (`FieldDef.omittable`, `FieldType.voidable`, the modifier), and the
   parser only records the marks: which combinations are refused is `FieldModifiers`', after parsing. The
   name's `?` needs no lexer change — `?` is always a token of its own, and `consumeAdjacentQuestion` holds it
-  to the name as it holds the other to the type. A group member takes a type `?` and refuses a name `?` and
-  a modifier outright, its presence being the group's (§5.11).
+  to the name as it holds the other to the type. A group member takes both `?`s — the name's makes it
+  optional within its option — and refuses a modifier outright, its presence being the group's (§5.11).
+  `|` separates a group's options and the members of one option are separated as record entries are; `)+`
+  marks the at-least-one group, `+` binding to the `)` as `?` does. `checkGroupShape` refuses every group that
+  restates plain fields or another group, so each presence rule has one spelling (SPEC-FEEDBACK.md #18).
   - A map key stays `type-name ["<" type-args ">"]` and nothing else — not a paren type, not a bracket form
     — which is what holds the brace dispatch below to its lookahead budget; a composite key earns a named
     declaration and the explicit `!map { key_type: … }` form.

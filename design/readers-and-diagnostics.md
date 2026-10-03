@@ -74,16 +74,18 @@ is small and parsed once.)
   silence. The comparison uses a raw parsed value and the **pre-rebind** parser (`FixedCheck`), because bind
   mode narrows `precomputedValue` in place and comparing across that narrowing would flag every conforming
   document.
-- **A field is four facts, and each reader decision reads its own** (`RecordField`: `optional`, `voidable`,
-  `role`, `value`). A written `_` reads `voidable`; a written value reads `role` (FIXED means compare) and
-  `value`; a field never written reads `RecordField.omitted`, which derives from `optional` and `value` —
-  not optional is `FIELD_REQUIRED`, optional with a value injects it whatever the role, and anything else
-  stays absent. **A field group's member is the one exception and is never injected**, pin or not: its
-  presence is what selects the group's alternative, so injecting it would make a member present that the
-  document never wrote. A pinned field is never voidable (`type? = value` is refused), because the written-`_`
-  decision runs before the pin is consulted, so a `_` at a FIXED field is always `FIELD_FIXED`. Nothing is
-  pre-seeded: every field the document didn't state goes through one `valueForAbsentField` switch over the
-  three `Omitted` answers, and the JSON reader's `fillAbsent` switches over the same three.
+- **A field is four facts, and each reader decision reads its own** (`RecordField`: `optional`, `voidable`, `role`,
+  `value`). A written `_` reads `voidable`; a written value reads `role` (FIXED means compare) and `value`; a field
+  never written reads `RecordField.omitted`, which derives from `optional` and `value` — not optional is
+  `FIELD_REQUIRED`, optional with a value injects it whatever the role, and anything else stays absent. **A field
+  group's member is the one exception and is never injected**, pin or not: its presence is what chooses the group's
+  option, so injecting it would make a member present that the document never wrote. A group is judged after the
+  field pass: an option is chosen when any member appeared, a chosen option reports each member it needs and lacks
+  (`optionNeeds`), and the chosen options are counted (`groupRequiresOne`, `groupRequiresAtLeastOne` for the `+`
+  group, `groupAdmitsAtMostOne`). A pinned field is never voidable (`type? = value` is refused), because the
+  written-`_` decision runs before the pin is consulted, so a `_` at a FIXED field is always `FIELD_FIXED`. Nothing
+  is pre-seeded: every field the document didn't state goes through one `valueForAbsentField` switch over the three
+  `Omitted` answers, and the JSON reader's `fillAbsent` switches over the same three.
 - **An array element's own state is the two-member `ElementState`, and an absent element occupies its slot.**
   Under `[T?]` (`state: OPTIONAL`) an element may be the absent sentinel `_`; under the default `REQUIRED` one
   is `FIELD_REQUIRED`. Either way `ArrayAbstractReader` consumes the `AbsentEvent` and advances the index, so

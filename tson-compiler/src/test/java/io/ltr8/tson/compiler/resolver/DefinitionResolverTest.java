@@ -419,8 +419,8 @@ class DefinitionResolverTest {
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} ] "
                         + "groups: [ "
-                        + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "
-                        + "{ members: [ \"max\" \"exclusive_max\" ] state: \"OPTIONAL\" } "
+                        + "{ members: [ [ \"min\" ] [ \"exclusive_min\" ] ] optional: [] state: \"OPTIONAL\" } "
+                        + "{ members: [ [ \"max\" ] [ \"exclusive_max\" ] ] optional: [] state: \"OPTIONAL\" } "
                         + "] extension: \"OPEN\" discriminators: [] } }",
                 write(integerType));
     }
@@ -667,10 +667,10 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesFieldGroupFromTheRealMetaKernelFixture() throws IOException, DataBindException {
-        // field_group => { members: [field_name]  state: element_state ~ REQUIRED } -- a fresh
-        // record combining a sugar form with an ordinary literal default modifier. Desugared first, as
-        // SchemaResolver does: `[field_name]` is lifted to its own entry, so what the resolver sees at the
-        // field is a bare name.
+        // field_group => { members: [[field_name]]  optional?: [field_name]  state?: element_state ~ REQUIRED }
+        // -- a fresh record combining sugar forms with an ordinary literal default modifier. Desugared first,
+        // as SchemaResolver does: each bracket form is lifted to its own entry, so what the resolver sees at
+        // each field is a bare name.
         SchemaMap schemaMap = SchemaDesugarer.desugar(
                 new TsonSchemaParser(readFixture()).parseSchemaDocument(), Set.of()).body();
 
@@ -678,8 +678,11 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" "
+                        + "{ name: \"members\" type: { name: \"array_array_field_name_f1a73e72_a0d61455\" "
+                        + "arguments: [] } optional: false voidable: false role: \"FREE\" "
+                        + "} "
+                        + "{ name: \"optional\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } "
+                        + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" "
@@ -1762,7 +1765,7 @@ class DefinitionResolverTest {
                 + "  strict => bounds ^ { ( min: integer | exclusive_min: integer ) }");
 
         RecordBody body = bodyOf(entries.get("strict"));
-        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.REQUIRED)), body.groups());
+        assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), ElementState.REQUIRED)), body.groups());
         assertEquals(List.of("a", "min", "exclusive_min"), fieldNames(entries.get("strict")));
         assertEquals("optional", body.fields().get(1).describe());
         assertEquals("optional", body.fields().get(2).describe());
@@ -1781,7 +1784,7 @@ class DefinitionResolverTest {
                 + "  strict => bounds & { ( min: integer | exclusive_min: integer )  extra: text }");
 
         RecordBody body = bodyOf(entries.get("strict"));
-        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.REQUIRED)), body.groups());
+        assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), ElementState.REQUIRED)), body.groups());
         // the new field still appends after the inherited ones (§5.8's ordering rule)
         assertEquals(List.of("a", "min", "exclusive_min", "extra"), fieldNames(entries.get("strict")));
     }
@@ -1792,7 +1795,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> entries = resolveAll(BOUNDS
                 + "  same => bounds ^ { ( min: integer | exclusive_min: integer )? }");
 
-        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.OPTIONAL)),
+        assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), ElementState.OPTIONAL)),
                 bodyOf(entries.get("same")).groups());
     }
 
@@ -1809,7 +1812,7 @@ class DefinitionResolverTest {
         SchemaValidationException reordered = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
                         + "  odd => bounds ^ { ( exclusive_min: integer | min: integer ) }"));
-        assertTrue(reordered.getMessage().contains("same member labels in the same order"), reordered.getMessage());
+        assertTrue(reordered.getMessage().contains("their members in the same order"), reordered.getMessage());
 
         SchemaValidationException added = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
@@ -1852,7 +1855,7 @@ class DefinitionResolverTest {
                 + "  extended => base & { ( p: integer | q: integer )? }");
 
         assertEquals(List.of("a", "p", "q"), fieldNames(entries.get("extended")));
-        assertEquals(List.of(new FieldGroup(List.of("p", "q"), ElementState.OPTIONAL)),
+        assertEquals(List.of(FieldGroup.ofSingles(List.of("p", "q"), ElementState.OPTIONAL)),
                 bodyOf(entries.get("extended")).groups());
     }
 
@@ -1983,14 +1986,105 @@ class DefinitionResolverTest {
         assertEquals(RecordField.fixed("min", TypeRef.of("integer"), new Token("0", Token.Form.UNQUOTED)), min);
         assertEquals(RecordField.Omitted.NOTHING, min.omitted(true));
         assertEquals("fixed", body.fields().get(2).describe());
-        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.OPTIONAL)), body.groups());
+        assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), ElementState.OPTIONAL)), body.groups());
     }
 
-    /** A member's omission is the group's, so the name takes no {@code ?} and the member takes no default. */
+    /**
+     * A member's omission is the group's, so a restatement adds no {@code ?} to its name, which would loosen its
+     * option, and the member takes no default.
+     */
     @Test
-    void aRestatedMemberTakesNoNameMarkAndNoDefault() {
-        assertRefused(BOUNDS + "  pinned => bounds ^ { min?: integer = 0 }", "without the '?' on its name");
+    void aRestatedMemberTakesNoNewNameMarkAndNoDefault() {
+        assertRefused(BOUNDS + "  pinned => bounds ^ { min?: integer = 0 }", "adding one loosens its option");
         assertRefused(BOUNDS + "  pinned => bounds ^ { min: integer ~ 0 }", "takes no default");
+    }
+
+    // ── Options of several fields (SPEC-FEEDBACK.md #18) ──────────────────
+
+    private static final String FRAGMENT =
+            "fragment => { ( include: text | name?: text  type?: text ) }";
+
+    private static FieldGroup group(List<List<String>> options, List<String> optional, ElementState state) {
+        return new FieldGroup(options, optional, state);
+    }
+
+    /** Each option keeps its members, the marked ones are named, and every member is an optional field. */
+    @Test
+    void aGroupOfSeveralFieldOptionsResolves() {
+        RecordBody body = bodyOf(resolveAll(FRAGMENT).get("fragment"));
+        assertEquals(List.of(group(List.of(List.of("include"), List.of("name", "type")), List.of("name", "type"),
+                ElementState.REQUIRED)), body.groups());
+        assertTrue(body.fields().stream().allMatch(RecordField::optional), "members are optional fields");
+    }
+
+    /** {@code +} lowers to one REQUIRED option, every member optional within it. */
+    @Test
+    void aPlusGroupResolvesToOneOption() {
+        RecordBody body = bodyOf(resolveAll("contact => { ( email: text | phone: text )+ }").get("contact"));
+        assertEquals(List.of(group(List.of(List.of("email", "phone")), List.of("email", "phone"),
+                ElementState.REQUIRED)), body.groups());
+    }
+
+    /** A restated member's name {@code ?} is never inherited: leaving it off makes the member required there. */
+    @Test
+    void aRestatedMemberWithoutItsMarkIsRequiredInItsOption() {
+        RecordBody body = bodyOf(resolveAll(FRAGMENT + "  strict => fragment ^ { name: text }").get("strict"));
+        assertEquals(List.of("type"), body.groups().getFirst().optional());
+        assertTrue(body.fields().stream().allMatch(RecordField::optional), "and still an optional field");
+
+        RecordBody kept = bodyOf(resolveAll(FRAGMENT + "  same => fragment ^ { name?: text }").get("same"));
+        assertEquals(List.of("name", "type"), kept.groups().getFirst().optional());
+    }
+
+    /** A {@code +} group's members were written without a {@code ?}, so they are restated that way. */
+    @Test
+    void aPlusGroupsMemberIsRestatedAsWritten() {
+        String contact = "contact => { ( email: text | phone: text )+ }";
+        RecordBody body = bodyOf(resolveAll(contact + "  narrow => contact ^ { email: text }").get("narrow"));
+        assertEquals(List.of("email", "phone"), body.groups().getFirst().optional());
+
+        assertRefused(contact + "  marked => contact ^ { email?: text }", "written with '+'");
+    }
+
+    /** A restated group may drop a member's {@code ?} and never add one. */
+    @Test
+    void aRestatedGroupMayDropAMarkAndNotAddOne() {
+        RecordBody body = bodyOf(resolveAll(FRAGMENT
+                + "  strict => fragment ^ { ( include: text | name: text  type?: text ) }").get("strict"));
+        assertEquals(List.of("type"), body.groups().getFirst().optional());
+
+        assertRefused("base => { ( a: text | b: text  c?: text ) }"
+                + "  loose => base ^ { ( a: text | b?: text  c?: text ) }", "never add one");
+        assertRefused(FRAGMENT + "  odd => fragment ^ { ( include: text  name: text | type: text ) }",
+                "the same options");
+    }
+
+    /**
+     * Removal takes a member out of its option and an emptied option out of the group; a member left alone in
+     * its option loses its mark, and a group of one option that no schema could write becomes plain fields.
+     */
+    @Test
+    void aRemovalLeavesTheGroupItEquals() {
+        Map<String, TypeDefinition> entries = resolveAll(FRAGMENT + """
+                  no_include => fragment - { include }
+                  no_type => fragment - { type }
+                  endpoint => { ( host: text  port: text | socket: text ) }
+                  no_socket => endpoint - { socket }
+                  pair => { ( b: text  a?: text )? }
+                  no_b => pair - { b }
+                """);
+        assertEquals(List.of(group(List.of(List.of("name", "type")), List.of("name", "type"),
+                ElementState.REQUIRED)), bodyOf(entries.get("no_include")).groups(), "at least one of the two");
+        assertEquals(List.of(group(List.of(List.of("include"), List.of("name")), List.of(),
+                ElementState.REQUIRED)), bodyOf(entries.get("no_type")).groups(), "exactly one of the two");
+
+        RecordBody noSocket = bodyOf(entries.get("no_socket"));
+        assertEquals(List.of(), noSocket.groups());
+        assertEquals(List.of("required", "required"), noSocket.fields().stream().map(RecordField::describe).toList());
+
+        RecordBody noB = bodyOf(entries.get("no_b"));
+        assertEquals(List.of(), noB.groups());
+        assertEquals("optional", noB.fields().getFirst().describe());
     }
 
     // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
@@ -2230,7 +2324,7 @@ class DefinitionResolverTest {
         assertEquals(List.of(), bodyOf(dissolved).groups());
         assertEquals("required", bodyOf(dissolved).fields().get(1).describe());
         // the source still has both members and its group
-        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.REQUIRED)),
+        assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), ElementState.REQUIRED)),
                 bodyOf(entries.get("bounds")).groups());
     }
 
@@ -2254,7 +2348,7 @@ class DefinitionResolverTest {
                 """);
 
         assertEquals(List.of("created", "modified"), fieldNames(entries.get("fewer")));
-        assertEquals(List.of(new FieldGroup(List.of("created", "modified"), ElementState.OPTIONAL)),
+        assertEquals(List.of(FieldGroup.ofSingles(List.of("created", "modified"), ElementState.OPTIONAL)),
                 bodyOf(entries.get("fewer")).groups());
     }
 

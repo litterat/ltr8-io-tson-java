@@ -113,7 +113,7 @@ class SidecarSchemaReadTest {
         accepts("lexer", """
                 {
                   spec: "§7.2.4"
-                  description: "A bare '+' has no grammar role"
+                  description: "A bare '.' has no grammar role"
                   error: { category: lexer }
                 }""");
     }

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b37bc018cf844b88497acd98e50f774f6662351c25e7ee6c97ceeef28dacc5b4"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=999b5bbbde031910ea4250a828b0e3492867a3517b97e86bb5a39646a93562ef"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -541,16 +541,23 @@
   }
 
   @doc:"""
-    Field group — a set of mutually exclusive fields of a record ([TSON-SCHEMA]
-    §5.11). `members` names at least two fields declared in the enclosing
-    record's `fields` list; member fields are uniformly OPTIONAL there, with
-    presence governed by the group's state: REQUIRED admits exactly one member
-    present, OPTIONAL at most one. The flattened fields-plus-groups encoding is
-    canonical.
+    Field group — a presence rule over fields of a record ([TSON-SCHEMA]
+    §5.11). `members` lists the group's options in source order, each the
+    fields it holds. Every member is declared in the enclosing record's
+    `fields` list, OPTIONAL there and carrying no value, and sits in one option
+    of one group. `optional` names the members that may be left out once their
+    option is chosen, and never the only member of an option. An option is
+    chosen when any of its members is present, and a chosen option holds every
+    member `optional` does not name. REQUIRED admits exactly one chosen option,
+    OPTIONAL at most one. A group of one option is REQUIRED with every member
+    named in `optional`, so at least one is present, or OPTIONAL with at least
+    two members and one not named. The flattened fields-plus-groups encoding
+    is canonical.
     """
   field_group => {
-    members:  [field_name]
-    state?:   element_state ~ REQUIRED
+    members:   [[field_name]]
+    optional?: [field_name]
+    state?:    element_state ~ REQUIRED
   }
 
   @doc:"""

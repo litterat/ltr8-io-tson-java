@@ -314,10 +314,7 @@ public final class Lexer {
             checkNfc(text);
             return finish(TokenType.UNQUOTED, text);
         }
-        if (signCp == '-') {
-            return finish(TokenType.MINUS, "-");
-        }
-        throw errorAtTokenStart("unexpected character '+': a bare '+' has no grammar role; write \"+\" (quoted) for a literal plus sign");
+        return signCp == '-' ? finish(TokenType.MINUS, "-") : finish(TokenType.PLUS, "+");
     }
 
     // ── Unquoted tokens (§7.1, §7.2.1) ─────────────────────────────────
