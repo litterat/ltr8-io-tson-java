@@ -24,6 +24,7 @@ import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -92,6 +93,16 @@ public final class AtomParsers {
      * supplies its own.
      */
     public static Optional<AtomType<?>> forType(Top body) {
+        return forType(body, Normalization.NONE);
+    }
+
+    /**
+     * {@link #forType(Top)}, with the form an enum matches its members in: its label type's {@code normalization}
+     * (SPEC-FEEDBACK.md #19), which the body does not carry -- {@code enum_type.type} names an entry the governing
+     * meta may hold, which only linking sees, so the caller supplies what linking recorded
+     * ({@code TsonLinkedSchema.enumForms}). Ignored for every other body.
+     */
+    public static Optional<AtomType<?>> forType(Top body, Normalization enumForm) {
         return Optional.ofNullable(switch (body) {
             case ValueType ignored -> null;
             case VoidType ignored -> null;
@@ -116,7 +127,7 @@ public final class AtomParsers {
             case EmailType t -> new EmailParser(t);
             case Cidr4Type t -> new Cidr4Parser(t);
             case Cidr6Type t -> new Cidr6Parser(t);
-            case EnumBody t -> new EnumParser(t);
+            case EnumBody t -> new EnumParser(t, enumForm);
             case ComplexType ignored -> ComplexParser.UNCONSTRAINED;
             case Ipv4Type t -> Ipv4Parser.of(t);
             case Ipv6Type t -> Ipv6Parser.of(t);

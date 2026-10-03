@@ -5,6 +5,7 @@ import java.util.Optional;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.schema.meta.EnumBody;
 import java.util.List;
 
@@ -29,26 +30,44 @@ import java.util.List;
  * form-agnostic behavior {@code MetaKernelBootstrapResolver}'s own hand-written enum converter already uses,
  * "correct for every enum member regardless of what it happens to look like".
  *
+ * <p><b>The match is in the label type's form</b> ({@link #form}): an enum over a case-folding identifier admits
+ * a member however it is cased, and the value is the token in that form. The form is not on the body -- the label
+ * type may live in the governing meta -- so the caller supplies what linking recorded.
+ *
  * <p><b>Not registered in {@link BuiltinTypeVocabulary} and has no {@code TYPENAME}</b>: {@code enum} is a
  * Part 2 schema constructor rather than a name a schemaless document could write, since the members are the
  * author's. Its two published <em>instances</em> are registered -- {@link BooleanParser} under
  * {@code boolean}, which reads the host values its members stand for rather than their text, and that is
  * the one case this class deliberately does not serve.
  */
-public record EnumParser(EnumBody constraints) implements AtomTypeParser<String> {
+public record EnumParser(EnumBody constraints, Normalization form) implements AtomTypeParser<String> {
+
+    /** An enum whose label type keeps its text as written. */
+    public EnumParser(EnumBody constraints) {
+        this(constraints, Normalization.NONE);
+    }
 
     public EnumParser(List<String> members) {
         this(new EnumBody(members));
     }
 
+    /**
+     * The member the token is, compared in {@link #form} -- the normalization of the enum's label type
+     * (SPEC-FEEDBACK.md #19) -- so under a case-folding type {@code Content-Type} is the member written
+     * {@code content-type}. The value is the token in that form. Each member is put into the form as it is
+     * compared, which allocates nothing for a member already in it.
+     */
     @Override
     public String read(String text) {
-        if (!constraints.members().contains(text)) {
-            throw new AtomValidationException(
-                    "'" + text + "' is not a member of this enum -- expected one of " + constraints.members(),
-                    "one of (" + String.join(", ", constraints.members()) + ")");
+        String value = form.apply(text);
+        for (String member : constraints.members()) {
+            if (form.apply(member).equals(value)) {
+                return value;
+            }
         }
-        return text;
+        throw new AtomValidationException(
+                "'" + text + "' is not a member of this enum -- expected one of " + constraints.members(),
+                "one of (" + String.join(", ", constraints.members()) + ")");
     }
 
     @Override

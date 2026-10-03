@@ -139,10 +139,13 @@ that is neither member is the enum miss it is — `ATOM_CONSTRAINT_VIOLATION`, m
 **An enum's members are text and its `type` says what they are labels of**, which changes nothing here:
 matching is an identity check of the token's decoded text against the members, and the host value is the natural
 parse of the member that matched. `type` governs what may be *declared* — each member a value of it, none two of
-one value — so it is a schema-load question the linker asks (`EnumLabels`), and no reader sees it. A `type` whose
-`normalization` is not `NONE` makes two spellings one value, which `EnumLabels` already judges on the parser's
-value; the enum *reader* still matches the text, so a document spelling a member another way is refused until it
-keys on that parser's value (`BACKLOG.md`). `text_type.members` is likewise an
+one value — so it is a schema-load question the linker asks (`EnumLabels`). The one fact a reader needs from it
+is the label type's `normalization`: the token and each member are compared in that form, so under a
+case-folding label type `Content-Type` is the member written `content-type`. The type may be an entry of the
+governing meta, which only linking sees, so the linker records each enum's form
+(`EnumLabels.labelForm`, `TsonLinkedSchema.enumForms`) and every site that builds an enum parser passes it to
+`AtomParsers.forType(body, form)` — both encodings' atom readers, map keys, pins and selectors, and the linker's
+own default and pin checks. `text_type.members` is likewise an
 ordinary facet on the shared parser — `TextParser` checks it last, as the numeric tiers do, a member set naming
 the whole value space so the other facets hold vacuously where it is present.
 It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recovers a boolean from an unquoted

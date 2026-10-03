@@ -39,7 +39,7 @@ import java.util.Optional;
 public record RegexType(String spec, @Field("min_length") Optional<Integer> minLength,
                         @Field("max_length") Optional<Integer> maxLength,
                         Optional<Integer> length, Optional<String> pattern,
-                        Optional<List<String>> members, Normalization normalization) implements Atom {
+                        Optional<List<String>> members, Normalization normalization) implements Atom, TextFamily {
 
     /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
     public static final RegexType UNCONSTRAINED = new RegexType(

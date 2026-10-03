@@ -1,5 +1,7 @@
 package io.ltr8.tson.schema;
 
+import io.ltr8.tson.base.unicode.Normalization;
+
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -46,13 +48,25 @@ import java.util.Set;
  * TsonSchema#entries()} and which linking is the last phase to see. Like {@code entryOrigins} it is carried
  * through {@code !!import}, each enum judged in the schema that declared it. An enum not listed has names for
  * members, which is also what a schema assembled by hand gets.
+ *
+ * <p><b>{@code enumForms} is the third</b>, for the same reason: each enum whose label type's {@code normalization}
+ * is not {@code NONE} (SPEC-FEEDBACK.md #19), with that form, which its readers match members in -- the kernel's
+ * {@code identifier} is NFC, a schema's own case-folding identifier {@code NFKC_CASEFOLD}. An enum not listed
+ * matches its members as written.
  */
-public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums) {
+public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums,
+                               Map<String, Normalization> enumForms) {
 
     public TsonLinkedSchema {
         Objects.requireNonNull(schema, "schema");
         entryOrigins = Map.copyOf(entryOrigins);
         textEnums = Set.copyOf(textEnums);
+        enumForms = Map.copyOf(enumForms);
+    }
+
+    /** A schema whose enums all match their members as written. */
+    public TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums) {
+        this(schema, entryOrigins, textEnums, Map.of());
     }
 
     /** A schema with no enum over a family other than an identifier one. */
@@ -66,6 +80,11 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      */
     public TsonLinkedSchema(TsonSchema schema) {
         this(schema, Map.of());
+    }
+
+    /** The form enum {@code entryName} matches its members in -- {@code NONE} for one {@link #enumForms} omits. */
+    public Normalization enumForm(String entryName) {
+        return enumForms.getOrDefault(entryName, Normalization.NONE);
     }
 
     /**

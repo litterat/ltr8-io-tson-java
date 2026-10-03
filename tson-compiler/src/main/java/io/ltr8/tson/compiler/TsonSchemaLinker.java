@@ -6,6 +6,7 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -567,7 +568,8 @@ public final class TsonSchemaLinker {
                                              DiagnosticsReceiver receiver, IdentifierPolicy identifiers) {
         Map<String, String> origins = new LinkedHashMap<>();
         Set<String> textEnums = new LinkedHashSet<>();
-        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins, textEnums);
+        Map<String, Normalization> enumForms = new LinkedHashMap<>();
+        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins, textEnums, enumForms);
 
         // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
         // merges another schema's entries into *this* schema's own returned entries()). !!meta only says
@@ -642,6 +644,10 @@ public final class TsonSchemaLinker {
             if (def.body() instanceof EnumBody && !EnumLabels.membersAreNames(def, merged, structureNamespace::get)) {
                 textEnums.add(name);
             }
+            Normalization form = EnumLabels.labelForm(def, merged, structureNamespace::get);
+            if (form != Normalization.NONE) {
+                enumForms.put(name, form);
+            }
         }
         merged = computeDisjointness(merged, textEnums);
         // Before the name checks: a member that is not a value of its enum's type is the more basic verdict,
@@ -678,13 +684,13 @@ public final class TsonSchemaLinker {
         }
 
         checkEveryEntryIsInhabited(schema, merged, localNames, receiver);
-        checkRecordExtension(schema, merged, localNames, origins, receiver);
+        checkRecordExtension(schema, merged, localNames, origins, enumForms, receiver);
 
         AnnotatedMap<String, TypeDefinition> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, localNames, receiver);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
-                annotated, schema.bootstrap()), origins, textEnums);
+                annotated, schema.bootstrap()), origins, textEnums, enumForms);
     }
 
     /**
@@ -754,8 +760,8 @@ public final class TsonSchemaLinker {
      */
     private static void checkRecordExtension(TsonSchema schema, Map<String, TypeDefinition> merged,
                                               Set<String> localNames, Map<String, String> origins,
-                                              DiagnosticsReceiver receiver) {
-        for (RecordExtension.Violation violation : RecordExtension.check(merged, localNames, origins)) {
+                                              Map<String, Normalization> enumForms, DiagnosticsReceiver receiver) {
+        for (RecordExtension.Violation violation : RecordExtension.check(merged, localNames, origins, enumForms)) {
             String at = reportedAgainst(violation.entry(), merged);
             report(receiver, schema, at, merged.get(at), violation.message());
         }
@@ -1074,7 +1080,8 @@ public final class TsonSchemaLinker {
      * schema unify -- which is what lets an author pin their own import while a peer's is unpinned.
      */
     private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader,
-                                                            Map<String, String> origins, Set<String> textEnums) {
+                                                            Map<String, String> origins, Set<String> textEnums,
+                                                            Map<String, Normalization> enumForms) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : imports) {
@@ -1107,6 +1114,10 @@ public final class TsonSchemaLinker {
                 origins.put(name, origin);
                 if (imported.textEnums().contains(name)) {
                     textEnums.add(name);
+                }
+                Normalization form = imported.enumForms().get(name);
+                if (form != null) {
+                    enumForms.put(name, form);
                 }
             }
         }
@@ -1177,11 +1188,11 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def.body(), namespace, def.parameters());
+        validateBody(name, def.body(), namespace, structureNamespace, def.parameters());
     }
 
     private static void validateBody(String entryName, Top body, Map<String, TypeDefinition> namespace,
-                                      List<String> ownParameters) {
+                                      Map<String, TypeDefinition> structureNamespace, List<String> ownParameters) {
         checkCoherent(body);
         switch (body) {
             case RecordBody r -> {
@@ -1193,7 +1204,7 @@ public final class TsonSchemaLinker {
                 for (RecordField field : r.fields()) {
                     validateTypeRef(field.type(), namespace, ownParameters, entryName,
                             " field '" + field.name() + "'");
-                    checkFieldValue(entryName, field, namespace, ownParameters);
+                    checkFieldValue(entryName, field, namespace, structureNamespace, ownParameters);
                 }
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.memberNames()) {
@@ -1518,8 +1529,8 @@ public final class TsonSchemaLinker {
      * a held body is not read as this vocabulary at all, so the only parametric field reaching here has
      * already been substituted by materialisation, and is checked against the argument it was closed with.
      */
-    private static void checkFieldValue(String entryName, RecordField field,
-                                         Map<String, TypeDefinition> namespace, List<String> ownParameters) {
+    private static void checkFieldValue(String entryName, RecordField field, Map<String, TypeDefinition> namespace,
+                                         Map<String, TypeDefinition> structureNamespace, List<String> ownParameters) {
         if (field.value().isEmpty() || ownParameters.contains(field.type().name())) {
             return;
         }
@@ -1537,7 +1548,8 @@ public final class TsonSchemaLinker {
             return;
         }
         Token value = field.value().get();
-        Optional<AtomType<?>> parser = AtomParsers.forType(target.body());
+        Optional<AtomType<?>> parser = AtomParsers.forType(target.body(),
+                EnumLabels.labelForm(target, namespace, structureNamespace::get));
         if (parser.isEmpty()) {
             throw notAScalarType(entryName, field, value, target.body());
         }

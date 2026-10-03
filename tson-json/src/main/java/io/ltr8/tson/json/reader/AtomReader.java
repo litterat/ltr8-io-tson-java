@@ -82,7 +82,8 @@ final class AtomReader<T> implements JsonTypeReader<T> {
     }
 
     private static JsonTypeReader<?> of(String name, TypeDefinition definition, ValueReaderContext context) {
-        AtomType<?> parser = AtomParsers.forType(definition.body()).orElseThrow(() -> new IllegalStateException(
+        AtomType<?> parser = AtomParsers.forType(definition.body(), context.linked().enumForm(name)).orElseThrow(
+                () -> new IllegalStateException(
                 "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
         IdentifierProfile names = definition.body() instanceof IdentifierType identifier ? identifier.profile() : null;
         return new AtomReader<>(name, parser, AtomForm.of(definition.body()), context.locationOf(name, definition),

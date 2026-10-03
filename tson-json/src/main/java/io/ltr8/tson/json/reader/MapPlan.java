@@ -6,6 +6,7 @@ import io.ltr8.tson.base.diagnostics.MapDiagnostics;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ElementState;
@@ -50,7 +51,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean op
         // The name the author wrote, not the entry the resolver minted: `{text => int32}` rather than a
         // content-derived `map_text_int32_...`, which appears in neither the schema nor the document.
         String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
-        AtomType<?> keyParser = scalarKeyParser(context.schema(), body.keyType().name()).orElse(null);
+        AtomType<?> keyParser = scalarKeyParser(context.linked(), body.keyType().name()).orElse(null);
         return new MapPlan(displayName, context.locationOf(name, definition),
                 body.state() == ElementState.OPTIONAL, body.minItems(), body.maxItems(), keyParser,
                 keyParser == null ? context.readers().resolve(body.keyType().name()) : null,
@@ -82,7 +83,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean op
 
     /** Whether {@code body} takes the object form -- §8.3 asks the same question to judge class stability. */
     static boolean isObjectForm(TsonSchema schema, MapBody body) {
-        return scalarKeyParser(schema, body.keyType().name()).isPresent();
+        return scalarKeyParser(new TsonLinkedSchema(schema), body.keyType().name()).isPresent();
     }
 
     /**
@@ -91,11 +92,11 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean op
      * takes the pairs form. The kernel's {@code value} and {@code void} fall to pairs by declining a parser rather
      * than by being listed: neither has a content grammar for a key token to face.
      */
-    private static Optional<AtomType<?>> scalarKeyParser(TsonSchema schema, String keyTypeName) {
-        ReferenceChain.Resolved terminal = ReferenceChain.terminal(schema, keyTypeName).orElseThrow(() ->
+    private static Optional<AtomType<?>> scalarKeyParser(TsonLinkedSchema linked, String keyTypeName) {
+        ReferenceChain.Resolved terminal = ReferenceChain.terminal(linked.schema(), keyTypeName).orElseThrow(() ->
                 new IllegalStateException("'" + keyTypeName + "' does not resolve -- linking should have refused it"));
         return terminal.definition().body() instanceof Atom atom
-                ? AtomParsers.forType(atom)
+                ? AtomParsers.forType(atom, linked.enumForm(terminal.name()))
                 : Optional.empty();
     }
 }

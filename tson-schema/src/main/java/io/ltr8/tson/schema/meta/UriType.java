@@ -44,7 +44,7 @@ public record UriType(String spec, @Field("min_length") Optional<Integer> minLen
                       Optional<List<String>> members, Optional<List<String>> schemes,
                       @Field("allow_relative") boolean allowRelative,
                       @Field("allow_fragment") boolean allowFragment,
-                      Normalization normalization) implements Atom {
+                      Normalization normalization) implements Atom, TextFamily {
 
     /** RFC 3986, the one {@code spec} every {@code uri_type} carries. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc3986";

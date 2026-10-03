@@ -12,7 +12,7 @@ history lives in git.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds.
 - A reference to a DATA-kinded entry is refused at every position a type-ref occupies.
-- `entryOrigins` and `textEnums` are on `TsonLinkedSchema`, never on `TsonSchema` or `TypeDefinition`.
+- `entryOrigins`, `textEnums` and `enumForms` are on `TsonLinkedSchema`, never on `TsonSchema` or `TypeDefinition`.
 - An enum's discrimination class is read from `TsonLinkedSchema.textEnums`, never re-derived by a reader.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
@@ -275,3 +275,7 @@ rules for an enum whose `type` is not an identifier family; the collision relati
   `TsonSchema.entries()`, where a pinned `type` may not resolve, so the linker lists such enums in
   `TsonLinkedSchema.textEnums` before deriving `disjoint`. Each enum is judged in the schema that declares it, and an
   import's list is merged with its entries, as `entryOrigins` is.
+- **So is the form, for the same reason.** An enum matches its members in its label type's `normalization`
+  (SPEC-FEEDBACK.md #19), and the linker records each one whose form is not `NONE` in `TsonLinkedSchema.enumForms`
+  (`EnumLabels.labelForm`), merged through imports the same way. Every site that builds an enum parser passes it to
+  `AtomParsers.forType(body, form)`; the linker's own default and pin checks ask `labelForm` or the map directly.
