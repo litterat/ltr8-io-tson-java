@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * Parses and validates against meta-kernel's {@code time_type} constructor (§5.4's {@code time}
+ * Parses and validates against meta's {@code time_type} constructor (§5.4's {@code time}
  * atom, RFC 3339 {@code full-time}). Same shape-then-delegate pattern as {@link DateParser} --
  * {@link OffsetTime#parse} itself already gets RFC 3339's case-insensitive {@code T}/{@code Z}
  * allowance right natively (no extra work needed there, confirmed empirically) and correctly
@@ -20,17 +20,12 @@ import java.util.regex.Pattern;
  * DateParser}'s does. Holds a {@link TimeType} -- the pure constraint values, unchanged by this
  * split -- rather than declaring those fields itself.
  *
- * <p>One real, unavoidable gap: RFC 3339's grammar permits {@code time-second} up to {@code 60}
- * (leap-second accommodation), but {@code java.time} has no leap-second concept at all --
- * {@code OffsetTime.parse("23:59:60Z")} throws regardless of what this class does before calling it.
- * A spec-legal leap-second token is therefore rejected here as a parse error; there's no reasonable
- * fix short of a from-scratch time representation just for this one case, so it's left as a
- * documented limitation rather than solved.
+ * <p><b>A leap second is refused.</b> RFC 3339's grammar admits {@code time-second} {@code 60}, but core's
+ * {@code time} is the time of day on {@code [00:00:00, 24:00:00)}, and {@code 23:59:60} lies outside it
+ * (SPEC-FEEDBACK.md #20). {@link OffsetTime#parse} refuses it as well, so the refusal is a parse error.
  *
- * <p>{@code precision} is enforced on the token as written (§5.5): a fractional-second part may carry at
- * most that many digits, and {@code precision: 0} admits none. The check is deliberately textual rather
- * than on the parsed value -- {@code 12:00:00.100} carries three digits whatever instant it denotes, and
- * the atom is exact, so nothing is ever truncated to satisfy the facet.
+ * <p>{@code precision} constrains the value, not the spelling (§5.5), through {@link FractionalSeconds}:
+ * {@code 12:00:00.500} is admitted under {@code precision: 1}, being the half-second.
  */
 public record TimeParser(TimeType constraints) implements AtomTypeParser<OffsetTime> {
 

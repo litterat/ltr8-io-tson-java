@@ -270,6 +270,17 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   host class. `CONFORMANCE.md`'s accepted-gap paragraph and the two parsers' Javadoc go with it; Class 1
   vectors for each case above.
 
+- [ ] **An ordered map is constructible and nothing honours it.** `!map { … ordered: true }` resolves, and
+  meta-kernel's `map` `@doc` says its entry order is part of its value and a host binds it to a map that keeps its
+  order. No reader consults the facet, so each mode gets one half wrong. Bind mode builds every map through
+  `tson-bind`'s `Map` descriptor (`MapBindReader`), and Java's `Map.equals` ignores order, so two ordered maps
+  differing only in order compare equal. The tree's `TsonMap` compares its entries as a `List`, so two *unordered*
+  maps differing only in order compare unequal. That matters wherever compound values are compared: §7.5's
+  duplicate rule over set elements and §2.6's compound-key identity. The work: bind an ordered map to a
+  `SequencedMap` (`LinkedHashMap` by default), refusing at compile a declared target class that does not keep
+  order; make equality follow the facet in both modes and in `tson-json`'s reader; Class 2 vectors for two maps
+  differing only in order as set elements, ordered and not.
+
 - [ ] **Decide whether `text_type` takes a facet for the text's format.** `@doc` is CommonMark by its type's contract
   (`meta-kernel.tn`, `core.tn`), which a data field cannot state: a `description: text` holding CommonMark, or
   JSON Schema's `contentMediaType` on a string, has no home but prose. The question is whether a format is a facet

@@ -127,7 +127,7 @@
       !record_field { name: parameters      type: array_template_param_xxhash }
       !record_field { name: template        type: text }
       !record_field { name: extension       type: record_extension_type  optional: true }
-      !record_field { name: discriminators  type: array_field_name_xxhash  optional: true }
+      !record_field { name: discriminators  type: array_field_name_1_xxhash  optional: true }
     ] }
   }
 
@@ -258,7 +258,7 @@
       !record_field { name: length          type: non_negative_integer  optional: true }
       !record_field { name: pattern         type: regex    optional: true }
       !record_field { name: members         type: text_member_set  optional: true }
-      !record_field { name: normalization   type: normalization  optional: true  role: DEFAULT  value: NONE }
+      !record_field { name: normalization   type: normalization  optional: true  role: FIXED  value: NONE }
       !record_field { name: spec            type: uri      optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
       !record_field { name: schemes         type: scheme_set  optional: true }
       !record_field { name: allow_relative  type: boolean  optional: true  role: DEFAULT  value: true }
@@ -391,8 +391,8 @@
 
   field_group => !type_definition {
     body: !record { fields: [
-      !record_field { name: members   type: array_array_field_name_f1a73e72_xxhash }
-      !record_field { name: optional  type: array_field_name_xxhash  optional: true }
+      !record_field { name: members   type: array_array_field_name_1_5d4d7dc5_1_xxhash }
+      !record_field { name: optional  type: array_field_name_1_xxhash  optional: true }
       !record_field { name: state     type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
     ] }
   }
@@ -406,7 +406,7 @@
       !record_field { name: groups          type: array_field_group_xxhash  optional: true }
       !record_field { name: extension       type: record_extension_type  optional: true  role: DEFAULT  value: OPEN }
       !record_field { name: supertypes      type: array_type_ref_xxhash   optional: true }
-      !record_field { name: discriminators  type: array_field_name_xxhash  optional: true }
+      !record_field { name: discriminators  type: array_field_name_1_xxhash  optional: true }
     ] }
   }
 
@@ -532,9 +532,9 @@
     body: !array { element_type: type_name }
   }
 
-  @synthetic array_field_name_xxhash => !type_definition {
+  @synthetic array_field_name_1_xxhash => !type_definition {
     source: array
-    body: !array { element_type: field_name }
+    body: !array { element_type: field_name  min_items: 1 }
   }
 
   @synthetic array_template_param_xxhash => !type_definition {
@@ -557,9 +557,9 @@
     body: !array { element_type: record_field }
   }
 
-  @synthetic array_array_field_name_f1a73e72_xxhash => !type_definition {
+  @synthetic array_array_field_name_1_5d4d7dc5_1_xxhash => !type_definition {
     source: array
-    body: !array { element_type: array_field_name_xxhash }
+    body: !array { element_type: array_field_name_1_xxhash  min_items: 1 }
   }
 
   @synthetic array_field_group_xxhash => !type_definition {

@@ -141,6 +141,20 @@ class TextNormalizationTest {
         assertEquals(1, refused.size(), refused.toString());
     }
 
+    /** A fold over a whole URI, IRI or address would fold a path or a local part that compares with case. */
+    @Test
+    void aUriAnIriAndAnEmailAreAlwaysTheirTextAsWritten() {
+        for (String constructor : List.of("uri_type", "iri_type", "email_type")) {
+            List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace(
+                    "name => !identifier_type { continue_add: \"-\" }",
+                    "name => !identifier_type { continue_add: \"-\" }\n  folded => !" + constructor
+                            + " { normalization: NFKC_CASEFOLD }"));
+            assertEquals(1, refused.size(), constructor + ": " + refused);
+            assertTrue(refused.getFirst().message().contains("'normalization' is fixed on '" + constructor + "'"),
+                    refused.toString());
+        }
+    }
+
     @Test
     void twoMembersThatAreOneValueAreRefused() {
         List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace("members: [UTF-8 us-ascii]",

@@ -678,10 +678,10 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"members\" type: { name: \"array_array_field_name_f1a73e72_a0d61455\" "
+                        + "{ name: \"members\" type: { name: \"array_array_field_name_1_5d4d7dc5_1_0942e088\" "
                         + "arguments: [] } optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"optional\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } "
+                        + "{ name: \"optional\" type: { name: \"array_field_name_1_5d4d7dc5\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "

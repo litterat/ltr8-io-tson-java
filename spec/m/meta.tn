@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=85ca0f7545e12b5d1e2e2fb302580210c7b28935279dafd2f21395d277559469"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=7dda4ea780e1374a085b67a24c5507b1a644e4085f50e56ad5315db1b42c64d4"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=7dda4ea780e1374a085b67a24c5507b1a644e4085f50e56ad5315db1b42c64d4"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=80bde97ac97a6df9553779b27eeb2273d1c52e64b233cbc1d4c4d6eb8e7b4c4c"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=3e594d225f9fa92847cf2358a747aaaa0724fe8e692fb60760ddd14abb0f11b9"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=3e594d225f9fa92847cf2358a747aaaa0724fe8e692fb60760ddd14abb0f11b9"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 
@@ -41,18 +41,18 @@
   Plus annotation types — the classifying markers `ordered`, `bounded`, `exact`,
   `numeric`; the checked assertion `disjoint`; and the documentary `deprecated`,
   `title`, `comment`, `examples`, `read_only`, `write_only`. Annotation types
-  must reside in the governing target's namespace (per Part 2 §6); placing them
-  in meta makes them reachable from core and from every schema that meta
+  must reside in the governing target's namespace ([TSON-SCHEMA] §6); placing
+  them in meta makes them reachable from core and from every schema that meta
   governs.
 
   An annotation never changes a value, its type, or whether it is valid:
   validation is over values, and a schema with every annotation erased admits
-  exactly the same values. Part 2 §6 admits two further things within that rule
-  — a load-time check, and a directive over how a class of encodings represents
-  a value — and the annotations declared here use the first alone. The same
-  stance governs the type docs: a value space is described without reference to
-  any encoding, and where a doc mentions how TSON text spells a value it says so
-  by name.
+  exactly the same values. [TSON-SCHEMA] §6 admits two further things within
+  that rule — a load-time check, and a directive over how a class of encodings
+  represents a value — and the annotations declared here use the first alone.
+  The same stance governs the type docs: a value space is described without
+  reference to any encoding, and where a doc mentions how TSON text spells a
+  value it says so by name.
 
   Constructors that bind to a governing specification compose with the kernel's
   atom_specification mixin and pin the spec field with `=`. Their instances in
@@ -176,13 +176,13 @@
     equality comparison is unsafe (ordering is PARTIAL — NaN is unordered). The
     `format` radix (binary or decimal) is the ISO 11404 radix characteristic of
     the type. The value set is that grid together with signed zeros, subnormals,
-    the two infinities, and the canonical quiet NaN (Part 1 §5.6); `allow_nan`,
-    `allow_infinity`, `allow_subnormal`, and `allow_negative_zero` default to
-    true (`~ true` — the format's full set) and may be narrowed to false to
-    exclude those representation artifacts. The bounds are OPTIONAL domain
-    restrictions validated against the value as written, before rounding; they
-    do not bound the special values. Not a narrowing of the exact tier:
-    infinities and NaN are not exact numbers.
+    the two infinities, and the canonical quiet NaN ([TSON-DATA] §5.6);
+    `allow_nan`, `allow_infinity`, `allow_subnormal`, and `allow_negative_zero`
+    default to true (`~ true` — the format's full set) and may be narrowed to
+    false to exclude those representation artifacts. The bounds are OPTIONAL
+    domain restrictions validated against the value as written, before
+    rounding; they do not bound the special values. Not a narrowing of the
+    exact tier: infinities and NaN are not exact numbers.
 
     Bounds follow the header's field-group rule. There is no `multiple_of`; use
     the exact tier (`decimal_type`) when a step is required. A text-class token
@@ -295,9 +295,10 @@
     constraint on the value, not on a spelling: `precision: N` admits a value
     that is a whole number of 10^-N seconds, so `precision: 3` is millisecond
     resolution and `precision: 0` whole seconds. The atom is exact — nothing is
-    truncated; a value off the grid is rejected ([TSON-SCHEMA] §5.5). A text
-    encoding may spell an admitted value with trailing zeros (`12:00:00.500`
-    under `precision: 1`) and writes at most N digits.
+    truncated; a value off the grid is rejected ([TSON-SCHEMA] §5.5). Reading
+    admits any spelling of an admitted value, trailing zeros included, so
+    `12:00:00.500` is admitted under `precision: 1`; a text encoding writing the
+    value writes at most N fractional digits, `12:00:00.5`.
     """
   time_type => atom & atom_specification & {
     spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
@@ -389,26 +390,33 @@
     admits a relative reference beside an IRI, so its default is an
     IRI-reference; `allow_fragment` admits a fragment. An IRI's characters
     beyond US-ASCII are RFC 3987's `ucschar`, and `iprivate` within the query.
+    An IRI is its text as written, as a URI is.
     """
   iri_type => text_type & atom_specification & {
     spec?:           = "https://www.rfc-editor.org/rfc/rfc3987"
     schemes?:        scheme_set
     allow_relative?: boolean ~ true
     allow_fragment?: boolean ~ true
+    normalization?:  = NONE
   }
 
-  @doc:"Email constraint vocabulary. Instance is `email` in core."
+  @doc:"""
+    Email constraint vocabulary. Instance is `email` in core. An address is its
+    text as written: a mailbox's local part is case-sensitive (RFC 5321 §2.4),
+    so a form over the whole text could merge two mailboxes.
+    """
   email_type => text_type & atom_specification & {
-    spec?: = "https://www.rfc-editor.org/rfc/rfc5322"
+    spec?:          = "https://www.rfc-editor.org/rfc/rfc5322"
+    normalization?: = NONE
   }
 
   @doc:"""
     IPv4 address constraint vocabulary. Instance is `ipv4` in core. The spec pin
     cites RFC 3986 for its `IPv4address` production — the normative dotted-quad
-    grammar (Part 1 §5.5). `within` and `excluding` list IPv4 networks in CIDR
-    text (quoted — the form contains `/`): the address must lie inside at least
-    one `within` network when the field is present, and inside no `excluding`
-    network. `excluding` carves holes out of `within`.
+    grammar ([TSON-DATA] §5.5). `within` and `excluding` list IPv4 networks in
+    CIDR text (quoted — the form contains `/`): the address must lie inside at
+    least one `within` network when the field is present, and inside no
+    `excluding` network. `excluding` carves holes out of `within`.
     """
   ipv4_type => atom & atom_specification & {
     spec?:      = "https://www.rfc-editor.org/rfc/rfc3986"
