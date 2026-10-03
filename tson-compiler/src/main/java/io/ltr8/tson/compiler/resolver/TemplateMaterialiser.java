@@ -795,9 +795,9 @@ final class TemplateMaterialiser {
         } catch (ReadException e) {
             // The bindings a template defers are checked here and nowhere else (§8.2): `<T, N> [T; N]` is a
             // fine declaration, and `vector<text, "two">` is where it stops being one.
-            throw new SchemaValidationException("'" + head + "<...>' substitutes into a body that is not "
-                    + "valid data for '" + target + "', the constructor's own constraint vocabulary -- "
-                    + e.getMessage(), e);
+            throw DefinitionResolver.payloadFailure("'" + head + "<...>' substitutes into a body that",
+                    "'" + head + "<...>' substitutes into a body that is not valid data for '" + target
+                            + "', the constructor's own constraint vocabulary -- " + e.getMessage(), e);
         }
     }
 

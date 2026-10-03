@@ -10,6 +10,8 @@ history lives in git.
 - What stays at the reading positions is §7.7's grammar (`IdentifierProfile.validate`); `IdentifierProfile.hygiene`
   returns a verdict rather than throwing.
 - A template's parameters are a checked scope although §11.4 declines to list them; a choice's variants are not.
+- A `data` body and an annotation value are judged at the payload read (`SchemaResolver.payloadNames`), not in the
+  walk, which cannot see into them; every other constructor payload is read under no policy.
 - A minted name is ASCII and an identifier by construction, and is never exempted from the walk.
 - Non-ASCII or non-admitted content in a minted name is hashed rather than dropped; a part is capped at 64 characters,
   hash included.
@@ -42,6 +44,17 @@ meets the two per-name rules in the same pass, under that family's own profile. 
 stands alone — but it is the schema's own copy of a value a read judges: a default reaches every document that
 omits the field, so a value the reader would refuse if written must not be one it injects
 (`design/name-hygiene-read-path.md`).
+
+**A `data` body and an annotation value are judged where they are read, not in the walk.** A `data` constructor's
+payload binds to the consumer's own class (`design/meta-layer-data-kind.md`) and an annotation value to whatever
+its type binds, so by link time the field types that make a value a name are behind them — a meta layer's
+`methods: {method_name => …}` arrives as a `Map<String, String>`. `SchemaResolver` reads those two payloads under
+the registry's policy instead, and the readers apply §8.2 exactly as they do in a data document: the keys of one
+identifier-keyed map are one scope, and an identifier-typed value meets the per-name rules. Every other
+constructor builds the schema layer's own vocabulary and is read under `IdentifierPolicy.none()`: its names are
+the walk's scopes, and its identifier-typed values outside them are references — a choice's variants, a
+supertype — whose verdict belongs to the declaration they name, possibly in another schema. Judging a reference
+too would report one name twice, against the wrong declaration, and stop the schema reaching the linker.
 
 **The restriction level is refused per name, in the same pass** (`IdentifierPolicy.judge`, UTS #39 §5.2). The two
 are complementary rather than overlapping: the confusable check is a *relation* and needs the whole set, so
@@ -135,7 +148,11 @@ for names that read alike, `RESTRICTED_CHARACTER` for a character outside the id
 a *read* reports for the same rules, so one schema and one document that break the same rule come back
 alike. §8.2 requires a refusal be distinguishable from a
 validity error, and a consumer that has to read prose to tell them apart is what the code exists to prevent.
-It is still a verdict: the schema must change, or the deployment must relax the policy in code.
+It is still a verdict: the schema must change, or the deployment must relax the policy in code. A refusal at a
+payload read travels as `SchemaRefusalException`, the one subtype of `SchemaValidationException`, so every collect
+site already takes it and `SchemaResolver.Problems` reports it under its code; the message names the pointer
+within the payload, which says which key of a map was refused. A fail-fast caller gets the exception itself,
+from the resolver and the linker alike.
 
 The one scope the linker cannot reach is a Class 1 record, which has no declaration; `SchemalessTreeReader`
 checks its own field set, and `DefaultTsonReadContext` applies the restricted-character and

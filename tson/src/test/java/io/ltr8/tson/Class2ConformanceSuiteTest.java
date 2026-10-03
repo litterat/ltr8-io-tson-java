@@ -173,9 +173,9 @@ class Class2ConformanceSuiteTest {
                         + "carries " + ProcessorPolicy.dataVersion());
 
         assertFalse(problems.isEmpty(), "the " + subject + " is refused, but it was read without a diagnostic");
-        assertTrue(problems.stream().anyMatch(diagnostic -> isPolicyRefusal(diagnostic.code())),
+        assertTrue(problems.stream().anyMatch(diagnostic -> diagnostic.code().isNameRefusal()),
                 "expected a §8.2 refusal (" + fieldText(refusal, "mechanism") + "); got " + problems);
-        problems.forEach(diagnostic -> assertTrue(isPolicyRefusal(diagnostic.code()),
+        problems.forEach(diagnostic -> assertTrue(diagnostic.code().isNameRefusal(),
                 "a refused " + subject + " must not also be reported invalid: " + diagnostic));
         assertRefusalMatches(refusal, problems);
     }
@@ -215,14 +215,6 @@ class Class2ConformanceSuiteTest {
                 () -> "vector names " + fieldText(refusal, "mechanism") + "; got " + reported);
     }
 
-    /**
-     * The three codes that mean <em>refused under a stated policy</em> rather than <em>wrong</em>, one per
-     * §8.2 rule. Every other code is a verdict on the schema, which is exactly what a refusal is not.
-     */
-    private static boolean isPolicyRefusal(Diagnostic.Code code) {
-        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_CHARACTER
-                || code == Diagnostic.Code.RESTRICTED_SCRIPT;
-    }
 
     // ── Link-layer vectors: §2.2.3, §5.4, §5.10.1, §8.2 ──────────────────
 

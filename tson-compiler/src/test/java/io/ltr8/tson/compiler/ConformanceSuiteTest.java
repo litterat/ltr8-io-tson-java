@@ -346,7 +346,7 @@ class ConformanceSuiteTest {
                 new TsonTreeReader().withDiagnostics(reported::add).read(new ByteArrayInputStream(raw));
                 assertTrue(!reported.isEmpty(),
                         "the document parses, so the reader is what must reject it -- none reported");
-                reported.forEach(diagnostic -> assertFalse(isPolicyRefusal(diagnostic.code()),
+                reported.forEach(diagnostic -> assertFalse(diagnostic.code().isNameRefusal(),
                         "an error vector must not be satisfied by a §8.2 policy refusal: " + diagnostic));
             }
             case "refused" -> checkRefusedVector(raw, sidecar);
@@ -383,9 +383,9 @@ class ConformanceSuiteTest {
         List<Diagnostic> reported = new ArrayList<>();
         new TsonTreeReader().withDiagnostics(reported::add).read(new ByteArrayInputStream(raw));
 
-        assertTrue(reported.stream().anyMatch(diagnostic -> isPolicyRefusal(diagnostic.code())),
+        assertTrue(reported.stream().anyMatch(diagnostic -> diagnostic.code().isNameRefusal()),
                 "expected a §8.2 policy refusal (" + fieldText(refusal, "mechanism") + "); got " + reported);
-        reported.forEach(diagnostic -> assertTrue(isPolicyRefusal(diagnostic.code()),
+        reported.forEach(diagnostic -> assertTrue(diagnostic.code().isNameRefusal(),
                 "a refused document must not also be reported invalid -- §8.2's refusal MUST NOT be any "
                         + "of §8.1's four categories: " + diagnostic));
         assertRefusalMatches(refusal, reported);
@@ -426,14 +426,6 @@ class ConformanceSuiteTest {
                 () -> "vector names " + fieldText(refusal, "mechanism") + "; got " + reported);
     }
 
-    /**
-     * The three codes that mean <em>refused under a stated policy</em> rather than <em>invalid</em>, one per
-     * §8.2 rule. Every other code is a verdict on the document, which is exactly what a refusal is not.
-     */
-    private static boolean isPolicyRefusal(Diagnostic.Code code) {
-        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_CHARACTER
-                || code == Diagnostic.Code.RESTRICTED_SCRIPT;
-    }
 
     private static void assertReaderValueMatches(RecordValue expected, TsonValue actual) {
         RecordValue.Field member = soleField(expected, "reader-value");

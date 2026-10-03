@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -52,4 +53,11 @@ public interface TsonCompiledSchemaLoader {
      *                               {@link #resolveLinked} may throw)
      */
     TsonCompiledMetaSchema loadMeta(String uri);
+
+    /**
+     * [TSON-DATA] §8.2's identifier policy the schemas this loader resolves are judged under. The resolver reads
+     * a constructor payload under it, so an identifier-typed value there -- a key of an identifier-keyed map in a
+     * governed schema's {@code data} body -- is judged as a name, as it is in a data document.
+     */
+    IdentifierPolicy identifierPolicy();
 }
