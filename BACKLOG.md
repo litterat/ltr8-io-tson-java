@@ -257,13 +257,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **A template's value argument of an enum type is checked as written.** `TemplateMaterialiser.checkValue` reads
-  the argument through `AtomParsers.forType(body)` with no enum form, so under a case-folding label type
-  (SPEC-FEEDBACK.md #19) `box<Content-Type>` is refused where the member is `content-type`. Materialisation runs in
-  the resolver, before linking records `TsonLinkedSchema.enumForms`, so the fix resolves the label type there
-  (`EnumLabels.labelForm` needs the governing meta's namespace) or defers the check to the linker's re-check of
-  minted entries.
-
 - [ ] **`!uri` is `java.net.URI`'s RFC 2396 grammar, not [TSON-DATA] §5.5's RFC 3986** (`main` and
   `r2026-37-proposal`). `UriParser` delegates the whole grammar to `java.net.URI`, which refuses valid URIs —
   `https://` and `foo://` ("Expected authority": RFC 3986's `reg-name` may be empty, §3.2.2, and an empty

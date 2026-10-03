@@ -279,3 +279,5 @@ rules for an enum whose `type` is not an identifier family; the collision relati
   (SPEC-FEEDBACK.md #19), and the linker records each one whose form is not `NONE` in `TsonLinkedSchema.enumForms`
   (`EnumLabels.labelForm`), merged through imports the same way. Every site that builds an enum parser passes it to
   `AtomParsers.forType(body, form)`; the linker's own default and pin checks ask `labelForm` or the map directly.
+  Where `type` resolves is `resolver.EnumLabelType`'s, shared with materialisation, which checks a template's value
+  argument of an enum type before linking has recorded anything.
