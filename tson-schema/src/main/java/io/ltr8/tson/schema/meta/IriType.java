@@ -2,6 +2,7 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.base.unicode.Normalization;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,23 +27,24 @@ public record IriType(String spec, @Field("min_length") Optional<Integer> minLen
                       Optional<Integer> length, Optional<String> pattern,
                       Optional<List<String>> members, Optional<List<String>> schemes,
                       @Field("allow_relative") boolean allowRelative,
-                      @Field("allow_fragment") boolean allowFragment) implements Atom {
+                      @Field("allow_fragment") boolean allowFragment,
+                      Normalization normalization) implements Atom {
 
     /** RFC 3987, the one {@code spec} every {@code iri_type} carries. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc3987";
 
     /** {@code iri_reference => !iri_type {}} -- §5.5's {@code !iri_reference}, an IRI or a relative reference. */
     public static final IriType REFERENCE = new IriType(SPEC, Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), true, true);
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), true, true, Normalization.NONE);
 
     /** {@code iri => !iri_reference ^ { allow_relative: false }} -- §5.5's {@code !iri}, which has a scheme. */
     public static final IriType IRI = new IriType(SPEC, Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true);
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true, Normalization.NONE);
 
     /** The same facets as the {@link UriType} that owns their rules; {@code spec} is not among them. */
     public UriType uriFacets() {
         return new UriType(UriType.SPEC, minLength, maxLength, length, pattern, members, schemes,
-                allowRelative, allowFragment);
+                allowRelative, allowFragment, normalization);
     }
 
     /** {@inheritDoc} <p>{@code uri_type}'s rules, facet for facet ({@link UriType#constraintsCheck}). */

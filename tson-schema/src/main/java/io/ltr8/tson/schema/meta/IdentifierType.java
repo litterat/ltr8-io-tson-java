@@ -5,7 +5,7 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.base.unicode.IdentifierProfile.Base;
-import io.ltr8.tson.base.unicode.IdentifierProfile.Normalization;
+import io.ltr8.tson.base.unicode.Normalization;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +21,8 @@ import java.util.Optional;
  *
  * <p>The profile facets are {@code start} and {@code continue} (the Unicode property each set is drawn from),
  * {@code start_add}, {@code continue_add}, {@code medial} and {@code exclude} (each the set of code points its
- * text holds), and {@code normalization}; {@link IdentifierProfile} states how they combine. {@code spec} is
+ * text holds); {@link IdentifierProfile} states how they combine. {@code normalization} is {@code text_type}'s,
+ * defaulting to NFC here: the profile judges the value, which is the text put into that form. {@code spec} is
  * pinned to UAX #31.
  *
  * <p>Every field is flat, mirroring the resolved shape rather than the composition that produced it, as
@@ -61,13 +62,14 @@ public record IdentifierType(
 
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
     public TextType textConstraints() {
-        return new TextType(minLength, maxLength, length, pattern, members);
+        return new TextType(minLength, maxLength, length, pattern, members, normalization);
     }
 
     /** This profile with {@code text}'s facets in place of its own. */
     public IdentifierType withTextConstraints(TextType text) {
         return new IdentifierType(spec, text.minLength(), text.maxLength(), text.length(), text.pattern(),
-                text.members(), start, continueBase, startAdd, continueAdd, medial, exclude, normalization);
+                text.members(), start, continueBase, startAdd, continueAdd, medial, exclude,
+                text.normalization());
     }
 
     /** The profile the profile facets make. Built on each call: a reader holds the one it built. */
@@ -79,10 +81,10 @@ public record IdentifierType(
     /**
      * {@inheritDoc}
      *
-     * <p>The text facets narrow as {@link TextType}'s own rule says. <b>The profile facets do not move at
-     * all</b>: a refinement restates each one or leaves it. Narrowing a profile has no use a fresh
-     * {@code !identifier_type} does not serve better, and an addition set cannot follow the other facets'
-     * set-once rule, because setting {@code start_add} on a source that left it unset widens the profile --
+     * <p>The text facets narrow as {@link TextType}'s own rule says, {@code normalization} among them. <b>The
+     * profile facets do not move at all</b>: a refinement restates each one or leaves it. Narrowing a profile
+     * has no use a fresh {@code !identifier_type} does not serve better, and an addition set cannot follow the
+     * other facets' set-once rule, because setting {@code start_add} on a source that left it unset widens the profile --
      * the one direction a refinement never goes. The sets compare as sets, however they are spelled.
      */
     @Override
@@ -97,7 +99,6 @@ public record IdentifierType(
         fixedSet(violations, "continue_add", continueAdd, other.continueAdd);
         fixedSet(violations, "medial", medial, other.medial);
         fixedSet(violations, "exclude", exclude, other.exclude);
-        fixed(violations, "normalization", normalization, other.normalization);
         return List.copyOf(violations);
     }
 
@@ -105,16 +106,17 @@ public record IdentifierType(
      * {@inheritDoc}
      *
      * <p>The facets this composes, judged by {@link TextType#coherenceCheck} that owns them; the profile's own
-     * ({@link IdentifierProfile#incoherence}); and one rule joining them: every member is an identifier under
-     * this profile. A member the profile refuses is one no value can ever be, since a value is refused by the
-     * profile before a facet is asked, so it is refused here with the rest.
+     * ({@link IdentifierProfile#incoherence}); and one rule joining them: every member, as the value it is in
+     * {@code normalization}'s form, is an identifier under this profile. A member the profile refuses is one no
+     * value can ever be, since a value is refused by the profile before a facet is asked, so it is refused here
+     * with the rest.
      */
     @Override
     public List<String> coherenceCheck() {
         List<String> violations = new ArrayList<>(textConstraints().coherenceCheck());
         IdentifierProfile profile = profile();
         violations.addAll(profile.incoherence());
-        members.ifPresent(set -> set.forEach(member -> profile.check(member).ifPresent(why ->
+        members.ifPresent(set -> set.forEach(member -> profile.check(normalization.apply(member)).ifPresent(why ->
                 violations.add("member '" + member + "' is not an identifier: " + why))));
         return List.copyOf(violations);
     }

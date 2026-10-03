@@ -140,12 +140,23 @@ that is neither member is the enum miss it is — `ATOM_CONSTRAINT_VIOLATION`, m
 matching is an identity check of the token's decoded text against the members, and the host value is the natural
 parse of the member that matched. `type` governs what may be *declared* — each member a value of it, none two of
 one value — so it is a schema-load question the linker asks (`EnumLabels`), and no reader sees it. A `type` whose
-parser someday compares by more than text (case folding) changes the match too, and the enum reader will have to
-key on that parser's value rather than on the text. `text_type.members` is likewise an
+`normalization` is not `NONE` makes two spellings one value, which `EnumLabels` already judges on the parser's
+value; the enum *reader* still matches the text, so a document spelling a member another way is refused until it
+keys on that parser's value (`BACKLOG.md`). `text_type.members` is likewise an
 ordinary facet on the shared parser — `TextParser` checks it last, as the numeric tiers do, a member set naming
 the whole value space so the other facets hold vacuously where it is present.
 It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recovers a boolean from an unquoted
 `true`, so a writer annotating every one with `!boolean` would be restating what the token already says.
+
+**A text family's value is its text in the type's `normalization` form** (`base.unicode.Normalization`;
+SPEC-FEEDBACK.md #19). `text_type` carries the facet and every family composing it inherits it — `NONE` by
+default, `NFC` on `identifier_type`, fixed to `NONE` on `regex_type`, since folding a pattern changes what it
+matches. Each parser puts the text into the form first and judges the result: the lengths, `pattern`, the
+members (normalised the same way, `TextType.normalizedMembers`), an identifier's profile, a URI's or an
+address's grammar. Since every comparison downstream — map keys, set elements, pins, look-alike scopes, hygiene —
+already runs on the parser's value, none of them needed a change of its own beyond reading the value rather than
+the token. `NFKC_CASEFOLD` is `NfkcCasefold`, derived from the JDK's normalizer and case mappings with three
+exceptions and checked against `DerivedNormalizationProps.txt` over every code point.
 
 - **Each constructor splits into two classes across two modules:** a pure constraint-*values* record in
   `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`, `RegexType`, `DateType`, …, matching the kernel's
@@ -162,13 +173,12 @@ It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recover
   a Thompson-NFA, linear-time and ReDoS-safe — not `java.util.regex`.
 - **`value`, `void` and `identifier` each have a constructor**, and are read by it: `value_type` by `ValueParser`
   (in `tson-compiler`, base-type resolution to the natural host), `void_type` by `VoidReader` (the absent sentinel
-  `_` alone), and `identifier_type` by `IdentifierParser` — the text matched against the type's own
-  `IdentifierProfile` first, a profile failure being a parse failure, then `text_type`'s facets through
-  `TextParser`. So a naming convention is a `pattern` and a closed vocabulary of names is `members`, and an
-  identifier is string-class (§5.4).
+  `_` alone), and `identifier_type` by `IdentifierParser` — the text put into its `normalization` form, then
+  matched against the type's own `IdentifierProfile`, a profile failure being a parse failure, then `text_type`'s
+  facets through `TextParser`. So a naming convention is a `pattern` and a closed vocabulary of names is
+  `members`, and an identifier is string-class (§5.4).
 - **`identifier_type` is a UAX #31 profile**: `start`/`continue` bases (`XID`, `ID`, `NONE`), `start_add`,
-  `continue_add`, `medial` and `exclude` code-point sets, and a required `normalization` form (`NONE`, `NFC`,
-  `NFKC`; `NFKC_Casefold` is left out, the JDK having no full case folding — see `IdentifierProfile.Normalization`).
+  `continue_add`, `medial` and `exclude` code-point sets, with `text_type`'s `normalization` defaulting to `NFC`.
   `IdentifierType.profile()` builds the `IdentifierProfile`; the parser builds it once, so a read builds nothing. The
   kernel's `identifier` is `!identifier_type { continue_add: "-" }`, whose profile is `IdentifierProfile.NAME` —
   which the lexer, schema parser, resolver and linker hold statically, since the kernel's own names are read before
@@ -177,8 +187,8 @@ It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recover
   restates them or leaves them, and narrows only the text facets. Set-once would not do — setting `start_add` where
   the source left it unset widens the profile. `coherenceCheck` holds each member to the type's profile as well as
   to the facets, since a member the profile refuses is one no value can reach, and refuses a profile with an empty
-  Start set or a medial that is also Start or Continue. Core declares its own `identifier` sibling, as it does
-  `text`. Core's `void`
+  Start set or a medial that is also Start or Continue. Core declares no `identifier`; a schema wanting one
+  writes the kernel's line. Core's `void`
   is `!void_type {}` too, so the linker's refusal of a `void` variant and the inhabitance check ask the body
   (`ReferenceChain.resolvesToVoid`), not the name.
 - **The network family reuses one grammar per address form, never a second copy.** Both grammars are

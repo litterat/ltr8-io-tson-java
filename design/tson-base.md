@@ -120,15 +120,17 @@ never written, and a sink cannot tell a caller who finished from one who abandon
 flushes explicitly. What stays smaller is the *target* set, not the contract: `Appendable` is a genuinely
 different target rather than one spelled twice, so `toTson`'s char path is untouched.
 **`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
-`IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — and the
+`IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc`, `NfkcCasefold` — and the
 UTS #39 rules over them, read by two engines and knowing nothing about either format. The two policies are
 in `policy` rather than beside the tables they read, because the line between the two Unicode packages is
 **who touches them**: a consumer names `policy` to configure a processor and never names `unicode`; the
 engines read `unicode` and never name `policy`.
 **`IdentifierProfile` is here too**, beside the tables it reads: a UAX #31 R1 profile (`of`, `check`), with
 [TSON-DATA] §7.7's as `NAME` (`validate`), and §8.2's restricted-character rule (`hygiene`), all **reporting** a
-violation rather than throwing one. Its `Base` and `Normalization` enums are the meta-kernel's `identifier_base`
-and `normalization`, which `schema.meta.IdentifierType` binds directly rather than mirroring.
+violation rather than throwing one. Its `Base` enum is the meta-kernel's `identifier_base`, and the top-level
+`Normalization` is `normalization`, which every `schema.meta` text family binds directly rather than mirroring; it
+applies its form (`apply`) as well as testing for it (`holds`), the parsers putting a value into the form and the
+profile then requiring it.
 That is what lets one check serve a caller that owes a parse error and one that owes a diagnostic — the
 identical violation is a `ParseException` from the lexer and a refusal from the linker — where a signature
 that threw forced the lexer's answer on everyone. It is not a parser: nothing here turns a token into a

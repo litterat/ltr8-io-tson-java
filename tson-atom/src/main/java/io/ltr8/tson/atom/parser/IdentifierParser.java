@@ -15,9 +15,12 @@ import java.util.Optional;
  * {@code type_name}/{@code field_name}/{@code param_name} roles, and {@code enum}'s members, its {@code type}.
  * Other instances name an outside system's positions under that system's own profile.
  *
- * <p><b>The profile comes first, then the text facets.</b> A name the profile refuses is a grammar violation
- * whatever its facets say, so a refinement's {@code pattern} or {@code members} is only ever asked of a
- * well-formed name; the facets are {@link TextParser}'s, applied to the same text.
+ * <p><b>The text is put into the {@code normalization} form, then the profile judges it, then the text
+ * facets.</b> The value is the normalised text (SPEC-FEEDBACK.md #19), so the profile asks whether the
+ * <em>value</em> is a name: under {@code NFKC_CASEFOLD}, a profile of lowercase letters admits
+ * {@code Content-Type}. A name the profile refuses is a grammar violation whatever its facets say, so a
+ * refinement's {@code pattern} or {@code members} is only ever asked of a well-formed name; the facets are
+ * {@link TextParser}'s, applied to the same value.
  *
  * <p><b>The profile itself is {@link IdentifierProfile}'s</b>, beside the UCD tables it reads, built once here
  * so a read builds nothing. What is here is only the atom: the rule that a name the profile refuses is a
@@ -53,11 +56,13 @@ public final class IdentifierParser implements AtomTypeParser<String> {
 
     @Override
     public String read(String text) {
-        Optional<String> violation = profile.check(text);
+        String value = constraints.normalization().apply(text);
+        Optional<String> violation = profile.check(value);
         if (violation.isPresent()) {
             throw new AtomParseException(violation.get(), EXPECTED);
         }
-        return this.text.read(text);
+        this.text.validate(value);
+        return value;
     }
 
     @Override

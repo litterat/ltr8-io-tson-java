@@ -130,7 +130,9 @@ that another processor at another Unicode version may accept the same document.
 **A value whose type is an identifier family is a name too**, because the type says so (§8.2, [TSON-SCHEMA]
 §11.4): a field value or a map key typed by any entry whose body `identifier_type` made — the kernel's
 `identifier`, a schema's own, a refinement of either. `AtomTypeReader` holds the family's profile, built once when
-the reader compiles, and after the family parses a value it asks `TsonReadContext.refusesName` — the same two rules
+the reader compiles, and after the family parses a value it asks `TsonReadContext.refusesName` of that value — the
+text in the family's `normalization` form, never the spelling, so a folded name is judged as the name it is — the
+same two rules
 `checkNameHygiene` applies to the stream's names, through one method, under that profile rather than §7.7's, so a
 character the profile adds (`$` in a JavaScript-name profile) is the profile's and meets no restricted-character
 rule (`IdentifierProfile.restrictedCharacter`), as §7.7's `-` is. A refused value reads as nothing, as a refused
@@ -139,7 +141,8 @@ field name is never looked up, so it is in no scope a later rule judges.
 **The keys of an identifier-keyed map are a data scope under a schema, and the elements of a unique array of
 names the other.** `MapAbstractReader` knows from the
 compiled key type whether its keys are names (`keysAreNames`, decided once per reader), and for such a map builds a
-`ConfusableNames.Scope` per read and adds each cleanly-read key as it arrives, so a pair is reported at the second
+`ConfusableNames.Scope` per read and adds each cleanly-read key's value as it arrives (`ValueIdentity.nameOf`, the
+name in its type's form rather than the token), so a pair is reported at the second
 key's own position, as §8.2's detection rule asks, and its entry read normally. A repeat is `DUPLICATE_MAP_KEY` and
 nothing else: the scope ignores an equal name. A map keyed by `text` builds nothing — its keys are data. The scope
 costs one small `HashMap` per such map read, and the per-name rules nothing; `AllocationHarnessTest` reports both

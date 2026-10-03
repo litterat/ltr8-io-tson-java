@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=999b5bbbde031910ea4250a828b0e3492867a3517b97e86bb5a39646a93562ef"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b7f6eb260a166e6277aac3bc48ffca876d914dad23f2bf870b7e2ac449026b63"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -247,15 +247,25 @@
     `members` lists the admitted strings outright. Every member must satisfy the
     other facets on the same body, the pattern included.
 
+    `normalization` is the form a value is put into. A value is its token's
+    text, unquoted, unescaped and then put into that form; every other facet
+    judges the value and never the spelling, and so does every comparison of
+    two values. A member is a value too, and two members that are one value are
+    refused.
+
     `pattern` and `members` are each settable once: a refinement may set one the
     source left unset, or restate the source's own, and never change it.
+    `normalization` is fixed where the type is constructed: a refinement restates
+    it or leaves it, since changing it would change what a token means rather
+    than narrow the values admitted.
     """
   text_type => atom & {
-    min_length?: non_negative_integer
-    max_length?: non_negative_integer
-    length?:     non_negative_integer
-    pattern?:    regex
-    members?:    text_member_set
+    min_length?:    non_negative_integer
+    max_length?:    non_negative_integer
+    length?:        non_negative_integer
+    pattern?:       regex
+    members?:       text_member_set
+    normalization?: normalization ~ NONE
   }
 
   text => !text_type {}
@@ -272,10 +282,12 @@
   identifier_base => !enum [XID ID NONE]
 
   @doc:"""
-    The normalization form an identifier must already be in. Text not in it is
-    refused, never rewritten.
+    The form a text value is put into. NONE keeps the text as written. NFC and
+    NFKC are Unicode's normalization forms. NFKC_CASEFOLD is toNFKC_Casefold,
+    UAX #31's form for names compared without case: over ASCII it lowercases,
+    so Content-Type and content-type are one value.
     """
-  normalization => !enum [NONE NFC NFKC]
+  normalization => !enum [NONE NFC NFKC NFKC_CASEFOLD]
 
   @doc:"""
     Identifier constraint vocabulary: a UAX #31 identifier profile, with the
@@ -293,7 +305,8 @@
     start_add, continue_add, medial and exclude is the set of code points its
     text holds. A medial character stands only between two others and never
     beside another medial, so medial must be disjoint from Start and Continue.
-    The whole text must be in the normalization form given. A join control
+    The profile judges the value, which is the text put into the normalization
+    form; the form defaults to NFC here. A join control
     (U+200C, U+200D) is admitted only in the contexts UTS #39 §3.1.1.1 permits,
     whatever the profile.
 
@@ -312,7 +325,7 @@
       Start    = XID_Start
       Continue = XID_Continue + "-"
 
-    and the text MUST be in NFC. The profile is the token profile minus the
+    and its value is the text in NFC. The profile is the token profile minus the
     extensions the number grammar requires, so an identifier never begins with a
     digit or a sign, which subsumes the rule that numbers are not declarable
     names. "+" is dropped from Continue, and "." is reserved as a future
@@ -368,10 +381,12 @@
 
   @doc:"""
     Regex constraint vocabulary. Same shape pattern as uri_type, pinned to
-    I-Regexp.
+    I-Regexp. A regex is its text as written: putting it into another form
+    would change what it matches.
     """
   regex_type => text_type & atom_specification & {
-    spec?: = "https://www.rfc-editor.org/rfc/rfc9485"
+    spec?:          = "https://www.rfc-editor.org/rfc/rfc9485"
+    normalization?: = NONE
   }
 
   regex => !regex_type {}

@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.tson.base.atom.Rational;
+import io.ltr8.tson.base.unicode.Normalization;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -124,11 +125,13 @@ class AtomCoherenceTest {
     @Test
     void theTextComposingFamiliesInheritTheSameLengthRule() {
         assertViolation(new UriType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty(),
-                        Optional.empty(), true, true),
+                        Optional.empty(), true, true, Normalization.NONE),
                 "min_length 10 is above max_length 3");
-        assertViolation(new RegexType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty()),
+        assertViolation(new RegexType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty(),
+                        Normalization.NONE),
                 "min_length 10 is above max_length 3");
-        assertViolation(new EmailType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty()),
+        assertViolation(new EmailType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty(),
+                        Normalization.NONE),
                 "min_length 10 is above max_length 3");
     }
 

@@ -112,6 +112,13 @@ class CrossEncodingParityTest {
               fragment   => { ( include: text | name?: text  type?: text ) }
               endpoint   => { ( host: text  port: int32 | socket: text )? }
               contact    => { ( email: text | phone: text )+ }
+              header_name => !identifier_type { start: NONE  continue: NONE
+                start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
+                normalization: NFKC_CASEFOLD }
+              headers     => { header_name => text }
+              pinned      => { h: header_name = Idempotency-Key }
+              charset     => !text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
+              encoded     => { c: charset }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -889,5 +896,38 @@ class CrossEncodingParityTest {
     private static void bothAdmit(String rootType, String tsonBody, String jsonBody) {
         assertEquals(List.of(), tson(rootType, tsonBody), "TSON refused " + tsonBody);
         assertEquals(List.of(), json(rootType, jsonBody), "JSON refused " + jsonBody);
+    }
+
+    // ── A text family's normalization (SPEC-FEEDBACK.md #19) ──
+
+    /** The value is the text in the type's form, so a member, a pin and a key each match it however it is cased. */
+    @Test
+    void normalizedValuesBothEncodingsAdmit() {
+        bothAdmit("encoded", "{ c: Us-Ascii }", "{\"c\": \"Us-Ascii\"}");
+        bothAdmit("pinned", "{ h: IDEMPOTENCY-KEY }", "{\"h\": \"IDEMPOTENCY-KEY\"}");
+        bothAdmit("headers", "{ Content-Type => \"a\"  Accept => \"b\" }",
+                "{\"Content-Type\": \"a\", \"Accept\": \"b\"}");
+    }
+
+    @Test
+    void twoCasingsOfOneName() {
+        sameRule("headers", """
+                { Content-Type => "a"  content-type => "b" }""", """
+                {"Content-Type": "a", "content-type": "b"}""");
+    }
+
+    @Test
+    void aPinNoCasingMatches() {
+        sameRule("pinned", "{ h: request-id }", "{\"h\": \"request-id\"}");
+    }
+
+    /**
+     * A JSON tree's node keeps the spelling that arrived, a value's normalized text being what the facets, the
+     * keys and the pins judge rather than what the node holds -- as a tree keeps an instant's offset.
+     */
+    @Test
+    void theJsonTreeKeepsTheSpelling() {
+        JsonObject json = (JsonObject) jsonTree("encoded", "{\"c\": \"UTF-8\"}");
+        assertEquals("\"UTF-8\"", json.get("c").toString());
     }
 }

@@ -2,6 +2,7 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.schema.meta.EmailType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -67,7 +68,7 @@ class EmailParserTest {
 
     private static EmailParser withMaxLength(int max) {
         return new EmailParser(new EmailType(EmailType.UNCONSTRAINED.spec(), Optional.empty(),
-                Optional.of(max), Optional.empty(), Optional.empty(), Optional.empty()));
+                Optional.of(max), Optional.empty(), Optional.empty(), Optional.empty(), Normalization.NONE));
     }
 
     @Test
@@ -87,7 +88,7 @@ class EmailParserTest {
     void appliesThePatternFacet() {
         EmailParser corporate = new EmailParser(new EmailType(EmailType.UNCONSTRAINED.spec(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(".*@example\\.com"),
-                Optional.empty()));
+                Optional.empty(), Normalization.NONE));
 
         assertEquals("ada@example.com", corporate.read(token("ada@example.com")));
         assertThrows(AtomValidationException.class, () -> corporate.read(token("ada@other.com")));

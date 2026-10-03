@@ -3,6 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.schema.meta.UriType;
 import java.net.URI;
@@ -52,11 +53,12 @@ public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
                       Optional<String> pattern, Optional<List<String>> schemes, boolean allowRelative,
                       boolean allowFragment) {
         this(new UriType(UriType.SPEC, minLength, maxLength, length, pattern,
-                Optional.empty(), schemes, allowRelative, allowFragment));
+                Optional.empty(), schemes, allowRelative, allowFragment, Normalization.NONE));
     }
 
     @Override
-    public URI read(String text) {
+    public URI read(String written) {
+        String text = constraints.normalization().apply(written);
         URI value;
         try {
             value = new URI(text);

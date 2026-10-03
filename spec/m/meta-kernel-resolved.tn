@@ -195,11 +195,12 @@
     supertypes: [atom top]
     subtypes: [identifier_type regex_type uri_type]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: min_length  type: non_negative_integer  optional: true }
-      !record_field { name: max_length  type: non_negative_integer  optional: true }
-      !record_field { name: length      type: non_negative_integer  optional: true }
-      !record_field { name: pattern     type: regex    optional: true }
-      !record_field { name: members     type: text_member_set  optional: true }
+      !record_field { name: min_length     type: non_negative_integer  optional: true }
+      !record_field { name: max_length     type: non_negative_integer  optional: true }
+      !record_field { name: length         type: non_negative_integer  optional: true }
+      !record_field { name: pattern        type: regex    optional: true }
+      !record_field { name: members        type: text_member_set  optional: true }
+      !record_field { name: normalization  type: normalization  optional: true  role: DEFAULT  value: NONE }
     ] }
   }
 
@@ -222,7 +223,7 @@
 
   normalization => !type_definition {
     source: enum
-    body: !enum { members: [NONE NFC NFKC] }
+    body: !enum { members: [NONE NFC NFKC NFKC_CASEFOLD] }
   }
 
   identifier_type => !type_definition {
@@ -233,6 +234,7 @@
       !record_field { name: length         type: non_negative_integer  optional: true }
       !record_field { name: pattern        type: regex    optional: true }
       !record_field { name: members        type: text_member_set  optional: true }
+      !record_field { name: normalization  type: normalization  optional: true  role: DEFAULT  value: NFC }
       !record_field { name: spec           type: uri   optional: true  role: FIXED  value: "https://www.unicode.org/reports/tr31/" }
       !record_field { name: start          type: identifier_base  optional: true  role: DEFAULT  value: XID }
       !record_field { name: continue       type: identifier_base  optional: true  role: DEFAULT  value: XID }
@@ -240,7 +242,6 @@
       !record_field { name: continue_add   type: text  optional: true }
       !record_field { name: medial         type: text  optional: true }
       !record_field { name: exclude        type: text  optional: true }
-      !record_field { name: normalization  type: normalization  optional: true  role: DEFAULT  value: NFC }
     ] }
   }
 
@@ -257,6 +258,7 @@
       !record_field { name: length          type: non_negative_integer  optional: true }
       !record_field { name: pattern         type: regex    optional: true }
       !record_field { name: members         type: text_member_set  optional: true }
+      !record_field { name: normalization   type: normalization  optional: true  role: DEFAULT  value: NONE }
       !record_field { name: spec            type: uri      optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
       !record_field { name: schemes         type: scheme_set  optional: true }
       !record_field { name: allow_relative  type: boolean  optional: true  role: DEFAULT  value: true }
@@ -277,12 +279,13 @@
   regex_type => !type_definition {
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length  type: non_negative_integer  optional: true }
-      !record_field { name: max_length  type: non_negative_integer  optional: true }
-      !record_field { name: length      type: non_negative_integer  optional: true }
-      !record_field { name: pattern     type: regex    optional: true }
-      !record_field { name: members     type: text_member_set  optional: true }
-      !record_field { name: spec        type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9485" }
+      !record_field { name: min_length     type: non_negative_integer  optional: true }
+      !record_field { name: max_length     type: non_negative_integer  optional: true }
+      !record_field { name: length         type: non_negative_integer  optional: true }
+      !record_field { name: pattern        type: regex  optional: true }
+      !record_field { name: members        type: text_member_set  optional: true }
+      !record_field { name: normalization  type: normalization  optional: true  role: FIXED  value: NONE }
+      !record_field { name: spec           type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9485" }
     ] }
   }
 

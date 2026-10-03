@@ -4,9 +4,12 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.base.unicode.Normalization;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -28,6 +31,11 @@ import java.util.stream.Stream;
  * included -- one rule, checked in one place ({@link #coherenceCheck}), which is why this module depends on
  * {@code tson-regex}.
  *
+ * <p><b>{@code normalization} is the form the decoded value is put into</b> (SPEC-FEEDBACK.md #19): a value is
+ * the text as written put into that form, and every other facet -- lengths, {@code pattern}, {@code members}
+ * -- judges the value, never the spelling. A member is a value too, so it is put into the form before it is
+ * judged.
+ *
  * <p>Also an {@link Atom} variant: {@code text => !text_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
@@ -37,17 +45,31 @@ public record TextType(
         @Field("max_length") Optional<Integer> maxLength,
         Optional<Integer> length,
         Optional<String> pattern,
-        Optional<List<String>> members) implements Atom {
+        Optional<List<String>> members,
+        Normalization normalization) implements Atom {
 
     @Record
     public TextType {
         members = members.map(List::copyOf);
     }
 
-    /** The four facets that were this type's whole vocabulary before {@link #members} joined them. */
+    /** These facets with no normalization: the value is the text as written. */
+    public TextType(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+            Optional<String> pattern, Optional<List<String>> members) {
+        this(minLength, maxLength, length, pattern, members, Normalization.NONE);
+    }
+
+    /** These facets with no member set and no normalization. */
     public TextType(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
             Optional<String> pattern) {
         this(minLength, maxLength, length, pattern, Optional.empty());
+    }
+
+    /** {@code members} put into {@link #normalization}'s form: the values a token is matched against. */
+    public Optional<List<String>> normalizedMembers() {
+        return normalization == Normalization.NONE
+                ? members
+                : members.map(set -> set.stream().map(normalization::apply).toList());
     }
 
     /** {@code text => !text_type {}} -- the unconstrained text type. */
@@ -76,6 +98,10 @@ public record TextType(
      * member set <em>is</em> decidably narrowable, and shares its logical position with a pattern that is
      * not. One rule for the position keeps the narrowing relation from turning on which of the two
      * spellings an author reached for, which is [TSON-SCHEMA] §5.7's <b>settable once</b> facet kind.
+     *
+     * <p><b>{@link #normalization} does not move at all</b>, as an identifier profile's facets do not. Setting it
+     * on a source that left it at {@code NONE} would not narrow the source's values but change what a token
+     * means: {@code Content-Type} would be one value under the source and another under the refinement.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
@@ -90,6 +116,11 @@ public record TextType(
         AtomNarrowing.checkSettableOnce(violations, "pattern", pattern, other.pattern);
         AtomNarrowing.checkSettableOnce(violations, "members", members, other.members,
                 "members and pattern share one position and pattern cannot be narrowed");
+        if (normalization != other.normalization) {
+            violations.add("changes 'normalization' from " + normalization + " to " + other.normalization
+                    + " -- a text family's normalization is fixed where it is constructed, and a refinement only"
+                    + " restates it");
+        }
         return List.copyOf(violations);
     }
 
@@ -122,7 +153,9 @@ public record TextType(
      * <p><b>{@link #members} answers to every facet beside it, {@link #pattern} included.</b> The lengths are
      * counts and the pattern is a regex match, and the two are one rule -- "every member satisfies the other
      * facets on the same body or the schema fails to load" -- so they are checked together here rather than
-     * split across modules by which engine each needs.
+     * split across modules by which engine each needs. A member is judged as the value it is, in
+     * {@link #normalization}'s form, and two members that are one value are refused: a set that lists one value
+     * twice is not the set its author meant.
      */
     @Override
     public List<String> coherenceCheck() {
@@ -133,7 +166,14 @@ public record TextType(
         AtomCoherence.checkOrdered(violations, "min_length", minLength, "max_length", maxLength);
         AtomCoherence.checkOrdered(violations, "min_length", minLength, "length", length);
         AtomCoherence.checkOrdered(violations, "length", length, "max_length", maxLength);
-        members.ifPresent(set -> set.forEach(member -> {
+        Map<String, String> spelledBy = new HashMap<>();
+        members.ifPresent(set -> set.forEach(written -> {
+            String member = normalization.apply(written);
+            String earlier = spelledBy.putIfAbsent(member, written);
+            if (earlier != null) {
+                violations.add("members '" + earlier + "' and '" + written + "' are one value under "
+                        + normalization);
+            }
             int codePoints = member.codePointCount(0, member.length());
             length.filter(fixed -> codePoints != fixed).ifPresent(fixed -> violations.add(
                     "member '" + member + "' is " + codePoints + " characters, and length is " + fixed));

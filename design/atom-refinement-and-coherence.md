@@ -21,6 +21,9 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
   binds to its family's host type (`ValueParser.at`), so temporal and duration bounds are compared as values.
 - `text_type`'s `pattern` and `members` are each **settable once** — they occupy one logical position and the pattern
   half cannot be narrowed, so the position takes one rule. A member set may still be *added* to a patterned source.
+- `text_type`'s `normalization` is **identity-only**, default or not: setting it where the source left `NONE` changes
+  what a token means rather than narrowing the values, so no refinement moves it. Its members are judged as values in
+  the form, and two that are one value are refused.
 - `members` against `pattern` is checked on the family with the length facets — one rule, one place. `tson-schema`
   depends on `tson-regex` for it; the engine is an internal library like any other.
 
@@ -60,7 +63,9 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   rejecting one would reject a documented construct — §5.7 states the rule per facet kind, and a selector is
   settable where the source leaves it at the constructor's default, identity-only once bound. An
   `identifier_type`'s **profile** facets are identity-only outright, default or not: setting an addition set the
-  source left unset widens the profile, so no set-once form of the rule is sound (`IdentifierType`).
+  source left unset widens the profile, so no set-once form of the rule is sound (`IdentifierType`). Every text
+  family's `normalization` is identity-only on the same terms (`TextType`): turning folding on would make
+  `Content-Type` one value under the source and another under the refinement.
 - **A body must also be coherent with itself**, which is the other question about the same facets and
   needs no source to compare against. `checkCoherent` asks `Atom.coherenceCheck()` — one rule per family over
   the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `SchemaValidationException`
