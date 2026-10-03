@@ -37,6 +37,8 @@ class TextNormalizationTest {
               safe_header => !enum_type { type: header_name  members: [Accept content-type] }
               allowed => { h: safe_header }
               chosen => { h: safe_header = Content-Type }
+              web => !uri ^ { schemes: [HTTP https] }
+              link => { to: web }
             }
             """;
 
@@ -155,5 +157,15 @@ class TextNormalizationTest {
     void anEnumPinIsAValueInTheLabelTypesForm() {
         assertEquals(List.of(), codes("!chosen { h: content-type }"));
         assertEquals(List.of(Diagnostic.Code.FIELD_FIXED), codes("!chosen { h: accept }"));
+    }
+
+    /** A scheme set's elements are scheme_names, folded as RFC 3986 §3.1 compares a scheme. */
+    @Test
+    void aSchemeSetHoldsFoldedSchemes() {
+        assertEquals(List.of(), codes("!link { to: \"HTTPS://example.com/\" }"));
+        assertEquals(List.of(), codes("!link { to: \"http://example.com/\" }"));
+        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION), codes("!link { to: \"ftp://example.com/\" }"));
+        assertEquals(1, tson().validateSchema(SCHEMA.replace("schemes: [HTTP https]", "schemes: [HTTP http]")).size());
+        assertEquals(1, tson().validateSchema(SCHEMA.replace("schemes: [HTTP https]", "schemes: [\"ht tp\"]")).size());
     }
 }

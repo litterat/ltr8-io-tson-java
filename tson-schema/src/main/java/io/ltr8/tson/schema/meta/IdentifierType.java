@@ -60,6 +60,17 @@ public record IdentifierType(
             Optional.empty(), Optional.empty(), Optional.empty(), Base.XID, Base.XID, Optional.empty(),
             Optional.of("-"), Optional.empty(), Optional.empty(), Normalization.NFC);
 
+    /**
+     * {@code scheme_name => !identifier_type { start: NONE  continue: NONE  start_add: "a…z"
+     * continue_add: "a…z0…9+-."  normalization: NFKC_CASEFOLD }} -- RFC 3986 §3.1's scheme, the element of
+     * {@code uri_type.schemes}. Since the profile judges the folded value, it lists lowercase letters only and
+     * admits a scheme however it is cased.
+     */
+    public static final IdentifierType SCHEME_NAME = new IdentifierType(SPEC, Optional.empty(), Optional.empty(),
+            Optional.empty(), Optional.empty(), Optional.empty(), Base.NONE, Base.NONE,
+            Optional.of("abcdefghijklmnopqrstuvwxyz"), Optional.of("abcdefghijklmnopqrstuvwxyz0123456789+-."),
+            Optional.empty(), Optional.empty(), Normalization.NFKC_CASEFOLD);
+
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
     public TextType textConstraints() {
         return new TextType(minLength, maxLength, length, pattern, members, normalization);

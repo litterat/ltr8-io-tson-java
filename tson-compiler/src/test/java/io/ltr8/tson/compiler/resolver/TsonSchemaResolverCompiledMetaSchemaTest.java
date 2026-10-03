@@ -438,7 +438,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         // The same entry set a genuinely registered meta-kernel has: the bootstrap desugars its own document,
         // so TsonSchemaLinker.linkBootstrap has nothing left to add. Never cached (see the next test).
-        assertEquals(68, compiled.schema().entries().size());
+        assertEquals(69, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
         assertNotNull(compiled.compiledSchema().get("integer_size")

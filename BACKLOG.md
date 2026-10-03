@@ -264,14 +264,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   (`EnumLabels.labelForm` needs the governing meta's namespace) or defers the check to the linker's re-check of
   minted entries.
 
-- [ ] **`uri_type.schemes` should be a set of case-folding scheme identifiers** (SPEC-FEEDBACK.md #19). The kernel's
-  `scheme_set` holds `text`, and `uri_type`'s `@doc` states the case-insensitive comparison for that field alone;
-  `scheme_name => !identifier_type { start: NONE  continue: NONE  start_add: "a…z"  continue_add: "a…z0…9+-."
-  normalization: NFKC_CASEFOLD }`, spelled out, would carry it as data. What constrains it is the bootstrap:
-  `MetaKernelBootstrapResolver.instanceBody` dispatches on the constructor and `requireIdentifierProfile` admits the
-  kernel's one `identifier_type` instance only, so a second needs dispatch by entry name. `UriParser.admitsScheme`
-  then compares the folded scheme.
-
 - [ ] **`!uri` is `java.net.URI`'s RFC 2396 grammar, not [TSON-DATA] §5.5's RFC 3986** (`main` and
   `r2026-37-proposal`). `UriParser` delegates the whole grammar to `java.net.URI`, which refuses valid URIs —
   `https://` and `foo://` ("Expected authority": RFC 3986's `reg-name` may be empty, §3.2.2, and an empty
