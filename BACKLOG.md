@@ -87,7 +87,7 @@ disagree — the same shape as the compatibility claim Revision 35 withdrew ([TS
 record from a map syntactically (`a: 1` vs `k => v`), so `TsonDataStream` emits `RecordStart`/`FieldName` or
 `MapStart`/`MapArrow` and each reader asserts which it got; JSON's `{"a": 1}` is one syntax for both and §4.1 makes
 the *position* decide, which a pull-only event source has no channel to say. And `null` is a value in a JSON tree and
-the absent sentinel under a schema (§7), so a shared `TsonEvent` forces one meaning on the layer that does not hold
+the void sentinel under a schema (§7), so a shared `TsonEvent` forces one meaning on the layer that does not hold
 it. `design/json-encoding.md` has the argument; the entries below follow it. The tree model follows
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
@@ -269,6 +269,14 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   atom's natural value becomes text with `java.net.URI` a binding target — validity must not depend on the
   host class. `CONFORMANCE.md`'s accepted-gap paragraph and the two parsers' Javadoc go with it; Class 1
   vectors for each case above.
+
+- [ ] **The Java identifiers still say "absent" where the series now says "void"** (SPEC-FEEDBACK.md #21). The
+  prose, the diagnostics and the kernel moved; the names did not: `TsonAbsent` (the tree's void node, the
+  consumer-facing one), `AbsentValue` and `AbsentEvent` (the AST node and the stream event), `AbsentTreeReader`,
+  and the diagnostic rules `absentElement`, `absentEntryValue`, `absentPosition` and `absentKey`, about 130 uses
+  over 57 files. It is an IDE rename — `TsonVoid`, `VoidValue`, `VoidEvent`, `VoidTreeReader`, `voidElement` and
+  so on — then a sweep of the Javadoc that names the old classes in prose. `JsonNull` stays: it is JSON's node for
+  its own token, which is the void sentinel's spelling there.
 
 - [ ] **An ordered map is constructible and nothing honours it.** `!map { … ordered: true }` resolves, and
   meta-kernel's `map` `@doc` says its entry order is part of its value and a host binds it to a map that keeps its

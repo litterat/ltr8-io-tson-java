@@ -6,7 +6,7 @@
 
   Conventions:
   - Fields at their default values are omitted (`optional: false`,
-    `role: FREE`, `state: REQUIRED`).
+    `voidable: false`, `role: FREE`).
   - `type_definition.supertypes` and `subtypes` are complete and
     lexically sorted; a resolver's native ordering is
     implementation-defined, so comparison tools canonicalise both
@@ -175,8 +175,8 @@
       !record_field { name: members        type: integer_member_set  optional: true }
     ]
     groups: [
-      !field_group { members: [[min] [exclusive_min]]  state: OPTIONAL }
-      !field_group { members: [[max] [exclusive_max]]  state: OPTIONAL }
+      !field_group { members: [[min] [exclusive_min]]  optional: true }
+      !field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
   }
 
@@ -346,11 +346,6 @@
     body: !enum { members: [FREE DEFAULT FIXED] }
   }
 
-  element_state => !type_definition {
-    source: enum
-    body: !enum { members: [REQUIRED OPTIONAL] }
-  }
-
   record_extension_type => !type_definition {
     source: enum
     body: !enum { members: [ABSTRACT FINAL OPEN] }
@@ -385,15 +380,15 @@
   tuple_element => !type_definition {
     body: !record { fields: [
       !record_field { name: element_type  type: type_ref }
-      !record_field { name: state         type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
+      !record_field { name: voidable      type: boolean  optional: true  role: DEFAULT  value: false }
     ] }
   }
 
   field_group => !type_definition {
     body: !record { fields: [
-      !record_field { name: members   type: array_array_field_name_1_5d4d7dc5_1_xxhash }
-      !record_field { name: optional  type: array_field_name_1_xxhash  optional: true }
-      !record_field { name: state     type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
+      !record_field { name: members           type: array_array_field_name_1_5d4d7dc5_1_xxhash }
+      !record_field { name: optional_members  type: array_field_name_1_xxhash  optional: true }
+      !record_field { name: optional          type: boolean  optional: true  role: DEFAULT  value: false }
     ] }
   }
 
@@ -417,7 +412,7 @@
       !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: INDEX }
       !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
       !record_field { name: element_type    type: type_ref }
-      !record_field { name: state           type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
+      !record_field { name: voidable        type: boolean  optional: true  role: DEFAULT  value: false }
       !record_field { name: ordered         type: boolean  optional: true  role: DEFAULT  value: true }
       !record_field { name: unique_items    type: boolean  optional: true  role: DEFAULT  value: false }
       !record_field { name: min_items       type: non_negative_integer  optional: true }
@@ -432,7 +427,7 @@
       !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: INDEX }
       !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
       !record_field { name: element_type    type: type_ref }
-      !record_field { name: state           type: element_state  optional: true  role: FIXED  value: REQUIRED }
+      !record_field { name: voidable        type: boolean  optional: true  role: FIXED  value: false }
       !record_field { name: ordered         type: boolean  optional: true  role: FIXED  value: false }
       !record_field { name: unique_items    type: boolean  optional: true  role: FIXED  value: true }
       !record_field { name: min_items       type: non_negative_integer  optional: true }
@@ -446,7 +441,7 @@
       !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
       !record_field { name: key_type        type: type_ref }
       !record_field { name: value_type      type: type_ref }
-      !record_field { name: state           type: element_state  optional: true  role: DEFAULT  value: REQUIRED }
+      !record_field { name: voidable        type: boolean  optional: true  role: DEFAULT  value: false }
       !record_field { name: ordered         type: boolean  optional: true  role: DEFAULT  value: false }
       !record_field { name: min_items       type: non_negative_integer  optional: true }
       !record_field { name: max_items       type: non_negative_integer  optional: true }

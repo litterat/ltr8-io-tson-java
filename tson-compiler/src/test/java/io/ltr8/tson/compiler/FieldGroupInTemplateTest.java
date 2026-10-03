@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
 import org.junit.jupiter.api.Test;
@@ -53,8 +52,8 @@ class FieldGroupInTemplateTest {
     void anApplicationKeepsTheGroupsOptionsAndMarks() {
         TsonCompiledSchema schema = compiled();
         assertEquals(List.of(new FieldGroup(List.of(List.of("include"), List.of("name", "type")),
-                List.of("name", "type"), ElementState.OPTIONAL)), groupsOf(schema, "text_fragment"));
+                List.of("name", "type"), true)), groupsOf(schema, "text_fragment"));
         assertEquals(List.of(new FieldGroup(List.of(List.of("email", "phone")), List.of("email", "phone"),
-                ElementState.REQUIRED)), groupsOf(schema, "text_contact"));
+                false)), groupsOf(schema, "text_contact"));
     }
 }

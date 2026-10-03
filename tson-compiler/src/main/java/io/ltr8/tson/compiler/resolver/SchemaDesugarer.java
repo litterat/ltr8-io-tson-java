@@ -32,7 +32,6 @@ import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
@@ -67,7 +66,7 @@ import java.util.function.UnaryOperator;
  * <pre>
  * [T]              !array { element_type: T }
  * [T; N..M]        !array { element_type: T  min_items: N  max_items: M }
- * [T?; ...]        the corresponding form with state: OPTIONAL bound directly
+ * [T?; ...]        the corresponding form with voidable: true bound directly
  * [T, U]           !tuple { elements: [{ element_type: T } { element_type: U }] }
  * (A | B)          !choice { variants: [A B] }
  * {K =&gt; V}         !map   { key_type: K  value_type: V }
@@ -586,8 +585,8 @@ final class SchemaDesugarer {
                 new RecordValue.Field(WireForm.ARGUMENTS, WireForm.scoped(new ArrayValue(arguments)))));
     }
 
-    /** One position of a tuple after expansion: the type it names, and whether it is marked {@code OPTIONAL}. */
-    private record Position(TypeRef typeRef, boolean optional) {
+    /** One position of a tuple after expansion: the type it names, and whether it is marked voidable. */
+    private record Position(TypeRef typeRef, boolean voidable) {
     }
 
     /**
@@ -598,34 +597,34 @@ final class SchemaDesugarer {
     private Optional<Binding> binding(TypeRef ref) {
         return switch (ref) {
             case ArrayRef array -> arrayBinding(elementRef(array.elementType()),
-                    array.elementType().optional(), array.size(), shownElement(array.elementType()));
+                    array.elementType().voidable(), array.size(), shownElement(array.elementType()));
             case MapRef map -> mapBinding(typeRef(map.keyType()), elementRef(map.valueType()),
-                    map.valueType().optional(), map.size());
+                    map.valueType().voidable(), map.size());
             case TupleRef tuple -> tupleBinding(tuple.elementTypes().stream()
-                    .map(e -> new Position(elementRef(e), e.optional())).toList());
+                    .map(e -> new Position(elementRef(e), e.voidable())).toList());
             case ChoiceRef choice -> choiceBinding(mapShared(choice.variants(), this::typeRef));
             default -> Optional.empty();
         };
     }
 
     /**
-     * {@code !array { element_type: T [state: OPTIONAL] [min_items: N] [max_items: M] }} -- the whole array
+     * {@code !array { element_type: T [voidable: true] [min_items: N] [max_items: M] }} -- the whole array
      * row of the desugar table, the unsized and sized spellings alike.
      *
-     * <p><b>The element {@code ?} binds {@code state} directly</b>, alongside the bounds rather than through
+     * <p><b>The element {@code ?} binds {@code voidable} directly</b>, alongside the bounds rather than through
      * them: §5.3's {@code [T?; 3]} states both at once and both land on the one record. An unmarked element
-     * states nothing at all and lets §5.2's default injection supply it, exactly as a REQUIRED tuple
-     * position omits its own {@code state}.
+     * states nothing at all and lets §5.2's default injection supply it, exactly as an unmarked tuple
+     * position omits its own {@code voidable}.
      */
-    private static Optional<Binding> arrayBinding(TypeRef element, boolean optional, Optional<SizeSpec> size,
+    private static Optional<Binding> arrayBinding(TypeRef element, boolean voidable, Optional<SizeSpec> size,
             String shown) {
         if (!isReference(element)) {
             return Optional.empty();
         }
         List<RecordValue.Field> fields = new ArrayList<>();
         refSlot(ELEMENT_TYPE, element, fields);
-        if (optional) {
-            fields.add(WireForm.nameField(WireForm.STATE, ElementState.OPTIONAL.name()));
+        if (voidable) {
+            fields.add(WireForm.nameField(WireForm.VOIDABLE, "true"));
         }
         size.ifPresent(spec -> fields.addAll(sizeFields(spec, "[" + shown + "; 0..]")));
         return Optional.of(new Binding(ARRAY, fields));
@@ -641,14 +640,14 @@ final class SchemaDesugarer {
     }
 
     /**
-     * <code>!map { key_type: K  value_type: V [state: OPTIONAL] [min_items: N] [max_items: M] }</code> --
-     * the map row of the desugar table. The <b>value</b> carries a {@code state} the way an array element
+     * <code>!map { key_type: K  value_type: V [voidable: true] [min_items: N] [max_items: M] }</code> --
+     * the map row of the desugar table. The <b>value</b> carries {@code voidable} the way an array element
      * does, written only when marked, for the reason {@link #arrayBinding} omits an unmarked element's: the
-     * kernel's default is REQUIRED, so writing it would put a field at its default value into every map.
-     * The key carries none -- a key is never absent ([TSON-DATA] §2.9), so the parser refuses the marker
+     * kernel's default is false, so writing it would put a field at its default value into every map.
+     * The key carries none -- a key is never void ([TSON-DATA] §2.9), so the parser refuses the marker
      * there rather than this table dropping it.
      */
-    private static Optional<Binding> mapBinding(TypeRef key, TypeRef value, boolean optional,
+    private static Optional<Binding> mapBinding(TypeRef key, TypeRef value, boolean voidable,
             Optional<SizeSpec> size) {
         if (!isReference(key) || !isReference(value)) {
             return Optional.empty();
@@ -656,8 +655,8 @@ final class SchemaDesugarer {
         List<RecordValue.Field> fields = new ArrayList<>();
         refSlot(KEY_TYPE, key, fields);
         refSlot(VALUE_TYPE, value, fields);
-        if (optional) {
-            fields.add(WireForm.nameField(WireForm.STATE, ElementState.OPTIONAL.name()));
+        if (voidable) {
+            fields.add(WireForm.nameField(WireForm.VOIDABLE, "true"));
         }
         size.ifPresent(spec -> fields.addAll(
                 sizeFields(spec, "{" + shownRef(key) + " => " + shownRef(value) + "; 0..}")));
@@ -674,10 +673,9 @@ final class SchemaDesugarer {
      *
      * <p><b>Why this is not {@link #choiceBinding}.</b> Both are variadic and both fill one collection-typed
      * vocabulary field. What differs is what one position <em>is</em>: a variant is a bare {@code type_ref},
-     * while an element is a {@code tuple_element} record carrying a type <em>and</em> its own {@link
-     * ElementState}, so each position needs a record built for it rather than a name token. {@code state} is
-     * written only for an {@code OPTIONAL} position, for the reason {@link #arrayBinding} omits an unmarked
-     * element's.
+     * while an element is a {@code tuple_element} record carrying a type <em>and</em> its own {@code voidable},
+     * so each position needs a record built for it rather than a name token. {@code voidable} is written only
+     * for a marked position, for the reason {@link #arrayBinding} omits an unmarked element's.
      *
      * <p>What the two do share is that a position's type is written through {@link #refValue}: an element
      * holding a §5.10 application is spelled in {@code type_ref}'s record form and rewritten one pass later,
@@ -688,8 +686,8 @@ final class SchemaDesugarer {
         for (Position position : positions) {
             List<RecordValue.Field> members = new ArrayList<>();
             members.add(new RecordValue.Field(ELEMENT_TYPE, WireForm.scoped(refValue(position.typeRef()))));
-            if (position.optional()) {
-                members.add(WireForm.nameField(WireForm.STATE, ElementState.OPTIONAL.name()));
+            if (position.voidable()) {
+                members.add(WireForm.nameField(WireForm.VOIDABLE, "true"));
             }
             elements.add(WireForm.scoped(new RecordValue(members)));
         }

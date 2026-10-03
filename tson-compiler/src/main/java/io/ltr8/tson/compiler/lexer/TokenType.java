@@ -16,7 +16,7 @@ public enum TokenType {
     /** An unquoted token: identifiers, numbers, dates, etc. (§7.1, §7.3). */
     UNQUOTED,
 
-    /** {@code _} — the absent sentinel (§2.9). */
+    /** {@code _} — the void sentinel (§2.9). */
     ABSENT,
 
     // Structural delimiters (§7.2 rule 4)

@@ -35,10 +35,10 @@ import java.util.Map;
  *
  * <p>An entry whose value the document wrote as {@code _} arrives here as a {@code null} and is
  * {@code put} like any other, so the key is in the bound map and maps to nothing -- the closest a Java
- * {@code Map} comes to §2.9's "present with an absent value", and distinguishable from a key never stated.
+ * {@code Map} comes to §2.9's "present with a void value", and distinguishable from a key never stated.
  *
  * <p>Everything else -- resolving the key/value readers, confirming a map shape, size validation, rejecting
- * an absent key and admitting an absent value -- lives on {@link MapAbstractReader}.
+ * an absent key and admitting a void value -- lives on {@link MapAbstractReader}.
  */
 final class MapBindReader extends MapAbstractReader<Object> {
 

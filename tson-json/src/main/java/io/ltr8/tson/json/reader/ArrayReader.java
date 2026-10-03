@@ -75,7 +75,7 @@ final class ArrayReader implements JsonTypeReader<Object> {
             JsonReadContext at = ctx.index(index);
             if (at.peek() instanceof JsonEvent.NullValue) {
                 at.next();
-                if (!plan.optionalElements()) {
+                if (!plan.voidableElements()) {
                     at.report(plan.rules().absentElement(index, NULL));
                 }
                 // The slot exists and counts either way, so it stays rather than shifting every later element's

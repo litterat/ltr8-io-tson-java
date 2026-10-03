@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * Tree mode's map, in the form the document was written in: a {@link JsonObject} keyed by the member names for the
- * object form, a {@link JsonArray} of two-element arrays for the pairs form, an absent value standing as
+ * object form, a {@link JsonArray} of two-element arrays for the pairs form, a void value standing as
  * {@link JsonNull}. A map whose read reported anything builds nothing -- all-or-nothing, as bind mode is.
  */
 final class TreeMapBuilder implements MapBuilder {

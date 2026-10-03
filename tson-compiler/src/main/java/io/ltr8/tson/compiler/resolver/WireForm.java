@@ -11,7 +11,6 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -83,8 +82,8 @@ final class WireForm {
     static final String GROUPS = "groups";
     static final String MEMBERS = "members";
     static final String TYPE = "type";
-    static final String STATE = "state";
     static final String OPTIONAL = "optional";
+    static final String OPTIONAL_MEMBERS = "optional_members";
     static final String VOIDABLE = "voidable";
     static final String ROLE = "role";
     static final String SUPERTYPES = "supertypes";
@@ -110,18 +109,18 @@ final class WireForm {
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * A {@code field_group} as a held body writes it: {@code optional} only where it names a member, and
-     * {@code state} only where it is not the default {@code REQUIRED}.
+     * A {@code field_group} as a held body writes it: {@code optional_members} only where it names a member, and
+     * {@code optional} only where it is set.
      */
     static ScopedValue group(FieldGroup group, List<Annotation> annotations) {
         List<RecordValue.Field> fields = new ArrayList<>();
         fields.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(group.members().stream()
                 .map(option -> scoped(names(option))).toList()))));
-        if (!group.optional().isEmpty()) {
-            fields.add(new RecordValue.Field(OPTIONAL, scoped(names(group.optional()))));
+        if (!group.optionalMembers().isEmpty()) {
+            fields.add(new RecordValue.Field(OPTIONAL_MEMBERS, scoped(names(group.optionalMembers()))));
         }
-        if (group.state() != ElementState.REQUIRED) {
-            fields.add(nameField(STATE, group.state().name()));
+        if (group.optional()) {
+            fields.add(nameField(OPTIONAL, "true"));
         }
         return scoped(new RecordValue(fields), annotations);
     }

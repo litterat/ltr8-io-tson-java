@@ -172,7 +172,7 @@ a singleton, which is the overwhelming majority of them.
 
 ## Untagged labelled choices (`reader/GroupUnionBindReader`)
 
-**A record whose fields form one REQUIRED group, bound onto a Java sealed interface whose members carry those
+**A record whose fields form one non-optional group, bound onto a Java sealed interface whose members carry those
 fields one apiece.** The kernel's `type_argument => { ( name: type_ref | value: value ) }` is the case that
 forces it: a record with no subtypes otherwise binds only onto a record descriptor (`requireRecord`), so
 without this reader no `type_ref` carrying `arguments` could be read at all.
@@ -186,7 +186,7 @@ without this reader no `type_ref` carrying `arguments` could be read at all.
   the component *is* the field; matching on anything else would need a second table to keep in step with the
   first. `TypeArgument.Ref` carries `@Field("name")` for this reason, which also brings `toTson` closer to the
   kernel's own spelling.
-- **Three conditions are checked, not assumed** — union target, one REQUIRED group covering every field, and
+- **Three conditions are checked, not assumed** — union target, one non-optional group covering every field, and
   every member carrying one component named for one of those fields. A near-miss falls through to the
   ordinary record path and is reported there; guessing at a partial match would bind a member to a field it
   does not carry.

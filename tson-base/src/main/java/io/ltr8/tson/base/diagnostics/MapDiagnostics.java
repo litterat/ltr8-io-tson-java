@@ -25,16 +25,16 @@ public record MapDiagnostics(String typeName) {
     }
 
     /**
-     * [TSON-DATA] §2.9: a key must not be absent. The one absence rule that holds at every state, there being
-     * no facet that admits an absent key and no reading under which one would mean anything.
+     * [TSON-DATA] §2.9: a key must not be void. The one void rule that holds at every position, there being no
+     * facet that admits a void key and no reading under which one would mean anything.
      *
-     * <p>"The absent sentinel" is §2.9's own noun for the concept and so belongs in the prose; what stays out
-     * is the <em>spelling</em>, which is each encoding's and rides in {@code actual}.
+     * <p>"The void sentinel" is the series' noun for the concept (§2.9, SPEC-FEEDBACK.md #21) and so belongs in
+     * the prose; what stays out is the <em>spelling</em>, which is each encoding's and rides in {@code actual}.
      */
     public Refusal absentKey(String spelling) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
-                "'%s': the absent sentinel must not appear as a map key (§2.9)".formatted(typeName),
-                "a real map key, never the absent sentinel", spelling);
+                "'%s': the void sentinel must not appear as a map key (§2.9)".formatted(typeName),
+                "a real map key, never the void sentinel", spelling);
     }
 
     /** [TSON-DATA] §2.6: a map states each key at most once, and the repeat states an entry for nothing. */
@@ -65,7 +65,7 @@ public record MapDiagnostics(String typeName) {
                 "a value", spelling);
     }
 
-    /** §5.3's {@code min_items}, counted over entries -- an entry with an absent value is an entry. */
+    /** §5.3's {@code min_items}, counted over entries -- an entry with a void value is an entry. */
     public Refusal tooFewEntries(BigInteger min, int size) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 "'%s' has %d entries, fewer than the minimum %s".formatted(typeName, size, min),

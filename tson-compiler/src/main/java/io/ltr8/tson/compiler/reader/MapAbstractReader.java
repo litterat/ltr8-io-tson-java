@@ -9,7 +9,6 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
 
@@ -25,7 +24,7 @@ import java.util.function.BiConsumer;
  * {@code EmptyBraceEvent}, zero entries, matching {@code TsonObjectReader.toMap}'s own treatment of
  * {@code {}}), and decoding entries one at a time straight off the event stream -- validating {@code
  * min_items}/{@code max_items} against the final count (known only once {@code MapEnd} arrives),
- * rejecting the absent sentinel {@code _} in key position and admitting it in value position (§2.9) --
+ * rejecting the void sentinel {@code _} in key position and admitting it in value position (§2.9) --
  * handing each decoded key/value pair to a {@link BiConsumer} rather than assembling a result itself, the
  * same reasoning {@link ArrayAbstractReader#readInto} documents for arrays.
  *
@@ -35,12 +34,11 @@ import java.util.function.BiConsumer;
  * min_items: 1} forbids. The count is therefore validated in {@link #expectMapShape}, the one funnel every
  * map reader passes through, rather than in {@link #readInto}, which a {@code {}} never reaches.
  *
- * <p>Unlike {@link ArrayAbstractReader}, there's no {@code unique_items}/{@code ElementState}
- * concept here at all -- {@link MapBody} carries no {@code unique_items}. It does carry an {@link
- * ElementState}, governing the <b>value</b> ({@code {K => V?}}): an entry's value may be the absent
- * sentinel under OPTIONAL and is {@code FIELD_REQUIRED} otherwise, which is the array element's own rule
- * (see {@link #decodedValue}). The key is the opposite and unconditional -- §2.9 forbids the sentinel
- * there whatever the declaration says, checked in {@link #readInto} before the key is decoded at all.
+ * <p>Unlike {@link ArrayAbstractReader}, there's no {@code unique_items} concept here at all -- {@link MapBody}
+ * carries no {@code unique_items}. It does carry {@code voidable}, governing the <b>value</b> ({@code {K => V?}}):
+ * an entry's value may be the void sentinel where it is set and is {@code FIELD_REQUIRED} otherwise, which is the
+ * array element's own rule (see {@link #decodedValue}). The key is the opposite and unconditional -- §2.9 forbids the
+ * sentinel there whatever the declaration says, checked in {@link #readInto} before the key is decoded at all.
  *
  * <p><b>A repeated key is a validation error</b> ({@code DUPLICATE_MAP_KEY}), reported at the repeat's
  * own position and then decoded like any other entry so the sink still ends up "last value wins".
@@ -207,9 +205,9 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * The entry's value, or nothing where the document wrote {@code _} there -- permitted under {@code
-     * {K => V?}} ({@link ElementState#OPTIONAL}) and {@code FIELD_REQUIRED} otherwise, the same two answers
+     * {K => V?}} ({@code voidable}) and {@code FIELD_REQUIRED} otherwise, the same two answers
      * {@link ArrayAbstractReader#defaultOrRequire} gives an element. Either way the entry is present with an
-     * absent value ([TSON-DATA] §2.9) and counts toward the size bounds. Answered here rather than by the
+     * void value ([TSON-DATA] §2.9) and counts toward the size bounds. Answered here rather than by the
      * value's own reader, which is right to refuse the sentinel: {@code _} is a value of no atom type, so
      * absence is the container's question, exactly as {@link ArrayAbstractReader#readInto} asks it of an
      * element before reaching for the element parser.
@@ -221,8 +219,8 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      */
     private Object decodedValue(String keySegment, TsonReadContext ctx) {
         if (ctx.peek() instanceof AbsentEvent) {
-            ctx.next(); // consumed regardless of REQUIRED/OPTIONAL, so the entry keeps its place either way
-            if (body.state() == ElementState.REQUIRED) {
+            ctx.next(); // consumed whether or not the value is voidable, so the entry keeps its place either way
+            if (!body.voidable()) {
                 ctx.field(keySegment).report(rules.absentEntryValue(keySegment, ABSENT));
             }
             return null;

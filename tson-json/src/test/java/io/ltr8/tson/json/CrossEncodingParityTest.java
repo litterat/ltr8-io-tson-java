@@ -583,7 +583,7 @@ class CrossEncodingParityTest {
                 {"name": "Ada", "kind": "robot", "labels": []}""");
     }
 
-    /** The absent sentinel at a field that admits none: `_` in text, null in JSON, one verdict. */
+    /** The void sentinel at a field that admits none: `_` in text, null in JSON, one verdict. */
     @Test
     void theAbsentSentinelAtARequiredField() {
         sameRule("person", """

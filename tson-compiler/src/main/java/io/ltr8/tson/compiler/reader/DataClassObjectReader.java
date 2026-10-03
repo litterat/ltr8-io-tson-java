@@ -458,7 +458,10 @@ public final class DataClassObjectReader {
         return names.toString();
     }
 
-    /** One record field's value: the absent sentinel {@code _} binds to {@code null} (a required field left {@code _} is a {@code FIELD_REQUIRED} problem), anything else binds recursively. */
+    /**
+     * One record field's value: the void sentinel {@code _} binds to {@code null} (a required field left {@code _}
+     * is a {@code FIELD_REQUIRED} problem), anything else binds recursively.
+     */
     private Object bindField(TsonReadContext ctx, DataClassField field) {
         if (ctx.peek() instanceof AbsentEvent) {
             ctx.next();
@@ -521,7 +524,7 @@ public final class DataClassObjectReader {
     /**
      * A map key is a full {@code data-value} (§2.6), bound recursively exactly like a value is.
      * {@code {}} binds to an empty map (§2.8's deferred choice, resolved to a map here since the
-     * target says map), and the absent sentinel {@code _} in key position is rejected (§2.9).
+     * target says map), and the void sentinel {@code _} in key position is rejected (§2.9).
      */
     private Object bindMap(TsonReadContext ctx, DataClassMap dataClass) {
         containerFraming(ctx, dataClass);
@@ -552,7 +555,7 @@ public final class DataClassObjectReader {
             while (!(ctx.peek() instanceof MapEnd)) {
                 if (ctx.peek() instanceof AbsentEvent) {
                     ctx.next(); // the absent key itself
-                    ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the absent sentinel '_' must not appear as a map key "
+                    ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the void sentinel '_' must not appear as a map key "
                             + "(§2.9) for " + dataClass.typeClass(), "a real map key", "_");
                     ctx.next(); // MapArrow
                     EventSkip.scopedValue(ctx);

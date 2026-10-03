@@ -53,7 +53,7 @@ final class AtomReader<T> implements JsonTypeReader<T> {
                     AtomForm.BOOLEAN, context.locationOf(name, definition), null)
             : of(name, definition, context);
 
-    /** {@code void_type}: the absent sentinel and nothing else, read as [TSON-JSON] §5.7 states for JSON. */
+    /** {@code void_type}: the void sentinel and nothing else, read as [TSON-JSON] §5.7 states for JSON. */
     static final ValueReaderFactory VOID = (name, definition, context) ->
             new VoidReader(name, context.locationOf(name, definition));
 
@@ -106,7 +106,7 @@ final class AtomReader<T> implements JsonTypeReader<T> {
         String content = form.contentOf(event);
         if (content == null) {
             // §5: a JSON value of the wrong kind at an atom position is a validation error -- and JSON null
-            // is one of them here, §7 having already spent it as the absent sentinel, which no REQUIRED
+            // is one of them here, §7 having already spent it as the void sentinel, which no REQUIRED
             // position admits. That is the same verdict TSON text gives `_` in the same position.
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' takes %s, and this is %s"
                     .formatted(name, form.describe(), JsonAtoms.describe(event)),

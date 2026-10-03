@@ -176,7 +176,7 @@ public final class JsonDataEmitter {
     /**
      * RFC 8259's {@code null}.
      *
-     * <p>At this layer it is a value and nothing more. [TSON-JSON] §7 makes it the absent sentinel's
+     * <p>At this layer it is a value and nothing more. [TSON-JSON] §7 makes it the void sentinel's
      * spelling <em>at a typed position</em>, which is the schema-directed decode's rule and not one a
      * structural emitter can apply -- it does not know what position anything is at.
      */

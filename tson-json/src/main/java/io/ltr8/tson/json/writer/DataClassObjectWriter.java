@@ -90,7 +90,7 @@ public final class DataClassObjectWriter {
     private void write(Object value, DataClass dataClass, JsonDataEmitter out) throws DataBindException {
         try {
             if (value == null) {
-                // §7 makes JSON null the absent sentinel's spelling at a typed position, which is what a
+                // §7 makes JSON null the void sentinel's spelling at a typed position, which is what a
                 // reader of this document will apply. Here it is simply the one spelling absence has.
                 out.nullValue();
                 return;

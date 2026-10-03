@@ -233,7 +233,7 @@ class JsonObjectReaderTest {
 
         @Test
         void null_at_an_optional_member_is_the_absence_and_binds_null() {
-            // §7: JSON null is the absent sentinel's spelling, admitted where the position admits absence.
+            // §7: JSON null is the void sentinel's spelling, admitted where the position admits absence.
             assertEquals(new Person(null, 36), READER.read("{\"name\": null, \"age\": 36}", Person.class));
         }
 

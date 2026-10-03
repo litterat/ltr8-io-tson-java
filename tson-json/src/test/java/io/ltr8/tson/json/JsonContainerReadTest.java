@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-JSON] §6.1/§6.3/§6.4 and §7: records as objects, arrays and sets and tuples as arrays, and JSON null
- * as the absent sentinel.
+ * as the void sentinel.
  *
  * <p>The read is asserted as JSON: a schema-directed tree read validates and hands the document back, so what
  * a test compares is the tree that came out and the diagnostics beside it.
@@ -371,7 +371,7 @@ class JsonContainerReadTest {
                 ["a", 1, 2]""").refusal().code());
     }
 
-    /** §6.4: an OPTIONAL position's absent value is null in its slot; at a REQUIRED position it is an error. */
+    /** §6.4: an OPTIONAL position's void value is null in its slot; at a REQUIRED position it is an error. */
     @Test
     void aTupleSlotTakesNullOnlyWhereItIsOptional() {
         assertEquals("""

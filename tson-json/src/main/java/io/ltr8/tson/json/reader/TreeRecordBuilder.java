@@ -22,7 +22,7 @@ import io.ltr8.tson.json.tree.JsonValue;
  * <p><b>A tree keeps the spelling of absence</b> ([TSON-JSON] §7.2). Of a clean read, a member written null --
  * which a clean read admits only at a voidable field -- stands as {@link JsonNull}, and a member never written
  * is left out, as the text tree keeps {@code _} as an absent node distinct from a missing field ([TSON-DATA]
- * §2.9's "present with an absent value"). Bind mode has one null and collapses the two; a tree is the document,
+ * §2.9's "present with a void value"). Bind mode has one null and collapses the two; a tree is the document,
  * and the consumer that needs "no lower bound" told apart from "not stated" is a tree consumer.
  */
 final class TreeRecordBuilder implements RecordBuilder {

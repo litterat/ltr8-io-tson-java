@@ -271,7 +271,7 @@ public final class TsonDataEmitter {
 
     // ── Leaf tokens ──────────────────────────────────────────────────────────
 
-    /** {@code _}, the absent sentinel (§2.9) -- the notation's only no-value spelling. */
+    /** {@code _}, the void sentinel (§2.9) -- the notation's only no-value spelling. */
     public TsonDataEmitter absentValue() {
         startCoreValue();
         emit('_');

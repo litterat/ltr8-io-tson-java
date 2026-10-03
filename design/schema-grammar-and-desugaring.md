@@ -76,11 +76,11 @@ rebuilt and called a cache.
   |---|---|
   | `[T]` | `!array { element_type: T }` |
   | `[T; N]` / `[T; N..M]` / `[T; N..]` / `[T; ..M]` | the same, plus `min_items`/`max_items` |
-  | `[T?]`, `[T?; …]` | the corresponding form with `state: OPTIONAL` bound directly |
+  | `[T?]`, `[T?; …]` | the corresponding form with `voidable: true` bound directly |
   | `[T, U, …]` | `!tuple { elements: [{ element_type: T } { element_type: U }] }` |
   | `(A \| B)` | `!choice { variants: [A B] }` |
   | `{K => V}` | `!map { key_type: K  value_type: V }` |
-  | `{K => V?}`, `{K => V?; …}` | the corresponding form with `state: OPTIONAL` bound directly |
+  | `{K => V?}`, `{K => V?; …}` | the corresponding form with `voidable: true` bound directly |
   | `{K => V; N..M}` | the same, plus `min_items`/`max_items` |
 
   The constructors being parameterless (§4.2), the table above is the whole rule: `SchemaResolver` threads no
@@ -109,9 +109,9 @@ rebuilt and called a cache.
   differ between two runs of the same application. `SchemaDesugarerTest` pins two derived names to exact
   strings, because a change to them is a change to the resolved form of every schema.
 - **The variadic pair, `choice` and `tuple`, differ in what one position *is*.** A variant is a bare
-  `type_ref`; an element is a `tuple_element` record carrying a type **and** its own `ElementState`, so each
-  tuple position needs a record built for it. `state` is written only for an `OPTIONAL` position — the member
-  is defaulted (`state?: element_state ~ REQUIRED`), so a `REQUIRED` one is spelled by omitting it,
+  `type_ref`; an element is a `tuple_element` record carrying a type **and** its own `voidable`, so each
+  tuple position needs a record built for it. `voidable` is written only for a marked position — the member
+  is defaulted (`voidable?: boolean ~ false`), so an unmarked one is spelled by omitting it,
   as every other defaulted vocabulary field is. Nothing rides on trust: the emitted body binds through the
   governing meta's compiled reader, where an undeclared member is `UNRECOGNIZED_FIELD` under §7.2's closure.
   §5.4's "each variant resolves to a distinct type" is deliberately not checked here — it is a question about
@@ -128,19 +128,19 @@ rebuilt and called a cache.
   per-depth case and no second walk, there being one node family for a container wherever it stands.
   Because identity is structural, the injected entry is shared: one `array_integer_<hash>` serves the nested
   position, the flat declaration `[integer]` and an inline field's `[integer]` alike. An injected **tuple**'s
-  name derives from its positions' *states* as well as their types, or `[T, U?]` and `[T, U]` would land on
+  name derives from its positions' `voidable` as well as their types, or `[T, U?]` and `[T, U]` would land on
   one entry.
-- **The element `?` binds `state` directly.** `[T?]` becomes `!array { element_type: T  state: OPTIONAL }` —
+- **The element `?` binds `voidable` directly.** `[T?]` becomes `!array { element_type: T  voidable: true }` —
   §5.3's "elements at any position MAY be the absent sentinel `_`; absent elements occupy positional slots".
   It has no parameter to route through, which is why §5.3 gives the `?` forms no template route. An unmarked
-  element states nothing and lets §5.2's default injection supply `REQUIRED`, exactly as a REQUIRED
-  tuple position omits its own `state`. The state reaches the derived name too, or `[T?]` and `[T]` collide on
-  one injected entry. `[T?; 3]` — the form §5.3 states the rule through — puts the state and both bounds on
+  element states nothing and lets §5.2's default injection supply `false`, exactly as an unmarked
+  tuple position omits its own `voidable`. The fact reaches the derived name too, or `[T?]` and `[T]` collide on
+  one injected entry. `[T?; 3]` — the form §5.3 states the rule through — puts the fact and both bounds on
   one binding record, which is the shape the whole table is written in. On the read side `ArrayAbstractReader`
-  admits `_` under `ElementState.OPTIONAL` and counts it toward the bounds. **A map's value takes the same
-  `?`** and binds the same field — `map` carries an `element_state` for it (§5.3's `{K => V?}` row) — so
-  `{K => V}` means what `[T]` means and an author who wants absence writes it. The *key* takes none: §2.9
-  forbids an absent key outright, so there is no state for a marker to bind.
+  admits `_` under `voidable` and counts it toward the bounds. **A map's value takes the same
+  `?`** and binds the same field — `map` carries `voidable` for it (§5.3's `{K => V?}` row) — so
+  `{K => V}` means what `[T]` means and an author who wants a void value writes it. The *key* takes none: §2.9
+  forbids a void key outright, so there is nothing for a marker to bind.
 - **The size specifier is one rule over the `min_items`/`max_items` pair, for arrays and maps alike.** There
   is no template in between — the kernel declares no size template — and each of the
   four spellings binds the pair directly, an exact `N` pinning both. §5.3's bound coherence (`min <= max`) is

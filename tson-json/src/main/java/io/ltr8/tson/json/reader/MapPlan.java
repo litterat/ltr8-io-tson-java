@@ -9,7 +9,6 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -41,7 +40,7 @@ import java.util.Optional;
  * {@code {text => text}} is an ordinary key. §8.3.1's escape is for a map standing as a choice variant, and
  * belongs to the choice reader.
  */
-record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean optionalValues,
+record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean voidableValues,
                Optional<BigInteger> minItems, Optional<BigInteger> maxItems, AtomType<?> keyParser,
                JsonTypeReader<?> schemaKey, JsonTypeReader<?> schemaValue, MapDiagnostics rules,
                IdentifierProfile keyProfile) {
@@ -53,7 +52,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean op
         String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
         AtomType<?> keyParser = scalarKeyParser(context.linked(), body.keyType().name()).orElse(null);
         return new MapPlan(displayName, context.locationOf(name, definition),
-                body.state() == ElementState.OPTIONAL, body.minItems(), body.maxItems(), keyParser,
+                body.voidable(), body.minItems(), body.maxItems(), keyParser,
                 keyParser == null ? context.readers().resolve(body.keyType().name()) : null,
                 context.readers().resolve(body.valueType().name()), new MapDiagnostics(displayName),
                 keyProfile(context.schema(), body.keyType().name()));

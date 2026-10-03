@@ -18,7 +18,7 @@ import java.util.Objects;
  * reference), matching the kernel's own choice to call both "type_ref" too.
  *
  * <p>{@code arguments} is bound from {@code type_ref}'s OPTIONAL {@code arguments: [type_argument]?}
- * field, so an absent value arrives as {@code null} -- which, per the "empty means no {@code <...>}"
+ * field, so a void value arrives as {@code null} -- which, per the "empty means no {@code <...>}"
  * rule above, is the same thing as no arguments. The constructor therefore normalizes {@code null} to
  * the empty list rather than rejecting it: absent and empty are one state for a reference, and there is
  * no wire form for "present but empty" arguments to keep distinct.

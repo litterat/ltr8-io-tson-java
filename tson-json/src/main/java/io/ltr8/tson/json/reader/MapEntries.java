@@ -17,14 +17,14 @@ final class MapEntries {
     }
 
     /**
-     * An entry's value. {@code {K => V?}} admits JSON null as the entry's <b>absent value</b> -- the entry is
+     * An entry's value. {@code {K => V?}} admits JSON null as the entry's <b>void value</b> -- the entry is
      * present, counts toward the size bounds, and carries no value; under {@code {K => V}} a null entry value is a
      * validation error, as with an array element (§7).
      */
     static Object value(MapPlan plan, JsonTypeReader<?> reader, JsonReadContext at, String keySegment) {
         if (at.peek() instanceof JsonEvent.NullValue) {
             at.next();
-            if (!plan.optionalValues()) {
+            if (!plan.voidableValues()) {
                 at.report(plan.rules().absentEntryValue(keySegment, NULL));
             }
             return Slots.ABSENT;
@@ -33,7 +33,7 @@ final class MapEntries {
         return value == null ? Slots.REFUSED : value;
     }
 
-    /** §6.4: size facets count entries -- an entry with an absent value is an entry. */
+    /** §6.4: size facets count entries -- an entry with a void value is an entry. */
     static void checkSize(MapPlan plan, JsonReadContext ctx, int count) {
         BigInteger size = BigInteger.valueOf(count);
         plan.minItems().filter(min -> size.compareTo(min) < 0)

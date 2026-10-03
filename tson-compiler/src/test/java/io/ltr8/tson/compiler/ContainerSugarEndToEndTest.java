@@ -11,7 +11,6 @@ import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -326,7 +325,7 @@ class ContainerSugarEndToEndTest {
 
     /**
      * <code>{K =&gt; V?}</code> through the real bundled chain: the marker reaches the kernel's {@code map}
-     * {@code state} field (issue #227), so the value may be the absent sentinel and the map's own type says
+     * {@code state} field (issue #227), so the value may be the void sentinel and the map's own type says
      * so. The peer of {@code [T?]}, and the end-to-end half of {@code SchemaDesugarerTest}'s binding check.
      */
     @Test
@@ -335,8 +334,8 @@ class ContainerSugarEndToEndTest {
                   loose => {text => text?}
                   strict => {text => text}""");
 
-        assertEquals(ElementState.OPTIONAL, ((MapBody) bodyOf(compiled, "loose")).state());
-        assertEquals(ElementState.REQUIRED, ((MapBody) bodyOf(compiled, "strict")).state());
+        assertTrue(((MapBody) bodyOf(compiled, "loose")).voidable());
+        assertFalse(((MapBody) bodyOf(compiled, "strict")).voidable());
     }
 
     /**

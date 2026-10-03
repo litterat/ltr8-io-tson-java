@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -90,7 +89,7 @@ final class TypeInhabitance {
             Set<String> inhabited) {
         return switch (definition.body()) {
             case RecordBody record -> recordInhabited(record, namespace, inhabited);
-            case ArrayBody array -> array.state() == ElementState.OPTIONAL
+            case ArrayBody array -> array.voidable()
                     || isEmptyAllowed(array.minItems())
                     || refInhabited(array.elementType(), namespace, inhabited);
             case MapBody map -> isEmptyAllowed(map.minItems())
@@ -119,7 +118,7 @@ final class TypeInhabitance {
      *
      * <p><b>The groups are walked separately because their members hide from the field walk</b>: §5.11 makes a
      * group's members uniformly optional in {@code fields}, with the requirement carried by the group's own
-     * state. Reading only the field list would find nothing required and call every group satisfied.
+     * {@code optional}. Reading only the field list would find nothing required and call every group satisfied.
      */
     private static boolean recordInhabited(RecordBody record, Map<String, TypeDefinition> namespace,
             Set<String> inhabited) {
@@ -134,7 +133,7 @@ final class TypeInhabitance {
             }
         }
         for (FieldGroup group : record.groups()) {
-            if (group.state() == ElementState.REQUIRED && group.members().stream()
+            if (!group.optional() && group.members().stream()
                     .noneMatch(option -> choosable(option, group, record, namespace, inhabited))) {
                 return false;
             }
@@ -151,7 +150,7 @@ final class TypeInhabitance {
         boolean anyStated = false;
         for (String member : option) {
             boolean stated = memberSatisfiable(member, record, namespace, inhabited);
-            if (!stated && !group.optional().contains(member)) {
+            if (!stated && !group.optionalMembers().contains(member)) {
                 return false;
             }
             anyStated |= stated;
@@ -191,7 +190,7 @@ final class TypeInhabitance {
 
     private static boolean positionInhabited(TupleElement element, Map<String, TypeDefinition> namespace,
             Set<String> inhabited) {
-        return element.state() == ElementState.OPTIONAL
+        return element.voidable()
                 || refInhabited(element.elementType(), namespace, inhabited);
     }
 
@@ -257,7 +256,7 @@ final class TypeInhabitance {
             }
         }
         return record.groups().stream()
-                .filter(group -> group.state() == ElementState.REQUIRED && group.members().stream()
+                .filter(group -> !group.optional() && group.members().stream()
                         .noneMatch(option -> choosable(option, group, record, namespace, inhabited)))
                 .flatMap(group -> group.memberNames().stream())
                 .flatMap(member -> record.fields().stream().filter(field -> field.name().equals(member)))

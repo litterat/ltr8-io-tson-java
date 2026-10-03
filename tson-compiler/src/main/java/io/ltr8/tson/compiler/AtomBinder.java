@@ -46,7 +46,7 @@ public final class AtomBinder {
     /** {@code _} binds to {@code null}, the host's only no-value representation -- so no primitive can take it. */
     private static Object bindAbsent(Class<?> target) throws DataBindException {
         if (target.isPrimitive()) {
-            throw new DataBindException("cannot bind the absent sentinel '_' to primitive type " + target);
+            throw new DataBindException("cannot bind the void sentinel '_' to primitive type " + target);
         }
         return null;
     }

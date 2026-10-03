@@ -21,7 +21,7 @@ import java.util.Optional;
  *
  * <p>The classes exist so that every encoding can state how much of a value's class its own forms recover.
  * JSON has six value kinds and the type system five classes; the null kind carries no class at all -- it is
- * the absent sentinel (§7), spent before any class question arises -- and the remaining five nearly map
+ * the void sentinel (§7), spent before any class question arises -- and the remaining five nearly map
  * one-to-one.
  *
  * <p><b>A type with no class needs no verdict.</b> {@code rational} and {@code complex} (both strings, but
@@ -107,7 +107,7 @@ enum DiscriminationClass {
 
     /**
      * §4.2's table, read from the wire end: the class an arriving value's kind names, or empty for null,
-     * which carries no class -- it is the absent sentinel and is spent before any class question arises.
+     * which carries no class -- it is the void sentinel and is spent before any class question arises.
      *
      * <p>The two leaks §8.3 names are <em>not</em> folded in here, and that is the point of keeping stability
      * a separate question: a string may be an approximate atom's special value and an array may be a map in

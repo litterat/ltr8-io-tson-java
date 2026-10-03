@@ -124,7 +124,7 @@ class TupleReadTest {
         assertEquals(Optional.of("/0"), thrown.diagnostic().path(), "reported at the offending position");
     }
 
-    /** A declaration-position `?` makes that position OPTIONAL, which is what admits the absent sentinel. */
+    /** A declaration-position `?` makes that position OPTIONAL, which is what admits the void sentinel. */
     @Test
     void anOptionalPositionAdmitsTheAbsentSentinel() {
         TsonValue pair = read("[integer?, text]", "pair", "[_ \"hello\"]");

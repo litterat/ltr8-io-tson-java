@@ -65,7 +65,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(69, registered.entries().size());
+        assertEquals(68, registered.entries().size());
     }
 
     @Test
@@ -124,11 +124,11 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("field_group")
-                .read(TestDocuments.document("{ members: [[foo] [bar baz]] optional: [baz] state: OPTIONAL }")));
+                .read(TestDocuments.document("{ members: [[foo] [bar baz]] optional_members: [baz] optional: true }")));
 
         assertEquals(List.of(List.of("foo"), List.of("bar", "baz")), result.get("members"));
-        assertEquals(List.of("baz"), result.get("optional"));
-        assertEquals("OPTIONAL", result.get("state"));
+        assertEquals(List.of("baz"), result.get("optional_members"));
+        assertEquals(true, result.get("optional"));
     }
 
     @Test
@@ -137,9 +137,9 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("tuple_element")
-                .read(TestDocuments.document("{ element_type: { name: text arguments: [] } state: REQUIRED }")));
+                .read(TestDocuments.document("{ element_type: { name: text arguments: [] } voidable: true }")));
 
-        assertEquals("REQUIRED", result.get("state"));
+        assertEquals(true, result.get("voidable"));
         @SuppressWarnings("unchecked")
         Map<String, Object> elementType = (Map<String, Object>) result.get("element_type");
         assertEquals("text", elementType.get("name"));

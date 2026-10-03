@@ -114,7 +114,7 @@ class JsonStreamTest {
 
         @Test
         void nothing_here_interprets_null_which_is_a_json_value_at_this_layer() {
-            // §7 makes JSON null the absent sentinel's spelling *at a typed position*. This layer has
+            // §7 makes JSON null the void sentinel's spelling *at a typed position*. This layer has
             // none, so settling it here would impose a schema's answer on a layer that has no schema.
             assertEquals(List.of("{", "name(nickname)", "null", "}", "end"), events("{\"nickname\": null}"));
         }

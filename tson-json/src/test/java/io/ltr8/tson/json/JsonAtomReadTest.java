@@ -253,7 +253,7 @@ class JsonAtomReadTest {
 
     // ── §5.7 void and value ──────────────────────────────────────────────
 
-    /** §5.7: at a {@code void} position the absent sentinel is the only conforming value, and null spells it. */
+    /** §5.7: at a {@code void} position the void sentinel is the only conforming value, and null spells it. */
     @Test
     void voidTakesNullAndNothingElse() {
         assertNull(read("nothing", "null").accepted());
@@ -289,7 +289,7 @@ class JsonAtomReadTest {
     }
 
     /**
-     * §7: JSON null is the absent sentinel, spent before any family rule applies -- so at every REQUIRED
+     * §7: JSON null is the void sentinel, spent before any family rule applies -- so at every REQUIRED
      * atom position it is a validation error, precisely as {@code _} is in text.
      */
     @Test

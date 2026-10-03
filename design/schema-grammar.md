@@ -48,7 +48,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **No production of the schema grammar takes the full `data-value`**, which §12.1 states.
   `instance`'s payload is a `core-value` (`Instance` wraps a `DataValue` with `typeRef` pre-set, no separate
   `target`); `construction-def` admits the implicit `&` before its trailing `record-def`; `field-modifier`'s
-  value is a bare token or the absent sentinel.
+  value is a bare token or the void sentinel.
   - **`atom-refinement` is `"!" type-name ws "^" ws record-def`**, so the `^` branch requires a brace:
     `!integer ^ 5`, `!integer ^ !foo { … }` and `!integer ^ @doc:"d" { … }` are syntax errors, reported at the
     offending token, per declaration like every other schema syntax error.

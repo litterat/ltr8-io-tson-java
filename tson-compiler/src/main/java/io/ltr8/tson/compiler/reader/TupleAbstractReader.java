@@ -7,7 +7,6 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.*;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 
@@ -23,8 +22,8 @@ import java.util.List;
  * {@code TsonObjectReader.toTuple}'s own note), and decoding every position into a single {@code
  * Object[]} in slot order straight off the stream.
  *
- * <p>Each position carries its own type *and* its own {@link ElementState} (§5.3) -- unlike {@link
- * ArrayAbstractReader}, where every element shares one type/state -- so absent-position handling
+ * <p>Each position carries its own type *and* its own {@code voidable} (§5.3) -- unlike {@link
+ * ArrayAbstractReader}, where every element shares one type and one fact -- so void-position handling
  * stays per-slot here rather than shared with arrays; the logic is analogous, not identical, so it's
  * duplicated rather than forced through one shared method (matching how {@code isAbsent} is
  * duplicated, not shared, across every structural kind in this package).
@@ -140,8 +139,8 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     private Object defaultOrRequire(CompiledSlot slot, int index, TsonReadContext ctx) {
-        ctx.next(); // consume the AbsentEvent regardless of REQUIRED/OPTIONAL
-        if (slot.schema().state() == ElementState.REQUIRED) {
+        ctx.next(); // consume the AbsentEvent whether or not the position is voidable
+        if (!slot.schema().voidable()) {
             ctx.index(index).report(rules.absentPosition(index, ABSENT));
         }
         return null;

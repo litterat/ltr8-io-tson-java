@@ -202,8 +202,8 @@ public final class SchemalessTreeReader {
                 // key is left out of `seen`, since a second `_` is this same problem again and not a
                 // duplicate of a key the document meaningfully stated.
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "the absent sentinel '_' must not appear as a map key (§2.9)",
-                        "a real map key, never the absent sentinel '_'", "_");
+                        "the void sentinel '_' must not appear as a map key (§2.9)",
+                        "a real map key, never the void sentinel '_'", "_");
             } else if (!seen.add(keyIdentity(key))) {
                 // §2.6, the map half of readRecord's rule.
                 ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,

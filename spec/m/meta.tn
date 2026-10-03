@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=80bde97ac97a6df9553779b27eeb2273d1c52e64b233cbc1d4c4d6eb8e7b4c4c"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=3e594d225f9fa92847cf2358a747aaaa0724fe8e692fb60760ddd14abb0f11b9"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=3e594d225f9fa92847cf2358a747aaaa0724fe8e692fb60760ddd14abb0f11b9"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=8df0771b72d26310873aa954a3fab7d094cea2cb64c8f6594d40ffe25944fea6"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=cfbc5c47c825a30bb9762a06bc98724bde640a8038d4d5f85376bb7f761cfb47"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=cfbc5c47c825a30bb9762a06bc98724bde640a8038d4d5f85376bb7f761cfb47"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 
@@ -143,7 +143,7 @@
 
     `scope` says which namespaces are admitted. `schemas` narrows the foreign
     ones: absent is any foreign schema, a keyed map is those schemas, and a
-    key's absent value is every type that schema declares where a list is those
+    key's void value is every type that schema declares where a list is those
     types. The map is keyed by schema identity, so one schema cannot be listed
     twice, and keys are compared by canonical identity ([TSON-DATA] §2.2.1) so a
     pinned key and an unpinned !!schema in the data match; each pin is verified

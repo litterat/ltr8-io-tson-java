@@ -74,7 +74,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition))
             : ATOM.create(name, definition, context);
     /**
-     * {@code void_type}: not a scalar at all -- its contract admits only the absent sentinel {@code _}, never a
+     * {@code void_type}: not a scalar at all -- its contract admits only the void sentinel {@code _}, never a
      * token -- so it bypasses {@link AtomType} via {@link VoidReader}. Keyed on the constructor, so the
      * kernel's {@code void} and core's sibling read alike.
      */

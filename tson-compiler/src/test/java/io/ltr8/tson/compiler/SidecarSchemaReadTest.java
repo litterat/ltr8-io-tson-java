@@ -201,7 +201,7 @@ class SidecarSchemaReadTest {
         accepts("parser", """
                 {
                   spec: "§2.9"
-                  description: "The absent sentinel as a root value"
+                  description: "The void sentinel as a root value"
                   valid: {
                     document: {
                       id: _  schema: _

@@ -92,7 +92,7 @@ import java.util.function.Function;
  *
  * JSON null is bound the way §7 binds it, as far as a class can express §7: a component the class marks
  * required refuses it, one that does not takes {@code null}. That is the same treatment
- * {@code tson-compiler}'s reader of that name gives the absent sentinel {@code _} — §7 makes the
+ * {@code tson-compiler}'s reader of that name gives the void sentinel {@code _} — §7 makes the
  * two spellings one concept, and a bound object has no third state to tell "omitted" from "present and
  * null" (the asymmetry {@code TsonAbsent} exists for on the tree side). An omitted member and a null
  * member are therefore indistinguishable in the result, which §6.1.2 says outright.

@@ -148,13 +148,13 @@ class SchemaDrivenTreeAnnotationTest {
 
     @Test
     void aBareAnnotationOnANonVoidTypeIsReported() {
-        // §6 makes bare `@T` shorthand for `@T:_`, so the type must admit the absent sentinel. `checked` is
+        // §6 makes bare `@T` shorthand for `@T:_`, so the type must admit the void sentinel. `checked` is
         // void-targeted and does (see VALID); `label` is text-targeted and does not.
         ReadException thrown = assertThrows(ReadException.class,
                 () -> read("!shape { name: @label \"square\"  origin: { x: 1  y: 2 }  tags: [] }"));
 
         assertTrue(thrown.getMessage().contains("@label"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("absent sentinel"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("void sentinel"), thrown.getMessage());
     }
 
     @Test

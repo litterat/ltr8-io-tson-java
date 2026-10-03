@@ -39,7 +39,7 @@ class EntryDisplayNameTest {
     }
 
     private static ArrayBody array(Optional<BigInteger> min, Optional<BigInteger> max) {
-        return new ArrayBody(TypeRef.of("order"), ElementState.REQUIRED, true, false, min, max);
+        return new ArrayBody(TypeRef.of("order"), false, true, false, min, max);
     }
 
     @Test
@@ -67,7 +67,7 @@ class EntryDisplayNameTest {
 
     @Test
     void aMapRendersAsItsSugar() {
-        MapBody body = new MapBody(TypeRef.of("text"), TypeRef.of("order"), ElementState.REQUIRED, false,
+        MapBody body = new MapBody(TypeRef.of("text"), TypeRef.of("order"), false, false,
                 Optional.of(BigInteger.ONE), Optional.empty());
 
         assertEquals("{text => order; 1..}", EntryDisplayName.of("x", synthetic(body)));

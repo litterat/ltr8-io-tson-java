@@ -8,7 +8,6 @@ import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -202,8 +201,8 @@ final class RecordPlan {
                 if (chosen == 0) {
                     ctx.report(rules.groupRequiresAtLeastOne(plan.text));
                 }
-            } else if (plan.group.state() == ElementState.REQUIRED ? chosen != 1 : chosen > 1) {
-                ctx.report(plan.group.state() == ElementState.REQUIRED
+            } else if (plan.group.optional() ? chosen > 1 : chosen != 1) {
+                ctx.report(!plan.group.optional()
                         ? rules.groupChoosesExactlyOne(plan.text, chosen)
                         : rules.groupChoosesAtMostOne(plan.text, chosen));
             }
@@ -240,7 +239,7 @@ final class RecordPlan {
             for (int o = 0; o < members.size(); o++) {
                 List<String> option = members.get(o);
                 options[o] = option.stream().mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray();
-                required[o] = option.stream().filter(member -> !group.optional().contains(member))
+                required[o] = option.stream().filter(member -> !group.optionalMembers().contains(member))
                         .mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray();
                 optionText[o] = String.join(" ", option);
             }

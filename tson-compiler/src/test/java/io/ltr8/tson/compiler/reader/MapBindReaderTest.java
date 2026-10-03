@@ -58,8 +58,8 @@ class MapBindReaderTest {
     }
 
     /**
-     * Under {@code {text => text?}} an entry's value may be the absent sentinel, so the entry is present with
-     * an absent value ([TSON-DATA] §2.9) -- which on the bind side means the key is in the map and maps to
+     * Under {@code {text => text?}} an entry's value may be the void sentinel, so the entry is present with
+     * a void value ([TSON-DATA] §2.9) -- which on the bind side means the key is in the map and maps to
      * {@code null}, distinguishable from a key the document never stated.
      */
     @Test
