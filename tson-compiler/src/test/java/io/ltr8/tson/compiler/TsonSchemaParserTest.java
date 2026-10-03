@@ -27,6 +27,8 @@ import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
+import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.meta.FieldGroup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -472,16 +474,74 @@ class TsonSchemaParserTest {
         assertThrows(ParseException.class, () -> declOf("config => { port ?: integer }"));
     }
 
-    /** A group member's presence is the group's, so its name takes no mark; its type may (§5.11). */
+    /** A group member's type takes {@code ?}, admitting {@code _}, as any field's does (§5.11). */
     @Test
-    void aGroupMemberTakesATypeMarkAndNoNameMark() {
-        RecordDef record = (RecordDef) ((StructuralTypeDef) declOf(
-                "range => { ( min: integer? | exclusive_min: integer ) }").typeDef()).body();
-        GroupDef group = (GroupDef) record.entries().get(0);
+    void aGroupMemberTakesATypeMark() {
+        GroupDef group = groupOf("range => { ( min: integer? | exclusive_min: integer ) }");
         assertTrue(group.members().get(0).voidable());
         assertFalse(group.members().get(1).voidable());
+    }
 
-        assertThrows(ParseException.class, () -> declOf("range => { ( min?: integer | max: integer ) }"));
+    /**
+     * {@code |} separates options and the members of one option are separated as record entries are; a
+     * member's name {@code ?} makes it optional within its option (SPEC-FEEDBACK.md #18).
+     */
+    @Test
+    void aGroupOptionHoldsSeveralMembers() {
+        GroupDef group = groupOf("fragment => { ( include: text | name?: text  type?: text ) }");
+        assertEquals(GroupDef.Quantifier.EXACTLY_ONE, group.quantifier());
+        assertEquals(List.of(1, 2), group.options().stream().map(List::size).toList());
+        assertEquals(List.of(false, true, true), group.members().stream().map(GroupDef.Member::omittable).toList());
+
+        GroupDef commas = groupOf("endpoint => { ( host: text, port: integer | socket: text )? }");
+        assertEquals(GroupDef.Quantifier.AT_MOST_ONE, commas.quantifier());
+        assertEquals(List.of(2, 1), commas.options().stream().map(List::size).toList());
+    }
+
+    /** {@code +} is at least one of its members, and lowers to the one REQUIRED option they are all optional in. */
+    @Test
+    void aPlusGroupIsAtLeastOneOfItsMembers() {
+        GroupDef group = groupOf("contact => { ( email: text | phone: text )+ }");
+        assertEquals(GroupDef.Quantifier.AT_LEAST_ONE, group.quantifier());
+        assertEquals(new FieldGroup(List.of(List.of("email", "phone")), List.of("email", "phone"),
+                ElementState.REQUIRED), group.fieldGroup());
+    }
+
+    /** A group with one option and an unmarked member, under {@code ?}, is the one-option shape a schema writes. */
+    @Test
+    void anOptionalGroupOfOneOptionWithAnUnmarkedMemberParses() {
+        GroupDef group = groupOf("pair => { ( b: text  a?: text )? }");
+        assertEquals(new FieldGroup(List.of(List.of("b", "a")), List.of("a"), ElementState.OPTIONAL),
+                group.fieldGroup());
+    }
+
+    /** Every group that restates plain fields or another group is refused, naming the spelling it restates. */
+    @Test
+    void aGroupThatRestatesAnotherSpellingIsAParseError() {
+        assertGroupRefused("( a?: text | b: text )", "changes nothing");
+        assertGroupRefused("( a: text  b: text | c: text )+", "single fields");
+        assertGroupRefused("( a: text )+", "at least two members");
+        assertGroupRefused("( a: text )", "states plain fields");
+        assertGroupRefused("( a: text  b?: text )", "states plain fields");
+        assertGroupRefused("( a?: text  b?: text )", "(a | b)+");
+        assertGroupRefused("( a: text )?", "as optional fields");
+        assertGroupRefused("( a?: text  b?: text )?", "as optional fields");
+    }
+
+    /** {@code +}, like {@code ?}, binds to the token before it (§12.3). */
+    @Test
+    void aPlusSeparatedFromItsGroupIsAParseError() {
+        assertGroupRefused("( a: text | b: text ) +", "immediately adjacent");
+    }
+
+    private GroupDef groupOf(String source) {
+        RecordDef record = (RecordDef) ((StructuralTypeDef) declOf(source).typeDef()).body();
+        return (GroupDef) record.entries().get(0);
+    }
+
+    private void assertGroupRefused(String group, String fragment) {
+        ParseException thrown = assertThrows(ParseException.class, () -> declOf("r => { " + group + " }"));
+        assertTrue(thrown.getMessage().contains(fragment), group + ": " + thrown.getMessage());
     }
 
     @Test

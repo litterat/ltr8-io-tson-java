@@ -1375,11 +1375,9 @@ final class DefinitionResolver {
      * things in one declaration, and the author meant one of them. Rule 4 is checked first: a body-introduced
      * field <em>is</em> in the merged set, so the weaker "no such field" answer would be the wrong diagnosis.
      *
-     * <p>Groups (§5.11): a removed member leaves its group's {@code members}, and a group left with one member
-     * is dissolved -- the survivor becomes an ordinary field taking the group's own state, since a group's
-     * members are flattened as {@code OPTIONAL} whatever the group says. Removing every member of a group
-     * drops the group with them -- §5.11 runs the ladder to zero and states the two-member minimum as an
-     * invariant of resolved output.
+     * <p>Groups (§5.11, SPEC-FEEDBACK.md #18): a removed member leaves its option, and an emptied option leaves
+     * the group. A group left with one option that no schema could write is dissolved into the plain fields it
+     * equals ({@link #dissolveInto}), and removing every member drops the group with them.
      */
     private static void applyRemovals(String declarationName, RemovalSet removal, Set<String> bodyDeclared,
                                        List<RecordField> fields, List<FieldGroup> groups) {
@@ -1400,13 +1398,22 @@ final class DefinitionResolver {
 
         List<FieldGroup> surviving = new ArrayList<>();
         for (FieldGroup group : groups) {
-            List<String> members = group.memberNames().stream().filter(member -> !removed.contains(member)).toList();
-            if (members.size() == group.memberNames().size()) {
+            if (group.memberNames().stream().noneMatch(removed::contains)) {
                 surviving.add(group);
-            } else if (members.size() > 1) {
-                surviving.add(FieldGroup.ofSingles(members, group.state()));
-            } else if (members.size() == 1) {
-                dissolveInto(fields, members.get(0), group.state());
+                continue;
+            }
+            List<List<String>> options = group.members().stream()
+                    .map(option -> option.stream().filter(member -> !removed.contains(member)).toList())
+                    .filter(option -> !option.isEmpty()).toList();
+            // A member left alone in its option is present exactly when the option is chosen, so its mark goes.
+            List<String> optional = group.optional().stream()
+                    .filter(member -> options.stream().anyMatch(option -> option.size() > 1
+                            && option.contains(member))).toList();
+            if (options.size() > 1 || options.size() == 1 && keepsOneOption(options.getFirst(), optional,
+                    group.state())) {
+                surviving.add(new FieldGroup(options, optional, group.state()));
+            } else if (options.size() == 1) {
+                dissolveInto(fields, options.getFirst(), optional, group.state());
             }
         }
         groups.clear();
@@ -1415,15 +1422,34 @@ final class DefinitionResolver {
         fields.removeIf(field -> removed.contains(field.name()));
     }
 
-    /** §5.11: the last member of a dissolved group becomes a plain field carrying the group's own state. */
-    private static void dissolveInto(List<RecordField> fields, String member, ElementState groupState) {
-        boolean optional = groupState == ElementState.OPTIONAL;
+    /**
+     * Whether a group reduced to one option is still one a schema could write (SPEC-FEEDBACK.md #18): REQUIRED
+     * with at least two members, every one marked -- the {@code +} group -- or OPTIONAL with at least two
+     * members, one unmarked. Any other one option is plain fields.
+     */
+    private static boolean keepsOneOption(List<String> option, List<String> optional, ElementState state) {
+        if (option.size() < 2) {
+            return false;
+        }
+        boolean anyUnmarked = option.stream().anyMatch(member -> !optional.contains(member));
+        return state == ElementState.REQUIRED ? !anyUnmarked : anyUnmarked;
+    }
+
+    /**
+     * §5.11: a group reduced to one option it may not keep becomes the plain fields it equals. Under REQUIRED
+     * the option is always chosen, so its unmarked members are required and its marked ones optional; under
+     * OPTIONAL every member is optional. A sole member takes the group's own state for both its marks.
+     */
+    private static void dissolveInto(List<RecordField> fields, List<String> option, List<String> optional,
+                                     ElementState groupState) {
         for (int i = 0; i < fields.size(); i++) {
             RecordField field = fields.get(i);
-            if (field.name().equals(member)) {
-                fields.set(i, field.withFacts(optional, optional, FieldRole.FREE));
-                return;
+            if (!option.contains(field.name())) {
+                continue;
             }
+            boolean omittable = groupState == ElementState.OPTIONAL || optional.contains(field.name());
+            fields.set(i, field.withFacts(omittable, option.size() == 1 ? omittable : field.voidable(),
+                    FieldRole.FREE));
         }
     }
 
@@ -1568,7 +1594,7 @@ final class DefinitionResolver {
             if (entry instanceof GroupDef groupDef) {
                 if (!restatesInheritedGroup(name, groupDef, fields, groups, inheritedFieldIndex)) {
                     throw new SchemaValidationException("'" + name + "': the group ("
-                            + String.join(" | ", memberNames(groupDef)) + ") names no inherited group -- a "
+                            + describe(groupDef.fieldGroup()) + ") names no inherited group -- a "
                             + "refinement copies its source's whole field set and admits no new fields or "
                             + "groups; composition (`&`) is what adds one (§5.7, §5.11)");
                 }
@@ -1837,17 +1863,14 @@ final class DefinitionResolver {
                 if (restatesInheritedGroup(declarationName, groupDef, fields, groups, inheritedFieldIndex)) {
                     return;
                 }
-                List<String> memberNames = new ArrayList<>();
                 for (GroupDef.Member member : groupDef.members()) {
                     requireFieldNameNotSeen(declarationName, member.name(), seenFieldNames,
                             FieldOrigin.GROUP_MEMBER);
                     RecordField field = resolveGroupMember(member);
                     seenFieldNames.add(field.name());
                     fields.add(field);
-                    memberNames.add(field.name());
                 }
-                groups.add(FieldGroup.ofSingles(memberNames,
-                        groupDef.optional() ? ElementState.OPTIONAL : ElementState.REQUIRED));
+                groups.add(groupDef.fieldGroup());
             }
         }
     }
@@ -1869,10 +1892,8 @@ final class DefinitionResolver {
     private RecordField resolveTighteningField(String declarationName, FieldDef fieldDef, RecordField inherited,
                                                 List<FieldGroup> groups, List<String> parameters) {
         boolean member = groups.stream().anyMatch(group -> group.hasMember(fieldDef.name()));
-        if (member && fieldDef.omittable()) {
-            throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
-                    + "member of a field group, whose presence the group decides (§5.11) -- restate it without "
-                    + "the '?' on its name");
+        if (member) {
+            restateMemberMark(declarationName, fieldDef, groups);
         }
         if (member && fieldDef.modifier().filter(m -> m.kind() == FieldDef.Modifier.Kind.DEFAULT).isPresent()) {
             throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
@@ -1893,6 +1914,37 @@ final class DefinitionResolver {
                     + "state transition -- a refinement can only restrict, never expand (§5.7)");
         }
         return tightened;
+    }
+
+    /**
+     * A restated member's name {@code ?} (§5.11, SPEC-FEEDBACK.md #18) speaks for its option, not the record:
+     * it keeps the member optional once its option is chosen, and leaving it off makes the member required
+     * there -- the name's {@code ?} is never inherited, at a member as at any field. It may be dropped and
+     * never added, since adding one loosens the option. A {@code +} group, the one group of a single REQUIRED
+     * option, is the exception: its members were written without a {@code ?}, so they are restated that way
+     * and keep their mark.
+     */
+    private static void restateMemberMark(String declarationName, FieldDef fieldDef, List<FieldGroup> groups) {
+        for (int i = 0; i < groups.size(); i++) {
+            FieldGroup group = groups.get(i);
+            if (!group.hasMember(fieldDef.name())) {
+                continue;
+            }
+            boolean atLeastOne = group.members().size() == 1 && group.state() == ElementState.REQUIRED;
+            boolean marked = group.optional().contains(fieldDef.name());
+            if (fieldDef.omittable() && (atLeastOne || !marked)) {
+                throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
+                        + "member of a field group " + (atLeastOne
+                        ? "written with '+', whose members take no '?' -- restate it as written there"
+                        : "without a '?' on its name, and adding one loosens its option") + " (§5.11)");
+            }
+            if (!fieldDef.omittable() && marked && !atLeastOne) {
+                List<String> optional = new ArrayList<>(group.optional());
+                optional.remove(fieldDef.name());
+                groups.set(i, new FieldGroup(group.members(), optional, group.state()));
+            }
+            return;
+        }
     }
 
     /**
@@ -2083,10 +2135,6 @@ final class DefinitionResolver {
         return new Token(token.text(), form);
     }
 
-    private static List<String> memberNames(GroupDef groupDef) {
-        return groupDef.members().stream().map(GroupDef.Member::name).toList();
-    }
-
     /**
      * §5.11's group restatement, shared by a refinement body and a composition body -- "a body entry may also
      * restate a group: the restated group MUST have the same member labels in the same order (member
@@ -2108,13 +2156,14 @@ final class DefinitionResolver {
      */
     private boolean restatesInheritedGroup(String declarationName, GroupDef groupDef, List<RecordField> fields,
                                             List<FieldGroup> groups, Map<String, Integer> inheritedFieldIndex) {
-        List<String> restated = memberNames(groupDef);
+        FieldGroup restatement = groupDef.fieldGroup();
+        List<String> restated = restatement.memberNames();
         List<String> inheritedMembers = restated.stream().filter(inheritedFieldIndex::containsKey).toList();
         if (inheritedMembers.isEmpty()) {
             return false;
         }
         String prefix = (declarationName == null ? "" : "'" + declarationName + "': ") + "the restated group ("
-                + String.join(" | ", restated) + ") ";
+                + describe(restatement) + ") ";
         if (inheritedMembers.size() != restated.size()) {
             throw new SchemaValidationException(prefix + "adds a member the source does not declare -- "
                     + "changing membership is a resolver error (§5.11)");
@@ -2132,10 +2181,17 @@ final class DefinitionResolver {
                     + "a group can only restate one the source declares as a group (§5.11)");
         }
         FieldGroup inherited = groups.get(index);
-        if (!inherited.memberNames().equals(restated)) {
+        if (!inherited.members().equals(restatement.members())) {
             throw new SchemaValidationException(prefix + "does not match the inherited group ("
-                    + String.join(" | ", inherited.memberNames()) + ") -- a restatement MUST have the same member "
-                    + "labels in the same order, and changing membership is a resolver error (§5.11)");
+                    + describe(inherited) + ") -- a restatement MUST have the same options, their members in "
+                    + "the same order, and changing membership is a resolver error (§5.11)");
+        }
+        List<String> added = restatement.optional().stream()
+                .filter(member -> !inherited.optional().contains(member)).toList();
+        if (!added.isEmpty()) {
+            throw new SchemaValidationException(prefix + "marks " + String.join(", ", added) + " '?' where "
+                    + "the source does not -- a restatement may drop a member's '?' and never add one, which "
+                    + "loosens its option (§5.11)");
         }
         for (GroupDef.Member member : groupDef.members()) {
             io.ltr8.tson.schema.meta.TypeRef restatedType = resolveTypeRef(member.typeRef());
@@ -2149,13 +2205,18 @@ final class DefinitionResolver {
             }
         }
 
-        ElementState state = groupDef.optional() ? ElementState.OPTIONAL : ElementState.REQUIRED;
-        if (inherited.state() == ElementState.REQUIRED && state == ElementState.OPTIONAL) {
+        if (inherited.state() == ElementState.REQUIRED && restatement.state() == ElementState.OPTIONAL) {
             throw new SchemaValidationException(prefix + "loosens a REQUIRED group to OPTIONAL -- a "
                     + "restatement may only tighten OPTIONAL→REQUIRED (§5.11)");
         }
-        groups.set(index, new FieldGroup(inherited.members(), inherited.optional(), state));
+        groups.set(index, restatement);
         return true;
+    }
+
+    /** A group as its options read: {@code (a | b c?)}'s members, each option's separated by {@code |}. */
+    private static String describe(FieldGroup group) {
+        return String.join(" | ", group.members().stream().map(option -> String.join(" ", option.stream()
+                .map(member -> group.optional().contains(member) ? member + "?" : member).toList())).toList());
     }
 
     /**

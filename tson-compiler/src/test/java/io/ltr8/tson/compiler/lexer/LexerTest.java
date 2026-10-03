@@ -254,8 +254,10 @@ class LexerTest {
     }
 
     @Test
-    void barePlusIsLexError() {
-        assertThrows(LexException.class, () -> lex("+"));
+    void barePlusIsSpecialToken() {
+        List<Token> ts = tokens("( a ) + 2");
+        assertToken(ts.get(3), TokenType.PLUS, "+");
+        assertToken(ts.get(4), TokenType.UNQUOTED, "2");
     }
 
     @Test

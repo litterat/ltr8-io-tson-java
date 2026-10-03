@@ -444,9 +444,10 @@ final class SchemaDesugarer {
                 yield rewritten;
             }
             case GroupDef group -> {
-                List<GroupDef.Member> members = mapShared(group.members(), this::groupMember);
-                yield members == group.members() ? group
-                        : new GroupDef(group.annotations(), members, group.optional());
+                List<List<GroupDef.Member>> options = mapShared(group.options(),
+                        option -> mapShared(option, this::groupMember));
+                yield options == group.options() ? group
+                        : new GroupDef(group.annotations(), options, group.quantifier());
             }
         };
     }
@@ -454,7 +455,8 @@ final class SchemaDesugarer {
     private GroupDef.Member groupMember(GroupDef.Member member) {
         TypeRef ref = typeRef(member.typeRef());
         return ref == member.typeRef() ? member
-                : new GroupDef.Member(member.annotations(), member.name(), ref, member.voidable());
+                : new GroupDef.Member(member.annotations(), member.name(), member.omittable(), ref,
+                        member.voidable());
     }
 
     /**
@@ -769,26 +771,19 @@ final class SchemaDesugarer {
                     }
                 }
                 case GroupDef group -> {
-                    List<ScopedValue> members = new ArrayList<>();
                     for (GroupDef.Member member : group.members()) {
                         requireFieldNameUnseen(member.name(), seen, "a group member repeats it -- member "
                                 + "labels share the enclosing record's field namespace");
                         // A group's members are ordinary optional fields of the record, voidable where the type
-                        // says so, and the group records only their names and its own state (§5.11) -- the
-                        // shape the resolver builds.
+                        // says so, and the group records its options, their optional members and its own state
+                        // (§5.11) -- the shape the resolver builds.
                         List<RecordValue.Field> memberFields = new ArrayList<>(List.of(
                                 WireForm.nameField(WireForm.NAME, member.name()),
                                 new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(member.typeRef())))));
                         WireForm.addFacts(memberFields, true, member.voidable(), FieldRole.FREE);
                         fields.add(WireForm.scoped(new RecordValue(memberFields), member.annotations()));
-                        members.add(WireForm.scoped(new TokenValue(member.name(), TokenForm.UNQUOTED)));
                     }
-                    List<RecordValue.Field> groupFields = new ArrayList<>();
-                    groupFields.add(new RecordValue.Field(WireForm.MEMBERS, WireForm.scoped(new ArrayValue(members))));
-                    if (group.optional()) {
-                        groupFields.add(WireForm.nameField(WireForm.STATE, ElementState.OPTIONAL.name()));
-                    }
-                    groups.add(WireForm.scoped(new RecordValue(groupFields), group.annotations()));
+                    groups.add(WireForm.group(group.fieldGroup(), group.annotations()));
                 }
             }
         }

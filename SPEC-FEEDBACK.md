@@ -1592,9 +1592,10 @@ their own `@doc`. Nothing in this library renders a doc, so nothing else changes
 **Section:** [TSON-SCHEMA] §5.11 (field groups: "a bare group is REQUIRED — exactly one member MUST be present; a
 group with `?` is OPTIONAL — at most one member MAY be present. These are the only group states", and "a `?` on the
 member's *name* … [is a] parse error on a member"), §5.8 (removal, rule 7: "a group reduced to one member is
-dissolved per §5.11"), §12.1 (`group-def`, `group-member`), and the meta-kernel's `field_group` and its doc.
+dissolved per §5.11"), §12.1 (`group-def`, `group-member`), and the meta-kernel's `field_group` and its doc;
+[TSON-DATA] §7.2.4 and §7.2.5 (the special-token set: "Fourteen characters qualify").
 
-**Kind:** proposal — a kernel change and a grammar extension.
+**Kind:** proposal — a kernel change, a grammar extension, and a fifteenth special token in [TSON-DATA].
 
 **What the spec says today.** A group admits exactly one member (REQUIRED) or at most one (OPTIONAL), and a member
 is one field. "A contact needs an email, a phone, or both" — at least one of a set of keys — has no spelling, and
@@ -1631,11 +1632,20 @@ group takes `?` for at most one option, as today, and `+` is sugar for "at least
 
 ```
 group-def    = *annotation "(" ws group-option *( ws "|" ws group-option ) ws ")" ["?" / "+"]
-group-option = group-member *( ws group-member )
+group-option = group-member *( separator group-member )
 group-member = *annotation field-name ["?"] ws ":" ws type-ref ["?"]
 ```
 
-The `~`, `=` and `=?` modifiers stay parse errors on a member, since a member is never supplied.
+The `~`, `=` and `=?` modifiers stay parse errors on a member, since a member is never supplied. `+`, like `?`,
+is adjacent to the `)` it marks.
+
+**`+` becomes [TSON-DATA]'s fifteenth special token.** §7.2.5's set is closed: a character is a special token
+exactly when it has a grammar role somewhere in the series, and `+` has none today. §7.2.4 lexes a `+` followed by
+an unquoted-continuation character as the start of an unquoted token, and a bare `+` is a lexer error. Under this
+proposal `+` takes `-`'s boundary rule exactly: followed by a continuation character it begins an unquoted token,
+so `+5` and `+0.5` are unchanged, and otherwise it is emitted as a special token. In a data value it is then
+reserved by the schema grammar like the other twelve, so a bare `+` stays an error there, a parse error rather
+than a lexer error. §7.2.5's list gains `+`, and its parenthetical on `-` covers both signs.
 
 Three rules decide validity:
 
