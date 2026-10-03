@@ -272,12 +272,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   kernel's one `identifier_type` instance only, so a second needs dispatch by entry name. `UriParser.admitsScheme`
   then compares the folded scheme.
 
-- [ ] **The text facets' lengths count UTF-16 units in three parsers.** `TextParser`, `UriParser` and `EmailParser`
-  measure `String.length()`, where `text_type`'s `@doc` and `TextType.coherenceCheck` count code points, so a value
-  holding a supplementary character (an emoji, a CJK Extension B ideograph) meets `max_length` one unit early and a
-  member the schema admits can be refused on read. The fix is `codePointCount` at each, with a test on a
-  supplementary character.
-
 - [ ] **`!uri` is `java.net.URI`'s RFC 2396 grammar, not [TSON-DATA] §5.5's RFC 3986** (`main` and
   `r2026-37-proposal`). `UriParser` delegates the whole grammar to `java.net.URI`, which refuses valid URIs —
   `https://` and `foo://` ("Expected authority": RFC 3986's `reg-name` may be empty, §3.2.2, and an empty

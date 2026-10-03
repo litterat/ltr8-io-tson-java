@@ -69,27 +69,7 @@ public record EmailParser(EmailType constraints) implements AtomTypeParser<Strin
 
     /** The same length and pattern facets {@link TextParser} applies, on the same terms -- {@code email_type} composes {@code text_type}. */
     private void validate(String text) {
-        constraints.length().ifPresent(len -> {
-            if (text.length() != len) {
-                throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, expected exactly " + len,
-                        "exactly " + len + " characters");
-            }
-        });
-        constraints.minLength().ifPresent(min -> {
-            if (text.length() < min) {
-                throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, less than the minimum " + min,
-                        "at least " + min + " characters");
-            }
-        });
-        constraints.maxLength().ifPresent(max -> {
-            if (text.length() > max) {
-                throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, more than the maximum " + max,
-                        "at most " + max + " characters");
-            }
-        });
+        TextParser.checkLengths(text, constraints.length(), constraints.minLength(), constraints.maxLength());
         // I-Regexp (RFC 9485) via tson-regex -- linear-time and ReDoS-safe, not java.util.regex; already
         // validated well-formed when the schema resolved (see RegexParser).
         constraints.pattern().ifPresent(p -> {
