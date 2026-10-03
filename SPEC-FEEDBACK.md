@@ -68,8 +68,8 @@ and `comment` joins it for JSON Schema's `$comment`.
 both-or-neither and one key requiring another have a spelling, and refuses any group that restates plain fields
 or another group.
 #19 moves `normalization` to `text_type` and makes it the form a value is put into, rather than one it must
-already be in, with `NFKC_CASEFOLD` so a case-insensitive naming system's names are one value however they are
-cased.
+already be in, with `ASCII_CASEFOLD` and `NFKC_CASEFOLD` so a case-insensitive naming system's names are one value
+however they are cased.
 
 ---
 
@@ -1830,7 +1830,7 @@ The coverage table compares the rule with the presence logic read from the sourc
 
 ---
 
-## 19. `normalization` should be `text_type`'s, put a value into its form, and offer `NFKC_CASEFOLD`
+## 19. `normalization` should be `text_type`'s, put a value into its form, and offer two case folds
 
 **Sections:** [TSON-SCHEMA] §5.5 (an atom's identity is over its value space), §5.7 (the facet kinds), §7.4 (the
 `identifier` primitive: "the decoded text of a token, after unquoting, escape processing, and NFC normalisation", and
@@ -1847,9 +1847,13 @@ rules. Nothing in the kernel can say that `Content-Type` and `content-type` are 
 for one field, `schemes`, in prose.
 
 **Evidence, from consumers.** The names of case-insensitive naming systems: RFC 9110 field names, URI schemes (RFC
-3986 §3.1), DNS names (RFC 4343) and charset names. The meta-service experiment in `ltr8-io-tson-java-http` declares
-`header_name => !text ^ { pattern: "[!#$%&'*+.^_`|~0-9A-Za-z-]+" }`, under which `Idempotency-Key` and
-`idempotency-key` are two values: two map keys, two set members, and a pin that refuses the other spelling.
+3986 §3.1), DNS names (RFC 4343) and charset names. Each folds ASCII letters and nothing else -- RFC 4343 says so
+outright, and the other three admit only ASCII characters. JSON Schema documents fake the same rule with patterns:
+SchemaStore holds 1,330 written as `[Pp][Rr][Ee][Ss][Ee][Nn][Tt]`, each exactly an ASCII-folded member set. The
+validation libraries that rewrite on input (below) fold across Unicode instead. The meta-service experiment in
+`ltr8-io-tson-java-http` declares `header_name => !text ^ { pattern: "[!#$%&'*+.^_`|~0-9A-Za-z-]+" }`, under which
+`Idempotency-Key` and `idempotency-key` are two values: two map keys, two set members, and a pin that refuses the
+other spelling.
 
 **How other systems state case.**
 - **Schema languages refuse the other case.** JSON Schema, XSD, Avro, Protobuf and GraphQL compare case-sensitively,
@@ -1869,12 +1873,19 @@ NFC normalisation. A form *requirement* is the outlier, and §7.4 states both re
   value and never the spelling — lengths, `pattern`, `members`, an identifier's profile, a URI's or an address's
   grammar — and so does every comparison of two values: pins, map keys, set uniqueness, the duplicate and
   look-alike rules.
-- **`NFKC_CASEFOLD` joins the enum.** It is `toNFKC_Casefold`, UAX #31 §5's form for identifiers compared without
-  case: NFKC, a full case fold, and the default ignorables removed. Over ASCII it lowercases.
+- **`ASCII_CASEFOLD` joins the enum**: U+0041..005A mapped to U+0061..007A, and nothing else -- no Unicode
+  normalization runs, so a composed and a decomposed `É` stay two values, as under `NONE`. It is the comparison
+  the four naming systems state, and it needs no Unicode table.
+- **`NFKC_CASEFOLD` joins it.** It is `toNFKC_Casefold`, UAX #31 §5's form for identifiers compared without
+  case: NFKC, a full case fold, and the default ignorables removed. Over ASCII it lowercases, but it also folds
+  compatibility characters *into* ASCII -- a full-width `Ｃ`, the Kelvin sign U+212A, the long `ſ` -- so it is
+  looser than any of the four naming systems, and is the form for names compared without case across Unicode, as
+  the libraries that rewrite on input compare them.
 - **NFD and NFKD are not members.** Each is the same equivalence as its composed twin, stored decomposed, so it
   would change no verdict and only the spelling of the value; the series writes NFC (an unquoted token must be
-  NFC, [TSON-DATA] §7.2.1), and a host that wants decomposed text decomposes it in its binding. The four members
-  are the four distinct equalities: code points, canonical, compatibility, and compatibility without case.
+  NFC, [TSON-DATA] §7.2.1), and a host that wants decomposed text decomposes it in its binding. The five members
+  are five distinct equalities: code points, code points without ASCII case, canonical, compatibility, and
+  compatibility without case.
 - **Defaults:** `NONE` on `text_type`, where quoted text is otherwise kept as written; `NFC` on `identifier_type`,
   matching §7.2.1 and §7.4.
 - **Fixed where the type is constructed**, like the profile facets: a refinement restates it or leaves it. §5.7's
@@ -1884,7 +1895,7 @@ NFC normalisation. A form *requirement* is the outlier, and §7.4 states both re
   (`[A-Z]` folds to `[a-z]`).
 - **A schema's members and pins are values too**, decoded like data, as `= 0x10` is. Two members that are one
   value are refused.
-- **`uri_type.schemes` becomes structure**: a set of a case-folding scheme identifier in place of a comparison
+- **`uri_type.schemes` becomes structure**: a set of an ASCII-folding scheme identifier in place of a comparison
   stated in prose for one field.
 
 ```
@@ -1896,27 +1907,31 @@ text_type => atom & {
   members?:       text_member_set
   normalization?: normalization ~ NONE
 }
-normalization => !enum [NONE NFC NFKC NFKC_CASEFOLD]
+normalization => !enum [NONE NFC NFKC NFKC_CASEFOLD ASCII_CASEFOLD]
 
 identifier_type => text_type & atom_specification & { …  normalization?: normalization ~ NFC }
 regex_type      => text_type & atom_specification & { spec?: = "…/rfc9485"  normalization?: = NONE }
 
 header_name => !identifier_type { start: NONE  continue: NONE
   start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
-  normalization: NFKC_CASEFOLD }
+  normalization: ASCII_CASEFOLD }
 ```
 
 Because the profile judges the value, `header_name`'s profile lists lowercase letters only and admits
-`Content-Type`, and a full-width `Ｃｏｎｔｅｎｔ-Ｔｙｐｅ` folds to the same name.
+`Content-Type`. It refuses a full-width `Ｃｏｎｔｅｎｔ-Ｔｙｐｅ` and a `Keep-Alive` spelled with the Kelvin sign, as RFC
+9110 does; under `NFKC_CASEFOLD` both would fold into the profile and be admitted.
 
 **What the text must add:**
 - **A round trip writes the value.** `Content-Type` is written back as `content-type`, as `0x10` is written as
-  `16`. Messages quote the value; a data position still locates the token as written.
-- **The full fold is not lowercasing** beyond ASCII. `ß` folds to `ss`, so a length changes; the Cherokee
+  `16`. A refusal quotes the token as written, then the value it was judged as -- `'PUT' (read as 'put' under
+  NFKC_CASEFOLD)` -- since the written spelling is what a reader, or a repair of a generated document, has to find.
+- **`NFKC_CASEFOLD`'s full fold is not lowercasing** beyond ASCII. `ß` folds to `ss`, so a length changes; the Cherokee
   syllabary folds to its uppercase letters; `İ` folds to `i` and a combining dot. These are the standard's
   comparison keys and arise only in profiles that admit the characters.
 - **Join controls**: `NFKC_CASEFOLD` removes them, so §7.7 rule 2's context check has nothing to judge under that
   form.
+- **`ASCII_CASEFOLD` runs no NFC**, on an `identifier_type` too, so a quoted decomposed spelling keeps its code
+  points; the ASCII profiles the form exists for refuse it anyway.
 - **§7.4's identifier paragraph** keeps "the decoded text … after NFC normalisation" and drops "rejects … non-NFC
   text": a quoted decomposed spelling at an identifier-typed position reads as its composed value.
 
@@ -1930,7 +1945,7 @@ Because the profile judges the value, `header_name`'s profile lists lowercase le
   forms, and a `CASEFOLD` member of it would need the same Unicode table.
 
 **What is running** (`r2026-37-proposal`):
-- **Kernel.** `text_type.normalization` with the four members, `identifier_type` defaulting to `NFC`, and
+- **Kernel.** `text_type.normalization` with the five members, `identifier_type` defaulting to `NFC`, and
   `regex_type` fixing `NONE`. Every bundled schema is re-pinned, and every value they admit is unchanged.
 - **`NFKC_CASEFOLD`** is derived from the JDK's normalizer and case mappings with three exceptions (dotless `ı`,
   and two Cherokee ranges, which fold to uppercase). It matches `DerivedNormalizationProps.txt`'s `NFKC_CF` for
@@ -1943,8 +1958,9 @@ Because the profile judges the value, `header_name`'s profile lists lowercase le
   and two that are one value are refused.
 - **Enums.** An enum matches its members in its label type's form, on both encodings' read paths, in the
   linker's checks of defaults and pins, and in a template's value argument.
-- **Schemes.** `uri_type.schemes` is a set of the kernel's `scheme_name`, a case-folding identifier, so a scheme is
-  held folded and `[HTTP http]` is a duplicate; `uri_type`'s prose comparison rule is gone.
+- **Schemes.** `uri_type.schemes` is a set of the kernel's `scheme_name`, an `ASCII_CASEFOLD` identifier, so a
+  scheme is held folded, `[HTTP http]` is a duplicate and a full-width `ＨＴＴＰ` is no scheme; `uri_type`'s prose
+  comparison rule is gone.
 
 **Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
 

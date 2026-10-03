@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ff02bc0caa6659961dcac0526215f29374819dc3c67a48f8dd5b9877fd0baf02"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=7dda4ea780e1374a085b67a24c5507b1a644e4085f50e56ad5315db1b42c64d4"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -285,9 +285,11 @@
     The form a text value is put into. NONE keeps the text as written. NFC and
     NFKC are Unicode's normalization forms. NFKC_CASEFOLD is toNFKC_Casefold,
     UAX #31's form for names compared without case: over ASCII it lowercases,
-    so Content-Type and content-type are one value.
+    so Content-Type and content-type are one value. ASCII_CASEFOLD maps A-Z to
+    a-z and changes nothing else, the comparison of case-insensitive ASCII
+    names such as URI schemes and HTTP field names.
     """
-  normalization => !enum [NONE NFC NFKC NFKC_CASEFOLD]
+  normalization => !enum [NONE NFC NFKC NFKC_CASEFOLD ASCII_CASEFOLD]
 
   @doc:"""
     Identifier constraint vocabulary: a UAX #31 identifier profile, with the
@@ -384,7 +386,7 @@
   scheme_name => !identifier_type { start: NONE  continue: NONE
     start_add: "abcdefghijklmnopqrstuvwxyz"
     continue_add: "abcdefghijklmnopqrstuvwxyz0123456789+-."
-    normalization: NFKC_CASEFOLD }
+    normalization: ASCII_CASEFOLD }
 
   @doc:"A URI (RFC 3986 §3): the scheme is required."
   uri => !uri_type { allow_relative: false }

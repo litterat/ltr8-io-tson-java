@@ -116,6 +116,10 @@ class CrossEncodingParityTest {
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: NFKC_CASEFOLD }
               headers     => { header_name => text }
+              field_name  => !identifier_type { start: NONE  continue: NONE
+                start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
+                normalization: ASCII_CASEFOLD }
+              fields      => { field_name => text }
               pinned      => { h: header_name = Idempotency-Key }
               charset     => !text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
               encoded     => { c: charset }
@@ -938,5 +942,16 @@ class CrossEncodingParityTest {
     void anEnumMatchesInItsLabelTypesForm() {
         bothAdmit("screened", "{ h: Content-Type }", "{\"h\": \"Content-Type\"}");
         sameRule("screened", "{ h: x-trace }", "{\"h\": \"x-trace\"}");
+    }
+
+    /** An ASCII fold admits any casing of an ASCII name and refuses a full-width one, in both encodings. */
+    @Test
+    void anAsciiFoldInBothEncodings() {
+        bothAdmit("fields", "{ Content-Type => \"a\" }", "{\"Content-Type\": \"a\"}");
+        sameRule("fields", "{ Content-Type => \"a\"  content-type => \"b\" }",
+                "{\"Content-Type\": \"a\", \"content-type\": \"b\"}");
+        List<Verdict> fullWidth = tson("fields", "{ \"\uff23ontent-Type\" => \"a\" }");
+        assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_FORM_INVALID, "/\uff23ontent-Type")), fullWidth);
+        assertEquals(fullWidth, json("fields", "{\"\uff23ontent-Type\": \"a\"}"));
     }
 }
