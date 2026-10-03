@@ -51,7 +51,8 @@ public record EmailParser(EmailType constraints) implements AtomTypeParser<Strin
             ATEXT + "(?:\\." + ATEXT + ")*@" + ATEXT + "(?:\\." + ATEXT + ")*");
 
     @Override
-    public String read(String text) {
+    public String read(String written) {
+        String text = constraints.normalization().apply(written);
         if (!ADDR_SPEC.matcher(text).matches()) {
             throw new AtomParseException("'" + text + "' is not a valid email address -- expected RFC 5322's "
                     + "dot-atom form, local@domain (quoted local parts, domain literals and comments are not "

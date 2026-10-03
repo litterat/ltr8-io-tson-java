@@ -1,7 +1,10 @@
 package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomValidationException;
+import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.tson.schema.meta.TextType;
 import org.junit.jupiter.api.Test;
+import java.util.List;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -59,5 +62,20 @@ class TextParserTest {
     @Test
     void writeRoundTripsThroughRead() {
         assertEquals("hello", TextParser.UNCONSTRAINED.write(TextParser.UNCONSTRAINED.read(token("hello"))));
+    }
+
+    /** The value is the text in the type's form, and the facets judge that value (SPEC-FEEDBACK.md #19). */
+    @Test
+    void theValueIsTheTextInTheTypesNormalizationForm() {
+        TextParser charset = new TextParser(new TextType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of("[a-z0-9-]+"), Optional.of(List.of("UTF-8", "us-ascii")), Normalization.NFKC_CASEFOLD));
+        assertEquals("utf-8", charset.read(token("Utf-8")));
+        assertEquals("us-ascii", charset.read(token("US-ASCII")));
+        assertThrows(AtomValidationException.class, () -> charset.read(token("Latin1")));
+    }
+
+    @Test
+    void noNormalizationKeepsTheTextAsWritten() {
+        assertEquals("Content-Type", TextParser.UNCONSTRAINED.read(token("Content-Type")));
     }
 }

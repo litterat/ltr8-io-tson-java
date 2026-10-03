@@ -186,8 +186,8 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             if (ctx.reported() == before) {
                 if (!seen.add(ValueIdentity.of(key))) {
                     ctx.field(keySegment).report(rules.duplicateKey(keySegment));
-                } else if (names != null) {
-                    Optional<ConfusableNames.Collision> collision = names.add(keySegment);
+                } else if (names != null && ValueIdentity.nameOf(key) instanceof String name) {
+                    Optional<ConfusableNames.Collision> collision = names.add(name);
                     if (collision.isPresent()) {
                         ctx.field(keySegment).report(rules.confusableKeys(collision.get()));
                     }

@@ -40,7 +40,8 @@ public record IriParser(IriType constraints) implements AtomTypeParser<URI> {
     public static final IriParser REFERENCE = new IriParser(IriType.REFERENCE);
 
     @Override
-    public URI read(String text) {
+    public URI read(String written) {
+        String text = constraints.normalization().apply(written);
         checkCharacters(text);
         try {
             new URI(encoded(text, false));

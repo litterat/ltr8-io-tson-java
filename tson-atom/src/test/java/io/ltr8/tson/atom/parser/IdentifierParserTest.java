@@ -2,6 +2,8 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.base.unicode.IdentifierProfile.Base;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.TextType;
 import org.junit.jupiter.api.Test;
@@ -71,5 +73,21 @@ class IdentifierParserTest {
         assertThrows(AtomTypeException.class, () -> closed.read("east"));
         assertEquals("an identifier",
                 assertThrows(AtomParseException.class, () -> closed.read("2fast")).expected());
+    }
+
+    /** The profile judges the value: a lowercase profile under NFKC_CASEFOLD admits a name cased any way. */
+    @Test
+    void theProfileJudgesTheNormalizedValue() {
+        IdentifierParser header = new IdentifierParser(new IdentifierType(IdentifierType.SPEC, Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Base.NONE, Base.NONE,
+                Optional.of("abcdefghijklmnopqrstuvwxyz"), Optional.of("abcdefghijklmnopqrstuvwxyz-"),
+                Optional.empty(), Optional.empty(), Normalization.NFKC_CASEFOLD));
+        assertEquals("content-type", header.read("Content-Type"));
+        assertThrows(AtomParseException.class, () -> header.read("content_type"));
+    }
+
+    @Test
+    void theKernelsIdentifierIsNfcNormalisedRatherThanRefused() {
+        assertEquals("caf\u00e9", IdentifierParser.IDENTIFIER.read("cafe\u0301"));
     }
 }

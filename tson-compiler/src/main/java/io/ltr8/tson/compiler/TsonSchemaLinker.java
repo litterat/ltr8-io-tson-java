@@ -314,7 +314,7 @@ public final class TsonSchemaLinker {
      * where the field's type is an identifier family. Such a value is a name, as the same token written in a
      * document is -- and a default reaches every document that omits the field, so a value the reader would
      * refuse if the document wrote it must not be one the reader injects. Judged under the family's own profile,
-     * as a read judges it.
+     * as a read judges it: over the value, the text in the family's normalization form.
      */
     private static void checkFieldValues(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                          TypeDefinition definition, RecordBody record,
@@ -329,7 +329,8 @@ public final class TsonSchemaLinker {
                     .map(IdentifierType.class::cast);
             if (family.isPresent()) {
                 String what = field.role() == FieldRole.FIXED ? "a fixed value" : "a default";
-                perName(receiver, schema, entry, definition, field.value().get().text(),
+                perName(receiver, schema, entry, definition,
+                        family.get().normalization().apply(field.value().get().text()),
                         "'" + entry + "' has " + what + " for '" + field.name() + "' where ", identifiers,
                         family.get().profile());
             }

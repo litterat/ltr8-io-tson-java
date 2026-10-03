@@ -92,14 +92,16 @@ final class MapObjectReader implements JsonTypeReader<Object> {
                 // as a repeat of the first.
                 continue;
             }
-            Integer slot = byIdentity.putIfAbsent(ValueIdentity.of(key), keys.size());
+            Object identity = ValueIdentity.of(key);
+            Integer slot = byIdentity.putIfAbsent(identity, keys.size());
             if (slot != null) {
                 at.report(plan.rules().duplicateKey(member.name()));
                 values.set(slot, entry);
                 continue;
             }
             if (scope != null) {
-                Optional<ConfusableNames.Collision> collision = scope.add(member.name());
+                Optional<ConfusableNames.Collision> collision =
+                        scope.add(identity instanceof String name ? name : member.name());
                 if (collision.isPresent()) {
                     at.report(plan.rules().confusableKeys(collision.get()));
                 }
@@ -122,7 +124,8 @@ final class MapObjectReader implements JsonTypeReader<Object> {
             at.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
             return null;
         }
-        if (plan.keysAreNames() && NameHygiene.refusesValue(at, memberName, plan.keyProfile())) {
+        if (plan.keysAreNames()
+                && NameHygiene.refusesValue(at, key instanceof String name ? name : memberName, plan.keyProfile())) {
             return null;
         }
         if (keyBridge == null) {

@@ -2,6 +2,7 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.base.unicode.Normalization;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,18 +43,19 @@ public record UriType(String spec, @Field("min_length") Optional<Integer> minLen
                       Optional<Integer> length, Optional<String> pattern,
                       Optional<List<String>> members, Optional<List<String>> schemes,
                       @Field("allow_relative") boolean allowRelative,
-                      @Field("allow_fragment") boolean allowFragment) implements Atom {
+                      @Field("allow_fragment") boolean allowFragment,
+                      Normalization normalization) implements Atom {
 
     /** RFC 3986, the one {@code spec} every {@code uri_type} carries. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc3986";
 
     /** {@code uri_reference => !uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
     public static final UriType REFERENCE = new UriType(SPEC, Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), true, true);
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), true, true, Normalization.NONE);
 
     /** {@code uri => !uri_reference ^ { allow_relative: false }} -- §5.5's {@code !uri}, which has a scheme. */
     public static final UriType URI = new UriType(SPEC, Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true);
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true, Normalization.NONE);
 
     /** Whether {@code scheme} is one {@link #schemes} admits -- §3.1's case-insensitive comparison. */
     public boolean admitsScheme(String scheme) {
@@ -62,7 +64,7 @@ public record UriType(String spec, @Field("min_length") Optional<Integer> minLen
 
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
     public TextType textConstraints() {
-        return new TextType(minLength, maxLength, length, pattern, members);
+        return new TextType(minLength, maxLength, length, pattern, members, normalization);
     }
 
     /**

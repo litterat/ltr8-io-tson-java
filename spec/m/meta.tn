@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=710ee1ab1e322e34a00a91d137894e97cb3636165c24635a0efc5a482e8edcd5"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=999b5bbbde031910ea4250a828b0e3492867a3517b97e86bb5a39646a93562ef"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=999b5bbbde031910ea4250a828b0e3492867a3517b97e86bb5a39646a93562ef"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=e3a52fec065a355d7ee8c5d475e52b52d42fee694b0dbaa0dde0296d27ace79a"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b7f6eb260a166e6277aac3bc48ffca876d914dad23f2bf870b7e2ac449026b63"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=b7f6eb260a166e6277aac3bc48ffca876d914dad23f2bf870b7e2ac449026b63"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 

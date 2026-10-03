@@ -121,7 +121,7 @@ class IdentifierProfileTest {
     @Test
     void aNameThatIsNotNfcIsRejected() {
         String nfd = "cafe" + new String(Character.toChars(0x0301));
-        assertTrue(rejects(nfd).contains("not NFC-normalized"));
+        assertTrue(rejects(nfd).contains("not in NFC form"));
         assertEquals("café", read("café"), "the NFC spelling is fine");
     }
 

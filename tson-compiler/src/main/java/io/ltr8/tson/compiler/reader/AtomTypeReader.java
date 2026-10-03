@@ -211,7 +211,9 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                 return formSensitive.read(tokenValue);
             }
             T value = delegate.read(tokenValue.text());
-            return names != null && ctx.refusesName(token.text(), names) ? null : value;
+            // Hygiene judges the name the value is, in its type's normalization form, not the spelling.
+            return names != null && ctx.refusesName(value instanceof String name ? name : token.text(), names)
+                    ? null : value;
         } catch (AtomTypeException ex) {
             // The entry's own name leads the sentence -- see `name` above -- and AtomRefusal decides the
             // code: §8.1 files a contract rejection apart from a range violation, and this reader is not a

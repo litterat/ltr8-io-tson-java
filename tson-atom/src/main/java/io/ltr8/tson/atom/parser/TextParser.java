@@ -18,6 +18,10 @@ import java.util.Optional;
  * that is the point -- it lets the string case be asserted, so a quoted numeric under {@code !text} is
  * unambiguously the string rather than a number that happened to be quoted.
  *
+ * <p><b>The value is the token's text in the type's {@code normalization} form</b>, and the facets judge that
+ * value: under {@code NFKC_CASEFOLD}, {@code Content-Type} reads as {@code content-type} and matches a member
+ * written either way.
+ *
  * <p><b>No reverse mapping.</b> {@code VocabularyAtoms} maps a host class to the name a writer annotates it
  * with, and this one's host class is {@code String} -- what both writers emit bare. An entry there would put
  * {@code !text} on every string in every document.
@@ -35,10 +39,15 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
         this(new TextType(minLength, maxLength, length, pattern));
     }
 
+    /**
+     * The value {@code text} decodes to -- the text put into the type's {@code normalization} form
+     * (SPEC-FEEDBACK.md #19) -- once every facet has judged that value.
+     */
     @Override
     public String read(String text) {
-        validate(text);
-        return text;
+        String value = constraints.normalization().apply(text);
+        validate(value);
+        return value;
     }
 
     @Override
@@ -46,7 +55,8 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
         return value;
     }
 
-    private void validate(String text) {
+    /** The facets over a value already in the type's form; {@code IdentifierParser} runs its profile between. */
+    void validate(String text) {
         constraints.length().ifPresent(len -> {
             if (text.length() != len) {
                 throw new AtomValidationException(
@@ -78,7 +88,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
         });
         // Last, as on the numeric tiers: a member set names the whole value space, so where it is present the
         // other facets hold vacuously and their messages are the less useful of the two.
-        constraints.members().ifPresent(members -> {
+        constraints.normalizedMembers().ifPresent(members -> {
             if (!members.contains(text)) {
                 throw new AtomValidationException(
                         "'" + text + "' is not a member of this type -- expected one of " + members,

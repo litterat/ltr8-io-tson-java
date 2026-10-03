@@ -199,7 +199,8 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
             return written;   // already reported by the field's own reader
         }
         if (!Objects.equals(ValueIdentity.of(value), ValueIdentity.of(pin.pinned()))) {
-            plan.field(ctx, at).report(plan.rules.fixedFieldContradicted(memberName, pin.text(), content));
+            plan.field(ctx, at).report(plan.rules.fixedFieldContradicted(memberName, Nodes.rendered(pin.pinned()),
+                    content));
         }
         // The schema's value, which is what an omitted FIXED member gets too: whether the document stated it
         // decides nothing about what the field holds (§6.1.3).

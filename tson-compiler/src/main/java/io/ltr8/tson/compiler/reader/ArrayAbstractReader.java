@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.annotation.Annotated;
 import io.ltr8.tson.base.diagnostics.ArrayDiagnostics;
 import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.SchemaLocation;
@@ -13,7 +12,6 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.tree.TsonAtom;
 
 import java.math.BigInteger;
 import java.util.Optional;
@@ -152,7 +150,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
             if (seen != null && decoded != null) {
                 if (!seen.add(ValueIdentity.of(decoded))) {
                     ctx.index(index).report(rules.repeatedElement(Rendered.value(decoded)));
-                } else if (names != null && nameOf(decoded) instanceof String name) {
+                } else if (names != null && ValueIdentity.nameOf(decoded) instanceof String name) {
                     Optional<ConfusableNames.Collision> collision = names.add(name);
                     if (collision.isPresent()) {
                         ctx.index(index).report(rules.confusableElements(collision.get()));
@@ -165,20 +163,6 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         ctx.next(); // ArrayEnd
         validateSize(index, ctx);
     }
-
-    /**
-     * The name an element of a unique array of names decoded to, whichever mode read it: the text itself in object binding,
-     * boxed where the bound element is {@code Annotated}, and a tree's atom node.
-     */
-    private static String nameOf(Object decoded) {
-        return switch (decoded) {
-            case String text -> text;
-            case TsonAtom atom when atom.value() instanceof String text -> text;
-            case Annotated<?> annotated when annotated.value() instanceof String text -> text;
-            default -> null;
-        };
-    }
-
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for the `actual` of an element-state rule. */
     private static final String ABSENT = "_";
 

@@ -226,6 +226,7 @@
       !record_field { name: length          type: non_negative_integer  optional: true }
       !record_field { name: pattern         type: regex       optional: true }
       !record_field { name: members         type: text_member_set  optional: true }
+      !record_field { name: normalization   type: normalization  optional: true  role: DEFAULT  value: NONE }
       !record_field { name: spec            type: uri         optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3987" }
       !record_field { name: schemes         type: scheme_set  optional: true }
       !record_field { name: allow_relative  type: boolean     optional: true  role: DEFAULT  value: true }
@@ -236,12 +237,13 @@
   email_type => !type_definition {
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length  type: non_negative_integer  optional: true }
-      !record_field { name: max_length  type: non_negative_integer  optional: true }
-      !record_field { name: length      type: non_negative_integer  optional: true }
-      !record_field { name: pattern     type: regex    optional: true }
-      !record_field { name: members     type: text_member_set  optional: true }
-      !record_field { name: spec        type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc5322" }
+      !record_field { name: min_length     type: non_negative_integer  optional: true }
+      !record_field { name: max_length     type: non_negative_integer  optional: true }
+      !record_field { name: length         type: non_negative_integer  optional: true }
+      !record_field { name: pattern        type: regex  optional: true }
+      !record_field { name: members        type: text_member_set  optional: true }
+      !record_field { name: normalization  type: normalization  optional: true  role: DEFAULT  value: NONE }
+      !record_field { name: spec           type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc5322" }
     ] }
   }
 

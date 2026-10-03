@@ -7,6 +7,8 @@ import io.ltr8.tson.json.tree.JsonNumber;
 import io.ltr8.tson.json.tree.JsonString;
 import io.ltr8.tson.json.tree.JsonValue;
 
+import java.util.HexFormat;
+
 /**
  * One scalar event as the tree node it stands for. The composite kinds are each reader's own to assemble, so
  * this covers exactly the four leaves and null.
@@ -27,10 +29,15 @@ final class Nodes {
      * saying an element "appears more than once" is naming the value that repeated, and the schema's
      * vernacular is what those messages are written in ({@code base.diagnostics}). The TSON reader's
      * {@code Rendered.value} answers the same question from a host value, as this does for bind mode's; for a
-     * node it renders the value, tree mode having discarded the host one by design.
+     * node it renders the value, tree mode having discarded the host one by design. Octets render as hex, as
+     * there: a {@code byte[]} prints as an identity hash otherwise.
      */
     static String rendered(Object value) {
-        return value instanceof JsonString string ? string.value() : String.valueOf(value);
+        return switch (value) {
+            case JsonString string -> string.value();
+            case byte[] octets -> HexFormat.of().formatHex(octets) + " (hex)";
+            case null, default -> String.valueOf(value);
+        };
     }
 
     /** The node {@code event} carries, or null when {@code event} opens a composite or ends one. */

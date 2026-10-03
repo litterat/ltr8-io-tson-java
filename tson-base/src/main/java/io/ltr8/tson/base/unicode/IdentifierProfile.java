@@ -54,9 +54,12 @@ import java.util.Optional;
  * invisible. Every profile applies it, an invisible joiner being as much a spoofing surface in an outside
  * system's names as in the series' own.
  *
- * <p>NFC is required as a <em>form</em>, not merely as a comparison. §2.5 and §2.6 define name identity by
- * NFC-normalised comparison, which is the harder rule and the easy one to get wrong; requiring the form
- * makes the stored name equal the compared name and reduces duplicate detection to string equality.
+ * <p><b>The profile judges a value, which is already in its {@link Normalization} form.</b> An
+ * {@code identifier_type} atom puts the text it reads into the form first (SPEC-FEEDBACK.md #19), and a name the
+ * series reads arrives NFC -- an unquoted token by the lexer's rule, a quoted one normalised before it is matched
+ * ([TSON-DATA] §7.2.1). So {@link #check} refuses text not in the form rather than normalising it: the form holds
+ * for every caller with a value, the stored name equals the compared name, and duplicate detection is string
+ * equality.
  *
  * <p><b>It lives here, beside the tables it reads, because it is not a parser.</b> Nothing here turns a
  * token into a host value: it answers <em>is this a legal name</em> over text a caller already holds. The
@@ -82,25 +85,6 @@ public final class IdentifierProfile {
         ID,
         /** The empty set: the additions are the whole set. */
         NONE
-    }
-
-    /**
-     * The normalization form an identifier must already be in -- a <em>form</em> requirement, never a
-     * transformation: text not in it is refused, not rewritten.
-     *
-     * <p><b>UAX #31's {@code NFKC_Casefold} is left out deliberately.</b> The JDK has no full case folding
-     * ({@code toLowerCase} is not {@code toCasefold}: ß, the Cherokee syllabary and the default ignorables
-     * differ), so checking it needs a {@code Changes_When_NFKC_Casefolded} table derived from
-     * {@code DerivedNormalizationProps.txt} and re-derived on every Unicode version, as {@link Xid}'s are. It
-     * waits for a naming system that needs it.
-     */
-    public enum Normalization {
-        /** No form required: names compare by code point. */
-        NONE,
-        /** NFC, the series' own form (§2.5, §2.6). */
-        NFC,
-        /** NFKC: compatibility variants (full-width letters, ligatures) are refused. */
-        NFKC
     }
 
     /** [TSON-DATA] §7.7's profile: {@code XID_Start}, {@code XID_Continue ∪ { - }}, NFC. */
@@ -153,18 +137,8 @@ public final class IdentifierProfile {
         }
         // Before anything else: UTS #39 §3.1.1.1's global conditions include NFC, and JoiningControls is
         // written to that assumption rather than re-checking it per joiner.
-        switch (normalization) {
-            case NFC -> {
-                if (!Normalizer.isNormalized(text, Normalizer.Form.NFC)) {
-                    return Optional.of("'" + text + "' is not NFC-normalized");
-                }
-            }
-            case NFKC -> {
-                if (!Normalizer.isNormalized(text, Normalizer.Form.NFKC)) {
-                    return Optional.of("'" + text + "' is not NFKC-normalized");
-                }
-            }
-            case NONE -> { }
+        if (!normalization.holds(text)) {
+            return Optional.of("'" + text + "' is not in " + normalization + " form");
         }
         int first = text.codePointAt(0);
         if (!isStart(first)) {

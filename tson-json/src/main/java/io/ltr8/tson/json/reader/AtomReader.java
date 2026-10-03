@@ -115,7 +115,9 @@ final class AtomReader<T> implements JsonTypeReader<T> {
         }
         try {
             T value = parser.read(content);
-            return names != null && NameHygiene.refusesValue(ctx, content, names) ? null : value;
+            // Hygiene judges the name the value is, in its type's normalization form, not the spelling.
+            return names != null && NameHygiene.refusesValue(ctx, value instanceof String name ? name : content, names)
+                    ? null : value;
         } catch (AtomTypeException e) {
             AtomRefusal refusal = AtomRefusal.of(e, content, Object.class).named(name);
             ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());

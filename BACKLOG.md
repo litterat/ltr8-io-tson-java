@@ -257,6 +257,27 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **An enum matches a token's text, not its label type's value** (`r2026-37-proposal`). `EnumParser` checks
+  `members().contains(text)`, so under a `type` whose `normalization` is not `NONE` (SPEC-FEEDBACK.md #19) a document
+  spelling a member another way -- `Content-Type` for a member `content-type` of a case-folding identifier -- is
+  refused, where `EnumLabels` already judges the declared members on the type's value. The reader needs the label
+  type's parser at compile time (`EnumTypeParserFactory` resolving `enum_type.type`), decoding the token through it and
+  matching the decoded members; both encodings' enum readers move together, with a parity case.
+
+- [ ] **`uri_type.schemes` should be a set of case-folding scheme identifiers** (SPEC-FEEDBACK.md #19). The kernel's
+  `scheme_set` holds `text`, and `uri_type`'s `@doc` states the case-insensitive comparison for that field alone;
+  `scheme_name => !identifier_type { start: NONE  continue: NONE  start_add: "a…z"  continue_add: "a…z0…9+-."
+  normalization: NFKC_CASEFOLD }`, spelled out, would carry it as data. What constrains it is the bootstrap:
+  `MetaKernelBootstrapResolver.instanceBody` dispatches on the constructor and `requireIdentifierProfile` admits the
+  kernel's one `identifier_type` instance only, so a second needs dispatch by entry name. `UriParser.admitsScheme`
+  then compares the folded scheme.
+
+- [ ] **The text facets' lengths count UTF-16 units in three parsers.** `TextParser`, `UriParser` and `EmailParser`
+  measure `String.length()`, where `text_type`'s `@doc` and `TextType.coherenceCheck` count code points, so a value
+  holding a supplementary character (an emoji, a CJK Extension B ideograph) meets `max_length` one unit early and a
+  member the schema admits can be refused on read. The fix is `codePointCount` at each, with a test on a
+  supplementary character.
+
 - [ ] **`!uri` is `java.net.URI`'s RFC 2396 grammar, not [TSON-DATA] §5.5's RFC 3986** (`main` and
   `r2026-37-proposal`). `UriParser` delegates the whole grammar to `java.net.URI`, which refuses valid URIs —
   `https://` and `foo://` ("Expected authority": RFC 3986's `reg-name` may be empty, §3.2.2, and an empty
