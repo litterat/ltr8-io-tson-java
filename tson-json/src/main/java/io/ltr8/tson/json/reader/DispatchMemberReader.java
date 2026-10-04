@@ -243,7 +243,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         Refusal missing = extension.discriminatorMissing(field);
         return new Refusal(missing.code(), "missing discriminator '%s' for '%s' -- a sealed family selects its "
                 .formatted(field, displayName) + "member by reading it, so its discriminators lead the object, "
-                + "after any '$type' (§6.1.5), and '" + field + "' is absent or follows another member",
+                + "after any '$type' (§6.1.5), and '" + field + "' is missing or follows another member",
                 "'" + field + "' as a leading member", missing.actual());
     }
 

@@ -85,7 +85,7 @@ class JsonBindContainerReadTest {
     public record Pair(String label, long count) {
     }
 
-    /** An optional position binds to a boxed element, which can hold the absence. */
+    /** A voidable position binds to a boxed element, which can hold a void value. */
     @Tuple
     public record Loose(String label, Integer count) {
     }
@@ -207,13 +207,13 @@ class JsonBindContainerReadTest {
         assertTrue(e.getMessage().contains("field 'tags''s element cannot produce"), e.getMessage());
     }
 
-    /** {@code [int32?]} admits an absent element, which an {@code int[]} has nowhere to hold. */
+    /** {@code [int32?]} admits a void element, which an {@code int[]} has nowhere to hold. */
     @Test
     void optionalElementsCannotReachAPrimitiveArray() {
         Map<String, Class<?>> bindings = new HashMap<>(BINDINGS);
         bindings.put("optional_ints", OptionalInts.class);
         BindMismatchException e = assertThrows(BindMismatchException.class, () -> compile(bindings));
-        assertTrue(e.getMessage().contains("admits absent elements"), e.getMessage());
+        assertTrue(e.getMessage().contains("admits void elements"), e.getMessage());
     }
 
     // ── Tuples ───────────────────────────────────────────────────────────

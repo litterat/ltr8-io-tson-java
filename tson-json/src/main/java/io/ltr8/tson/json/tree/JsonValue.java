@@ -63,9 +63,9 @@ public sealed interface JsonValue
     /**
      * This value, or empty if it is {@link JsonNull} — the one-call form of "a value, if there is one".
      *
-     * <p>JEP 540's own way of collapsing JSON's null into an absence at the point a caller reads it,
+     * <p>JEP 540's own way of collapsing JSON's null into an empty result at the point a caller reads it,
      * and the nearest thing this layer has to §7's rule. It is a caller's convenience and not that
-     * rule: §7 is decided by the <em>position's declared state</em>, which nothing here holds.
+     * rule: §7 is decided by the <em>position's declaration</em>, which nothing here holds.
      */
     default Optional<JsonValue> tryValue() {
         return Optional.of(this);

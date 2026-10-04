@@ -194,13 +194,13 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * choice that cannot be discriminated needs a tag on every value, where one that is disjoint and
      * class-stable but received an unexpected kind has a document problem. A null gets its own answer -- §7
      * spends it as the void sentinel before any class question arises, so it is not an unrecognised kind but
-     * an absence at a position admitting none.
+     * a void value at a position admitting none.
      */
     private Object untagged(JsonReadContext ctx, JsonEvent first, Optional<DiscriminationClass> arriving) {
         String found = JsonAtoms.describe(first);
         if (first instanceof JsonEvent.NullValue) {
             ctx.report(Diagnostic.Code.FIELD_REQUIRED,
-                    "'%s' admits no absence, and JSON null is this encoding's spelling of the void sentinel (§7)"
+                    "'%s' is not voidable, and JSON null is this encoding's spelling of the void sentinel (§7)"
                             .formatted(name), "a value of one of (" + String.join(" | ", variants) + ")", "null");
         } else if (byClass.isEmpty()) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,

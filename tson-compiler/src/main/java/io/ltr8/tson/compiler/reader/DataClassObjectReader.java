@@ -435,7 +435,7 @@ public final class DataClassObjectReader {
             if (field.isRequired()) {
                 ctx.field(field.name()).report(Diagnostic.Code.FIELD_REQUIRED,
                         "missing required field '" + field.name() + "' for " + dataClass.typeClass(),
-                        "a value for '" + field.name() + "'", "(absent)");
+                        "a value for '" + field.name() + "'", "(missing)");
             }
             construct[field.index()] = null;
         }

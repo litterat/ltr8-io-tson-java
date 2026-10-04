@@ -66,7 +66,7 @@ class OutputFormatTest {
     void textIncludesThePathWhenPresent() {
         CliDiagnostic diagnostic = new CliDiagnostic(Optional.of("/value"), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.FIELD_REQUIRED, "missing",
-                Optional.of("a value"), Optional.of("(absent)"), Optional.empty(), Optional.empty());
+                Optional.of("a value"), Optional.of("(missing)"), Optional.empty(), Optional.empty());
         String rendered = OutputFormat.TEXT.render(new ValidationReport(Outcome.INVALID, POLICY, List.of(diagnostic)));
         assertEquals("[FIELD_REQUIRED] /value: missing", rendered);
     }
@@ -155,7 +155,7 @@ class OutputFormatTest {
     void jsonRendersPositionsWhenPresent() {
         CliDiagnostic diagnostic = new CliDiagnostic(Optional.of("/value"), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.FIELD_REQUIRED, "missing",
-                Optional.of("a value"), Optional.of("(absent)"), Optional.of("1:1:0"), Optional.of("6:3:42"));
+                Optional.of("a value"), Optional.of("(missing)"), Optional.of("1:1:0"), Optional.of("6:3:42"));
         String rendered = OutputFormat.JSON.render(new ValidationReport(Outcome.INVALID, POLICY, List.of(diagnostic)));
         assertTrue(rendered.contains("\"data_position\":\"1:1:0\""), rendered);
         assertTrue(rendered.contains("\"schema_position\":\"6:3:42\""), rendered);
@@ -442,7 +442,7 @@ class OutputFormatTest {
                 FileReport.of("good.tn", List.of()),
                 FileReport.of("bad.tn", List.of(new CliDiagnostic(Optional.of("/a"), Optional.empty(), Optional.empty(),
                         Diagnostic.Code.FIELD_REQUIRED,
-                        "missing required field 'a'", Optional.of("a value"), Optional.of("(absent)"),
+                        "missing required field 'a'", Optional.of("a value"), Optional.of("(missing)"),
                         Optional.of("1:1:0"), Optional.of("6:3:42"))))));
 
         String rendered = OutputFormat.TSON.render(original);
@@ -469,7 +469,7 @@ class OutputFormatTest {
     void tsonOutputRoundTripsRealPositions() {
         ValidationReport original = new ValidationReport(Outcome.INVALID, POLICY, List.of(
                 new CliDiagnostic(Optional.of("/value"), Optional.empty(), Optional.empty(), Diagnostic.Code.FIELD_REQUIRED,
-                        "missing required field 'value'", Optional.of("a value"), Optional.of("(absent)"),
+                        "missing required field 'value'", Optional.of("a value"), Optional.of("(missing)"),
                         Optional.of("1:1:0"), Optional.of("6:3:42"))));
 
         String rendered = OutputFormat.TSON.render(original);

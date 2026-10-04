@@ -17,12 +17,12 @@ import io.ltr8.tson.json.tree.JsonValue;
  * field is declared instead of appended after everything the document happened to state.
  *
  * <p><b>All-or-nothing, as bind mode is.</b> A record whose read reported anything builds nothing: a placeholder
- * for a refused member would be the same node as a real absent one, and the diagnostics are the answer.
+ * for a refused member would be the same node as a real void one, and the diagnostics are the answer.
  *
- * <p><b>A tree keeps the spelling of absence</b> ([TSON-JSON] §7.2). Of a clean read, a member written null --
- * which a clean read admits only at a voidable field -- stands as {@link JsonNull}, and a member never written
- * is left out, as the text tree keeps {@code _} as an absent node distinct from a missing field ([TSON-DATA]
- * §2.9's "present with a void value"). Bind mode has one null and collapses the two; a tree is the document,
+ * <p><b>A tree keeps a void member apart from a missing one</b> ([TSON-JSON] §7.2). Of a clean read, a member
+ * written null -- which a clean read admits only at a voidable field -- stands as {@link JsonNull}, and a member
+ * never written is left out, as the text tree keeps {@code _} as a void node distinct from a missing field
+ * ([TSON-DATA] §2.9's "present with a void value"). Bind mode has one null and collapses the two; a tree is the document,
  * and the consumer that needs "no lower bound" told apart from "not stated" is a tree consumer.
  */
 final class TreeRecordBuilder implements RecordBuilder {

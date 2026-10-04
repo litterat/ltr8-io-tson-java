@@ -254,12 +254,12 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * Both trees keep the spelling of absence (§7.2): a field written {@code _} or null stands as the absent
+     * Both trees keep the spelling of a void value (§7.2): a field written {@code _} or null stands as the void
      * node, and one never written is not there -- the text tree's {@code TsonVoid} and the JSON tree's
      * {@code JsonNull} at the same fields, in both directions.
      */
     @Test
-    void bothTreesKeepWhichSpellingOfAbsenceArrived() {
+    void bothTreesKeepWhichSpellingOfAVoidValueArrived() {
         TsonRecord text = (TsonRecord) TSON.treeReader().read("""
                 !!schema:"%s"
                 !marks { from: _  timeout: _  version: "2.0" }""".formatted(ID));
@@ -544,8 +544,8 @@ class CrossEncodingParityTest {
      * <p>That difference is confined to <em>which kinds reach a family's parser</em>, which is each
      * encoding's own by §5.1. It is not a difference about the parser, the acceptance set, or the constraint
      * vocabulary -- those are one implementation ({@code tson-atom}) and cannot drift. So the parity this
-     * class guards is over the rules that <em>are</em> written twice: closure, duplicates, the field states,
-     * absence, group multiplicity, and container size and arity.
+     * class guards is over the rules that <em>are</em> written twice: closure, duplicates, the field facts,
+     * void values, group multiplicity, and container size and arity.
      */
     @Test
     void anUnquotedTokenAndAJsonNumberAreNotTheSameThingAtATextField() {
@@ -591,7 +591,7 @@ class CrossEncodingParityTest {
                 {"name": null, "labels": []}""");
     }
 
-    /** §6.1.2: at REQUIRED_DEFAULT the fix is omission, and stating absence is refused in both encodings. */
+    /** §6.1.2: at REQUIRED_DEFAULT the fix is omission, and stating a void value is refused in both encodings. */
     @Test
     void theVoidSentinelAtADefaultedField() {
         sameRule("person", """
@@ -606,7 +606,7 @@ class CrossEncodingParityTest {
                 {"name": "Ada", "labels": ["x", [2]]}""");
     }
 
-    /** An absent element where the array admits none: `_` in text, null in JSON, one verdict at one index. */
+    /** A void element where the array admits none: `_` in text, null in JSON, one verdict at one index. */
     @Test
     void aVoidElementInANonVoidableArray() {
         sameRule("person", """
@@ -781,7 +781,7 @@ class CrossEncodingParityTest {
                 {"a": {"b": 1}}""");
     }
 
-    /** An entry value absent where the map admits none: `_` in text, null in JSON, one verdict at one key. */
+    /** A void entry value where the map admits none: `_` in text, null in JSON, one verdict at one key. */
     @Test
     void aVoidEntryValueWhereValuesAreNotVoidable() {
         sameRule("counts", """

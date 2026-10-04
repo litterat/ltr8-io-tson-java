@@ -112,7 +112,7 @@ class JsonChoiceReadTest {
                 refusal.message());
     }
 
-    /** §7: null carries no class at all -- it is the void sentinel, and a choice admits no absence. */
+    /** §7: null carries no class at all -- it is the void sentinel, and this choice is not voidable. */
     @Test
     void nullAtAChoiceIsVoidAndNotAnUnknownKind() {
         assertEquals(Diagnostic.Code.FIELD_REQUIRED, read("scalar_or_list", "null").refusal().code());
@@ -136,7 +136,7 @@ class JsonChoiceReadTest {
         Diagnostic refusal = read("shape", """
                 {"radius": 1.0}""").refusal();
         // TYPE_MISMATCH, matching the TSON reader for the same document -- §9.4 gives both encodings one
-        // vocabulary. A required tag that is absent establishes no type, which is what the code says;
+        // vocabulary. A required tag that is missing establishes no type, which is what the code says;
         // UNKNOWN_TYPE_REF would claim a name denoted nothing, and there is no name here at all.
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
         assertTrue(refusal.message().contains("$type"), refusal.message());

@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 /**
  * One rule for every read: a document whose read reported anything reads to nothing, in tree mode and bind mode
  * and in both encodings, and the diagnostics are the answer. A partial value cannot say which of its parts to
- * trust -- a tree's placeholder for a refused value is the same node as a real absent one.
+ * trust -- a tree's placeholder for a refused value is the same node as a real void one.
  */
 class AllOrNothingReadTest {
 

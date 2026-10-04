@@ -68,7 +68,7 @@ enum AtomForm {
      * The text {@code event} carries for this form's parser, or null when the kind is one this form does not
      * admit -- §5's <em>value of the wrong form</em>, which the caller reports.
      *
-     * <p>JSON null is never admitted here and returns null for every form: §5 spends it as the absent
+     * <p>JSON null is never admitted here and returns null for every form: §5 spends it as the void
      * sentinel under §7's rules before any family rule applies, and the one position whose contract admits
      * it has a reader of its own ({@link VoidReader}).
      */

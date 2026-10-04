@@ -91,7 +91,7 @@ public final class DataClassObjectWriter {
         try {
             if (value == null) {
                 // §7 makes JSON null the void sentinel's spelling at a typed position, which is what a
-                // reader of this document will apply. Here it is simply the one spelling absence has.
+                // reader of this document will apply. Here it is simply the one spelling a void value has.
                 out.nullValue();
                 return;
             }
@@ -188,7 +188,7 @@ public final class DataClassObjectWriter {
     /**
      * A record as a JSON object.
      *
-     * <p>An absent field is left out rather than written {@code null}: §7 makes JSON null the absent
+     * <p>A null component is left out rather than written {@code null}: §7 makes JSON null the void
      * sentinel at a typed position, so the two say the same thing, and the shorter one is what a reader
      * of any strictness takes. The annotations carrier is skipped because it is not data -- see {@link
      * #write}.
@@ -247,7 +247,7 @@ public final class DataClassObjectWriter {
     /** A key's text, through the same vocabulary a value would use, with any bridge applied first. */
     private String memberName(Object key, DataClass keyClass) throws Throwable {
         if (key == null) {
-            throw new WriteException("a JSON member name cannot be absent, so a map with a null key "
+            throw new WriteException("a JSON member name is never null, so a map with a null key "
                     + "has no JSON spelling");
         }
         Object wire = keyClass.bridge().isPresent() ? keyClass.bridge().get().toData().invoke(key) : key;

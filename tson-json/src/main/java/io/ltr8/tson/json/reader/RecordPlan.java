@@ -30,7 +30,7 @@ import java.util.Set;
  */
 final class RecordPlan {
 
-    /** How a JSON document spells absence (§7), for the {@code actual} of a rule about a field's state. */
+    /** How a JSON document spells the void sentinel (§7), for the {@code actual} of a rule about a voidable field. */
     static final String NULL = "null";
 
     final String name;

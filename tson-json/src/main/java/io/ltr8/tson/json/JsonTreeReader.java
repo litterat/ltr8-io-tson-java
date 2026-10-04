@@ -239,7 +239,7 @@ public final class JsonTreeReader {
     /**
      * One whole-document read, run on a copy of this reader whose receiver counts: a read that reported anything
      * returns no tree ({@link CountingReceiver}) -- all-or-nothing, as bind mode is. A placeholder for a refused
-     * value would be the same node as a real absent one, so a partial tree could not say which parts to trust.
+     * value would be the same node as a real void one, so a partial tree could not say which parts to trust.
      */
     private <T> T counted(Function<JsonTreeReader, T> read) {
         CountingReceiver counting = new CountingReceiver(receiver);

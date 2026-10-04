@@ -106,7 +106,7 @@ public final class DataClassObjectReader {
     /** One value at one descriptor, {@code first} being its opening event, already pulled. */
     private Object bind(JsonReadContext ctx, JsonEvent first, DataClass target) {
         if (first instanceof JsonEvent.NullValue && !(target instanceof DataClassAtom)) {
-            // A container or record component written null: absence, which the caller's own state rule
+            // A container or record component written null: a void value, which the caller's own voidable rule
             // has already admitted -- a required one never reaches here (see bindMember/element).
             return null;
         }
@@ -241,7 +241,7 @@ public final class DataClassObjectReader {
                 ctx.field(fields[i].name()).report(Diagnostic.Code.FIELD_REQUIRED,
                         "%s requires a member '%s', and this object has none"
                                 .formatted(target.typeClass().getSimpleName(), fields[i].name()),
-                        "a value for '" + fields[i].name() + "'", "(absent)");
+                        "a value for '" + fields[i].name() + "'", "(missing)");
             }
         }
         if (ctx.reported() > mark) {
@@ -265,8 +265,8 @@ public final class DataClassObjectReader {
      * One member's value.
      *
      * <p>Where §7 lands: a member written {@code null} at a required component is refused, exactly as
-     * {@code _} is at a REQUIRED field in text ([TSON-SCHEMA] §7.6), and at any other component it is the
-     * absence — which a bound object spells {@code null}, having no third state.
+     * {@code _} is at a REQUIRED field in text ([TSON-SCHEMA] §7.6), and at any other component it is a
+     * void value — which a bound object spells {@code null}, having no third state.
      */
     private Object bindMember(JsonReadContext ctx, DataClassField field) {
         JsonReadContext at = ctx.field(field.name());
