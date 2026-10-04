@@ -278,7 +278,9 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   map nested there is never refused against a target that does not keep order (it is built as a `LinkedHashMap`,
   so nothing is lost). `tson-json` re-binds at every depth through `BindTargets`. The work: rebind element, key and
   value readers against the descriptor's component classes in `ArrayBindReader` and `MapBindReader`, carrying
-  `mismatches` down; tests for a nested ordered map refused, and for a nested collection class honoured.
+  `mismatches` down; tests for a nested ordered map refused, and for a nested collection class honoured. A tuple
+  written inline at that depth (`[[text, int32]]` into a `List<Pair>`) is the sharpest case: its entry is unbound,
+  so the element raises `MissingBindingException` on read where a field's inline tuple now binds.
 
 - [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
   `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
