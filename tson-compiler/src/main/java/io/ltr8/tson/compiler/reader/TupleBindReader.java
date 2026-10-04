@@ -39,7 +39,14 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  */
 final class TupleBindReader extends TupleAbstractReader<Object> {
 
+    /** The tuple's schema shape, kept so a record field can build this tuple again for its own class. */
+    final TupleBody body;
+
+    /** The class this tuple builds, or {@code null} where nothing is bound to its name ({@link #unbound}). */
     private final DataClassTuple descriptor;
+
+    /** Why no class is bound, raised on read; {@code null} where {@link #descriptor} is set. */
+    private final MissingBindingException missing;
 
     public TupleBindReader(String name, String displayName, TupleBody body, DataClassTuple descriptor,
                            TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
@@ -49,16 +56,63 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
     public TupleBindReader(String name, String displayName, TupleBody body, DataClassTuple descriptor,
                            TsonTypeReaderResolver resolver,
                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
+        this(name, displayName, body, descriptor, null, resolver, schemaLocation, annotationTypes);
+    }
+
+    private TupleBindReader(String name, String displayName, TupleBody body, DataClassTuple descriptor,
+                            MissingBindingException missing, TsonTypeReaderResolver resolver,
+                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
         super(name, displayName, body, resolver, schemaLocation,
-                position -> position < descriptor.elements().length
+                position -> descriptor != null && position < descriptor.elements().length
                         ? descriptor.elements()[position].dataClass()
                         : null,
                 annotationTypes);
+        this.body = body;
         this.descriptor = descriptor;
+        this.missing = missing;
+    }
+
+    /**
+     * A tuple nothing binds a class to by name -- most often one written inline at a record field, whose entry
+     * has a minted name no author would bind. A tuple has no natural Java form to fall back on, as an array has
+     * its {@code List}, so this reader builds nothing: a record field rebuilds it against its own component's
+     * tuple class ({@code RecordBindReader.rebindContainerIfNeeded}), and read directly it raises {@code
+     * missing}, which is what {@link ErrorReader} would have raised for the entry.
+     */
+    static TupleBindReader unbound(String name, String displayName, TupleBody body, MissingBindingException missing,
+                                   TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
+                                   AnnotationTypes annotationTypes) {
+        return new TupleBindReader(name, displayName, body, null, missing, resolver, schemaLocation,
+                annotationTypes);
+    }
+
+    /**
+     * Where {@code descriptor} cannot build {@code body}'s values, before any document: an arity of its own, or a
+     * voidable position bound to a primitive component, which has no {@code null} for a void value to arrive as.
+     * Empty where they agree.
+     */
+    static List<String> disagreements(TupleBody body, DataClassTuple descriptor) {
+        List<String> mismatches = new ArrayList<>();
+        if (body.elements().size() != descriptor.elements().length) {
+            mismatches.add("it has " + body.elements().size() + " positions, and "
+                    + descriptor.typeClass().getSimpleName() + " has " + descriptor.elements().length);
+            return mismatches;
+        }
+        for (int i = 0; i < body.elements().size(); i++) {
+            Class<?> element = descriptor.elements()[i].dataClass().typeClass();
+            if (body.elements().get(i).voidable() && element.isPrimitive()) {
+                mismatches.add("position " + i + " is voidable, and " + element.getName()
+                        + " has no null to hold a void value");
+            }
+        }
+        return mismatches;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
+        if (missing != null) {
+            throw missing;
+        }
         ctx = ctx.underDeclaration(schemaLocation);
         if (!expectTupleStart(ctx)) {
             return null;
@@ -91,36 +145,26 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
             if (!(typeDefinition.body() instanceof TupleBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
             }
-            DataClass dataClass = descriptorFor(name, typeDefinition, context);
+            String displayName = EntryDisplayName.of(name, typeDefinition);
+            DataClass dataClass;
+            try {
+                dataClass = descriptorFor(name, typeDefinition, context);
+            } catch (MissingBindingException missing) {
+                return unbound(name, displayName, body, missing, resolver, context.locationOf(name, typeDefinition),
+                        AnnotationTypes.of(context));
+            }
             if (!(dataClass instanceof DataClassTuple descriptor)) {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't tuple-shaped -- can't bind '" + name + "' as one");
             }
-            String displayName = EntryDisplayName.of(name, typeDefinition);
-            refuseVoidAtPrimitive(displayName, body, descriptor);
-            return new TupleBindReader(name, displayName, body, descriptor, resolver,
-                    context.locationOf(name, typeDefinition),
-                    AnnotationTypes.of(context));
-        }
-
-        /**
-         * A voidable position bound to a primitive component, which has no {@code null} for a void value to arrive
-         * as -- known before any document, so refused at compile rather than left to the read that writes one.
-         */
-        private static void refuseVoidAtPrimitive(String displayName, TupleBody body, DataClassTuple descriptor) {
-            List<String> mismatches = new ArrayList<>();
-            int positions = Math.min(body.elements().size(), descriptor.elements().length);
-            for (int i = 0; i < positions; i++) {
-                Class<?> element = descriptor.elements()[i].dataClass().typeClass();
-                if (body.elements().get(i).voidable() && element.isPrimitive()) {
-                    mismatches.add("position " + i + " is voidable, and " + element.getName()
-                            + " has no null to hold a void value");
-                }
-            }
+            List<String> mismatches = disagreements(body, descriptor);
             if (!mismatches.isEmpty()) {
                 throw new BindMismatchException("'" + displayName + "' and " + descriptor.typeClass().getName()
                         + " do not agree: " + String.join("; ", mismatches));
             }
+            return new TupleBindReader(name, displayName, body, descriptor, resolver,
+                    context.locationOf(name, typeDefinition),
+                    AnnotationTypes.of(context));
         }
 
         private DataClass descriptorFor(String name, TypeDefinition definition, ValueReaderContext vctx) {

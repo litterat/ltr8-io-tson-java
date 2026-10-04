@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.annotation.Annotations;
@@ -352,6 +353,11 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * every field whose target type isn't itself a collection {@link DataClass}, which is every
      * ordinary case.
      *
+     * <p>A tuple is the case where this is the only way to a class at all: a tuple written inline has a minted
+     * entry no author binds, and no natural Java form to fall back on, so its own reader is unbound
+     * ({@link TupleBindReader#unbound}) and the component's {@code @Tuple} class is what it is built into. Its
+     * arity and voidable positions are checked against that class here, as the factory checks a bound one.
+     *
      * <p>An ordered map needs a target that keeps insertion order ({@link DataClassMap#ordered()}), or the order
      * the document wrote is lost, and {@code mismatches} records one that does not. An unordered map takes either
      * kind: keeping its order loses nothing.
@@ -380,6 +386,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             }
             return new ArrayBindReader(field.schema().name(), field.schema().name(), existing.body, targetArray,
                     resolver, existing.schemaLocation, annotationTypes, existing.elementsAreNames);
+        }
+        if (target.dataClass() instanceof DataClassTuple targetTuple && parser instanceof TupleBindReader existing) {
+            for (String disagreement : TupleBindReader.disagreements(existing.body, targetTuple)) {
+                mismatches.add("field '" + field.schema().name() + "' is a tuple, and component '" + target.name()
+                        + "' binds " + targetTuple.typeClass().getName() + ": " + disagreement);
+            }
+            return new TupleBindReader(field.schema().name(), field.schema().name(), existing.body, targetTuple,
+                    resolver, existing.schemaLocation, annotationTypes);
         }
         if (target.dataClass() instanceof DataClassMap targetMap && parser instanceof MapBindReader existing) {
             if (existing.body.ordered() && !targetMap.ordered()) {

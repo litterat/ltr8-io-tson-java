@@ -168,6 +168,12 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       Both readers check fields; the TSON reader also checks tuple positions and arrays, which `tson-json` already
       did. A collection that refuses `null` (`ConcurrentHashMap`, `ArrayDeque`) is not refused here, since no JDK
       type says so; the read that meets one reports it (`design/readers-and-diagnostics.md`).
+    - **A tuple field binds to its component's own `@Tuple` class**, which must have the tuple's arity. A
+      tuple written inline has a minted entry no author binds and no natural Java form to fall back on, so its
+      own reader is unbound (`TupleBindReader.unbound`, raising the `MissingBindingException` an unbound entry
+      always raised if read directly) and `rebindContainerIfNeeded` builds it into the component's class, as it
+      builds an array or map into the component's collection. The factory checks a bound tuple's class the same
+      way (`TupleBindReader.disagreements`).
     - **An ordered map needs a component that keeps insertion order** (`DataClassMap.ordered()`: a `SequencedMap`
       that is not a `SortedMap`, or `AnnotatedMap`), or the order the document wrote is lost; a bare `Map` is
       built as a `HashMap` and does not. The check runs one way only: an unordered map binds to either kind,
