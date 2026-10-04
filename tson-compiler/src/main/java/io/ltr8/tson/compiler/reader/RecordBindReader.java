@@ -110,7 +110,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             boolean atomPosition = readsAnAtom(field.parser());
             TsonTypeReader<?> rebound = rebindValueIfNeeded(field, target);
             rebound = rebindContainerIfNeeded(new CompiledField(field.schema(), rebound), target, resolver,
-                    this.annotationTypes);
+                    this.annotationTypes, mismatches);
             if (target.dataClass() instanceof DataClassAnnotated boxed) {
                 rebound = boxing(rebound, boxed, annotationTypes);
             }
@@ -329,15 +329,21 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * *structural* stays schema-derived; only the target Java container type changes). Untouched for
      * every field whose target type isn't itself a collection {@link DataClass}, which is every
      * ordinary case.
+     *
+     * <p>An ordered map needs a target that keeps insertion order ({@link DataClassMap#ordered()}), or the order
+     * the document wrote is lost, and {@code mismatches} records one that does not. An unordered map takes either
+     * kind: keeping its order loses nothing.
      */
     private static TsonTypeReader<?> rebindContainerIfNeeded(CompiledField field, DataClassField target,
-                                                             TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes) {
+                                                             TsonTypeReaderResolver resolver,
+                                                             AnnotationTypes annotationTypes,
+                                                             List<String> mismatches) {
         TsonTypeReader<?> parser = field.parser();
         // A §7.2 subsumption guard wraps the container reader, and the tests below are on its concrete class
         // -- so look through the guard and put it back around whatever replaces it (Subsumption).
         if (parser instanceof VariantSchemaReader guard) {
             TsonTypeReader<?> rebound = rebindContainerIfNeeded(
-                    new CompiledField(field.schema(), guard.wrapped()), target, resolver, annotationTypes);
+                    new CompiledField(field.schema(), guard.wrapped()), target, resolver, annotationTypes, mismatches);
             return rebound == guard.wrapped() ? parser : guard.rewrap(rebound);
         }
         // The field's own name serves as both, here and only here: this rebuild deliberately drops the
@@ -348,6 +354,11 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                     resolver, existing.schemaLocation, annotationTypes, existing.elementsAreNames);
         }
         if (target.dataClass() instanceof DataClassMap targetMap && parser instanceof MapBindReader existing) {
+            if (existing.body.ordered() && !targetMap.ordered()) {
+                mismatches.add("field '" + field.schema().name() + "' is an ordered map, and component '"
+                        + target.name() + "' binds " + targetMap.typeClass().getName()
+                        + ", which does not keep insertion order -- declare a SequencedMap");
+            }
             return new MapBindReader(field.schema().name(), field.schema().name(), existing.body, targetMap,
                     resolver, existing.schemaLocation, annotationTypes, existing.keysAreNames);
         }

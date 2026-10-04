@@ -19,10 +19,10 @@ import java.util.Optional;
 
 /**
  * What a map's schema fixes, resolved once when the schema compiles: [TSON-JSON] §6.4's half that does not depend
- * on what the read builds -- which of the two forms the map takes, the entry value's state and reader, the size
- * facets, and the diagnostics. A mode's factory decides the readers and hands them to the form's loop ({@link
- * MapObjectReader}, {@link MapPairsReader}); bind mode keeps the plan to build the same position again for a
- * component's own map class ({@link BindTargets}).
+ * on what the read builds -- which of the two forms the map takes, the entry value's state and reader, whether
+ * entry order is part of the value, the size facets, and the diagnostics. A mode's factory decides the readers
+ * and hands them to the form's loop ({@link MapObjectReader}, {@link MapPairsReader}); bind mode keeps the plan
+ * to build the same position again for a component's own map class ({@link BindTargets}).
  *
  * <p><b>The form is selected by the schema -- by {@code K}, never by inspecting the value -- and it is therefore
  * selected once, here.</b> That is §4.1's rule taken literally: an object is one syntax for a record and a map
@@ -40,7 +40,7 @@ import java.util.Optional;
  * {@code {text => text}} is an ordinary key. §8.3.1's escape is for a map standing as a choice variant, and
  * belongs to the choice reader.
  */
-record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean voidableValues,
+record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean voidableValues, boolean ordered,
                Optional<BigInteger> minItems, Optional<BigInteger> maxItems, AtomType<?> keyParser,
                JsonTypeReader<?> schemaKey, JsonTypeReader<?> schemaValue, MapDiagnostics rules,
                IdentifierProfile keyProfile) {
@@ -52,7 +52,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
         String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
         AtomType<?> keyParser = scalarKeyParser(context.linked(), body.keyType().name()).orElse(null);
         return new MapPlan(displayName, context.locationOf(name, definition),
-                body.voidable(), body.minItems(), body.maxItems(), keyParser,
+                body.voidable(), body.ordered(), body.minItems(), body.maxItems(), keyParser,
                 keyParser == null ? context.readers().resolve(body.keyType().name()) : null,
                 context.readers().resolve(body.valueType().name()), new MapDiagnostics(displayName),
                 keyProfile(context.schema(), body.keyType().name()));

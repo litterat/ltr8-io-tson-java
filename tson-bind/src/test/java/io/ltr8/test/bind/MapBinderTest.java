@@ -16,13 +16,18 @@
 package io.ltr8.test.bind;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.SequencedMap;
+import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassMap;
@@ -151,5 +156,67 @@ public class MapBinderTest {
 		@SuppressWarnings("unchecked")
 		Map<UUID, String> map = (Map<UUID, String>) mapData;
 		Assertions.assertEquals("Alice", map.get(id));
+	}
+
+	// ── Insertion order ──────────────────────────────────────────────────
+	// ordered() is asked of the class constructor() builds: insertion order, the order a document writes its
+	// entries in, and never an order by key.
+
+	public record OrderHolder(Map<String, Integer> plain, HashMap<String, Integer> hashed,
+			LinkedHashMap<String, Integer> linked, SequencedMap<String, Integer> sequenced,
+			ConcurrentHashMap<String, Integer> concurrent,
+			SizedTreeMap<String, Integer> sorted, AnnotatedMap<String, Integer> annotated) {
+	}
+
+	/** A sorted map with the capacity constructor the binder needs, which TreeMap itself lacks. */
+	public static class SizedTreeMap<K, V> extends TreeMap<K, V> {
+		private static final long serialVersionUID = 1L;
+
+		public SizedTreeMap(int capacity) {
+		}
+	}
+
+	private DataClassMap orderField(String name) throws Throwable {
+		DataClassRecord descriptor = (DataClassRecord) context.getDescriptor(OrderHolder.class);
+		for (DataClassField field : descriptor.fields()) {
+			if (field.name().equals(name)) {
+				return (DataClassMap) field.dataClass();
+			}
+		}
+		throw new AssertionError("no field " + name);
+	}
+
+	@Test
+	public void aMapThatKeepsInsertionOrderIsOrdered() throws Throwable {
+		Assertions.assertTrue(orderField("linked").ordered());
+		Assertions.assertTrue(orderField("sequenced").ordered(), "a bare SequencedMap is built as a LinkedHashMap");
+		Assertions.assertTrue(orderField("annotated").ordered());
+	}
+
+	@Test
+	public void aHashedMapIsNotOrdered() throws Throwable {
+		Assertions.assertFalse(orderField("plain").ordered(), "a bare Map is built as a HashMap");
+		Assertions.assertFalse(orderField("hashed").ordered());
+		Assertions.assertFalse(orderField("concurrent").ordered());
+	}
+
+	/** A SortedMap is sequenced, but by key: it re-sorts what it is given rather than keeping it. */
+	@Test
+	public void aSortedMapIsNotOrdered() throws Throwable {
+		DataClassMap sorted = orderField("sorted");
+		Assertions.assertFalse(sorted.ordered());
+
+		Object mapData = sorted.constructor().invoke(2);
+		sorted.put().invoke(mapData, "b", 1);
+		sorted.put().invoke(mapData, "a", 2);
+		Assertions.assertEquals("a", ((Map<?, ?>) mapData).keySet().iterator().next());
+	}
+
+	/** A bare SequencedMap is built as a LinkedHashMap, which keeps the order its entries were put in. */
+	@Test
+	public void aSequencedMapIsBuiltAsALinkedHashMap() throws Throwable {
+		DataClassMap sequenced = orderField("sequenced");
+		Object mapData = sequenced.constructor().invoke(2);
+		Assertions.assertInstanceOf(LinkedHashMap.class, mapData);
 	}
 }

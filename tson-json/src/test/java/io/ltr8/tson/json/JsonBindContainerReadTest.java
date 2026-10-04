@@ -20,8 +20,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SequencedMap;
 import java.util.Set;
 import java.util.UUID;
 
@@ -64,6 +66,8 @@ class JsonBindContainerReadTest {
                 maybe:    {text => text?}
                 byPoint:  {point => text}
               }
+              ranked => !map { key_type: text  value_type: int32  ordered: true }
+              league => { table: ranked }
             }
             """;
 
@@ -324,5 +328,55 @@ class JsonBindContainerReadTest {
         bindings.put("weights", WeightsWithIntKeys.class);
         BindMismatchException e = assertThrows(BindMismatchException.class, () -> compile(bindings));
         assertTrue(e.getMessage().contains("field 'counts''s key cannot produce"), e.getMessage());
+    }
+
+    // ── Ordered maps ─────────────────────────────────────────────────────
+    // An ordered map needs a component that keeps insertion order, the order the document wrote; an unordered
+    // map takes either kind, since keeping its order loses nothing.
+
+    public record League(SequencedMap<String, Long> table) {
+    }
+
+    public record LeagueAsMap(Map<String, Long> table) {
+    }
+
+    public record WeightsLinked(Map<LocalDate, BigDecimal> byDate, LinkedHashMap<String, Long> counts,
+                                Map<String, String> maybe, Map<Point, String> byPoint) {
+    }
+
+    @Test
+    void anOrderedMapKeepsTheOrderTheDocumentWrote() {
+        Map<String, Class<?>> bindings = new HashMap<>(BINDINGS);
+        bindings.put("league", League.class);
+        League league = (League) readWith(compile(bindings), "league", """
+                {"table": {"zeta": 1, "alpha": 2, "mid": 3}}""");
+        assertEquals(List.of("zeta", "alpha", "mid"), List.copyOf(league.table().keySet()));
+    }
+
+    @Test
+    void anOrderedMapBoundToAComponentThatDoesNotKeepOrderFailsTheCompile() {
+        Map<String, Class<?>> bindings = new HashMap<>(BINDINGS);
+        bindings.put("league", LeagueAsMap.class);
+        BindMismatchException e = assertThrows(BindMismatchException.class, () -> compile(bindings));
+        assertTrue(e.getMessage().contains("field 'table' is an ordered map, and Map does not keep insertion order "
+                + "-- declare a SequencedMap"),
+                e.getMessage());
+    }
+
+    @Test
+    void anUnorderedMapBindsToAComponentThatKeepsOrder() {
+        Map<String, Class<?>> bindings = new HashMap<>(BINDINGS);
+        bindings.put("weights", WeightsLinked.class);
+        assertEquals(List.of("b", "a"), List.copyOf(((WeightsLinked) readWith(compile(bindings), "weights",
+                WEIGHTS.replace("{\"a\": 1}", "{\"b\": 2, \"a\": 1}"))).counts().keySet()));
+    }
+
+    private static Object readWith(JsonCompiledSchema compiled, String type, String json) {
+        try (ByteSource bytes = ByteSource.of(json)) {
+            DiagnosticsReceiver receiver = DiagnosticsReceiver.throwing();
+            JsonReadContext ctx = JsonReadContext.of(new JsonStream(bytes, ProcessorPolicy.defaults(), receiver),
+                    receiver);
+            return compiled.get(type).read(ctx);
+        }
     }
 }

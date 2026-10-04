@@ -14,8 +14,11 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.SequencedMap;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.function.Supplier;
 
 /**
@@ -50,15 +53,14 @@ public class DefaultMapBinder {
 			// Produces the MethodHandles for the DataClassMap.
 			MapAccessBridge mapBridge = new MapAccessBridge(targetClass);
 
-			// An AnnotatedMap is an ordinary map that also keeps its keys' annotations -- same shape, two
-			// extra handles, rather than a DataClass of its own.
 			// A map that keeps its keys' annotations needs no extra shape and no extra handles: its key is a
 			// boxed position, and the same handles are simply bound to views that carry the box -- iteration
 			// over boxed entries, and a put that takes one apart. Map.Entry.getKey() then yields the box, so
-			// key()/next()/value() are untouched.
+			// key()/next()/value() are untouched. It is insertion-ordered without being a SequencedMap.
 			boolean annotated = AnnotatedMap.class.isAssignableFrom(targetClass);
 			descriptor = new DataClassMap(targetClass,
 					annotated ? DefaultClassBinder.boxed(keyDataClass) : keyDataClass, valueDataClass,
+					annotated || mapBridge.insertionOrdered(),
 					mapBridge.constructor(), mapBridge.size(),
 					annotated ? mapBridge.annotatedIterator() : mapBridge.iterator(), mapBridge.next(),
 					mapBridge.key(), mapBridge.value(),
@@ -95,12 +97,26 @@ public class DefaultMapBinder {
 
 		static {
 			mapInterfaces.put(Map.class, HashMap.class);
+			mapInterfaces.put(SequencedMap.class, LinkedHashMap.class);
 		}
 
 		private final Class<?> targetClass;
 
 		public MapAccessBridge(Class<?> targetClass) {
 			this.targetClass = targetClass;
+		}
+
+		/**
+		 * Whether the map {@link #constructor()} builds keeps insertion order: a {@link SequencedMap} that is not
+		 * a {@link SortedMap}. Both {@code TreeMap} and {@code ConcurrentSkipListMap} are sequenced, but in key
+		 * order, which re-sorts the entries a document wrote rather than keeping them. Asked of the class
+		 * constructed, so a bare {@code Map} -- built as a {@code HashMap} -- is not ordered, and a bare
+		 * {@code SequencedMap} -- built as a {@code LinkedHashMap} -- is.
+		 */
+		public boolean insertionOrdered() {
+			Class<?> implementationClass = mapInterfaces.getOrDefault(targetClass, targetClass);
+			return SequencedMap.class.isAssignableFrom(implementationClass)
+					&& !SortedMap.class.isAssignableFrom(implementationClass);
 		}
 
 		/**

@@ -270,16 +270,23 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   host class. `CONFORMANCE.md`'s accepted-gap paragraph and the two parsers' Javadoc go with it; Class 1
   vectors for each case above.
 
-- [ ] **An ordered map is constructible and nothing honours it.** `!map { … ordered: true }` resolves, and
-  meta-kernel's `map` `@doc` says its entry order is part of its value and a host binds it to a map that keeps its
-  order. No reader consults the facet, so each mode gets one half wrong. Bind mode builds every map through
-  `tson-bind`'s `Map` descriptor (`MapBindReader`), and Java's `Map.equals` ignores order, so two ordered maps
-  differing only in order compare equal. The tree's `TsonMap` compares its entries as a `List`, so two *unordered*
-  maps differing only in order compare unequal. That matters wherever compound values are compared: §7.5's
-  duplicate rule over set elements and §2.6's compound-key identity. The work: bind an ordered map to a
-  `SequencedMap` (`LinkedHashMap` by default), refusing at compile a declared target class that does not keep
-  order; make equality follow the facet in both modes and in `tson-json`'s reader; Class 2 vectors for two maps
-  differing only in order as set elements, ordered and not.
+- [ ] **A void value or element bound to a host collection that refuses `null` escapes as a bare
+  `NullPointerException`.** A schemaless read of `{ a => 1  b => _ }` into a `ConcurrentHashMap` component, or of
+  `[1 _ 3]` into a `Deque` (built as an `ArrayDeque`), throws rather than reporting. `MapBindReader.put` rethrows a
+  `RuntimeException` as is, and `ArrayBindReader` and `DataClassObjectReader` do the same; `tson-json`'s builders
+  already report it. A refused `put` is a `TYPE_MISMATCH` diagnostic at the entry; a schema-aware read could also
+  refuse a voidable map or array bound to such a class at compile, though no JDK type says which collections refuse
+  `null`.
+
+- [ ] **The TSON bind reader ignores a nested container's declared class.** `RecordBindReader.rebindContainerIfNeeded`
+  rebuilds a container reader against the component's own `DataClassArray`/`DataClassMap` only where the container
+  is the field's type. An array element or map value that is itself a container keeps the reader its schema type
+  compiled to, so a `List<TreeMap<String, Integer>>` component receives what that reader builds -- a `HashMap` for
+  an unordered map -- rather than the declared class, and no bind-agreement check runs at that depth. So an ordered
+  map nested there is never refused against a target that does not keep order (it is built as a `LinkedHashMap`,
+  so nothing is lost). `tson-json` re-binds at every depth through `BindTargets`. The work: rebind element, key and
+  value readers against the descriptor's component classes in `ArrayBindReader` and `MapBindReader`, carrying
+  `mismatches` down; tests for a nested ordered map refused, and for a nested collection class honoured.
 
 - [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
   `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
