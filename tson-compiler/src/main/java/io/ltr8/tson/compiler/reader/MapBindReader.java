@@ -14,6 +14,7 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -26,10 +27,9 @@ import java.util.Map;
  * to allocate the target with a known capacity, then {@code descriptor.put().invoke(mapData, key,
  * value)} per decoded entry -- no iterator needed, unlike {@link DataClassMap}'s own *reading* side,
  * since writing a map only ever needs {@code put}. Unlike {@link ArrayBindReader}, there's no fixed-
- * size-target concern here at all -- {@code tson-bind}'s own {@code MapAccessBridge.constructor()}
- * always resolves to a growable, hash-based constructor (confirmed by reading {@code
- * DefaultMapBinder} directly), so this always constructs empty ({@code invoke(0)}) and appends
- * incrementally, one entry at a time, with no buffer-then-allocate step. As with {@link
+ * size-target concern here at all -- every map {@code tson-bind} constructs is growable, so this always
+ * constructs empty ({@code invoke(0)}) and appends incrementally, one entry at a time, with no
+ * buffer-then-allocate step. As with {@link
  * ArrayBindReader}, there's no narrowing at this level either -- each key and value's own binding
  * already happened recursively, inside whatever reader {@code resolver} produced for its type.
  *
@@ -92,7 +92,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     /**
      * Validates {@code typeDefinition} is map-shaped before ever constructing one, and resolves a
-     * {@code descriptor} to build it with, always targeting {@code Map} but making a real effort to
+     * {@code descriptor} to build it with -- a {@code LinkedHashMap} for an ordered map, so the order the
+     * document wrote is kept, and a {@code Map} otherwise -- making a real effort to
      * get the key/value types right: the schema's own {@code key_type}/{@code value_type} names are
      * each resolved to a real bound Java class the same way any other schema type name is (falling
      * back to {@link String} only when a name has no real bound class at all, e.g. a synthesized,
@@ -118,7 +119,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
             }
             Type keyType = resolveType(body.keyType().name());
             Type valueType = resolveType(body.valueType().name());
-            DataClass dataClass = descriptorFor(new DataParameterizedType(Map.class, keyType, valueType));
+            Class<?> mapClass = body.ordered() ? LinkedHashMap.class : Map.class;
+            DataClass dataClass = descriptorFor(mapClass, new DataParameterizedType(mapClass, keyType, valueType));
             if (!(dataClass instanceof DataClassMap descriptor)) {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't map-shaped -- can't bind '" + name + "' as one");
@@ -137,11 +139,11 @@ final class MapBindReader extends MapAbstractReader<Object> {
             }
         }
 
-        private DataClass descriptorFor(Type type) {
+        private DataClass descriptorFor(Class<?> mapClass, Type type) {
             try {
-                return context.getDescriptor(Map.class, type);
+                return context.getDescriptor(mapClass, type);
             } catch (DataBindException e) {
-                throw new IllegalStateException("no bound Java class for '" + Map.class.getName() + "'", e);
+                throw new IllegalStateException("no bound Java class for '" + mapClass.getName() + "'", e);
             }
         }
     }

@@ -160,6 +160,12 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       `DateTimeType`/`TimeType` carry it and their parsers enforce it — §5.5 makes it an upper bound on the
       fractional-second digits of the token *as written*, checked textually because the atoms are exact and
       nothing is ever truncated to satisfy a facet (`FractionalSeconds`).
+    - **An ordered map needs a component that keeps insertion order** (`DataClassMap.ordered()`: a `SequencedMap`
+      that is not a `SortedMap`, or `AnnotatedMap`), or the order the document wrote is lost; a bare `Map` is
+      built as a `HashMap` and does not. The check runs one way only: an unordered map binds to either kind,
+      since keeping its order loses nothing, and `TsonSchema.entries` is exactly that case. Both readers make it
+      (`RecordBindReader.rebindContainerIfNeeded`, `tson-json`'s `BindMapBuilder.forTarget`), and a map read
+      with no component to declare a class is built as a `LinkedHashMap` when it is ordered.
     - The converse — a component no field fills — is refused at compile too: it reaches the constructor as
       `null` on every document. `@Unbound` is how a class says a component is its own and not the wire's,
       needed exactly once here (`TypeDefinition.position`, this implementation's own addition for

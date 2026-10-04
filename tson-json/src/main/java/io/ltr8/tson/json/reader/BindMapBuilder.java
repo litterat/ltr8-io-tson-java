@@ -33,12 +33,19 @@ final class BindMapBuilder implements MapBuilder {
     /**
      * {@code map} read again for {@code target}: the object form's key parser bound to the target's key class
      * (through its bridge), the pairs form's key reader and either form's value reader bound through {@link
-     * BindTargets}.
+     * BindTargets}. An ordered map needs a target that keeps insertion order ({@link DataClassMap#ordered()}),
+     * or the order the document wrote is lost; an unordered map takes either kind, since keeping its order loses
+     * nothing.
      */
     static JsonTypeReader<?> forTarget(JsonTypeReader<?> map, DataClassMap target, String what,
                                        List<String> mismatches) {
         String targetName = target.typeClass().getSimpleName();
         BindMapBuilder builder = new BindMapBuilder(target);
+        MapPlan ordering = map instanceof MapObjectReader object ? object.plan() : ((MapPairsReader) map).plan();
+        if (ordering.ordered() && !target.ordered()) {
+            mismatches.add(what + " is an ordered map, and " + targetName + " does not keep insertion order -- "
+                    + "declare a SequencedMap");
+        }
         if (map instanceof MapObjectReader object) {
             MapPlan plan = object.plan();
             JsonTypeReader<?> value = BindTargets.to(object.value(), target.valueDataClass(), what + "'s value",

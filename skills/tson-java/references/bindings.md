@@ -16,9 +16,16 @@ hand — so **the target class must be `public`**, since the library reaches it 
 | a `record` carrying `@Tuple`                | a `tuple` — positional, by constructor-argument order             |
 | `List<E>`                                   | an array                                                          |
 | `Map<K, V>`                                 | a map                                                             |
+| `SequencedMap<K, V>`                        | a map, keeping the order the document wrote its entries in        |
 | a plain `enum`                              | an enum                                                           |
 | a sealed interface, or one with `@Union`    | a choice                                                          |
 | the built-in atom vocabulary                | the `java.base` types in the table below                          |
+
+A bare `Map` is built as a `HashMap`, which does not keep entry order. An ordered map
+(`!map { … ordered: true }`) under a schema needs a component that does — `SequencedMap` (built as a
+`LinkedHashMap`), or a concrete class that is a `SequencedMap` but not a `SortedMap`, which sorts by key
+instead — or the bind-mode compile refuses it with a `BindMismatchException`. An unordered map binds to
+either.
 
 A cyclic type graph resolves: `getDescriptor` hands a re-entrant call a deferred supplier and each
 holder keeps it in a final `Memoized`, so laziness is confined to the cyclic edge and every other

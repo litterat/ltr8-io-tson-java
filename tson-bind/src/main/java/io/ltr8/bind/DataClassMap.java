@@ -66,6 +66,10 @@ import io.ltr8.bind.internal.Memoized;
  * <li>value( Entry ):value;
  * <li>put( Map, key, value ):void;
  * </ul>
+ * <p>
+ * {@link #ordered()} says whether the map {@code constructor} builds keeps its entries in the order they were
+ * {@code put} -- insertion order, which is the order a document writes them in. It never means ordered by key:
+ * a {@code SortedMap} re-sorts what it is given, so it is not ordered in this sense.
  *
  */
 public class DataClassMap extends DataClass {
@@ -88,7 +92,8 @@ public class DataClassMap extends DataClass {
 	 */
 	private final Memoized<DataClass> valueDataClass;
 
-
+	// whether the constructed map keeps insertion order.
+	private final boolean ordered;
 
 	// <map> constructor( int size );
 	private final MethodHandle constructor;
@@ -114,12 +119,13 @@ public class DataClassMap extends DataClass {
 
 	/** The same, for a component on a cycle in the type graph -- see {@code DataBindContext.componentSource}. */
 	public DataClassMap(Class<?> targetType, Supplier<DataClass> keyDataClass,
-			Supplier<DataClass> valueDataClass, MethodHandle constructor, MethodHandle size,
+			Supplier<DataClass> valueDataClass, boolean ordered, MethodHandle constructor, MethodHandle size,
 			MethodHandle iterator, MethodHandle next, MethodHandle key, MethodHandle value, MethodHandle put) {
 		super(targetType);
 
 		this.keyDataClass = Memoized.deferred(keyDataClass);
 		this.valueDataClass = Memoized.deferred(valueDataClass);
+		this.ordered = ordered;
 		this.constructor = constructor;
 		this.size = size;
 		this.iterator = iterator;
@@ -129,13 +135,14 @@ public class DataClassMap extends DataClass {
 		this.put = put;
 	}
 
-	public DataClassMap(Class<?> targetType, DataClass keyDataClass, DataClass valueDataClass,
+	public DataClassMap(Class<?> targetType, DataClass keyDataClass, DataClass valueDataClass, boolean ordered,
 			MethodHandle constructor, MethodHandle size, MethodHandle iterator, MethodHandle next,
 			MethodHandle key, MethodHandle value, MethodHandle put) {
 		super(targetType);
 
 		this.keyDataClass = Memoized.of(keyDataClass);
 		this.valueDataClass = Memoized.of(valueDataClass);
+		this.ordered = ordered;
 		this.constructor = constructor;
 		this.size = size;
 		this.iterator = iterator;
@@ -158,6 +165,14 @@ public class DataClassMap extends DataClass {
 	 */
 	public DataClass valueDataClass() {
 		return valueDataClass.get();
+	}
+
+	/**
+	 * @return whether the map {@link #constructor()} builds keeps its entries in insertion order -- the order
+	 *         they were {@code put}, never an order by key.
+	 */
+	public boolean ordered() {
+		return ordered;
 	}
 
 	/**
@@ -216,7 +231,7 @@ public class DataClassMap extends DataClass {
 	public String toString() {
 		return "DataClassMap [ typeClass=" + typeClass().getName() + ", keyDataClass="
 				+ shown(keyDataClass) + ", valueDataClass=" + shown(valueDataClass)
-				+ "]";
+				+ ", ordered=" + ordered + "]";
 	}
 
 }
