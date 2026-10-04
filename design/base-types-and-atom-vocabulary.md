@@ -171,6 +171,12 @@ letters under it refuses the full-width and Kelvin-sign spellings `NFKC_CASEFOLD
 is the form of the case-insensitive ASCII naming systems (field names, schemes, DNS names), and `scheme_name` uses
 it; `NFKC_CASEFOLD` is for names compared without case across Unicode.
 
+**`text_type` has no facet for the text's format, deliberately.** A facet narrows a value space (§5.7), and a
+format such as CommonMark narrows nothing — every string is valid CommonMark — so it would fail §6's own test for
+an annotation rather than a facet; that is why `doc`'s CommonMark is its type's documented contract and not a
+facet. A format that does narrow, such as a media type that must parse, is a type of its own rather than a facet
+on every text family.
+
 - **Each constructor splits into two classes across two modules:** a pure constraint-*values* record in
   `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`, `RegexType`, `DateType`, …, matching the kernel's
   `*_type` shape) and a same-named `*Parser` in `tson-atom`'s unexported `atom.parser` (`IntegerParser`,

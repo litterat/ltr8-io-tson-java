@@ -281,15 +281,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   order; make equality follow the facet in both modes and in `tson-json`'s reader; Class 2 vectors for two maps
   differing only in order as set elements, ordered and not.
 
-- [ ] **Decide whether `text_type` takes a facet for the text's format.** `@doc` is CommonMark by its type's contract
-  (`meta-kernel.tn`, `core.tn`), which a data field cannot state: a `description: text` holding CommonMark, or
-  JSON Schema's `contentMediaType` on a string, has no home but prose. The question is whether a format is a facet
-  at all, and the answer may differ by format. A facet narrows a value space (§5.7), and every string is valid
-  CommonMark, so a `COMMONMARK` facet would narrow nothing and fails §6's own test for what an annotation is
-  rather than a facet. A media type that parses (`application/json`) does narrow, and refines like any facet.
-  `bytes_type.encoding` is the nearest precedent and the opposite case: a selector of spelling, not refinable.
-  The outcome is a `meta.tn` change and a SPEC-FEEDBACK entry, or a recorded reason in `design/` not to.
-
 - [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
   `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
   `NOT_IMPLEMENTED` diagnostic carries. `resolveTypeRef`'s, for a sugar form that reaches resolution unlifted, offers two
@@ -360,16 +351,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   *where it is counted*: the ones that bound shape are per-container state the stream does not keep, where
   depth was a counter it already had, and the two aggregates (total values, foreign schemas) need their own
   counter since §9.1 is explicit that the total is not bounded by the parts.
-
-- [ ] **`scripts/restamp-bundled-schemas.sh` does not cover the spec's own §13.2 table.** The script moves
-  every pin in the repo bottom-up — the three `spec/m/*.tn` headers, `TsonBundledSchemas`, `InitCommand`,
-  `README.md` and the getting-started example — and `--check` reports staleness across all of them. It does
-  not know about `spec/tson-part2-schema.md` §13.2, which pins the same three digests, so that table is the
-  one pin a schema edit leaves behind and the only one whose drift nothing reports. It drifted once already.
-  Teaching the script to stamp it (or at least to `--check` it, leaving the write to the spec author) is a
-  few lines against the same digest computation, and makes CI able to catch what a hand edit currently must.
-  The wrinkle worth deciding first: `spec/` is a cache this repo otherwise only reads, so writing into it is
-  a small change to what the script is for — `--check` alone may be the honest scope.
 
 - [ ] **`class2/schema/` carries no vector declaring a template, and the reason it could not is gone.**
   [TSON-SCHEMA] §8.1 now says an open entry is a `type_definition` like any other — `parameters` non-empty,

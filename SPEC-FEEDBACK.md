@@ -591,7 +591,10 @@ and the mechanism serves `enum` and template parameters only.
 slot, #7's Proposal 2 holds an enum's `type` as a `type_name` field and states its bound and member conformance
 as §7.4 rules the linker checks, and §5.2's conformance is enforced by the resolver as prose requires.
 
-**Status against Revision 36:** open.
+**Status against Revision 36:** open, and **deferred to Revision 38.** The field half changes `record_field` and
+`enum_type`, and the template half it would generalise has no use yet: no declaration in the bundled schemas
+writes a typed or bounded parameter, so #9's `template_param.type` and `bound` are running but unproven as a
+shape, and building a second mechanism on them first would fix that shape twice.
 
 ---
 
