@@ -82,6 +82,20 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
         this.rules = new TupleDiagnostics(displayName, slots.size());
     }
 
+    /** Over position readers already built, one per {@code body} position -- object-binding mode's rebuild. */
+    TupleAbstractReader(String name, String displayName, TupleBody body, List<TsonTypeReader<?>> positions,
+                        SchemaLocation schemaLocation) {
+        this.name = name;
+        this.displayName = displayName;
+        List<CompiledSlot> slots = new ArrayList<>(positions.size());
+        for (int position = 0; position < positions.size(); position++) {
+            slots.add(new CompiledSlot(body.elements().get(position), positions.get(position)));
+        }
+        this.slots = slots;
+        this.schemaLocation = schemaLocation;
+        this.rules = new TupleDiagnostics(displayName, slots.size());
+    }
+
     /**
      * Consumes leading annotations/type-ref, then checks for {@code ArrayStart}, consuming it on
      * success and returning {@code true}. On a shape mismatch, reports {@code TYPE_MISMATCH},

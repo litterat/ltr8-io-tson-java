@@ -160,26 +160,33 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       `DateTimeType`/`TimeType` carry it and their parsers enforce it — §5.5 makes it an upper bound on the
       fractional-second digits of the token *as written*, checked textually because the atoms are exact and
       nothing is ever truncated to satisfy a facet (`FractionalSeconds`).
+    - **The class is the target at every depth, not only at a field.** A collection's element, a map's key and
+      value and a tuple's position are bound to what the component's class declares there, recursively
+      (`reader.BindTargets`, the same rule `tson-json`'s class of that name states): an atom narrowed to the
+      element's wire class, a nested container rebuilt for its declared class, a record checked against it, and
+      each level's agreement checks applied where they meet. Without it a `List<Long>` would hold the `Integer`s
+      an `int32` element reads to, which erasure lets through until a consumer unboxes one. A container with no
+      component above it is built from what its schema type binds, and is never checked against that guess.
     - **A field or position that can deliver no value cannot bind to a primitive.** A voidable field, tuple
       position or array element may be void, and a field that yields nothing when left out (optional with no
       default, or a field group's member, `RecordField.omitted`) may be missing; either reaches the constructor
       or array as `null`, which `int` cannot take. Known before any document, so refused here rather than at the
-      read that writes one -- a defaulted field binds to a primitive, since leaving it out injects the default.
-      Both readers check fields; the TSON reader also checks tuple positions and arrays, which `tson-json` already
-      did. A collection that refuses `null` (`ConcurrentHashMap`, `ArrayDeque`) is not refused here, since no JDK
-      type says so; the read that meets one reports it (`design/readers-and-diagnostics.md`).
+      read that writes one — a defaulted field binds to a primitive, since leaving it out injects the default.
+      Both readers check every depth (`BindTargets` in each), fields in the record reader itself. A collection
+      that refuses `null` (`ConcurrentHashMap`, `ArrayDeque`) is not refused here, since no JDK type says so;
+      the read that meets one reports it (`design/readers-and-diagnostics.md`).
     - **A tuple field binds to its component's own `@Tuple` class**, which must have the tuple's arity. A
       tuple written inline has a minted entry no author binds and no natural Java form to fall back on, so its
       own reader is unbound (`TupleBindReader.unbound`, raising the `MissingBindingException` an unbound entry
-      always raised if read directly) and `rebindContainerIfNeeded` builds it into the component's class, as it
-      builds an array or map into the component's collection. The factory checks a bound tuple's class the same
-      way (`TupleBindReader.disagreements`).
+      always raised if read directly) and `BindTargets` builds it into the component's class, as it builds an
+      array or map into the component's collection, at a field or nested in one. The factory checks a bound
+      tuple's class the same way (`TupleBindReader.disagreements`).
     - **An ordered map needs a component that keeps insertion order** (`DataClassMap.ordered()`: a `SequencedMap`
       that is not a `SortedMap`, or `AnnotatedMap`), or the order the document wrote is lost; a bare `Map` is
       built as a `HashMap` and does not. The check runs one way only: an unordered map binds to either kind,
       since keeping its order loses nothing, and `TsonSchema.entries` is exactly that case. Both readers make it
-      (`RecordBindReader.rebindContainerIfNeeded`, `tson-json`'s `BindMapBuilder.forTarget`), and a map read
-      with no component to declare a class is built as a `LinkedHashMap` when it is ordered.
+      at every depth (`BindTargets` in the TSON reader, `BindMapBuilder.forTarget` in `tson-json`), and a map
+      read with no component to declare a class is built as a `LinkedHashMap` when it is ordered.
     - The converse — a component no field fills — is refused at compile too: it reaches the constructor as
       `null` on every document. `@Unbound` is how a class says a component is its own and not the wire's,
       needed exactly once here (`TypeDefinition.position`, this implementation's own addition for

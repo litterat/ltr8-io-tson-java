@@ -270,18 +270,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   host class. `CONFORMANCE.md`'s accepted-gap paragraph and the two parsers' Javadoc go with it; Class 1
   vectors for each case above.
 
-- [ ] **The TSON bind reader ignores a nested container's declared class.** `RecordBindReader.rebindContainerIfNeeded`
-  rebuilds a container reader against the component's own `DataClassArray`/`DataClassMap` only where the container
-  is the field's type. An array element or map value that is itself a container keeps the reader its schema type
-  compiled to, so a `List<TreeMap<String, Integer>>` component receives what that reader builds -- a `HashMap` for
-  an unordered map -- rather than the declared class, and no bind-agreement check runs at that depth. So an ordered
-  map nested there is never refused against a target that does not keep order (it is built as a `LinkedHashMap`,
-  so nothing is lost). `tson-json` re-binds at every depth through `BindTargets`. The work: rebind element, key and
-  value readers against the descriptor's component classes in `ArrayBindReader` and `MapBindReader`, carrying
-  `mismatches` down; tests for a nested ordered map refused, and for a nested collection class honoured. A tuple
-  written inline at that depth (`[[text, int32]]` into a `List<Pair>`) is the sharpest case: its entry is unbound,
-  so the element raises `MissingBindingException` on read where a field's inline tuple now binds.
-
 - [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
   `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
   `NOT_IMPLEMENTED` diagnostic carries. `resolveTypeRef`'s, for a sugar form that reaches resolution unlifted, offers two
