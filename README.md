@@ -57,9 +57,9 @@ including records, record groups, enums and some in-built types. The `2026/36` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/37/getting-started/person.tn?sha256=556d74a3542e2fa99125d85539509895c598601b1631f539ed52ccd0029237d6"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=8df0771b72d26310873aa954a3fab7d094cea2cb64c8f6594d40ffe25944fea6"
-!!import:"https://tson.io/2026/37/m/core.tn?sha256=4fef190e3111420bc4992e3dc51aa788a815fb1f61288c19a3ccd5011b64e16a"
+!!id:"https://example.com/2026/37/getting-started/person.tn?sha256=5246598e98e615c754e3d31a0e6f221b68c58345b3b307e5e7e154528e63a641"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=001ce80d5273e3a13999f6f1d91b6a2f73a62c5f32ab7bcbdd182fd24ae4a572"
+!!import:"https://tson.io/2026/37/m/core.tn?sha256=0315cb4d799b769009438bcaa9d4e4fbf6d6c88090bd1c0d844ad267a9635ed9"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]

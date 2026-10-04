@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=8df0771b72d26310873aa954a3fab7d094cea2cb64c8f6594d40ffe25944fea6"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=001ce80d5273e3a13999f6f1d91b6a2f73a62c5f32ab7bcbdd182fd24ae4a572"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=cfbc5c47c825a30bb9762a06bc98724bde640a8038d4d5f85376bb7f761cfb47"
 !!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=cfbc5c47c825a30bb9762a06bc98724bde640a8038d4d5f85376bb7f761cfb47"
 @doc:"""
@@ -524,9 +524,12 @@
   comment => @annotation text
 
   @doc:"""
-    Example values for a definition or field, carried for documentation only.
+    Example values for a definition or field, each the text a reader is shown:
+    conventionally the value written in TSON notation, so a record's example
+    is a string such as `"{ x: 1 }"`. Nothing parses or checks an example
+    against the type it illustrates; the annotation is documentation only.
     """
-  examples => @annotation [value]
+  examples => @annotation [text]
 
   @doc:"""
     Marks a field an encoding's consumers may read but not write. A bare

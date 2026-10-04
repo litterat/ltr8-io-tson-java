@@ -336,7 +336,7 @@
 
   examples => @annotation !type_definition {
     source: array
-    body: !array { element_type: value }
+    body: !array { element_type: text }
   }
 
   read_only => @annotation !type_definition {
