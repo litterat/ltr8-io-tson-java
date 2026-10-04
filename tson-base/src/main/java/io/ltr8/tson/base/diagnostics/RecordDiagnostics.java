@@ -54,7 +54,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     public Refusal missingRequiredField(String field) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
                 "missing required field '%s' for '%s'".formatted(field, typeName),
-                "a value for '" + field + "'", "(absent)");
+                "a value for '" + field + "'", "(missing)");
     }
 
     /**

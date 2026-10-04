@@ -149,15 +149,15 @@ class JsonContainerReadTest {
                 {"tries": 1, "name": "Ada"}""").accepted()));
     }
 
-    // ── §6.1.2 presence and absence, and §7 ──────────────────────────────
+    // ── §6.1.2 missing and void, and §7 ──────────────────────────────────
 
     /**
-     * §6.1.2 and §7.2: at a field that admits both, omission and null are two spellings of one absence, and a
+     * §6.1.2 and §7.2: at a field that admits both, omission and null are two spellings of one void value, and a
      * tree keeps which arrived -- a member written null stands as null, one never written is not there -- as
      * the text tree keeps {@code _} apart from a missing field. Bound output has one null for both.
      */
     @Test
-    void aTreeKeepsWhichSpellingOfAbsenceArrived() {
+    void aTreeKeepsWhichSpellingOfAVoidValueArrived() {
         String omitted = json(read("person", """
                 {"name": "Ada"}""").accepted());
         String stated = json(read("person", """
@@ -319,7 +319,7 @@ class JsonContainerReadTest {
                 ["a", 2]""").refusal().code());
     }
 
-    /** §6.3: `[T?]` admits null at any slot as the absent element -- the slot exists and counts. */
+    /** §6.3: `[T?]` admits null at any slot as a void element -- the slot exists and counts. */
     @Test
     void anElementVoidableArrayAdmitsNullAsAVoidElement() {
         assertEquals("""

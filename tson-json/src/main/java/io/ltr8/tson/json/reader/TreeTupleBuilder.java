@@ -8,7 +8,7 @@ import io.ltr8.tson.json.tree.JsonValue;
 import java.util.List;
 
 /**
- * Tree mode's tuple: a {@link JsonArray} of the positions the document stated, an absent position standing as
+ * Tree mode's tuple: a {@link JsonArray} of the positions the document stated, a void position standing as
  * {@link JsonNull} in its slot. A tuple whose read reported anything builds nothing -- all-or-nothing, as bind
  * mode is.
  */
@@ -35,7 +35,7 @@ final class TreeTupleBuilder implements TupleBuilder {
                 positions.set(i, JsonNull.INSTANCE);
             }
         }
-        @SuppressWarnings("unchecked")   // every slot now holds a node: a child's, or the absence just set
+        @SuppressWarnings("unchecked")   // every slot now holds a node: a child's, or the void node just set
         List<JsonValue> nodes = (List<JsonValue>) (List<?>) positions;
         return new JsonArray(nodes);
     }

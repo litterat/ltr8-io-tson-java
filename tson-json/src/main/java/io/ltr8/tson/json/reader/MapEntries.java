@@ -10,7 +10,7 @@ import java.math.BigInteger;
 /** The rules both map forms share: an entry's value, the size facets, and a value of the wrong shape. */
 final class MapEntries {
 
-    /** How a JSON document spells absence (§7), for the {@code actual} of a rule about an entry value's state. */
+    /** How a JSON document spells the void sentinel (§7), for the {@code actual} of a rule about a voidable value. */
     private static final String NULL = "null";
 
     private MapEntries() {

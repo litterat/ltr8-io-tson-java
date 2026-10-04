@@ -45,7 +45,7 @@ retry loop needs them:
 2. **What kind** — `code`, a closed `Diagnostic.Code` enum, so a system prompt or few-shot pattern can generalise
    a fix instead of parsing prose. Every atom-constraint violation is `ATOM_CONSTRAINT_VIOLATION`; there are no
    per-facet codes, the facet being named by `expected`.
-3. **What was there** — `actual`: `99999`, `CANCELLED`, `(absent)`.
+3. **What was there** — `actual`: `99999`, `CANCELLED`, `(missing)`.
 4. **What was expected** — `expected` is the *constraint that failed*, not the declared type's name: `<= 100`,
    `one of (PENDING, SHIPPED, DELIVERED)`, `at most 10 characters`. `AtomTypeException`'s Javadoc fixes the
    vocabulary at six shapes.

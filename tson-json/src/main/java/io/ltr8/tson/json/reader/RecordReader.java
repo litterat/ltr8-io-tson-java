@@ -18,8 +18,8 @@ import java.util.Objects;
  * RecordBuilder} once per record.
  *
  * <p><b>A slot says what the document did with its field.</b> Null means the document did not state it; non-null
- * means it did, which is what the duplicate check, the group count and the absent-field pass all ask. The
- * {@link Slots} markers carry the cases a value cannot -- stated as absent, and a child's refusal -- and each
+ * means it did, which is what the duplicate check, the group count and the missing-field pass all ask. The
+ * {@link Slots} markers carry the cases a value cannot -- stated void, and a child's refusal -- and each
  * builder decides what they become.
  *
  * <p><b>Member order carries no meaning</b> (§6.1.6), so presence is settled once the object has closed: the
@@ -139,7 +139,7 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
 
     /**
      * A member written null. §7 spends it as the void sentinel before any type rule applies, so what happens
-     * next is the field's facts and nothing else: at a voidable field the member decodes to absence, stated --
+     * next is the field's facts and nothing else: at a voidable field the member decodes to a void value, stated --
      * which a tree keeps as {@code JsonNull} and bind mode delivers as {@code null} (§7.2). A FIXED field never
      * reaches here.
      */
@@ -208,7 +208,7 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
     }
 
     /**
-     * Every field the document never mentioned: §6.1.3's injection, §6.1.2's permitted absences, and §7.6's
+     * Every field the document never mentioned: §6.1.3's injection, §6.1.2's permitted omissions, and §7.6's
      * refusals, as {@link RecordField#omitted} derives them.
      */
     private void fillMissing(JsonReadContext ctx, Object[] slots) {

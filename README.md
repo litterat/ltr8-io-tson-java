@@ -707,7 +707,7 @@ $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person
   "files":[{"file":"bad.tn","outcome":"INVALID","errors":[{"path":"/name",
   "schema_pointer":"/person/name","schema_id":"example.com/2026/37/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
-  "expected":"a value for 'name'","actual":"(absent)","data_position":"2:9:63",
+  "expected":"a value for 'name'","actual":"(missing)","data_position":"2:9:63",
   "schema_position":"5:5:145"}]}],"errors":[]}
 
 $ tson compile person.tn

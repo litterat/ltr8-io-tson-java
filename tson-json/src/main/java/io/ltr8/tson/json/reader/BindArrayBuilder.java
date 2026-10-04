@@ -29,15 +29,15 @@ final class BindArrayBuilder implements ArrayBuilder {
     /**
      * {@code array} read again for {@code target} -- a component's {@code List<Long>}, {@code long[]} or
      * {@code Set<UUID>} -- its element bound to the target's element. A voidable element cannot reach a
-     * primitive array, which has nowhere to put the absence.
+     * primitive array, which has nowhere to put a void element.
      */
     static JsonTypeReader<?> forTarget(ArrayReader array, DataClassArray target, String what,
                                        List<String> mismatches) {
         ArrayPlan plan = array.plan();
         if (plan.voidableElements() && target.typeClass().isArray()
                 && target.arrayDataClass().typeClass().isPrimitive()) {
-            mismatches.add(what + " admits absent elements, and " + target.typeClass().getSimpleName()
-                    + " has no absence to hold one");
+            mismatches.add(what + " admits void elements, and " + target.typeClass().getSimpleName()
+                    + " has no null to hold one");
         }
         JsonTypeReader<?> element = BindTargets.to(array.element(), target.arrayDataClass(),
                 what + "'s element", target.typeClass().getSimpleName() + "'s element", mismatches);

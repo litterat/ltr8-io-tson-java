@@ -44,8 +44,8 @@ final class BindTupleBuilder implements TupleBuilder {
         for (int i = 0; i < slots.length; i++) {
             Class<?> element = target.elements()[i].dataClass().typeClass();
             if (plan.voidable()[i] && element.isPrimitive()) {
-                mismatches.add(what + "'s position " + i + " admits absence, and " + element.getName()
-                        + " has none to hold it");
+                mismatches.add(what + "'s position " + i + " is voidable, and " + element.getName()
+                        + " has no null to hold a void value");
             }
             slots[i] = BindTargets.to(tuple.slot(i), target.elements()[i].dataClass(), what + "'s position " + i,
                     target.typeClass().getSimpleName() + "'s element " + i, mismatches);

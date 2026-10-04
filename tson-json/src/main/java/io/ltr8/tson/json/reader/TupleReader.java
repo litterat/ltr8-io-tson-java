@@ -19,7 +19,7 @@ import java.util.List;
  */
 final class TupleReader implements JsonTypeReader<Object> {
 
-    /** How a JSON document spells absence (§7), for the {@code actual} of a rule about a position's state. */
+    /** How a JSON document spells the void sentinel (§7), for the {@code actual} of a rule about a voidable position. */
     private static final String NULL = "null";
 
     private final TuplePlan plan;
