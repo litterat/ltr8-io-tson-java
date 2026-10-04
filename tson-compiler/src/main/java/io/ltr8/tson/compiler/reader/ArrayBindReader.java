@@ -76,6 +76,13 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
         this.descriptor = descriptor;
     }
 
+    /** Over an element reader already bound to {@code descriptor}'s element -- {@link BindTargets}' rebuild. */
+    ArrayBindReader(String name, String displayName, ArrayBody body, DataClassArray descriptor,
+                    TsonTypeReader<?> element, SchemaLocation schemaLocation, boolean elementsAreNames) {
+        super(name, displayName, body, element, schemaLocation, elementsAreNames);
+        this.descriptor = descriptor;
+    }
+
     @Override
     public Object read(TsonReadContext ctx) {
         TsonReadContext at = ctx.underDeclaration(schemaLocation);

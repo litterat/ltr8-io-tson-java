@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.annotation.Annotations;
@@ -14,7 +13,6 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
-import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.*;
 
@@ -114,37 +112,12 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                         + target.name() + "' binds " + target.dataClass().typeClass().getName()
                         + ", which has no null to hold it");
             }
-            // Before any rebind: a `value` slot becomes an atom reader over the host type its own component
-            // chose, so judging it after would be judging the component against itself.
-            boolean atomPosition = readsAnAtom(field.parser());
-            TsonTypeReader<?> rebound = rebindValueIfNeeded(field, target);
-            rebound = rebindContainerIfNeeded(new CompiledField(field.schema(), rebound), target, resolver,
-                    this.annotationTypes, mismatches);
-            if (target.dataClass() instanceof DataClassAnnotated boxed) {
-                rebound = boxing(rebound, boxed, annotationTypes);
-            }
-            // The component's own bridge, applied here because this reader builds its constructor arguments
-            // itself -- tson-bind's binder, which collects a record's arguments through their bridges, is
-            // exactly the step a schema-driven read replaces. Same wrapper a container's elements take.
-            rebound = ElementBridging.wrap(rebound, target.dataClass());
-            if (atomPosition && boundAs(target) instanceof DataClassAtom bound) {
-                // The wire class, never the declared one: a bridged component is reached by whatever its
-                // bridge takes, and it is that the family has to produce.
-                Class<?> wire = bound.dataClass();
-                Optional<TsonTypeReader<?>> atTarget = boundTo(rebound, wire);
-                if (atTarget.isEmpty()) {
-                    mismatches.add("field '" + field.schema().name() + "' cannot produce " + wire.getName()
-                            + ", which is what component '" + target.name() + "' binds");
-                } else {
-                    rebound = atTarget.get();
-                }
-            } else if (atomPosition) {
-                mismatches.add("field '" + field.schema().name() + "' is an atom, and component '"
-                        + target.name() + "' binds " + boundAs(target).typeClass().getName()
-                        + " structurally -- register it as an atom (DataBindContext.Builder.registerAtom, "
-                        + "or @Transparent on a single-component record) so that the value the field "
-                        + "produces has a way to reach it");
-            }
+            // The component is the target at every depth below the field too (BindTargets), and the bridge and box
+            // are applied here because this reader builds its constructor arguments itself -- tson-bind's binder,
+            // which collects a record's arguments through their bridges, is the step a schema-driven read replaces.
+            TsonTypeReader<?> rebound = BindTargets.to(field.parser(), target.dataClass(),
+                    "field '" + field.schema().name() + "'", "component '" + target.name() + "'",
+                    new BindTargets.Site(field.schema().name(), resolver, this.annotationTypes, mismatches), true);
             if (rebound != field.parser()) {
                 field = new CompiledField(field.schema(), rebound);
                 fields.set(i, field);
@@ -171,42 +144,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                         + "which fields it takes rather than dropping whatever it does not name");
             }
         }
-    }
-
-    /**
-     * Whether this field's value arrives as a single decoded host value rather than a structure. The
-     * uninterpreted {@code value} atom answers false: what it reads is the component's own choice
-     * ({@link #rebindValueIfNeeded}), so the component cannot disagree with it.
-     */
-    private static boolean readsAnAtom(TsonTypeReader<?> parser) {
-        if (parser instanceof VariantSchemaReader guard) {
-            return readsAnAtom(guard.wrapped());
-        }
-        return parser instanceof AtomTypeReader<?> atom && !atom.readsUninterpretedValue()
-                && !atom.readsTheTokenItself();
-    }
-
-    /** What a component binds as -- an {@code Annotated} carrier's payload is what the value has to fit. */
-    private static DataClass boundAs(DataClassField target) {
-        DataClass bound = target.dataClass();
-        return bound instanceof DataClassAnnotated boxed ? boxed.valueClass() : bound;
-    }
-
-    /**
-     * This field's reader bound to {@code wire}, or empty where the family refuses it -- the refusal stays a
-     * value the whole way up, because this caller collects several before raising one
-     * {@code BindMismatchException} that names them all. Looks through a §7.2 subsumption guard as every
-     * question about a field's reader does, and reaches the atom through {@link AtomTypeReader#overAtom} --
-     * the same seam a {@code value} slot's own specialisation takes.
-     */
-    private static Optional<TsonTypeReader<?>> boundTo(TsonTypeReader<?> parser, Class<?> wire) {
-        if (parser instanceof VariantSchemaReader guard) {
-            return boundTo(guard.wrapped(), wire).map(guard::rewrap);
-        }
-        if (!(parser instanceof AtomTypeReader<?> atom)) {
-            return Optional.of(parser);
-        }
-        return atom.boundTo(wire);
     }
 
     /** Whether any schema field of this type binds to {@code classField}. */
@@ -247,20 +184,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             unbound.add(renamed != null && !renamed.value().isEmpty() ? renamed.value() : component.getName());
         }
         return unbound;
-    }
-
-    /**
-     * A field whose bound position is {@code Annotated<T>}: capture the annotations written at that position,
-     * read {@code T} with the reader the schema already gave the field, and hand back both.
-     *
-     * <p>Wrapping the field's own reader is what keeps this out of the shared field loop -- the base reads a
-     * field by calling whatever reader it holds, so replacing that reader is enough and no signature carries
-     * annotations. The capture is the same hoist used everywhere else: it runs before the delegate, whose own
-     * framing consumption then finds nothing left.
-     */
-    private static TsonTypeReader<?> boxing(TsonTypeReader<?> value, DataClassAnnotated boxed,
-                                            AnnotationTypes annotationTypes) {
-        return AnnotationBoxing.wrap(value, boxed, annotationTypes);
     }
 
     /**
@@ -335,76 +258,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         return omitted == RecordField.Omitted.NOTHING ? "may be left out with nothing injected" : null;
     }
 
-    /**
-     * The schema-driven child reader {@link RecordAbstractReader}'s own constructor already built
-     * (via {@code resolver.resolve(field.type().name())}) has no visibility into what Java
-     * collection shape the *consuming* field actually wants -- for a synthesized, materialized
-     * array/map type (e.g. a template's {@code set<T>} applied to a field), there's no real Java
-     * class registered under that synthetic schema name at all, so {@link ArrayBindReader.Factory}/
-     * {@link MapBindReader.Factory} have nothing reliable to resolve one from on their own.
-     *
-     * <p>{@code target.dataClass()} is already the right answer, independent of any of that --
-     * reflection on the record's own real field (e.g. {@code List<String> members}) already
-     * resolved a genuine {@link DataClassArray}/{@link DataClassMap} when {@code descriptor} itself
-     * was built, with no dependency on the schema's own (possibly synthetic) type name. This rebuilds
-     * the child reader against that target directly, reusing the already-resolved {@code body} the
-     * schema-driven build produced (element/key/value readers, size constraints -- everything
-     * *structural* stays schema-derived; only the target Java container type changes). Untouched for
-     * every field whose target type isn't itself a collection {@link DataClass}, which is every
-     * ordinary case.
-     *
-     * <p>A tuple is the case where this is the only way to a class at all: a tuple written inline has a minted
-     * entry no author binds, and no natural Java form to fall back on, so its own reader is unbound
-     * ({@link TupleBindReader#unbound}) and the component's {@code @Tuple} class is what it is built into. Its
-     * arity and voidable positions are checked against that class here, as the factory checks a bound one.
-     *
-     * <p>An ordered map needs a target that keeps insertion order ({@link DataClassMap#ordered()}), or the order
-     * the document wrote is lost, and {@code mismatches} records one that does not. An unordered map takes either
-     * kind: keeping its order loses nothing.
-     */
-    private static TsonTypeReader<?> rebindContainerIfNeeded(CompiledField field, DataClassField target,
-                                                             TsonTypeReaderResolver resolver,
-                                                             AnnotationTypes annotationTypes,
-                                                             List<String> mismatches) {
-        TsonTypeReader<?> parser = field.parser();
-        // A §7.2 subsumption guard wraps the container reader, and the tests below are on its concrete class
-        // -- so look through the guard and put it back around whatever replaces it (Subsumption).
-        if (parser instanceof VariantSchemaReader guard) {
-            TsonTypeReader<?> rebound = rebindContainerIfNeeded(
-                    new CompiledField(field.schema(), guard.wrapped()), target, resolver, annotationTypes, mismatches);
-            return rebound == guard.wrapped() ? parser : guard.rewrap(rebound);
-        }
-        // The field's own name serves as both, here and only here: this rebuild deliberately drops the
-        // schema type name (see above), and a field name is already the author's own word for the value --
-        // there is nothing a derived display name would add over it.
-        if (target.dataClass() instanceof DataClassArray targetArray && parser instanceof ArrayBindReader existing) {
-            if (existing.body.voidable() && targetArray.typeClass().isArray()
-                    && targetArray.arrayDataClass().typeClass().isPrimitive()) {
-                mismatches.add("field '" + field.schema().name() + "' admits void elements, and component '"
-                        + target.name() + "' binds " + targetArray.typeClass().getSimpleName()
-                        + ", which has no null to hold one");
-            }
-            return new ArrayBindReader(field.schema().name(), field.schema().name(), existing.body, targetArray,
-                    resolver, existing.schemaLocation, annotationTypes, existing.elementsAreNames);
-        }
-        if (target.dataClass() instanceof DataClassTuple targetTuple && parser instanceof TupleBindReader existing) {
-            for (String disagreement : TupleBindReader.disagreements(existing.body, targetTuple)) {
-                mismatches.add("field '" + field.schema().name() + "' is a tuple, and component '" + target.name()
-                        + "' binds " + targetTuple.typeClass().getName() + ": " + disagreement);
-            }
-            return new TupleBindReader(field.schema().name(), field.schema().name(), existing.body, targetTuple,
-                    resolver, existing.schemaLocation, annotationTypes);
-        }
-        if (target.dataClass() instanceof DataClassMap targetMap && parser instanceof MapBindReader existing) {
-            if (existing.body.ordered() && !targetMap.ordered()) {
-                mismatches.add("field '" + field.schema().name() + "' is an ordered map, and component '"
-                        + target.name() + "' binds " + targetMap.typeClass().getName()
-                        + ", which does not keep insertion order -- declare a SequencedMap");
-            }
-            return new MapBindReader(field.schema().name(), field.schema().name(), existing.body, targetMap,
-                    resolver, existing.schemaLocation, annotationTypes, existing.keysAreNames);
-        }
-        return parser;
+    /** The class this record builds, which a field holding it must be able to hold ({@link BindTargets}). */
+    Class<?> boundClass() {
+        return descriptor.typeClass();
     }
 
     @Override
@@ -470,42 +326,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
     }
 
-
-    /**
-     * A {@code value}-typed field read under the atom of the position it stands in, where the position's own
-     * host type says which one.
-     *
-     * <p>[TSON-SCHEMA] §7.4 types a constructor's constraint fields {@code value}, and the bootstrap ordering
-     * behind it leaves no alternative: {@code duration_type} is what defines a duration, and {@code duration
-     * => !duration_type {}} lives a layer up in core.tn, so meta.tn cannot write {@code min: duration}. A
-     * {@code value} slot is decoded by [TSON-DATA] §4 and by nothing else, which resolves boolean, number and
-     * string -- so every non-numeric bound in the meta layer arrives as a {@code String} and reaches a
-     * component that cannot hold one. The schema-driven reader has no visibility into that component, exactly
-     * as it has none into a collection's Java shape; this is {@link #rebindContainerIfNeeded}'s sibling and
-     * runs beside it for the same reason.
-     *
-     * <p>Keyed on the slot still being read as the uninterpreted {@code value} atom, which is what makes
-     * {@link #tokenAware} the sibling rather than the competitor: it claims a {@code Token}-bound slot before
-     * the field loop runs, and a slot something has already specialised is one this must not redo. Untouched
-     * for every other field, and {@link ValueParser#at} itself changes nothing about a token the component
-     * could already have held, so the rebind is only ever reached by a value that had no way to arrive.
-     */
-    private static TsonTypeReader<?> rebindValueIfNeeded(CompiledField field, DataClassField target) {
-        // A §7.2 subsumption guard wraps the atom reader, as it does a container's -- look through it and put
-        // it back around the replacement, the same handover rebindContainerIfNeeded makes.
-        if (field.parser() instanceof VariantSchemaReader guard) {
-            TsonTypeReader<?> rebound = rebindValueIfNeeded(
-                    new CompiledField(field.schema(), guard.wrapped()), target);
-            return rebound == guard.wrapped() ? field.parser() : guard.rewrap(rebound);
-        }
-        if (!(field.parser() instanceof AtomTypeReader<?> atom) || !atom.readsUninterpretedValue()) {
-            return field.parser();
-        }
-        // The field's own name, for the same reason the container rebind takes it: the entry here is `value`,
-        // which names the escape hatch and not the constraint the author wrote. The wire class, never the
-        // declared one, on the same terms as the ordinary atom branch above.
-        return atom.overAtom(field.schema().name(), ValueParser.at(boundAs(target).dataClass()));
-    }
 
     /**
      * Validates what {@link #RecordBindReader} needs before ever constructing one, and owns the

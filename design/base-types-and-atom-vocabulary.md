@@ -270,9 +270,9 @@ on every text family.
   a duration, and `duration => !duration_type {}` is a layer up in core.tn — so a bound is decoded by §4 base
   type resolution, which resolves boolean, number and string and none of those is a duration, a date or a
   UUID. `ValueParser.read(token, target)` asks `HostAtoms` which built-in produces the position's own host
-  type and re-reads the token under it; `RecordBindReader.rebindValueIfNeeded` is where a field's reader is
-  swapped for one, beside `rebindContainerIfNeeded` and `tokenAware`, which specialise the same slot on the
-  same evidence. **The host type is the class a component's bridge takes, never the one it declares** — a
+  type and re-reads the token under it; `reader.BindTargets` is where a position's reader is swapped for one,
+  at a record field and at any depth below it, beside `RecordBindReader.tokenAware`, which specialises the
+  same slot on the same evidence. **The host type is the class a component's bridge takes, never the one it declares** — a
   registered atom or a `@Transparent` wrapper is reached through its wire type, so the family is chosen by
   what the bridge can be handed, the same class the ordinary atom branch binds against. **Additive by
   construction**: a value the component can already hold, or that the caller's

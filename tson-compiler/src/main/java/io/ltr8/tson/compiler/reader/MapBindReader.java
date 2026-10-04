@@ -64,6 +64,13 @@ final class MapBindReader extends MapAbstractReader<Object> {
         this.descriptor = descriptor;
     }
 
+    /** Over key and value readers already bound to {@code descriptor}'s own -- {@link BindTargets}' rebuild. */
+    MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor, TsonTypeReader<?> key,
+                  TsonTypeReader<?> value, SchemaLocation schemaLocation, boolean keysAreNames) {
+        super(name, displayName, body, key, value, schemaLocation, keysAreNames);
+        this.descriptor = descriptor;
+    }
+
 
     @Override
     public Object read(TsonReadContext ctx) {

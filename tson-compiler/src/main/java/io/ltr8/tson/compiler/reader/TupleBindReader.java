@@ -72,11 +72,20 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
         this.missing = missing;
     }
 
+    /** Over position readers already bound to {@code descriptor}'s elements -- {@link BindTargets}' rebuild. */
+    TupleBindReader(String name, String displayName, TupleBody body, DataClassTuple descriptor,
+                    List<TsonTypeReader<?>> positions, SchemaLocation schemaLocation) {
+        super(name, displayName, body, positions, schemaLocation);
+        this.body = body;
+        this.descriptor = descriptor;
+        this.missing = null;
+    }
+
     /**
      * A tuple nothing binds a class to by name -- most often one written inline at a record field, whose entry
      * has a minted name no author would bind. A tuple has no natural Java form to fall back on, as an array has
      * its {@code List}, so this reader builds nothing: a record field rebuilds it against its own component's
-     * tuple class ({@code RecordBindReader.rebindContainerIfNeeded}), and read directly it raises {@code
+     * tuple class ({@link BindTargets}), and read directly it raises {@code
      * missing}, which is what {@link ErrorReader} would have raised for the entry.
      */
     static TupleBindReader unbound(String name, String displayName, TupleBody body, MissingBindingException missing,
