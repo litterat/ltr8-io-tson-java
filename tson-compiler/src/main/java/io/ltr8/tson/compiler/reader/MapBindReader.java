@@ -5,6 +5,9 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataParameterizedType;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
+import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -36,6 +39,11 @@ import java.util.Map;
  * <p>An entry whose value the document wrote as {@code _} arrives here as a {@code null} and is
  * {@code put} like any other, so the key is in the bound map and maps to nothing -- the closest a Java
  * {@code Map} comes to §2.9's "present with a void value", and distinguishable from a key never stated.
+ * A map that refuses {@code null} -- a {@code ConcurrentHashMap} -- throws on it instead, which is reported
+ * as a {@code BIND_MISMATCH}: the schema admitted what the bound class cannot hold.
+ *
+ * <p><b>Nothing is handed to the map once the value is lost</b> ({@link ConstructionGuard}): a refused key or
+ * value travels as {@code null}, so each {@code put} is skipped once anything has been reported since the mark.
  *
  * <p>Everything else -- resolving the key/value readers, confirming a map shape, size validation, rejecting
  * an absent key and admitting a void value -- lives on {@link MapAbstractReader}.
@@ -59,35 +67,37 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.underDeclaration(schemaLocation);
-        Shape shape = expectMapShape(ctx);
+        TsonReadContext at = ctx.underDeclaration(schemaLocation);
+        Shape shape = expectMapShape(at);
         if (shape == Shape.MISMATCH) {
             return null;
         }
-        int mark = ConstructionGuard.mark(ctx);
+        int mark = ConstructionGuard.mark(at);
+        Object mapData;
         try {
-            Object mapData = descriptor.constructor().invoke(0);
-            if (shape == Shape.ENTRIES) {
-                readInto(ctx, (key, decodedValue) -> put(mapData, key, decodedValue));
-            }
-            return ConstructionGuard.abandoned(ctx, mark) ? null : mapData;
-        } catch (RuntimeException e) {
-            throw e;
+            mapData = descriptor.constructor().invoke(0);
         } catch (Throwable t) {
-            throw new IllegalStateException("failed to construct " + descriptor.typeClass() + " from '" + name
-                    + "'s own decoded entries", t);
+            at.report(rejected(t));
+            mapData = null;
         }
+        Object map = mapData;
+        if (shape == Shape.ENTRIES) {
+            readInto(at, (key, decodedValue) -> {
+                if (!ConstructionGuard.abandoned(at, mark)) {
+                    try {
+                        descriptor.put().invoke(map, key, decodedValue);
+                    } catch (Throwable t) {
+                        at.report(rejected(t));
+                    }
+                }
+            });
+        }
+        return ConstructionGuard.abandoned(at, mark) ? null : map;
     }
 
-    /** {@code descriptor.put()} is a {@link java.lang.invoke.MethodHandle}, declared to throw {@code Throwable} -- caught and rewrapped here since this is called from within a {@code BiConsumer}, which can't declare it. */
-    private void put(Object mapData, Object key, Object decodedValue) {
-        try {
-            descriptor.put().invoke(mapData, key, decodedValue);
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Throwable t) {
-            throw new IllegalStateException("failed to add an entry to " + descriptor.typeClass(), t);
-        }
+    /** The bound map refusing what this read handed it, which the schema admitted. */
+    private Refusal rejected(Throwable cause) {
+        return BindingDiagnostics.rejectedUnderSchema(descriptor.typeClass(), Handed.ENTRIES, cause);
     }
 
     /**

@@ -309,7 +309,9 @@ Codes come from the same closed vocabulary the TSON readers use — §9.4 adds n
 `WRONG_ARITY`, `ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`, `TYPE_MISMATCH` again for a union with no selector, and
 **`BIND_MISMATCH`** for a class this context cannot analyse or cannot receive a JSON object's keys into.
 That last one is deliberately **not a verdict**: nothing about the document is being asserted by it, which
-is what a caller routing on `Code.verdict()` needs to be able to tell.
+is what a caller routing on `Code.verdict()` needs to be able to tell. A class whose constructor or collection
+throws on what it is handed is `TYPE_MISMATCH` here, the class being the contract; under a schema the same
+refusal is `BIND_MISMATCH` (`BindingDiagnostics`, shared with the TSON readers).
 
 **Bind mode is all-or-nothing.** A record, array, tuple or map whose contents reported is not constructed:
 a Java record has nowhere to put a hole, so a collecting read hands back `null` rather than an object

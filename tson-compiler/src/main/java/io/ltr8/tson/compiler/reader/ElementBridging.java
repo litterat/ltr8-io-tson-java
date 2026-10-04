@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.bind.DataClass;
 import io.ltr8.tson.compiler.TsonTypeReader;
 
@@ -40,10 +42,9 @@ final class ElementBridging {
             }
             try {
                 return bridge.toObject().invoke(read);
-            } catch (RuntimeException e) {
-                throw e;
             } catch (Throwable t) {
-                throw new IllegalStateException("failed to bridge a value to " + target.typeClass(), t);
+                ctx.report(BindingDiagnostics.rejectedUnderSchema(target.typeClass(), Handed.VALUE, t));
+                return null;
             }
         };
     }

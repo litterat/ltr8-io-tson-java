@@ -1,7 +1,8 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.bind.DataClassTuple;
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 
@@ -76,9 +77,7 @@ final class BindTupleBuilder implements TupleBuilder {
         try {
             return target.constructor().invoke(positions.toArray());
         } catch (Throwable e) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "%s rejected the positions read for it: %s"
-                    .formatted(target.typeClass().getSimpleName(), e), "positions "
-                    + target.typeClass().getSimpleName() + " accepts", String.valueOf(e.getMessage()));
+            ctx.report(BindingDiagnostics.rejectedUnderSchema(target.typeClass(), Handed.POSITIONS, e));
             return null;
         }
     }

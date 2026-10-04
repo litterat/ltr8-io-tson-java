@@ -25,7 +25,7 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `UNKNOWN_TYPE`              | a type reference does not resolve within the linked schema                                   |
 | `VALIDATION_ERROR`          | anything not covered by a more specific code — including a document that will not lex or parse |
 | `NOT_IMPLEMENTED`           | **a library gap, not bad input**                                                             |
-| `BIND_MISMATCH`             | a schema type and its bound class disagree about that type's fields                          |
+| `BIND_MISMATCH`             | a schema type and its bound class disagree — about its fields, or a value the class refuses   |
 | `LIMIT_EXCEEDED`            | a §9.1 resource limit refused the document — nested deeper than `LimitsPolicy.maxDepth`      |
 | `SCHEMA_NOT_PERMITTED`      | policy refused the reference — not an allowed host, not a legal identity, no pin where required |
 | `SCHEMA_NOT_FOUND`          | the location was reached and does not have it                                                |
@@ -46,7 +46,11 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
   meta-layer constructor this library has never seen (§2.2.2's extension point).
 - **`BIND_MISMATCH`** is a misconfiguration in the *reading application*, no more a verdict on the
   document than a gap is. It normally fails the bind-mode compile as an exception instead; it reaches a
-  read as a diagnostic only for a schema compiled on demand.
+  read as a diagnostic for a schema compiled on demand, and where the bound class refuses a value the schema
+  admits — its constructor's own check, or a void value meeting a collection that refuses `null`, such as
+  `ConcurrentHashMap`. With no schema the class is the contract, and the same refusal is `TYPE_MISMATCH`.
+  A field or position that can hold no value (voidable, or optional with no default) bound to a primitive is
+  refused at compile.
 - **`LIMIT_EXCEEDED`** is this deployment declining: the document nested deeper than `LimitsPolicy.maxDepth`
   (64 by default). The bytes may be valid and read in full by a processor configured for more, which is why
   the bound is stated once per run (`ProcessorPolicy.limits()`, the `policy` field of every CLI envelope)

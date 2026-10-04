@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.Diagnostic;
@@ -440,7 +442,7 @@ public final class DataClassObjectReader {
             construct[field.index()] = null;
         }
 
-        return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass());
+        return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass(), Handed.VALUE);
     }
 
     /** The names this class declares, for a message that has to say what was expected. */
@@ -510,11 +512,8 @@ public final class DataClassObjectReader {
                 dataClass.put().invoke(arrayData, iterator, element);
             }
             return arrayData;
-        } catch (RuntimeException ex) {
-            throw ex;
         } catch (Throwable t) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "failed to build " + dataClass.typeClass() + ": " + t.getMessage(),
-                    String.valueOf(dataClass.typeClass()), "(" + buffered.size() + " elements)");
+            ctx.report(BindingDiagnostics.rejectedByClass(dataClass.typeClass(), Handed.ELEMENTS, t));
             return null;
         }
     }
@@ -543,48 +542,52 @@ public final class DataClassObjectReader {
             return null;
         }
         int mark = ConstructionGuard.mark(ctx);
-
+        Object mapData;
         try {
-            Object mapData = dataClass.constructor().invoke(0);
-            if (empty) {
-                return mapData; // EmptyBraceEvent already consumed; no MapEnd for {}
-            }
-            DataClass keyClass = dataClass.keyDataClass();
-            DataClass valueClass = dataClass.valueDataClass();
-            Set<Object> statedKeys = new HashSet<>();
-            while (!(ctx.peek() instanceof MapEnd)) {
-                if (ctx.peek() instanceof VoidEvent) {
-                    ctx.next(); // the absent key itself
-                    ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the void sentinel '_' must not appear as a map key "
-                            + "(§2.9) for " + dataClass.typeClass(), "a real map key", "_");
-                    ctx.next(); // MapArrow
-                    EventSkip.scopedValue(ctx);
-                    continue;
-                }
-                int beforeKey = ctx.reported();
-                Object key = bind(ctx, keyClass);
-                if (ctx.reported() == beforeKey && !statedKeys.add(ValueIdentity.of(key))) {
-                    // §2.6, by bound key value -- a key that failed to bind is left out, since it is not a
-                    // key the document stated and a second failure would otherwise read as a repeat of it.
-                    ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
-                            "duplicate key '" + key + "' for " + dataClass.typeClass() + " -- a map states each "
-                                    + "key at most once (§2.6), and the repeat states an entry for nothing",
-                            "each key stated once", "'" + key + "' stated again");
-                }
-                ctx.next(); // MapArrow
-                ScopePush.refuseSchemaless(ctx);
-                Object value = bind(ctx, valueClass);
-                dataClass.put().invoke(mapData, key, value);
-            }
-            ctx.next(); // MapEnd
-            return ConstructionGuard.abandoned(ctx, mark) ? null : mapData;
-        } catch (RuntimeException ex) {
-            throw ex;
+            mapData = dataClass.constructor().invoke(0);
         } catch (Throwable t) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "failed to build " + dataClass.typeClass() + ": " + t.getMessage(),
-                    String.valueOf(dataClass.typeClass()), "(map)");
-            return null;
+            ctx.report(BindingDiagnostics.rejectedByClass(dataClass.typeClass(), Handed.ENTRIES, t));
+            mapData = null;
         }
+        if (empty) {
+            return mapData; // EmptyBraceEvent already consumed; no MapEnd for {}
+        }
+        DataClass keyClass = dataClass.keyDataClass();
+        DataClass valueClass = dataClass.valueDataClass();
+        Set<Object> statedKeys = new HashSet<>();
+        while (!(ctx.peek() instanceof MapEnd)) {
+            if (ctx.peek() instanceof VoidEvent) {
+                ctx.next(); // the void key itself
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the void sentinel '_' must not appear as a map key "
+                        + "(§2.9) for " + dataClass.typeClass(), "a real map key", "_");
+                ctx.next(); // MapArrow
+                EventSkip.scopedValue(ctx);
+                continue;
+            }
+            int beforeKey = ctx.reported();
+            Object key = bind(ctx, keyClass);
+            if (ctx.reported() == beforeKey && !statedKeys.add(ValueIdentity.of(key))) {
+                // §2.6, by bound key value -- a key that failed to bind is left out, since it is not a
+                // key the document stated and a second failure would otherwise read as a repeat of it.
+                ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
+                        "duplicate key '" + key + "' for " + dataClass.typeClass() + " -- a map states each "
+                                + "key at most once (§2.6), and the repeat states an entry for nothing",
+                        "each key stated once", "'" + key + "' stated again");
+            }
+            ctx.next(); // MapArrow
+            ScopePush.refuseSchemaless(ctx);
+            Object value = bind(ctx, valueClass);
+            // Not once the value is lost: a refused key or value travels as null (ConstructionGuard).
+            if (!ConstructionGuard.abandoned(ctx, mark)) {
+                try {
+                    dataClass.put().invoke(mapData, key, value);
+                } catch (Throwable t) {
+                    ctx.report(BindingDiagnostics.rejectedByClass(dataClass.typeClass(), Handed.ENTRIES, t));
+                }
+            }
+        }
+        ctx.next(); // MapEnd
+        return ConstructionGuard.abandoned(ctx, mark) ? null : mapData;
     }
 
     // ── Tuples ───────────────────────────────────────────────────────────
@@ -628,7 +631,7 @@ public final class DataClassObjectReader {
                     + " elements, found " + index, slots.length + " elements", String.valueOf(index));
         }
 
-        return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass());
+        return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass(), Handed.POSITIONS);
     }
 
     // ── Unions ───────────────────────────────────────────────────────────
@@ -805,20 +808,19 @@ public final class DataClassObjectReader {
      * Invokes {@code constructor} with the assembled arguments, unless anything was reported since {@code
      * mark} -- {@link ConstructionGuard}'s all-or-nothing rule, shared verbatim with the schema-driven
      * {@code RecordBindReader}/{@code TupleBindReader} so both bind paths abandon a value for the same
-     * reasons. A caller in collecting mode has the diagnostics saying why.
+     * reasons. A caller in collecting mode has the diagnostics saying why. What the constructor throws -- its
+     * own check, or an unboxing {@code NullPointerException} at a primitive -- is the class refusing the values,
+     * reported as a {@code TYPE_MISMATCH}: with no schema the class is the contract ({@link BindingDiagnostics}).
      */
     private Object construct(TsonReadContext ctx, java.lang.invoke.MethodHandle constructor, Object[] arguments,
-                             int mark, Class<?> typeClass) {
+                             int mark, Class<?> typeClass, Handed handed) {
         if (ConstructionGuard.abandoned(ctx, mark)) {
             return null;
         }
         try {
             return constructor.invoke(arguments);
-        } catch (RuntimeException e) {
-            throw e;
         } catch (Throwable t) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "failed to construct " + typeClass + ": " + t.getMessage(),
-                    String.valueOf(typeClass), "(the read field values)");
+            ctx.report(BindingDiagnostics.rejectedByClass(typeClass, handed, t));
             return null;
         }
     }
