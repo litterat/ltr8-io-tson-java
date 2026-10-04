@@ -13,7 +13,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
  *
  * <p><b>Why a partial value is worse than none.</b> A bound object is real, typed application data, and the
  * whole point of binding is that reaching it means the document was good. A tree is no different in the end:
- * its placeholder for a refused value is the same node as a real absent one, so a partial tree cannot say
+ * its placeholder for a refused value is the same node as a real void one, so a partial tree cannot say
  * which of its parts to trust, and a caller holding one has to consult the diagnostics before using any of it.
  * The diagnostics -- each with a path into the document the caller already holds -- are the answer.
  *
@@ -21,7 +21,10 @@ import io.ltr8.tson.compiler.TsonReadContext;
  * {@code null} for a primitive-typed parameter, and neither can a primitive-component array's own {@code
  * put} -- so a partial build risks a secondary {@code NullPointerException} on a caller's stack in place of
  * the diagnostic already recorded. That is why the array readers check <em>before allocating</em> rather than
- * only before returning.
+ * only before returning, and why a container that hands each element to its collection as it reads stops handing
+ * them over once anything has been reported: a collection that refuses {@code null} would throw on the refused
+ * child's placeholder. What the host throws regardless is reported, never rethrown
+ * ({@link io.ltr8.tson.base.diagnostics.BindingDiagnostics}).
  *
  * <p><b>What the checkpoint counts.</b> {@link TsonReadContext#reported()} is a single counter for the whole
  * read, not per value, so {@link #abandoned} answers "did anything at all get reported since the mark" --

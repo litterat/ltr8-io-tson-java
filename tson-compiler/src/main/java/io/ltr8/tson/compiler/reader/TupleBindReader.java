@@ -1,5 +1,10 @@
 package io.ltr8.tson.compiler.reader;
 
+import java.util.List;
+import java.util.ArrayList;
+import io.ltr8.tson.base.BindMismatchException;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -65,11 +70,9 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
         }
         try {
             return descriptor.constructor().invoke(decoded);
-        } catch (RuntimeException e) {
-            throw e;
         } catch (Throwable t) {
-            throw new IllegalStateException("failed to construct " + descriptor.typeClass() + " from '" + name
-                    + "'s own decoded elements", t);
+            ctx.report(BindingDiagnostics.rejectedUnderSchema(descriptor.typeClass(), Handed.POSITIONS, t));
+            return null;
         }
     }
 
@@ -93,9 +96,31 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't tuple-shaped -- can't bind '" + name + "' as one");
             }
-            return new TupleBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
+            String displayName = EntryDisplayName.of(name, typeDefinition);
+            refuseVoidAtPrimitive(displayName, body, descriptor);
+            return new TupleBindReader(name, displayName, body, descriptor, resolver,
                     context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
+        }
+
+        /**
+         * A voidable position bound to a primitive component, which has no {@code null} for a void value to arrive
+         * as -- known before any document, so refused at compile rather than left to the read that writes one.
+         */
+        private static void refuseVoidAtPrimitive(String displayName, TupleBody body, DataClassTuple descriptor) {
+            List<String> mismatches = new ArrayList<>();
+            int positions = Math.min(body.elements().size(), descriptor.elements().length);
+            for (int i = 0; i < positions; i++) {
+                Class<?> element = descriptor.elements()[i].dataClass().typeClass();
+                if (body.elements().get(i).voidable() && element.isPrimitive()) {
+                    mismatches.add("position " + i + " is voidable, and " + element.getName()
+                            + " has no null to hold a void value");
+                }
+            }
+            if (!mismatches.isEmpty()) {
+                throw new BindMismatchException("'" + displayName + "' and " + descriptor.typeClass().getName()
+                        + " do not agree: " + String.join("; ", mismatches));
+            }
         }
 
         private DataClass descriptorFor(String name, TypeDefinition definition, ValueReaderContext vctx) {

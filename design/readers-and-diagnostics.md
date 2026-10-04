@@ -142,6 +142,18 @@ is small and parsed once.)
   read goes on, so every problem in the document surfaces in one pass and later indices stay accurate; a shape
   mismatch reports `TYPE_MISMATCH`/`WRONG_ARITY` and returns `null` so a caller doesn't also report every child
   as missing.
+- **A bound class refusing what a read hands it is a diagnostic, never an exception** (`BindingDiagnostics`
+  states the rule once for both encodings). A constructor's own check, a bridge, an unboxing
+  `NullPointerException` at a primitive, a collection that refuses `null` meeting a void value: the `try` covers
+  the host call and nothing else, so a read's own `ReadException` from a nested read still passes through, and
+  whatever the host throws is reported. **Written inline at each site, not through a helper taking a lambda**:
+  `put` runs per element and the constructor per record, and a closure per call is bytes on the success path
+  for a refusal that almost never happens — the `Refusal` is built only in the `catch`. **The code follows the
+  contract**: under a schema the class refusing what the schema admits is the binding disagreeing with it,
+  `BIND_MISMATCH` (no verdict); with no schema the class is the contract, and its refusal is `TYPE_MISMATCH`.
+  A streaming container stops calling `put` once anything has been reported since its mark, since a refused
+  child travels as `null`. What is known before any document is refused at compile instead
+  (`design/schema-side-diagnostics.md`).
 - **Every read is all-or-nothing, in both modes and both encodings** (`ConstructionGuard`, which states the
   rule once for every assembly site, tree and bind). A value whose read reported *anything* — its own
   problem or a descendant's — is not assembled and reads to `null`, which propagates to the root. A bound

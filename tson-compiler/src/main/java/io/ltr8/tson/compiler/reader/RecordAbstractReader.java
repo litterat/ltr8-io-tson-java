@@ -557,4 +557,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 IdentifierPolicy.none());
         return field.parser().read(syntheticCtx);
     }
+
+    /** What field {@code i} yields when a document never writes it ({@link RecordField#omitted}). */
+    final RecordField.Omitted omitted(int i) {
+        return omitted[i];
+    }
 }

@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.*;
@@ -104,6 +106,12 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                     mismatches.add("no component for field '" + field.schema().name() + "'");
                 }
                 continue;
+            }
+            String deliversNull = deliversNull(field.schema(), omitted(i));
+            if (deliversNull != null && target.dataClass().typeClass().isPrimitive()) {
+                mismatches.add("field '" + field.schema().name() + "' " + deliversNull + ", and component '"
+                        + target.name() + "' binds " + target.dataClass().typeClass().getName()
+                        + ", which has no null to hold it");
             }
             // Before any rebind: a `value` slot becomes an atom reader over the host type its own component
             // chose, so judging it after would be judging the component against itself.
@@ -313,6 +321,20 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     }
 
     /**
+     * How {@code field} can deliver no value to its component, or {@code null} where it cannot: a voidable field
+     * whose value may be void, and one that yields nothing when the document leaves it out -- optional with no
+     * default, or a field group's member. Either reaches the constructor as {@code null}, which a primitive
+     * component cannot take, and both are known before any document -- so the class is refused at compile rather
+     * than at the read that writes one.
+     */
+    private static String deliversNull(RecordField field, RecordField.Omitted omitted) {
+        if (field.voidable()) {
+            return "is voidable";
+        }
+        return omitted == RecordField.Omitted.NOTHING ? "may be left out with nothing injected" : null;
+    }
+
+    /**
      * The schema-driven child reader {@link RecordAbstractReader}'s own constructor already built
      * (via {@code resolver.resolve(field.type().name())}) has no visibility into what Java
      * collection shape the *consuming* field actually wants -- for a synthesized, materialized
@@ -350,6 +372,12 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         // schema type name (see above), and a field name is already the author's own word for the value --
         // there is nothing a derived display name would add over it.
         if (target.dataClass() instanceof DataClassArray targetArray && parser instanceof ArrayBindReader existing) {
+            if (existing.body.voidable() && targetArray.typeClass().isArray()
+                    && targetArray.arrayDataClass().typeClass().isPrimitive()) {
+                mismatches.add("field '" + field.schema().name() + "' admits void elements, and component '"
+                        + target.name() + "' binds " + targetArray.typeClass().getSimpleName()
+                        + ", which has no null to hold one");
+            }
             return new ArrayBindReader(field.schema().name(), field.schema().name(), existing.body, targetArray,
                     resolver, existing.schemaLocation, annotationTypes, existing.elementsAreNames);
         }
@@ -421,11 +449,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
         try {
             return descriptor.constructor().invoke(arguments);
-        } catch (RuntimeException e) {
-            throw e;
         } catch (Throwable t) {
-            throw new IllegalStateException("failed to construct " + descriptor.typeClass() + " from '" + name
-                    + "'s own compiled field values", t);
+            // The constructor is the class's own code: what it throws is its refusal (BindingDiagnostics).
+            ctx.report(BindingDiagnostics.rejectedUnderSchema(descriptor.typeClass(), Handed.VALUE, t));
+            return null;
         }
     }
 

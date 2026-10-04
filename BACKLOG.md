@@ -270,14 +270,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   host class. `CONFORMANCE.md`'s accepted-gap paragraph and the two parsers' Javadoc go with it; Class 1
   vectors for each case above.
 
-- [ ] **A void value or element bound to a host collection that refuses `null` escapes as a bare
-  `NullPointerException`.** A schemaless read of `{ a => 1  b => _ }` into a `ConcurrentHashMap` component, or of
-  `[1 _ 3]` into a `Deque` (built as an `ArrayDeque`), throws rather than reporting. `MapBindReader.put` rethrows a
-  `RuntimeException` as is, and `ArrayBindReader` and `DataClassObjectReader` do the same; `tson-json`'s builders
-  already report it. A refused `put` is a `TYPE_MISMATCH` diagnostic at the entry; a schema-aware read could also
-  refuse a voidable map or array bound to such a class at compile, though no JDK type says which collections refuse
-  `null`.
-
 - [ ] **The TSON bind reader ignores a nested container's declared class.** `RecordBindReader.rebindContainerIfNeeded`
   rebuilds a container reader against the component's own `DataClassArray`/`DataClassMap` only where the container
   is the field's type. An array element or map value that is itself a container keeps the reader its schema type

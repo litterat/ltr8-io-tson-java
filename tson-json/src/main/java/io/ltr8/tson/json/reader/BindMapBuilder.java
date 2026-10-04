@@ -1,9 +1,10 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.tson.atom.AtomType;
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 
@@ -99,9 +100,7 @@ final class BindMapBuilder implements MapBuilder {
             }
             return built;
         } catch (Throwable e) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "%s rejected the entries read for it: %s"
-                    .formatted(target.typeClass().getSimpleName(), e), "entries "
-                    + target.typeClass().getSimpleName() + " accepts", String.valueOf(e.getMessage()));
+            ctx.report(BindingDiagnostics.rejectedUnderSchema(target.typeClass(), Handed.ENTRIES, e));
             return null;
         }
     }

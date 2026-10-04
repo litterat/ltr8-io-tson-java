@@ -160,6 +160,14 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       `DateTimeType`/`TimeType` carry it and their parsers enforce it — §5.5 makes it an upper bound on the
       fractional-second digits of the token *as written*, checked textually because the atoms are exact and
       nothing is ever truncated to satisfy a facet (`FractionalSeconds`).
+    - **A field or position that can deliver no value cannot bind to a primitive.** A voidable field, tuple
+      position or array element may be void, and a field that yields nothing when left out (optional with no
+      default, or a field group's member, `RecordField.omitted`) may be missing; either reaches the constructor
+      or array as `null`, which `int` cannot take. Known before any document, so refused here rather than at the
+      read that writes one -- a defaulted field binds to a primitive, since leaving it out injects the default.
+      Both readers check fields; the TSON reader also checks tuple positions and arrays, which `tson-json` already
+      did. A collection that refuses `null` (`ConcurrentHashMap`, `ArrayDeque`) is not refused here, since no JDK
+      type says so; the read that meets one reports it (`design/readers-and-diagnostics.md`).
     - **An ordered map needs a component that keeps insertion order** (`DataClassMap.ordered()`: a `SequencedMap`
       that is not a `SortedMap`, or `AnnotatedMap`), or the order the document wrote is lost; a bare `Map` is
       built as a `HashMap` and does not. The check runs one way only: an unordered map binds to either kind,

@@ -1,7 +1,8 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.bind.DataClassArray;
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 
@@ -72,9 +73,7 @@ final class BindArrayBuilder implements ArrayBuilder {
             }
             return built;
         } catch (Throwable e) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "%s rejected the elements read for it: %s"
-                    .formatted(target.typeClass().getSimpleName(), e), "elements "
-                    + target.typeClass().getSimpleName() + " accepts", String.valueOf(e.getMessage()));
+            ctx.report(BindingDiagnostics.rejectedUnderSchema(target.typeClass(), Handed.ELEMENTS, e));
             return null;
         }
     }

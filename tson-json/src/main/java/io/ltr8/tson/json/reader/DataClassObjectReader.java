@@ -1,5 +1,7 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
@@ -251,7 +253,7 @@ public final class DataClassObjectReader {
             // ConstructionGuard's on the TSON side.
             return null;
         }
-        return construct(ctx, target.constructor(), construct, target.typeClass());
+        return construct(ctx, target.constructor(), construct, target.typeClass(), Handed.VALUE);
     }
 
     /** §3.1's repeat, reported wherever the member was noticed to be one. */
@@ -390,7 +392,7 @@ public final class DataClassObjectReader {
             }
             return array;
         } catch (Throwable e) {
-            return failed(ctx, target.typeClass(), e);
+            return failed(ctx, target.typeClass(), Handed.ELEMENTS, e);
         }
     }
 
@@ -435,7 +437,7 @@ public final class DataClassObjectReader {
         if (ctx.reported() > mark) {
             return null;
         }
-        return construct(ctx, target.constructor(), construct, target.typeClass());
+        return construct(ctx, target.constructor(), construct, target.typeClass(), Handed.POSITIONS);
     }
 
     /**
@@ -490,7 +492,7 @@ public final class DataClassObjectReader {
                 }
             }
         } catch (Throwable e) {
-            return failed(ctx, target.typeClass(), e);
+            return failed(ctx, target.typeClass(), Handed.ENTRIES, e);
         }
     }
 
@@ -502,17 +504,18 @@ public final class DataClassObjectReader {
         try {
             return target.constructor().invoke(value, Annotations.empty());
         } catch (Throwable e) {
-            return failed(ctx, target.typeClass(), e);
+            return failed(ctx, target.typeClass(), Handed.VALUE, e);
         }
     }
 
     // ── Skipping, construction, errors ───────────────────────────────────
 
-    private Object construct(JsonReadContext ctx, MethodHandle constructor, Object[] arguments, Class<?> type) {
+    private Object construct(JsonReadContext ctx, MethodHandle constructor, Object[] arguments, Class<?> type,
+                             Handed handed) {
         try {
             return constructor.invoke(arguments);
         } catch (Throwable e) {
-            return failed(ctx, type, e);
+            return failed(ctx, type, handed, e);
         }
     }
 
@@ -523,13 +526,12 @@ public final class DataClassObjectReader {
     }
 
     /**
-     * A constructor or collection call that threw — the class's own rule refusing the value, most often,
-     * which is a fact about this document and not a fault in this library.
+     * A constructor or collection call that threw — the class's own rule refusing the value, most often, which is
+     * a fact about this document and not a fault in this library. With no schema the class is the contract, so
+     * its refusal is a {@code TYPE_MISMATCH} ({@link BindingDiagnostics}).
      */
-    private static Object failed(JsonReadContext ctx, Class<?> type, Throwable cause) {
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                "%s rejected the value read for it: %s".formatted(type.getSimpleName(), cause),
-                "a value " + type.getSimpleName() + " accepts", String.valueOf(cause.getMessage()));
+    private static Object failed(JsonReadContext ctx, Class<?> type, Handed handed, Throwable cause) {
+        ctx.report(BindingDiagnostics.rejectedByClass(type, handed, cause));
         return null;
     }
 }
