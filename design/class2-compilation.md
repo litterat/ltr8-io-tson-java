@@ -124,11 +124,12 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   **Only a derived entry is reached this way**, which is the test `EntryDisplayName` already applies: an entry
   with a source position was declared, so its own name is the one the author wrote and an alias naming it must
   never redirect its binding. The index is built once per compile beside `namesMeaning`, for that one's
-  reason — a property of the schema, not of the entry being looked up. A failure keeps the **first**
-  candidate's cause, the author-written name's, so a class that was mapped and then failed analysis is not
-  masked by "the minted name is unbound"; `MissingBindingException` carries that cause rather than only its
-  text, which is what makes an erased component (`no valid data conversion for class java.lang.Object`)
-  visible from an ordinary read.
+  reason — a property of the schema, not of the entry being looked up. **A class that is mapped and fails
+  analysis stops the search at once** and says so — `'sets' binds Sets, which cannot be analysed: …`, each
+  cause along the chain — rather than reading as a name nothing binds; only `tson-bind`'s
+  `UnboundNameException` moves on to the next candidate, and a search that finds nothing reports the first,
+  the author-written name. That is what makes an erased component
+  (`no valid data conversion for class java.lang.Object`) visible from an ordinary read.
 - **A family check names its members the same way.** `RecordExtension`'s pin-collision message renders each
   colliding member through `EntryDisplayName`, so a family whose members are template applications reports
   `pet_of<cat, int32>` rather than `pet_of_cat_int32_1c52dc45` — a name that points at no declaration an

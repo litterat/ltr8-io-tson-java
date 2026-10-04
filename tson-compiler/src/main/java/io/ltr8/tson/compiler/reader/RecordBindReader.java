@@ -487,11 +487,15 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             for (String candidate : vctx.bindingNamesFor(name, definition)) {
                 try {
                     return context.getDescriptor(candidate);
-                } catch (DataBindException e) {
-                    // The first failure is the one reported: it is the name the author wrote, so a class
-                    // that was mapped and then failed analysis is not masked by "the minted name is unbound".
+                } catch (UnboundNameException e) {
+                    // Not bound under this name; the next candidate is tried, and the first is the one reported,
+                    // being the name the author wrote.
                     first = first == null ? e : first;
                     tried.append(tried.isEmpty() ? "" : "' or '").append(candidate);
+                } catch (DataBindException e) {
+                    // Bound, to a class this context cannot analyse: deferred like a type nobody bound (a meta
+                    // layer maps its marker kinds to interfaces nothing builds), and named for what it is.
+                    throw new MissingBindingException(e.getMessage(), e);
                 }
             }
             throw new MissingBindingException("no bound Java class for '" + tried + "': nothing in this "

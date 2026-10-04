@@ -311,10 +311,35 @@ public class DataBindContext {
 	 * Builder#nameBinderAliases}), then returns its descriptor exactly as {@link
 	 * #getDescriptor(Class)} would -- one call in place of resolving the class and fetching its
 	 * descriptor as two separate steps.
+	 *
+	 * @throws UnboundNameException where the binder resolves the name to no class
+	 * @throws DataBindException    where it does, and that class cannot be analysed -- the message names both
 	 */
 	public DataClass getDescriptor(String schemaTypeName) throws DataBindException {
-		Class<?> target = nameBinder.resolve(schemaTypeName);
-		return getDescriptor(target);
+		Class<?> target;
+		try {
+			target = nameBinder.resolve(schemaTypeName);
+		} catch (DataBindException e) {
+			throw new UnboundNameException(e.getMessage(), e);
+		}
+		try {
+			return getDescriptor(target);
+		} catch (DataBindException e) {
+			throw new DataBindException("'" + schemaTypeName + "' binds " + target.getName()
+					+ ", which cannot be analysed: " + reasons(e), e);
+		}
+	}
+
+	/** Each distinct message along {@code e}'s cause chain, outermost first -- the innermost is usually the fact. */
+	private static String reasons(Throwable e) {
+		StringBuilder reasons = new StringBuilder();
+		for (Throwable at = e; at != null; at = at.getCause() == at ? null : at.getCause()) {
+			String message = at.getMessage();
+			if (message != null && reasons.indexOf(message) < 0) {
+				reasons.append(reasons.isEmpty() ? "" : ": ").append(message);
+			}
+		}
+		return reasons.toString();
 	}
 
 	/**

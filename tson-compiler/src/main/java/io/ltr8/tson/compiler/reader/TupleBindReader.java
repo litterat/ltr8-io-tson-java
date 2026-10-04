@@ -7,6 +7,7 @@ import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.UnboundNameException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.base.MissingBindingException;
@@ -182,9 +183,11 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
             for (String candidate : vctx.bindingNamesFor(name, definition)) {
                 try {
                     return context.getDescriptor(candidate);
-                } catch (DataBindException e) {
+                } catch (UnboundNameException e) {
                     first = first == null ? e : first;
                     tried.append(tried.isEmpty() ? "" : "' or '").append(candidate);
+                } catch (DataBindException e) {
+                    throw new MissingBindingException(e.getMessage(), e);
                 }
             }
             // A misconfiguration, not a gap -- see RecordBindReader.Factory.descriptorFor.

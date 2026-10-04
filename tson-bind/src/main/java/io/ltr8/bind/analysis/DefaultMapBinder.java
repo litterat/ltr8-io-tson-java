@@ -17,6 +17,12 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.SequencedMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.TreeMap;
+import java.util.NavigableMap;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.function.Supplier;
@@ -98,6 +104,10 @@ public class DefaultMapBinder {
 		static {
 			mapInterfaces.put(Map.class, HashMap.class);
 			mapInterfaces.put(SequencedMap.class, LinkedHashMap.class);
+			mapInterfaces.put(SortedMap.class, TreeMap.class);
+			mapInterfaces.put(NavigableMap.class, TreeMap.class);
+			mapInterfaces.put(ConcurrentMap.class, ConcurrentHashMap.class);
+			mapInterfaces.put(ConcurrentNavigableMap.class, ConcurrentSkipListMap.class);
 		}
 
 		private final Class<?> targetClass;
@@ -128,7 +138,20 @@ public class DefaultMapBinder {
 			// knowing the implementation expected -- same limitation DefaultArrayBinder has for
 			// a bare List/Set field, and the same fallback: a default concrete type.
 			Class<?> implementationClass = mapInterfaces.getOrDefault(targetClass, targetClass);
-			return MethodHandles.lookup().unreflectConstructor(implementationClass.getConstructor(int.class));
+			// Its capacity constructor where it has one, and otherwise its no-argument constructor with the
+			// capacity ignored -- TreeMap and ConcurrentSkipListMap have no capacity to take.
+			try {
+				return MethodHandles.lookup().unreflectConstructor(implementationClass.getConstructor(int.class));
+			} catch (NoSuchMethodException capacity) {
+				try {
+					return MethodHandles.dropArguments(
+							MethodHandles.lookup().unreflectConstructor(implementationClass.getConstructor()), 0,
+							int.class);
+				} catch (NoSuchMethodException none) {
+					throw new CodeAnalysisException(implementationClass.getName() + " has neither a public (int) "
+							+ "nor a public no-argument constructor to build it with");
+				}
+			}
 		}
 
 		/**

@@ -7,6 +7,7 @@ import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.UnboundNameException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
@@ -250,8 +251,11 @@ final class BindRecordBuilder implements RecordBuilder {
         for (String candidate : candidates) {
             try {
                 return binding.getDescriptor(candidate);
-            } catch (DataBindException e) {
+            } catch (UnboundNameException e) {
                 first = first == null ? e : first;
+            } catch (DataBindException e) {
+                // Bound, to a class this context cannot analyse: deferred like a type nobody bound, named for what it is.
+                throw new MissingBindingException(e.getMessage(), e);
             }
         }
         throw new MissingBindingException("no bound Java class for '" + String.join("' or '", candidates)
