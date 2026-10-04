@@ -73,8 +73,8 @@ class BindMismatchClassificationTest {
     /**
      * {@code @data} names the kernel's own {@code data} base kind, which
      * {@code MissingBindingException}'s Javadoc gives as an example of a type a consumer legitimately
-     * never binds. §6 puts an annotation written before the name on the <em>name</em> and one after the
-     * arrow on the <em>definition</em>, which used to be two different code paths with two different codes.
+     * never binds -- mapped to a marker interface nothing can build. §6 puts an annotation written before the
+     * name on the <em>name</em> and one after the arrow on the <em>definition</em>, and both are one problem.
      */
     @Test
     void anUnboundAnnotationTypeIsAWiringProblemInEitherPosition() {
@@ -87,7 +87,8 @@ class BindMismatchClassificationTest {
                 "the same annotation, moved across the arrow, is the same problem");
         for (Diagnostic d : List.of(beforeTheName, afterTheArrow)) {
             assertEquals("/foo", d.schemaPointer().orElseThrow(), "located at the declaration");
-            assertTrue(d.message().contains("no bound Java class for 'data'"), d::message);
+            assertTrue(d.message().contains("'data' binds io.ltr8.tson.schema.meta.Data, which cannot be analysed"),
+                    d::message);
         }
     }
 

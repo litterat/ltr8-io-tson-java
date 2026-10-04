@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedMap;
+import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,6 +49,7 @@ class NestedBindTargetTest {
               pairs    => { values: [[text, int32]] }
               point    => { x: int32  y: int32 }
               points   => { values: [point] }
+              groups   => { values: {text => set<int32>} }
             }
             """;
 
@@ -86,6 +88,9 @@ class NestedBindTargetTest {
     }
 
     public record Points(List<Other> values) {
+    }
+
+    public record Groups(Map<String, TreeSet<Integer>> values) {
     }
 
     private final List<Diagnostic> diagnostics = new ArrayList<>();
@@ -165,5 +170,12 @@ class NestedBindTargetTest {
     void aNestedRecordBoundToAnotherClassIsRefused() {
         assertTrue(refusal("points", Points.class, "{ values: [] }").contains("field 'values''s element binds "
                 + Point.class.getName() + ", which List's element (" + Other.class.getName() + ") cannot hold"));
+    }
+
+    /** A {@code TreeSet} has no capacity constructor, and is built through its no-argument one. */
+    @Test
+    void aNestedSortedSetIsBuiltAsTheSetItsMapDeclares() {
+        TreeSet<Integer> group = read("groups", Groups.class, "{ values: { a => [3 1 2] } }").values().get("a");
+        assertEquals(List.of(1, 2, 3), List.copyOf(group));
     }
 }

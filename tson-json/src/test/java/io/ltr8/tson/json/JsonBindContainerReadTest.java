@@ -25,10 +25,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.SequencedMap;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -66,6 +69,7 @@ class JsonBindContainerReadTest {
                 maybe:    {text => text?}
                 byPoint:  {point => text}
               }
+              sorted => { tags: set<text> }
               ranked => !map { key_type: text  value_type: int32  ordered: true }
               league => { table: ranked }
             }
@@ -378,5 +382,21 @@ class JsonBindContainerReadTest {
                     receiver);
             return compiled.get(type).read(ctx);
         }
+    }
+
+    // ── Collections with no capacity constructor ─────────────────────────
+
+    public record Sorted(SortedSet<String> tags) {
+    }
+
+    /** A {@code SortedSet} component is built as a {@code TreeSet}, through its no-argument constructor. */
+    @Test
+    void aSortedSetComponentReceivesASortedSet() {
+        Map<String, Class<?>> bindings = new HashMap<>(BINDINGS);
+        bindings.put("sorted", Sorted.class);
+        Sorted sorted = (Sorted) readWith(compile(bindings), "sorted", """
+                {"tags": ["c", "a", "b"]}""");
+        assertInstanceOf(TreeSet.class, sorted.tags());
+        assertEquals(List.of("a", "b", "c"), List.copyOf(sorted.tags()));
     }
 }

@@ -191,9 +191,11 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       `null` on every document. `@Unbound` is how a class says a component is its own and not the wire's,
       needed exactly once here (`TypeDefinition.position`, this implementation's own addition for
       diagnostics).
-    - **The check is raised at bind-mode compile — startup, not first read — except for a type with no class at
-      all.** That is the `MissingBindingException` subclass, deferred to the first read of that type, since a schema
-      legitimately declares types a consumer never binds.
+    - **The check is raised at bind-mode compile — startup, not first read — except for a type with no class to
+      build.** That is the `MissingBindingException` subclass, deferred to the first read of that type, since a
+      schema legitimately declares types a consumer never binds. It covers two causes the message tells apart:
+      a name the binder resolves to no class (`tson-bind`'s `UnboundNameException`), and a class it does resolve
+      to that cannot be analysed — the kernel's `data` kind is mapped to a marker interface nothing builds.
     - **There is no wholesale opt-out**, and that is deliberate: accepting fewer fields without saying *which* is the
       defect §7.2 refuses on the wire, and a class that means to read one version of a schema while another is current
       declares a `@Profile` constructor for it. Reaching a read as a diagnostic instead (a schema compiled on demand),

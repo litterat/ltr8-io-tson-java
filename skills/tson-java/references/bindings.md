@@ -14,12 +14,17 @@ hand — so **the target class must be `public`**, since the library reaches it 
 | a `record`                                  | a `record` — named fields, bound by component name                |
 | a hand-written immutable class with `@Record` on its canonical constructor | the same                          |
 | a `record` carrying `@Tuple`                | a `tuple` — positional, by constructor-argument order             |
-| `List<E>`                                   | an array                                                          |
+| `List<E>`, `Set<E>`, any `Collection<E>`   | an array (`set<T>` included)                                      |
 | `Map<K, V>`                                 | a map                                                             |
 | `SequencedMap<K, V>`                        | a map, keeping the order the document wrote its entries in        |
 | a plain `enum`                              | an enum                                                           |
 | a sealed interface, or one with `@Union`    | a choice                                                          |
 | the built-in atom vocabulary                | the `java.base` types in the table below                          |
+
+A component declaring an interface is built as a default class for it — `List` and `Collection` as
+`ArrayList`, `Set` as `HashSet`, `SortedSet` as `TreeSet`, `SequencedSet` as `LinkedHashSet`, `SortedMap` as
+`TreeMap`, `ConcurrentMap` as `ConcurrentHashMap` — and a concrete class through its capacity constructor where
+it has one and its no-argument constructor otherwise (`TreeSet`, `LinkedList`, `TreeMap`).
 
 A bare `Map` is built as a `HashMap`, which does not keep entry order. An ordered map
 (`!map { … ordered: true }`) under a schema needs a component that does — `SequencedMap` (built as a

@@ -165,15 +165,7 @@ public class MapBinderTest {
 	public record OrderHolder(Map<String, Integer> plain, HashMap<String, Integer> hashed,
 			LinkedHashMap<String, Integer> linked, SequencedMap<String, Integer> sequenced,
 			ConcurrentHashMap<String, Integer> concurrent,
-			SizedTreeMap<String, Integer> sorted, AnnotatedMap<String, Integer> annotated) {
-	}
-
-	/** A sorted map with the capacity constructor the binder needs, which TreeMap itself lacks. */
-	public static class SizedTreeMap<K, V> extends TreeMap<K, V> {
-		private static final long serialVersionUID = 1L;
-
-		public SizedTreeMap(int capacity) {
-		}
+			TreeMap<String, Integer> sorted, AnnotatedMap<String, Integer> annotated) {
 	}
 
 	private DataClassMap orderField(String name) throws Throwable {
