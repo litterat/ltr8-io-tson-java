@@ -1556,9 +1556,16 @@ a resolver error.
 - **`deprecated` becomes `@annotation void`**, a presence marker like `@numeric`. Deprecation is a yes-or-no fact
   — JSON Schema's `deprecated` is a boolean, and so is every host language's marker — and a reason, where there
   is one, is `@doc`'s to give.
+- **`examples` becomes `@annotation [text]`.** `[value]` says each example is a token "read by the type the
+  position hands it to", and an annotation's position hands it none, so nothing is read and a record's example
+  has no spelling but a string anyway. `[text]` says what an example is — text shown to a reader, conventionally
+  the value in TSON notation, never parsed or checked against the type it illustrates — rather than implying a
+  validation no processor can perform. Checking examples would need an annotation value typed by its target,
+  which §6 does not have.
 
 **What is running** (`r2026-37-proposal`): the bundled `meta.tn` without `todo`, `since` and `lang`, with
-`deprecated => @annotation void` and `comment => @annotation text`, and its resolved fixture. `tson strip` drops
+`deprecated => @annotation void`, `comment => @annotation text` and `examples => @annotation [text]`, and its
+resolved fixture. `tson strip` drops
 `@comment` with `@doc`.
 
 **Interpretation chosen:** on `main`, the current text. On `r2026-37-proposal`, this entry.
