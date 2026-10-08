@@ -1012,7 +1012,8 @@ final class TemplateMaterialiser {
                     checkBound(head, parameter, ref.ref().name(), parameter.bound().get().name());
                 }
             } else if (argument instanceof TypeArgument.Value value) {
-                checkValue(head, parameter, value.value().text(), valueType(parameters, arguments, parameter));
+                checkValue(head, parameter, value.value().text(), valueType(parameters, arguments, parameter),
+                        ParameterTypes.readsInStructure(template, namespace::getTypeDefinition));
             }
         }
     }
@@ -1047,11 +1048,17 @@ final class TemplateMaterialiser {
         return type;
     }
 
-    private void checkValue(String head, TemplateParam parameter, String argument, String type) {
+    /**
+     * {@code argument} as a value of {@code type}, read in the structure namespace where the template applies a meta
+     * constructor ({@link ParameterTypes#readsInStructure}) -- so a schema's own entry under a meta type's name never
+     * stands in for the type the constructor's slot declares -- and in the schema's namespace otherwise.
+     */
+    private void checkValue(String head, TemplateParam parameter, String argument, String type, boolean structural) {
         if (type == null) {
             return;
         }
-        TypeDefinition definition = lookup(ReferenceChain.terminal(type, this::lookup));
+        Function<String, TypeDefinition> resolve = structural ? metaTypes : this::lookup;
+        TypeDefinition definition = resolve.apply(ReferenceChain.terminal(type, resolve::apply));
         // An enum's argument is matched in its label type's form, which the governing meta may hold.
         Optional<AtomType<?>> parser = definition == null ? Optional.empty() : AtomParsers.forType(definition.body(),
                 EnumLabelType.form(definition, namespace::getTypeDefinition, metaTypes));

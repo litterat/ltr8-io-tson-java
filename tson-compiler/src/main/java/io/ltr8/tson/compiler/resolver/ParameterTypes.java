@@ -104,6 +104,32 @@ final class ParameterTypes {
     }
 
     /**
+     * Whether {@code template}'s value parameters are the governing meta's types, read and checked in the structure
+     * namespace (§5.10): a template whose body applies a meta constructor other than {@code record} --
+     * {@code vec => <N> !array { element_type: text  min_items: N }} -- binds its values into the meta's own
+     * structure, so {@code N} is the meta's {@code non_negative_integer} whatever the schema declares under that
+     * name, and a written narrowing names a type there too. A record template's fields are typed by the schema, so
+     * its parameters read in the schema's namespace. A template whose body applies another template takes that
+     * template's form. A type parameter's bound is the schema's either way: its argument names a schema type, the
+     * way {@code set<T>} captures a local name into the meta's {@code element_type}.
+     */
+    static boolean readsInStructure(TypeDefinition template, Function<String, TypeDefinition> entries) {
+        TypeDefinition current = template;
+        for (int hop = 0; hop < 64 && current != null; hop++) {
+            String head = current.source().map(TypeRef::name).orElse(null);
+            if (head == null || head.equals("record")) {
+                return false;
+            }
+            TypeDefinition applied = entries.apply(head);
+            if (applied == null || !(applied.body() instanceof TemplateBody)) {
+                return true;
+            }
+            current = applied;
+        }
+        return false;
+    }
+
+    /**
      * Every local open entry's parameters, by entry name then parameter name.
      *
      * <p>{@code entries} is the <b>whole namespace</b>, imports included, because a local template may route a
@@ -127,7 +153,8 @@ final class ParameterTypes {
                 recorded.put(name, params);
                 return;
             }
-            Occurrences occurrences = new Occurrences(held.parameterNames(), written.getOrDefault(name, Map.of()));
+            Occurrences occurrences = new Occurrences(held.parameterNames(), written.getOrDefault(name, Map.of()),
+                    readsInStructure(definition, entries::get));
             try {
                 new Walk(occurrences, meta).body(HeldBody.of(held));
             } catch (SchemaValidationException e) {
@@ -164,7 +191,7 @@ final class ParameterTypes {
         if (!(template.body() instanceof TemplateBody held)) {
             return Map.of();
         }
-        Occurrences occurrences = new Occurrences(held.parameterNames(), Map.of());
+        Occurrences occurrences = new Occurrences(held.parameterNames(), Map.of(), false);
         try {
             new Walk(occurrences, meta).body(HeldBody.of(held));
         } catch (SchemaValidationException e) {
@@ -230,8 +257,10 @@ final class ParameterTypes {
                         continue;
                     }
                     occurrences.settled.add(deferred);
-                    occurrences.observe(deferred.parameter(),
-                            new Use(known.type(), known.bound(), !recorded.containsKey(deferred.head())));
+                    // A value type is read where the callee reads it: the meta's for a constructor template.
+                    boolean schemaSide = known.isTypeParameter() ? !recorded.containsKey(deferred.head())
+                            : !readsInStructure(callee, entries::get);
+                    occurrences.observe(deferred.parameter(), new Use(known.type(), known.bound(), schemaSide));
                     moved = true;
                 }
             }
@@ -267,13 +296,15 @@ final class ParameterTypes {
 
         private final List<String> parameters;
         private final Map<String, TypeRef> written;
+        private final boolean structural;
         private final Map<String, List<Use>> uses = new LinkedHashMap<>();
         private final List<Deferred> deferred = new ArrayList<>();
         private final Set<Deferred> settled = new LinkedHashSet<>();
 
-        Occurrences(List<String> parameters, Map<String, TypeRef> written) {
+        Occurrences(List<String> parameters, Map<String, TypeRef> written, boolean structural) {
             this.parameters = parameters;
             this.written = written;
+            this.structural = structural;
         }
 
         boolean declares(String name) {
@@ -348,7 +379,14 @@ final class ParameterTypes {
             }
             Use derived = narrowest(parameter, "read as", all, local, meta);
             if (declared.isPresent()) {
-                Use mine = new Use(declared.get(), true);
+                if (structural && meta.apply(declared.get().name()) == null) {
+                    throw new SchemaValidationException("parameter '" + parameter + "' is declared '" + parameter
+                            + ": " + spell(declared.get()) + "', and this template applies a constructor of the "
+                            + "governing meta, so its value parameters are the meta's types and a written type "
+                            + "names one there -- '" + declared.get().name() + "' is not in the structure namespace "
+                            + "(§5.10)");
+                }
+                Use mine = new Use(declared.get(), !structural);
                 if (!isA(mine, derived, local, meta)) {
                     throw new SchemaValidationException("parameter '" + parameter + "' is declared '" + parameter
                             + ": " + spell(declared.get()) + "', and the positions it stands in read it as "

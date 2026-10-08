@@ -13,10 +13,10 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-**Revision 37 closed seventeen of the twenty-one open against Revision 36**, and #1–#4 below are what remains: two
-of the four that revision's change log carries open, and the two open remainders of its typed template parameters.
-The closed entries are gone: the spec now carries their rules — a family member is declared and a family is judged
-over its closure, the cell rule at every scoped position, `identifier` as a text family and `enum_type.type`,
+**Revision 37 closed seventeen of the twenty-one open against Revision 36**, and #1–#3 below are what remains: two
+of the four that revision's change log carries open, and an open remainder of its typed template parameters. The
+closed entries are gone: the spec now carries their rules — a family member is declared and a family is judged over
+its closure, the cell rule at every scoped position, `identifier` as a text family and `enum_type.type`,
 `value_type` and `void_type`, typed template parameters with their bounds and the call-site check, `ordered` on
 every container, the empty set, `tuple1<T>`, `uri` beside `uri_reference` and `iri_type`, the smaller core, meta's
 annotation vocabulary, `@doc` as CommonMark, field-group options and `+`, `normalization` on `text_type`, the leap
@@ -40,13 +40,12 @@ spanning both stays, and says which half is which.
 for an entry below, where there is no section to point at yet. When an entry closes, its citations become spec
 citations and the entry is deleted — nothing here is an archive.
 
-**#1–#4 are directions rather than defects.** Each is a place the series stops short of a rule on purpose: where a
+**#1–#3 are directions rather than defects.** Each is a place the series stops short of a rule on purpose: where a
 deployment's policy lives (#1), a bounded type slot at a field, which lets one field's type depend on another's
-(#2), a bound on the constructor an argument's type was built with (#3), and an edge between a core sibling and its
-kernel original, which resolved output needs and the same-body rule cannot give it (#4). What verifying Revision
-37's text against the closed entries found is in that revision's text and artifacts. **Two directions Revision 37
-carried open are not here**: a namespace as a value and a JSON member name that is not an identifier are being
-reworked together, and will be raised against Revision 38 as entries of their own.
+(#2), and a bound on the constructor an argument's type was built with (#3). What verifying Revision 37's text
+against the closed entries found is in that revision's text and artifacts. **Two directions Revision 37 carried
+open are not here**: a namespace as a value and a JSON member name that is not an identifier are being reworked
+together, and will be raised against Revision 38 as entries of their own.
 
 ---
 
@@ -263,32 +262,3 @@ template_param => {
 
 **Status against Revision 37:** open; not running. Taking it is a kernel change (`template_param.constructor`)
 and one spelling in §12.1's `type-param`.
-
----
-
-## 4. A core sibling and its kernel original are one type by name and body, where an edge would say so
-
-**Section:** [TSON-SCHEMA] §5.10 (*Where a type is read*), §3.3.5 (a core sibling remains a distinct type), §1.3
-and §8.1 (`template_param.type` in resolved output).
-
-**Kind:** proposal — an open remainder of typed template parameters, carried by the Revision 37 change log (§5).
-
-**What Revision 37 settled.** Each derived parameter type is read where the held body wrote it: a slot's
-declared type in the governing meta's vocabulary, and a routed default, a written type and a bound in the
-schema's own namespace. The two can hold one name for two entries with no IS-A edge between them, so §5.10
-states: "Two same-named entries with the same resolved body are one type wherever this section compares
-parameter types … and for nothing else". Every check §5.10 makes is covered, and this implementation runs it so
-(`ParameterTypes.isA`).
-
-**What the sentence does not reach is resolved output.** `{ name: N  type: non_negative_integer }` reads the same
-whether the kernel's type or a schema's copy was meant, and the only way to tell is the held text the recorded
-type exists to make unnecessary. A consumer of resolved output (§1.3) reading `type` as a reference has no
-same-body rule to fall back on.
-
-**Suggested resolution:** an edge — a core sibling records its kernel original as a supertype, so that IS-A
-answers every check, either reading of a recorded `type` gives the same answer, and the same-body sentence goes.
-What it costs is §3.3.5's "a core sibling remains a distinct type", which the edge would make a subtype instead.
-
-**Interpretation chosen:** the spec as written.
-
-**Status against Revision 37:** open.
