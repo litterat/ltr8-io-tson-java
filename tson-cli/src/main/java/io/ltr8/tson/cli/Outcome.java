@@ -14,7 +14,7 @@ import java.util.List;
  * not be accepted here, and the sender holds the fix. Which of the two it was -- the portable finding or the
  * local one -- is each diagnostic's {@link Diagnostic.Code}, where {@link Diagnostic.Code#verdict()} and {@link
  * Diagnostic.Code#isRefusal()} tell them apart. What leaves a document {@link #UNDETERMINED} is nothing anyone
- * present could judge it by: a schema the world could not supply, a gap in this library, a type with no class
+ * present could judge it by: a schema that could not be obtained, a gap in this library, a type with no class
  * here (SPEC-FEEDBACK.md #1).
  *
  * <p><b>An enum rather than a {@code valid} boolean</b>, since {@code if (!valid)} reads "undetermined" as

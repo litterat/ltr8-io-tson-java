@@ -38,7 +38,7 @@ class OutcomeTest {
     }
 
     @Test
-    void whatTheWorldCouldNotSupplyOrNobodyPresentCouldJudgeIsUndetermined() {
+    void whatCouldNotBeObtainedOrJudgedIsUndetermined() {
         assertEquals(Outcome.UNDETERMINED, of(Code.SCHEMA_NOT_FOUND));
         assertEquals(Outcome.UNDETERMINED, of(Code.SCHEMA_TIMEOUT));
         assertEquals(Outcome.UNDETERMINED, of(Code.BIND_MISMATCH));

@@ -723,7 +723,7 @@ OK
   boolean. `REJECTED` is an invalidity, or a refusal under this processor's configuration — §8.2 policy, §9.1
   limits, or a schema it will not supply — either way it will not be accepted here, and one rejection settles it
   whatever else went unjudged; each diagnostic's code says which kind it was. `UNDETERMINED` is a document
-  nothing rejected but something could not judge — a schema the world could not supply, a type with no Java
+  nothing rejected but something could not judge — a schema that could not be obtained, a type with no Java
   class in this tool, a construct not implemented — and reporting it `valid: false` would assert a rejection the
   run cannot make, which is exactly what an agent acts on when it reads `if (!valid)`. A run is `REJECTED` if
   any file is, else `UNDETERMINED` if any file is.
@@ -741,7 +741,7 @@ OK
   **Every field is a location, and the one fact that is not — why no schema was obtained — rides the `code`
   rather than a field beside it**: `SCHEMA_NOT_PERMITTED` and `SCHEMA_TOO_LARGE` are this deployment declining —
   a schema it does not hold and will not fetch, or one past its size cap — and so a rejection here, where
-  `SCHEMA_NOT_FOUND`, `SCHEMA_UNREACHABLE` and `SCHEMA_TIMEOUT` are what the world could not supply, and only
+  `SCHEMA_NOT_FOUND`, `SCHEMA_UNREACHABLE` and `SCHEMA_TIMEOUT` are what could not be obtained, and only
   the last two are worth retrying. Five codes rather than one plus a reason field because which one it is is a
   *routing* question, and a code is what a consumer routes on; consumers partition the five differently (this
   CLI by whether a rerun could help, an HTTP surface by whose doing it was), so one code per reason privileges

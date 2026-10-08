@@ -23,13 +23,14 @@ import java.util.Set;
  * wanted to know what {@code hash} does. A usage <em>error</em> still prints the short one-line usage plus
  * the command list, since what a caller needs there is the shape of the invocation they got wrong.
  *
- * <p>Exit codes are Unix-conventional: 0 accepted (or an explicit {@code --help}), 1 rejected, 2 a usage error
- * (bad arguments, a file that can't be read), and four that are not a rejection of the document itself -- 69
- * ({@code EX_UNAVAILABLE}) and 75 ({@code EX_TEMPFAIL}) for a schema not obtained, permanently or not, 78
- * ({@code EX_CONFIG}) for a type with no Java class here, and 70 ({@code EX_SOFTWARE}) for this library
- * failing. See {@link #exitCodeFor}
- * for how a mixed run ranks them -- so a script or agent shelling out gets a clean signal without parsing
- * prose, and never reads a bug, or a missing schema, as a verdict. Help requested explicitly ({@code --help}/{@code -h}/{@code help}) prints to stdout and
+ * <p>Exit codes are Unix-conventional and answer who acts: 0 accepted (or an explicit {@code --help}), 1 rejected
+ * and the document is the fix, 2 a usage error (bad arguments, a file that can't be read), 69 ({@code
+ * EX_UNAVAILABLE}) a schema not obtained that no rerun obtains -- the reference is the fix, and where this run
+ * would not supply it ({@code SCHEMA_NOT_PERMITTED}) the outcome is {@code REJECTED} -- 75 ({@code EX_TEMPFAIL})
+ * a schema that could not be reached, 78 ({@code EX_CONFIG}) a type with no Java class here, and 70 ({@code
+ * EX_SOFTWARE}) this library failing. See {@link #exitCodeFor} for how a mixed run ranks them -- so a script or
+ * agent shelling out gets a clean signal without parsing prose, and never reads a bug, or a missing schema, as
+ * an invalid document. Help requested explicitly ({@code --help}/{@code -h}/{@code help}) prints to stdout and
  * exits 0; usage shown because of a mistake (no command, a bad flag) prints to stderr and exits 2.
  *
  * <p>70 covers the two ways a run can end without a verdict, and they print differently: a gap in this

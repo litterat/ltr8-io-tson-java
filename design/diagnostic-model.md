@@ -58,9 +58,10 @@ model it the same way (rustc's `MultiSpan` being the mature form of the same ide
 **A fetch failure is five codes, not one code and a field.** Two are this deployment *would not*, and so
 refusals (`Code.isRefusal()`): `SCHEMA_NOT_PERMITTED`, a schema it does not hold and will not fetch (a closed
 lookup's miss, a host off its allow-list, an illegal identity, a missing required pin), and `SCHEMA_TOO_LARGE`,
-one past its size cap ([TSON-SCHEMA] §11.2). Three are the world *could not*: `SCHEMA_NOT_FOUND`, a source that
-looks beyond its configuration (an origin, a directory) and finds nothing, and `SCHEMA_UNREACHABLE`/
-`SCHEMA_TIMEOUT`, the only two a retry may change. That is the difference between telling a sender this
+one past its size cap ([TSON-SCHEMA] §11.2). Three are *could not*: `SCHEMA_NOT_FOUND`, a source that looks
+beyond its configuration (an origin, a directory) and finds nothing — nobody judged the document, though the
+sender most likely holds the fix, a reference with nothing behind it being most often a typo — and
+`SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT`, the only two a retry may change. That is the difference between telling a sender this
 deployment will not accept the document and telling it nobody could judge it, and it is a question consumers
 *route* on — so it lives where routing values live. A field beside the code would be a
 second carrier for one fact, and would cost a `Diagnostic` component, a `TsonReadContext.report` overload

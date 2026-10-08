@@ -65,8 +65,7 @@ server's schema and policy — the question is *will this document be accepted*,
 
 - a refusal is a **certain rejection**: this processor will not accept the document, the report names the rule and
   the policy, and the sender holds the fix (rename the field, nest less, or ask for a relaxed policy);
-- an unavailable schema the world could not supply is **no answer**: nothing was judged, and nobody present may be
-  able to act.
+- a schema that could not be obtained is **no answer**: nothing was judged, whoever holds the fix.
 
 Filing both under "not judged" makes the headline outcome ambiguous exactly where a client branches on it, and makes
 a refused document indistinguishable, at that level, from one nobody could check. It is also inaccurate: a refusal
@@ -77,8 +76,8 @@ a refused document indistinguishable, at that level, from one nobody could check
 deployment-specific as an identifier policy: a schema it does not hold and will not fetch (fetching is opt-in and
 off by default, §11.2), a host off its allowlist, or a document past its size limit (§11.2). The sender's fix is to
 name a schema this deployment will supply, a processor configured otherwise accepts the same document, and no rerun
-changes the answer — a refusal by every property above. Only what the world could not supply (an origin with
-nothing at the reference, a host that did not answer or timed out) leaves the document undetermined.
+changes the answer — a refusal by every property above. Only what this processor could not obtain (nothing at the
+reference, a host that did not answer or timed out) leaves the document undetermined.
 
 What §8.1 is protecting is right and should stay: a refusal is not a finding about **validity**. Validity is a
 property of the bytes and the schema, the same at every processor, and a content-addressed document must mean the
@@ -92,13 +91,14 @@ same forever; rules reading Unicode data the UCD declines to freeze cannot decid
   `Code.isRefusal()`, names the refusals: the three name-hygiene codes, `LIMIT_EXCEEDED`, `SCHEMA_NOT_PERMITTED` (a
   schema this deployment does not hold and will not fetch — a closed library's miss, a host off the allowlist, an
   illegal identity, a missing required pin) and `SCHEMA_TOO_LARGE` (past its size limit).
-- What the world could not supply is `SCHEMA_NOT_FOUND` (a source that looks beyond its configuration — an origin,
-  a directory — and found nothing), `SCHEMA_UNREACHABLE` and `SCHEMA_TIMEOUT`. A closed library's miss is
-  `SCHEMA_NOT_PERMITTED`, never `SCHEMA_NOT_FOUND`: the library is the deployment's whole configuration, so a
+- What could not be obtained is `SCHEMA_NOT_FOUND` (a source that looks beyond its configuration — an origin, a
+  directory — and found nothing: nobody judged the document, though the sender most likely holds the fix, a reference
+  with nothing behind it being most often a typo), `SCHEMA_UNREACHABLE` and `SCHEMA_TIMEOUT`. A closed library's miss
+  is `SCHEMA_NOT_PERMITTED`, never `SCHEMA_NOT_FOUND`: the library is the deployment's whole configuration, so a
   schema outside it is one this deployment will not supply.
 - The `tson` CLI's report states acceptance: `outcome` is `ACCEPTED` (nothing reported), `REJECTED` (any invalidity
-  or any refusal) or `UNDETERMINED` (nothing rejected the document, but something could not be judged — a schema the
-  world could not supply, a type with no binding, a construct not implemented). One rejection settles it whatever
+  or any refusal) or `UNDETERMINED` (nothing rejected the document, but something could not be judged — a schema that
+  could not be obtained, a type with no binding, a construct not implemented). One rejection settles it whatever
   else went unjudged, since what was not judged cannot make a rejected document acceptable. Which kind a rejection
   was — portable or local — rides on each diagnostic's code, and the report states the policy and data version once
   (§8.2).
@@ -114,8 +114,9 @@ judged is a fifth outcome" with two outcomes beside them:
   limit. The document is not accepted *here*; a refusal is not a finding about validity, MUST be distinguishable
   from the four categories, and MUST name the rule or limit that refused — a conforming processor may legitimately
   not refuse.
-- **Undetermined**: the world did not supply what this processor would judge against — nothing at the reference,
-  or no answer — and the report says nothing about whether the document conforms or would be accepted.
+- **Undetermined**: this processor could not obtain what it would judge against — nothing at the reference, or no
+  answer — and the report says nothing about whether the document conforms or would be accepted. Nobody judged
+  it; for nothing at the reference, the sender most likely holds the fix.
 
 A report then answers acceptance as a summary — accepted, rejected (by a category error or a refusal), or
 undetermined — with validity still carried by the categories alone. §8.1's sentence on an unavailable schema keeps
@@ -126,7 +127,6 @@ validity." §8.2 and §9.1 cite "refused" in place of "the fifth outcome".
 **Status against Revision 37:** open. Running in this implementation as described: `Code.verdict()`,
 `Code.isRefusal()`, the sources' and both encodings' readers reporting a closed library's miss as
 `SCHEMA_NOT_PERMITTED`, and the CLI's `outcome`, declared in its `diagnostics.tn`. The HTTP layer in
-`ltr8-io-tson-java-http` answers `SCHEMA_NOT_PERMITTED` and `SCHEMA_TOO_LARGE` with a 4xx and an unreachable or
-timed-out origin with a 5xx, so its boundary is the CLI's `REJECTED`/`UNDETERMINED` boundary but for
-`SCHEMA_NOT_FOUND`, which it also answers 400: under this reading that code is an origin's miss, the world's rather
-than the sender's.
+`ltr8-io-tson-java-http` answers who acts, as the CLI's exit code does: its status follows the exit code, and parts
+from `outcome` exactly where the exit code does — a rejection beside a gap or a binding mismatch is a 500 or 501
+there and `REJECTED` here, as the CLI exits 70 or 78. It too keeps the fetch allowlist out of every response.

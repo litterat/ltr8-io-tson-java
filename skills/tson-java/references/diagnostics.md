@@ -68,9 +68,9 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
   obtained and does not resolve. And "everyone else" is several people, which is why there are five.
   `SCHEMA_NOT_PERMITTED` (a schema this deployment does not hold and will not fetch) and `SCHEMA_TOO_LARGE`
   (one past its size cap) are this deployment *would not* — refusals, `Code.isRefusal()`, so the CLI's
-  `outcome` is `REJECTED`. `SCHEMA_NOT_FOUND` (an origin or directory had nothing there) and
-  `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` are the world *could not*, `UNDETERMINED` — and only those last two
-  are worth a retry.
+  `outcome` is `REJECTED`. `SCHEMA_NOT_FOUND` (an origin or directory had nothing there, most often the
+  sender's typo) and `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` are *could not*: nothing was judged, so
+  `UNDETERMINED` — and only those last two are worth a retry.
 
 **The three refusal codes are not verdicts either.** Each rule reads Unicode data the UCD does not
 freeze, so a refusal is [TSON-DATA] §8.1's fifth outcome beside `LIMIT_EXCEEDED`: this processor declined

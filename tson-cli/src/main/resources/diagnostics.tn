@@ -36,7 +36,7 @@
     not hold and will not fetch; either way it will not be accepted here, and one rejection settles it
     whatever else went unjudged. Which kind each problem is, the portable finding or the local refusal,
     is its diagnostic_code. UNDETERMINED: nothing rejected the document, but something could not be
-    judged -- a schema the world could not supply, a type with no Java class here, a construct not
+    judged -- a schema that could not be obtained, a type with no Java class here, a construct not
     implemented -- so acceptance cannot be stated.
     """
   outcome => !enum [ ACCEPTED REJECTED UNDETERMINED ]
