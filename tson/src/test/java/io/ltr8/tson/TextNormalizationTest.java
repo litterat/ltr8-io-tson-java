@@ -155,6 +155,35 @@ class TextNormalizationTest {
         }
     }
 
+    /**
+     * Two members differing only by composition are one value, NFC being the floor of every comparison (§5.5):
+     * the member set's own uniqueness refuses them before the family's coherence check is reached.
+     */
+    @Test
+    void membersDifferingOnlyByCompositionAreOneValue() {
+        List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace("members: [\"\u00e9\"]",
+                "members: [\"\u00e9\" \"e\u0301\"]"));
+        assertEquals(1, refused.size(), refused.toString());
+        assertTrue(refused.getFirst().message().contains("requires unique elements"), refused.toString());
+    }
+
+    /** An enum's members match in NFC as well, whatever its label type's form. */
+    @Test
+    void anEnumMatchesADecomposedSpellingOfItsMember() {
+        Tson tson = Tson.standard();
+        tson.resolve("""
+                !!id:"https://example.test/normalized-enum.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
+                {
+                  accented => !text_enum ["caf\u00e9" tea]
+                  order    => { drink: accented }
+                }
+                """);
+        assertEquals(List.of(), tson.validate("!!schema:\"https://example.test/normalized-enum.tn\"\n"
+                + "!order { drink: \"cafe\u0301\" }"));
+    }
+
     @Test
     void twoMembersThatAreOneValueAreRefused() {
         List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace("members: [UTF-8 us-ascii]",
@@ -224,11 +253,14 @@ class TextNormalizationTest {
                 codes("!message { fields: { \"\u212aeep-Alive\" => a } }"));
     }
 
-    /** No Unicode normalization runs either, so a decomposed spelling is not its composed member. */
+    /**
+     * The fold runs no Unicode normalization on the value, but no comparison goes below NFC ([TSON-SCHEMA] §5.5), so
+     * a decomposed spelling is its composed member.
+     */
     @Test
-    void anAsciiFoldDoesNotComposeADecomposedSpelling() {
+    void anAsciiFoldStillMatchesADecomposedSpellingInNfc() {
         assertEquals(List.of(), codes("!message { accent: \"\u00e9\" }"));
-        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION), codes("!message { accent: \"e\u0301\" }"));
+        assertEquals(List.of(), codes("!message { accent: \"e\u0301\" }"));
     }
 
     /** {@code scheme_name} folds ASCII only, so a full-width scheme is not a scheme at all. */

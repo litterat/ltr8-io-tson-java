@@ -2,6 +2,7 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
+import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.schema.meta.TextType;
@@ -74,7 +75,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
         // Last, as on the numeric tiers: a member set names the whole value space, so where it is present the
         // other facets hold vacuously and their messages are the less useful of the two.
         constraints.normalizedMembers().ifPresent(members -> {
-            if (!members.contains(text)) {
+            if (!members.contains(Nfc.of(text))) {
                 throw new AtomValidationException(
                         subject + " is not a member of this type -- expected one of " + members,
                         "one of (" + String.join(", ", members) + ")");

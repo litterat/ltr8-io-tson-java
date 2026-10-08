@@ -132,10 +132,10 @@ refusal have already reported, so an invalid document's diagnostics follow its m
 deliberately: holding them back would cost every valid document a buffer to tidy the answer for invalid ones.
 The allocation harness measures what the peek saved (`aSchemaDirectedRecordReadsWithoutLookingAhead`).
 
-- **`$schema` is refused everywhere a scoped reader does not stand.** §8.5 admits it only where the effective
-  type is a `scoped` instance holding EXTERN, and §3.3 makes it a resolver error at a position that is not
-  scoped. The scoped reader is the one place that reads it, and it consumes it, so a record reader never meets
-  one it should admit.
+- **`$schema` is refused everywhere a scoped reader does not stand.** §8.5 admits it only where the effective type is
+  a `scoped` instance holding EXTERN, and [TSON-SCHEMA] §7.8 makes it a resolver error at a position that is not
+  scoped (`SCOPE_NOT_ADMITTED`, as TSON text's `!!schema` there). The scoped reader is the one place that reads it,
+  and it consumes it, so a record reader never meets one it should admit.
 
 `CompiledReaders` is how a factory reaches another entry's reader, and carries `tson-compiler`'s own hazard: it is
 **rebound exactly once**, from the in-progress compilation to the finished schema, because handing readers the

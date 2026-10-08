@@ -39,12 +39,12 @@ final class Tags {
 
     /**
      * Reports a {@code $schema} in the object at {@code ctx}, consuming nothing. §8.5 admits one exactly where
-     * the position's effective type is a {@code scoped} instance holding EXTERN, or a container of one. Neither a
-     * record nor a choice is one, and §3.3 makes it a resolver error anywhere else -- a scope change the model
-     * never opted into.
+     * the position's own type is a {@code scoped} instance holding EXTERN. Neither a record nor a choice is one,
+     * and [TSON-SCHEMA] §7.8 makes it a resolver error anywhere such -- {@code SCOPE_NOT_ADMITTED}, a scope change
+     * the model never opted into.
      */
     static void refuseScope(JsonReadContext ctx, String displayName, String what) {
-        ctx.field(ReservedMembers.SCHEMA).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
+        ctx.field(ReservedMembers.SCHEMA).report(Diagnostic.Code.SCOPE_NOT_ADMITTED,
                 "'$schema' opens a schema scope, which [TSON-SCHEMA] §7.8 admits only at a scoped position "
                         + "-- '" + displayName + "' " + what, "no $schema at this position",
                 ReservedMembers.SCHEMA);

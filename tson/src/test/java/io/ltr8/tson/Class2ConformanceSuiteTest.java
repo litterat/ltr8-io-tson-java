@@ -364,8 +364,8 @@ class Class2ConformanceSuiteTest {
             // atom's parsing contract rejects (§5.2) -- the structural parser has already accepted the
             // document before an atom contract is consulted, so contract failures resolve, they do not
             // parse." Only the range violation beside it is a validation error.
-            case UNKNOWN_TYPE_REF, UNKNOWN_TYPE, DUPLICATE_FIELD, DUPLICATE_MAP_KEY, SCHEMA_ERROR,
-                 ATOM_FORM_INVALID -> "resolver";
+            case UNKNOWN_TYPE_REF, SCOPE_NOT_ADMITTED, UNKNOWN_TYPE, DUPLICATE_FIELD, DUPLICATE_MAP_KEY,
+                 SCHEMA_ERROR, ATOM_FORM_INVALID -> "resolver";
             case RESTRICTED_CHARACTER, RESTRICTED_SCRIPT, CONFUSABLE_NAMES -> fail(
                     "§8.2 name hygiene is a policy refusal, which §8.1 says MUST NOT be reported in any of "
                             + "the four categories: " + diagnostic);

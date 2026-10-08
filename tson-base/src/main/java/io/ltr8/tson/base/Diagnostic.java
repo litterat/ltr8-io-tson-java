@@ -276,6 +276,17 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
          * #TYPE_MISMATCH}, not this.
          */
         UNKNOWN_TYPE_REF,
+
+        /**
+         * A value opens a schema scope -- {@code !!schema} in TSON text, {@code $schema} in JSON -- at a position
+         * whose own type is not a {@code scoped} instance, so there is no cell to read it into ([TSON-SCHEMA] §7.8's
+         * typed-position restriction). §8.1's {@code resolver} category: the document named a scope the schema
+         * gives it nowhere to open.
+         *
+         * <p>A push at a {@code scoped} position whose {@code scope} does not hold {@code EXTERN} is the cell rule's
+         * refusal instead, a {@link #VALIDATION_ERROR}: the position reads scopes, and this one is not admitted.
+         */
+        SCOPE_NOT_ADMITTED,
         ATOM_FORM_INVALID,
         ATOM_CONSTRAINT_VIOLATION,
         UNRECOGNIZED_FIELD,

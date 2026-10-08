@@ -61,7 +61,7 @@ final class ScopePush {
      * @param typeName the position's own declared type, for the refusal to name
      */
     static void refuse(TsonReadContext at, String typeName, SchemaRef ref) {
-        at.report(Diagnostic.Code.VALIDATION_ERROR,
+        at.report(Diagnostic.Code.SCOPE_NOT_ADMITTED,
                 "'" + typeName + "' is not a scoped type, so a value here cannot open a schema scope with "
                         + "'!!schema:\"" + ref.uri() + "\"' -- a position takes a value from a foreign schema "
                         + "only where its own schema said so, by declaring it scoped (§7.8)",

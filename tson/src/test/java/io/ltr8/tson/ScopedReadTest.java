@@ -356,7 +356,8 @@ class ScopedReadTest {
         List<Diagnostic> problems = problems("!closed { n: !!schema:\"" + CLAIM + "\" 1 }");
 
         assertEquals(1, problems.size(), problems::toString);
-        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code());
+        // A resolver error, there being no cell to refuse it; the cell rule's refusal is the validation one.
+        assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, problems.getFirst().code());
         assertTrue(problems.getFirst().message().contains("not a scoped type"), problems::toString);
     }
 

@@ -366,7 +366,7 @@ class JsonScopedReadTest {
                 {"$schema": "%s", "$type": "holder",
                  "inner": {"$schema": "%s", "$type": "claim", "id": "C-1", "amount": 1}}""".formatted(CLAIM, CLAIM), """
                 {"$type": "note", "body": "b"}"""));
-        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, refusal.code());
+        assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, refusal.code());
         assertEquals("/foreign/inner/$schema", refusal.path().orElseThrow());
     }
 
