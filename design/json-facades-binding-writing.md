@@ -136,7 +136,7 @@ every other number, and no third spelling of infinity enters the series.
 **What is dropped is what the reader cannot produce.** Wire annotations: §3.3's annotation object belongs to
 the schema-directed decode, and `DataClassObjectReader` binds every carrier to `Annotations.empty()`, so
 writing them would emit members no reader here takes back. An absent field is left out rather than written
-`null` — §7 makes JSON null the absent sentinel at a typed position, so the two say the same thing and the
+`null` — §7 makes JSON null the void sentinel at a typed position, so the two say the same thing and the
 shorter one is what a reader of any strictness takes.
 
 **`WriteException` is `tson-base`'s**, shared by both encodings for `ParseException`'s reason: a value the
@@ -309,7 +309,9 @@ Codes come from the same closed vocabulary the TSON readers use — §9.4 adds n
 `WRONG_ARITY`, `ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`, `TYPE_MISMATCH` again for a union with no selector, and
 **`BIND_MISMATCH`** for a class this context cannot analyse or cannot receive a JSON object's keys into.
 That last one is deliberately **not a verdict**: nothing about the document is being asserted by it, which
-is what a caller routing on `Code.verdict()` needs to be able to tell.
+is what a caller routing on `Code.verdict()` needs to be able to tell. A class whose constructor or collection
+throws on what it is handed is `TYPE_MISMATCH` here, the class being the contract; under a schema the same
+refusal is `BIND_MISMATCH` (`BindingDiagnostics`, shared with the TSON readers).
 
 **Bind mode is all-or-nothing.** A record, array, tuple or map whose contents reported is not constructed:
 a Java record has nowhere to put a hole, so a collecting read hands back `null` rather than an object

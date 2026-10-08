@@ -1,8 +1,9 @@
 package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 
+import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
-import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentPeek;
@@ -146,35 +147,36 @@ class Class2ConformanceSuiteTest {
                         "the entries marked @synthetic are not the ones the vector marks");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
-            case "refused" -> assertSchemaRefused(sidecar, problems);
+            case "refused" -> assertRefused(sidecar, problems, "schema");
             default -> fail("unknown schema-layer outcome: " + outcomeOf(sidecar));
         }
     }
 
     /**
-     * §8.1's fifth outcome at the schema layer: the schema is <b>refused by this processor</b> under one of
-     * §8.2's name-hygiene rules, over the scopes [TSON-SCHEMA] §11.4 supplies.
+     * §8.1's fifth outcome at the schema and validate layers: the {@code subject} is <b>refused by this
+     * processor</b> under one of §8.2's name-hygiene rules, over the scopes [TSON-SCHEMA] §11.4 supplies --
+     * a schema's names, or a value that is a name and the keys of a map keyed by one.
      *
      * <p>{@code checkRefusedVector}'s peer, asserting the same two halves for the same reason: something was
-     * refused, and nothing was reported as a verdict on the schema's correctness. A processor that reported a
-     * confusable declaration the way it reports an unresolved reference has not passed the vector -- §8.2
+     * refused, and nothing was reported as a verdict on the document's correctness. A processor that reported
+     * a confusable declaration the way it reports an unresolved reference has not passed the vector -- §8.2
      * keeps these out of validity because they read data the UCD does not freeze, and being able to tell them
      * apart is the whole of it.
      */
-    private static void assertSchemaRefused(RecordValue sidecar, List<Diagnostic> problems) {
+    private static void assertRefused(RecordValue sidecar, List<Diagnostic> problems, String subject) {
         RecordValue refusal = outcomePayload(sidecar);
         String stated = fieldText(refusal, "unicode");
         // Through the public accessor, the way a consumer of this library reads it: `Xid` is in the
         // unexported `lexer` package, so nothing outside `tson-compiler` can name the constant by hand.
-        Assumptions.assumeTrue(UnicodePolicy.dataVersion().equals(stated),
+        Assumptions.assumeTrue(ProcessorPolicy.dataVersion().equals(stated),
                 "vector computed against UTS #39 data for Unicode " + stated + "; this implementation "
-                        + "carries " + UnicodePolicy.dataVersion());
+                        + "carries " + ProcessorPolicy.dataVersion());
 
-        assertFalse(problems.isEmpty(), "the schema is refused, but it loaded without a diagnostic");
-        assertTrue(problems.stream().anyMatch(diagnostic -> isPolicyRefusal(diagnostic.code())),
+        assertFalse(problems.isEmpty(), "the " + subject + " is refused, but it was read without a diagnostic");
+        assertTrue(problems.stream().anyMatch(diagnostic -> diagnostic.code().isNameRefusal()),
                 "expected a §8.2 refusal (" + fieldText(refusal, "mechanism") + "); got " + problems);
-        problems.forEach(diagnostic -> assertTrue(isPolicyRefusal(diagnostic.code()),
-                "a refused schema must not also be reported invalid: " + diagnostic));
+        problems.forEach(diagnostic -> assertTrue(diagnostic.code().isNameRefusal(),
+                "a refused " + subject + " must not also be reported invalid: " + diagnostic));
         assertRefusalMatches(refusal, problems);
     }
 
@@ -203,7 +205,7 @@ class Class2ConformanceSuiteTest {
      * happened" would pass a processor that refused for the wrong reason.
      *
      * <p><b>The data version §8.2 requires a refusal to name is the processor's, not the diagnostic's</b>
-     * ({@link UnicodePolicy#dataVersion()}, which the caller has already matched against the vector's
+     * ({@link ProcessorPolicy#dataVersion()}, which the caller has already matched against the vector's
      * own {@code unicode} field before running it -- a version this implementation does not carry is a
      * legitimate skip). It is constant for every refusal in a run, so it is stated once beside the
      * diagnostics rather than stamped onto each of them.
@@ -213,14 +215,6 @@ class Class2ConformanceSuiteTest {
                 () -> "vector names " + fieldText(refusal, "mechanism") + "; got " + reported);
     }
 
-    /**
-     * The three codes that mean <em>refused under a stated policy</em> rather than <em>wrong</em>, one per
-     * §8.2 rule. Every other code is a verdict on the schema, which is exactly what a refusal is not.
-     */
-    private static boolean isPolicyRefusal(Diagnostic.Code code) {
-        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_CHARACTER
-                || code == Diagnostic.Code.RESTRICTED_SCRIPT;
-    }
 
     // ── Link-layer vectors: §2.2.3, §5.4, §5.10.1, §8.2 ──────────────────
 
@@ -320,6 +314,7 @@ class Class2ConformanceSuiteTest {
                         "no diagnostic is a " + category + " error"
                                 + (path == null ? "" : " at path '" + path + "'") + "; got " + reported);
             }
+            case "refused" -> assertRefused(sidecar, reported, "document");
             default -> fail("unknown validate-layer outcome: " + outcomeOf(sidecar));
         }
     }
@@ -363,14 +358,14 @@ class Class2ConformanceSuiteTest {
     private static String categoryOf(Diagnostic diagnostic) {
         assertIsAVerdict(diagnostic);
         return switch (diagnostic.code()) {
-            case FIELD_REQUIRED, FIELD_FIXED, TYPE_MISMATCH, WRONG_ARITY, UNRECOGNIZED_FIELD,
+            case FIELD_REQUIRED, FIELD_FIXED, FIELD_GROUP, TYPE_MISMATCH, WRONG_ARITY, UNRECOGNIZED_FIELD,
                  ATOM_CONSTRAINT_VIOLATION, VALIDATION_ERROR -> "validation";
             // ATOM_FORM_INVALID is here and not above because §8.1 puts it here: "a token that a built-in
             // atom's parsing contract rejects (§5.2) -- the structural parser has already accepted the
             // document before an atom contract is consulted, so contract failures resolve, they do not
             // parse." Only the range violation beside it is a validation error.
-            case UNKNOWN_TYPE_REF, UNKNOWN_TYPE, DUPLICATE_FIELD, DUPLICATE_MAP_KEY, SCHEMA_ERROR,
-                 ATOM_FORM_INVALID -> "resolver";
+            case UNKNOWN_TYPE_REF, SCOPE_NOT_ADMITTED, UNKNOWN_TYPE, DUPLICATE_FIELD, DUPLICATE_MAP_KEY,
+                 SCHEMA_ERROR, ATOM_FORM_INVALID -> "resolver";
             case RESTRICTED_CHARACTER, RESTRICTED_SCRIPT, CONFUSABLE_NAMES -> fail(
                     "§8.2 name hygiene is a policy refusal, which §8.1 says MUST NOT be reported in any of "
                             + "the four categories: " + diagnostic);

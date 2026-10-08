@@ -1,6 +1,6 @@
 allprojects {
     group = "io.ltr8"
-    version = "0.36.0-SNAPSHOT"
+    version = "0.37.0-SNAPSHOT"
 
     repositories {
         mavenCentral()
@@ -20,6 +20,7 @@ val moduleDescriptions = mapOf(
     "tson-bind" to "TSON binding engine between data values and Java objects",
     "tson-annotation" to "TSON binding annotations and the wire-annotation carrier a bound class declares",
     "tson-regex" to "A native RFC 9485 I-Regexp engine: parse, match, and decide whether two patterns are disjoint",
+    "tson-net" to "Native network text formats: URIs and IRIs, IPv4 and IPv6 addresses, CIDR networks, EUI-48",
     "tson-cli" to "The tson command-line application",
     "tson-json" to "The JSON encoding of TSON: an RFC 8259 stack of its own, aligned with JEP 540's JSON API"
 )

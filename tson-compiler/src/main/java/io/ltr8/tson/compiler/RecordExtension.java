@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
@@ -44,10 +45,22 @@ import java.util.Set;
  * its own -- which the declaration must say, since instantiability is not derivable from a field. Whether the
  * family is tag-dispatched or member-dispatched is *not* a second mark: it is whether any field carries the
  * spelling, read off the body the way {@code choice.disjoint} is.
+ *
+ * <p><b>Extending a family is a declaration.</b> A family's members are open across schemas (§3.3.4), so a
+ * member changes what every position typed by its base does, in every schema that imports it; and a member is
+ * something a read reports, a tag names (§6.1.5) and a binding maps, all by name. An application at a use site
+ * has only a minted name, which nothing may write (§8.2), so a member it produced could be selected and never
+ * named. It is refused, and the author declares it: {@code dogs => dog_of<text>}. A minted entry that joins no
+ * family -- an array, a set, a choice, an application of a family's base -- is untouched, and two schemas
+ * minting one such form hold two entries that are the same type in every way a value can tell.
  */
 final class RecordExtension {
 
-    /** One problem, and the entry it is reported against -- which is always one this schema declares. */
+    /**
+     * One problem, and the entry it is reported against: one this schema declares or minted -- the linker
+     * reports a minted one against the declaration that wrote it -- or {@code ""}, the schema itself, for what
+     * its imports brought together.
+     */
     record Violation(String entry, String message) {
     }
 
@@ -59,14 +72,27 @@ final class RecordExtension {
      * blamed for: an imported entry was judged when its own schema linked, and reporting it here would stamp
      * this schema's identity on another document's mistake.
      *
-     * <p><b>A family is re-judged whenever any part of it is local</b>, base or subtype, which is not the same
-     * as judging local entries. A schema importing a sealed family and adding one subtype has changed the
-     * family: the new sibling can collide with an imported one, and only a closure holding both can see it.
+     * <p><b>Every family in the closure is judged</b>, not only one with a part declared here. Two schemas
+     * that each link cleanly can each add a member to one imported family, and a schema importing both holds a
+     * family neither did: its merge is what put the two members together, so a collision between them is this
+     * schema's, reported against the schema itself ({@code ""}) and naming where each member came from. A
+     * collision inside one import cannot reach here, since that import was refused when it linked.
      */
-    static List<Violation> check(Map<String, TypeDefinition> merged, Set<String> localNames) {
+    static List<Violation> check(Map<String, TypeDefinition> merged, Set<String> localNames,
+                                 Map<String, String> origins, Map<String, Normalization> enumForms) {
         List<Violation> violations = new ArrayList<>();
         for (String name : localNames) {
             TypeDefinition def = merged.get(name);
+            if (def != null && isUndeclaredMember(def)) {
+                String base = def.supertypes().getFirst();
+                violations.add(new Violation(name, "'" + shown(name, merged) + "' composes onto '"
+                        + shown(base, merged) + "', so it is a member of that family, and a member is declared: "
+                        + "a read reports the member it selects, a tag names it and a binding maps it, all by a "
+                        + "name an application at a use site does not have (§3.3.4, §8.2). Declare it -- "
+                        + "'my_name => " + shown(name, merged) + "' -- and use that name in place of the "
+                        + "application"));
+                continue;
+            }
             RecordBody record = def == null ? null : familyBodyOf(def, merged);
             if (record != null) {
                 checkDeclaration(name, def, record, merged, violations);
@@ -75,12 +101,22 @@ final class RecordExtension {
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             TypeDefinition def = entry.getValue();
             RecordBody base = familyBodyOf(def, merged);
-            if (base != null && FamilySelectors.dispatchesOnMembers(def)
-                    && touchesLocally(entry.getKey(), def, localNames)) {
-                checkFamily(entry.getKey(), def, merged, localNames, violations);
+            if (base != null && FamilySelectors.dispatchesOnMembers(def)) {
+                checkFamily(entry.getKey(), def, merged, localNames, origins, enumForms, violations);
             }
         }
         return violations;
+    }
+
+    /**
+     * A record a use-site template application minted that composes onto another: a family member with no
+     * declared name. A minted entry has no source position, and an application's {@code source} carries its
+     * arguments; a constructor ({@code top} in its chain) is no member of anything.
+     */
+    private static boolean isUndeclaredMember(TypeDefinition def) {
+        return def.position().isEmpty() && def.body() instanceof RecordBody
+                && def.source().filter(source -> !source.arguments().isEmpty()).isPresent()
+                && !def.supertypes().isEmpty() && !def.supertypes().contains("top");
     }
 
     // ── The declaration's own obligations ────────────────────────────────
@@ -138,7 +174,7 @@ final class RecordExtension {
             Map<String, TypeDefinition> merged, List<Violation> violations) {
         // Group membership is checked first and alone: §5.11 forces a member optional, so the state rule
         // would fire too and report the symptom beside the cause. One mistake, one verdict.
-        if (groups.stream().anyMatch(group -> group.members().contains(field.name()))) {
+        if (groups.stream().anyMatch(group -> group.hasMember(field.name()))) {
             violations.add(new Violation(name, "'" + name + "': discriminator field '" + field.name()
                     + "' is a member of a field group, whose members are mutually exclusive and uniformly "
                     + "optional (§5.11) -- so a conforming value may leave it out, and a selector that may be "
@@ -160,8 +196,9 @@ final class RecordExtension {
 
     // ── The family's obligations, over the closure ───────────────────────
 
-    private static void checkFamily(String base, TypeDefinition def,
-            Map<String, TypeDefinition> merged, Set<String> localNames, List<Violation> violations) {
+    private static void checkFamily(String base, TypeDefinition def, Map<String, TypeDefinition> merged,
+            Set<String> localNames, Map<String, String> origins, Map<String, Normalization> enumForms,
+            List<Violation> violations) {
         // The same derivation the dispatchers read, never a second filter over the fields: a check that
         // decided "which fields select" differently from the read could pass a family no reader can place.
         List<RecordField> selectors = FamilySelectors.of(def, merged);
@@ -171,27 +208,30 @@ final class RecordExtension {
         Map<List<Object>, String> seen = new LinkedHashMap<>();
         for (String subtype : new LinkedHashSet<>(def.subtypes())) {
             TypeDefinition sub = merged.get(subtype);
-            if (sub == null || !(sub.body() instanceof RecordBody record) || !sub.parameters().isEmpty()) {
+            // An undeclared member is refused on its own, and judging its pins too would report one mistake twice.
+            if (sub == null || !(sub.body() instanceof RecordBody record) || !sub.parameters().isEmpty()
+                    || isUndeclaredMember(sub)) {
                 continue;
             }
-            List<Object> pins = pinsOf(base, subtype, selectors, record, merged, localNames, violations);
+            List<Object> pins = pinsOf(base, subtype, selectors, record, merged, localNames, enumForms, violations);
             if (pins == null) {
                 continue;
             }
             String collision = seen.putIfAbsent(pins, subtype);
             if (collision != null) {
-                String blamed = localNames.contains(subtype) ? subtype
-                        : localNames.contains(collision) ? collision : null;
-                if (blamed != null) {
-                    violations.add(new Violation(blamed, "'" + shown(subtype, merged) + "' and '"
-                            + shown(collision, merged)
-                            + "' pin the discriminator" + (selectors.size() > 1 ? "s" : "") + " of '" + base
-                            + "' to the same "
-                            + describe(selectors, pins) + " -- two subtypes a value cannot tell apart, so the "
-                            + "family's mapping is not a function. Pins are compared as values and not as "
-                            + "tokens, so `= 255` and `= 0xFF` are one pin (§4.3) and `= 1` and `= 1.0` are one "
-                            + "(§5.5)"));
-                }
+                boolean merge = !localNames.contains(subtype) && !localNames.contains(collision);
+                String blamed = localNames.contains(subtype) ? subtype : localNames.contains(collision) ? collision : "";
+                violations.add(new Violation(blamed, "'" + shown(subtype, merged) + "' and '"
+                        + shown(collision, merged)
+                        + "' pin the discriminator" + (selectors.size() > 1 ? "s" : "") + " of '" + base
+                        + "' to the same "
+                        + describe(selectors, pins) + " -- two subtypes a value cannot tell apart, so the "
+                        + "family's mapping is not a function. "
+                        + (merge ? "Each is declared by a schema this one imports ('" + origins.get(subtype)
+                                + "' and '" + origins.get(collision) + "'), and importing both is what puts them in "
+                                + "one family. " : "")
+                        + "Pins are compared as values and not as tokens, so `= 255` and `= 0xFF` are one pin "
+                        + "(§4.3) and `= 1` and `= 1.0` are one (§5.5)"));
             }
         }
     }
@@ -217,6 +257,7 @@ final class RecordExtension {
      */
     private static List<Object> pinsOf(String base, String subtype, List<RecordField> selectors,
             RecordBody record, Map<String, TypeDefinition> merged, Set<String> localNames,
+            Map<String, Normalization> enumForms,
             List<Violation> violations) {
         List<Object> pins = new ArrayList<>(selectors.size());
         for (RecordField selector : selectors) {
@@ -234,7 +275,7 @@ final class RecordExtension {
                 }
                 return null;
             }
-            Object value = decode(selector, pinned.value().get(), merged);
+            Object value = decode(selector, pinned.value().get(), merged, enumForms);
             if (value == null) {
                 return null; // the pin is not a value of the declared type -- checkFieldValue's verdict
             }
@@ -243,8 +284,9 @@ final class RecordExtension {
         return pins;
     }
 
-    private static Object decode(RecordField selector, Token pin, Map<String, TypeDefinition> merged) {
-        Optional<AtomType<?>> parser = parserFor(selector, merged);
+    private static Object decode(RecordField selector, Token pin, Map<String, TypeDefinition> merged,
+                                 Map<String, Normalization> enumForms) {
+        Optional<AtomType<?>> parser = parserFor(selector, merged, enumForms);
         try {
             return parser.get() instanceof io.ltr8.tson.compiler.atom.TokenAtomType<?> formSensitive
                     ? formSensitive.read(new TokenValue(pin.text(), TokenForm.valueOf(pin.form().name())))
@@ -256,6 +298,12 @@ final class RecordExtension {
 
     /** The parser for a field's type at the end of its reference chain, empty where nothing reads a token. */
     private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, TypeDefinition> merged) {
+        return parserFor(field, merged, Map.of());
+    }
+
+    /** {@link #parserFor(RecordField, Map)}, an enum selector matching in its label type's form. */
+    private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, TypeDefinition> merged,
+                                                   Map<String, Normalization> enumForms) {
         if (!field.type().arguments().isEmpty()) {
             return Optional.empty();
         }
@@ -264,7 +312,7 @@ final class RecordExtension {
         if (target == null || !target.parameters().isEmpty() || target.body() instanceof Reference) {
             return Optional.empty();
         }
-        return AtomParsers.forType(terminal, target.body());
+        return AtomParsers.forType(target.body(), enumForms.getOrDefault(terminal, Normalization.NONE));
     }
 
     /**
@@ -295,11 +343,6 @@ final class RecordExtension {
         // parsing the held text, which `tson-json` cannot do and §1.3 says no consumer should have to.
         return new RecordBody(List.of(), FamilySelectors.of(def, merged), List.of(),
                 held.extension().get(), held.discriminators());
-    }
-
-    /** Whether this schema may be blamed for the family at all -- the base or any subtype declared here. */
-    private static boolean touchesLocally(String base, TypeDefinition def, Set<String> localNames) {
-        return localNames.contains(base) || def.subtypes().stream().anyMatch(localNames::contains);
     }
 
     /** The colliding pin, named the way an author reads it: one value, or the tuple the selectors form. */

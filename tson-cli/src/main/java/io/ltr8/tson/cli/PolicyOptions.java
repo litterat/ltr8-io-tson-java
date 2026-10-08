@@ -1,9 +1,10 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 
 import java.lang.Character.UnicodeScript;
 import java.util.ArrayList;
@@ -24,7 +25,7 @@ import java.util.Locale;
  * <p><b>Every flag is consumed here and nowhere else</b> ({@link #consume}), which is what lets the three
  * subcommands' own argument loops go on seeing only {@code --output} and their positionals.
  */
-record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
+record PolicyOptions(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy,
                      LimitsPolicy limits) {
 
     /**
@@ -32,8 +33,8 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
      * the CLI decides whether a report is worth printing to a person ({@link CliPolicy#isDefault()}).
      * {@code PolicyOptionsTest} pins the restatement against a real {@code Tson}.
      */
-    static final PolicyOptions DEFAULTS = new PolicyOptions(UnicodePolicy.highlyRestrictive(),
-            UnicodePolicy.unrestricted(), LimitsPolicy.defaults());
+    static final PolicyOptions DEFAULTS = new PolicyOptions(IdentifierPolicy.defaults(),
+            ScriptPolicy.unrestricted(), LimitsPolicy.defaults());
 
     /**
      * The level a script list brings with it on a surface whose default scans nothing.
@@ -44,7 +45,7 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
      * passes, and a mixed one passes only where the list names it. Anything stricter (ASCII-only) would
      * refuse the very scripts being admitted; anything looser stops scanning again.
      */
-    private static final UnicodePolicy.Level IMPLIED_BY_SCRIPTS = UnicodePolicy.Level.SINGLE_SCRIPT;
+    private static final ScriptPolicy.Level IMPLIED_BY_SCRIPTS = ScriptPolicy.Level.SINGLE_SCRIPT;
 
     /** This run's policies on a fresh {@link ProcessorConfig}. */
     ProcessorConfig applyTo(ProcessorConfig config) {
@@ -62,10 +63,11 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
      *                        a surface whose stated level scans nothing
      */
     static PolicyOptions consume(List<String> args) {
-        UnicodePolicy.Level identifierLevel = null;
-        UnicodePolicy.Level tokenLevel = null;
+        ScriptPolicy.Level identifierLevel = null;
+        ScriptPolicy.Level tokenLevel = null;
         int maxDepth = LimitsPolicy.DEFAULT_MAX_DEPTH;
         boolean perSegment = false;
+        boolean lookAlikes = false;
         List<UnicodeScript[]> identifierScripts = new ArrayList<>();
         List<UnicodeScript[]> tokenScripts = new ArrayList<>();
 
@@ -75,6 +77,7 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
                 case "--identifier-policy" -> identifierLevel = level(value(args, ++i, "--identifier-policy"));
                 case "--token-policy" -> tokenLevel = level(value(args, ++i, "--token-policy"));
                 case "--identifier-per-segment" -> perSegment = true;
+                case "--identifier-allow-look-alikes" -> lookAlikes = true;
                 case "--identifier-scripts" ->
                         identifierScripts.add(scripts(value(args, ++i, "--identifier-scripts")));
                 case "--token-scripts" -> tokenScripts.add(scripts(value(args, ++i, "--token-scripts")));
@@ -85,9 +88,10 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
         args.clear();
         args.addAll(rest);
 
-        return new PolicyOptions(
-                assemble("identifier", identifierLevel, DEFAULTS.identifierPolicy().level(), perSegment,
-                        identifierScripts),
+        IdentifierPolicy identifiers = IdentifierPolicy.of(assemble("identifier", identifierLevel,
+                DEFAULTS.identifierPolicy().scripts().level(), perSegment, identifierScripts))
+                .withSkeletonDistinctness(!lookAlikes);
+        return new PolicyOptions(perSegment ? identifiers.perSegment() : identifiers,
                 assemble("token", tokenLevel, DEFAULTS.tokenPolicy().level(), false, tokenScripts),
                 new LimitsPolicy(maxDepth));
     }
@@ -114,7 +118,9 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
     }
 
     /**
-     * One surface's policy: the stated level or the default, then the relaxations layered on it.
+     * One surface's level: the stated level or the default, then the script combinations layered on it.
+     * {@code perSegment} is the identifier surface's unit, which the caller applies; it is passed here because it
+     * is a relaxation of the level, and so refused with the others against a level that scans nothing.
      *
      * <p><b>A script list brings its own level where the default scans nothing</b> (see {@link
      * #IMPLIED_BY_SCRIPTS}) -- {@code --token-scripts Latin+Cyrillic} on its own means "values are one
@@ -123,29 +129,26 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
      *
      * <p><b>A relaxation against a level that scans nothing is refused, not ignored.</b> {@code
      * --token-policy unrestricted --token-scripts Latin+Cyrillic} configures nothing whatever, and silently
-     * accepting it would leave the caller believing a restriction is in force. {@code withTokenPolicy}
-     * refuses a per-segment token policy on the same ground: a policy that cannot mean what it says is never
-     * quietly accepted.
+     * accepting it would leave the caller believing a restriction is in force: a policy that cannot mean what it
+     * says is never quietly accepted. {@code --identifier-allow-look-alikes} is not such a relaxation -- skeleton
+     * distinctness is no part of the level, and means the same under every one.
      */
-    private static UnicodePolicy assemble(String surface, UnicodePolicy.Level stated,
-                                          UnicodePolicy.Level fallback, boolean perSegment,
-                                          List<UnicodeScript[]> scripts) {
+    private static ScriptPolicy assemble(String surface, ScriptPolicy.Level stated,
+                                         ScriptPolicy.Level fallback, boolean perSegment,
+                                         List<UnicodeScript[]> scripts) {
         boolean relaxed = perSegment || !scripts.isEmpty();
-        UnicodePolicy.Level level = stated;
+        ScriptPolicy.Level level = stated;
         if (level == null) {
-            level = relaxed && !UnicodePolicy.of(fallback).checksScripts() ? IMPLIED_BY_SCRIPTS : fallback;
+            level = relaxed && !ScriptPolicy.of(fallback).checksScripts() ? IMPLIED_BY_SCRIPTS : fallback;
         }
 
-        UnicodePolicy policy = UnicodePolicy.of(level);
+        ScriptPolicy policy = ScriptPolicy.of(level);
         if (relaxed && !policy.checksScripts()) {
             String given = scripts.isEmpty() ? "--" + surface + "-per-segment"
                     : "--" + surface + "-scripts" + (perSegment ? " and --" + surface + "-per-segment" : "");
             throw new UsageException("--" + surface + "-policy " + spelling(level) + " scans no scripts, so the "
                     + given + " given with it would configure nothing -- state a level that scans, or drop the"
                     + " relaxation");
-        }
-        if (perSegment) {
-            policy = policy.perSegment();
         }
         for (UnicodeScript[] combination : scripts) {
             policy = policy.permitting(combination);
@@ -159,9 +162,9 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
      * because {@code highly-restrictive} is what a person types and {@code HIGHLY_RESTRICTIVE} is what they
      * copy.
      */
-    private static UnicodePolicy.Level level(String value) {
+    private static ScriptPolicy.Level level(String value) {
         try {
-            return UnicodePolicy.Level.valueOf(value.replace('-', '_').toUpperCase(Locale.ROOT));
+            return ScriptPolicy.Level.valueOf(value.replace('-', '_').toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             throw new UsageException("unknown restriction level '" + value + "' -- expected one of "
                     + String.join(", ", levels()));
@@ -185,10 +188,10 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
 
     /** The six levels as the flags spell them, for a usage message. */
     private static List<String> levels() {
-        return java.util.Arrays.stream(UnicodePolicy.Level.values()).map(PolicyOptions::spelling).toList();
+        return java.util.Arrays.stream(ScriptPolicy.Level.values()).map(PolicyOptions::spelling).toList();
     }
 
-    private static String spelling(UnicodePolicy.Level level) {
+    private static String spelling(ScriptPolicy.Level level) {
         return level.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 

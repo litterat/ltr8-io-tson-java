@@ -42,25 +42,25 @@ consumer-facing `README.md`, `STATUS.md` (the implemented checklist) and `CONFOR
 A from-scratch Java implementation of TSON (Typed Schema Object Notation), built directly against the TSON spec series
 (2026 revision), and the spec's first implementation:
 
-- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/36/tson-part1-data.md
-- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/36/tson-part2-schema.md
+- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/37/tson-part1-data.md
+- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/37/tson-part2-schema.md
 - Part 3 — the JSON encoding, **drafted in this repo**: `spec/tson-part3-json.md`
 
 The spec is a working revision that changes without compatibility guarantees. When in doubt, **re-fetch the current URL**
-and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 36, not
-edited here) with **two exceptions that are live**: `spec/m/{meta-kernel,meta,core}.tn` are packaged from here at build
-time, and `spec/tson-part3-json.md` is edited in place.
+and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 37, not
+edited here) with **two exceptions that are live**: `spec/m/{meta-kernel,meta,core,policy}.tn` are packaged from here at
+build time, and `spec/tson-part3-json.md` is edited in place.
 
 **Editing a bundled schema means re-stamping.** The library verifies the packaged bytes against
 `TsonBundledSchemas`' digests on every load, so one stale constant fails `Tson.standard()` and most of the suite.
 `scripts/restamp-bundled-schemas.sh` re-pins everything in dependency order (`--check` reports only); Part 2 §13.2's
 table in `spec/` is the one pin it does not write. Keep `spec/m/*-resolved.tn` in step — `ResolvedFixtureTest` checks
-them. `design/process.md` has the procedure.
+them. `design/process.md` has the procedure, and the rules for what a schema's `@doc` may say.
 
-**Branches.** `main` is the reference implementation of the *published* revision (36); published revisions are tags
-(`r2026-32`, `r2026-34`, `r2026-35`). **No proposal branch is open**: PR branches come off `main` and merge into it.
-Work that needs an unpublished revision — a meta-kernel change the published spec cannot carry — opens
-`r2026-37-proposal`, with a corpus branch of the same name, and it merges when the spec lands and not before.
+**Branches.** `main` is the reference implementation of the *published* revision (37): identities `/2026/37/m/`,
+version `0.37.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`), each added
+when the next revision merges. Work the published spec cannot carry goes on a proposal branch, `r2026-NN-proposal`, with
+a corpus branch of the same name; none is open. `design/process.md` has the procedure.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** No published releases, every version
 `-SNAPSHOT`. So correctness wins over stability every time: a wrong rule gets fixed, a bad name changed rather than
@@ -88,6 +88,7 @@ Schema documents: **parse → desugar → resolve → link → register → comp
 | `tson-atom` | The built-in atom vocabulary, over `String`, shared by both encodings |
 | `tson-tree` | `TsonValue` data tree model; depends on nothing |
 | `tson-regex` | RFC 9485 I-Regexp engine; depends on nothing |
+| `tson-net` | Network text formats (`io.ltr8.net`: URIs/IRIs, IP addresses, CIDR, EUI-48), each to its RFC; depends on nothing |
 | `tson-compiler` | The engine: lexer, grammars, resolver, linker, compiler, readers, writers, facades |
 | `tson` | The front door: `Tson` |
 | `tson-json` | The JSON encoding, a separate stack with no dependency on `tson-compiler` |
@@ -128,15 +129,16 @@ fact that must survive its entry goes in the note, the Javadoc or the test that 
 
 **`Tson` is a prefix, never an infix** (`TsonCompiledSchema`, never `CompiledTsonSchema`), and only on types a consumer
 names in their own code; internal machinery is bare (`Lexer`, `SchemaResolver`). `tson-base` drops it; `tson-json`
-uses `Json` on the same terms.
+uses `Json` on the same terms. A module that knows nothing of TSON carries no prefix and lives at `io.ltr8.<name>`
+(`tson-bind` → `io.ltr8.bind`, `tson-net` → `io.ltr8.net`), usable on its own.
 
 **Exception classification is a policy.** `SchemaValidationException`: the author's schema is wrong and the spec
 says so. `UnsupportedOperationException`: this library has not implemented that yet. `IllegalStateException`: an
 internal invariant broke. The test: *a schema error's verdict doesn't change when this library improves; a gap's does.*
 A gap travels as `Diagnostic.Code.NOT_IMPLEMENTED`, and the CLI's exit 1 vs 70 rides on that code.
 
-**Project-owned schema `!!id`:** `https://tson.io/2026/36/ltr8/<group>/<name>-<version>.tn`. The version is bumped on
-a *release*, not on a change — between releases the schema is edited in place. Use `.tn`, never `.tn1`.
+**Project-owned schema `!!id`:** `https://tson.io/2026/37/io/ltr8/<group>/<name>.tn`. Between releases the schema is
+edited in place; a release fixes the document under its identity (§10). Use `.tn`, never `.tn1`.
 
 **Line wrapping:** 125 characters, comments and code. Count characters, not bytes (`scripts/check-line-length.sh`).
 
@@ -176,7 +178,7 @@ No system Gradle — always the wrapper. `build` also runs javadoc (doclint), so
 ./gradlew :tson-base:test :tson-json:test
 ./gradlew :tson-cli:installDist      # then tson-cli/build/install/tson/bin/tson validate ...
 ./gradlew :tson:allocationReport     # allocation harness, numbers on stdout
-./gradlew publishToMavenLocal        # io.ltr8:<module>:0.36.0-SNAPSHOT; no remote repository, deliberately
+./gradlew publishToMavenLocal        # io.ltr8:<module>:0.37.0-SNAPSHOT; no remote repository, deliberately
 scripts/restamp-bundled-schemas.sh --check
 ```
 

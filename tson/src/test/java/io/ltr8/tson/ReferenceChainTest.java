@@ -79,8 +79,8 @@ class ReferenceChainTest {
     private static String schema(String body) {
         return """
                 !!id:"https://example.test/chain.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 { %s }
                 """.formatted(body);
     }

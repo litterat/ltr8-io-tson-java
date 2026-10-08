@@ -9,6 +9,9 @@ and why the same table is what untagged reading dispatches on. Current form only
   twice, `false` otherwise, never absent.
 - An `integer` and a `decimal` are one class (`number`); records and maps are one class (`brace`).
 - A variant classifies through its §8.3 reference chain; no class at all makes the choice `false`.
+- An enum's class needs its `type`'s family, which only linking can see (a pinned `type` lives in the governing meta):
+  the linker records the closure's text-membered enums as `TsonLinkedSchema.textEnums`, and every classifier — both
+  encodings' — reads that set rather than re-deriving it.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's
   §8.3 reference chain.
 - `ChoiceReader.untaggedRecovery` and the derivation both go through `DiscriminationClass.of`: one fact, not two.
@@ -33,12 +36,13 @@ match.
 
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
 §4's three scalar classes — `boolean`, `number` (every numeric family: an `integer` and a `decimal`
-are one class, so never disjoint), `string` (every text-form family: `text`, enums by their members' shared
-class — so `[true false]` is boolean-class — `uuid`, `date`, `bytes`, …) — plus `brace` (records **and**
+are one class, so never disjoint), `string` (every text-form family: `text`, an enum whose `type` is not an
+identifier family whatever its members spell, `uuid`, `date`, `bytes`, …; an enum over an identifier family takes its
+members' shared token class instead, so `[true false]` is boolean-class) — plus `brace` (records **and**
 maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a
 discrimination the wire can't deliver) and `bracket` (arrays and tuples). A variant classifies through its
 §8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —
-`rational`/`complex` (whose typed forms straddle classes), `unit`, a mixed-class enum, a scoped instance (its
+`rational`/`complex` (whose typed forms straddle classes), `value`, `void`, a mixed-class enum, a scoped instance (its
 membership is a namespace, not a shape), a nested choice, an unresolved name — makes the choice `false`, the
 conservative side. A `void` variant
 never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`) —

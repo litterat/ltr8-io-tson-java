@@ -18,8 +18,9 @@ that runs before it. Current form only; history lives in git.
   into the namespace as it is built.
 - Which parents were applications is read off the **held** body, not off the closed one (§5.9 subtraction keeps named
   lineage in a body whose contract was emptied).
-- `TypeDefinition.kind` is `@Unbound` and never written; an open entry is `TEMPLATE`, and a closed entry's kind is the
-  branch of `Top` its substituted body occupies (`kindOfClosed`).
+- `TypeDefinition.kind` is `@Unbound` and never written; an open entry is `TEMPLATE`. A closed entry whose chain
+  reaches `top` is a constructor and takes its chain's base kind; every other closed entry takes the branch of `Top`
+  its substituted body occupies (`kindOfClosed`).
 - A template `TemplateRegularity` condemns is replaced with a placeholder in both the entry map and the namespace; the
   depth guard stays as a backstop for a hole in that check.
 
@@ -77,7 +78,9 @@ recorded open form, and replacing the application with a reference to the entry 
     The pass indexes entries by their own canonical application and folds each owner and its ancestors into
     `supertypes` to a fixed point, so `dogs` reaches `pet` whether it is declared before or after it.
   - **A synthetic still mints, and must.** Only a *declared* application closes into a name; a use-site sugar
-    form has no author-written name for identity to key on, so it keeps its content-derived one (§8.2).
+    form has no author-written name for identity to key on, so it keeps its content-derived one (§8.2). One
+    that composes onto a record would be an unnameable family member, and the linker refuses it
+    (`RecordExtension`, `design/linking-and-compilation.md`).
 - **Arguments close innermost-first**, so `box<box<text>>` builds the inner entry before the outer one names
   it, and no special case is needed for depth.
 - **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head
@@ -204,9 +207,13 @@ recorded open form, and replacing the application with a reference to the entry 
   - **Which is where materialisation reads the closed entry's kind from instead** (`kindOfClosed`): the
     branch of `Top` the substituted body occupies, §4.1's "construction transfers kind" asked of the
     construction. Not the constructor's *name* — a held body's head is structure-namespace vocabulary the
-    governing meta declares, and this pass holds only the type-name namespace (§3.3.1 keeps them apart). An
-    entry materialisation mints is never a constructor, so it does not compose with `top`, and for
-    everything that does not, kind is its body's branch.
+    governing meta declares, and this pass holds only the type-name namespace (§3.3.1 keeps them apart). For
+    everything that does not compose with `top`, kind is its body's branch.
+  - **A template composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }`
+    makes `listed<text>` a constructor: its `!record` body describes its instances, so the body's branch
+    (PRODUCT) is the wrong answer, and its kind is the base kind its chain reaches (ATOM), by the rule a
+    declared entry follows (`DefinitionResolver.determineKind`). Construction then transfers that kind to
+    `!listed_text [...]`. `OpenEntryResolvedFormTest` covers `atom` and `data`.
   - **And it makes the derivation total.** Every other entry's kind follows from what it already states —
     the base-kind name in its own `supertypes` for a constructor, its body's branch otherwise — and an open
     entry claiming its application's kind would be the one case needing a lookup outside itself. `OpenEntryResolvedFormTest`

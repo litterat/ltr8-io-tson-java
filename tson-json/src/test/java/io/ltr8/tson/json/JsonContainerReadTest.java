@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-JSON] §6.1/§6.3/§6.4 and §7: records as objects, arrays and sets and tuples as arrays, and JSON null
- * as the absent sentinel.
+ * as the void sentinel.
  *
  * <p>The read is asserted as JSON: a schema-directed tree read validates and hands the document back, so what
  * a test compares is the tree that came out and the diagnostics beside it.
@@ -27,8 +27,8 @@ class JsonContainerReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/containers-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               person => {
                 name:     text
@@ -62,6 +62,9 @@ class JsonContainerReadTest {
               pair       => [text, int32]
               maybe_pair => [text?, int32]
               nested     => { who: person  labels: [text] }
+
+              answer     => !text_enum ["true" "false"]
+              survey     => { reply?: answer ~ "true"  agreed?: boolean ~ true }
             }
             """;
 
@@ -146,15 +149,15 @@ class JsonContainerReadTest {
                 {"tries": 1, "name": "Ada"}""").accepted()));
     }
 
-    // ── §6.1.2 presence and absence, and §7 ──────────────────────────────
+    // ── §6.1.2 missing and void, and §7 ──────────────────────────────────
 
     /**
-     * §6.1.2 and §7.2: at a field that admits both, omission and null are two spellings of one absence, and a
+     * §6.1.2 and §7.2: at a field that admits both, omission and null are two spellings of one void value, and a
      * tree keeps which arrived -- a member written null stands as null, one never written is not there -- as
      * the text tree keeps {@code _} apart from a missing field. Bound output has one null for both.
      */
     @Test
-    void aTreeKeepsWhichSpellingOfAbsenceArrived() {
+    void aTreeKeepsWhichSpellingOfAVoidValueArrived() {
         String omitted = json(read("person", """
                 {"name": "Ada"}""").accepted());
         String stated = json(read("person", """
@@ -185,6 +188,16 @@ class JsonContainerReadTest {
         assertEquals("""
                 {"name":"Ada","tries":0,"kind":"person"}""", json(read("person", """
                 {"name": "Ada"}""").accepted()));
+    }
+
+    /**
+     * §5.2: a member of an enum whose type is not an identifier family is a string, {@code "true"} included --
+     * only an identifier enum's {@code true}/{@code false}, {@code boolean}'s among them, are JSON booleans.
+     */
+    @Test
+    void anInjectedTextEnumMemberIsAStringWhateverItsSpelling() {
+        assertEquals("""
+                {"reply":"true","agreed":true}""", json(read("survey", "{}").accepted()));
     }
 
     /** {@code retired?: void?}: null is the member's one value, and any other is refused by {@code void}. */
@@ -275,9 +288,9 @@ class JsonContainerReadTest {
     void aRequiredGroupTakesExactlyOneMember() {
         read("bounded", """
                 {"value": 1, "min": 0}""").accepted();
-        assertEquals(Diagnostic.Code.FIELD_REQUIRED, read("bounded", """
+        assertEquals(Diagnostic.Code.FIELD_GROUP, read("bounded", """
                 {"value": 1}""").refusal().code());
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("bounded", """
+        assertEquals(Diagnostic.Code.FIELD_GROUP, read("bounded", """
                 {"value": 1, "min": 0, "max": 9}""").refusal().code());
     }
 
@@ -287,7 +300,7 @@ class JsonContainerReadTest {
                 {"value": 1}""").accepted();
         read("flagged", """
                 {"value": 1, "cleared": 3}""").accepted();
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("flagged", """
+        assertEquals(Diagnostic.Code.FIELD_GROUP, read("flagged", """
                 {"value": 1, "cleared": 3, "pending": 4}""").refusal().code());
     }
 
@@ -306,9 +319,9 @@ class JsonContainerReadTest {
                 ["a", 2]""").refusal().code());
     }
 
-    /** §6.3: `[T?]` admits null at any slot as the absent element -- the slot exists and counts. */
+    /** §6.3: `[T?]` admits null at any slot as a void element -- the slot exists and counts. */
     @Test
-    void anElementOptionalArrayAdmitsNullAsAnAbsentElement() {
+    void anElementVoidableArrayAdmitsNullAsAVoidElement() {
         assertEquals("""
                 ["a",null,"c"]""", json(read("maybe_tags", """
                 ["a", null, "c"]""").accepted()));
@@ -358,7 +371,7 @@ class JsonContainerReadTest {
                 ["a", 1, 2]""").refusal().code());
     }
 
-    /** §6.4: an OPTIONAL position's absent value is null in its slot; at a REQUIRED position it is an error. */
+    /** §6.4: an OPTIONAL position's void value is null in its slot; at a REQUIRED position it is an error. */
     @Test
     void aTupleSlotTakesNullOnlyWhereItIsOptional() {
         assertEquals("""

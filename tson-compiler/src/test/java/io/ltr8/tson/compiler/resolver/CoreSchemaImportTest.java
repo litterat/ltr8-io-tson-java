@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.reader.Dom;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.base.atom.CidrNetwork;
+import io.ltr8.net.CidrNetwork;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -74,7 +74,7 @@ class CoreSchemaImportTest {
         assertTrue(registered.isPresent(), "expected core.tn to be registered");
 
         TsonSchema core = registered.get().schema();
-        assertEquals(50, core.entries().size(), "expected every core.tn declaration to resolve");
+        assertEquals(48, core.entries().size(), "expected every core.tn declaration to resolve");
 
         // A representative spread of core.tn's own real declarations -- atom refinements
         // (int32/positive_integer) and constructor applications (hex, float32, cidr4, ipv4, complex,
@@ -85,7 +85,7 @@ class CoreSchemaImportTest {
         // "source" reference (§3.3.1's structure-namespace rule), which is exactly what lets int32's
         // own `source: integer_type` validate despite integer_type living in meta-kernel, two hops up.
         assertTrue(core.entries().containsKey("int32"));
-        assertTrue(core.entries().containsKey("positive_integer"));
+        assertTrue(core.entries().containsKey("uint8"));
         assertTrue(core.entries().containsKey("bytes"));
         assertTrue(core.entries().containsKey("float32"));
         assertTrue(core.entries().containsKey("float64"));

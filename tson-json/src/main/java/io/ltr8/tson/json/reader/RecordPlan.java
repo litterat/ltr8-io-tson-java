@@ -8,7 +8,6 @@ import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -31,7 +30,7 @@ import java.util.Set;
  */
 final class RecordPlan {
 
-    /** How a JSON document spells absence (§7), for the {@code actual} of a rule about a field's state. */
+    /** How a JSON document spells the void sentinel (§7), for the {@code actual} of a rule about a voidable field. */
     static final String NULL = "null";
 
     final String name;
@@ -65,10 +64,9 @@ final class RecordPlan {
     final FieldValue[] stated;
 
     private final Map<String, Integer> index;
-    private final List<FieldGroup> groups;
 
-    /** Each group's members as field slots; a member naming no field of this record is -1. */
-    private final int[][] groupSlots;
+    /** Each field group, compiled to slots once ({@link GroupPlan}). */
+    private final GroupPlan[] groups;
 
     /** What this record's rules say when a document breaks one -- shared with the TSON reader ([TSON-JSON] §9.4). */
     final RecordDiagnostics rules;
@@ -92,16 +90,14 @@ final class RecordPlan {
             // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule.
             names[i] = Nfc.of(field.name());
             byName.put(names[i], i);
-            omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.members().contains(field.name())));
+            omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(field.name())));
             schemaReaders[i] = context.readers().resolve(field.type().name());
             if (field.value().isPresent()) {
-                stated[i] = FieldValue.of(context.schema(), field.type().name(), field.value().get());
+                stated[i] = FieldValue.of(context.linked(), field.type().name(), field.value().get());
             }
         }
         this.index = Map.copyOf(byName);
-        this.groups = List.copyOf(body.groups());
-        this.groupSlots = groups.stream().map(group -> group.members().stream()
-                .mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray()).toArray(int[][]::new);
+        this.groups = body.groups().stream().map(group -> GroupPlan.of(group, byName)).toArray(GroupPlan[]::new);
         this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().stream()
                 .map(RecordField::name).toList()));
         this.subsumption = new SubsumptionDiagnostics(displayName);
@@ -180,28 +176,74 @@ final class RecordPlan {
     }
 
     /**
-     * §6.1.4's field groups, counted over what the document stated -- a non-null slot, before anything is
-     * injected. Grouping has no wire form (§5.11), so this is the only place a group's multiplicity is enforced,
-     * and a member written null still counts: presence is what a group counts.
+     * §6.1.4's field groups, judged over what the document stated -- a non-null slot, before anything is
+     * injected. Grouping has no wire form (§5.11), so this is the only place a group is enforced, and a member
+     * written null still counts: presence is what a group counts. Per group, in one pass over its members: an
+     * option is chosen when any member is stated, each chosen option reports every member it needs and lacks,
+     * in option order, and then the count of chosen options is judged against the group's state.
      */
     void validateGroups(JsonReadContext ctx, Object[] slots) {
-        for (int g = 0; g < groupSlots.length; g++) {
-            int present = 0;
-            for (int at : groupSlots[g]) {
-                if (at >= 0 && slots[at] != null) {
-                    present++;
+        for (GroupPlan plan : groups) {
+            int chosen = 0;
+            for (int o = 0; o < plan.options.length; o++) {
+                int by = firstStated(plan.options[o], slots);
+                if (by < 0) {
+                    continue;
+                }
+                chosen++;
+                for (int at : plan.required[o]) {
+                    if (at >= 0 && slots[at] == null) {
+                        ctx.report(rules.optionNeeds(names[by], plan.optionText[o], names[at]));
+                    }
                 }
             }
-            FieldGroup group = groups.get(g);
-            if (present > 1) {
-                ctx.report(rules.groupAdmitsAtMostOne(String.join(" | ", group.members()), present));
-            } else if (group.state() == ElementState.REQUIRED && present == 0) {
-                ctx.report(rules.groupRequiresOne(String.join(" | ", group.members())));
+            if (plan.group.atLeastOne()) {
+                if (chosen == 0) {
+                    ctx.report(rules.groupRequiresAtLeastOne(plan.text));
+                }
+            } else if (plan.group.optional() ? chosen > 1 : chosen != 1) {
+                ctx.report(!plan.group.optional()
+                        ? rules.groupChoosesExactlyOne(plan.text, chosen)
+                        : rules.groupChoosesAtMostOne(plan.text, chosen));
             }
         }
     }
 
+    /** The first slot of {@code option} the document stated, or -1. */
+    private static int firstStated(int[] option, Object[] slots) {
+        for (int at : option) {
+            if (at >= 0 && slots[at] != null) {
+                return at;
+            }
+        }
+        return -1;
+    }
+
     boolean hasGroups() {
-        return groupSlots.length > 0;
+        return groups.length > 0;
+    }
+
+    /**
+     * One field group as slots: each option's members, and the subset its group does not mark {@code ?}. A
+     * member naming no field of this record is -1. The texts are the option and the group as messages show
+     * them, built once so a read builds none.
+     */
+    private record GroupPlan(FieldGroup group, int[][] options, int[][] required, String[] optionText,
+                             String text) {
+
+        static GroupPlan of(FieldGroup group, Map<String, Integer> byName) {
+            List<List<String>> members = group.members();
+            int[][] options = new int[members.size()][];
+            int[][] required = new int[members.size()][];
+            String[] optionText = new String[members.size()];
+            for (int o = 0; o < members.size(); o++) {
+                List<String> option = members.get(o);
+                options[o] = option.stream().mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray();
+                required[o] = option.stream().filter(member -> !group.optionalMembers().contains(member))
+                        .mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray();
+                optionText[o] = String.join(" ", option);
+            }
+            return new GroupPlan(group, options, required, optionText, group.describe());
+        }
     }
 }

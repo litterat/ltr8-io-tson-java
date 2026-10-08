@@ -65,7 +65,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(61, registered.entries().size());
+        assertEquals(68, registered.entries().size());
     }
 
     @Test
@@ -95,8 +95,8 @@ class MetaKernelEndToEndTest {
 
     @Test
     void readsEnumsOwnMembersFieldAgainstRealData() {
-        // The exact fix under test: enum => atom & { members: set<token> } -- previously
-        // unbuildable (set<token> fell back to an unusable placeholder), now a genuine ArrayBody.
+        // enum => enum_type ^ { type?: = identifier }: the pinned `type` is injected, and `members` reads
+        // through enum_set, a genuine ArrayBody.
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
@@ -124,10 +124,11 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("field_group")
-                .read(TestDocuments.document("{ members: [foo bar] state: OPTIONAL }")));
+                .read(TestDocuments.document("{ members: [[foo] [bar baz]] optional_members: [baz] optional: true }")));
 
-        assertEquals(List.of("foo", "bar"), result.get("members"));
-        assertEquals("OPTIONAL", result.get("state"));
+        assertEquals(List.of(List.of("foo"), List.of("bar", "baz")), result.get("members"));
+        assertEquals(List.of("baz"), result.get("optional_members"));
+        assertEquals(true, result.get("optional"));
     }
 
     @Test
@@ -136,9 +137,9 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("tuple_element")
-                .read(TestDocuments.document("{ element_type: { name: text arguments: [] } state: REQUIRED }")));
+                .read(TestDocuments.document("{ element_type: { name: text arguments: [] } voidable: true }")));
 
-        assertEquals("REQUIRED", result.get("state"));
+        assertEquals(true, result.get("voidable"));
         @SuppressWarnings("unchecked")
         Map<String, Object> elementType = (Map<String, Object>) result.get("element_type");
         assertEquals("text", elementType.get("name"));

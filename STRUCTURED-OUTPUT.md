@@ -45,7 +45,7 @@ retry loop needs them:
 2. **What kind** — `code`, a closed `Diagnostic.Code` enum, so a system prompt or few-shot pattern can generalise
    a fix instead of parsing prose. Every atom-constraint violation is `ATOM_CONSTRAINT_VIOLATION`; there are no
    per-facet codes, the facet being named by `expected`.
-3. **What was there** — `actual`: `99999`, `CANCELLED`, `(absent)`.
+3. **What was there** — `actual`: `99999`, `CANCELLED`, `(missing)`.
 4. **What was expected** — `expected` is the *constraint that failed*, not the declared type's name: `<= 100`,
    `one of (PENDING, SHIPPED, DELIVERED)`, `at most 10 characters`. `AtomTypeException`'s Javadoc fixes the
    vocabulary at six shapes.
@@ -182,7 +182,7 @@ piece of work. `design/json-encoding.md` states that goal and what it rules out 
 
 **A JSON member name that is not an identifier is refused where it is read.** A field name is an identifier at
 every layer ([TSON-DATA] §2.5), so `{"first name": 1}` fails before any schema is consulted — the largest single
-obstacle to the on-ramp. `SPEC-FEEDBACK.md` #3 states the proposal.
+obstacle to the on-ramp. A projection annotation is the proposal, to be raised against Revision 38.
 
 **Untagged unions.** Native TSON data announces a union member with `!typeName value` — the type-ref *is* the
 discriminator — and bare JSON has no such mechanism. [TSON-JSON] §8.2 lets a tag be omitted by exactly two

@@ -11,7 +11,6 @@ import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -54,8 +53,8 @@ class ContainerSugarEndToEndTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/container-sugar.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                 %s
                 }
@@ -216,12 +215,12 @@ class ContainerSugarEndToEndTest {
     void aSetCarriesItsOwnTightenedDefaultsNotArrays() {
         ArrayBody asSet = assertInstanceOf(ArrayBody.class,
                 compile("  xs => !set_type { element_type: text }").schema().entries().get("xs").body());
-        assertTrue(asSet.unordered());
+        assertFalse(asSet.ordered());
         assertTrue(asSet.uniqueItems());
 
         ArrayBody asArray = assertInstanceOf(ArrayBody.class,
                 compile("  xs => [text]").schema().entries().get("xs").body());
-        assertFalse(asArray.unordered());
+        assertTrue(asArray.ordered());
         assertFalse(asArray.uniqueItems());
     }
 
@@ -245,7 +244,7 @@ class ContainerSugarEndToEndTest {
         assertEquals(TypeRef.of("array"), entry.source().orElseThrow(), "the constructor the sugar names");
 
         // !array { element_type: text  min_items: 1  max_items: 2 } -- only the fields the form binds; the
-        // vocabulary's own defaults (state/unordered/unique_items) stay out of the binding record (§5.6).
+        // vocabulary's own defaults (state/ordered/unique_items) stay out of the binding record (§5.6).
         ArrayBody body = assertInstanceOf(ArrayBody.class, entry.body());
         assertEquals(TypeRef.of("text"), body.elementType());
         assertEquals(Optional.of(BigInteger.ONE), body.minItems());
@@ -326,7 +325,7 @@ class ContainerSugarEndToEndTest {
 
     /**
      * <code>{K =&gt; V?}</code> through the real bundled chain: the marker reaches the kernel's {@code map}
-     * {@code state} field (issue #227), so the value may be the absent sentinel and the map's own type says
+     * {@code state} field (issue #227), so the value may be the void sentinel and the map's own type says
      * so. The peer of {@code [T?]}, and the end-to-end half of {@code SchemaDesugarerTest}'s binding check.
      */
     @Test
@@ -335,8 +334,8 @@ class ContainerSugarEndToEndTest {
                   loose => {text => text?}
                   strict => {text => text}""");
 
-        assertEquals(ElementState.OPTIONAL, ((MapBody) bodyOf(compiled, "loose")).state());
-        assertEquals(ElementState.REQUIRED, ((MapBody) bodyOf(compiled, "strict")).state());
+        assertTrue(((MapBody) bodyOf(compiled, "loose")).voidable());
+        assertFalse(((MapBody) bodyOf(compiled, "strict")).voidable());
     }
 
     /**
@@ -346,7 +345,7 @@ class ContainerSugarEndToEndTest {
      * the map's own value state.
      */
     @Test
-    void anAbsentMapValueIsAcceptedOnlyWhereTheSchemaMarkedItOptional() {
+    void aVoidMapValueIsAcceptedOnlyWhereTheSchemaMarkedItVoidable() {
         TsonCompiledSchema compiled = compile("""
                   loose => {text => text?}
                   strict => {text => text}
@@ -388,7 +387,7 @@ class ContainerSugarEndToEndTest {
     /**
      * `enum.members` is typed through `enum_set`, so members reach the contract by the other route — the
      * constructor body read back against the kernel's own vocabulary — and pick up `min_items: 1` and the
-     * set's uniqueness with it.
+     * set's uniqueness with it. That each member is an identifier is `enum`'s `type`, checked at linking.
      */
     @Test
     void enumMembersAreIdentifiersAndAtLeastOneAndUnique() {

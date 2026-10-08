@@ -13,7 +13,7 @@ interface MapBuilder {
 
     /**
      * The map, from its entries in order: each key as the loop decoded it, each value a child's value or a
-     * {@link Slots} marker ({@link Slots#ABSENT} for an entry with an absent value, {@link Slots#REFUSED} for a
+     * {@link Slots} marker ({@link Slots#VOID} for an entry with a void value, {@link Slots#REFUSED} for a
      * refused one).
      *
      * @param names the member name each key was written as, in the object form; null in the pairs form

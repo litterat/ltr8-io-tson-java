@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.atom;
 
 import java.util.Optional;
 
-import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.HostAtoms;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -15,11 +14,10 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 /**
- * Parses meta-kernel's {@code value} instance of the {@code unit} atom constructor (§4.2, §8.1) --
+ * Parses meta-kernel's {@code value}, the instance of the {@code value_type} constructor (§4.2, §8.1) --
  * the "escape hatch primitive": per its own kernel doc, "the result of base type resolution
  * ([TSON-DATA] §4) applied to a source token, with no further interpretation... the host runtime is
- * responsible for type-checking values at use site." Unlike {@link IdentifierProfile} (raw lexical text,
- * unconstrained) this actually runs {@link BaseTypeResolver} -- boolean/number/string, §4.5's
+ * responsible for type-checking values at use site." It runs {@link BaseTypeResolver} -- boolean/number/string, §4.5's
  * fixed order -- and narrows the result to the natural Java host type each {@link BaseValue}
  * variant implies: {@link Boolean}, {@link BigInteger}/{@link BigDecimal} (or {@link Double} for the
  * two special numeric forms, {@code .nan}/{@code .inf}, which have no exact intermediate), or
@@ -29,11 +27,9 @@ import java.math.BigInteger;
  * no constraint vocabulary and is explicitly "not narrowable" (its own kernel doc), so there is only
  * ever the one, natural representation.
  *
- * <p>See {@link IdentifierProfile}'s own Javadoc for why this class -- along with {@code void}'s own
- * {@code io.ltr8.tson.compiler.reader.VoidReader} -- exists as a separate,
- * name-keyed specialization rather than one shared {@code unit} compiler: the kernel's own text says
- * {@code value}/{@code token}/{@code void} are "distinguished by name and prose-level parsing
- * contract, not by schema shape."
+ * <p>It lives in the encoding rather than in {@code tson-atom}'s vocabulary because base type resolution
+ * depends on how the token was written, which an {@code AtomType} cannot see; {@code value_type}'s reader
+ * factory selects it by the constructor.
  */
 public final class ValueParser implements TokenAtomType<Object> {
 
@@ -133,8 +129,8 @@ public final class ValueParser implements TokenAtomType<Object> {
 
     private static Object narrow(BaseValue value) {
         return switch (value) {
-            // Unreachable: BaseTypeResolver resolves a token, and no token is the absent sentinel.
-            case BaseValue.AbsentValue ignored -> throw new IllegalStateException("base resolution produced absence");
+            // Unreachable: BaseTypeResolver resolves a token, and no token is the void sentinel.
+            case BaseValue.VoidValue ignored -> throw new IllegalStateException("base resolution produced absence");
             case BaseValue.BooleanValue b -> b.value();
             case BaseValue.StringValue s -> s.text();
             case BaseValue.NumberValue n -> narrowNumber(n.form());
@@ -163,7 +159,7 @@ public final class ValueParser implements TokenAtomType<Object> {
     public String write(Object value) {
         return switch (value) {
             // `value` has no null inhabitant to write: absence is `_`, and an emitter writes it as absence.
-            case null -> throw new IllegalArgumentException("the absent sentinel is not a 'value'; emit '_' instead");
+            case null -> throw new IllegalArgumentException("the void sentinel is not a 'value'; emit '_' instead");
             case Boolean b -> b.toString();
             case Double d when d.isNaN() -> ".nan";
             case Double d when d == Double.POSITIVE_INFINITY -> ".inf";

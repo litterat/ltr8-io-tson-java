@@ -115,7 +115,7 @@ Each of these is a shape TSON has and a converted schema cannot reach — either
 source for it, or because reaching it would break documents already on the wire.
 
 - **Non-text map keys.** JSON Schema's `additionalProperties`/`patternProperties` are string-keyed, so
-  `{K => V}` with a compound `K` never arises. §6.5's **pairs form is therefore unreachable**, and with it one
+  `{K => V}` with a compound `K` never arises. §6.4's **pairs form is therefore unreachable**, and with it one
   of §8.3's two class-stability leaks.
 - **Annotations on data values.** No JSON carrier exists (§4.3) and JSON Schema has no source for one, so the
   encode-side refusal never fires. It stays implemented, for values that arrive from the text encoding.
@@ -145,8 +145,8 @@ work, and the first is the largest single obstacle to the stated goal.
    `identifier-continue`, so `user-name` and OpenAPI's `x-` extensions are declarable — which leaves
    JSON-LD's `@`-prefixed keys and digit- or underscore-initial names as what cannot be spelled. The only
    answer today is to refuse, or to type the position as a map and forgo per-field validation. A projection
-   annotation binding a wire spelling to a declared field would fit [TSON-SCHEMA] §6's licence exactly;
-   `SPEC-FEEDBACK.md` #3 states it.
+   annotation binding a wire spelling to a declared field would fit [TSON-SCHEMA] §6's licence exactly, and is
+   the proposal to be raised against Revision 38.
 2. **Records are closed and JSON Schema's are open.** `additionalProperties` defaults to *true*, so a
    converted record fails §6.1.1 on the first document carrying an extra member. There is no flattened tail
    to relax it (§7.2): open-ended data is a declared map-typed field, which the producer
@@ -183,7 +183,7 @@ formats defeat it, and both are the shape of the JSON-superset claim Revision 35
   way of giving it one — a hint call, a schema-walking stream, readers that accept either shape — puts the
   JSON encoding's problem inside the TSON reader stack.
 - **`null` is two things.** In a plain JSON tree it is a value, and JEP 540 has a `JsonNull` for it. Under a
-  schema it is the absent sentinel and nothing else (§7). Mapping it to `AbsentEvent` in the event layer
+  schema it is the void sentinel and nothing else (§7). Mapping it to `VoidEvent` in the event layer
   settles that question one layer too early, and forces the schemaless reading to inherit a schema's answer.
 
 So: `tson-json` has its own lexer, its own structural layer, its own tree, and its own readers.

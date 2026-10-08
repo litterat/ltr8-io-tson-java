@@ -18,6 +18,7 @@ import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -91,7 +92,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         Map<String, TypeDefinition> entries = context.schema().entries();
         this.selfNames = Set.copyOf(selfNames);
         this.readerFor = readerFor;
-        this.selectors = selectorFields.stream().map(field -> selectorOf(field, entries)).toList();
+        this.selectors = selectorFields.stream().map(field -> selectorOf(field, entries, context.linked())).toList();
         this.selectorNames = new LinkedHashSet<>(selectors.stream().map(Selector::name).toList());
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
@@ -114,10 +115,11 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
-    private static Selector selectorOf(RecordField field, Map<String, TypeDefinition> entries) {
+    private static Selector selectorOf(RecordField field, Map<String, TypeDefinition> entries,
+                                       TsonLinkedSchema linked) {
         String terminal = ReferenceChain.terminal(field.type().name(), entries);
         TypeDefinition target = entries.get(terminal);
-        AtomType<?> parser = AtomParsers.forType(terminal, target.body()).orElseThrow(
+        AtomType<?> parser = AtomParsers.forType(target.body(), linked.enumForm(terminal)).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
         return new Selector(Nfc.of(field.name()), parser);

@@ -16,8 +16,8 @@ public enum TokenType {
     /** An unquoted token: identifiers, numbers, dates, etc. (§7.1, §7.3). */
     UNQUOTED,
 
-    /** {@code _} — the absent sentinel (§2.9). */
-    ABSENT,
+    /** {@code _} — the void sentinel (§2.9). */
+    VOID,
 
     // Structural delimiters (§7.2 rule 4)
     LBRACE, RBRACE, LBRACKET, RBRACKET, COLON, COMMA,
@@ -31,7 +31,7 @@ public enum TokenType {
     /** {@code ..} — the range token (§7.2.4). Reserved; no role in data values. */
     RANGE,
 
-    // Special tokens (§7.2.5). Fourteen characters, all Pattern_Syntax.
+    // Special tokens (§7.2.5). Fifteen characters, all Pattern_Syntax.
     // Only BANG (type prefix) and AT (annotation prefix) have a role in
     // data values; the rest are reserved by the schema grammar and are
     // parse errors wherever a data value is expected.
@@ -59,6 +59,9 @@ public enum TokenType {
 
     /** {@code -} not immediately followed by an unquoted-continuation character. */
     MINUS,
+
+    /** {@code +} not immediately followed by an unquoted-continuation character. */
+    PLUS,
 
     /** End of input. */
     EOF

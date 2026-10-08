@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import java.util.Optional;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -17,6 +18,8 @@ import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.Top;
 
 /**
  * Adapts an {@code atom} {@link AtomType} into a {@link TsonTypeReader} -- this package's own copy
@@ -29,8 +32,8 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
  * constant, one per constructor name -- see {@link ValueReaderFactoryRegistry} for where they
  * actually get registered. Every one of these reaches {@code context} only for
  * {@link ValueReaderContext#locationOf} (an atom never needs to resolve a child), and {@code name}
- * additionally in {@link #ENUM_OBJECT_MODE}/{@link #UNIT}, both keyed on the declaration's own name rather
- * than its resolved shape -- see each one's own note.
+ * additionally in {@link #ENUM_OBJECT_MODE}, keyed on the declaration's own name rather than its resolved
+ * shape -- see its own note.
  */
 final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
@@ -45,18 +48,18 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * fault rather than an author error -- the registry only routes here for names that are atoms.
      */
     static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
-            .forType(name, definition.body())
-            .<TsonTypeReader<?>>map(parser ->
-                    new AtomTypeReader<>(name, parser, context.locationOf(name, definition)))
+            .forType(definition.body(), context.linked().enumForm(name))
+            .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(name, parser,
+                    context.locationOf(name, definition), namesProfile(definition.body())))
             .orElseThrow(() -> new IllegalStateException(
                     "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
 
     /**
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean},
-     * every other enum instance its member text. Dispatch is keyed on the declaration's own name, the same
-     * mechanism {@link #UNIT} uses for {@code value}/{@code identifier}/{@code void}, and the one case
-     * {@link #ATOM} cannot serve -- an enum body maps to {@link io.ltr8.tson.atom.parser.EnumParser}, which
-     * hands back the member's own text, and this one name wants the host value its two members stand for.
+     * every other enum instance its member text. Dispatch is keyed on the declaration's own name -- the one
+     * atom that needs it, and the one case {@link #ATOM} cannot serve: an enum body maps to {@link
+     * io.ltr8.tson.atom.parser.EnumParser}, which hands back the member's own text, and this one name wants the
+     * host value its two members stand for.
      * (Tree mode then wraps the result in a {@code TsonAtom} -- see {@link ValueReaderFactoryRegistry}.)
      *
      * <p><b>The parser is the vocabulary's own</b>, asked for by name through {@link
@@ -71,28 +74,24 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition))
             : ATOM.create(name, definition, context);
     /**
-     * {@code unit}'s three real instances -- {@code value}/{@code identifier}/{@code void} -- all resolve to the
-     * identical empty body, so, per the kernel's own doc ("distinguished by name and prose-level parsing
-     * contract, not by schema shape"), dispatch is keyed on the declaration's own name rather than its
-     * resolved shape. §4.2 makes that dispatch normative.
-     *
-     * <p><b>Two of the three are this encoding's, not the vocabulary's</b>, which is why they are named here
-     * and not left to {@link #ATOM}. {@code void} is not a scalar at all -- its contract admits only the
-     * absent sentinel {@code _}, never a token -- so it bypasses {@link AtomType} via {@link VoidReader}.
-     * {@code value} is decoded by [TSON-DATA] §4 base type resolution, whose §4.4 rule is that a quoted
-     * token is a string: it depends on the lexical form, which an {@link AtomType} deliberately cannot see,
-     * so {@code AtomParsers} declines it and {@link ValueParser} answers here. {@code identifier}, and any
-     * other {@code unit}-constructed name, is a function of the text alone and {@link #ATOM} has it.
+     * {@code void_type}: not a scalar at all -- its contract admits only the void sentinel {@code _}, never a
+     * token -- so it bypasses {@link AtomType} via {@link VoidReader}. Keyed on the constructor, so the
+     * kernel's {@code void} and core's sibling read alike.
      */
-    static final ValueReaderFactory UNIT = (name, definition, context) -> switch (name) {
-        case "void" -> new VoidReader(context.locationOf(name, definition));
-        case "value" -> new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition));
-        default -> ATOM.create(name, definition, context);
-    };
+    static final ValueReaderFactory VOID = (name, definition, context) ->
+            new VoidReader(context.locationOf(name, definition));
+
+    /**
+     * {@code value_type}: decoded by [TSON-DATA] §4 base type resolution, whose §4.4 rule is that a quoted token
+     * is a string. That depends on the lexical form, which an {@link AtomType} deliberately cannot see, so
+     * {@code AtomParsers} declines it and {@link ValueParser} answers here.
+     */
+    static final ValueReaderFactory VALUE = (name, definition, context) ->
+            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition), null);
 
     /**
      * The schema entry's own declared name -- the <em>declaration's</em>, not the built-in it refines, so a
-     * {@code TYPE_MISMATCH} against {@code my_percentage => !positive_integer ^ { max: 100 }} names {@code
+     * {@code TYPE_MISMATCH} against {@code my_percentage => !integer ^ { min: 0  max: 100 }} names {@code
      * my_percentage}, which is what its author wrote and can act on. There is no name on {@link AtomType} to
      * use instead (one {@code IntegerParser} serves {@code int8}..{@code int256} and every refinement of
      * them), so it has to come from the entry, which every {@link ValueReaderFactory} is handed anyway.
@@ -109,10 +108,22 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     private final AtomType<T> delegate;
     private final SchemaLocation schemaLocation;
 
+    /**
+     * The profile of an identifier family, whose values are names ([TSON-DATA] §8.2), or {@code null} for every
+     * other atom. A name the identifier policy refuses is reported and read as nothing, as a refused field name
+     * is never looked up.
+     */
+    private final IdentifierProfile names;
+
+    /** {@code body}'s profile when it is an identifier family -- its constructor IS-A {@code identifier_type}. */
+    private static IdentifierProfile namesProfile(Top body) {
+        return body instanceof IdentifierType identifier ? identifier.profile() : null;
+    }
+
 
     /** A reader over an {@link AtomType} chosen by the caller rather than by the declaration's own body. */
     static <T> AtomTypeReader<T> of(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
-        return new AtomTypeReader<>(name, delegate, schemaLocation);
+        return new AtomTypeReader<>(name, delegate, schemaLocation, null);
     }
 
     /**
@@ -121,7 +132,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     @Override
     public TsonTypeReader<?> renamed(String displayName) {
-        return new AtomTypeReader<>(displayName, delegate, schemaLocation);
+        return new AtomTypeReader<>(displayName, delegate, schemaLocation, names);
     }
 
     /**
@@ -151,7 +162,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * the entry's own is {@code value}, which names the escape hatch rather than anything the author wrote.
      */
     TsonTypeReader<?> overAtom(String displayName, AtomType<?> replacement) {
-        return new AtomTypeReader<>(displayName, replacement, schemaLocation);
+        return new AtomTypeReader<>(displayName, replacement, schemaLocation, null);
     }
 
     /**
@@ -165,13 +176,15 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * case that does rename, its entry naming the escape hatch rather than anything in the schema.
      */
     Optional<TsonTypeReader<?>> boundTo(Class<?> wire) {
-        return delegate.boundTo(wire).map(bound -> overAtom(name, bound));
+        return delegate.boundTo(wire).map(bound -> new AtomTypeReader<>(name, bound, schemaLocation, names));
     }
 
-    private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
+    private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation,
+                           IdentifierProfile names) {
         this.name = name;
         this.delegate = delegate;
         this.schemaLocation = schemaLocation;
+        this.names = names;
     }
 
 
@@ -197,7 +210,10 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                 TokenAtomType<T> formSensitive = (TokenAtomType<T>) delegate;
                 return formSensitive.read(tokenValue);
             }
-            return delegate.read(tokenValue.text());
+            T value = delegate.read(tokenValue.text());
+            // Hygiene judges the name the value is, in its type's normalization form, not the spelling.
+            return names != null && ctx.refusesName(value instanceof String name ? name : token.text(), names)
+                    ? null : value;
         } catch (AtomTypeException ex) {
             // The entry's own name leads the sentence -- see `name` above -- and AtomRefusal decides the
             // code: §8.1 files a contract rejection apart from a range violation, and this reader is not a

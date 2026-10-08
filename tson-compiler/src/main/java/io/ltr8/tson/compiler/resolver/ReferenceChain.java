@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.VoidType;
 
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -31,7 +32,7 @@ import java.util.function.Function;
  *       with an empty {@code Optional}, having been asked for an entry and having none to give.
  * </ul>
  *
- * <p><b>Not every walk over references is this one.</b> {@code ParameterKinds} follows a chain to reach a
+ * <p><b>Not every walk over references is this one.</b> {@code ParameterTypes} follows a chain to reach a
  * slot's declared body and deliberately does <em>not</em> stop at an argument-bearing target -- it is after
  * the constructor's own vocabulary, where the template is the answer. It keeps its own loop, and the
  * difference is the reason to say so here rather than let a future reader assume the four were five.
@@ -61,6 +62,14 @@ public final class ReferenceChain {
     public static Optional<TypeDefinition> terminalDefinition(String name, Map<String, TypeDefinition> entries) {
         Stop stop = walk(name, entries::get);
         return stop.reached() ? Optional.ofNullable(entries.get(stop.name())) : Optional.empty();
+    }
+
+    /**
+     * Whether {@code name}'s chain ends at a {@code void} -- the kernel's, core's sibling, or any other {@code
+     * !void_type} -- told by the body's constructor rather than by the name the chain ends at.
+     */
+    public static boolean resolvesToVoid(String name, Map<String, TypeDefinition> entries) {
+        return terminalDefinition(name, entries).map(d -> d.body() instanceof VoidType).orElse(false);
     }
 
     /** Where the walk stopped, and whether it stopped on a type rather than on nothing or on itself. */

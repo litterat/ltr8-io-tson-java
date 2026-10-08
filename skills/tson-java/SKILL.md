@@ -40,14 +40,14 @@ TypeScript port is [ltr8-io-tson-typescript](https://github.com/litterat/ltr8-io
 the shared conformance vectors both are tested against are
 [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite).
 
-**Versioning is `0.<spec revision>.<patch>`.** `0.36.x` implements **2026 Revision 36**: its bundled schemas
-carry Revision 36 identities (`https://tson.io/2026/36/m/…`). A new revision moves the minor, and the spec is a working draft
+**Versioning is `0.<spec revision>.<patch>`.** `0.37.x` implements **2026 Revision 37**: its bundled schemas
+carry Revision 37 identities (`https://tson.io/2026/37/m/…`). A new revision moves the minor, and the spec is a working draft
 with no compatibility guarantee between revisions — so a schema `!!id` pinned at
-`https://tson.io/2026/36/m/core.tn` is revision-specific and must match the library's own revision.
+`https://tson.io/2026/37/m/core.tn` is revision-specific and must match the library's own revision.
 
 > **Not on Maven Central**, deliberately — publishing needs signed artifacts and a fuller POM, which is a
 > separate decision. To use it from another project on the same machine: clone, `./gradlew
-> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.36.0-SNAPSHOT` (the front
+> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.37.0-SNAPSHOT` (the front
 > door pulls the rest in). The jars carry real `module-info.class`es, so class path or module path both
 > work.
 
@@ -100,7 +100,7 @@ out.
 ```java
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.*;        // Diagnostic, the receivers, ProcessorConfig, the exceptions
-import io.ltr8.tson.base.policy.*; // UnicodePolicy, LimitsPolicy, ProcessorPolicy, FetchPolicy
+import io.ltr8.tson.base.policy.*; // IdentifierPolicy, ScriptPolicy, LimitsPolicy, ProcessorPolicy, FetchPolicy
 import io.ltr8.tson.base.source.*; // SchemaAccess, SchemaSource, the two fetching sources
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
@@ -108,9 +108,9 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn and core.tn
 
 String schema = """
-        !!id:"https://example.com/2026/36/app/order-1.tn"
-        !!meta:"https://tson.io/2026/36/m/meta.tn"
-        !!import:"https://tson.io/2026/36/m/core.tn"
+        !!id:"https://example.com/2026/37/app/order-1.tn"
+        !!meta:"https://tson.io/2026/37/m/meta.tn"
+        !!import:"https://tson.io/2026/37/m/core.tn"
         {
           order => {
             order_id: int32
@@ -123,7 +123,7 @@ String schema = """
 tson.resolve(schema);                 // registers it under its own !!id
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/36/app/order-1.tn")
+        .withSchema("https://example.com/2026/37/app/order-1.tn")
         .readAs("""
                 { order_id: 1042  customer: "Ada Lovelace"  placed: !date 2026-07-01  total: 149.95 }""",
                 "order");
@@ -170,7 +170,7 @@ Where schemas come from is one value, `SchemaAccess` — the source plus the `Fe
 ## Reading into a tree
 
 `TsonValue` is a sealed interface over eight pure immutable node types — `TsonRecord`, `TsonMap`,
-`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonAbsent`, `TsonMissing`, `TsonScopedValue` (no `Node` suffix,
+`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonVoid`, `TsonMissing`, `TsonScopedValue` (no `Node` suffix,
 deliberately). **Every accessor is total — nothing throws.** `TsonScopedValue(schema, root)` is a value
 read under a foreign schema at an `extern`/`dynamic` position (§7.8): it names that schema and is transparent
 to navigation, so `get`/`at` look straight through it.
@@ -188,8 +188,8 @@ A failed step yields a `TsonMissing` whose `missingPath()` is the pointer *up to
 that failed* — `at("/nope/deeper").missingPath()` is `Optional[/nope]` — and every further `get`/`at`
 returns that same node, so the first failure stays the informative one.
 
-**`TsonMissing` (nothing there) is not `TsonAbsent` (the document wrote `_`).** There is one no-value
-node because there is one no-value spelling: `TsonAbsent` carries `_` and a collecting-mode read failure.
+**`TsonMissing` (nothing there) is not `TsonVoid` (the document wrote `_`).** There is one no-value
+node because there is one no-value spelling: `TsonVoid` carries `_` and a collecting-mode read failure.
 The token `null` is not absence — §4 resolves it to the string `null`, so it arrives as a `TsonAtom`.
 
 **Casting and converting are different questions.** `as(Class)`/`asString`/`asBigDecimal` only ever
@@ -292,9 +292,9 @@ project shipped exactly that bug.
 
 ## Fetching schemas
 
-Out of the box a `Tson` serves only the three bundled schemas: `SchemaAccess.registeredOnly()` is
-the default, so anything else must be registered first or reachable through a configured source. Two
-fetching sources ship, plus a non-fetching third:
+Out of the box a `Tson` serves only the four bundled schemas (meta-kernel, meta, core, policy):
+`SchemaAccess.registeredOnly()` is the default, so anything else must be registered first or reachable through a
+configured source. Two fetching sources ship, plus a non-fetching third:
 
 | Source              | One-call form                                | Configure                                                        |
 | ------------------- | -------------------------------------------- | ---------------------------------------------------------------- |
@@ -394,18 +394,21 @@ Two policies, defaulting opposite ways for the same reason in each case:
 
 ```java
 Tson tson = Tson.of(ProcessorConfig.defaults()
-        .withIdentifierPolicy(UnicodePolicy.highlyRestrictive().perSegment())  // names
-        .withTokenPolicy(UnicodePolicy.unrestricted()));                       // values
+        .withIdentifierPolicy(IdentifierPolicy.defaults().perSegment())  // names
+        .withTokenPolicy(ScriptPolicy.unrestricted()));                 // values
 ```
 
-`identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names — and
-defaults to Highly Restrictive over the whole name (§8.2's SHOULD). Reach for `perSegment()`, or
-`permitting(scripts…)`, before loosening the level: both keep the rule everywhere else. `tokenPolicy`
+`identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names, and every
+value whose type is an `identifier_type` family — with all three §8.2 mechanisms on and Highly Restrictive over
+the whole name (§8.2's SHOULD). Reach for `perSegment()`, or `permitting(scripts…)` on the level, before
+loosening the level: both keep the rule everywhere else. A segment ends at `_`, and at whatever a name's profile
+adds that is not a letter or digit (`-` for core names, a `$` or a medial `.` for a family that adds one).
+`withSkeletonDistinctness(false)` drops the look-alike rule over a scope, independently of the level. `tokenPolicy`
 governs **every token a read pulls** and defaults to `unrestricted()`, a value being data that may
 legitimately be anything; raise it when values are more than payload (a service that renders what it
-reads into a UI). A token policy **may not be per-segment**: `ProcessorPolicy` refuses one with
-`IllegalArgumentException` rather than ignoring it: `_` and `-` are ordinary characters in a value
-rather than word separators, and UTS #39's own `Toys-Я-Us` is the spoof segmenting one would admit. Note
+reads into a UI). A token policy is a plain `ScriptPolicy` and has **no unit**: `_` and `-` are ordinary
+characters in a value rather than word separators, and UTS #39's own `Toys-Я-Us` is the spoof segmenting one
+would admit. Note
 also that a token policy stricter than the identifier policy **subsumes it** — the token scan runs before
 anything knows which tokens are names. Either is also settable per reader with `withIdentifierPolicy`/`withTokenPolicy`; the
 six levels and the rest of the surface are in `references/api.md`, and the command-line flags in
@@ -424,6 +427,8 @@ tson validate person.tn data.tn         # also --output json|tson; `-` reads std
 tson compile person.tn                  # does the schema itself resolve and compile?
 tson policy                             # the §8.2 Unicode policy and §9.1 limits this run would apply
 tson hash person.tn                     # stamp ?sha256=… onto its own !!id, in place
+tson strip person.tn                    # print a token-lean reading form for a prompt (not loadable)
+tson strip --keep-docs person.tn        # the same, keeping @doc, @title and @examples
 tson validate --schema order.tn --type order data.json        # JSON data, bound out of band
 ```
 
@@ -501,7 +506,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | expecting a collecting read to throw on a syntax error          | it collects; an empty list is the only "valid"                      | check `problems.diagnostics().isEmpty()`                    |
 | matching diagnostic `message` text                              | messages are not API                                                | switch on `Diagnostic.Code`                                 |
 | `!type` on a schemaless read                                    | schemaless reads resolve built-ins only, and report the rest        | `.withSchema(uri)`, or `preservingUnknownTypeRefs()`        |
-| treating `TsonMissing` and `TsonAbsent` as the same             | `TsonAbsent` was written (`_`); `TsonMissing` is a failed lookup    | `isAbsent()` / `isMissing()`, or `missingPath()`            |
+| treating `TsonMissing` and `TsonVoid` as the same             | `TsonVoid` was written (`_`); `TsonMissing` is a failed lookup    | `isVoid()` / `isMissing()`, or `missingPath()`            |
 | `asInt()` to assert which host type a read produced             | it converts; `234.56E2` answers too                                 | `as(Integer.class)`                                         |
 | `SchemaAccess.of(schemas::get)`                                 | a `null` carries no `Reason`; refused as a fault                    | `SchemaSource.ofMap(schemas)`                               |
 | `SchemaAccess.httpSchemas()` with no host                       | deny by default means nothing is permitted                          | name the hosts explicitly                                   |
@@ -548,8 +553,8 @@ outstanding work, `SPEC-FEEDBACK.md` the spec issues still open against the curr
 
 ## Specification
 
-- Part 1 — Text Data Format: https://tson.io/raw/2026/36/tson-part1-data.md
-- Part 2 — Type System and Schema: https://tson.io/raw/2026/36/tson-part2-schema.md
+- Part 1 — Text Data Format: https://tson.io/raw/2026/37/tson-part1-data.md
+- Part 2 — Type System and Schema: https://tson.io/raw/2026/37/tson-part2-schema.md
 - Part 3 — JSON Encoding: drafted in the repository, `spec/tson-part3-json.md`
 
 Both are working revisions and change without compatibility guarantees. Re-fetch and check the revision

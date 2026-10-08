@@ -9,9 +9,11 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | --------------------------- | --------------------------------------------------------------------------------------------- |
 | `FIELD_REQUIRED`            | a required field was absent from the data                                                   |
 | `FIELD_FIXED`               | a field the schema fixes carried a different value                                           |
+| `FIELD_GROUP`               | a field group's rule broke: no option chosen, too many, or a chosen option missing a member |
 | `TYPE_MISMATCH`             | the value's shape does not match the type in scope                                           |
 | `WRONG_ARITY`               | a tuple or template application has the wrong element/argument count                         |
 | `UNKNOWN_TYPE_REF`          | a `!type` annotation names a type the schema in scope does not declare                       |
+| `SCOPE_NOT_ADMITTED`        | a `!!schema` (`$schema`) at a position whose type is not `scoped` (§7.8, a resolver error)   |
 | `ATOM_FORM_INVALID`         | the token is not the atom's grammar — `'thirty'` where an integer goes                      |
 | `ATOM_CONSTRAINT_VIOLATION` | the token parsed, then broke a declared constraint — `150` under `max: 100`                  |
 | `UNRECOGNIZED_FIELD`        | the data carried a field the type does not declare (§7.2 — records are closed, always)       |
@@ -24,7 +26,7 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `UNKNOWN_TYPE`              | a type reference does not resolve within the linked schema                                   |
 | `VALIDATION_ERROR`          | anything not covered by a more specific code — including a document that will not lex or parse |
 | `NOT_IMPLEMENTED`           | **a library gap, not bad input**                                                             |
-| `BIND_MISMATCH`             | a schema type and its bound class disagree about that type's fields                          |
+| `BIND_MISMATCH`             | a schema type and its bound class disagree — about its fields, or a value the class refuses   |
 | `LIMIT_EXCEEDED`            | a §9.1 resource limit refused the document — nested deeper than `LimitsPolicy.maxDepth`      |
 | `SCHEMA_NOT_PERMITTED`      | policy refused the reference — not an allowed host, not a legal identity, no pin where required |
 | `SCHEMA_NOT_FOUND`          | the location was reached and does not have it                                                |
@@ -45,7 +47,11 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
   meta-layer constructor this library has never seen (§2.2.2's extension point).
 - **`BIND_MISMATCH`** is a misconfiguration in the *reading application*, no more a verdict on the
   document than a gap is. It normally fails the bind-mode compile as an exception instead; it reaches a
-  read as a diagnostic only for a schema compiled on demand.
+  read as a diagnostic for a schema compiled on demand, and where the bound class refuses a value the schema
+  admits — its constructor's own check, or a void value meeting a collection that refuses `null`, such as
+  `ConcurrentHashMap`. With no schema the class is the contract, and the same refusal is `TYPE_MISMATCH`.
+  A field or position that can hold no value (voidable, or optional with no default) bound to a primitive is
+  refused at compile.
 - **`LIMIT_EXCEEDED`** is this deployment declining: the document nested deeper than `LimitsPolicy.maxDepth`
   (64 by default). The bytes may be valid and read in full by a processor configured for more, which is why
   the bound is stated once per run (`ProcessorPolicy.limits()`, the `policy` field of every CLI envelope)
@@ -141,7 +147,7 @@ leaves the original fail-fast.
 
 **Mode asymmetry, deliberate, not an inconsistency:** collecting mode always keeps reading, and **bind
 mode is all-or-nothing** (a `ConstructionGuard` — a partially-filled object is worse than none) while
-**tree mode keeps everything it built** (a `TsonAbsent` stands where a value failed).
+**tree mode keeps everything it built** (a `TsonVoid` stands where a value failed).
 
 ## Exceptions
 

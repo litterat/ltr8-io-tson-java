@@ -17,10 +17,11 @@ import io.ltr8.tson.atom.parser.PeriodParser;
 import io.ltr8.tson.atom.parser.RationalParser;
 import io.ltr8.tson.atom.parser.TextParser;
 import io.ltr8.tson.atom.parser.TimeParser;
+import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
-import io.ltr8.tson.base.atom.CidrInet4Network;
-import io.ltr8.tson.base.atom.CidrInet6Network;
+import io.ltr8.net.CidrInet4Network;
+import io.ltr8.net.CidrInet6Network;
 import io.ltr8.tson.base.atom.Complex;
 import io.ltr8.tson.base.atom.Rational;
 import io.ltr8.tson.schema.meta.IntegerSize;
@@ -28,6 +29,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
+import io.ltr8.net.Iri;
 import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -52,6 +54,10 @@ import java.util.UUID;
  * min: PT30M} arrives as the string {@code PT30M} and the position's own type is the only thing that says
  * what it meant. This table is how {@code TokenValue, Class)}
  * asks.
+ *
+ * <p>{@code java.net.URI} answers with {@code iri_reference}, the widest of the four atoms it holds: every
+ * URI, URI-reference and IRI is an IRI-reference, and the class holds any of them, so the class alone names
+ * no narrower contract.
  *
  * <p>The entries are unconstrained instances, deliberately: a bound is a value of the atom's own type, not
  * of the refinement being declared, and asking a half-built refinement to validate its own bound would be
@@ -79,7 +85,8 @@ public final class HostAtoms {
             Map.entry(Rational.class, RationalParser.UNCONSTRAINED),
             Map.entry(Complex.class, ComplexParser.UNCONSTRAINED),
             Map.entry(UUID.class, UuidParser.UNCONSTRAINED),
-            Map.entry(URI.class, UriParser.UNCONSTRAINED),
+            Map.entry(URI.class, IriParser.REFERENCE_AS_JAVA_URI),
+            Map.entry(Iri.class, IriParser.REFERENCE),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
@@ -101,7 +108,8 @@ public final class HostAtoms {
             Map.entry(Duration.class, DurationParser.UNCONSTRAINED),
             Map.entry(Period.class, PeriodParser.UNCONSTRAINED),
             Map.entry(UUID.class, UuidParser.UNCONSTRAINED),
-            Map.entry(URI.class, UriParser.UNCONSTRAINED),
+            Map.entry(URI.class, IriParser.REFERENCE_AS_JAVA_URI),
+            Map.entry(Iri.class, IriParser.REFERENCE),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),

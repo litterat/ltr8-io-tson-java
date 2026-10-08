@@ -15,7 +15,9 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Supplier;
 
 public class DefaultArrayBinder {
@@ -97,6 +99,12 @@ public class DefaultArrayBinder {
 			collectionInterfaces.put(Deque.class, ArrayDeque.class);
 			collectionInterfaces.put(Queue.class, ArrayDeque.class);
 			collectionInterfaces.put(Set.class, HashSet.class);
+			collectionInterfaces.put(SequencedSet.class, LinkedHashSet.class);
+			collectionInterfaces.put(SortedSet.class, TreeSet.class);
+			collectionInterfaces.put(NavigableSet.class, TreeSet.class);
+			collectionInterfaces.put(SequencedCollection.class, ArrayList.class);
+			collectionInterfaces.put(Collection.class, ArrayList.class);
+			collectionInterfaces.put(BlockingQueue.class, LinkedBlockingQueue.class);
 		}
 
 		private final Class<?> targetClass;
@@ -122,27 +130,34 @@ public class DefaultArrayBinder {
 				constructorHandle = MethodHandles.arrayConstructor(targetClass);
 			} else if (Collection.class.isAssignableFrom(targetClass)) {
 
-				// If a field uses a non-specific collection type such as List there's no way
-				// in knowing the implementation that is expected. This could be fixed with an annotation.
-				// For now, use a default concrete type.
-				if (collectionInterfaces.containsKey(targetClass)) {
-					Class<?> implementationClass = collectionInterfaces.get(targetClass);
-
-					constructorHandle = MethodHandles.lookup()
-							.unreflectConstructor(implementationClass.getConstructor(int.class));
-				} else {
-
-					// There are some collection types that do not have a constructor that takes an int as a parameter.
-					// These are things like TreeSet and custom Collection implementations. This will
-					// need to expanded in future to allow other user custom constructors to be supplied.
-					constructorHandle = MethodHandles.lookup()
-							.unreflectConstructor(targetClass.getConstructor(int.class));
-				}
+				// A field declaring an interface such as List says nothing of the class expected, so it is
+				// built as a default concrete one.
+				constructorHandle = sized(collectionInterfaces.getOrDefault(targetClass, targetClass));
 			} else {
 				throw new CodeAnalysisException("Not recognised array class");
 			}
 
 			return constructorHandle;
+		}
+
+		/**
+		 * {@code (int):collection} for {@code collectionClass}: its capacity constructor where it has one, and
+		 * otherwise its no-argument constructor with the capacity ignored -- {@code TreeSet}, {@code LinkedList}
+		 * and {@code CopyOnWriteArrayList} have no capacity to take, and the caller need not know which kind it
+		 * holds.
+		 */
+		static MethodHandle sized(Class<?> collectionClass) throws IllegalAccessException, CodeAnalysisException {
+			try {
+				return MethodHandles.lookup().unreflectConstructor(collectionClass.getConstructor(int.class));
+			} catch (NoSuchMethodException capacity) {
+				try {
+					return MethodHandles.dropArguments(
+							MethodHandles.lookup().unreflectConstructor(collectionClass.getConstructor()), 0, int.class);
+				} catch (NoSuchMethodException none) {
+					throw new CodeAnalysisException(collectionClass.getName() + " has neither a public (int) nor a "
+							+ "public no-argument constructor to build it with");
+				}
+			}
 		}
 
 		/**

@@ -11,7 +11,7 @@ only; history lives in git.
 - `TsonAtom.toString()` renders its value alone — it reaches a `Diagnostic`'s `expected`/`actual`.
 - `get`/`at` never throw; a `TsonMissing` carries the pointer of the step that failed, and the first failure
   sticks. "Missing" and "absent" stay distinct kinds.
-- There is one no-value node, `TsonAbsent`; `null` is a `TsonAtom` holding the string `null`, and a `void`
+- There is one no-value node, `TsonVoid`; `null` is a `TsonAtom` holding the string `null`, and a `void`
   position admits `_` and nothing else.
 - `as(Class)`/`asString`/… cast, `asInt`/`asLong`/`asDouble` convert — a test asserting which host type a
   reader produced must use `as(Class)`.
@@ -26,7 +26,7 @@ Related: `design/facades-and-tree.md` (the readers producing a tree), `design/wr
 
 What every tree read hands back — the compiled tree readers (`design/class2-compilation.md`) and the
 schemaless `TsonTreeReader` alike. A sealed `TsonValue` over eight pure immutable node types (`TsonRecord`/
-`TsonMap`/`TsonArray`/`TsonTuple`/`TsonAtom`/`TsonAbsent`/`TsonMissing`/`TsonScopedValue`),
+`TsonMap`/`TsonArray`/`TsonTuple`/`TsonAtom`/`TsonVoid`/`TsonMissing`/`TsonScopedValue`),
 **structure-preserving** — TSON's
 record-vs-map and array-vs-tuple distinctions survive into the model, where JSON's would collapse — and
 annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
@@ -47,7 +47,7 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
     governs, §2.3's own order, which is also why the scoped case sits ahead of `writeNode`'s switch rather
     than in it: every branch of that switch is already past the annotations, and a directive precedes them.
   - **Bind mode has no counterpart**, deliberately: a bound object has nowhere to carry a URI and inventing
-    somewhere would change what a consumer's own class means. `TsonAbsent` makes the same asymmetry for
+    somewhere would change what a consumer's own class means. `TsonVoid` makes the same asymmetry for
     §2.9.
 
 - **`TsonDocument` is the model's document, and `TsonValue` stays a pure value.** [TSON-DATA] §2.2 —
@@ -101,8 +101,8 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   cast via `TsonValue.missingPath()`. The first failure sticks — stepping on past a missing returns the
   same node rather than extending its pointer. "Missing" (not in the tree) and "absent" (written, but
   holding no value) stay distinct kinds.
-- **There is one no-value node, `TsonAbsent`, because there is one no-value spelling**: the `_` sentinel. A read that
-  failed leaves no node at all — every read is all-or-nothing — so a `TsonAbsent` in a tree always means the document
+- **There is one no-value node, `TsonVoid`, because there is one no-value spelling**: the `_` sentinel. A read that
+  failed leaves no node at all — every read is all-or-nothing — so a `TsonVoid` in a tree always means the document
   wrote `_`. `null` is not one — §4 resolves boolean, number and string, so the unquoted token is a `TsonAtom` holding
   the string `null`, schemaless and under a schema alike, and it round-trips through `TsonTreeWriter` as the string it
   is. A JSON document's `null` reaches absence through a JSON reader, which maps it in the model, where the position's

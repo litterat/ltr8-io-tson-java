@@ -69,8 +69,8 @@ public final class ProcessorConfig {                 // io.ltr8.tson.base
     public ProcessorConfig withMetaNameBinder(DataNameBinder binder);  // a consumer's own meta vocabulary
 
     public ProcessorConfig withProcessorPolicy(ProcessorPolicy policy);   // the whole value
-    public ProcessorConfig withIdentifierPolicy(UnicodePolicy policy);    // declared names
-    public ProcessorConfig withTokenPolicy(UnicodePolicy policy);         // every token a read pulls
+    public ProcessorConfig withIdentifierPolicy(IdentifierPolicy policy); // every name, and its scopes
+    public ProcessorConfig withTokenPolicy(ScriptPolicy policy);         // every token a read pulls
     public ProcessorConfig withLimits(LimitsPolicy limits);               // §9.1's resource bounds
 
     public SchemaAccess schemaAccess();
@@ -172,14 +172,15 @@ public record SchemaLocation(…)   // io.ltr8.tson.compiler -- id + pointer + p
 ```
 
 ```java
-public record ProcessorPolicy(UnicodePolicy identifierPolicy,       // io.ltr8.tson.base.policy
-                              UnicodePolicy tokenPolicy,
+public record ProcessorPolicy(IdentifierPolicy identifierPolicy,    // io.ltr8.tson.base.policy
+                              ScriptPolicy tokenPolicy,
                               LimitsPolicy limits,
                               String unicodeDataVersion) {
     public static ProcessorPolicy defaults();
-    public static ProcessorPolicy of(UnicodePolicy identifier, UnicodePolicy token, LimitsPolicy limits);
-    public ProcessorPolicy withIdentifierPolicy(UnicodePolicy policy);
-    public ProcessorPolicy withTokenPolicy(UnicodePolicy policy);    // refused if per-segment
+    public static String dataVersion();                // the Unicode data version this build carries, e.g. "16.0"
+    public static ProcessorPolicy of(IdentifierPolicy identifier, ScriptPolicy token, LimitsPolicy limits);
+    public ProcessorPolicy withIdentifierPolicy(IdentifierPolicy policy);
+    public ProcessorPolicy withTokenPolicy(ScriptPolicy policy);
     public ProcessorPolicy withLimits(LimitsPolicy limits);
 }
 
@@ -190,8 +191,7 @@ public record LimitsPolicy(int maxDepth) {                           // io.ltr8.
 }
 ```
 
-The compact constructor refuses a per-segment token policy with `IllegalArgumentException`. `LimitsPolicy`
-is §9.1's bounds; nesting depth is the one enforced, by the event stream, and a document past it is reported
+`LimitsPolicy` is §9.1's bounds; nesting depth is the one enforced, by the event stream, and a document past it is reported
 as `LIMIT_EXCEEDED` — not a verdict, the document perhaps being valid and readable by a processor configured
 for more.
 
@@ -202,27 +202,41 @@ so does `processorPolicy()` on either read facade, which is the one to use when 
 changed a policy. A refusal carries **no** copy of its own: it is constant for a run, and what a sender needs
 in order not to be refused is this record *before* it writes. `tson policy` prints it from the shell.
 
-### Unicode policy
+### Identifier and Unicode policies
 
 ```java
-public final class UnicodePolicy {                          // io.ltr8.tson.base.policy
+public final class IdentifierPolicy {                       // io.ltr8.tson.base.policy -- §8.2's identifier policy
+    public record Violation(Diagnostic.Code code, String reason) {}
+
+    public static IdentifierPolicy of(ScriptPolicy scripts);      // whole name, skeleton distinctness on
+    public static IdentifierPolicy defaults();                    // of(highlyRestrictive())
+    public static IdentifierPolicy none();                        // judges nothing -- a synthetic source
+
+    public IdentifierPolicy perSegment();                  // the level per segment, split at the profile's separators
+    public IdentifierPolicy withSkeletonDistinctness(boolean on);  // mechanism 1, the look-alike rule over a scope
+
+    public ScriptPolicy scripts();
+    public boolean isPerSegment();
+    public boolean appliesSkeletonDistinctness();
+    public boolean appliesIdentifierProfile();
+    public List<Violation> judge(String name, IdentifierProfile profile);   // the per-name rules; empty if none
+}
+
+public final class ScriptPolicy {                          // the token policy, and an identifier policy's level
     public enum Level { ASCII_ONLY, SINGLE_SCRIPT, HIGHLY_RESTRICTIVE,
                         MODERATELY_RESTRICTIVE, MINIMALLY_RESTRICTIVE, UNRESTRICTED }
 
-    public static UnicodePolicy of(Level level);
-    public static UnicodePolicy asciiOnly();
-    public static UnicodePolicy singleScript();
-    public static UnicodePolicy highlyRestrictive();       // the identifier default, whole-name
-    public static UnicodePolicy moderatelyRestrictive();
-    public static UnicodePolicy scriptsUnchecked();
-    public static UnicodePolicy unrestricted();            // the token default
+    public static ScriptPolicy of(Level level);
+    public static ScriptPolicy asciiOnly();
+    public static ScriptPolicy singleScript();
+    public static ScriptPolicy highlyRestrictive();       // the identifier default
+    public static ScriptPolicy moderatelyRestrictive();
+    public static ScriptPolicy scriptsUnchecked();
+    public static ScriptPolicy unrestricted();            // the token default
 
-    public UnicodePolicy perSegment();                     // identifiers only -- tokenPolicy throws on one
-    public UnicodePolicy permitting(UnicodeScript... scripts);
+    public ScriptPolicy permitting(UnicodeScript... scripts);
 
-    public static String dataVersion();                        // the Unicode data version, e.g. "16.0"
-    public Level level();                                      // the three below are the whole of a policy
-    public boolean isPerSegment();
+    public Level level();                                      // with permittedScripts, the whole of a policy
     public List<Set<UnicodeScript>> permittedScripts();
     public boolean checksScripts();
     public boolean appliesIdentifierProfile();
@@ -278,8 +292,8 @@ public final class TsonTreeReader {
     public TsonTreeReader withSchema(String schemaUri);
     public TsonTreeReader withDiagnostics(DiagnosticsReceiver receiver);
     public TsonTreeReader withProcessorPolicy(ProcessorPolicy policy);
-    public TsonTreeReader withTokenPolicy(UnicodePolicy policy);
-    public TsonTreeReader withIdentifierPolicy(UnicodePolicy policy);
+    public TsonTreeReader withTokenPolicy(ScriptPolicy policy);
+    public TsonTreeReader withIdentifierPolicy(IdentifierPolicy policy);
     public TsonTreeReader withLimits(LimitsPolicy limits);
     public TsonTreeReader preservingUnknownTypeRefs();
     public ProcessorPolicy processorPolicy();                 // what THIS reader judges under
@@ -437,12 +451,12 @@ everything, are fail-fast by design.
 ### Exported sub-packages
 
 - `io.ltr8.tson.compiler.ast` — the parse-preserving AST: `Document`, `DataValue`, `CoreValue` and its
-  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `AbsentValue`, `EmptyBrace`,
+  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `VoidValue`, `EmptyBrace`,
   `ScopedValue`), `Annotation`, `TokenForm`.
 - `io.ltr8.tson.compiler.ast.schema` — `SchemaDocument` and the schema-grammar nodes.
 - `io.ltr8.tson.compiler.stream` — the Tier 2 event vocabulary: `TsonEvent` (sealed) with
   `DocumentStart`/`End`, `RecordStart`/`End`, `MapStart`/`MapArrow`/`MapEnd`, `ArrayStart`/`End`,
-  `FieldName`, `TokenEvent`, `AbsentEvent`, `EmptyBraceEvent`, `TypeRef`, `SchemaRef`,
+  `FieldName`, `TokenEvent`, `VoidEvent`, `EmptyBraceEvent`, `TypeRef`, `SchemaRef`,
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
 - `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`:
   the schema pipeline's own bind context), `SchemaMetaNameBinder` (`INSTANCE`, `defaultContext()`,
@@ -457,10 +471,10 @@ A true leaf — depends on **nothing**, not even `tson-annotation`.
 
 ```java
 public sealed interface TsonValue
-        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonAbsent, TsonMissing,
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonVoid, TsonMissing,
                 TsonScopedValue {
 
-    default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isAbsent() / isMissing();
+    default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isVoid() / isMissing();
     default boolean isContainer();
     default Optional<String> missingPath();          // the pointer up to the step that FAILED
 

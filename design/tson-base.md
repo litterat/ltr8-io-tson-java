@@ -56,8 +56,9 @@ applies with the same defaults", so one record and one refusal serve both encodi
 raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and is the one factory on the
 record — its classifying siblings switch on an encoding's own exception type where it classifies
 nothing at all.
-**`io.ltr8.tson.base.policy`** is what this processor will admit and spend — `ProcessorPolicy` and the two
-it composes, `UnicodePolicy` (§8.2's levels) and `LimitsPolicy` (§9.1's bounds), plus `FetchPolicy`, the
+**`io.ltr8.tson.base.policy`** is what this processor will admit and spend — `ProcessorPolicy` and what it
+composes, `IdentifierPolicy` and `ScriptPolicy` (§8.2's identifier and token policies) and `LimitsPolicy` (§9.1's
+bounds), plus `FetchPolicy`, the
 same statement about *obtaining a schema* (document cap, cache cap, whether a `?sha256=` pin is required)
 — one package because a deployment states one set of constraints, and §8.2 requires a relaxation be code
 rather than ambient: this is where that code points. **`FetchPolicy` is `ProcessorPolicy`'s sibling, not
@@ -76,10 +77,16 @@ deployment states -- the policy, the schema access, the bind context, and the on
 vocabulary -- with every setting returning a new instance, so a configuration may be handed out and
 derived from without the holder losing what they stated. Construction is not here and cannot be: it names
 the compiler's registry, which is why `Tson.of(config)` lives with the engine.
-**`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to — `Rational`, `Complex`,
-`CidrInet4Network`/`CidrInet6Network`, `InternetAddress` — the question a consumer arrives with rather than
-part of §8's model, and
-pure values depending on nothing. **`io.ltr8.tson.base.bind`** is what a deployment binds with:
+**`CanonicalIdentity` reads a reference as an IRI-reference** through `tson-net`'s `Iri`, so a host or path beyond
+US-ASCII is an identity, compared as written. An identity with no host — path-only or `file:`-style — is its
+path, which must be absolute ([TSON-DATA] §2.2.1), so it can never equal a host-and-path identity: a relative
+`tson.io/…` would be `https://tson.io/…`'s. `SchemaReference`, the fetching sources' check, still requires a host:
+a library entry is never fetched.
+
+**`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to that are TSON's own — `Rational` and
+`Complex` — the question a consumer arrives with rather than part of §8's model, and pure values depending on
+nothing. The network values (`Iri`, the `CidrNetwork` pair) are `tson-net`'s, a library usable without TSON,
+which this module requires transitively. **`io.ltr8.tson.base.bind`** is what a deployment binds with:
 `AtomContext` registers those host values, and the JDK ones beside them, with a `DataBindContext`, so a
 class binds the same under every encoding ([TSON-JSON] §5.1). **That is why this module requires
 `tson-bind`, and why doing so costs it nothing**: `tson-bind` is a general engine that binds a `DataValue`
@@ -119,16 +126,20 @@ never written, and a sink cannot tell a caller who finished from one who abandon
 flushes explicitly. What stays smaller is the *target* set, not the contract: `Appendable` is a genuinely
 different target rather than one spelled twice, so `toTson`'s char path is untouched.
 **`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
-`IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — and the
-UTS #39 rules over them, read by two engines and knowing nothing about either format. `UnicodePolicy` is
-in `policy` rather than beside the tables it reads, because the line between the two Unicode packages is
+`IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc`, `NfkcCasefold` — and the
+UTS #39 rules over them, read by two engines and knowing nothing about either format. The two policies are
+in `policy` rather than beside the tables they read, because the line between the two Unicode packages is
 **who touches them**: a consumer names `policy` to configure a processor and never names `unicode`; the
 engines read `unicode` and never name `policy`.
-**`IdentifierProfile` is here too**, beside the tables it reads: [TSON-DATA] §7.7's grammar (`validate`)
-and §8.2's restricted-character rule (`hygiene`), both **reporting** a violation rather than throwing one.
+**`IdentifierProfile` is here too**, beside the tables it reads: a UAX #31 R1 profile (`of`, `check`), with
+[TSON-DATA] §7.7's as `NAME` (`validate`), and §8.2's restricted-character rule (`hygiene`), all **reporting** a
+violation rather than throwing one. Its `Base` enum is the meta-kernel's `identifier_base`, and the top-level
+`Normalization` is `normalization`, which every `schema.meta` text family binds directly rather than mirroring; it
+applies its form (`apply`) as well as testing for it (`holds`), the parsers putting a value into the form and the
+profile then requiring it.
 That is what lets one check serve a caller that owes a parse error and one that owes a diagnostic — the
 identical violation is a `ParseException` from the lexer and a refusal from the linker — where a signature
 that threw forced the lexer's answer on everyone. It is not a parser: nothing here turns a token into a
-host value, and the `identifier` atom is a wrapper over `validate` living with the rest of the vocabulary
-(`atom.parser.IdentifierAtom`). It leaves `tson-compiler`'s `lexer` package exactly `Lexer`, `LexException`, `Token` and
+host value, and the `identifier_type` atom is a wrapper over `check` living with the rest of the vocabulary
+(`atom.parser.IdentifierParser`). It leaves `tson-compiler`'s `lexer` package exactly `Lexer`, `LexException`, `Token` and
 `TokenType`.

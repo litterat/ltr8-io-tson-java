@@ -10,6 +10,8 @@ import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -111,12 +113,12 @@ class OpenEntryResolvedFormTest {
     @Test
     void anOpenEntryWithAValueParameterValidates() {
         assertEquals(List.of(), tson().validate("""
-                !!schema:"https://tson.io/2026/36/m/meta-kernel.tn"
+                !!schema:"https://tson.io/2026/37/m/meta-kernel.tn"
                 !schema {
                   vector => !type_definition {
                     source: array
                     body: !template {
-                      parameters: [T N]
+                      parameters: [ { name: T  type: type_ref } { name: N  type: non_negative_integer } ]
                       template: "!array { element_type: T  min_items: N  max_items: N }"
                     }
                   }
@@ -138,18 +140,21 @@ class OpenEntryResolvedFormTest {
     void aHeldBodyReadsBackAsTheApplicationItHolds() {
         Tson tson = metaBoundTson();
         String resolved = """
-                !!schema:"https://tson.io/2026/36/m/meta.tn"
+                !!schema:"https://tson.io/2026/37/m/meta.tn"
                 !schema {
                   extern_of => !type_definition {
                     source: scoped
                     body: !template {
-                      parameters: [S]
+                      parameters: [ { name: S  type: schema_identity } ]
                       template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }"
                     }
                   }
                   e => !type_definition {
                     source: enum
-                    body: !template { parameters: [M]  template: "!enum { members: [a b M] }" }
+                    body: !template {
+                      parameters: [ { name: M  type: text } ]
+                      template: "!enum { members: [a b M] }"
+                    }
                   }
                 }
                 """;
@@ -158,7 +163,7 @@ class OpenEntryResolvedFormTest {
         Map<String, TypeDefinition> read = ResolvedForm.readResolved(tson, resolved);
 
         TemplateBody externOf = assertInstanceOf(TemplateBody.class, read.get("extern_of").body());
-        assertEquals(List.of("S"), externOf.parameters());
+        assertEquals(List.of(new TemplateParam("S", TypeRef.of("schema_identity"))), externOf.parameters());
         assertEquals("!scoped { scope: [EXTERN]  schemas: { S => _ } }", externOf.template(),
                 "the application as written -- no URI named 'S' anywhere");
 
@@ -188,8 +193,8 @@ class OpenEntryResolvedFormTest {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/shapes.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                   base           => { id: text }
                   pair           => <A, B> { first: A  second: B }
@@ -217,16 +222,12 @@ class OpenEntryResolvedFormTest {
                 if (definition.parameters().isEmpty() == held) {
                     broken.add(id + "#" + entry.getKey() + ": parameters " + definition.parameters()
                             + " with a " + definition.body().getClass().getSimpleName() + " body");
-                } else if (definition.body() instanceof TemplateBody body
-                        && !body.parameters().equals(definition.parameters())) {
-                    broken.add(id + "#" + entry.getKey() + ": entry states " + definition.parameters()
-                            + " and its held body states " + body.parameters());
                 }
             }
         }
 
         int openEntries = open;
-        assertEquals(List.of(), broken, "§5.10: only template entries are open, and they agree with their body");
+        assertEquals(List.of(), broken, "§5.10: only template entries are open");
         assertTrue(openEntries >= 8, () -> "not enough open entries to mean anything: " + openEntries);
     }
 
@@ -255,8 +256,8 @@ class OpenEntryResolvedFormTest {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/kinds.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                   port   => !integer_type { min: 0  max: 65535 }
                   age    => !int32 ^ { min: 0  max: 150 }
@@ -272,8 +273,22 @@ class OpenEntryResolvedFormTest {
                   holder => { p: pair<text, int32> }
                 }
                 """);
+        // A meta layer whose templates compose onto a base kind: each application closes to a constructor,
+        // whose kind is its chain's base kind and not its !record body's PRODUCT.
+        tson.resolve("""
+                !!id:"https://example.com/kind-constructors.tn"
+                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/37/m/meta.tn"
+                {
+                  listed      => <T> atom & { members: [T] }
+                  listed_text => listed<text>
+                  payload     => <T> data & { value: T }
+                  payload_iri => payload<iri>
+                }
+                """);
         List<String> ids = List.of(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID,
-                TsonBundledSchemas.CORE_ID, "https://example.com/kinds.tn");
+                TsonBundledSchemas.CORE_ID, "https://example.com/kinds.tn",
+                "https://example.com/kind-constructors.tn");
 
         Map<String, TypeDefinition> universe = new LinkedHashMap<>();
         Map<String, Map<String, TypeDefinition>> perSchema = new LinkedHashMap<>();

@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.tree.*;
-import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.tree.TsonValue;
@@ -19,15 +19,14 @@ import java.util.Optional;
  * Tree mode's {@code array} reader -- reads an array-shaped value into a {@link TsonArray}, one {@link
  * TsonValue} per element in source order, the counterpart to the old DOM reader's plain {@code List}.
  * Distinct from {@link TupleTreeReader}, which reads a fixed-arity, positionally-typed sequence into a {@code
- * TsonTuple}. An element written {@code _} is a {@link TsonAbsent}; an array whose read reported anything is
+ * TsonTuple}. An element written {@code _} is a {@link TsonVoid}; an array whose read reported anything is
  * not built ({@link ConstructionGuard}).
  */
 final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
 
     public ArrayTreeReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
-                           SchemaLocation schemaLocation,
-                            AnnotationTypes annotationTypes) {
-        super(name, displayName, body, resolver, schemaLocation);
+                           SchemaLocation schemaLocation, AnnotationTypes annotationTypes, boolean elementsAreNames) {
+        super(name, displayName, body, resolver, schemaLocation, elementsAreNames);
         this.annotationTypes = annotationTypes;
     }
 
@@ -44,7 +43,7 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
             }
             return new ArrayTreeReader(name, EntryDisplayName.of(name, typeDefinition), body, resolver,
                     context.locationOf(name, typeDefinition),
-                    AnnotationTypes.of(context));
+                    AnnotationTypes.of(context), elementsAreNames(body, context));
         }
     }
 
@@ -58,7 +57,7 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
         }
         List<TsonValue> elements = new ArrayList<>();
         // A null element is a stated `_`: a refused one abandons the array below.
-        readInto(ctx, decoded -> elements.add(decoded == null ? TsonAbsent.instance() : (TsonValue) decoded));
+        readInto(ctx, decoded -> elements.add(decoded == null ? TsonVoid.instance() : (TsonValue) decoded));
         if (ConstructionGuard.abandoned(ctx, mark)) {
             return null;
         }

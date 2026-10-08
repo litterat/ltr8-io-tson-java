@@ -42,8 +42,8 @@ class RestatedFieldAnnotationsTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               account => {
                 @doc:"Pre-2020 registry identifier."
@@ -58,7 +58,7 @@ class RestatedFieldAnnotationsTest {
               }
 
               archived_account => account & {
-                @todo:"drop in v3"
+                @title:"Legacy id"
                 legacy_id?: ~ "none"
               }
 
@@ -108,7 +108,7 @@ class RestatedFieldAnnotationsTest {
     /** Merge, not replace: the restatement's own leads and the inherited ones follow. */
     @Test
     void aRestatementsOwnAnnotationsLeadTheInheritedOnes() {
-        assertEquals(List.of("todo", "doc", "deprecated"), names("archived_account", "legacy_id"));
+        assertEquals(List.of("title", "doc", "deprecated"), names("archived_account", "legacy_id"));
     }
 
     /**

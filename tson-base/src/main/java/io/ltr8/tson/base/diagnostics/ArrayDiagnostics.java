@@ -1,6 +1,7 @@
 package io.ltr8.tson.base.diagnostics;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.unicode.ConfusableNames;
 
 import java.math.BigInteger;
 
@@ -28,7 +29,7 @@ public record ArrayDiagnostics(String typeName) {
      * is how the document said it, and appears in {@code actual} rather than in the prose -- the rule is about
      * the element's state, not about how absence was spelled.
      */
-    public Refusal absentElement(int index, String spelling) {
+    public Refusal voidElement(int index, String spelling) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
                 "'%s' element [%d] is absent, but elements are required".formatted(typeName, index),
                 "a value", spelling);
@@ -43,6 +44,18 @@ public record ArrayDiagnostics(String typeName) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 "'%s' requires unique elements, '%s' appears more than once".formatted(typeName, rendered),
                 "each element once", rendered);
+    }
+
+    /**
+     * [TSON-DATA] §8.2's look-alike rule over the elements of an array whose elements are unique -- a set, or any
+     * array marked {@code unique_items} -- and whose element type is an identifier family: one naming scope as an
+     * identifier-keyed map's keys are ([TSON-SCHEMA] §11.4): a policy refusal, reported at
+     * the second element.
+     */
+    public Refusal confusableElements(ConfusableNames.Collision collision) {
+        return new Refusal(Diagnostic.Code.CONFUSABLE_NAMES,
+                "'%s' has elements that read alike: %s".formatted(typeName, collision.describe()),
+                "elements a reader can tell apart", "'" + collision.second() + "'");
     }
 
     /**

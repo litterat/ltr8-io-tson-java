@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.writer;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.atom.VocabularyAtoms;
 import io.ltr8.tson.compiler.TsonDataEmitter;
-import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonAtom;
@@ -56,9 +56,9 @@ public final class TreeValueWriter {
             case TsonArray array -> writeSequence(array.elements(), array.typeRef(), out);
             case TsonTuple tuple -> writeSequence(tuple.elements(), tuple.typeRef(), out);
             case TsonAtom atom -> writeAtom(atom, out);
-            case TsonAbsent absentNode -> {
-                absentNode.typeRef().ifPresent(out::typeRef);
-                out.absentValue();
+            case TsonVoid voidNode -> {
+                voidNode.typeRef().ifPresent(out::typeRef);
+                out.voidValue();
             }
             case TsonMissing missing -> throw new IllegalArgumentException(
                     "a TsonMissing is a navigation artifact and cannot be written as TSON; navigation failed at \""
@@ -134,7 +134,7 @@ public final class TreeValueWriter {
         Object value = node.value();
         VocabularyAtoms.Entry vocab = vocabularyAtoms.get(value.getClass());
         if (vocab != null) {
-            out.typeRef(node.typeRef().orElse(vocab.typeRef())).quotedString(vocab.write(value));
+            out.typeRef(node.typeRef().orElseGet(() -> vocab.typeRef(value))).quotedString(vocab.write(value));
         } else {
             node.typeRef().ifPresent(out::typeRef);
             AtomWriter.writeDefaultAtom(value, out);

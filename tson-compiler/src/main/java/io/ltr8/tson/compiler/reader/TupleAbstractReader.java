@@ -1,13 +1,11 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.TupleDiagnostics;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.*;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 
@@ -23,10 +21,10 @@ import java.util.List;
  * {@code TsonObjectReader.toTuple}'s own note), and decoding every position into a single {@code
  * Object[]} in slot order straight off the stream.
  *
- * <p>Each position carries its own type *and* its own {@link ElementState} (§5.3) -- unlike {@link
- * ArrayAbstractReader}, where every element shares one type/state -- so absent-position handling
+ * <p>Each position carries its own type *and* its own {@code voidable} (§5.3) -- unlike {@link
+ * ArrayAbstractReader}, where every element shares one type and one fact -- so void-position handling
  * stays per-slot here rather than shared with arrays; the logic is analogous, not identical, so it's
- * duplicated rather than forced through one shared method (matching how {@code isAbsent} is
+ * duplicated rather than forced through one shared method (matching how {@code isVoid} is
  * duplicated, not shared, across every structural kind in this package).
  *
  * <p><b>Arity is fixed and exact</b>, unlike {@link ArrayAbstractReader}/{@link MapAbstractReader}'s
@@ -54,7 +52,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
     final TupleDiagnostics rules;
 
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for a position's state rule. */
-    private static final String ABSENT = "_";
+    private static final String VOID = "_";
 
     TupleAbstractReader(String name, String displayName, TupleBody body, TsonTypeReaderResolver resolver,
                          SchemaLocation schemaLocation) {
@@ -78,6 +76,20 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
             TsonTypeReader<?> parser = AnnotationBoxing.wrap(resolver.resolve(element.elementType().name()),
                     boxedAt.apply(position), annotationTypes);
             slots.add(new CompiledSlot(element, parser));
+        }
+        this.slots = slots;
+        this.schemaLocation = schemaLocation;
+        this.rules = new TupleDiagnostics(displayName, slots.size());
+    }
+
+    /** Over position readers already built, one per {@code body} position -- object-binding mode's rebuild. */
+    TupleAbstractReader(String name, String displayName, TupleBody body, List<TsonTypeReader<?>> positions,
+                        SchemaLocation schemaLocation) {
+        this.name = name;
+        this.displayName = displayName;
+        List<CompiledSlot> slots = new ArrayList<>(positions.size());
+        for (int position = 0; position < positions.size(); position++) {
+            slots.add(new CompiledSlot(body.elements().get(position), positions.get(position)));
         }
         this.slots = slots;
         this.schemaLocation = schemaLocation;
@@ -128,7 +140,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
             if (push != null) {
                 ScopePush.refuse(ctx.index(index), slot.schema().elementType().name(), push);
             }
-            result[index] = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(slot, index, ctx)
+            result[index] = ctx.peek() instanceof VoidEvent ? defaultOrRequire(slot, index, ctx)
                     : slot.parser().read(ctx.index(index));
             index++;
         }
@@ -140,9 +152,9 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     private Object defaultOrRequire(CompiledSlot slot, int index, TsonReadContext ctx) {
-        ctx.next(); // consume the AbsentEvent regardless of REQUIRED/OPTIONAL
-        if (slot.schema().state() == ElementState.REQUIRED) {
-            ctx.index(index).report(rules.absentPosition(index, ABSENT));
+        ctx.next(); // consume the VoidEvent whether or not the position is voidable
+        if (!slot.schema().voidable()) {
+            ctx.index(index).report(rules.voidPosition(index, VOID));
         }
         return null;
     }

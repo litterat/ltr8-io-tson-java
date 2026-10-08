@@ -2,6 +2,7 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.base.unicode.Normalization;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +29,9 @@ import java.util.Optional;
  * never the untyped one this field goes through. {@code pattern} is the regex's own source text for
  * the reason {@link TextType#pattern()} records.
  *
+ * <p>{@code normalization} is fixed to {@code NONE}: putting a pattern into another form changes what it
+ * matches ({@code [A-Z]} folds to {@code [a-z]}), so a regex is always the text as written.
+ *
  * <p>{@code regex => !regex_type {}} is a constructor-application instance (§5.5) whose resolved body
  * is exactly {@link #UNCONSTRAINED}.
  */
@@ -35,16 +39,16 @@ import java.util.Optional;
 public record RegexType(String spec, @Field("min_length") Optional<Integer> minLength,
                         @Field("max_length") Optional<Integer> maxLength,
                         Optional<Integer> length, Optional<String> pattern,
-                        Optional<List<String>> members) implements Atom {
+                        Optional<List<String>> members, Normalization normalization) implements Atom, TextFamily {
 
     /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
     public static final RegexType UNCONSTRAINED = new RegexType(
             "https://www.rfc-editor.org/rfc/rfc9485", Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty());
+            Optional.empty(), Optional.empty(), Optional.empty(), Normalization.NONE);
 
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
     public TextType textConstraints() {
-        return new TextType(minLength, maxLength, length, pattern, members);
+        return new TextType(minLength, maxLength, length, pattern, members, normalization);
     }
 
     /**

@@ -1,7 +1,8 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.bind.DataClassArray;
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 
@@ -28,16 +29,16 @@ final class BindArrayBuilder implements ArrayBuilder {
 
     /**
      * {@code array} read again for {@code target} -- a component's {@code List<Long>}, {@code long[]} or
-     * {@code Set<UUID>} -- its element bound to the target's element. An optional element cannot reach a
-     * primitive array, which has nowhere to put the absence.
+     * {@code Set<UUID>} -- its element bound to the target's element. A voidable element cannot reach a
+     * primitive array, which has nowhere to put a void element.
      */
     static JsonTypeReader<?> forTarget(ArrayReader array, DataClassArray target, String what,
                                        List<String> mismatches) {
         ArrayPlan plan = array.plan();
-        if (plan.optionalElements() && target.typeClass().isArray()
+        if (plan.voidableElements() && target.typeClass().isArray()
                 && target.arrayDataClass().typeClass().isPrimitive()) {
-            mismatches.add(what + " admits absent elements, and " + target.typeClass().getSimpleName()
-                    + " has no absence to hold one");
+            mismatches.add(what + " admits void elements, and " + target.typeClass().getSimpleName()
+                    + " has no null to hold one");
         }
         JsonTypeReader<?> element = BindTargets.to(array.element(), target.arrayDataClass(),
                 what + "'s element", target.typeClass().getSimpleName() + "'s element", mismatches);
@@ -57,7 +58,7 @@ final class BindArrayBuilder implements ArrayBuilder {
             return null;
         }
         for (int i = 0; i < elements.size(); i++) {
-            if (elements.get(i) == Slots.ABSENT) {
+            if (elements.get(i) == Slots.VOID) {
                 elements.set(i, null);
             }
         }
@@ -72,9 +73,7 @@ final class BindArrayBuilder implements ArrayBuilder {
             }
             return built;
         } catch (Throwable e) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "%s rejected the elements read for it: %s"
-                    .formatted(target.typeClass().getSimpleName(), e), "elements "
-                    + target.typeClass().getSimpleName() + " accepts", String.valueOf(e.getMessage()));
+            ctx.report(BindingDiagnostics.rejectedUnderSchema(target.typeClass(), Handed.ELEMENTS, e));
             return null;
         }
     }

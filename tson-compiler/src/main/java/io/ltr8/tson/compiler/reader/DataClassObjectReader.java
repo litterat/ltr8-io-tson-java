@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.Diagnostic;
@@ -241,9 +243,9 @@ public final class DataClassObjectReader {
     private Object bindAtom(TsonReadContext ctx, DataClassAtom dataClass) {
         Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
-        if (e instanceof AbsentEvent) {
+        if (e instanceof VoidEvent) {
             ctx.next();
-            return bindBaseValue(ctx, new BaseValue.AbsentValue(), dataClass.dataClass());
+            return bindBaseValue(ctx, new BaseValue.VoidValue(), dataClass.dataClass());
         }
         if (!(e instanceof TokenEvent token)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
@@ -435,12 +437,12 @@ public final class DataClassObjectReader {
             if (field.isRequired()) {
                 ctx.field(field.name()).report(Diagnostic.Code.FIELD_REQUIRED,
                         "missing required field '" + field.name() + "' for " + dataClass.typeClass(),
-                        "a value for '" + field.name() + "'", "(absent)");
+                        "a value for '" + field.name() + "'", "(missing)");
             }
             construct[field.index()] = null;
         }
 
-        return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass());
+        return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass(), Handed.VALUE);
     }
 
     /** The names this class declares, for a message that has to say what was expected. */
@@ -458,9 +460,12 @@ public final class DataClassObjectReader {
         return names.toString();
     }
 
-    /** One record field's value: the absent sentinel {@code _} binds to {@code null} (a required field left {@code _} is a {@code FIELD_REQUIRED} problem), anything else binds recursively. */
+    /**
+     * One record field's value: the void sentinel {@code _} binds to {@code null} (a required field left {@code _}
+     * is a {@code FIELD_REQUIRED} problem), anything else binds recursively.
+     */
     private Object bindField(TsonReadContext ctx, DataClassField field) {
-        if (ctx.peek() instanceof AbsentEvent) {
+        if (ctx.peek() instanceof VoidEvent) {
             ctx.next();
             if (field.isRequired()) {
                 ctx.field(field.name()).report(Diagnostic.Code.FIELD_REQUIRED,
@@ -507,11 +512,8 @@ public final class DataClassObjectReader {
                 dataClass.put().invoke(arrayData, iterator, element);
             }
             return arrayData;
-        } catch (RuntimeException ex) {
-            throw ex;
         } catch (Throwable t) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "failed to build " + dataClass.typeClass() + ": " + t.getMessage(),
-                    String.valueOf(dataClass.typeClass()), "(" + buffered.size() + " elements)");
+            ctx.report(BindingDiagnostics.rejectedByClass(dataClass.typeClass(), Handed.ELEMENTS, t));
             return null;
         }
     }
@@ -521,7 +523,7 @@ public final class DataClassObjectReader {
     /**
      * A map key is a full {@code data-value} (§2.6), bound recursively exactly like a value is.
      * {@code {}} binds to an empty map (§2.8's deferred choice, resolved to a map here since the
-     * target says map), and the absent sentinel {@code _} in key position is rejected (§2.9).
+     * target says map), and the void sentinel {@code _} in key position is rejected (§2.9).
      */
     private Object bindMap(TsonReadContext ctx, DataClassMap dataClass) {
         containerFraming(ctx, dataClass);
@@ -540,48 +542,52 @@ public final class DataClassObjectReader {
             return null;
         }
         int mark = ConstructionGuard.mark(ctx);
-
+        Object mapData;
         try {
-            Object mapData = dataClass.constructor().invoke(0);
-            if (empty) {
-                return mapData; // EmptyBraceEvent already consumed; no MapEnd for {}
-            }
-            DataClass keyClass = dataClass.keyDataClass();
-            DataClass valueClass = dataClass.valueDataClass();
-            Set<Object> statedKeys = new HashSet<>();
-            while (!(ctx.peek() instanceof MapEnd)) {
-                if (ctx.peek() instanceof AbsentEvent) {
-                    ctx.next(); // the absent key itself
-                    ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the absent sentinel '_' must not appear as a map key "
-                            + "(§2.9) for " + dataClass.typeClass(), "a real map key", "_");
-                    ctx.next(); // MapArrow
-                    EventSkip.scopedValue(ctx);
-                    continue;
-                }
-                int beforeKey = ctx.reported();
-                Object key = bind(ctx, keyClass);
-                if (ctx.reported() == beforeKey && !statedKeys.add(ValueIdentity.of(key))) {
-                    // §2.6, by bound key value -- a key that failed to bind is left out, since it is not a
-                    // key the document stated and a second failure would otherwise read as a repeat of it.
-                    ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
-                            "duplicate key '" + key + "' for " + dataClass.typeClass() + " -- a map states each "
-                                    + "key at most once (§2.6), and the repeat states an entry for nothing",
-                            "each key stated once", "'" + key + "' stated again");
-                }
-                ctx.next(); // MapArrow
-                ScopePush.refuseSchemaless(ctx);
-                Object value = bind(ctx, valueClass);
-                dataClass.put().invoke(mapData, key, value);
-            }
-            ctx.next(); // MapEnd
-            return ConstructionGuard.abandoned(ctx, mark) ? null : mapData;
-        } catch (RuntimeException ex) {
-            throw ex;
+            mapData = dataClass.constructor().invoke(0);
         } catch (Throwable t) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "failed to build " + dataClass.typeClass() + ": " + t.getMessage(),
-                    String.valueOf(dataClass.typeClass()), "(map)");
-            return null;
+            ctx.report(BindingDiagnostics.rejectedByClass(dataClass.typeClass(), Handed.ENTRIES, t));
+            mapData = null;
         }
+        if (empty) {
+            return mapData; // EmptyBraceEvent already consumed; no MapEnd for {}
+        }
+        DataClass keyClass = dataClass.keyDataClass();
+        DataClass valueClass = dataClass.valueDataClass();
+        Set<Object> statedKeys = new HashSet<>();
+        while (!(ctx.peek() instanceof MapEnd)) {
+            if (ctx.peek() instanceof VoidEvent) {
+                ctx.next(); // the void key itself
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the void sentinel '_' must not appear as a map key "
+                        + "(§2.9) for " + dataClass.typeClass(), "a real map key", "_");
+                ctx.next(); // MapArrow
+                EventSkip.scopedValue(ctx);
+                continue;
+            }
+            int beforeKey = ctx.reported();
+            Object key = bind(ctx, keyClass);
+            if (ctx.reported() == beforeKey && !statedKeys.add(ValueIdentity.of(key))) {
+                // §2.6, by bound key value -- a key that failed to bind is left out, since it is not a
+                // key the document stated and a second failure would otherwise read as a repeat of it.
+                ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
+                        "duplicate key '" + key + "' for " + dataClass.typeClass() + " -- a map states each "
+                                + "key at most once (§2.6), and the repeat states an entry for nothing",
+                        "each key stated once", "'" + key + "' stated again");
+            }
+            ctx.next(); // MapArrow
+            ScopePush.refuseSchemaless(ctx);
+            Object value = bind(ctx, valueClass);
+            // Not once the value is lost: a refused key or value travels as null (ConstructionGuard).
+            if (!ConstructionGuard.abandoned(ctx, mark)) {
+                try {
+                    dataClass.put().invoke(mapData, key, value);
+                } catch (Throwable t) {
+                    ctx.report(BindingDiagnostics.rejectedByClass(dataClass.typeClass(), Handed.ENTRIES, t));
+                }
+            }
+        }
+        ctx.next(); // MapEnd
+        return ConstructionGuard.abandoned(ctx, mark) ? null : mapData;
     }
 
     // ── Tuples ───────────────────────────────────────────────────────────
@@ -625,7 +631,7 @@ public final class DataClassObjectReader {
                     + " elements, found " + index, slots.length + " elements", String.valueOf(index));
         }
 
-        return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass());
+        return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass(), Handed.POSITIONS);
     }
 
     // ── Unions ───────────────────────────────────────────────────────────
@@ -639,7 +645,7 @@ public final class DataClassObjectReader {
      *
      * <p><b>The vocabulary comes before any Java name</b>, which is the order {@link #bindAtom} already
      * takes: a type-ref is a TSON type name, so a union whose members are built-in host types --
-     * {@code java.net.InetAddress}, {@code base.atom.CidrNetwork} -- is selected by {@code !ipv4} and
+     * {@code java.net.InetAddress}, {@code io.ltr8.net.CidrNetwork} -- is selected by {@code !ipv4} and
      * {@code !cidr4}, the names every reader of the document knows. The simple-name pass still answers
      * {@code !inet4address} behind it, and is not narrowed to exclude a member the vocabulary names:
      * {@code !circle} for a {@code Circle} is the same rule, so restricting it would be one rule for a
@@ -802,20 +808,19 @@ public final class DataClassObjectReader {
      * Invokes {@code constructor} with the assembled arguments, unless anything was reported since {@code
      * mark} -- {@link ConstructionGuard}'s all-or-nothing rule, shared verbatim with the schema-driven
      * {@code RecordBindReader}/{@code TupleBindReader} so both bind paths abandon a value for the same
-     * reasons. A caller in collecting mode has the diagnostics saying why.
+     * reasons. A caller in collecting mode has the diagnostics saying why. What the constructor throws -- its
+     * own check, or an unboxing {@code NullPointerException} at a primitive -- is the class refusing the values,
+     * reported as a {@code TYPE_MISMATCH}: with no schema the class is the contract ({@link BindingDiagnostics}).
      */
     private Object construct(TsonReadContext ctx, java.lang.invoke.MethodHandle constructor, Object[] arguments,
-                             int mark, Class<?> typeClass) {
+                             int mark, Class<?> typeClass, Handed handed) {
         if (ConstructionGuard.abandoned(ctx, mark)) {
             return null;
         }
         try {
             return constructor.invoke(arguments);
-        } catch (RuntimeException e) {
-            throw e;
         } catch (Throwable t) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "failed to construct " + typeClass + ": " + t.getMessage(),
-                    String.valueOf(typeClass), "(the read field values)");
+            ctx.report(BindingDiagnostics.rejectedByClass(typeClass, handed, t));
             return null;
         }
     }

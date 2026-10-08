@@ -5,7 +5,7 @@ package io.ltr8.tson.base;
  * facade wraps its caller's receiver in for one whole-document read.
  *
  * <p><b>A read that reported anything returns no value</b>, in every mode and both encodings: a tree's
- * placeholder and a real absent value are the same node, so a partial result cannot say which of its parts to
+ * placeholder and a real void value are the same node, so a partial result cannot say which of its parts to
  * trust, and the diagnostics -- each with a path into the document the caller already holds -- are the answer.
  * Counting at the receiver rather than asking the read context catches every route a problem takes, a token
  * refusal the stream reports directly among them.

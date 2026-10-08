@@ -42,11 +42,14 @@ import java.util.Deque;
 public final class TsonDataEmitter {
 
     /**
-     * [TSON-DATA] §2.2.1's rules on what a directive's argument may be, asked of the vocabulary by name
-     * rather than by naming a parser: a directive argument is a URI, and {@code uri} is what says so.
+     * [TSON-DATA] §3.3's rule on what a directive's argument may be, asked of the vocabulary by name rather
+     * than by naming a parser: a directive argument is a reference or a file reference, read as an
+     * IRI-reference (RFC 3987) so that a name beyond US-ASCII is written as itself, and {@code iri_reference}
+     * is what says so. Every URI-reference is one. Whether an identity is absolute is §2.2.1's question,
+     * asked where an identity is formed.
      */
-    private static final AtomType<?> URI_ATOM = BuiltinTypeVocabulary.lookup("uri")
-            .orElseThrow(() -> new IllegalStateException("the built-in vocabulary has no 'uri'"));
+    private static final AtomType<?> URI_ATOM = BuiltinTypeVocabulary.lookup("iri_reference")
+            .orElseThrow(() -> new IllegalStateException("the built-in vocabulary has no 'iri_reference'"));
 
     private final Appendable out;
 
@@ -224,14 +227,14 @@ public final class TsonDataEmitter {
      * does not write.
      *
      * <p>{@code uri} is checked against the same atom the reader parses it with, so a caller cannot emit a
-     * document that will not read back -- a directive argument MUST be a URI (§3.3), and the failure belongs
+     * document that will not read back -- a directive argument is an IRI-reference (§3.3), and the failure belongs
      * at the write that caused it rather than at whoever reads the result.
      */
     private TsonDataEmitter directive(String name, String uri) {
         try {
             URI_ATOM.read(uri);
         } catch (AtomTypeException e) {
-            throw new WriteException("'!!" + name + "' argument \"" + uri + "\" is not a valid URI (§3.3): "
+            throw new WriteException("'!!" + name + "' argument \"" + uri + "\" is not a valid IRI-reference (§3.3): "
                     + e.getMessage(), e);
         }
         emit("!!");
@@ -268,8 +271,8 @@ public final class TsonDataEmitter {
 
     // ── Leaf tokens ──────────────────────────────────────────────────────────
 
-    /** {@code _}, the absent sentinel (§2.9) -- the notation's only no-value spelling. */
-    public TsonDataEmitter absentValue() {
+    /** {@code _}, the void sentinel (§2.9) -- the notation's only no-value spelling. */
+    public TsonDataEmitter voidValue() {
         startCoreValue();
         emit('_');
         return this;

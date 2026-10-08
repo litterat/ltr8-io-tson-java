@@ -108,7 +108,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * nothing. A policy has already decided the token is refused; this only shapes that into a diagnostic,
      * and §8.2's rule is the processor's rather than any one encoding's -- both streams report through it.
      *
-     * A token whose scripts the read's {@code UnicodePolicy} does not permit ([TSON-DATA] §8.2's
+     * A token whose scripts the read's {@code ScriptPolicy} does not permit ([TSON-DATA] §8.2's
      * "Values", UTS #39 §5.2).
      *
      * <p><b>Always {@link Diagnostic.Code#RESTRICTED_SCRIPT}.</b> A token is not a name, so it has no identifier profile
@@ -116,7 +116,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * surface can carry.
      *
      * <p><b>{@code why} names the text it judged, so this does not name it again.</b> {@code
-     * UnicodePolicy.violation} opens with the unit it refused ({@code 'аdmin' mixes the scripts ...}),
+     * ScriptPolicy.violation} opens with the unit it refused ({@code 'аdmin' mixes the scripts ...}),
      * which is what makes {@code "the token " + why} read as one sentence -- the same composition {@code
      * DefaultTsonReadContext.refuse} uses for a name.
      *
@@ -172,7 +172,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * [TSON-SCHEMA] §7.2's record closure, so its {@code expected} is the type's own field list.
      *
      * <p>{@code FIELD_REQUIRED} and {@code FIELD_FIXED} are the two [TSON-SCHEMA] §5.2 field-state rules a
-     * document can break, and they sit together deliberately: neither is anything to do with the field's
+     * document can break, with {@code FIELD_GROUP} beside them for §5.11's group rule, and they sit together
+     * deliberately: neither is anything to do with the field's
      * <em>type</em>. A {@code FIELD_FIXED} value satisfied its atom's grammar and every facet -- it simply
      * isn't the one value the schema permits, whether that is a stated value contradicting {@code = value}
      * or a pinned field written {@code _}.
@@ -210,7 +211,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * would only be a fact the code already fixes, free to disagree with it.
      *
      * <p><b>{@code RESTRICTED_SCRIPT} is a script the policy does not admit, which is wider than a mix.</b>
-     * A script <em>combination</em> is the usual finding, and at {@code UnicodePolicy.Level.ASCII_ONLY}
+     * A script <em>combination</em> is the usual finding, and at {@code ScriptPolicy.Level.ASCII_ONLY}
      * a single-script name is refused with nothing mixed at all -- so the code names what the policy would
      * not admit rather than what the text did, and pairs with {@code RESTRICTED_CHARACTER} as the two halves
      * of one identifier policy. It is also the one of the three a <em>value</em> can carry ({@code
@@ -243,6 +244,15 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         FIELD_FIXED,
 
         /**
+         * A field group's presence rule broken ([TSON-SCHEMA] §5.11): no option chosen
+         * where the group needs one, more chosen than it admits, or a chosen option missing a member its group
+         * does not mark optional. One code for everything a group decides, so a consumer repairs the group as
+         * one thing rather than as separate field and type problems; a field outside any group keeps
+         * {@link #FIELD_REQUIRED}.
+         */
+        FIELD_GROUP,
+
+        /**
          * The value's type is not one the position takes. That covers a written type annotation naming a type
          * the position does not admit ([TSON-SCHEMA] §7.2's subsumption rule, a choice's variant membership
          * and a union's alike) and a position where a selector is <b>required</b> and absent, since no type
@@ -266,6 +276,17 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
          * #TYPE_MISMATCH}, not this.
          */
         UNKNOWN_TYPE_REF,
+
+        /**
+         * A value opens a schema scope -- {@code !!schema} in TSON text, {@code $schema} in JSON -- at a position
+         * whose own type is not a {@code scoped} instance, so there is no cell to read it into ([TSON-SCHEMA] §7.8's
+         * typed-position restriction). §8.1's {@code resolver} category: the document named a scope the schema
+         * gives it nowhere to open.
+         *
+         * <p>A push at a {@code scoped} position whose {@code scope} does not hold {@code EXTERN} is the cell rule's
+         * refusal instead, a {@link #VALIDATION_ERROR}: the position reads scopes, and this one is not admitted.
+         */
+        SCOPE_NOT_ADMITTED,
         ATOM_FORM_INVALID,
         ATOM_CONSTRAINT_VIOLATION,
         UNRECOGNIZED_FIELD,
@@ -363,6 +384,15 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                         SCHEMA_UNREACHABLE, SCHEMA_TIMEOUT, SCHEMA_TOO_LARGE -> false;
                 default -> true;
             };
+        }
+
+        /**
+         * Whether this code is one of [TSON-DATA] §8.2's three name-hygiene refusals -- {@link #CONFUSABLE_NAMES},
+         * {@link #RESTRICTED_CHARACTER}, {@link #RESTRICTED_SCRIPT}: the processor declined a name under its
+         * identifier policy, which a consumer routes differently from a malformed document or schema.
+         */
+        public boolean isNameRefusal() {
+            return this == CONFUSABLE_NAMES || this == RESTRICTED_CHARACTER || this == RESTRICTED_SCRIPT;
         }
     }
 }

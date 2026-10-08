@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.tson.base.atom.Rational;
+import io.ltr8.tson.base.unicode.Normalization;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -57,7 +58,7 @@ class AtomCoherenceTest {
     void everyUnconstrainedInstanceIsCoherent() {
         assertCoherent(IntegerType.UNCONSTRAINED);
         assertCoherent(TextType.UNCONSTRAINED);
-        assertCoherent(UriType.UNCONSTRAINED);
+        assertCoherent(UriType.REFERENCE);
         assertCoherent(RegexType.UNCONSTRAINED);
         assertCoherent(EmailType.UNCONSTRAINED);
         assertCoherent(DecimalType.UNCONSTRAINED);
@@ -73,7 +74,9 @@ class AtomCoherenceTest {
         assertCoherent(MacType.UNCONSTRAINED);
         assertCoherent(UuidType.UNCONSTRAINED);
         assertCoherent(ComplexType.UNCONSTRAINED);
-        assertCoherent(new Unit());
+        assertCoherent(new ValueType());
+        assertCoherent(new VoidType());
+        assertCoherent(IdentifierType.IDENTIFIER);
     }
 
     /** One end alone is a half-open range, which is the normal way to write a floor or a ceiling. */
@@ -121,11 +124,14 @@ class AtomCoherenceTest {
     /** The three families composing {@code text_type}'s facets delegate rather than restating the rule. */
     @Test
     void theTextComposingFamiliesInheritTheSameLengthRule() {
-        assertViolation(new UriType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty(), Optional.empty()),
+        assertViolation(new UriType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty(),
+                        Optional.empty(), true, true, Normalization.NONE),
                 "min_length 10 is above max_length 3");
-        assertViolation(new RegexType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty()),
+        assertViolation(new RegexType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty(),
+                        Normalization.NONE),
                 "min_length 10 is above max_length 3");
-        assertViolation(new EmailType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty()),
+        assertViolation(new EmailType("s", some(10), some(3), NONE, Optional.empty(), Optional.empty(),
+                        Normalization.NONE),
                 "min_length 10 is above max_length 3");
     }
 
@@ -453,5 +459,20 @@ class AtomCoherenceTest {
         List<String> inverted =
                 new Cidr4Type("s", some(24), some(8), List.of("10.0.0.0/8"), List.of("10.0.0.0/8")).coherenceCheck();
         assertEquals(1, inverted.size(), () -> "one cause, one message: " + inverted);
+    }
+
+    /** A member no value can reach: the grammar refuses {@code 2fast} before the member set is asked. */
+    @Test
+    void anIdentifierMemberOutsideTheGrammarIsIncoherent() {
+        IdentifierType names = IdentifierType.IDENTIFIER.withTextConstraints(new TextType(Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of("north", "2fast"))));
+        assertViolation(names, "member '2fast' is not an identifier");
+        assertEquals(1, names.coherenceCheck().size(), names.coherenceCheck().toString());
+    }
+
+    @Test
+    void identifierMembersInsideTheGrammarAreCoherent() {
+        assertCoherent(IdentifierType.IDENTIFIER.withTextConstraints(new TextType(Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of("north", "south")))));
     }
 }

@@ -71,5 +71,5 @@ directive costs one diagnostic rather than a value.
 **Tree mode keeps the push and bind mode cannot.** `scoped` is where a document says which schema a value
 belongs to, and a tree that dropped it could not be written back, so tree mode wraps an EXTERN value in a
 `TsonScopedValue`. A bound object has nowhere to carry a URI and inventing somewhere would change what a
-consumer's own class means, so bind mode hands the object back as it is — the same asymmetry `TsonAbsent`
+consumer's own class means, so bind mode hands the object back as it is — the same asymmetry `TsonVoid`
 already makes for [TSON-DATA] §2.9.

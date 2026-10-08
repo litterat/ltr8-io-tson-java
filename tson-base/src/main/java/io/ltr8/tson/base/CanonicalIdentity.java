@@ -1,7 +1,7 @@
 package io.ltr8.tson.base;
 
-import java.net.URI;
-import java.net.URISyntaxException;
+import io.ltr8.net.Iri;
+import io.ltr8.net.IriSyntaxException;
 import java.util.Locale;
 
 /**
@@ -24,6 +24,17 @@ import java.util.Locale;
  * identities exactly the way the library does -- which is this class. The half of §2.2.1 that reads
  * the {@code ?sha256=} pin this one strips lives in {@code TsonContentHash}.
  *
+ * <p><b>The reference is read as an IRI-reference</b> (§2.2.1, §3.3), by {@link Iri}'s own RFC 3987 grammar rather
+ * than {@code java.net.URI}'s RFC 2396 one, so a host or path beyond US-ASCII is held as written and compared as
+ * written, and a percent-encoded spelling of the same characters is another identity.
+ *
+ * <p><b>An identity without a host has an absolute path.</b> §2.2.1 gives a path-only or {@code file:}-style
+ * reference the path alone as its identity, resolved only against a library entry. A relative path would then be a
+ * string a host and path also spell -- {@code tson.io/2026/37/m/core.tn} written without its scheme is
+ * {@code https://tson.io/2026/37/m/core.tn}'s identity -- so the path must begin with {@code /}, and the two kinds
+ * of identity are disjoint by their first character. {@code /local/orders.tn}, {@code file:/local/orders.tn} and
+ * {@code file:///local/orders.tn} are one identity.
+ *
  * <p>The methods return and compare plain {@code String}s rather than instances of this type: a
  * canonical identity is a map key throughout the registries, and wrapping it would buy type-safety
  * only if every identity-carrying signature were converted at once.
@@ -44,48 +55,69 @@ public final class CanonicalIdentity {
      * @throws SchemaValidationException if {@code uriString} isn't a valid canonical-identity candidate
      */
     public static String canonicalize(String uriString) {
-        URI uri;
+        Iri iri;
         try {
-            uri = new URI(uriString);
-        } catch (URISyntaxException e) {
-            throw new SchemaValidationException("'" + uriString + "' is not a valid URI: " + e.getReason());
+            iri = Iri.parse(uriString, Iri.Grammar.IRI);
+        } catch (IriSyntaxException e) {
+            throw new SchemaValidationException(
+                    "'" + uriString + "' is not a valid IRI-reference (RFC 3987): it " + e.reason());
         }
 
-        if (uri.getScheme() == null) {
-            throw new SchemaValidationException("'" + uriString + "' has no scheme");
+        Iri.Authority authority = iri.authority().orElse(null);
+        String host = authority == null ? "" : authority.host().text();
+        if (host.isEmpty() && !iri.path().startsWith("/")) {
+            throw new SchemaValidationException("'" + uriString + "' has no host and a path that is not absolute: "
+                    + "an identity without a host names a library entry by an absolute path, so that it can never "
+                    + "be one a host and path also spell");
         }
-        if (uri.getHost() == null) {
-            throw new SchemaValidationException("'" + uriString + "' has no host");
+        if (authority == null) {
+            return pathOnly(uriString, iri);
         }
-        if (uri.getUserInfo() != null) {
+        if (authority.userinfo().isPresent()) {
             throw new SchemaValidationException(
                     "'" + uriString + "' carries userinfo, not permitted in an identifying URI");
         }
-        if (uri.getPort() != -1) {
+        if (authority.port().isPresent()) {
             throw new SchemaValidationException(
                     "'" + uriString + "' carries a port, not permitted in an identifying URI");
         }
-        if (uri.getRawFragment() != null) {
-            throw new SchemaValidationException(
-                    "'" + uriString + "' carries a fragment, not permitted in an identifying URI");
-        }
+        requireNoFragment(uriString, iri);
 
-        String host = uri.getHost();
         if (!host.equals(host.toLowerCase(Locale.ROOT))) {
             throw new SchemaValidationException("'" + uriString + "' has a non-lowercase host '" + host + "'");
         }
 
-        String rawPath = uri.getRawPath() == null ? "" : uri.getRawPath();
-        for (String segment : rawPath.split("/", -1)) {
+        requirePath(uriString, iri.path());
+        requireNoPercentEncodedUnreservedCharacters(uriString, host);
+        return host + iri.path();
+    }
+
+    /**
+     * A reference with no authority -- path-only ({@code /local/orders.tn}) or {@code file:}-style
+     * ({@code file:/local/orders.tn}) -- whose identity is the path alone, resolved only against a library entry.
+     * Its path is absolute, checked by the caller, so it begins with {@code /} where every identity with a host
+     * begins with the host: the two can never be one string.
+     */
+    private static String pathOnly(String uriString, Iri iri) {
+        requireNoFragment(uriString, iri);
+        requirePath(uriString, iri.path());
+        return iri.path();
+    }
+
+    private static void requireNoFragment(String uriString, Iri iri) {
+        if (iri.fragment().isPresent()) {
+            throw new SchemaValidationException(
+                    "'" + uriString + "' carries a fragment, not permitted in an identifying URI");
+        }
+    }
+
+    private static void requirePath(String uriString, String path) {
+        for (String segment : path.split("/", -1)) {
             if (segment.equals(".") || segment.equals("..")) {
                 throw new SchemaValidationException("'" + uriString + "' contains a dot-segment in its path");
             }
         }
-
-        requireNoPercentEncodedUnreservedCharacters(uriString, host);
-        requireNoPercentEncodedUnreservedCharacters(uriString, rawPath);
-
-        return host + rawPath;
+        requireNoPercentEncodedUnreservedCharacters(uriString, path);
     }
 
     /**

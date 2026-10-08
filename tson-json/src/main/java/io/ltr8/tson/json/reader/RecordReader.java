@@ -18,8 +18,8 @@ import java.util.Objects;
  * RecordBuilder} once per record.
  *
  * <p><b>A slot says what the document did with its field.</b> Null means the document did not state it; non-null
- * means it did, which is what the duplicate check, the group count and the absent-field pass all ask. The
- * {@link Slots} markers carry the cases a value cannot -- stated as absent, and a child's refusal -- and each
+ * means it did, which is what the duplicate check, the group count and the missing-field pass all ask. The
+ * {@link Slots} markers carry the cases a value cannot -- stated void, and a child's refusal -- and each
  * builder decides what they become.
  *
  * <p><b>Member order carries no meaning</b> (§6.1.6), so presence is settled once the object has closed: the
@@ -116,7 +116,7 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         if (plan.hasGroups()) {
             plan.validateGroups(closing, slots);
         }
-        fillAbsent(closing, slots);
+        fillMissing(closing, slots);
         return builder.build(ctx, slots, ctx.reported() == reportedBefore);
     }
 
@@ -138,8 +138,8 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
     }
 
     /**
-     * A member written null. §7 spends it as the absent sentinel before any type rule applies, so what happens
-     * next is the field's facts and nothing else: at a voidable field the member decodes to absence, stated --
+     * A member written null. §7 spends it as the void sentinel before any type rule applies, so what happens
+     * next is the field's facts and nothing else: at a voidable field the member decodes to a void value, stated --
      * which a tree keeps as {@code JsonNull} and bind mode delivers as {@code null} (§7.2). A FIXED field never
      * reaches here.
      */
@@ -147,17 +147,17 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         ctx.next();
         RecordField field = plan.fields[at];
         if (field.voidable()) {
-            return Slots.ABSENT;
+            return Slots.VOID;
         }
         if (field.role() == FieldRole.DEFAULT) {
             // §6.1.2: "at REQUIRED_DEFAULT the fix is omission, which injects the default". Injecting here
             // anyway would substitute a value the document explicitly disclaimed, so the default is still what
             // the field decodes to and only the verdict changes.
-            plan.field(ctx, at).report(plan.rules.absenceAtDefaultedField(memberName, RecordPlan.NULL));
+            plan.field(ctx, at).report(plan.rules.voidAtDefaultedField(memberName, RecordPlan.NULL));
             return injected[at];
         }
-        plan.field(ctx, at).report(plan.rules.absenceAtRequiredField(memberName, RecordPlan.NULL));
-        return Slots.ABSENT;
+        plan.field(ctx, at).report(plan.rules.voidAtRequiredField(memberName, RecordPlan.NULL));
+        return Slots.VOID;
     }
 
     /**
@@ -178,9 +178,9 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         if (event instanceof JsonEvent.NullValue) {
             ctx.next();
             // A field pinned to a value is never voidable: `_` is not the pin.
-            plan.field(ctx, at).report(plan.rules.fixedFieldAbsent(memberName, String.valueOf(pin.pinned()),
+            plan.field(ctx, at).report(plan.rules.voidAtFixedField(memberName, String.valueOf(pin.pinned()),
                     RecordPlan.NULL));
-            return Slots.ABSENT;
+            return Slots.VOID;
         }
         String content = pin.form().contentOf(event);
         if (content == null) {
@@ -199,7 +199,8 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
             return written;   // already reported by the field's own reader
         }
         if (!Objects.equals(ValueIdentity.of(value), ValueIdentity.of(pin.pinned()))) {
-            plan.field(ctx, at).report(plan.rules.fixedFieldContradicted(memberName, pin.text(), content));
+            plan.field(ctx, at).report(plan.rules.fixedFieldContradicted(memberName, Nodes.rendered(pin.pinned()),
+                    content));
         }
         // The schema's value, which is what an omitted FIXED member gets too: whether the document stated it
         // decides nothing about what the field holds (§6.1.3).
@@ -207,10 +208,10 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
     }
 
     /**
-     * Every field the document never mentioned: §6.1.3's injection, §6.1.2's permitted absences, and §7.6's
+     * Every field the document never mentioned: §6.1.3's injection, §6.1.2's permitted omissions, and §7.6's
      * refusals, as {@link RecordField#omitted} derives them.
      */
-    private void fillAbsent(JsonReadContext ctx, Object[] slots) {
+    private void fillMissing(JsonReadContext ctx, Object[] slots) {
         for (int i = 0; i < slots.length; i++) {
             if (slots[i] != null) {
                 continue;

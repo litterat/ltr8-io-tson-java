@@ -1,0 +1,36 @@
+package io.ltr8.tson.compiler.reader;
+
+import io.ltr8.tson.compiler.TsonReadContext;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.tree.*;
+import io.ltr8.tson.tree.TsonValue;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Tree mode: reads a {@code void_type} instance -- the void sentinel, spelled {@code _} or {@code null}
+ * -- consuming it via a delegate {@link VoidReader} and yielding {@link TsonVoid}.
+ */
+final class VoidTreeReader implements TsonTypeReader<TsonValue> {
+
+    private final TsonTypeReader<?> delegate;
+    private final AnnotationTypes annotationTypes;
+
+    VoidTreeReader(TsonTypeReader<?> delegate, AnnotationTypes annotationTypes) {
+        this.delegate = delegate;
+        this.annotationTypes = annotationTypes;
+    }
+
+    /** Captures the annotations before delegating -- see {@link AtomTreeReader#read} for why that ordering is what works. */
+    @Override
+    public TsonValue read(TsonReadContext ctx) {
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
+        int mark = ConstructionGuard.mark(ctx);
+        delegate.read(ctx); // consume the `_` (and let the delegate report any shape mismatch)
+        if (ConstructionGuard.abandoned(ctx, mark)) {
+            return null;
+        }
+        return annotations.isEmpty() ? TsonVoid.instance() : new TsonVoid(Optional.empty(), annotations);
+    }
+}

@@ -132,10 +132,10 @@ refusal have already reported, so an invalid document's diagnostics follow its m
 deliberately: holding them back would cost every valid document a buffer to tidy the answer for invalid ones.
 The allocation harness measures what the peek saved (`aSchemaDirectedRecordReadsWithoutLookingAhead`).
 
-- **`$schema` is refused everywhere a scoped reader does not stand.** §8.5 admits it only where the effective
-  type is a `scoped` instance holding EXTERN, and §3.3 makes it a resolver error at a position that is not
-  scoped. The scoped reader is the one place that reads it, and it consumes it, so a record reader never meets
-  one it should admit.
+- **`$schema` is refused everywhere a scoped reader does not stand.** §8.5 admits it only where the effective type is
+  a `scoped` instance holding EXTERN, and [TSON-SCHEMA] §7.8 makes it a resolver error at a position that is not
+  scoped (`SCOPE_NOT_ADMITTED`, as TSON text's `!!schema` there). The scoped reader is the one place that reads it,
+  and it consumes it, so a record reader never meets one it should admit.
 
 `CompiledReaders` is how a factory reaches another entry's reader, and carries `tson-compiler`'s own hazard: it is
 **rebound exactly once**, from the in-progress compilation to the finished schema, because handing readers the
@@ -145,11 +145,11 @@ edge, a dispatcher's included, is an object reference wired at compile, and a cy
 
 ### The map form is chosen by the factory, not re-asked per value
 
-§6.5 selects between the object and pairs forms **by `K`, never by inspecting the value**, and that selection
+§6.4 selects between the object and pairs forms **by `K`, never by inspecting the value**, and that selection
 is therefore made once: `MapPlan` records which form the key type names, and the factory returns that form's loop,
 `MapObjectReader` or `MapPairsReader`. Neither carries the other's state or a branch it never takes, and §4.1's
 "nothing is read speculatively" is structural rather than a thing the read remembers to honour. What both forms
-share is `MapEntries` — §6.5's entry-value rule, the size facets, and the wrong-shape refusal — and the form test
+share is `MapEntries` — §6.4's entry-value rule, the size facets, and the wrong-shape refusal — and the form test
 itself is `MapPlan.isObjectForm`, which §8.3 also asks to judge whether a map is class-stable. Both loops resolve a
 repeated key the same way in every mode: reported, and the value filed under the first spelling.
 
@@ -212,8 +212,12 @@ field the document contradicts, refused by the selected reader. TSON text still 
 dispatched member in the dispatcher; the parity test pins that divergence until `BACKLOG.md`'s port closes it.
 
 **What is specialised beyond the dispatch** is what the compiler already knows and the reader was re-deriving:
-a record with no field group skips the group pass entirely (§5.11's groups are the exception, and the pass
-indexes every member of every group).
+a record with no field group skips the group pass entirely (§5.11's groups are the exception). A group is
+compiled once to slot arrays (`RecordPlan.GroupPlan`): each option's members, and the subset its group does not
+mark `?`. The pass is one walk over each group's members: an option is chosen at its first stated member, each
+chosen option reports the members it lacks, in option order, and the count of chosen options is judged last.
+`RecordAbstractReader` on the TSON side does the same over field indexes, and `CrossEncodingParityTest` pins the
+two to one order.
 
 ### A concrete record: one loop for every mode, and a mode's factory and builder
 
@@ -262,11 +266,12 @@ position can hold. `tson-compiler` checks membership on every read instead; with
 compile, the check can be made once.
 
 **A record with no subtypes binds to a union only as a labelled choice** (`BindGroupUnionBuilder`): one REQUIRED
-group over every field, each member of the sealed interface a record whose one component's wire name is the field
-it labels — the kernel's `type_argument`, `{ ( name: type_ref | value: value ) }`, is the shape. The present field
-is the discriminator, so the record is read by the ordinary loop, the group rule admits exactly one member, and the
-builder constructs the member whose field arrived. Every part of the match is checked at compile; a near-miss is a
-`BindMismatchException` naming it rather than a guess.
+group of one-field options over every field (neither the `+` group, which admits several fields at once, nor an
+option holding several fields, which a one-component member could not carry), each member of the sealed interface a
+record whose one component's wire name is the field it labels — the kernel's `type_argument`, `{ ( name: type_ref |
+value: value ) }`, is the shape. The present field is the discriminator, so the record is read by the ordinary loop,
+the group rule admits exactly one member, and the builder constructs the member whose field arrived. Every part of
+the match is checked at compile; a near-miss is a `BindMismatchException` naming it rather than a guess.
 
 **A bound class is always what a record reader builds.** A class with a bridge over a record — `ToData`, or
 `@Transparent` over one — constructs its data form, and `BindRecordBuilder` passes it through the bridge. A
@@ -383,8 +388,8 @@ separates them is two constraint values, `scope` and `schemas`, and not a shape.
 `$type`'s). `$schema` leading is EXTERN, `$type` alone is LOCAL, and anything else -- a bare scalar, an array, an
 object leading with none of them, a wrapper with no `$type` -- names no type: a validation error in every mode.
 A cell the instance's `scope` does not hold refuses the value as a validation error, which is also how a
-`$schema` at a `declared` position is refused (`SPEC-FEEDBACK.md` #5: §7.8 states two categories for it, and both
-encodings take the cell rule's).
+`$schema` at a `declared` position is refused: [TSON-SCHEMA] §7.8's cell rule decides at every scoped position, in
+both encodings.
 
 **LOCAL is wired at compile.** Every name the governing namespace holds is resolved to a `Route` when the scoped
 entry compiles, so a LOCAL read is one map lookup and a route, exactly as a tagged record position's is -- inline

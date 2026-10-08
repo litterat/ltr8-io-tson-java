@@ -11,7 +11,6 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -36,7 +35,7 @@ import java.util.function.Function;
  * by two phases and read by four: {@code SchemaDesugarer} lifts a sugar form and {@code DefinitionResolver}
  * holds a composition or refinement template; {@code TemplateMaterialiser} closes one, {@link HeldBody}
  * answers §5.10's declaration-time questions about one, {@code SyntheticMerge} asks whether one holds an
- * application, and {@code ParameterKinds} walks one for §5.10's parameter kinds. A second opinion about what
+ * application, and {@code ParameterTypes} walks one for §5.10's parameter types. A second opinion about what
  * an application looks like is what makes one of those wrong.
  *
  * <p><b>Nothing here is canonical output, and {@code DataClassObjectWriter} cannot serve any of it.</b> That
@@ -83,8 +82,8 @@ final class WireForm {
     static final String GROUPS = "groups";
     static final String MEMBERS = "members";
     static final String TYPE = "type";
-    static final String STATE = "state";
     static final String OPTIONAL = "optional";
+    static final String OPTIONAL_MEMBERS = "optional_members";
     static final String VOIDABLE = "voidable";
     static final String ROLE = "role";
     static final String SUPERTYPES = "supertypes";
@@ -108,6 +107,28 @@ final class WireForm {
     static final String EXTENSION = "extension";
 
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * A {@code field_group} as a held body writes it: {@code optional_members} only where it names a member, and
+     * {@code optional} only where it is set.
+     */
+    static ScopedValue group(FieldGroup group, List<Annotation> annotations) {
+        List<RecordValue.Field> fields = new ArrayList<>();
+        fields.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(group.members().stream()
+                .map(option -> scoped(names(option))).toList()))));
+        if (!group.optionalMembers().isEmpty()) {
+            fields.add(new RecordValue.Field(OPTIONAL_MEMBERS, scoped(names(group.optionalMembers()))));
+        }
+        if (group.optional()) {
+            fields.add(nameField(OPTIONAL, "true"));
+        }
+        return scoped(new RecordValue(fields), annotations);
+    }
+
+    /** A list of field names as the array of bare names a resolved document writes. */
+    private static ArrayValue names(List<String> names) {
+        return new ArrayValue(names.stream().map(name -> scoped(new TokenValue(name, TokenForm.UNQUOTED))).toList());
+    }
 
     /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
     static ScopedValue scoped(CoreValue value) {
@@ -218,13 +239,7 @@ final class WireForm {
         }
         List<ScopedValue> groups = new ArrayList<>();
         for (FieldGroup group : body.groups()) {
-            List<RecordValue.Field> members = new ArrayList<>();
-            members.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(group.members().stream()
-                    .map(member -> scoped(new TokenValue(member, TokenForm.UNQUOTED))).toList()))));
-            if (group.state() != ElementState.REQUIRED) {
-                members.add(nameField(STATE, group.state().name()));
-            }
-            groups.add(scoped(new RecordValue(members)));
+            groups.add(group(group, List.of()));
         }
         List<RecordValue.Field> binding = new ArrayList<>();
         if (!body.supertypes().isEmpty()) {

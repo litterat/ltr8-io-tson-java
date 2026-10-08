@@ -5,7 +5,7 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -17,7 +17,7 @@ import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
+import io.ltr8.tson.compiler.stream.VoidEvent;
 import io.ltr8.tson.compiler.stream.AnnotationEnd;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
@@ -110,11 +110,14 @@ import java.util.Optional;
 public final class TsonDataStream implements TsonEventSource {
 
     /**
-     * [TSON-DATA] §2.2.1's rules on what a directive's argument may be, asked of the vocabulary by name
-     * rather than by naming a parser: a directive argument is a URI, and {@code uri} is what says so.
+     * [TSON-DATA] §3.3's rule on what a directive's argument may be, asked of the vocabulary by name rather
+     * than by naming a parser: a directive argument is a reference or a file reference, read as an
+     * IRI-reference (RFC 3987) so that a name beyond US-ASCII is written as itself, and {@code iri_reference}
+     * is what says so. Every URI-reference is one. Whether an identity is absolute is §2.2.1's question,
+     * asked where an identity is formed.
      */
-    private static final AtomType<?> URI_ATOM = BuiltinTypeVocabulary.lookup("uri")
-            .orElseThrow(() -> new IllegalStateException("the built-in vocabulary has no 'uri'"));
+    private static final AtomType<?> URI_ATOM = BuiltinTypeVocabulary.lookup("iri_reference")
+            .orElseThrow(() -> new IllegalStateException("the built-in vocabulary has no 'iri_reference'"));
 
     private final Lexer lexer;
 
@@ -148,7 +151,7 @@ public final class TsonDataStream implements TsonEventSource {
     private final LimitsPolicy limits;
 
     /** §8.2's token surface, or {@code null} where a read named none -- see {@link #checkTokenPolicy}. */
-    private UnicodePolicy tokenPolicy;
+    private ScriptPolicy tokenPolicy;
     private DiagnosticsReceiver tokenPolicyReceiver;
 
     /**
@@ -347,7 +350,7 @@ public final class TsonDataStream implements TsonEventSource {
                     + "(expected '!!schema', '!!meta' or the start of the document's value)");
         }
         return parseError("expected a value (record, map, array, empty braces, "
-                + "the absent sentinel '_', or a token), found " + describe(t));
+                + "the void sentinel '_', or a token), found " + describe(t));
     }
 
     /**
@@ -537,7 +540,7 @@ public final class TsonDataStream implements TsonEventSource {
     /** Every token type a {@code {} can be immediately followed by that can only ever be a map key (never a bare field name). */
     private static boolean isAlwaysMapStart(TokenType type) {
         return switch (type) {
-            case AT, BANG, LBRACE, LBRACKET, ABSENT -> true;
+            case AT, BANG, LBRACE, LBRACKET, VOID -> true;
             default -> false;
         };
     }
@@ -660,8 +663,8 @@ public final class TsonDataStream implements TsonEventSource {
         try {
             URI_ATOM.read(arg.text());
         } catch (AtomParseException e) {
-            throw new ParseException(
-                    "'!!" + expectedName + "' argument '" + arg.text() + "' is not a valid URI (§3.3)", arg.start());
+            throw new ParseException("'!!" + expectedName + "' argument '" + arg.text()
+                    + "' is not a valid IRI-reference (§3.3)", arg.start());
         }
         return arg.text();
     }
@@ -846,9 +849,9 @@ public final class TsonDataStream implements TsonEventSource {
                     ready.add(new ArrayStart(t.start()));
                     pushFrame(new ArrayFrame(true));
                 }
-                case ABSENT -> {
+                case VOID -> {
                     advance();
-                    ready.add(new AbsentEvent(t.start()));
+                    ready.add(new VoidEvent(t.start()));
                 }
                 case UNQUOTED, SINGLE_LINE_STRING, MULTI_LINE_STRING -> {
                     advance();
@@ -906,7 +909,7 @@ public final class TsonDataStream implements TsonEventSource {
             }
 
             throw parseError("expected a value (record, map, array, empty braces, "
-                    + "the absent sentinel '_', or a token), found " + describe(t1));
+                    + "the void sentinel '_', or a token), found " + describe(t1));
         }
     }
 

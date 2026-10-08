@@ -27,8 +27,9 @@ source of truth — with **two** standing exceptions. The three `.tn` schemas ar
 time**, so they are the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in
 place**: see "Part 3 is drafted here" below.
 
-The bundled schemas carry **Revision 36 identities** — `https://tson.io/2026/36/m/*.tn`. `spec/` holds
-**Revision 36** of Parts 1 and 2, the published cache, not edited here except for §13.2's three artifact rows,
+On `main` the bundled schemas carry **Revision 37 identities** (`https://tson.io/2026/37/m/*.tn`); a proposal branch
+carries the next revision's. `spec/` holds
+**Revision 37** of Parts 1 and 2, the published cache, not edited here except for §13.2's four artifact rows,
 so the table names the bytes beside it and stays checkable; its Part 1 and Guide rows stay at the revision
 those documents actually are. **§13.2 is a fourth pin to move** whenever the artifacts change.
 `scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins, and the spec
@@ -56,17 +57,48 @@ lets a schema change land across several commits with the integrity checks left 
 **The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
 `@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`
 does it: every entry must read back into `schema.meta`, have a counterpart here and resolve identically,
-and every schema-map key must carry the same annotations (`@ordered`, `@bounded`, `@exact`, `@numeric`,
-`@synthetic`; `@doc` aside, a fixture summarising it). **Key annotations are compared from the parsed
-text**, never through the bound document, which drops them, so both sides would carry none and agree for the
-wrong reason. They are the only external statement of what a conforming resolver produces. Keep them in step
-with the `.tn` beside them.
+and every schema-map key must carry the same annotations (`@ordering`, `@bounded`, `@exact`, `@numeric`,
+`@synthetic`). `@doc` is not compared: a fixture keeps only its header note for the reader and leaves entry
+docs out, since it exists to be compared and a summary of a source doc only drifts from it. **Key annotations
+are compared from the parsed text**, never through the bound document, which drops them, so both sides would
+carry none and agree for the wrong reason. They are the only external statement of what a conforming resolver
+produces. Keep them in step with the `.tn` beside them.
+
+### Writing the bundled schemas' docs
+
+A bundled schema's `@doc` states the **contract** of its entry and nothing else. The test for every sentence: would a
+schema author or a processor implementer get something wrong without it? If not, it belongs in the spec, not here —
+the schemas ship in the library and are read as the normative vocabulary, so an argument in them reads as a rule.
+
+- **Stays:** what the entry is, and for a type its value space — which values, how equality and ordering work; what
+  each field or facet means, with its unit; coherence rules and schema-load/resolver errors; refinement rules (what a
+  refinement may set, tighten, never change); defaults and what omission yields; cross-layer name-resolution facts
+  (core declaring a sibling of a kernel type under the same name); how TSON text spells a value, said by name;
+  mappings a converter needs (JSON Schema `number`, a host language's closed-set construct); one short example where
+  the spelling is not obvious; the spec citations attached to sentences that stay.
+- **Goes:** history ("earlier revisions called", "was removed", "unchanged", "now", "remains"); rationale ("because",
+  "which is why", "considered and rejected"); comparisons made to persuade (Java's `BigDecimal.equals`, "as
+  `java.time.Duration` writes it"); restatements — a rule a file header states for several entries (meta's bounds,
+  `multiple_of` and `members` rules) is stated once there and an entry refers to it. The exception is the kernel's
+  `integer_type`, which keeps its own statement: a schema chained to the kernel alone never reads meta's header.
+- **Form:** open with what the entry is, then fields or facets, then rules. Present tense, plain declarative
+  sentences. A one-sentence doc is `@doc:"…"` on one line; a longer one, or one that does not fit in 80 columns, is a
+  `"""` block indented as the file does. Doc text is filled to **80 columns, indentation included**; a backtick code
+  span is never split across lines, and preformatted text (a grammar, the References table, indented examples)
+  keeps its own layout. A member-set entry says whose members it holds ("The members of an integer_type.").
+- **File headers** keep what the file is, how it is reached through `!!meta` and `!!import`, what it contains, rules
+  shared by several entries, and the hash-pin note.
+- **Shortening a rule never changes it.** Where tighter wording could strengthen or weaken it, the sentence stays
+  verbatim. A doc that contradicts its declaration or another doc is reported, never silently reconciled.
+
+Text that leaves a doc is not discarded: it goes to the spec author as a removed-text list, verbatim and categorised,
+so the argument can land in Part 2. The `*-resolved.tn` fixtures carry none of these docs.
 
 ## Branches and revisions
 
-**`main` is the reference implementation of the published revision, which is Revision 36.** Each published
+**`main` is the reference implementation of the published revision, which is Revision 37.** Each published
 revision's implementation stays reachable at the point it was the whole of `main`, by tag: `r2026-32`,
-`r2026-34`, `r2026-35` — tagged before the next proposal merges, and in the corpus repo too where the pair is
+`r2026-34`, `r2026-35`, `r2026-36` — tagged before the next proposal merges, and in the corpus repo too where the pair is
 wanted. The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling corpus
 branch of the same name and `SUITE_PIN` following it — where the register's entries state what is *running* rather
 than what is *proposed*, the branch being the argument. It merges when the spec lands and not before, since
@@ -74,10 +106,12 @@ merging a divergence early costs `main` the one signal it exists to give. The bu
 revision's own identities from the start, so a content change lands on artifacts named for the revision
 proposing it rather than being re-identified at the end.
 
-**No proposal is open.** Work lands on `main` through ordinary PR branches until something needs a rule the
-published revision cannot carry — typically a meta-kernel field — and that opens `r2026-37-proposal`, its
-corpus twin, and the Revision 37 identities from its first commit. While it is open, `Closes #N` in a PR into it
-does not close the issue (GitHub fires it only on the default branch), so each is closed by hand.
+**No proposal branch is open.** Revision 37's — the meta-kernel changes Revision 36 could not carry — merged to
+`main` when the spec landed. The next opens as `r2026-38-proposal` with its corpus twin, carrying the Revision 38
+identities and the next version from its first commit. Kernel work lands through PR branches off it; work the
+published revision can carry still lands on `main`, which the proposal merges in to keep up. While one is open,
+`Closes #N` in a PR into it does not close the issue (GitHub fires it only on the default branch), so each is closed
+by hand.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** The spec is a working
 revision, this is its first implementation, and the artifact has no published releases and no remote
@@ -193,15 +227,12 @@ keeps it apart; the exception's class is what picks the code.
 `DefinitionResolver`'s Javadoc lists the exact current boundary.
 
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
-`https://tson.io/2026/36/ltr8/<group>/<name>-<version>.tn` — `/2026/36` is the spec revision, `ltr8` the
-publishing org, `<group>` the subsystem (`cli`), `<name>-<version>` the schema name with a trailing
-integer version. **The version is bumped on a release, not on a change.** §10's immutability rule binds a
-*published* identity: once a release ships carrying the schema, the document under that `!!id` is fixed and
-a later shape change mints the next version (`diagnostics-12.tn`) rather than editing it. Between releases
-— while the build version carries `-SNAPSHOT`, so nothing has published the identity — the schema is in
-development and is edited in place. Bumping per change instead mints versions nobody ever consumed, one for
-every field added during a development cycle. **Use `.tn`, not `.tn1`** — `.tn1` is a stability claim §7.1
-reserves for the eventual frozen "TSON version 1", which hasn't happened.
+`https://tson.io/2026/37/io/ltr8/<group>/<name>.tn` — `/2026/37` is the spec revision, `io/ltr8` the publisher,
+`<group>` the subsystem (`cli`), `<name>` the schema. Between releases — while the build version carries
+`-SNAPSHOT`, so nothing has published the identity — the schema is edited in place. §10's immutability rule
+binds a *published* identity: once a release ships carrying the schema, the document under that `!!id` is fixed.
+**Use `.tn`, not `.tn1`** — `.tn1` is a stability claim §7.1 reserves for the eventual frozen "TSON version 1",
+which hasn't happened.
 
 **Line wrapping:** wrap both comments and code to 125 characters.
 

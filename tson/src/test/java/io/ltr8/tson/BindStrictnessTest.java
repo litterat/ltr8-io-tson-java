@@ -42,8 +42,8 @@ class BindStrictnessTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               order => { sku: text  quantity: int32  currency: text }
             }
@@ -142,7 +142,7 @@ class BindStrictnessTest {
         String written = new TsonObjectWriter(context).toTson(new OrderTraced("A", 1, "AUD", Optional.of("t")));
         assertFalse(written.contains("trace"), written);
 
-        // And it still constructs: the class's own component arrives as the engine's absent value, not as a
+        // And it still constructs: the class's own component arrives as the engine's void value, not as a
         // hole in the array, which is what keeps the read side of `@Unbound` unchanged.
         assertEquals(new OrderTraced("A", 1, "AUD", Optional.empty()),
                 read(tson(SCHEMA, OrderTraced.class), OrderTraced.class,
@@ -189,8 +189,8 @@ class BindStrictnessTest {
 
     private static final String MONEY_SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               money => text
               order => { sku: text  quantity: int32  currency: money }

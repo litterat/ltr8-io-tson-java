@@ -1,9 +1,10 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.tson.atom.AtomType;
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 
@@ -33,12 +34,19 @@ final class BindMapBuilder implements MapBuilder {
     /**
      * {@code map} read again for {@code target}: the object form's key parser bound to the target's key class
      * (through its bridge), the pairs form's key reader and either form's value reader bound through {@link
-     * BindTargets}.
+     * BindTargets}. An ordered map needs a target that keeps insertion order ({@link DataClassMap#ordered()}),
+     * or the order the document wrote is lost; an unordered map takes either kind, since keeping its order loses
+     * nothing.
      */
     static JsonTypeReader<?> forTarget(JsonTypeReader<?> map, DataClassMap target, String what,
                                        List<String> mismatches) {
         String targetName = target.typeClass().getSimpleName();
         BindMapBuilder builder = new BindMapBuilder(target);
+        MapPlan ordering = map instanceof MapObjectReader object ? object.plan() : ((MapPairsReader) map).plan();
+        if (ordering.ordered() && !target.ordered()) {
+            mismatches.add(what + " is an ordered map, and " + targetName + " does not keep insertion order -- "
+                    + "declare a SequencedMap");
+        }
         if (map instanceof MapObjectReader object) {
             MapPlan plan = object.plan();
             JsonTypeReader<?> value = BindTargets.to(object.value(), target.valueDataClass(), what + "'s value",
@@ -92,9 +100,7 @@ final class BindMapBuilder implements MapBuilder {
             }
             return built;
         } catch (Throwable e) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "%s rejected the entries read for it: %s"
-                    .formatted(target.typeClass().getSimpleName(), e), "entries "
-                    + target.typeClass().getSimpleName() + " accepts", String.valueOf(e.getMessage()));
+            ctx.report(BindingDiagnostics.rejectedUnderSchema(target.typeClass(), Handed.ENTRIES, e));
             return null;
         }
     }
@@ -105,6 +111,6 @@ final class BindMapBuilder implements MapBuilder {
     }
 
     private static Object value(Object slot) {
-        return slot == Slots.ABSENT ? null : slot;
+        return slot == Slots.VOID ? null : slot;
     }
 }

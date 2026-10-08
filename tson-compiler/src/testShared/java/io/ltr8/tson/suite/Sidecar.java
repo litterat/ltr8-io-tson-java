@@ -1,7 +1,7 @@
 package io.ltr8.tson.suite;
 
 import io.ltr8.tson.compiler.TsonDataParser;
-import io.ltr8.tson.compiler.ast.AbsentValue;
+import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -177,10 +177,10 @@ public final class Sidecar {
         return assertInstanceOf(TokenValue.class, fieldCore(record, name), "field '" + name + "'").text();
     }
 
-    /** Like {@link #fieldText}, but the field may be the absent sentinel {@code _}, returning null then. */
+    /** Like {@link #fieldText}, but the field may be the void sentinel {@code _}, returning null then. */
     public static String fieldTextOrAbsent(RecordValue record, String name) {
         DataValue value = fieldValue(record, name);
-        return (value.coreValue() instanceof AbsentValue) ? null : fieldText(record, name);
+        return (value.coreValue() instanceof VoidValue) ? null : fieldText(record, name);
     }
 
     /**

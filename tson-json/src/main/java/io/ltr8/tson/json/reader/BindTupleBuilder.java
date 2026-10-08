@@ -1,7 +1,8 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.bind.DataClassTuple;
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 
@@ -30,7 +31,7 @@ final class BindTupleBuilder implements TupleBuilder {
 
     /**
      * {@code tuple} read again for {@code target}, each position bound to the target's element at the same index.
-     * The target's arity must be the tuple's, and an optional position cannot reach a primitive element.
+     * The target's arity must be the tuple's, and a voidable position cannot reach a primitive element.
      */
     static JsonTypeReader<?> forTarget(TupleReader tuple, DataClassTuple target, String what,
                                        List<String> mismatches) {
@@ -43,9 +44,9 @@ final class BindTupleBuilder implements TupleBuilder {
         JsonTypeReader<?>[] slots = new JsonTypeReader<?>[plan.arity()];
         for (int i = 0; i < slots.length; i++) {
             Class<?> element = target.elements()[i].dataClass().typeClass();
-            if (plan.optional()[i] && element.isPrimitive()) {
-                mismatches.add(what + "'s position " + i + " admits absence, and " + element.getName()
-                        + " has none to hold it");
+            if (plan.voidable()[i] && element.isPrimitive()) {
+                mismatches.add(what + "'s position " + i + " is voidable, and " + element.getName()
+                        + " has no null to hold a void value");
             }
             slots[i] = BindTargets.to(tuple.slot(i), target.elements()[i].dataClass(), what + "'s position " + i,
                     target.typeClass().getSimpleName() + "'s element " + i, mismatches);
@@ -66,7 +67,7 @@ final class BindTupleBuilder implements TupleBuilder {
             return null;
         }
         for (int i = 0; i < positions.size(); i++) {
-            if (positions.get(i) == Slots.ABSENT) {
+            if (positions.get(i) == Slots.VOID) {
                 positions.set(i, null);
             }
         }
@@ -76,9 +77,7 @@ final class BindTupleBuilder implements TupleBuilder {
         try {
             return target.constructor().invoke(positions.toArray());
         } catch (Throwable e) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "%s rejected the positions read for it: %s"
-                    .formatted(target.typeClass().getSimpleName(), e), "positions "
-                    + target.typeClass().getSimpleName() + " accepts", String.valueOf(e.getMessage()));
+            ctx.report(BindingDiagnostics.rejectedUnderSchema(target.typeClass(), Handed.POSITIONS, e));
             return null;
         }
     }

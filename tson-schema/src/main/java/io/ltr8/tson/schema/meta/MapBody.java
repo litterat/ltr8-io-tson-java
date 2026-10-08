@@ -15,21 +15,23 @@ import java.util.Optional;
  * type_definition>}). {@code @Field} renames each component to the kernel's own snake_case wire
  * name -- {@code tson-bind} otherwise writes the bare Java component name verbatim (camelCase).
  *
- * <p>{@code state} governs the <b>value</b> and only the value, spelled {@code {K => V?}} -- a key can
- * never be absent ([TSON-DATA] §2.9), so there is no second state for the name to be ambiguous between.
- * It is the same two-member {@link ElementState} an array element and a tuple position carry, defaulting
- * the same way, so a map value defaults REQUIRED like every other container position and is loosened with
- * {@code ?} rather than being permissive by default with no way to tighten it.
+ * <p>{@code voidable} governs the <b>value</b> and only the value, spelled {@code {K => V?}} -- a key can
+ * never be void ([TSON-DATA] §2.9), so there is nothing else for the name to be ambiguous between. It is the
+ * same fact an array element and a tuple position carry, defaulting the same way, so a map value is never void
+ * unless {@code ?} says so.
+ *
+ * <p>{@code ordered} says whether entry order is part of the value, and is false unless a schema says so, as
+ * a JSON object's is; output keeps the order written either way ([TSON-SCHEMA] §7.5).
  */
 @Typename(name = "map")
 public record MapBody(@Field("key_type") TypeRef keyType, @Field("value_type") TypeRef valueType,
-                       @Field("state") ElementState state,
+                       @Field("voidable") boolean voidable, @Field("ordered") boolean ordered,
                        @Field("min_items") Optional<BigInteger> minItems,
                        @Field("max_items") Optional<BigInteger> maxItems) implements Product {
 
-    /** An unconstrained map: values required, no size bounds. */
+    /** An unconstrained map: values never void, unordered, no size bounds. */
     public static MapBody of(TypeRef keyType, TypeRef valueType) {
-        return new MapBody(keyType, valueType, ElementState.REQUIRED, Optional.empty(), Optional.empty());
+        return new MapBody(keyType, valueType, false, false, Optional.empty(), Optional.empty());
     }
 
     /**

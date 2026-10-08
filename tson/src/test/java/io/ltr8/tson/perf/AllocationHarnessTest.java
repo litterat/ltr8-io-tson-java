@@ -1,13 +1,14 @@
 package io.ltr8.tson.perf;
 import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.io.ByteSource;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
-import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.compiler.TsonDataStream;
@@ -59,13 +60,21 @@ class AllocationHarnessTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/orders-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               order => { id: uuid  customer: text  placed: datetime  lines: [line]  note: text }
               line => { sku: text  quantity: int32  price: float64 }
+              identifier => !identifier_type { continue_add: "-" }
+              named => { names: { identifier => text } }
+              labelled => { names: { text => text } }
             }
             """;
+
+    /** The same entries keyed by name and by text, so the difference is the two hygiene rules and nothing else. */
+    private static final String ENTRIES = "{ create => a  read => b  update-all => c  delete => d  list => e }";
+    private static final String NAMED = "!!schema:\"" + ID + "\"\n!named { names: " + ENTRIES + " }";
+    private static final String LABELLED = "!!schema:\"" + ID + "\"\n!labelled { names: " + ENTRIES + " }";
 
     /** The root value on its own, which is what a schemaless read is given -- it names no schema. */
     private static final String ROOT = """
@@ -89,6 +98,9 @@ class AllocationHarnessTest {
     public record Order(UUID id, String customer, OffsetDateTime placed, List<Line> lines, String note) {
     }
 
+    public record Names(Map<String, String> names) {
+    }
+
     private static Tson tson;
     private static TsonObjectReader reader;
     private static TsonObjectReader schemalessReader;
@@ -100,7 +112,8 @@ class AllocationHarnessTest {
         SchemaSource source = uri -> SCHEMA;
         tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext(DataBindContext.builder()
-                        .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "line", Line.class))
+                        .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "line", Line.class,
+                                        "named", Names.class, "labelled", Names.class))
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
         reader = tson.objectReader();
@@ -112,6 +125,8 @@ class AllocationHarnessTest {
         for (int i = 0; i < 2_000; i++) {
             AllocationProbe.sink = reader.read(DOCUMENT, Order.class);
             AllocationProbe.sink = schemalessReader.read(ROOT, Order.class);
+            AllocationProbe.sink = reader.read(NAMED, Names.class);
+            AllocationProbe.sink = reader.read(LABELLED, Names.class);
         }
         AllocationProbe.sink = null;
     }
@@ -214,13 +229,62 @@ class AllocationHarnessTest {
         double unrestricted = AllocationProbe.allocatedPerOperation(20_000, () ->
                 AllocationProbe.sink = reader.read(DOCUMENT, Order.class));
         double restricted = AllocationProbe.allocatedPerOperation(20_000, () -> AllocationProbe.sink =
-                reader.withTokenPolicy(UnicodePolicy.highlyRestrictive()).read(DOCUMENT, Order.class));
+                reader.withTokenPolicy(ScriptPolicy.highlyRestrictive()).read(DOCUMENT, Order.class));
         double overhead = restricted - unrestricted;
 
         report("allocated per read, tokenPolicy raised to highlyRestrictive", restricted, "bytes");
         report("  overhead over the unrestricted default", overhead, "bytes");
         assertTrue(overhead < 300, "a raised token policy added " + overhead + " bytes per read, which is "
                 + "per-token allocation rather than the one decorator a read should cost");
+    }
+
+    /**
+     * <b>Keys that are names cost their scope and nothing per name.</b> An identifier-typed key meets §8.2's two
+     * per-name rules, which scan and return {@code Optional.empty()} for a name that passes, so they allocate
+     * nothing; the keys of an identifier-keyed map are one look-alike scope, a {@code HashMap} of skeletons for
+     * the map being read. The same five entries keyed by {@code text} are the baseline, so the difference is the
+     * identifier grammar's own cost over text's (~550 bytes here) and the scope (~270) -- the per-name rules
+     * measure at nothing. A capturing lambda or a materialised script set per name would add over 100 bytes a
+     * key, which the ceiling catches.
+     */
+    @Test
+    void keysThatAreNamesCostTheirScopeAndNothingPerName() {
+        double named = AllocationProbe.allocatedPerOperation(20_000, () ->
+                AllocationProbe.sink = reader.read(NAMED, Names.class));
+        double labelled = AllocationProbe.allocatedPerOperation(20_000, () ->
+                AllocationProbe.sink = reader.read(LABELLED, Names.class));
+        double overhead = named - labelled;
+
+        report("allocated per read, five identifier keys", named, "bytes");
+        report("  overhead over five text keys", overhead, "bytes");
+        assertTrue(overhead < 1_200, "five identifier keys cost " + overhead + " bytes more than five text keys");
+    }
+
+    /**
+     * <b>The look-alike check over a schemaless read's records costs its scopes, not a skeleton per name per
+     * record.</b> A schemaless record is a look-alike scope of its own field names ([TSON-DATA] §8.2), and the
+     * harness document's three {@code line} records repeat one set of names. The same read with skeleton
+     * distinctness switched off is the baseline, so the difference is the whole check: ~420 bytes over four
+     * records, an array of names and skeletons and a key-set iterator per record, and one skeleton for the one
+     * name that maps ({@code customer}, whose {@code m} reads as {@code rn}). A map built per record cost ~1,140,
+     * which the ceiling catches.
+     */
+    @Test
+    void theLookAlikeCheckOverASchemalessReadCostsItsScopes() {
+        TsonTreeReader checked = new TsonTreeReader().preservingUnknownTypeRefs();
+        TsonTreeReader unchecked = checked.withIdentifierPolicy(IdentifierPolicy.defaults()
+                .withSkeletonDistinctness(false));
+        for (int i = 0; i < 2_000; i++) {
+            AllocationProbe.sink = checked.read(ROOT);
+            AllocationProbe.sink = unchecked.read(ROOT);
+        }
+        double with = AllocationProbe.allocatedPerOperation(20_000, () -> AllocationProbe.sink = checked.read(ROOT));
+        double without = AllocationProbe.allocatedPerOperation(20_000, () ->
+                AllocationProbe.sink = unchecked.read(ROOT));
+        double overhead = with - without;
+
+        report("schemaless tree read, look-alike check over 4 records", overhead, "bytes");
+        assertTrue(overhead < 800, "the look-alike check cost " + overhead + " bytes per read");
     }
 
     /**

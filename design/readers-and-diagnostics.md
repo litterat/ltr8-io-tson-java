@@ -74,23 +74,26 @@ is small and parsed once.)
   silence. The comparison uses a raw parsed value and the **pre-rebind** parser (`FixedCheck`), because bind
   mode narrows `precomputedValue` in place and comparing across that narrowing would flag every conforming
   document.
-- **A field is four facts, and each reader decision reads its own** (`RecordField`: `optional`, `voidable`,
-  `role`, `value`). A written `_` reads `voidable`; a written value reads `role` (FIXED means compare) and
-  `value`; a field never written reads `RecordField.omitted`, which derives from `optional` and `value` —
-  not optional is `FIELD_REQUIRED`, optional with a value injects it whatever the role, and anything else
-  stays absent. **A field group's member is the one exception and is never injected**, pin or not: its
-  presence is what selects the group's alternative, so injecting it would make a member present that the
-  document never wrote. A pinned field is never voidable (`type? = value` is refused), because the written-`_`
-  decision runs before the pin is consulted, so a `_` at a FIXED field is always `FIELD_FIXED`. Nothing is
-  pre-seeded: every field the document didn't state goes through one `valueForAbsentField` switch over the
-  three `Omitted` answers, and the JSON reader's `fillAbsent` switches over the same three.
-- **An array element's own state is the two-member `ElementState`, and an absent element occupies its slot.**
-  Under `[T?]` (`state: OPTIONAL`) an element may be the absent sentinel `_`; under the default `REQUIRED` one
-  is `FIELD_REQUIRED`. Either way `ArrayAbstractReader` consumes the `AbsentEvent` and advances the index, so
+- **A field is four facts, and each reader decision reads its own** (`RecordField`: `optional`, `voidable`, `role`,
+  `value`). A written `_` reads `voidable`; a written value reads `role` (FIXED means compare) and `value`; a field
+  never written reads `RecordField.omitted`, which derives from `optional` and `value` — not optional is
+  `FIELD_REQUIRED`, optional with a value injects it whatever the role, and anything else stays absent. **A field
+  group's member is the one exception and is never injected**, pin or not: its presence is what chooses the group's
+  option, so injecting it would make a member present that the document never wrote. A group is judged after the
+  field pass: an option is chosen when any member appeared, a chosen option reports each member it needs and lacks
+  (`optionNeeds`), and the chosen options are counted by the group's own rule (`groupChoosesExactlyOne`,
+  `groupChoosesAtMostOne`, `groupRequiresAtLeastOne` for the `+` group), every one of them `FIELD_GROUP`. A pinned
+  field is never voidable (`type? = value` is refused), because the written-`_` decision runs before the pin is
+  consulted, so a `_` at a FIXED field is always `FIELD_FIXED`. Nothing is pre-seeded: every field the document
+  didn't state goes through one `valueForMissingField` switch over the three `Omitted` answers, and the JSON reader's
+  `fillMissing` switches over the same three.
+- **An array element's one fact is `voidable`, and a void element occupies its slot.**
+  Under `[T?]` (`voidable: true`) an element may be the void sentinel `_`; under the default it
+  is `FIELD_REQUIRED`. Either way `ArrayAbstractReader` consumes the `VoidEvent` and advances the index, so
   `[a _ c]` has three elements and satisfies a `[T?; 3]` size constraint — §5.3's own stated equivalence,
   which falls out of counting rather than being checked for. Elements have no default/fixed concept at all
-  (`ElementState` has two members where a record field carries a role and a value), so none of the
-  `valueForAbsentField` machinery above has an array counterpart.
+  (`voidable` is their one fact, where a record field carries a role and a value), so none of the
+  `valueForMissingField` machinery above has an array counterpart.
 - **A name's identity is its NFC form, and normalising happens where a token becomes a name.** §2.5 and
   §2.6 define field-name and scalar-key identity by NFC-normalised text, whichever spelling produced it, so
   `café` precomposed and decomposed are one name, and §7.2.1 mandates it directly — "quoted tokens that
@@ -120,14 +123,14 @@ is small and parsed once.)
   TSON text preserve the offset as written, so this is an identity and never what a reader hands back.
   `Rendered` is the other half: `byte[]` inherits `Object.toString`, so a diagnostic naming one renders it
   through `Rendered` rather than as `[B@6d06d69c`.
-- **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody` carries an
-  `ElementState` governing the value — `{K => V?}`, §5.3's own row and the `state` field the kernel gives `map` — so
-  `MapAbstractReader.decodedValue` gives the array element's two answers: the sentinel under `OPTIONAL`,
-  `FIELD_REQUIRED` under the default `REQUIRED`. It answers above the value's own reader, which is right to refuse the
+- **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody` carries
+  `voidable` governing the value — `{K => V?}`, §5.3's own row and the field the kernel gives `map` — so
+  `MapAbstractReader.decodedValue` gives the array element's two answers: the sentinel where it is set,
+  `FIELD_REQUIRED` under the default. It answers above the value's own reader, which is right to refuse the
   sentinel (`_` is a value of no atom type) — absence is the container's question, the same place `ArrayAbstractReader`
-  asks it. The entry is present with an absent value (§2.9) whichever answer it gets, so it counts toward
+  asks it. The entry is present with a void value (§2.9) whichever answer it gets, so it counts toward
   `min_items`/`max_items` and the refusal costs the value its verdict, not the entry its place; both subclasses already
-  had the no-value form to put there — a `TsonAbsent` in tree mode, a `null` the bound `Map` really holds in bind mode.
+  had the no-value form to put there — a `TsonVoid` in tree mode, a `null` the bound `Map` really holds in bind mode.
   The **key** is the opposite and unconditional: §2.9 forbids the sentinel there whatever a declaration says, and the
   parser refuses a `?` on that side for the same reason. **The schemaless reader enforces it too**, which is where the
   rule most needs enforcing: §2.9 is a Part 1 rule, so Class 1 data is exactly the case it governs, and the map-entry
@@ -139,6 +142,18 @@ is small and parsed once.)
   read goes on, so every problem in the document surfaces in one pass and later indices stay accurate; a shape
   mismatch reports `TYPE_MISMATCH`/`WRONG_ARITY` and returns `null` so a caller doesn't also report every child
   as missing.
+- **A bound class refusing what a read hands it is a diagnostic, never an exception** (`BindingDiagnostics`
+  states the rule once for both encodings). A constructor's own check, a bridge, an unboxing
+  `NullPointerException` at a primitive, a collection that refuses `null` meeting a void value: the `try` covers
+  the host call and nothing else, so a read's own `ReadException` from a nested read still passes through, and
+  whatever the host throws is reported. **Written inline at each site, not through a helper taking a lambda**:
+  `put` runs per element and the constructor per record, and a closure per call is bytes on the success path
+  for a refusal that almost never happens — the `Refusal` is built only in the `catch`. **The code follows the
+  contract**: under a schema the class refusing what the schema admits is the binding disagreeing with it,
+  `BIND_MISMATCH` (no verdict); with no schema the class is the contract, and its refusal is `TYPE_MISMATCH`.
+  A streaming container stops calling `put` once anything has been reported since its mark, since a refused
+  child travels as `null`. What is known before any document is refused at compile instead
+  (`design/schema-side-diagnostics.md`).
 - **Every read is all-or-nothing, in both modes and both encodings** (`ConstructionGuard`, which states the
   rule once for every assembly site, tree and bind). A value whose read reported *anything* — its own
   problem or a descendant's — is not assembled and reads to `null`, which propagates to the root. A bound
@@ -220,15 +235,15 @@ is small and parsed once.)
   `SchemalessTreeReader.keyIdentity`
   does the stripping explicitly; the other two readers compare bound host values, which strips both by
   construction.
-- **A written `_` at an `OPTIONAL` field is present with an absent value** (§2.9: "distinct from not
-  appearing at all"), and tree mode keeps that: `{ x: _ }` reads with `x` a `TsonAbsent` where `{ }` reads
+- **A written `_` at an `OPTIONAL` field is present with a void value** (§2.9: "distinct from not
+  appearing at all"), and tree mode keeps that: `{ x: _ }` reads with `x` a `TsonVoid` where `{ }` reads
   with no `x` at all, and `TsonTreeWriter` writes the first back as `_`. It is the mode's own answer
-  (`statedAbsentValue`, per subclass) because bind mode has nowhere to put it — a Java component has no third
+  (`statedVoidValue`, per subclass) because bind mode has nowhere to put it — a Java component has no third
   state between "set to nothing" and "never set", so both readings arrive as `null` there. A limit of the
   target rather than a reading of §2.9, and the reason the tree's answer is not aligned down to it. An array
   element and a tuple slot keep the same distinction, so the containers agree.
 - **A written `_` at a defaulted field is an error**, where plain omission still injects the
-  default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 makes an explicit `_` a
+  default silently (`valueForVoidField` against `valueForMissingField`). §5.2 makes an explicit `_` a
   validation error at every REQUIRED-family field — "`_` asserts absence at a position the schema always
   fills; at REQUIRED_DEFAULT the fix is to omit the field" — which is §7.6's table read down its own column.
   The default is still what the field decodes to — only the verdict changes, the same split `verifyFixed`

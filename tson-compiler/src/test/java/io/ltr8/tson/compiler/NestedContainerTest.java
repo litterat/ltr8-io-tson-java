@@ -5,11 +5,10 @@ import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -20,6 +19,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -54,8 +54,8 @@ class NestedContainerTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/nested-container.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                 %s
                 }
@@ -88,7 +88,7 @@ class NestedContainerTest {
         TsonCompiledSchema compiled = compile("  grid => [[integer; 2], text]");
 
         TupleBody outer = assertInstanceOf(TupleBody.class, entry(compiled, "grid").body());
-        assertEquals(ElementState.REQUIRED, outer.elements().get(0).state());
+        assertFalse(outer.elements().get(0).voidable());
         assertEquals(TypeRef.of("text"), outer.elements().get(1).elementType());
 
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
@@ -157,13 +157,13 @@ class NestedContainerTest {
      * exactly that reading: {@code _} is admitted at an element position and still counts toward the size.
      */
     @Test
-    void anOptionalElementAdmitsTheAbsentSentinelAndItCountsTowardTheSize() {
+    void aVoidableElementAdmitsTheVoidSentinelAndItCountsTowardTheSize() {
         TsonCompiledSchema compiled = compile("""
                   triple => [integer?; 3]
                   strict => [integer; 3]""");
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, entry(compiled, "triple").body());
-        assertEquals(ElementState.OPTIONAL, body.state());
+        assertTrue(body.voidable());
         assertEquals(Optional.of(new BigInteger("3")), body.minItems());
 
         assertNotNull((TsonValue) compiled.get("triple").read(TestDocuments.document("[1 _ 3]")));
@@ -172,22 +172,21 @@ class NestedContainerTest {
                 () -> compiled.get("triple").read(TestDocuments.document("[1 _]")))
                 .getMessage().contains("minimum 3"), "an absent element occupies a slot, it does not vacate one");
 
-        assertEquals(ElementState.REQUIRED,
-                assertInstanceOf(ArrayBody.class, entry(compiled, "strict").body()).state(),
-                "the unmarked form keeps REQUIRED from the vocabulary's own default");
+        assertFalse(assertInstanceOf(ArrayBody.class, entry(compiled, "strict").body()).voidable(),
+                "the unmarked form keeps the vocabulary's own default, not voidable");
         assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("strict").read(TestDocuments.document("[1 _ 3]")))
                 .getMessage().contains("elements are required"));
     }
 
-    /** An absent element reaches the tree as {@code TsonAbsent}, in its own positional slot. */
+    /** An absent element reaches the tree as {@code TsonVoid}, in its own positional slot. */
     @Test
-    void anAbsentElementReadsAsTsonAbsentInItsOwnSlot() {
+    void aVoidElementReadsAsTsonVoidInItsOwnSlot() {
         TsonCompiledSchema compiled = compile("  slots => [integer?]");
 
         TsonArray array = (TsonArray) compiled.get("slots").read(TestDocuments.document("[1 _ 3]"));
         assertEquals(3, array.elements().size());
-        assertInstanceOf(TsonAbsent.class, array.get(1));
+        assertInstanceOf(TsonVoid.class, array.get(1));
     }
 
     /** Nesting recurses: a third bracket is no special case, because the hoist is bottom-up. */

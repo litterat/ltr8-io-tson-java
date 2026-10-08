@@ -18,7 +18,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.VoidType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -199,9 +199,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
             {
-              void => !unit {}
+              void => !void_type {}
             }
             """;
 
@@ -210,13 +210,13 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
-        // "unit" is neither local to mini.tn nor imported by it -- only reachable if resolveSchema
+        // "void_type" is neither local to mini.tn nor imported by it -- only reachable if resolveSchema
         // itself derived the structure namespace from the loader's own meta.tn entry (which in
         // turn carries meta-kernel's own entries, merged in via meta.tn's real !!import).
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
         TypeDefinition voidDef = resolved.entries().get("void");
-        assertEquals(new Unit(), voidDef.body());
+        assertEquals(new VoidType(), voidDef.body());
     }
 
     @Test
@@ -268,8 +268,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String KERNEL_GOVERNED_MARKS = """
             !!id:"https://example.test/marks.tn"
-            !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
             {
               pet => abstract { pet_type: identifier =?  nick: identifier }
             }
@@ -277,17 +277,17 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String KERNEL_GOVERNED_UNKNOWN_MARK = """
             !!id:"https://example.test/unknown-mark.tn"
-            !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
             {
               pet => @totally_unknown_xyz { nick: identifier }
             }
             """;
 
     private static final String MINI_DOCUMENT_NO_ID = """
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
             {
-              void => !unit {}
+              void => !void_type {}
             }
             """;
 
@@ -304,9 +304,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_ID = """
             !!id:"mini.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
             {
-              void => !unit {}
+              void => !void_type {}
             }
             """;
 
@@ -322,10 +322,10 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
             !!import:"meta-kernel.tn"
             {
-              void => !unit {}
+              void => !void_type {}
             }
             """;
 
@@ -341,8 +341,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
             {
               my_type => atom & {}
             }
@@ -374,10 +374,10 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
             {
-              void => !unit {}
+              void => !void_type {}
             }
             """;
 
@@ -397,9 +397,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/36/m/meta.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/37/m/meta.tn"
             {
               placeholder => unit
             }
@@ -436,13 +436,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // Completing at all is the proof; the assertions below just confirm it's genuinely usable.
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
 
-        // 60, matching a genuinely registered meta-kernel: the one-off bootstrap runs
-        // MetaKernelBootstrapResolver's own raw output through TsonSchemaLinker.linkBootstrap (no
-        // registry involved at all) purely so TsonSchemaLinker's own materialization step -- which
-        // synthesizes 9 extra entries for argument-bearing type-refs, e.g. enum's own "members:
-        // set<token>" -- runs before compiling. Never cached (see the next test) -- only the
-        // *quality* of the one-off result changed, not its lifetime.
-        assertEquals(61, compiled.schema().entries().size());
+        // The same entry set a genuinely registered meta-kernel has: the bootstrap desugars its own document,
+        // so TsonSchemaLinker.linkBootstrap has nothing left to add. Never cached (see the next test).
+        assertEquals(68, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
         assertNotNull(compiled.compiledSchema().get("integer_size")
@@ -471,7 +467,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = registry;
 
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
-                () -> loader.loadMeta("https://tson.io/2026/36/m/meta.tn"));
+                () -> loader.loadMeta("https://tson.io/2026/37/m/meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
 

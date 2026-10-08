@@ -70,13 +70,13 @@ public record IntegerType(
                 Optional.empty());
     }
 
-    /** {@code positive_integer => !integer ^ { min: 1 } }. */
+    /** {@code !integer ^ { min: 1 } } -- a lower bound and no width. */
     public static IntegerType ofMin(BigInteger min) {
         return new IntegerType(Optional.empty(), Optional.of(min), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty());
     }
 
-    /** {@code negative_integer => !integer ^ { max: -1 } }. */
+    /** {@code !integer ^ { max: -1 } } -- an upper bound and no width. */
     public static IntegerType ofMax(BigInteger max) {
         return new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(max), Optional.empty(),
                 Optional.empty(), Optional.empty());
@@ -100,7 +100,7 @@ public record IntegerType(
      *
      * <p>{@code size} is checked against the source's own {@code size} alone, never against its
      * explicit bounds: the two compose by intersection within a single type, so adding a width to a
-     * bounded-but-unsized source ({@code positive_integer}, {@code min: 1}) genuinely narrows even
+     * bounded-but-unsized source ({@code !integer ^ { min: 1 }}) genuinely narrows even
      * though the width's range on its own reaches below that floor.
      *
      * <p>A width whose {@code bits} exceeds 4096 contributes no derived range -- materialising a

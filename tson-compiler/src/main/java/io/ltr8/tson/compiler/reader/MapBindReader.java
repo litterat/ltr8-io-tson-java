@@ -5,6 +5,9 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataParameterizedType;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
+import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -14,6 +17,7 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -26,78 +30,87 @@ import java.util.Map;
  * to allocate the target with a known capacity, then {@code descriptor.put().invoke(mapData, key,
  * value)} per decoded entry -- no iterator needed, unlike {@link DataClassMap}'s own *reading* side,
  * since writing a map only ever needs {@code put}. Unlike {@link ArrayBindReader}, there's no fixed-
- * size-target concern here at all -- {@code tson-bind}'s own {@code MapAccessBridge.constructor()}
- * always resolves to a growable, hash-based constructor (confirmed by reading {@code
- * DefaultMapBinder} directly), so this always constructs empty ({@code invoke(0)}) and appends
- * incrementally, one entry at a time, with no buffer-then-allocate step. As with {@link
+ * size-target concern here at all -- every map {@code tson-bind} constructs is growable, so this always
+ * constructs empty ({@code invoke(0)}) and appends incrementally, one entry at a time, with no
+ * buffer-then-allocate step. As with {@link
  * ArrayBindReader}, there's no narrowing at this level either -- each key and value's own binding
  * already happened recursively, inside whatever reader {@code resolver} produced for its type.
  *
  * <p>An entry whose value the document wrote as {@code _} arrives here as a {@code null} and is
  * {@code put} like any other, so the key is in the bound map and maps to nothing -- the closest a Java
- * {@code Map} comes to §2.9's "present with an absent value", and distinguishable from a key never stated.
+ * {@code Map} comes to §2.9's "present with a void value", and distinguishable from a key never stated.
+ * A map that refuses {@code null} -- a {@code ConcurrentHashMap} -- throws on it instead, which is reported
+ * as a {@code BIND_MISMATCH}: the schema admitted what the bound class cannot hold.
+ *
+ * <p><b>Nothing is handed to the map once the value is lost</b> ({@link ConstructionGuard}): a refused key or
+ * value travels as {@code null}, so each {@code put} is skipped once anything has been reported since the mark.
  *
  * <p>Everything else -- resolving the key/value readers, confirming a map shape, size validation, rejecting
- * an absent key and admitting an absent value -- lives on {@link MapAbstractReader}.
+ * an absent key and admitting a void value -- lives on {@link MapAbstractReader}.
  */
 final class MapBindReader extends MapAbstractReader<Object> {
 
     private final DataClassMap descriptor;
 
     public MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor,
-                         TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
-        this(name, displayName, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
-    }
-
-    public MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor,
-                         TsonTypeReaderResolver resolver,
-                         SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
+                         TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
+                         AnnotationTypes annotationTypes, boolean keysAreNames) {
         super(name, displayName, body,
                 ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()),
                         descriptor.keyDataClass(), annotationTypes), descriptor.keyDataClass()),
                 ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.valueType().name()),
                         descriptor.valueDataClass(), annotationTypes), descriptor.valueDataClass()),
-                schemaLocation);
+                schemaLocation, keysAreNames);
+        this.descriptor = descriptor;
+    }
+
+    /** Over key and value readers already bound to {@code descriptor}'s own -- {@link BindTargets}' rebuild. */
+    MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor, TsonTypeReader<?> key,
+                  TsonTypeReader<?> value, SchemaLocation schemaLocation, boolean keysAreNames) {
+        super(name, displayName, body, key, value, schemaLocation, keysAreNames);
         this.descriptor = descriptor;
     }
 
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.underDeclaration(schemaLocation);
-        Shape shape = expectMapShape(ctx);
+        TsonReadContext at = ctx.underDeclaration(schemaLocation);
+        Shape shape = expectMapShape(at);
         if (shape == Shape.MISMATCH) {
             return null;
         }
-        int mark = ConstructionGuard.mark(ctx);
+        int mark = ConstructionGuard.mark(at);
+        Object mapData;
         try {
-            Object mapData = descriptor.constructor().invoke(0);
-            if (shape == Shape.ENTRIES) {
-                readInto(ctx, (key, decodedValue) -> put(mapData, key, decodedValue));
-            }
-            return ConstructionGuard.abandoned(ctx, mark) ? null : mapData;
-        } catch (RuntimeException e) {
-            throw e;
+            mapData = descriptor.constructor().invoke(0);
         } catch (Throwable t) {
-            throw new IllegalStateException("failed to construct " + descriptor.typeClass() + " from '" + name
-                    + "'s own decoded entries", t);
+            at.report(rejected(t));
+            mapData = null;
         }
+        Object map = mapData;
+        if (shape == Shape.ENTRIES) {
+            readInto(at, (key, decodedValue) -> {
+                if (!ConstructionGuard.abandoned(at, mark)) {
+                    try {
+                        descriptor.put().invoke(map, key, decodedValue);
+                    } catch (Throwable t) {
+                        at.report(rejected(t));
+                    }
+                }
+            });
+        }
+        return ConstructionGuard.abandoned(at, mark) ? null : map;
     }
 
-    /** {@code descriptor.put()} is a {@link java.lang.invoke.MethodHandle}, declared to throw {@code Throwable} -- caught and rewrapped here since this is called from within a {@code BiConsumer}, which can't declare it. */
-    private void put(Object mapData, Object key, Object decodedValue) {
-        try {
-            descriptor.put().invoke(mapData, key, decodedValue);
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Throwable t) {
-            throw new IllegalStateException("failed to add an entry to " + descriptor.typeClass(), t);
-        }
+    /** The bound map refusing what this read handed it, which the schema admitted. */
+    private Refusal rejected(Throwable cause) {
+        return BindingDiagnostics.rejectedUnderSchema(descriptor.typeClass(), Handed.ENTRIES, cause);
     }
 
     /**
      * Validates {@code typeDefinition} is map-shaped before ever constructing one, and resolves a
-     * {@code descriptor} to build it with, always targeting {@code Map} but making a real effort to
+     * {@code descriptor} to build it with -- a {@code LinkedHashMap} for an ordered map, so the order the
+     * document wrote is kept, and a {@code Map} otherwise -- making a real effort to
      * get the key/value types right: the schema's own {@code key_type}/{@code value_type} names are
      * each resolved to a real bound Java class the same way any other schema type name is (falling
      * back to {@link String} only when a name has no real bound class at all, e.g. a synthesized,
@@ -123,14 +136,15 @@ final class MapBindReader extends MapAbstractReader<Object> {
             }
             Type keyType = resolveType(body.keyType().name());
             Type valueType = resolveType(body.valueType().name());
-            DataClass dataClass = descriptorFor(new DataParameterizedType(Map.class, keyType, valueType));
+            Class<?> mapClass = body.ordered() ? LinkedHashMap.class : Map.class;
+            DataClass dataClass = descriptorFor(mapClass, new DataParameterizedType(mapClass, keyType, valueType));
             if (!(dataClass instanceof DataClassMap descriptor)) {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't map-shaped -- can't bind '" + name + "' as one");
             }
             return new MapBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
-                    context.locationOf(name, typeDefinition),
-                    AnnotationTypes.of(context));
+                    context.locationOf(name, typeDefinition), AnnotationTypes.of(context),
+                    keysAreNames(body, context));
         }
 
         /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */
@@ -142,11 +156,11 @@ final class MapBindReader extends MapAbstractReader<Object> {
             }
         }
 
-        private DataClass descriptorFor(Type type) {
+        private DataClass descriptorFor(Class<?> mapClass, Type type) {
             try {
-                return context.getDescriptor(Map.class, type);
+                return context.getDescriptor(mapClass, type);
             } catch (DataBindException e) {
-                throw new IllegalStateException("no bound Java class for '" + Map.class.getName() + "'", e);
+                throw new IllegalStateException("no bound Java class for '" + mapClass.getName() + "'", e);
             }
         }
     }

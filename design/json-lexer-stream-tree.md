@@ -13,7 +13,7 @@ alignment with JEP 540 does and does not claim. Current form only; history lives
 - Whitespace is RFC 8259's four characters and line breaks are LF, CR and CRLF; NEL/LS/PS are ordinary characters here.
 - Lexer and stream are grammar only: member names are not deduped, no value is interpreted, no member name is reserved.
 - Producing `EndOfDocument` is what pulls past the root value, and so what rejects trailing content.
-- `NullValue` is a value in the event layer; JSON null as the absent sentinel is a typed position's question.
+- `NullValue` is a value in the event layer; JSON null as the void sentinel is a typed position's question.
 - Nesting depth is bounded in `JsonStream` against the shared `LimitsPolicy` and refused with `LimitExceededException`,
   which stays distinct from `ParseException`.
 
@@ -136,7 +136,7 @@ merely `hasNext() == false` — **producing it is what pulls past the root value
 content**. `[1] 2` is refused there and nowhere else, the same trap the TSON facades keep under
 `requireDocumentEnd`.
 
-**`NullValue` is a value here.** §7 makes JSON null the absent sentinel's spelling *at a typed position*, and
+**`NullValue` is a value here.** §7 makes JSON null the void sentinel's spelling *at a typed position*, and
 this layer has none. Settling it in the event vocabulary is exactly the mistake a shared `TsonEvent` would
 have forced.
 

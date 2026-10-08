@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.base.Diagnostic;
@@ -40,9 +42,9 @@ import java.util.Map;
  */
 final class GroupUnionBindReader extends RecordAbstractReader<Object> {
 
-    /** {@code null}, a bind-mode reader having nowhere to put §2.9's "present with an absent value". */
+    /** {@code null}, a bind-mode reader having nowhere to put §2.9's "present with a void value". */
     @Override
-    Object statedAbsentValue() {
+    Object statedVoidValue() {
         return null;
     }
 
@@ -100,21 +102,19 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
                         + "for '" + fieldName + "'", "one of " + members.keySet(), fieldName);
                 return null;
             }
-            return construct(member, decoded[i]);
+            return construct(anchoredCtx, member, decoded[i]);
         }
         // Unreachable where the group is REQUIRED, which is the only shape the factory builds this for --
         // validateGroups has already reported an empty record by the time control arrives here.
         return null;
     }
 
-    private Object construct(DataClassRecord member, Object value) {
+    private static Object construct(TsonReadContext ctx, DataClassRecord member, Object value) {
         try {
             return member.constructor().invoke(new Object[] {value});
-        } catch (RuntimeException e) {
-            throw e;
         } catch (Throwable t) {
-            throw new IllegalStateException("failed to construct " + member.typeClass() + " from '" + name
-                    + "'s own labelled-choice value", t);
+            ctx.report(BindingDiagnostics.rejectedUnderSchema(member.typeClass(), Handed.VALUE, t));
+            return null;
         }
     }
 

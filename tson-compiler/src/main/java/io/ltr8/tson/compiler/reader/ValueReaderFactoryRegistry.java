@@ -72,49 +72,52 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
-                AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.UNIT, UnaryOperator.identity(),
+                AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.VOID, AtomTypeReader.VALUE, UnaryOperator.identity(),
                 ChoiceReader.FACTORY, ScopedReader.BIND));
     }
 
     /**
      * Tree mode: reads into an immutable {@link TsonValue}. The container factories
      * build node containers; every atom-family/enum factory is wrapped ({@link AtomTreeFactory}) so its leaf
-     * yields a {@code TsonAtom} (or a {@code TsonAbsent} where it produced no value), and {@code unit}'s
-     * {@code void} yields a {@code TsonAbsent} (see {@link #TREE_UNIT}). Uses the object-binding enum factory so {@code boolean} reads a real {@code
-     * Boolean} rather than the text {@code "true"}/{@code "false"}.
+     * yields a {@code TsonAtom} (or a {@code TsonVoid} where it produced no value), and {@code void_type}
+     * yields a {@code TsonVoid} (see {@link #TREE_VOID}). Uses the object-binding enum factory so {@code
+     * boolean} reads a real {@code Boolean} rather than the text {@code "true"}/{@code "false"}.
      */
     public static ValueReaderFactoryRegistry tree() {
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
-                new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_UNIT, AtomTreeFactory::new,
+                new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_VOID, TREE_VALUE,
+                AtomTreeFactory::new,
                 ChoiceReader.FACTORY, ScopedReader.TREE));
     }
 
-    /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentTreeReader}, {@code value}/{@code token} → {@link AtomTreeReader} over {@link AtomTypeReader#UNIT}'s own reader. */
-    private static final ValueReaderFactory TREE_UNIT = (name, definition, context) ->
-            "void".equals(name)
-                    ? new AbsentTreeReader(AtomTypeReader.UNIT.create(name, definition, context),
-                            AnnotationTypes.of(context))
-                    : new AtomTreeReader(AtomTypeReader.UNIT.create(name, definition, context), name,
-                            AnnotationTypes.of(context));
+    /** Tree mode's {@code void_type} factory: {@link VoidTreeReader} over {@link AtomTypeReader#VOID}'s reader. */
+    private static final ValueReaderFactory TREE_VOID = (name, definition, context) ->
+            new VoidTreeReader(AtomTypeReader.VOID.create(name, definition, context), AnnotationTypes.of(context));
+
+    /** Tree mode's {@code value_type} factory: {@link AtomTreeReader} over {@link AtomTypeReader#VALUE}'s reader. */
+    private static final ValueReaderFactory TREE_VALUE = (name, definition, context) ->
+            new AtomTreeReader(AtomTypeReader.VALUE.create(name, definition, context), name,
+                    AnnotationTypes.of(context));
 
     /** The atom constructors meta-kernel.tn and meta.tn declare, in the order those documents declare them. */
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
             // meta-kernel.tn
-            "integer_type", "text_type", "uri_type", "regex_type",
+            "integer_type", "text_type", "identifier_type", "uri_type", "regex_type",
             // meta.tn
             "bytes_type", "float_type", "decimal_type", "rational_type", "date_type", "time_type",
             "datetime_type", "duration_type", "period_type", "uuid_type", "complex_type", "mac_type",
-            "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type");
+            "iri_type", "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type");
 
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,
-            ValueReaderFactory unitFactory, UnaryOperator<ValueReaderFactory> leaf,
+            ValueReaderFactory voidFactory, ValueReaderFactory valueFactory, UnaryOperator<ValueReaderFactory> leaf,
             ValueReaderFactory choice, ValueReaderFactory scoped) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
 
         // meta-kernel.tn
-        factories.put("unit", unitFactory);
+        factories.put("value_type", valueFactory);
+        factories.put("void_type", voidFactory);
         factories.put("record", RecordDispatch.over(record));
         factories.put("array", array);
         factories.put("set_type", array);

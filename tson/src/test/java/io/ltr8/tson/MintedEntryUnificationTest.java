@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * §8.2 names a materialised instantiation by a function of its <b>resolved form alone</b>, which is what lets
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the fact: a template closed in its own schema is closed before anything has linked, while the same template
  * reaching an importer through {@code !!import} arrives already carrying whatever its home schema credited to
  * it. An instantiation minted from the template's own list would therefore differ between the two routes --
- * and, once an instantiation indexes under its template, would list itself. Hence {@code
+ * and, where a declared instantiation indexes under its template, would list itself. Hence {@code
  * TemplateMaterialiser} mints with none and leaves {@code subtypes} to linking, where every other entry's
  * comes from.
  */
@@ -104,11 +104,14 @@ class MintedEntryUnificationTest {
                 "a closed record has no subtypes of its own here");
     }
 
-    /** The index step 4 adds still lands, on the template, in both schemas. */
+    /**
+     * A minted instantiation is not a member of its template's family (§5.10): no declaration names it, so it
+     * is read where it was written and never stands as a candidate at a position typed by the template.
+     */
     @Test
-    void theTemplateStillIndexesTheInstantiation() {
+    void theTemplateDoesNotIndexAMintedInstantiation() {
         Map<String, TsonLinkedSchema> schemas = both();
-        schemas.forEach((which, schema) -> assertTrue(
+        schemas.forEach((which, schema) -> assertFalse(
                 schema.schema().entries().get("box").subtypes().contains(mintedName(schema)),
                 () -> which + ": " + schema.schema().entries().get("box").subtypes()));
     }

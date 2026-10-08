@@ -97,7 +97,7 @@ class SchemalessValidationTest {
 
     /** A built-in name is scalar-only, so one on a container is a mismatch rather than an unknown name. */
     @Test
-    void anAbsentSentinelInMapKeyPositionIsReported() {
+    void theVoidSentinelInMapKeyPositionIsReported() {
         // §2.9 forbids the sentinel in key position and calls it a resolver-layer constraint rather
         // than a grammar one: the map-entry production takes any data-value there, so the reader is
         // the first layer that can refuse it -- and Class 1 data is exactly what the rule governs.
@@ -220,7 +220,7 @@ class SchemalessValidationTest {
     void aSchemaDocumentWhereDataWasExpectedIsADiagnostic() {
         List<Diagnostic> diagnostics = validate("""
                 !!id:"https://example.test/s-1.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
                 point => { x: int32 }""");
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, diagnostics.getFirst().code());

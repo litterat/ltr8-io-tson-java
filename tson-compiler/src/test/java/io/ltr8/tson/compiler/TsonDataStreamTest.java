@@ -2,24 +2,8 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.AnnotationEnd;
-import io.ltr8.tson.compiler.stream.AnnotationStart;
-import io.ltr8.tson.compiler.stream.ArrayEnd;
-import io.ltr8.tson.compiler.stream.ArrayStart;
-import io.ltr8.tson.compiler.stream.DocumentEnd;
-import io.ltr8.tson.compiler.stream.DocumentStart;
-import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
-import io.ltr8.tson.compiler.stream.FieldName;
-import io.ltr8.tson.compiler.stream.MapArrow;
-import io.ltr8.tson.compiler.stream.MapEnd;
-import io.ltr8.tson.compiler.stream.MapStart;
-import io.ltr8.tson.compiler.stream.RecordEnd;
-import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
-import io.ltr8.tson.compiler.stream.TokenEvent;
-import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.compiler.stream.TypeRef;
+import io.ltr8.tson.compiler.stream.*;
+import io.ltr8.tson.compiler.stream.VoidEvent;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -66,7 +50,7 @@ class TsonDataStreamTest {
             case TypeRef t -> "TypeRef(" + t.name() + ")";
             case SchemaRef s -> "SchemaRef(" + s.uri() + ")";
             case TokenEvent t -> "Token(" + t.text() + "," + t.form() + ")";
-            case AbsentEvent a -> "Absent";
+            case VoidEvent a -> "Absent";
             case EmptyBraceEvent e2 -> "EmptyBrace";
         };
     }
@@ -85,7 +69,7 @@ class TsonDataStreamTest {
     }
 
     @Test
-    void absentRoot() {
+    void voidRoot() {
         assertEquals(List.of("DocumentStart(|)", "Absent", "DocumentEnd"), shape("_"));
     }
 
@@ -220,7 +204,7 @@ class TsonDataStreamTest {
     }
 
     @Test
-    void recordFieldValueCanBeAbsent() {
+    void recordFieldValueCanBeVoid() {
         assertEquals(List.of("DocumentStart(|)", "RecordStart", "FieldName(x)", "Absent",
                 "RecordEnd", "DocumentEnd"), shape("{ x: _ }"));
     }
@@ -348,7 +332,7 @@ class TsonDataStreamTest {
     }
 
     @Test
-    void absentAsMapKeyParsesStructurally() {
+    void voidAsMapKeyParsesStructurally() {
         assertEquals(List.of("DocumentStart(|)", "MapStart", "Absent", "MapArrow", "Token(1,UNQUOTED)",
                 "MapEnd", "DocumentEnd"), shape("{ _ => 1 }"));
     }
@@ -374,7 +358,7 @@ class TsonDataStreamTest {
     }
 
     @Test
-    void absentOccupiesPositionalArraySlot() {
+    void voidOccupiesPositionalArraySlot() {
         assertEquals(List.of("DocumentStart(|)", "ArrayStart",
                 "Token(1,UNQUOTED)", "Absent", "Token(3,UNQUOTED)",
                 "ArrayEnd", "DocumentEnd"), shape("[1 _ 3]"));

@@ -51,11 +51,11 @@ class TinySchemaImportsCoreTn1Test {
 
     private static final String TINY_DOCUMENT = """
             !!id:"https://example.test/tiny-core-import.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               my_int => int32
-              my_percentage => !positive_integer ^ { max: 100 }
+              my_percentage => !integer ^ { min: 1  max: 100 }
               my_record => { value: int32 }
             }
             """;

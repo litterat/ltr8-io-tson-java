@@ -4,7 +4,8 @@ import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -140,11 +141,11 @@ public final class TsonObjectReader {
 
     /**
      * This reader applying {@code policy} to the <b>names</b> a document carries -- a type-ref name and an
-     * annotation name -- instead of the default. [TSON-DATA] §8.2's restricted-script rule, whose RECOMMENDED default is
+     * annotation name -- instead of the default. [TSON-DATA] §8.2's identifier policy, whose RECOMMENDED default is
      * Highly Restrictive over the whole name, which is what a reader carries until this is called. The peer of
      * {@link TsonTreeReader#withIdentifierPolicy}, whose Javadoc carries the reasoning.
      */
-    public TsonObjectReader withIdentifierPolicy(UnicodePolicy identifierPolicy) {
+    public TsonObjectReader withIdentifierPolicy(IdentifierPolicy identifierPolicy) {
         Objects.requireNonNull(policy, "policy");
         return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri,
                 policy.withIdentifierPolicy(identifierPolicy));
@@ -180,13 +181,11 @@ public final class TsonObjectReader {
      * the stricter rule by the time the name rule looks at it. That is the honest consequence of where the
      * check sits, and is why this is not called {@code withValuePolicy}.
      *
-     * @throws IllegalArgumentException if {@code policy} is per-segment. {@code _} and {@code -} are word
-     *         separators by convention in a name and ordinary characters in a value, so segmenting one admits
-     *         UTS #39's own {@code Toys-Я-Us} -- the spoof a strict token policy exists to refuse. Refused
-     *         rather than ignored, so a policy that cannot mean what it says is never silently accepted;
-     *         {@link ProcessorPolicy} is where the refusal lives, so every route to one refuses it alike
+     * <p>A level over the whole token, never per segment: {@code _} and {@code -} are word separators by
+     * convention in a name and ordinary characters in a value, so segmenting one would admit UTS #39's own
+     * {@code Toys-Я-Us}. A {@link ScriptPolicy} has no unit to state.
      */
-    public TsonObjectReader withTokenPolicy(UnicodePolicy tokenPolicy) {
+    public TsonObjectReader withTokenPolicy(ScriptPolicy tokenPolicy) {
         Objects.requireNonNull(tokenPolicy, "tokenPolicy");
         return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri,
                 policy.withTokenPolicy(tokenPolicy));

@@ -6,13 +6,12 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
 import io.ltr8.tson.json.lexer.JsonLexer;
 import io.ltr8.tson.json.lexer.JsonTokenType;
 
-import java.io.InputStream;
 import java.util.NoSuchElementException;
 
 /**
@@ -39,7 +38,7 @@ import java.util.NoSuchElementException;
  *     only the declared key type relates the pair -- which is a fact no grammar layer holds. The tree
  *     applies the rule where JEP 540 does, and the schema-directed decode applies it with a category.
  * <li><b>It does not interpret a value.</b> A number is its source lexeme (§5.3), a string is its
- *     decoded content, and {@code null} is a JSON value rather than the absent sentinel -- §7 turns it
+ *     decoded content, and {@code null} is a JSON value rather than the void sentinel -- §7 turns it
  *     into one, at a typed position, which this layer has none of.
  * <li><b>It reserves no member name.</b> §3.2's {@code $}-namespace is reserved where an object is read
  *     as a record or an annotation object, which is a question about the position's type.
@@ -63,7 +62,7 @@ public final class JsonStream implements JsonEventSource {
     private final int maxDepth;
 
     /** §8.2's token surface, or {@code null} where a read named none -- see {@link #checkTokenPolicy}. */
-    private UnicodePolicy tokenPolicy;
+    private ScriptPolicy tokenPolicy;
     private DiagnosticsReceiver tokenPolicyReceiver;
 
     /**
@@ -114,7 +113,7 @@ public final class JsonStream implements JsonEventSource {
      * policy is applied to every token it hands out.
      *
      * <p><b>One policy rather than a depth and a surface</b>, because a deployment states one -- and because
-     * a bare {@code int} beside a {@code UnicodePolicy} is how a caller comes to pass a bound from one
+     * a bare {@code int} beside a {@code ScriptPolicy} is how a caller comes to pass a bound from one
      * policy and a token surface from another.
      *
      * <p>[TSON-JSON] §9.4 puts the token policy on "map keys and string values"; this checks every token

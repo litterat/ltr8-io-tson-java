@@ -36,8 +36,8 @@ class JsonChoiceReadTest {
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/choice-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               scalar_or_list => ( text | int32 | boolean | [text] )
               any_json       => ( text | number | boolean | [any_json?] | {text => any_json?} )
@@ -112,9 +112,9 @@ class JsonChoiceReadTest {
                 refusal.message());
     }
 
-    /** §7: null carries no class at all -- it is the absent sentinel, and a choice admits no absence. */
+    /** §7: null carries no class at all -- it is the void sentinel, and this choice is not voidable. */
     @Test
-    void nullAtAChoiceIsAnAbsenceAndNotAnUnknownKind() {
+    void nullAtAChoiceIsVoidAndNotAnUnknownKind() {
         assertEquals(Diagnostic.Code.FIELD_REQUIRED, read("scalar_or_list", "null").refusal().code());
     }
 
@@ -136,7 +136,7 @@ class JsonChoiceReadTest {
         Diagnostic refusal = read("shape", """
                 {"radius": 1.0}""").refusal();
         // TYPE_MISMATCH, matching the TSON reader for the same document -- §9.4 gives both encodings one
-        // vocabulary. A required tag that is absent establishes no type, which is what the code says;
+        // vocabulary. A required tag that is missing establishes no type, which is what the code says;
         // UNKNOWN_TYPE_REF would claim a name denoted nothing, and there is no name here at all.
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
         assertTrue(refusal.message().contains("$type"), refusal.message());
@@ -221,7 +221,7 @@ class JsonChoiceReadTest {
     /** §8.5 admits `$schema` at a scoped position; a choice is the closed sum, so it is refused here. */
     @Test
     void aSchemaMemberIsRefusedAtAChoicePosition() {
-        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, read("shape", """
+        assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, read("shape", """
                 {"$schema": "https://example.test/other.tn", "$type": "circle", "radius": 1.0}""")
                 .refusal().code());
     }

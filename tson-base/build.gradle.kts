@@ -11,6 +11,9 @@ dependencies {
     // this module names one of its types -- `tson-bind` declares it `implementation`, which does not
     // propagate. `tson-compiler` and `tson-json` carry the same line for the same reason.
     implementation(project(":tson-annotation"))
+    // Native recognizers for network text formats, a leaf like tson-regex. `api`: their values are host types
+    // this module's AtomContext binds, so a consumer naming one in a class needs the module readable.
+    api(project(":tson-net"))
 
     // The bottom of the stack: what every encoding and every phase reports through, and the position type
     // a report points at. A true pure leaf -- depends on nothing, and nothing here knows what a TSON

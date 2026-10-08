@@ -2,6 +2,7 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.base.unicode.Normalization;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,12 +22,12 @@ import java.util.Optional;
 public record EmailType(String spec, @Field("min_length") Optional<Integer> minLength,
                          @Field("max_length") Optional<Integer> maxLength,
                          Optional<Integer> length, Optional<String> pattern,
-                         Optional<List<String>> members) implements Atom {
+                         Optional<List<String>> members, Normalization normalization) implements Atom, TextFamily {
 
     /** {@code email => !email_type {}} -- the unconstrained email address, core.tn's own {@code !email}. */
     public static final EmailType UNCONSTRAINED = new EmailType(
             "https://www.rfc-editor.org/rfc/rfc5322", Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty());
+            Optional.empty(), Optional.empty(), Optional.empty(), Normalization.NONE);
 
     /**
      * {@inheritDoc}
@@ -46,7 +47,7 @@ public record EmailType(String spec, @Field("min_length") Optional<Integer> minL
 
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
     public TextType textConstraints() {
-        return new TextType(minLength, maxLength, length, pattern, members);
+        return new TextType(minLength, maxLength, length, pattern, members, normalization);
     }
 
     /** {@inheritDoc} <p>The length facets this composes, judged by {@link TextType#coherenceCheck} that owns them. */

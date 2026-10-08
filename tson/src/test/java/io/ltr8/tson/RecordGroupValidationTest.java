@@ -20,8 +20,8 @@ class RecordGroupValidationTest {
     private static TsonTypeReader<?> contactReader() {
         String schema = """
                 !!id:"https://example.test/group-1.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                   contact => {
                     name: text
@@ -37,18 +37,21 @@ class RecordGroupValidationTest {
         contactReader().read(TestDocuments.document("{ name: \"Ada\"  email: \"ada@example.com\" }")); // no exception
     }
 
+    /** A bare group requires exactly one option, and says so: not "at most one", which is a '?' group's rule. */
     @Test
     void twoPresentMembersAreRejected() {
         ReadException e = assertThrows(ReadException.class,
                 () -> contactReader()
                         .read(TestDocuments.document("{ name: \"Ada\"  email: \"ada@example.com\"  phone: \"111\" }")));
-        assertTrue(e.getMessage().contains("at most one"), e.getMessage());
+        assertTrue(e.getMessage().contains("exactly one option of (email | phone) must be chosen"), e.getMessage());
+        assertTrue(e.getMessage().contains("found 2"), e.getMessage());
     }
 
     @Test
     void zeroPresentMembersAreRejectedForARequiredGroup() {
         ReadException e = assertThrows(ReadException.class,
                 () -> contactReader().read(TestDocuments.document("{ name: \"Ada\" }")));
-        assertTrue(e.getMessage().contains("exactly one"), e.getMessage());
+        assertTrue(e.getMessage().contains("exactly one option of (email | phone) must be chosen"), e.getMessage());
+        assertTrue(e.getMessage().contains("found none"), e.getMessage());
     }
 }

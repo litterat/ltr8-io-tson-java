@@ -43,9 +43,15 @@ own prose (which had gone stale on it):
   collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (including this session's own `TinySchemaImportsCoreTn1Test`) has to
   already know and hand-sequence the correct registration order itself. Distinct from what
-  `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
+  `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the four bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
+- [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
+  so no path reads a resolved `type_definition` map and verifies it. §8.1's ingest verifies rather than
+  recomputes what an author may have written into a derived fact: a recorded `template_param.type` or `bound`
+  must be IS-A the type the held body derives, since a written narrowing lives nowhere else; it also re-runs the
+  family checks (no member minted at a use site) over the ingested map and its closure, and the §5.11 group
+  declaration rules over every `field_group`. `ParameterTypes` already derives the type to check against.
 
 ## Checked annotations
 
@@ -87,7 +93,7 @@ disagree — the same shape as the compatibility claim Revision 35 withdrew ([TS
 record from a map syntactically (`a: 1` vs `k => v`), so `TsonDataStream` emits `RecordStart`/`FieldName` or
 `MapStart`/`MapArrow` and each reader asserts which it got; JSON's `{"a": 1}` is one syntax for both and §4.1 makes
 the *position* decide, which a pull-only event source has no channel to say. And `null` is a value in a JSON tree and
-the absent sentinel under a schema (§7), so a shared `TsonEvent` forces one meaning on the layer that does not hold
+the void sentinel under a schema (§7), so a shared `TsonEvent` forces one meaning on the layer that does not hold
 it. `design/json-encoding.md` has the argument; the entries below follow it. The tree model follows
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
@@ -105,16 +111,6 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   dropped unchecked -- where [TSON-SCHEMA] §10.2 makes verification a MUST and a mismatch a resolver error. The
   TSON registry verifies against the bytes it fetched; the JSON side holds only linked schemas, so what it
   needs is either the digest beside each linked schema or a loader that takes the reference as written.
-
-- [ ] **The look-alike rule reaches no JSON position, and whether it should is now a real question rather
-  than a settled one.** [TSON-DATA] §8.2's two per-name rules run at the schema-directed record and `$type`
-  positions, so the realistic attack — a homoglyph in a name that matches no declared field — is refused. The
-  third rule, `CONFUSABLE_NAMES`, is a property of a *set*, and `CLAUDE.md` records it as not reaching JSON
-  because a JSON object's members are keys until a position says otherwise. **A schema-directed record position
-  does say otherwise**, which is the fact that changed: its unmatched members are field names, so the set rule
-  could run over them as `SchemalessTreeReader` runs it for TSON. What it would add over the two per-name rules
-  is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
-  name — so this is a decision to take deliberately, not a gap to close by reflex.
 
 - [ ] **The JSON reader factories share their per-entry work, and the container loops their remaining rules.**
   Every container reads through a plan, one mode-free loop and a builder per mode
@@ -170,6 +166,18 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
 
 ## Module structure
 
+- [ ] **The Unicode identifier machinery becomes a library of its own, `io.ltr8.unicode`, as `tson-net` did for
+  network formats.** `tson-base.unicode` holds UAX #31 profiles (`IdentifierProfile`, `Xid`), UTS #39's confusable
+  skeletons, `Identifier_Status` and joining-control contexts, and `NfkcCasefold`; `base.policy.ScriptPolicy` holds
+  UTS #39's restriction levels. None of it knows TSON, and the JDK implements none of UTS #39 (ICU4J is the usual
+  answer). What constrains it: the lexer and the identifier policy read these tables on the hot path, so the move
+  must keep `Nfc`'s allocation-free fast path and the allocation harness flat, and `ScriptPolicy` splits into the
+  UTS #39 levels (the library) and the policy a deployment states (`tson-base`).
+- [ ] **`tson-regex` drops its `Tson` prefix** — `io.ltr8.regex`, `TsonRegex` → a name for what it is (an
+  I-Regexp), `TsonRegexSyntaxException` likewise — on the rule `tson-net` and `tson-bind` follow: a library that
+  knows nothing of TSON carries no `Tson` prefix. A mechanical rename across `tson-schema`, `tson-atom` and
+  `tson-compiler`.
+
 - [ ] **The encoding-neutral reader parts move into a module both stacks share — `tson-encoding` or similar, not
   `tson-base`.** With two working stacks the seam is visible (`design/json-encoding.md` deferred this until there
   were two to find it from): everything above the event level is encoding-neutral, and today it exists twice,
@@ -185,7 +193,7 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   - **The bind builder** — construct from slots, fill a carrier, all-or-nothing, report a constructor's refusal.
   - **The field decisions** — what a stated absence and a written FIXED member become. The wording is already one
     (`base.diagnostics`), and so is what an omitted field yields (`RecordField.omitted`); the other two decisions
-    are two copies.
+    are two copies, and so is the field-group judgement (each reader's `GroupPlan` and its pass over chosen options).
   - **The dispatch tables built at compile** — a sealed family's pin table keyed by `ValueIdentity`, the deeper
     names, the alias index (`ReferenceChain.namesMeaning` beside `Subsumption.admitting`), and
     `DiscriminationClass`. The lookahead that reads them stays with each encoding.
@@ -230,8 +238,8 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
-  — the fixtures carry `@synthetic` on the keys the resolver minted and `@doc` on many more, and the bound
-  side renders none of them, so the entries would compare equal for the wrong reason;
+  — the fixtures carry `@synthetic` on the keys the resolver minted and `@ordering`/`@bounded`/`@exact` on core's,
+  and the bound side renders none of them, so the entries would compare equal for the wrong reason;
   `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
   test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
   only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers
@@ -267,6 +275,22 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **A text `members` check compares in the type's form exactly, below [TSON-SCHEMA] §5.5's NFC floor.**
+  `ValueIdentity` compares map keys, set elements, FIXED values and pins in NFC, but `TextParser`'s
+  `normalizedMembers` check and `EnumParser`'s member match compare `form.apply(...)` strings as they are, so
+  under `NONE` or `ASCII_CASEFOLD` a decomposed `e\u0301` is not the member `"\u00e9"`. Both match in NFC of
+  the value in its form, as do the two checks that refuse members which are one value (`TextType`'s coherence
+  check and `EnumLabels`); `TextNormalizationTest.anAsciiFoldDoesNotComposeADecomposedSpelling` asserts the old
+  rule and flips. A Class 2 vector for each.
+
+- [ ] **A scope push at a position that is not scoped is reported in the validation category**, where
+  [TSON-SCHEMA] §7.8 makes it a resolver error (the cell rule's refusal, at a `scoped` position without
+  `EXTERN`, is the validation error). TSON text reports it as `VALIDATION_ERROR` (`ScopePush.refuse`) and JSON
+  as `UNRECOGNIZED_FIELD` (`Tags.refuseScope`, whose Javadoc already says resolver error); both map to
+  validation in `Class2ConformanceSuiteTest.categoryOf`. Needs a resolver-category code at both sites, and a
+  corpus vector for each encoding — a `!!schema` on a record field and on a container of a scoped type
+  (`[declared]` itself, not its element) — since none catches it today.
+
 - [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
   `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
   `NOT_IMPLEMENTED` diagnostic carries. `resolveTypeRef`'s, for a sugar form that reaches resolution unlifted, offers two
@@ -280,6 +304,23 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   phase) decides whether it stays `UnsupportedOperationException` or becomes `IllegalStateException`, and with it exit
   70's two halves. `DefinitionResolver`'s class Javadoc lists both sites and moves with them.
 
+- [ ] **A template application is named in a diagnostic by the construction it closes, in array spelling.**
+  `tags: set<text>` given `[a a]` reports `'[text]' requires unique elements`, and `only: tuple1<text>` given `[]`
+  reports `'[text]' has 1 positions, found only 0 elements` — so a set and a one-element tuple both read as the
+  array `[text]`, a type the author never wrote. The instantiation entry carries the application in its `source`
+  (`{ name: set  arguments: [text] }`), but its body is a reference to the synthetic construction it closes
+  (`!set_type { element_type: text }`, sourced from the bare constructor), and the reader that reports is the
+  synthetic's, which `EntryDisplayName` renders from its body. The fix is to keep the application as the display
+  name across that hop, as `UseSite.named` already does for an alias; and where no application is in reach,
+  `EntryDisplayName` should not render a `set_type` body or a one-position tuple as array sugar.
+
+- [ ] **A tuple refused a scalar prints the event record.** `only: tuple1<text>` given `a` reports
+  `expected a tuple (array-shaped) for '[text]', found TokenEvent[text=a, form=UNQUOTED, position=…]`:
+  `TypeRefCheck.describe` names a record, map, array, `{}` and `_` and falls back to `String.valueOf` for anything
+  else, so a scalar token arrives as its `toString`. It has 18 callers, all exposed the same way; a scalar wants its
+  token text (and form, where quoting is the difference). `JsonAtoms.describe` is the JSON side's counterpart and
+  `CrossEncodingParityTest` the check that the two describe one value alike.
+
 - [ ] **A base-syntax diagnostic does not say whether it is a lexer error or a parse error.** [TSON-DATA] §8.1 makes
   them two categories, and [TSON-JSON] §9.4's table sorts JSON's failures into them (malformed text, invalid UTF-8 and
   ill-formed strings are lexer errors; grammar violations are parse errors). Both classifiers collapse the pair:
@@ -290,18 +331,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `ParseException`. What a consumer routes on is the `Code`, so the fix is a code per category rather than a component
   beside it; what constrains it is that the JSON lexer has to state which kind it raised, and that
   `CrossEncodingParityTest` compares codes, so the two encodings must sort one malformed input the same way.
-
-- [ ] **The look-alike check recomputes every skeleton per record, and ignores the identifier policy.**
-  `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of
-  every schemaless tree read, which builds a `HashMap` and a UTS #39 skeleton per field name. Field names
-  repeat across the records of a document, so the same skeletons are built again for each one; measured,
-  the whole check is ~1,300 bytes per read of the harness document even after `Confusables.skeleton` stopped
-  allocating for a name that maps nothing. A cache would take most of that, and the design question is its
-  bound: names are attacker-controlled, so a per-read cache is the safe shape and a process-wide one is not.
-  Separately, the check consults **no policy**, which is a conformance gap: a deployment that stated
-  `withIdentifierPolicy(unrestricted())` still gets `CONFUSABLE_NAMES`, where the two per-name rules honour
-  it, and [TSON-DATA] §8.2 says a processor "MUST allow a deployment to relax any of the three". What is
-  left to decide is the policy's shape for the set rule -- a switch of its own, or implied by the level.
 
 - [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
   in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a
@@ -316,39 +345,19 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   §10.2 makes a mismatch a resolver error, and the other two are §2.2.1 errors with no category of their own, which
   [TSON-DATA] §8.1 gives to the layer that detects them -- the resolver, following the reference.
 
-- [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is
-  the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one
-  table with a default each, so nothing here is a judgement call any more — what is left is eleven document
-  limits and five schema-side ones, each a component on `LimitsPolicy`, a `CliPolicy.CliLimits` field and a
-  `--flag`. Document side: **token length** (1,048,576 code points), **decoded text length** after escape
-  processing (1,048,576), **numeric literal length** (4,096 digits, annotated tokens included), **decoded
-  binary size** per `!bytes` value (16,777,216 octets), **document size** in bytes (16,777,216), **elements**
-  per array or set (1,048,576), **entries** per map (1,048,576), **fields** per record (65,536),
-  **annotations** on one value (64), **total values** in one document (16,777,216), and **foreign schemas** one
-  document's scope pushes may load (16). Schema side (§11.5, same policy and same reporting surfaces):
-  **import closure** (64), **entries** in one schema map (65,536), **reference chain** (64), **supertype
-  chain** (64), and **materialisation depth** (64) — which is where `TemplateMaterialiser.MAX_CLOSING_DEPTH`
-  goes, it being a bare constant with nowhere to live until now. What still needs deciding per limit is only
-  *where it is counted*: the ones that bound shape are per-container state the stream does not keep, where
-  depth was a counter it already had, and the two aggregates (total values, foreign schemas) need their own
-  counter since §9.1 is explicit that the total is not bounded by the parts.
-
-- [ ] **`scripts/restamp-bundled-schemas.sh` does not cover the spec's own §13.2 table.** The script moves
-  every pin in the repo bottom-up — the three `spec/m/*.tn` headers, `TsonBundledSchemas`, `InitCommand`,
-  `README.md` and the getting-started example — and `--check` reports staleness across all of them. It does
-  not know about `spec/tson-part2-schema.md` §13.2, which pins the same three digests, so that table is the
-  one pin a schema edit leaves behind and the only one whose drift nothing reports. It drifted once already.
-  Teaching the script to stamp it (or at least to `--check` it, leaving the write to the spec author) is a
-  few lines against the same digest computation, and makes CI able to catch what a hand edit currently must.
-  The wrinkle worth deciding first: `spec/` is a cache this repo otherwise only reads, so writing into it is
-  a small change to what the script is for — `--check` alone may be the honest scope.
-
-- [ ] **`class2/schema/` carries no vector declaring a template, and the reason it could not is gone.**
-  [TSON-SCHEMA] §8.1 now says an open entry is a `type_definition` like any other — `parameters` non-empty,
-  `body` the held application in wire form under §5.10's one-spelling rule, typed by the kernel's `schema`
-  without a second value shape — which is exactly the shape this resolver holds (`TemplateBody`/`HeldBody`).
-  The two sides no longer disagree as values, so the layer can compare a template the way it compares
-  everything else and the corpus can state what one resolves to directly rather than indirectly at `link/`.
-  `ResolvedForm.heldBodies` is the comparison to keep — §8.1 makes wire form what a held body *is* on both
-  sides, not a compromise — and what is owed is the vectors, upstream, plus the note in `CONFORMANCE.md` that
-  currently explains the absence.
+- [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is the policy value
+  and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one table with a default
+  each, so nothing here is a judgement call any more — what is left is eleven document limits and five schema-side
+  ones, each a component on `LimitsPolicy`, a field on `spec/m/policy.tn`'s `limits` (optional, defaulting to
+  §9.1's value, then a restamp), a `CliPolicy.CliLimits` field and a `--flag`. Document side: **token length**
+  (1,048,576 code points), **decoded text length** after escape processing (1,048,576), **numeric literal length**
+  (4,096 digits, annotated tokens included), **decoded binary size** per `!bytes` value (16,777,216 octets),
+  **document size** in bytes (16,777,216), **elements** per array or set (1,048,576), **entries** per map
+  (1,048,576), **fields** per record (65,536), **annotations** on one value (64), **total values** in one document
+  (16,777,216), and **foreign schemas** one document's scope pushes may load (16). Schema side (§11.5, same policy
+  and same reporting surfaces): **import closure** (64), **entries** in one schema map (65,536), **reference
+  chain** (64), **supertype chain** (64), and **materialisation depth** (64) — which is where
+  `TemplateMaterialiser.MAX_CLOSING_DEPTH` goes, it being a bare constant with nowhere to live until now. What
+  still needs deciding per limit is only *where it is counted*: the ones that bound shape are per-container state
+  the stream does not keep, where depth was a counter it already had, and the two aggregates (total values,
+  foreign schemas) need their own counter since §9.1 is explicit that the total is not bounded by the parts.

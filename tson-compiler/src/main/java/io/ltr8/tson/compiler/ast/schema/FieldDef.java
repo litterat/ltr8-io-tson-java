@@ -37,7 +37,7 @@ public record FieldDef(List<Annotation> annotations, String name, boolean omitta
      * {@code field-modifier = ws ("~" / "=") ws (token / absent) / ws "=" ws "?"} -- {@code ~} is {@link
      * Kind#DEFAULT}, {@code =} is {@link Kind#FIXED} (§5.2), and {@code =?} is {@link Value.Deferred},
      * the discriminator spelling. The value is a bare token or the
-     * absent sentinel only -- never annotated, never typed, never a container; §12.1 states that no
+     * void sentinel only -- never annotated, never typed, never a container; §12.1 states that no
      * production of the schema grammar uses the full {@code data-value}, and §5.2 restricts modifier values
      * to scalar tokens.
      */

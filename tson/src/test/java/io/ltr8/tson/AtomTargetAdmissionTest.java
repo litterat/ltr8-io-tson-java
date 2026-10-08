@@ -43,8 +43,8 @@ class AtomTargetAdmissionTest {
     private static Tson tson(String decls, Class<?> bound) {
         String schema = """
                 !!id:"https://example.test/a-1.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                 %s
                 }
@@ -135,7 +135,8 @@ class AtomTargetAdmissionTest {
         MissingBindingException e = assertThrows(MissingBindingException.class,
                 () -> tson("  t => { u: uri }", UriAsUrl.class).objectReader()
                         .read(doc("!t { u: \"https://x.test/p\" }"), UriAsUrl.class));
-        assertTrue(e.getMessage().contains("no bound Java class for 't'"), e.getMessage());
+        assertTrue(e.getMessage().contains("'t' binds " + UriAsUrl.class.getName() + ", which cannot be analysed"),
+                e.getMessage());
     }
 
     // ── a FIXED value arrives the way a written one does ─────────────────

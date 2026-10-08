@@ -33,11 +33,11 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     /** The atom constructors meta-kernel.tn and meta.tn declare, in the order those documents declare them. */
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
             // meta-kernel.tn
-            "integer_type", "text_type", "uri_type", "regex_type",
+            "integer_type", "text_type", "identifier_type", "uri_type", "regex_type",
             // meta.tn
             "bytes_type", "float_type", "decimal_type", "rational_type", "date_type", "time_type",
             "datetime_type", "duration_type", "period_type", "uuid_type", "complex_type", "mac_type",
-            "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type");
+            "iri_type", "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type");
 
     private final Map<String, ValueReaderFactory> factories;
 
@@ -46,8 +46,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     }
 
     /**
-     * [TSON-JSON] §5's vocabulary alone, with no mode over it: every atom family, the enums, and the three
-     * {@code unit} instances, each reading to its family's natural host value. No container constructor is
+     * [TSON-JSON] §5's vocabulary alone, with no mode over it: every atom family, the enums, {@code value} and
+     * {@code void}, each reading to its family's natural host value. No container constructor is
      * registered, so a schema using one compiles to a gap.
      *
      * <p>This is what a mode's registry is built over rather than a mode of its own -- {@link #tree} wraps
@@ -109,7 +109,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     /** §5's atom constructors, each leaf passed through {@code leaf} so a mode can wrap what it produces. */
     private static Map<String, ValueReaderFactory> vocabulary(UnaryOperator<ValueReaderFactory> leaf) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
-        factories.put("unit", leaf.apply(AtomReader.UNIT));
+        factories.put("value_type", leaf.apply(AtomReader.VALUE));
+        factories.put("void_type", leaf.apply(AtomReader.VOID));
         factories.put("enum", leaf.apply(AtomReader.ENUM));
         for (String constructor : ATOM_CONSTRUCTORS) {
             factories.put(constructor, leaf.apply(AtomReader.ATOM));

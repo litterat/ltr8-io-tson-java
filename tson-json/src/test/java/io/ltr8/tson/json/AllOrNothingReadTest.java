@@ -8,7 +8,7 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 /**
  * One rule for every read: a document whose read reported anything reads to nothing, in tree mode and bind mode
  * and in both encodings, and the diagnostics are the answer. A partial value cannot say which of its parts to
- * trust -- a tree's placeholder for a refused value is the same node as a real absent one.
+ * trust -- a tree's placeholder for a refused value is the same node as a real void one.
  */
 class AllOrNothingReadTest {
 
@@ -32,8 +32,8 @@ class AllOrNothingReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/all-or-nothing-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               point  => { x: int32  y: int32 }
               route  => { name: text  stops: [point] }
@@ -117,7 +117,7 @@ class AllOrNothingReadTest {
     @Test
     void aTokenRefusalLeavesNothingInEveryModeAndBothEncodings() {
         String text = "p\u0430ssword";
-        UnicodePolicy ascii = UnicodePolicy.asciiOnly();
+        ScriptPolicy ascii = ScriptPolicy.asciiOnly();
 
         Map<String, Object> read = new LinkedHashMap<>();
         DiagnosticsCollector tsonTree = new DiagnosticsCollector();

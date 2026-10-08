@@ -146,7 +146,7 @@ class ResolvedFixtureTest {
     }
 
     /**
-     * <b>And every entry's key carries the same annotations</b> -- {@code @ordered}, {@code @bounded}, {@code
+     * <b>And every entry's key carries the same annotations</b> -- {@code @ordering}, {@code @bounded}, {@code
      * @exact}, {@code @numeric} and the rest, {@code @doc} aside. They sit on the schema-map key, where binding
      * the fixture drops them, so this is the one assertion that reaches them; through the bound document both
      * sides would carry none and agree for the wrong reason, which is how a fixture drifts unnoticed.
@@ -165,14 +165,14 @@ class ResolvedFixtureTest {
         }
         // Non-vacuous: core marks its atoms, so an empty-equals-empty pass is not available here either.
         assertTrue(ResolvedForm.fixtureKeyAnnotations(Files.readString(specDirectory().resolve("core-resolved.tn")))
-                .get("int32").contains("@ordered:TOTAL"), "core-resolved.tn marks int32 @ordered:TOTAL");
+                .get("int32").contains("@ordering:TOTAL"), "core-resolved.tn marks int32 @ordering:TOTAL");
     }
 
     /**
      * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
      * {@code @synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
-     * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark eight keys
-     * in meta-kernel and five in meta.tn; core.tn writes no inline form and has none, which is as much a
+     * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark nine keys
+     * in meta-kernel and three in meta.tn; core.tn writes no inline form and has none, which is as much a
      * statement as the other two.
      *
      * <p>This is the one assertion here that does not go through the bound document -- see {@link
@@ -182,8 +182,8 @@ class ResolvedFixtureTest {
     void theSameEntriesAreMarkedSyntheticOnBothSides() throws Exception {
         // Non-vacuous: the fixtures really do mark keys, so an empty-equals-empty pass is not available to a
         // scan that stopped matching or a resolver that stopped marking.
-        assertEquals(8, fixtureSynthetics("meta-kernel-resolved.tn").size(), "meta-kernel.tn marks eight keys");
-        assertEquals(5, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks five keys");
+        assertEquals(9, fixtureSynthetics("meta-kernel-resolved.tn").size(), "meta-kernel.tn marks nine keys");
+        assertEquals(3, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks three keys");
 
         assertEquals(fixtureSynthetics("meta-kernel-resolved.tn"),
                 ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.META_KERNEL_ID), "meta-kernel.tn");

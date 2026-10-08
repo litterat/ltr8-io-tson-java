@@ -99,12 +99,12 @@ final class MetaRefs {
                     ? record.supertypes().stream().map(map).toList() : record.supertypes(),
                     record.fields().stream().map(field -> field.withType(map.apply(field.type()))).toList(),
                     record.groups(), record.extension(), record.discriminators());
-            case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.state(),
-                    array.unordered(), array.uniqueItems(), array.minItems(), array.maxItems());
+            case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.voidable(),
+                    array.ordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(map.apply(mapBody.keyType()), map.apply(mapBody.valueType()),
-                    mapBody.state(), mapBody.minItems(), mapBody.maxItems());
+                    mapBody.voidable(), mapBody.ordered(), mapBody.minItems(), mapBody.maxItems());
             case TupleBody tuple -> new TupleBody(tuple.elements().stream()
-                    .map(element -> new TupleElement(map.apply(element.elementType()), element.state())).toList());
+                    .map(element -> new TupleElement(map.apply(element.elementType()), element.voidable())).toList());
             case ChoiceBody choice -> new ChoiceBody(choice.variants().stream().map(map).toList());
             // An alias's target maps like any other reference, arguments and all -- which is what lets a
             // closed alias follow its own `source` onto the entry materialisation minted for it, and a

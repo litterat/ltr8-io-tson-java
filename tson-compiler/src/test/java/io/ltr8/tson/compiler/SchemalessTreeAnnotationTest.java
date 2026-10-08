@@ -78,12 +78,12 @@ class SchemalessTreeAnnotationTest {
     @Test
     void aValuelessAnnotationHasNoValueRatherThanAnEmptyOne() {
         // §3.1: with no ":", presence is the whole of the information. Distinct from @name:_ , which
-        // would carry the absent sentinel as a real value.
+        // would carry the void sentinel as a real value.
         TsonValue bare = read("{ tier: @deprecated GOLD }").get("tier");
         assertEquals(Optional.empty(), only(bare, "deprecated").value());
 
-        TsonValue explicitlyAbsent = read("{ tier: @deprecated:_ GOLD }").get("tier");
-        assertTrue(only(explicitlyAbsent, "deprecated").value().orElseThrow().isAbsent());
+        TsonValue explicitlyVoid = read("{ tier: @deprecated:_ GOLD }").get("tier");
+        assertTrue(only(explicitlyVoid, "deprecated").value().orElseThrow().isVoid());
     }
 
     @Test
@@ -157,7 +157,7 @@ class SchemalessTreeAnnotationTest {
         assertEquals(List.of("doc", "rev"), names(twice));
         assertEquals(List.of("deprecated"), names(twice.get("tier")));
         assertEquals(List.of("unset"), names(twice.get("nothing")));
-        assertTrue(twice.get("nothing").isAbsent());
+        assertTrue(twice.get("nothing").isVoid());
     }
 
     @Test

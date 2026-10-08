@@ -16,10 +16,12 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.meta.VoidType;
 
 import org.junit.jupiter.api.Test;
 
@@ -45,8 +47,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TsonSchemaLinkerTest {
 
-    private static TypeDefinition unitEntry() {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(), List.of(), new Unit());
+    private static TypeDefinition valueEntry() {
+        return new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new ValueType());
+    }
+
+    private static TypeDefinition voidEntry() {
+        return new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new VoidType());
     }
 
     private static TypeDefinition emptyRecord() {
@@ -122,7 +128,7 @@ class TsonSchemaLinkerTest {
     @Test
     void anArgumentBearingFieldTypeAgainstANonTemplateIsRejected() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", unitEntry());
+        entries.put("token", valueEntry());
         entries.put("set", emptyRecord());
         entries.put("container", TypeDefinition.product(RecordBody.of(List.of(RecordField.required("members",
                 new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
@@ -138,7 +144,7 @@ class TsonSchemaLinkerTest {
      */
     private static TypeDefinition template(String parameter, String body) {
         return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(),
-                new TemplateBody(List.of(parameter), body, Optional.empty()));
+                new TemplateBody(List.of(TemplateParam.typeParameter(parameter)), body, Optional.empty()));
     }
 
     /**
@@ -158,7 +164,7 @@ class TsonSchemaLinkerTest {
     @Test
     void anArgumentBearingSourceIsCarriedThroughWithoutMaterialising() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", unitEntry());
+        entries.put("token", valueEntry());
         entries.put("other", template("U", "!record { fields: [ { name: v  type: U } ] }"));
         TypeRef otherOfToken = new TypeRef("other", List.of(new TypeArgument.Ref(TypeRef.of("token"))));
         entries.put("generic", new TypeDefinition(Optional.of(otherOfToken), TypeKind.PRODUCT,
@@ -206,7 +212,7 @@ class TsonSchemaLinkerTest {
     @Test
     void rejectsAChoiceListingOneVariantTwice() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", unitEntry());
+        entries.put("token", valueEntry());
         entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("token")))));
 
         SchemaValidationException ex = assertThrows(SchemaValidationException.class,
@@ -221,7 +227,7 @@ class TsonSchemaLinkerTest {
     @Test
     void rejectsTwoVariantsThatFlattenToOneType() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", unitEntry());
+        entries.put("token", valueEntry());
         entries.put("nickname", TypeDefinition.reference("token"));
         entries.put("contact", choiceEntry(
                 new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("nickname")))));
@@ -235,7 +241,7 @@ class TsonSchemaLinkerTest {
     @Test
     void acceptsAliasedVariantsThatFlattenToDifferentTypes() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", unitEntry());
+        entries.put("token", valueEntry());
         entries.put("other", emptyRecord());
         entries.put("nickname", TypeDefinition.reference("token"));
         entries.put("contact", choiceEntry(
@@ -372,7 +378,7 @@ class TsonSchemaLinkerTest {
     @Test
     void rejectsAVoidChoiceVariant() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("void", unitEntry());
+        entries.put("void", voidEntry());
         entries.put("label", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
                 List.of(), List.of(), TextType.UNCONSTRAINED));
         entries.put("maybe_label", choiceEntry(
@@ -387,7 +393,7 @@ class TsonSchemaLinkerTest {
     @Test
     void rejectsAVoidVariantReachedThroughAnAlias() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("void", unitEntry());
+        entries.put("void", voidEntry());
         entries.put("nothing", TypeDefinition.reference("void"));
         entries.put("label", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
                 List.of(), List.of(), TextType.UNCONSTRAINED));
@@ -440,7 +446,7 @@ class TsonSchemaLinkerTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("thing", TypeDefinition.product(new RecordBody(List.of(),
                 List.of(RecordField.required("a", TypeRef.of("thing"))),
-                List.of(new FieldGroup(List.of("not_a_real_field"), io.ltr8.tson.schema.meta.ElementState.OPTIONAL)),
+                List.of(FieldGroup.ofSingles(List.of("not_a_real_field"), true)),
                 io.ltr8.tson.schema.meta.RecordExtensionType.OPEN)));
 
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(schemaOf(entries), null));
@@ -478,7 +484,7 @@ class TsonSchemaLinkerTest {
         // A genuinely different type under the same name. This used to declare `emptyRecord()` on both
         // sides, which is not a collision at all: [TSON-SCHEMA] §8.2 makes two entries that are the same
         // entry one entry, so the assertion passed only because nothing checked whether they agreed.
-        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), unitEntry()));
+        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), valueEntry()));
     }
 
     /**
@@ -514,7 +520,7 @@ class TsonSchemaLinkerTest {
     void rejectsAMetaTargetThatIsNotItselfGovernedByTheMetaKernel() {
         // a plain type library: its own !!meta is an ordinary meta, so it declares no constructors
         TsonLinkedSchema library = new TsonLinkedSchema(new TsonSchema("https://example.test/lib.tn",
-                "https://example.test/meta.tn", List.of(), Map.of("uuid", unitEntry())));
+                "https://example.test/meta.tn", List.of(), Map.of("uuid", valueEntry())));
         Map<String, TsonLinkedSchema> byIdentity =
                 Map.of(CanonicalIdentity.canonicalize("https://example.test/lib.tn"), library);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
@@ -563,7 +569,7 @@ class TsonSchemaLinkerTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("response", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("status", TypeRef.of("token"))))));
-        entries.put("token", unitEntry());
+        entries.put("token", valueEntry());
         entries.put("success_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
                 List.of("response"), List.of(),
                 RecordBody.of(List.of(RecordField.required("data", TypeRef.of("token"))))));

@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
  * {}`, `reference => top & { target: type_name }`, Part 2 §4.1) as real Java subtyping.
  *
  * <p>There's no need to also assert e.g. {@code !(unit instanceof Product)} -- {@code Product}'s
- * own {@code permits} list doesn't name {@link Unit} (a {@code final} record), so the compiler
+ * own {@code permits} list doesn't name {@link ValueType} (a {@code final} record), so the compiler
  * already rejects that check as provably impossible at compile time, a stronger guarantee than a
  * runtime assertion would give.
  */
@@ -20,8 +20,8 @@ class TopKindHierarchyTest {
 
     @Test
     void atomFamilyVariantsAreAtomAndTop() {
-        assertInstanceOf(Atom.class, new Unit());
-        assertInstanceOf(Top.class, new Unit());
+        assertInstanceOf(Atom.class, new ValueType());
+        assertInstanceOf(Top.class, new ValueType());
 
         EnumBody members = new EnumBody(List.of("true", "false"));
         assertInstanceOf(Atom.class, members);

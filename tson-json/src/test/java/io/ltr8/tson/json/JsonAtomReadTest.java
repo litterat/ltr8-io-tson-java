@@ -34,8 +34,8 @@ class JsonAtomReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/atoms-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               count      => int32
               exact      => number
@@ -45,7 +45,7 @@ class JsonAtomReadTest {
               day        => date
               blob       => bytes
               colour     => !enum [ RED GREEN BLUE ]
-              activity   => !enum { members: ["sedentary" "lightly active"]  profile: TEXT }
+              activity   => !text_enum ["sedentary" "lightly active"]
               country    => !text ^ { length: 2  members: ["AU" "NZ"] }
               flag       => boolean
               nothing    => void
@@ -253,7 +253,7 @@ class JsonAtomReadTest {
 
     // ── §5.7 void and value ──────────────────────────────────────────────
 
-    /** §5.7: at a {@code void} position the absent sentinel is the only conforming value, and null spells it. */
+    /** §5.7: at a {@code void} position the void sentinel is the only conforming value, and null spells it. */
     @Test
     void voidTakesNullAndNothingElse() {
         assertNull(read("nothing", "null").accepted());
@@ -289,7 +289,7 @@ class JsonAtomReadTest {
     }
 
     /**
-     * §7: JSON null is the absent sentinel, spent before any family rule applies -- so at every REQUIRED
+     * §7: JSON null is the void sentinel, spent before any family rule applies -- so at every REQUIRED
      * atom position it is a validation error, precisely as {@code _} is in text.
      */
     @Test
@@ -322,7 +322,7 @@ class JsonAtomReadTest {
     }
 
     /**
-     * §6.5's maps are unbuilt, so that constructor compiles to a gap. A gap is <b>not a verdict</b>
+     * §6.4's maps are unbuilt, so that constructor compiles to a gap. A gap is <b>not a verdict</b>
      * ({@code Code.verdict()} is false), which is what keeps it from being mistaken for a statement about
      * the document -- and it costs that value a verdict and nothing else's.
      */

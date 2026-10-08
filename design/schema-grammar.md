@@ -48,12 +48,16 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **No production of the schema grammar takes the full `data-value`**, which §12.1 states.
   `instance`'s payload is a `core-value` (`Instance` wraps a `DataValue` with `typeRef` pre-set, no separate
   `target`); `construction-def` admits the implicit `&` before its trailing `record-def`; `field-modifier`'s
-  value is a bare token or the absent sentinel.
+  value is a bare token or the void sentinel.
   - **`atom-refinement` is `"!" type-name ws "^" ws record-def`**, so the `^` branch requires a brace:
     `!integer ^ 5`, `!integer ^ !foo { … }` and `!integer ^ @doc:"d" { … }` are syntax errors, reported at the
     offending token, per declaration like every other schema syntax error.
   - An unquoted non-numeric type-argument always parses as a type reference, never a value literal — a
     deliberate grammar-layer deferral, classified at a later semantic layer.
+- **A parameter may write a type after its name** (`type-param = param-name [ws ":" ws type-ref]`), on every
+  type-def form alike. `parseTypeParamsOpt` still returns the names the type-def records; a written type goes to
+  the declaration being parsed (`SchemaMap.Declaration.parameterTypes`), because it narrows what resolution
+  derives rather than shaping the type-def, and the declaration survives every desugar rewrite of its type-def.
 - **A `!` head behind a parameter list is the same production as one without** (§12.1's `instance =
   [type-params] "!" type-name ws core-value`) -- `vector => <T, N> !array { element_type: T  min_items: N }`.
   §12.1 has one production for both, and its own note says so: "`!` opens an `instance`, with or without a
@@ -110,8 +114,11 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **A field has one slot per question** (`FieldDef.omittable`, `FieldType.voidable`, the modifier), and the
   parser only records the marks: which combinations are refused is `FieldModifiers`', after parsing. The
   name's `?` needs no lexer change — `?` is always a token of its own, and `consumeAdjacentQuestion` holds it
-  to the name as it holds the other to the type. A group member takes a type `?` and refuses a name `?` and
-  a modifier outright, its presence being the group's (§5.11).
+  to the name as it holds the other to the type. A group member takes both `?`s — the name's makes it
+  optional within its option — and refuses a modifier outright, its presence being the group's (§5.11).
+  `|` separates a group's options and the members of one option are separated as record entries are; `)+`
+  marks the at-least-one group, `+` binding to the `)` as `?` does. `checkGroupShape` refuses every group that
+  restates plain fields or another group, so each presence rule has one spelling ([TSON-SCHEMA] §5.11).
   - A map key stays `type-name ["<" type-args ">"]` and nothing else — not a paren type, not a bracket form
     — which is what holds the brace dispatch below to its lookahead budget; a composite key earns a named
     declaration and the explicit `!map { key_type: … }` form.

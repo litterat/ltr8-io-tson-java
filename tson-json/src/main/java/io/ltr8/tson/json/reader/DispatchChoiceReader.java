@@ -6,7 +6,7 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -70,7 +70,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         this.name = name;
         this.variants = body.variants().stream().map(TypeRef::name).toList();
         this.schemaLocation = schemaLocation;
-        this.byClass = variantsByClass(context.schema(), body);
+        this.byClass = variantsByClass(context.linked(), body);
         Map<DiscriminationClass, JsonTypeReader<?>> kinds = new LinkedHashMap<>();
         byClass.forEach((kind, variant) -> kinds.put(kind, context.readers().resolve(variant)));
         this.readerByClass = Map.copyOf(kinds);
@@ -112,14 +112,14 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * containing one non-disjoint, so this is unreachable in a linked schema -- and treating it as "the tag is
      * required" is the safe reading if it ever is reached.
      */
-    private static Map<DiscriminationClass, String> variantsByClass(TsonSchema schema, ChoiceBody body) {
+    private static Map<DiscriminationClass, String> variantsByClass(TsonLinkedSchema linked, ChoiceBody body) {
         if (!body.disjoint().orElse(false)) {
             return Map.of();
         }
         Map<DiscriminationClass, String> table = new LinkedHashMap<>();
         for (TypeRef variant : body.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(schema, variant.name());
-            if (variantClass.isEmpty() || !DiscriminationClass.stable(schema, variant.name())
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(linked, variant.name());
+            if (variantClass.isEmpty() || !DiscriminationClass.stable(linked.schema(), variant.name())
                     || table.put(variantClass.get(), variant.name()) != null) {
                 return Map.of();
             }
@@ -193,14 +193,14 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * <p>The message says <em>why</em> the tag is required, because the two reasons want different fixes: a
      * choice that cannot be discriminated needs a tag on every value, where one that is disjoint and
      * class-stable but received an unexpected kind has a document problem. A null gets its own answer -- §7
-     * spends it as the absent sentinel before any class question arises, so it is not an unrecognised kind but
-     * an absence at a position admitting none.
+     * spends it as the void sentinel before any class question arises, so it is not an unrecognised kind but
+     * a void value at a position admitting none.
      */
     private Object untagged(JsonReadContext ctx, JsonEvent first, Optional<DiscriminationClass> arriving) {
         String found = JsonAtoms.describe(first);
         if (first instanceof JsonEvent.NullValue) {
             ctx.report(Diagnostic.Code.FIELD_REQUIRED,
-                    "'%s' admits no absence, and JSON null is this encoding's spelling of the absent sentinel (§7)"
+                    "'%s' is not voidable, and JSON null is this encoding's spelling of the void sentinel (§7)"
                             .formatted(name), "a value of one of (" + String.join(" | ", variants) + ")", "null");
         } else if (byClass.isEmpty()) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,

@@ -13,8 +13,11 @@ package io.ltr8.tson.base;
  * reporting overloads: a misfiled author error aborts the whole run instead of joining the other problems,
  * and tells the author their correct reading of the spec is this library's fault. The test for which is
  * which: <b>a schema error's verdict does not change when this library improves; a gap's does.</b>
+ *
+ * <p>Its one subtype, {@link SchemaRefusalException}, is a schema the processor declines under its §8.2
+ * identifier policy rather than one the spec calls wrong, and is reported under its own code.
  */
-public final class SchemaValidationException extends RuntimeException {
+public sealed class SchemaValidationException extends RuntimeException permits SchemaRefusalException {
 
     private static final long serialVersionUID = 1L;
 

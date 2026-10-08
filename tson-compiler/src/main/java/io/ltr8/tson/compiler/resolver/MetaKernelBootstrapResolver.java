@@ -15,9 +15,10 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
@@ -25,11 +26,12 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
-import io.ltr8.tson.schema.meta.UriType;
+import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.meta.VoidType;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -172,7 +174,7 @@ public final class MetaKernelBootstrapResolver {
             }
             // §5.5: constructor application transfers only the target's kind; no supertypes, no
             // parameters -- this is construction, not composition or refinement.
-            instanceBody(instance).ifPresent(body -> entries.put(declaration.name(),
+            instanceBody(declaration.name(), instance).ifPresent(body -> entries.put(declaration.name(),
                     new TypeDefinition(Optional.of(TypeRef.of(instance.target())), target.kind(),
                             List.of(), List.of(), body)));
         }
@@ -240,22 +242,43 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * The direct, hand-written construction for one of meta-kernel's own six real constructor
+     * The direct, hand-written construction for one of meta-kernel's own eight real constructor
      * targets (see this class's own Javadoc) -- {@link Optional#empty()} for anything else, left
      * for the caller to decide what that means (today: the declaration is simply left out of the
      * result, rather than failing the whole bootstrap; unexercised against the real fixture, since
-     * all six real targets are covered).
+     * all eight real targets are covered).
      *
      * <p>Package-private, not {@code private} -- {@code MetaKernelBootstrapResolverTest} exercises the
      * unrecognized-target and wrong-shape-body branches directly, since neither is reachable through
-     * the real fixture (every real target is one of the six, and every empty-bodied one really is
+     * the real fixture (every real target is one of the eight, and every empty-bodied one really is
      * empty).
      */
     static Optional<Top> instanceBody(Instance instance) {
+        return instanceBody("", instance);
+    }
+
+    /**
+     * {@link #instanceBody(Instance)} for the entry named {@code name}: the one target with two instances,
+     * {@code identifier_type}, is told apart by the entry -- {@code identifier} and {@code scheme_name} -- each
+     * checked against the constant this implementation holds for it.
+     */
+    static Optional<Top> instanceBody(String name, Instance instance) {
         return switch (instance.target()) {
-            case "unit" -> {
+            case "value_type" -> {
                 requireEmptyBody(instance);
-                yield Optional.of(new Unit());
+                yield Optional.of(new ValueType());
+            }
+            case "void_type" -> {
+                requireEmptyBody(instance);
+                yield Optional.of(new VoidType());
+            }
+            case "identifier_type" -> {
+                if (name.equals("scheme_name")) {
+                    requireSchemeNameProfile(instance);
+                    yield Optional.of(IdentifierType.SCHEME_NAME);
+                }
+                requireIdentifierProfile(instance);
+                yield Optional.of(IdentifierType.IDENTIFIER);
             }
             case "integer_type" -> {
                 requireEmptyBody(instance);
@@ -265,9 +288,9 @@ public final class MetaKernelBootstrapResolver {
                 requireEmptyBody(instance);
                 yield Optional.of(TextType.UNCONSTRAINED);
             }
-            case "uri_type" -> {
-                requireEmptyBody(instance);
-                yield Optional.of(UriType.UNCONSTRAINED);
+            case "iri_type" -> {
+                requireSchemeRequired(instance);
+                yield Optional.of(IriType.IRI);
             }
             case "regex_type" -> {
                 requireEmptyBody(instance);
@@ -291,10 +314,60 @@ public final class MetaKernelBootstrapResolver {
         }
     }
 
+    /**
+     * {@code identifier => !identifier_type { continue_add: "-" }}, checked to be exactly that: the hand-picked
+     * constant is the profile the lexer, parser, resolver and linker already hold, since the kernel's own names
+     * are read by it before the kernel exists. The kernel stating another would be a kernel that describes a
+     * profile this implementation does not run.
+     */
+    private static void requireIdentifierProfile(Instance instance) {
+        if (!(instance.value().coreValue() instanceof RecordValue record) || record.fields().size() != 1
+                || !record.fields().getFirst().name().equals("continue_add")
+                || !(record.fields().getFirst().value().value().coreValue() instanceof TokenValue token)
+                || !token.text().equals("-")) {
+            throw new IllegalStateException("expected { continue_add: \"-\" } for !identifier_type, found "
+                    + instance.value().coreValue());
+        }
+    }
+
+    /**
+     * {@code scheme_name}'s body, checked to be exactly {@link IdentifierType#SCHEME_NAME}'s, field for field: the
+     * constant is what {@code iri_type.schemes} and {@code uri_type.schemes} read their elements through, so a
+     * kernel stating another profile would describe a scheme this implementation does not read.
+     */
+    private static void requireSchemeNameProfile(Instance instance) {
+        Map<String, String> expected = Map.of("start", "NONE", "continue", "NONE",
+                "start_add", "abcdefghijklmnopqrstuvwxyz", "continue_add", "abcdefghijklmnopqrstuvwxyz0123456789+-.",
+                "normalization", "ASCII_CASEFOLD");
+        Map<String, String> stated = new HashMap<>();
+        if (instance.value().coreValue() instanceof RecordValue record) {
+            for (RecordValue.Field field : record.fields()) {
+                if (field.value().value().coreValue() instanceof TokenValue token) {
+                    stated.put(field.name(), token.text());
+                }
+            }
+        }
+        if (!stated.equals(expected)) {
+            throw new IllegalStateException("expected " + expected + " for scheme_name, found "
+                    + instance.value().coreValue());
+        }
+    }
+
+    /** meta-kernel's one {@code iri_type} instance, {@code iri}, withdraws {@code allow_relative} and nothing else. */
+    private static void requireSchemeRequired(Instance instance) {
+        if (!(instance.value().coreValue() instanceof RecordValue record) || record.fields().size() != 1
+                || !record.fields().getFirst().name().equals("allow_relative")
+                || !(record.fields().getFirst().value().value().coreValue() instanceof TokenValue token)
+                || !token.text().equals("false")) {
+            throw new IllegalStateException("expected { allow_relative: false } for !iri_type, found "
+                    + instance.value().coreValue());
+        }
+    }
+
     /** {@code !array { element_type: T }} / {@code !set { element_type: T }} as the body each denotes. */
-    private static ArrayBody toArrayBody(DataValue value, boolean unique) {
+    private static ArrayBody toArrayBody(DataValue value, boolean set) {
         TypeRef element = TypeRef.of(bindingField(value, "element_type"));
-        return new ArrayBody(element, ElementState.REQUIRED, unique, unique, Optional.empty(), Optional.empty());
+        return new ArrayBody(element, false, !set, set, Optional.empty(), Optional.empty());
     }
 
     /** {@code !map { key_type: K  value_type: V }} as the body it denotes. */

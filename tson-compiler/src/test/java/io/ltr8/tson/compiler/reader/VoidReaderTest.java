@@ -17,7 +17,7 @@ class VoidReaderTest {
             new VoidReader(SchemaLocation.of("example.test/s.tn", "void", Optional.empty()));
 
     @Test
-    void acceptsTheAbsentSentinelAndReadsAsNull() {
+    void acceptsTheVoidSentinelAndReadsAsNull() {
         assertNull(READER.read(TestDocuments.document("_")));
     }
 

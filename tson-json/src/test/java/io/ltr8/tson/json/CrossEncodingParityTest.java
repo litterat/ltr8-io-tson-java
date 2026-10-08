@@ -12,7 +12,7 @@ import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonObject;
 import io.ltr8.tson.json.tree.JsonValue;
-import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonRecord;
 import org.junit.jupiter.api.Test;
 
@@ -49,8 +49,8 @@ class CrossEncodingParityTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/parity-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               person => {
                 name:   text
@@ -80,6 +80,14 @@ class CrossEncodingParityTest {
               shape     => ( circle | square )
               picked    => { pick: scalars }
               shaped    => { outline: shape }
+              port_label  => !text_enum ["80" "443"]
+              port_slot   => ( port_label | int32 )
+              ported      => { p: port_slot }
+              answer      => !text_enum ["true" "false"]
+              answer_slot => ( answer | boolean )
+              answered    => { a: answer_slot }
+              port_text   => ( port_label | text )
+              labelled    => { l: port_text }
               pet       => abstract { pet_type: text =?  name: text }
               dog       => pet & { pet_type?: = "dog"  breed: text }
               cat       => pet & { pet_type?: = "cat"  indoor: boolean }
@@ -101,6 +109,22 @@ class CrossEncodingParityTest {
               crate      => { b: box }
               local_box  => { v: declared }
               extern_box => { v: extern }
+              fragment   => { ( include: text | name?: text  type?: text ) }
+              endpoint   => { ( host: text  port: int32 | socket: text )? }
+              contact    => { ( email: text | phone: text )+ }
+              header_name => !identifier_type { start: NONE  continue: NONE
+                start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
+                normalization: NFKC_CASEFOLD }
+              headers     => { header_name => text }
+              field_name  => !identifier_type { start: NONE  continue: NONE
+                start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
+                normalization: ASCII_CASEFOLD }
+              fields      => { field_name => text }
+              pinned      => { h: header_name = Idempotency-Key }
+              charset     => !text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
+              encoded     => { c: charset }
+              safe_header => !enum_type { type: header_name  members: [Accept content-type] }
+              screened    => { h: safe_header }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -158,7 +182,7 @@ class CrossEncodingParityTest {
      * As {@link #sameVerdict}, comparing the codes alone.
      *
      * <p>For a case where the two documents genuinely have different <em>shapes</em>, the data pointer is not
-     * a fact the two can agree on: §6.5's pairs form makes a compound-keyed map a JSON array of pairs, so a
+     * a fact the two can agree on: §6.4's pairs form makes a compound-keyed map a JSON array of pairs, so a
      * pointer into it names an entry index where the TSON map has a key. What still must agree is which rule
      * fired.
      */
@@ -209,7 +233,7 @@ class CrossEncodingParityTest {
 
     /** {@code nickname?: text} may be omitted and refuses {@code _}: one rule, stated once, in both encodings. */
     @Test
-    void anOptionalFieldRefusesAbsenceInBothEncodings() {
+    void anOptionalFieldRefusesTheVoidSentinelInBothEncodings() {
         sameRule("marks", """
                 { nickname: _  from: 1  version: "2.0" }""", """
                 {"nickname": null, "from": 1, "version": "2.0"}""");
@@ -230,19 +254,19 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * Both trees keep the spelling of absence (§7.2): a field written {@code _} or null stands as the absent
-     * node, and one never written is not there -- the text tree's {@code TsonAbsent} and the JSON tree's
+     * Both trees keep the spelling of a void value (§7.2): a field written {@code _} or null stands as the void
+     * node, and one never written is not there -- the text tree's {@code TsonVoid} and the JSON tree's
      * {@code JsonNull} at the same fields, in both directions.
      */
     @Test
-    void bothTreesKeepWhichSpellingOfAbsenceArrived() {
+    void bothTreesKeepWhichSpellingOfAVoidValueArrived() {
         TsonRecord text = (TsonRecord) TSON.treeReader().read("""
                 !!schema:"%s"
                 !marks { from: _  timeout: _  version: "2.0" }""".formatted(ID));
         JsonObject json = (JsonObject) jsonTree("marks", """
                 {"from": null, "timeout": null, "version": "2.0"}""");
         for (String field : List.of("from", "timeout")) {
-            assertInstanceOf(TsonAbsent.class, text.get(field), field);
+            assertInstanceOf(TsonVoid.class, text.get(field), field);
             assertInstanceOf(JsonNull.class, json.get(field), field);
         }
         assertFalse(text.fields().containsKey("nickname"));
@@ -520,8 +544,8 @@ class CrossEncodingParityTest {
      * <p>That difference is confined to <em>which kinds reach a family's parser</em>, which is each
      * encoding's own by §5.1. It is not a difference about the parser, the acceptance set, or the constraint
      * vocabulary -- those are one implementation ({@code tson-atom}) and cannot drift. So the parity this
-     * class guards is over the rules that <em>are</em> written twice: closure, duplicates, the field states,
-     * absence, group multiplicity, and container size and arity.
+     * class guards is over the rules that <em>are</em> written twice: closure, duplicates, the field facts,
+     * void values, group multiplicity, and container size and arity.
      */
     @Test
     void anUnquotedTokenAndAJsonNumberAreNotTheSameThingAtATextField() {
@@ -559,17 +583,17 @@ class CrossEncodingParityTest {
                 {"name": "Ada", "kind": "robot", "labels": []}""");
     }
 
-    /** The absent sentinel at a field that admits none: `_` in text, null in JSON, one verdict. */
+    /** The void sentinel at a field that admits none: `_` in text, null in JSON, one verdict. */
     @Test
-    void theAbsentSentinelAtARequiredField() {
+    void theVoidSentinelAtARequiredField() {
         sameRule("person", """
                 { name: _  labels: [] }""", """
                 {"name": null, "labels": []}""");
     }
 
-    /** §6.1.2: at REQUIRED_DEFAULT the fix is omission, and stating absence is refused in both encodings. */
+    /** §6.1.2: at REQUIRED_DEFAULT the fix is omission, and stating a void value is refused in both encodings. */
     @Test
-    void theAbsentSentinelAtADefaultedField() {
+    void theVoidSentinelAtADefaultedField() {
         sameRule("person", """
                 { name: "Ada"  tries: _  labels: [] }""", """
                 {"name": "Ada", "tries": null, "labels": []}""");
@@ -582,9 +606,9 @@ class CrossEncodingParityTest {
                 {"name": "Ada", "labels": ["x", [2]]}""");
     }
 
-    /** An absent element where the array admits none: `_` in text, null in JSON, one verdict at one index. */
+    /** A void element where the array admits none: `_` in text, null in JSON, one verdict at one index. */
     @Test
-    void anAbsentElementInARequiredElementArray() {
+    void aVoidElementInANonVoidableArray() {
         sameRule("person", """
                 { name: "Ada"  labels: [ "x", _ ] }""", """
                 {"name": "Ada", "labels": ["x", null]}""");
@@ -645,6 +669,38 @@ class CrossEncodingParityTest {
         bothAccept("picked", """
                 { pick: true }""", """
                 {"pick": true}""");
+    }
+
+    /**
+     * An enum whose type is not an identifier family is string-class whatever its members spell ([TSON-SCHEMA]
+     * §7.4): {@code !text_enum ["80" "443"]} beside {@code int32}, and {@code !text_enum ["true" "false"]} beside
+     * {@code boolean}, are disjoint, and each value goes to the variant of its own class.
+     */
+    @Test
+    void aTextEnumIsStringClassInBoth() {
+        bothAccept("ported", """
+                { p: "80" }""", """
+                {"p": "80"}""");
+        bothAccept("ported", """
+                { p: 8080 }""", """
+                {"p": 8080}""");
+        bothAccept("answered", """
+                { a: "true" }""", """
+                {"a": "true"}""");
+        bothAccept("answered", """
+                { a: true }""", """
+                {"a": true}""");
+    }
+
+    /** Beside {@code text} it shares the string class, so the choice is not disjoint and needs the tag in both. */
+    @Test
+    void aTextEnumBesideTextNeedsTheTagInBoth() {
+        sameVerdict("labelled", """
+                { l: 80 }""", """
+                {"l": 80}""");
+        sameVerdict("labelled", """
+                { l: "80" }""", """
+                {"l": "80"}""");
     }
 
     /** The variant is selected, then validated as itself -- so an out-of-range value is refused in both. */
@@ -716,7 +772,7 @@ class CrossEncodingParityTest {
                 {"who": {"$type": "employee", "name": "Ada", "labels": []}, "labels": []}""");
     }
 
-    // ── §6.5 maps ────────────────────────────────────────────────────────
+    // ── §6.4 maps ────────────────────────────────────────────────────────
 
     @Test
     void aMapEntryValueOfTheWrongShape() {
@@ -725,9 +781,9 @@ class CrossEncodingParityTest {
                 {"a": {"b": 1}}""");
     }
 
-    /** An entry value absent where the map admits none: `_` in text, null in JSON, one verdict at one key. */
+    /** A void entry value where the map admits none: `_` in text, null in JSON, one verdict at one key. */
     @Test
-    void anAbsentEntryValueWhereValuesAreRequired() {
+    void aVoidEntryValueWhereValuesAreNotVoidable() {
         sameRule("counts", """
                 { "a" => _ }""", """
                 {"a": null}""");
@@ -742,12 +798,12 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * §6.5: identity is over the key type's value space, so {@code 1} and {@code 1.0} under a {@code number}
+     * §6.4: identity is over the key type's value space, so {@code 1} and {@code 1.0} under a {@code number}
      * key are one key in both encodings.
      *
      * <p>What this pins is that the exact tier compares by value and not by scale in both stacks: {@code
      * BigDecimal.equals} tells {@code 1} from {@code 1.0}, so a reader comparing decoded keys with it admits
-     * the pair as two keys. It is a parity case rather than a divergence because §6.5 leaves neither encoding
+     * the pair as two keys. It is a parity case rather than a divergence because §6.4 leaves neither encoding
      * room to answer differently.
      */
     @Test
@@ -759,7 +815,7 @@ class CrossEncodingParityTest {
 
 
     /**
-     * A compound key takes §6.5's pairs form in JSON and the ordinary map form in text -- genuinely different
+     * A compound key takes §6.4's pairs form in JSON and the ordinary map form in text -- genuinely different
      * document shapes -- so the codes must agree and the pointers cannot.
      */
     @Test
@@ -774,5 +830,128 @@ class CrossEncodingParityTest {
         sameRule("bounded", """
                 { value: 1  min: 0  max: 9 }""", """
                 {"value": 1, "min": 0, "max": 9}""");
+    }
+
+    // ── Field groups whose options hold several fields ([TSON-SCHEMA] §5.11) ──
+
+    /** Documents both encodings admit: each option chosen alone, its marked members left out or not. */
+    @Test
+    void groupOptionsBothEncodingsAdmit() {
+        bothAdmit("fragment", "{ include: \"a\" }", "{\"include\": \"a\"}");
+        bothAdmit("fragment", "{ type: \"t\" }", "{\"type\": \"t\"}");
+        bothAdmit("fragment", "{ name: \"n\"  type: \"t\" }", "{\"name\": \"n\", \"type\": \"t\"}");
+        bothAdmit("endpoint", "{}", "{}");
+        bothAdmit("endpoint", "{ host: \"h\"  port: 80 }", "{\"host\": \"h\", \"port\": 80}");
+        bothAdmit("contact", "{ email: \"e\"  phone: \"p\" }", "{\"email\": \"e\", \"phone\": \"p\"}");
+    }
+
+    @Test
+    void twoOptionsChosen() {
+        sameRule("fragment", """
+                { include: "a"  name: "n" }""", """
+                {"include": "a", "name": "n"}""");
+    }
+
+    @Test
+    void noOptionChosenInARequiredGroup() {
+        sameRule("fragment", "{}", "{}");
+    }
+
+    @Test
+    void aChosenOptionMissingAMember() {
+        sameRule("endpoint", """
+                { port: 80 }""", """
+                {"port": 80}""");
+    }
+
+    /** Both refusals, the missing member first: each chosen option is judged, then the count. */
+    @Test
+    void anIncompleteOptionBesideAnother() {
+        sameRule("endpoint", """
+                { port: 80  socket: "s" }""", """
+                {"port": 80, "socket": "s"}""");
+    }
+
+    @Test
+    void noMemberOfAnAtLeastOneGroup() {
+        sameRule("contact", "{}", "{}");
+    }
+
+    /**
+     * The shared rules' words and code, pinned once here since {@link #sameRule} only compares the two encodings:
+     * every group verdict is {@code FIELD_GROUP}, and the count states the group's own rule.
+     */
+    @Test
+    void theGroupRulesSayWhatWasChosenAndWhatIsMissing() {
+        assertGroupRule("endpoint", "{\"port\": 80, \"socket\": \"s\"}",
+                "'port' chose (host port) on 'endpoint', which needs 'host'",
+                "at most one option of (host port | socket) may be chosen for 'endpoint', found 2");
+        assertGroupRule("contact", "{}", "at least one of (email | phone) must be present for 'contact'");
+        assertGroupRule("fragment", "{}",
+                "exactly one option of (include | name? type?) must be chosen for 'fragment', found none");
+        assertGroupRule("fragment", "{\"include\": \"a\", \"type\": \"t\"}",
+                "exactly one option of (include | name? type?) must be chosen for 'fragment', found 2");
+    }
+
+    private static void assertGroupRule(String rootType, String json, String... messages) {
+        List<Diagnostic> problems = jsonDiagnostics(rootType, json);
+        assertEquals(List.of(messages), problems.stream().map(Diagnostic::message).toList());
+        assertTrue(problems.stream().allMatch(d -> d.code() == Diagnostic.Code.FIELD_GROUP), problems::toString);
+    }
+
+    private static void bothAdmit(String rootType, String tsonBody, String jsonBody) {
+        assertEquals(List.of(), tson(rootType, tsonBody), "TSON refused " + tsonBody);
+        assertEquals(List.of(), json(rootType, jsonBody), "JSON refused " + jsonBody);
+    }
+
+    // ── A text family's normalization ([TSON-SCHEMA] §5.5) ──
+
+    /** The value is the text in the type's form, so a member, a pin and a key each match it however it is cased. */
+    @Test
+    void normalizedValuesBothEncodingsAdmit() {
+        bothAdmit("encoded", "{ c: Us-Ascii }", "{\"c\": \"Us-Ascii\"}");
+        bothAdmit("pinned", "{ h: IDEMPOTENCY-KEY }", "{\"h\": \"IDEMPOTENCY-KEY\"}");
+        bothAdmit("headers", "{ Content-Type => \"a\"  Accept => \"b\" }",
+                "{\"Content-Type\": \"a\", \"Accept\": \"b\"}");
+    }
+
+    @Test
+    void twoCasingsOfOneName() {
+        sameRule("headers", """
+                { Content-Type => "a"  content-type => "b" }""", """
+                {"Content-Type": "a", "content-type": "b"}""");
+    }
+
+    @Test
+    void aPinNoCasingMatches() {
+        sameRule("pinned", "{ h: request-id }", "{\"h\": \"request-id\"}");
+    }
+
+    /**
+     * A JSON tree's node keeps the spelling that arrived, a value's normalized text being what the facets, the
+     * keys and the pins judge rather than what the node holds -- as a tree keeps an instant's offset.
+     */
+    @Test
+    void theJsonTreeKeepsTheSpelling() {
+        JsonObject json = (JsonObject) jsonTree("encoded", "{\"c\": \"UTF-8\"}");
+        assertEquals("\"UTF-8\"", json.get("c").toString());
+    }
+
+    /** An enum over a case-folding label type matches a member however it is cased, in both encodings. */
+    @Test
+    void anEnumMatchesInItsLabelTypesForm() {
+        bothAdmit("screened", "{ h: Content-Type }", "{\"h\": \"Content-Type\"}");
+        sameRule("screened", "{ h: x-trace }", "{\"h\": \"x-trace\"}");
+    }
+
+    /** An ASCII fold admits any casing of an ASCII name and refuses a full-width one, in both encodings. */
+    @Test
+    void anAsciiFoldInBothEncodings() {
+        bothAdmit("fields", "{ Content-Type => \"a\" }", "{\"Content-Type\": \"a\"}");
+        sameRule("fields", "{ Content-Type => \"a\"  content-type => \"b\" }",
+                "{\"Content-Type\": \"a\", \"content-type\": \"b\"}");
+        List<Verdict> fullWidth = tson("fields", "{ \"\uff23ontent-Type\" => \"a\" }");
+        assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_FORM_INVALID, "/\uff23ontent-Type")), fullWidth);
+        assertEquals(fullWidth, json("fields", "{\"\uff23ontent-Type\": \"a\"}"));
     }
 }

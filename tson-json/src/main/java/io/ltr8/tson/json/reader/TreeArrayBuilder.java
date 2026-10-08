@@ -9,7 +9,7 @@ import io.ltr8.tson.json.tree.JsonValue;
 import java.util.List;
 
 /**
- * Tree mode's array: a {@link JsonArray} of the elements the document stated, an absent element standing as
+ * Tree mode's array: a {@link JsonArray} of the elements the document stated, a void element standing as
  * {@link JsonNull} in its slot, the value itself (§7). An array whose read reported anything builds nothing --
  * all-or-nothing, as bind mode is.
  */
@@ -36,11 +36,11 @@ final class TreeArrayBuilder implements ArrayBuilder {
             return null;
         }
         for (int i = 0; i < elements.size(); i++) {
-            if (elements.get(i) == Slots.ABSENT) {
+            if (elements.get(i) == Slots.VOID) {
                 elements.set(i, JsonNull.INSTANCE);
             }
         }
-        @SuppressWarnings("unchecked")   // every slot now holds a node: a child's, or the absence just set
+        @SuppressWarnings("unchecked")   // every slot now holds a node: a child's, or the void node just set
         List<JsonValue> nodes = (List<JsonValue>) (List<?>) elements;
         return new JsonArray(nodes);
     }

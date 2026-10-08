@@ -44,11 +44,29 @@ public record SchemaMap(List<Annotation> annotations, Map<String, Declaration> d
      */
     public record Declaration(List<Annotation> nameAnnotations, String name,
                                List<Annotation> typeDefAnnotations, Optional<DefinitionMark> mark,
-                               TypeDef typeDef) {
+                               TypeDef typeDef, Map<String, TypeRef> parameterTypes) {
 
+        /**
+         * {@code parameterTypes} is what the parameter list wrote after each name -- {@code <T: text>} -- keyed
+         * by parameter name, and only for the parameters that wrote one ([TSON-SCHEMA] §5.10). It narrows the
+         * type the parameter's positions give, so it lives beside the type-def rather than inside it: every
+         * desugar rewrite of the type-def keeps the declaration's own list as written.
+         */
         public Declaration {
             nameAnnotations = List.copyOf(nameAnnotations);
             typeDefAnnotations = List.copyOf(typeDefAnnotations);
+            parameterTypes = Collections.unmodifiableMap(new LinkedHashMap<>(parameterTypes));
+        }
+
+        /** A declaration whose parameter list wrote no types -- every declaration the desugar phase injects. */
+        public Declaration(List<Annotation> nameAnnotations, String name, List<Annotation> typeDefAnnotations,
+                           Optional<DefinitionMark> mark, TypeDef typeDef) {
+            this(nameAnnotations, name, typeDefAnnotations, mark, typeDef, Map.of());
+        }
+
+        /** The same declaration with a rewritten type-def, its parameter list's written types kept. */
+        public Declaration withTypeDef(TypeDef rewritten) {
+            return new Declaration(nameAnnotations, name, typeDefAnnotations, mark, rewritten, parameterTypes);
         }
     }
 }

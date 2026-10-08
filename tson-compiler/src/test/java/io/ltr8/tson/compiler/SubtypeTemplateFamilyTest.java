@@ -38,8 +38,8 @@ class SubtypeTemplateFamilyTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/subtype-template.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                 %s
                 }
@@ -82,8 +82,9 @@ class SubtypeTemplateFamilyTest {
         assertEquals(List.of(target(compiled, "ok_of"), target(compiled, "err_of")),
                 compiled.schema().entries().get(base).subtypes(),
                 () -> base + ": " + compiled.schema().entries().get(base).subtypes());
-        assertEquals(List.of(base), compiled.schema().entries().get(target(compiled, "ok_of")).supertypes());
-        assertEquals(List.of(base), compiled.schema().entries().get(target(compiled, "err_of")).supertypes());
+        // Each is also a declared member of its own template's family (§8.2's entry shape).
+        assertEquals(List.of(base, "ok"), compiled.schema().entries().get(target(compiled, "ok_of")).supertypes());
+        assertEquals(List.of(base, "err"), compiled.schema().entries().get(target(compiled, "err_of")).supertypes());
     }
 
     /**
@@ -147,7 +148,7 @@ class SubtypeTemplateFamilyTest {
                   great_of  => great<text>
                 """);
 
-        assertEquals(List.of(target(compiled, "ok_of"), target(compiled, "result_of")),
+        assertEquals(List.of(target(compiled, "ok_of"), target(compiled, "result_of"), "great"),
                 compiled.schema().entries().get(target(compiled, "great_of")).supertypes(),
                 "the direct parent, then the chain it already carried");
         assertTrue(compiled.schema().entries().get(target(compiled, "result_of")).subtypes()
@@ -165,7 +166,7 @@ class SubtypeTemplateFamilyTest {
                   ok_of     => ok<text>
                 """);
 
-        assertEquals(List.of("tagged", target(compiled, "result_of")),
+        assertEquals(List.of("tagged", target(compiled, "result_of"), "ok"),
                 compiled.schema().entries().get(target(compiled, "ok_of")).supertypes(),
                 "tagged arrives with the template's own chain; the instantiation is minted here");
     }
@@ -187,7 +188,8 @@ class SubtypeTemplateFamilyTest {
 
         assertEquals(List.of("payload"), ((RecordBody) compiled.schema().entries().get(thin).body()).fields()
                 .stream().map(f -> f.name()).toList(), "the subtraction really ran");
-        assertEquals(List.of(), compiled.schema().entries().get(thin).supertypes(), "contract: broken");
+        // Not IS-A result: the only edge is to thin, whose declared member thin_of is (§8.2's entry shape).
+        assertEquals(List.of("thin"), compiled.schema().entries().get(thin).supertypes(), "contract: broken");
         assertEquals(List.of(), ((RecordBody) compiled.schema().entries().get(thin).body()).supertypes(),
                 "and nothing left in the body to close into one");
         assertEquals(List.of(), compiled.schema().entries().get(target(compiled, "result_of")).subtypes());

@@ -7,8 +7,8 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import java.util.List;
-import io.ltr8.tson.base.atom.CidrInet4Network;
-import io.ltr8.tson.base.atom.InternetAddress;
+import io.ltr8.net.CidrInet4Network;
+import io.ltr8.net.InternetAddress;
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
 

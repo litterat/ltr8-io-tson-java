@@ -3,16 +3,12 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
-import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.ast.*;
+import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
-import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
@@ -32,7 +28,6 @@ import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.Product;
@@ -159,11 +154,10 @@ import java.util.Set;
  * record has an empty chain by construction, so it is always {@code PRODUCT}.
  *
  * <p><b>Field groups (§5.11) flatten</b>: each member becomes an ordinary {@link RecordField} in
- * source position, optional and voidable, regardless of the group's own state (a REQUIRED
- * group still means each <em>member</em> is individually optional, since at most one is guaranteed, not
- * which), and the group itself is recorded as a {@link FieldGroup} (state {@link ElementState#REQUIRED}/
- * {@link ElementState#OPTIONAL} from the group's own {@code ?}). A composed supertype's groups are
- * inherited whole, in supertype order, ahead of the body's own.
+ * source position, optional and voidable, whether or not the group is optional (a group that is not
+ * still means each <em>member</em> is individually optional, since an option is guaranteed, not which), and
+ * the group itself is recorded as a {@link FieldGroup}, {@code optional} from the group's own {@code ?}. A composed
+ * supertype's groups are inherited whole, in supertype order, ahead of the body's own.
  *
  * <p><b>{@code subtypes} is never populated here</b> -- it is a reverse index over the whole namespace (who
  * lists me as a supertype, transitively), imports included, so {@code TsonSchemaLinker} computes it.
@@ -196,6 +190,9 @@ final class DefinitionResolver {
 
     /** The kernel's open-entry body constructor -- resolver vocabulary, see {@link #requireAuthorable}. */
     private static final String TEMPLATE = "template";
+
+    /** The {@code _} a bare annotation stands for (§6), read against the annotation's type like a written one. */
+    private static final DataValue VOID = new DataValue(List.of(), Optional.empty(), new VoidValue());
 
     /**
      * Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see
@@ -380,7 +377,7 @@ final class DefinitionResolver {
                     + " -- this entry's body applies '!" + held.application().typeRef().orElse("?")
                     + "' ([TSON-SCHEMA] §5.2)");
         }
-        return resolved.withBody(HeldBody.held(open.parameters(),
+        return resolved.withBody(HeldBody.held(open.parameterNames(),
                 WireForm.heldWithExtension(held.application(), extension)));
     }
 
@@ -416,11 +413,14 @@ final class DefinitionResolver {
         }
         Annotations.Builder annotations = new Annotations.Builder();
         for (io.ltr8.tson.compiler.ast.Annotation annotation : written) {
-            // The name is checked whether or not a value was written: §6's bare `@T` is shorthand for `@T:_`,
-            // so both forms name a type, and a marker whose type nothing can reach is as unresolved as a
-            // valued one.
+            // §6's bare `@T` is shorthand for `@T:_`, so both forms name a type and both are read against it: a
+            // marker whose type nothing can reach is as unresolved as a valued one, and a bare mark whose type
+            // is not void is refused as `_` would be.
             if (annotationsResolve && metaDefinitions.getTypeDefinition(annotation.name()) == null) {
                 throw unresolvedAnnotation(name, annotation.name());
+            }
+            if (annotation.value().isEmpty()) {
+                bindAnnotationValue(name, annotation.name(), VOID);
             }
             annotations.add(new Annotation(annotation.name(), annotation.value().flatMap(
                     value -> Optional.ofNullable(bindAnnotationValue(name, annotation.name(), value)))));
@@ -470,9 +470,9 @@ final class DefinitionResolver {
             // Same split as bindAtomInstance, for the same reason: an annotation value that does not conform
             // to the type its name refers to (§6) is the author's error, and relabelling it a coverage gap
             // aborts the run over a typo.
-            throw new SchemaValidationException("'" + declaration + "': the value of annotation '@"
-                    + annotationName + "' is not valid data for the type '" + annotationName + "' names -- "
-                    + e.getMessage(), e);
+            throw payloadFailure("'" + declaration + "': the value of annotation '@" + annotationName + "'",
+                    "'" + declaration + "': the value of annotation '@" + annotationName + "' is not valid data "
+                            + "for the type '" + annotationName + "' names -- " + e.getMessage(), e);
         } catch (BindMismatchException e) {
             // The same arm {@link #bindAtomInstance} carries, for the same reason and it is not a stylistic
             // echo: an annotation naming a type the consumer never bound -- the kernel's own `data` among
@@ -1080,8 +1080,24 @@ final class DefinitionResolver {
      */
     private static SchemaValidationException bodyIsNotValidData(String name, String constructorName,
                                                                     ReadException cause) {
-        return new SchemaValidationException("'" + name + "': the body is not valid data for '"
+        return payloadFailure("'" + name + "': the body", "'" + name + "': the body is not valid data for '"
                 + constructorName + "', the constructor's own constraint vocabulary -- " + cause.getMessage(), cause);
+    }
+
+    /**
+     * A payload read's failure restated against the schema. A [TSON-DATA] §8.2 refusal -- a value the payload's
+     * type makes a name, declined under the identifier policy -- stays a refusal with its rule's code, located by
+     * {@code subject} and the value's pointer within the payload, which a name in a map needs to say which key;
+     * any other failure is {@code invalid}, the author's error.
+     */
+    static SchemaValidationException payloadFailure(String subject, String invalid, ReadException cause) {
+        Diagnostic refused = cause.diagnostic();
+        if (!refused.code().isNameRefusal()) {
+            return new SchemaValidationException(invalid, cause);
+        }
+        return new SchemaRefusalException(refused.code(), subject + " has a name this processor refuses"
+                + refused.path().filter(path -> !path.isEmpty()).map(path -> " at " + path).orElse("")
+                + ": " + refused.message(), cause);
     }
 
     // ── Top-level constructor application (§5.6) ──────────────────────────
@@ -1368,11 +1384,9 @@ final class DefinitionResolver {
      * things in one declaration, and the author meant one of them. Rule 4 is checked first: a body-introduced
      * field <em>is</em> in the merged set, so the weaker "no such field" answer would be the wrong diagnosis.
      *
-     * <p>Groups (§5.11): a removed member leaves its group's {@code members}, and a group left with one member
-     * is dissolved -- the survivor becomes an ordinary field taking the group's own state, since a group's
-     * members are flattened as {@code OPTIONAL} whatever the group says. Removing every member of a group
-     * drops the group with them -- §5.11 runs the ladder to zero and states the two-member minimum as an
-     * invariant of resolved output.
+     * <p>Groups (§5.11): a removed member leaves its option, and an emptied option leaves
+     * the group. A group left with one option that no schema could write is dissolved into the plain fields it
+     * equals ({@link #dissolveInto}), and removing every member drops the group with them.
      */
     private static void applyRemovals(String declarationName, RemovalSet removal, Set<String> bodyDeclared,
                                        List<RecordField> fields, List<FieldGroup> groups) {
@@ -1393,13 +1407,22 @@ final class DefinitionResolver {
 
         List<FieldGroup> surviving = new ArrayList<>();
         for (FieldGroup group : groups) {
-            List<String> members = group.members().stream().filter(member -> !removed.contains(member)).toList();
-            if (members.size() == group.members().size()) {
+            if (group.memberNames().stream().noneMatch(removed::contains)) {
                 surviving.add(group);
-            } else if (members.size() > 1) {
-                surviving.add(new FieldGroup(members, group.state()));
-            } else if (members.size() == 1) {
-                dissolveInto(fields, members.get(0), group.state());
+                continue;
+            }
+            List<List<String>> options = group.members().stream()
+                    .map(option -> option.stream().filter(member -> !removed.contains(member)).toList())
+                    .filter(option -> !option.isEmpty()).toList();
+            // A member left alone in its option is present exactly when the option is chosen, so its mark goes.
+            List<String> optionalMembers = group.optionalMembers().stream()
+                    .filter(member -> options.stream().anyMatch(option -> option.size() > 1
+                            && option.contains(member))).toList();
+            if (options.size() > 1 || options.size() == 1 && keepsOneOption(options.getFirst(), optionalMembers,
+                    group.optional())) {
+                surviving.add(new FieldGroup(options, optionalMembers, group.optional()));
+            } else if (options.size() == 1) {
+                dissolveInto(fields, options.getFirst(), optionalMembers, group.optional());
             }
         }
         groups.clear();
@@ -1408,15 +1431,36 @@ final class DefinitionResolver {
         fields.removeIf(field -> removed.contains(field.name()));
     }
 
-    /** §5.11: the last member of a dissolved group becomes a plain field carrying the group's own state. */
-    private static void dissolveInto(List<RecordField> fields, String member, ElementState groupState) {
-        boolean optional = groupState == ElementState.OPTIONAL;
+    /**
+     * Whether a group reduced to one option is still one a schema could write ([TSON-SCHEMA] §5.11): not
+     * optional with at least two members, every one marked -- the {@code +} group -- or optional with at least
+     * two members, one unmarked. Any other one option is plain fields.
+     */
+    private static boolean keepsOneOption(List<String> option, List<String> optionalMembers,
+                                          boolean optionalGroup) {
+        if (option.size() < 2) {
+            return false;
+        }
+        boolean anyUnmarked = option.stream().anyMatch(member -> !optionalMembers.contains(member));
+        return optionalGroup ? anyUnmarked : !anyUnmarked;
+    }
+
+    /**
+     * §5.11: a group reduced to one option it may not keep becomes the plain fields it equals. In a group that
+     * is not optional the option is always chosen, so its unmarked members are required and its marked ones
+     * optional; in an optional group every member is optional. A sole member takes the group's own
+     * {@code optional} for both its marks.
+     */
+    private static void dissolveInto(List<RecordField> fields, List<String> option, List<String> optional,
+                                     boolean optionalGroup) {
         for (int i = 0; i < fields.size(); i++) {
             RecordField field = fields.get(i);
-            if (field.name().equals(member)) {
-                fields.set(i, field.withFacts(optional, optional, FieldRole.FREE));
-                return;
+            if (!option.contains(field.name())) {
+                continue;
             }
+            boolean omittable = optionalGroup || optional.contains(field.name());
+            fields.set(i, field.withFacts(omittable, option.size() == 1 ? omittable : field.voidable(),
+                    FieldRole.FREE));
         }
     }
 
@@ -1434,7 +1478,7 @@ final class DefinitionResolver {
      * chain is just {@code [top]}), so "inherit the nearest ancestor's kind" would give the wrong
      * answer even for {@code atom}'s own resolution.
      */
-    private static TypeKind determineKind(String name, List<String> transitiveSupertypes) {
+    static TypeKind determineKind(String name, List<String> transitiveSupertypes) {
         List<String> baseKindsFound = new ArrayList<>();
         for (String supertype : transitiveSupertypes) {
             if (supertype.equals("atom") || supertype.equals("product") || supertype.equals("sum")
@@ -1561,7 +1605,7 @@ final class DefinitionResolver {
             if (entry instanceof GroupDef groupDef) {
                 if (!restatesInheritedGroup(name, groupDef, fields, groups, inheritedFieldIndex)) {
                     throw new SchemaValidationException("'" + name + "': the group ("
-                            + String.join(" | ", memberNames(groupDef)) + ") names no inherited group -- a "
+                            + groupDef.fieldGroup().describe() + ") names no inherited group -- a "
                             + "refinement copies its source's whole field set and admits no new fields or "
                             + "groups; composition (`&`) is what adds one (§5.7, §5.11)");
                 }
@@ -1830,16 +1874,14 @@ final class DefinitionResolver {
                 if (restatesInheritedGroup(declarationName, groupDef, fields, groups, inheritedFieldIndex)) {
                     return;
                 }
-                List<String> memberNames = new ArrayList<>();
                 for (GroupDef.Member member : groupDef.members()) {
                     requireFieldNameNotSeen(declarationName, member.name(), seenFieldNames,
                             FieldOrigin.GROUP_MEMBER);
                     RecordField field = resolveGroupMember(member);
                     seenFieldNames.add(field.name());
                     fields.add(field);
-                    memberNames.add(field.name());
                 }
-                groups.add(new FieldGroup(memberNames, groupDef.optional() ? ElementState.OPTIONAL : ElementState.REQUIRED));
+                groups.add(groupDef.fieldGroup());
             }
         }
     }
@@ -1860,11 +1902,9 @@ final class DefinitionResolver {
      */
     private RecordField resolveTighteningField(String declarationName, FieldDef fieldDef, RecordField inherited,
                                                 List<FieldGroup> groups, List<String> parameters) {
-        boolean member = groups.stream().anyMatch(group -> group.members().contains(fieldDef.name()));
-        if (member && fieldDef.omittable()) {
-            throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
-                    + "member of a field group, whose presence the group decides (§5.11) -- restate it without "
-                    + "the '?' on its name");
+        boolean member = groups.stream().anyMatch(group -> group.hasMember(fieldDef.name()));
+        if (member) {
+            restateMemberMark(declarationName, fieldDef, groups);
         }
         if (member && fieldDef.modifier().filter(m -> m.kind() == FieldDef.Modifier.Kind.DEFAULT).isPresent()) {
             throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
@@ -1885,6 +1925,37 @@ final class DefinitionResolver {
                     + "state transition -- a refinement can only restrict, never expand (§5.7)");
         }
         return tightened;
+    }
+
+    /**
+     * A restated member's name {@code ?} (§5.11) speaks for its option, not the record:
+     * it keeps the member optional once its option is chosen, and leaving it off makes the member required
+     * there -- the name's {@code ?} is never inherited, at a member as at any field. It may be dropped and
+     * never added, since adding one loosens the option. A {@code +} group, the one group of a single REQUIRED
+     * option, is the exception: its members were written without a {@code ?}, so they are restated that way
+     * and keep their mark.
+     */
+    private static void restateMemberMark(String declarationName, FieldDef fieldDef, List<FieldGroup> groups) {
+        for (int i = 0; i < groups.size(); i++) {
+            FieldGroup group = groups.get(i);
+            if (!group.hasMember(fieldDef.name())) {
+                continue;
+            }
+            boolean atLeastOne = group.atLeastOne();
+            boolean marked = group.optionalMembers().contains(fieldDef.name());
+            if (fieldDef.omittable() && (atLeastOne || !marked)) {
+                throw new SchemaValidationException("'" + declarationName + "': '" + fieldDef.name() + "' is a "
+                        + "member of a field group " + (atLeastOne
+                        ? "written with '+', whose members take no '?' -- restate it as written there"
+                        : "without a '?' on its name, and adding one loosens its option") + " (§5.11)");
+            }
+            if (!fieldDef.omittable() && marked && !atLeastOne) {
+                List<String> optionalMembers = new ArrayList<>(group.optionalMembers());
+                optionalMembers.remove(fieldDef.name());
+                groups.set(i, new FieldGroup(group.members(), optionalMembers, group.optional()));
+            }
+            return;
+        }
     }
 
     /**
@@ -2075,10 +2146,6 @@ final class DefinitionResolver {
         return new Token(token.text(), form);
     }
 
-    private static List<String> memberNames(GroupDef groupDef) {
-        return groupDef.members().stream().map(GroupDef.Member::name).toList();
-    }
-
     /**
      * §5.11's group restatement, shared by a refinement body and a composition body -- "a body entry may also
      * restate a group: the restated group MUST have the same member labels in the same order (member
@@ -2100,13 +2167,14 @@ final class DefinitionResolver {
      */
     private boolean restatesInheritedGroup(String declarationName, GroupDef groupDef, List<RecordField> fields,
                                             List<FieldGroup> groups, Map<String, Integer> inheritedFieldIndex) {
-        List<String> restated = memberNames(groupDef);
+        FieldGroup restatement = groupDef.fieldGroup();
+        List<String> restated = restatement.memberNames();
         List<String> inheritedMembers = restated.stream().filter(inheritedFieldIndex::containsKey).toList();
         if (inheritedMembers.isEmpty()) {
             return false;
         }
         String prefix = (declarationName == null ? "" : "'" + declarationName + "': ") + "the restated group ("
-                + String.join(" | ", restated) + ") ";
+                + restatement.describe() + ") ";
         if (inheritedMembers.size() != restated.size()) {
             throw new SchemaValidationException(prefix + "adds a member the source does not declare -- "
                     + "changing membership is a resolver error (§5.11)");
@@ -2114,7 +2182,7 @@ final class DefinitionResolver {
 
         int index = -1;
         for (int i = 0; i < groups.size(); i++) {
-            if (groups.get(i).members().contains(restated.get(0))) {
+            if (groups.get(i).hasMember(restated.get(0))) {
                 index = i;
                 break;
             }
@@ -2124,10 +2192,17 @@ final class DefinitionResolver {
                     + "a group can only restate one the source declares as a group (§5.11)");
         }
         FieldGroup inherited = groups.get(index);
-        if (!inherited.members().equals(restated)) {
+        if (!inherited.members().equals(restatement.members())) {
             throw new SchemaValidationException(prefix + "does not match the inherited group ("
-                    + String.join(" | ", inherited.members()) + ") -- a restatement MUST have the same member "
-                    + "labels in the same order, and changing membership is a resolver error (§5.11)");
+                    + inherited.describe() + ") -- a restatement MUST have the same options, their members in "
+                    + "the same order, and changing membership is a resolver error (§5.11)");
+        }
+        List<String> added = restatement.optionalMembers().stream()
+                .filter(member -> !inherited.optionalMembers().contains(member)).toList();
+        if (!added.isEmpty()) {
+            throw new SchemaValidationException(prefix + "marks " + String.join(", ", added) + " '?' where "
+                    + "the source does not -- a restatement may drop a member's '?' and never add one, which "
+                    + "loosens its option (§5.11)");
         }
         for (GroupDef.Member member : groupDef.members()) {
             io.ltr8.tson.schema.meta.TypeRef restatedType = resolveTypeRef(member.typeRef());
@@ -2141,14 +2216,14 @@ final class DefinitionResolver {
             }
         }
 
-        ElementState state = groupDef.optional() ? ElementState.OPTIONAL : ElementState.REQUIRED;
-        if (inherited.state() == ElementState.REQUIRED && state == ElementState.OPTIONAL) {
-            throw new SchemaValidationException(prefix + "loosens a REQUIRED group to OPTIONAL -- a "
-                    + "restatement may only tighten OPTIONAL→REQUIRED (§5.11)");
+        if (!inherited.optional() && restatement.optional()) {
+            throw new SchemaValidationException(prefix + "makes the group optional where the source's is not -- "
+                    + "a restatement may drop a group's '?' and never add one (§5.11)");
         }
-        groups.set(index, new FieldGroup(inherited.members(), state));
+        groups.set(index, restatement);
         return true;
     }
+
 
     /**
      * §12.1 gives a group member its own annotation position ({@code group-member = *annotation field-name ws
@@ -2165,9 +2240,23 @@ final class DefinitionResolver {
     }
 
     /**
+     * The type a declaration's parameter list wrote after {@code parameter} ({@code <T: text>}, §5.10), as a
+     * type-ref. A written type names a type or an application of one; a container sugar form is not lifted at
+     * this position, so it has no entry to name and is refused here in those terms.
+     */
+    io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeRef written) {
+        if (!(written instanceof SimpleRef) && !(written instanceof GenericRef)) {
+            throw new SchemaValidationException("parameter '" + parameter + "' is written with the type "
+                    + written + ", and a parameter's written type names a declared type or an application of one "
+                    + "(§5.10); declare the form under a name and write that name");
+        }
+        return resolveTypeRef(written);
+    }
+
+    /**
      * A field/group-member's type-ref, as one of the two shapes that reach resolution: a bare
      * {@link SimpleRef}, or a {@link GenericRef} -- a §5.10 application, or a constructor's own generic
-     * vocabulary such as {@code enum}'s {@code members: set<token>}.
+     * vocabulary such as meta's {@code scoped.scope: set<scope_kind>}.
      *
      * <p><b>A container sugar form is the third case and is refused</b>, because by this phase every one of
      * them should already be an entry: {@link SchemaDesugarer} lifts each to a declaration and leaves a bare

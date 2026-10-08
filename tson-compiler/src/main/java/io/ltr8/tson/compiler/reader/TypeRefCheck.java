@@ -5,12 +5,8 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.ArrayStart;
-import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
-import io.ltr8.tson.compiler.stream.MapStart;
-import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.compiler.stream.*;
+import io.ltr8.tson.compiler.stream.VoidEvent;
 
 /**
  * The wire type-ref rules a <b>schemaless</b> read applies, and the one wording each produces -- shared by
@@ -109,7 +105,7 @@ final class TypeRefCheck {
             case MapStart ignored -> "a map";
             case ArrayStart ignored -> "an array";
             case EmptyBraceEvent ignored -> "{}";
-            case AbsentEvent ignored -> "the absent sentinel '_'";
+            case VoidEvent ignored -> "the void sentinel '_'";
             default -> String.valueOf(core);
         };
     }

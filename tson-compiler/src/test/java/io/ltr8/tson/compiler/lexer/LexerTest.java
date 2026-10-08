@@ -71,8 +71,8 @@ class LexerTest {
     }
 
     @Test
-    void absentSentinel() {
-        assertToken(tokens("_").get(0), TokenType.ABSENT, "_");
+    void voidSentinel() {
+        assertToken(tokens("_").get(0), TokenType.VOID, "_");
     }
 
     // ── Ignorable format controls: LRM/RLM (UAX31-R3a-1 item 2) ─────────
@@ -224,11 +224,11 @@ class LexerTest {
     }
 
     @Test
-    void leadingUnderscoreIsAbsentThenSeparateToken() {
-        // Underscore cannot start an unquoted token; it's always the absent sentinel.
+    void leadingUnderscoreIsTheVoidSentinelThenSeparateToken() {
+        // Underscore cannot start an unquoted token; it's always the void sentinel.
         List<Token> ts = tokens("_id");
         assertEquals(2, ts.size());
-        assertToken(ts.get(0), TokenType.ABSENT, "_");
+        assertToken(ts.get(0), TokenType.VOID, "_");
         assertToken(ts.get(1), TokenType.UNQUOTED, "id");
     }
 
@@ -254,8 +254,10 @@ class LexerTest {
     }
 
     @Test
-    void barePlusIsLexError() {
-        assertThrows(LexException.class, () -> lex("+"));
+    void barePlusIsSpecialToken() {
+        List<Token> ts = tokens("( a ) + 2");
+        assertToken(ts.get(3), TokenType.PLUS, "+");
+        assertToken(ts.get(4), TokenType.UNQUOTED, "2");
     }
 
     @Test

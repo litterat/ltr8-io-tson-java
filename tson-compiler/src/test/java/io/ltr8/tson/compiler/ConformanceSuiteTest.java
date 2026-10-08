@@ -1,19 +1,14 @@
 package io.ltr8.tson.compiler;
+
+import io.ltr8.net.Iri;
 import io.ltr8.tson.base.io.ByteSource;
 
 import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.ArrayValue;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.Document;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
-import io.ltr8.tson.compiler.ast.MapValue;
-import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.*;
+import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.compiler.lexer.Token;
@@ -27,7 +22,7 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
-import io.ltr8.tson.base.atom.CidrNetwork;
+import io.ltr8.net.CidrNetwork;
 import io.ltr8.tson.base.atom.Complex;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -35,12 +30,8 @@ import io.ltr8.tson.suite.Sidecar;
 import io.ltr8.tson.suite.Vectors;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.atom.Rational;
-import io.ltr8.tson.tree.TsonAbsent;
-import io.ltr8.tson.tree.TsonArray;
-import io.ltr8.tson.tree.TsonAtom;
-import io.ltr8.tson.tree.TsonMap;
-import io.ltr8.tson.tree.TsonRecord;
-import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.tree.*;
+import io.ltr8.tson.tree.TsonVoid;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -53,7 +44,6 @@ import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -197,7 +187,7 @@ class ConformanceSuiteTest {
             case SINGLE_LINE_STRING -> "single-line-token";
             case MULTI_LINE_STRING -> "multi-line-token";
             case UNQUOTED -> "unquoted-token";
-            case ABSENT -> "absent-token";
+            case VOID -> "absent-token";
             case LBRACE, RBRACE, LBRACKET, RBRACKET, COLON, COMMA -> "structural-delimiter";
             case MAP_ARROW -> "map-arrow-token";
             case DIRECTIVE -> "directive-token";
@@ -243,7 +233,7 @@ class ConformanceSuiteTest {
             assertEquals(fieldText(expAnn, "name"), actAnn.name(), "annotation[" + i + "].name");
 
             DataValue expAnnValue = fieldValue(expAnn, "value");
-            boolean expectsValue = !(expAnnValue.coreValue() instanceof AbsentValue);
+            boolean expectsValue = !(expAnnValue.coreValue() instanceof VoidValue);
             assertEquals(expectsValue, actAnn.value().isPresent(), "annotation[" + i + "].value presence");
             if (expectsValue) {
                 assertDataValueMatches((RecordValue) expAnnValue.coreValue(), actAnn.value().orElseThrow());
@@ -274,7 +264,7 @@ class ConformanceSuiteTest {
                 assertEquals(expForm, actForm, "token form");
                 assertEquals(fieldText(payload, "text"), tv.text(), "token text");
             }
-            case "absent" -> assertInstanceOf(AbsentValue.class, actual, "core-value kind 'absent'");
+            case "absent" -> assertInstanceOf(VoidValue.class, actual, "core-value kind 'absent'");
             case "empty-brace" -> assertInstanceOf(EmptyBrace.class, actual, "core-value kind 'empty-brace'");
             case "record" -> {
                 RecordValue rv = assertInstanceOf(RecordValue.class, actual, "core-value kind 'record'");
@@ -345,7 +335,7 @@ class ConformanceSuiteTest {
                 new TsonTreeReader().withDiagnostics(reported::add).read(new ByteArrayInputStream(raw));
                 assertTrue(!reported.isEmpty(),
                         "the document parses, so the reader is what must reject it -- none reported");
-                reported.forEach(diagnostic -> assertFalse(isPolicyRefusal(diagnostic.code()),
+                reported.forEach(diagnostic -> assertFalse(diagnostic.code().isNameRefusal(),
                         "an error vector must not be satisfied by a §8.2 policy refusal: " + diagnostic));
             }
             case "refused" -> checkRefusedVector(raw, sidecar);
@@ -382,9 +372,9 @@ class ConformanceSuiteTest {
         List<Diagnostic> reported = new ArrayList<>();
         new TsonTreeReader().withDiagnostics(reported::add).read(new ByteArrayInputStream(raw));
 
-        assertTrue(reported.stream().anyMatch(diagnostic -> isPolicyRefusal(diagnostic.code())),
+        assertTrue(reported.stream().anyMatch(diagnostic -> diagnostic.code().isNameRefusal()),
                 "expected a §8.2 policy refusal (" + fieldText(refusal, "mechanism") + "); got " + reported);
-        reported.forEach(diagnostic -> assertTrue(isPolicyRefusal(diagnostic.code()),
+        reported.forEach(diagnostic -> assertTrue(diagnostic.code().isNameRefusal(),
                 "a refused document must not also be reported invalid -- §8.2's refusal MUST NOT be any "
                         + "of §8.1's four categories: " + diagnostic));
         assertRefusalMatches(refusal, reported);
@@ -415,7 +405,7 @@ class ConformanceSuiteTest {
      * happened" would pass a processor that refused for the wrong reason.
      *
      * <p><b>The data version §8.2 requires a refusal to name is the processor's, not the diagnostic's</b>
-     * ({@link UnicodePolicy#dataVersion()}, which the caller has already matched against the vector's
+     * ({@link ProcessorPolicy#dataVersion()}, which the caller has already matched against the vector's
      * own {@code unicode} field before running it -- a version this implementation does not carry is a
      * legitimate skip). It is constant for every refusal in a run, so it is stated once beside the
      * diagnostics rather than stamped onto each of them.
@@ -425,20 +415,12 @@ class ConformanceSuiteTest {
                 () -> "vector names " + fieldText(refusal, "mechanism") + "; got " + reported);
     }
 
-    /**
-     * The three codes that mean <em>refused under a stated policy</em> rather than <em>invalid</em>, one per
-     * §8.2 rule. Every other code is a verdict on the document, which is exactly what a refusal is not.
-     */
-    private static boolean isPolicyRefusal(Diagnostic.Code code) {
-        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_CHARACTER
-                || code == Diagnostic.Code.RESTRICTED_SCRIPT;
-    }
 
     private static void assertReaderValueMatches(RecordValue expected, TsonValue actual) {
         RecordValue.Field member = soleField(expected, "reader-value");
         CoreValue payload = member.value().value().coreValue();
         switch (member.name()) {
-            case "absent" -> assertInstanceOf(TsonAbsent.class, actual, "reader-value 'absent'");
+            case "absent" -> assertInstanceOf(TsonVoid.class, actual, "reader-value 'absent'");
             case "atom" -> assertAtomMatches((RecordValue) payload,
                     assertInstanceOf(TsonAtom.class, actual, "reader-value 'atom'"));
             case "record" -> {
@@ -551,7 +533,7 @@ class ConformanceSuiteTest {
                 assertEquals(fieldTextOrAbsent(expected, "fraction-digits"), f.fractionDigits().orElse(null), "float fraction-digits");
 
                 DataValue expExponent = fieldValue(expected, "exponent");
-                boolean expectsExponent = !(expExponent.coreValue() instanceof AbsentValue);
+                boolean expectsExponent = !(expExponent.coreValue() instanceof VoidValue);
                 assertEquals(expectsExponent, f.exponent().isPresent(), "float exponent presence");
                 if (expectsExponent) {
                     RecordValue expExpRecord = (RecordValue) expExponent.coreValue();
@@ -684,9 +666,11 @@ class ConformanceSuiteTest {
                 assertEquals(Long.parseLong(((TokenValue) payload).text()), actual.toTotalMonths(),
                         "period months");
             }
-            case "uri" -> {
-                URI actual = (URI) atomType.boundTo(URI.class).orElseThrow().read(token);
-                assertEquals(URI.create(((TokenValue) payload).text()), actual, "vocabulary value");
+            // A URI or IRI is its text as written ([TSON-DATA] §2.2.1 compares identities so), so the oracle is
+            // the text: java.net.URI implements RFC 2396 and cannot hold every reference RFC 3986 admits.
+            case "uri", "uri_reference", "iri", "iri_reference" -> {
+                Iri actual = (Iri) atomType.boundTo(Iri.class).orElseThrow().read(token);
+                assertEquals(((TokenValue) payload).text(), actual.text(), "vocabulary value");
             }
             case "ipv4" -> {
                 Inet4Address actual = (Inet4Address) atomType.boundTo(Inet4Address.class).orElseThrow().read(token);

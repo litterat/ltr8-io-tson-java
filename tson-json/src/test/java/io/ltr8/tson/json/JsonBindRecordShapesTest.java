@@ -30,10 +30,11 @@ class JsonBindRecordShapesTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/bind-shapes-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               argument => { ( name: text | count: int32 ) }
+              contact  => { ( email: text | phone: text )+ }
               call     => { arg: argument }
               address  => { street: text  city: text }
               letter   => { to: address }
@@ -48,8 +49,8 @@ class JsonBindRecordShapesTest {
      */
     private static final String FACETS_SCHEMA = """
             !!id:"https://example.test/bind-facets-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
             {
               facet => { limit: value  scale: value  label: value }
             }
@@ -128,7 +129,7 @@ class JsonBindRecordShapesTest {
     @Test
     void aLabelledChoiceWithTwoFieldsOrNoneBindsNothing() {
         Map<String, Diagnostic.Code> cases = Map.of("{\"name\": \"width\", \"count\": 3}",
-                Diagnostic.Code.TYPE_MISMATCH, "{}", Diagnostic.Code.FIELD_REQUIRED);
+                Diagnostic.Code.FIELD_GROUP, "{}", Diagnostic.Code.FIELD_GROUP);
         cases.forEach((json, code) -> {
             List<Diagnostic> problems = new ArrayList<>();
             assertNull(JSON.objectReader().withDiagnostics(problems::add).withSchema(ID)
@@ -152,6 +153,30 @@ class JsonBindRecordShapesTest {
                 .readAs("{\"name\": \"width\"}", "argument", Loose.class));
         assertEquals(Diagnostic.Code.BIND_MISMATCH, problems.getFirst().code());
         assertTrue(problems.getFirst().message().contains("labelled choice"), problems.getFirst().message());
+    }
+
+    public sealed interface Contact permits Email, Phone {
+    }
+
+    public record Email(String email) implements Contact {
+    }
+
+    public record Phone(String phone) implements Contact {
+    }
+
+    /**
+     * An at-least-one group admits several of its fields at once ([TSON-SCHEMA] §5.11), so a record of it is
+     * not one alternative of a sealed union, and binding one there is named as the wiring's mistake.
+     */
+    @Test
+    void anAtLeastOneGroupIsNotALabelledChoice() {
+        Json json = Json.of(config(Map.of("contact", Contact.class))).withSchemas(TSON.schemaRegistry());
+        List<Diagnostic> problems = new ArrayList<>();
+        assertNull(json.objectReader().withDiagnostics(problems::add).withSchema(ID)
+                .readAs("{\"email\": \"e\"}", "contact", Contact.class));
+        assertEquals(Diagnostic.Code.BIND_MISMATCH, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("several of its fields at once"),
+                problems.getFirst().message());
     }
 
     /** A component typed by a bridged wrapper over the field's record receives the wrapper. */

@@ -21,7 +21,7 @@ import io.ltr8.tson.json.JsonPosition;
  * what rejects trailing content.
  *
  * <p><b>Six events for six JSON value kinds, one of them {@link NullValue}.</b> This layer is JSON's,
- * so {@code null} is a value here. §7 makes JSON null the absent sentinel's spelling, but that is a
+ * so {@code null} is a value here. §7 makes JSON null the void sentinel's spelling, but that is a
  * fact about reading a document <em>at a typed position</em>, and settling it in the event vocabulary
  * would impose a schema's answer on a layer that has no schema -- which is one of the two
  * disagreements that make this a separate stack from the TSON reader's (see
@@ -83,7 +83,7 @@ public sealed interface JsonEvent
     record BooleanValue(boolean value, JsonPosition position) implements JsonEvent {
     }
 
-    /** {@code null} -- a JSON value here; the absent sentinel only once a typed position reads it (§7). */
+    /** {@code null} -- a JSON value here; the void sentinel only once a typed position reads it (§7). */
     record NullValue(JsonPosition position) implements JsonEvent {
     }
 

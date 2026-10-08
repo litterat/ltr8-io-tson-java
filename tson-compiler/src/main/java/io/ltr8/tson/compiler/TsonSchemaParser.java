@@ -102,6 +102,9 @@ public final class TsonSchemaParser extends TsonDataParser {
     /** The declaration currently being parsed, or {@code ""} before its name token is reached -- the {@code /name} schema pointer a recovered diagnostic carries. */
     private String declarationInProgress = "";
 
+    /** The types the declaration being parsed wrote in its parameter list, by parameter name ({@link #parseTypeParam}). */
+    private Map<String, TypeRef> parameterTypes = new LinkedHashMap<>();
+
     public TsonSchemaParser(String source) {
         super(source);
     }
@@ -287,9 +290,10 @@ public final class TsonSchemaParser extends TsonDataParser {
         expect(TokenType.MAP_ARROW, "a declaration's '=>'");
         List<Annotation> typeDefAnnotations = parseAnnotationList();
         Optional<DefinitionMark> mark = parseDefinitionMarkOpt();
+        parameterTypes = new LinkedHashMap<>();
         TypeDef typeDef = parseTypeDef(mark);
-        SchemaMap.Declaration declaration =
-                new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations, mark, typeDef);
+        SchemaMap.Declaration declaration = new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations,
+                mark, typeDef, parameterTypes);
         declarationPositions.put(declaration, namePosition);
         declarationInProgress = "";
         return declaration;
@@ -594,7 +598,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             advance();
             return new FieldDef.Modifier(kind, new FieldDef.Modifier.Value.Deferred());
         }
-        if (check(TokenType.ABSENT)) {
+        if (check(TokenType.VOID)) {
             advance();
             value = new FieldDef.Modifier.Value.Absent();
         } else {
@@ -604,8 +608,8 @@ public final class TsonSchemaParser extends TsonDataParser {
                 case SINGLE_LINE_STRING -> TokenForm.SINGLE_LINE_QUOTED;
                 case MULTI_LINE_STRING -> TokenForm.MULTI_LINE_QUOTED;
                 default -> throw mismatch(kind == FieldDef.Modifier.Kind.DEFAULT
-                        ? "a scalar token or the absent sentinel '_' after '~'"
-                        : "a scalar token, the absent sentinel '_', or '?' after '='");
+                        ? "a scalar token or the void sentinel '_' after '~'"
+                        : "a scalar token, the void sentinel '_', or '?' after '='");
             };
             advance();
             value = new FieldDef.Modifier.Value.Literal(recordPosition(new TokenValue(t.text(), form), t.start()));
@@ -613,30 +617,51 @@ public final class TsonSchemaParser extends TsonDataParser {
         return new FieldDef.Modifier(kind, value);
     }
 
+    /**
+     * {@code group-def} (§5.11): {@code |} separates options, and the members of one option
+     * are separated as a record body's entries are. The grammar refuses a group that restates what plain fields
+     * or another group already state, so each presence rule has one spelling ({@link #checkGroupShape}).
+     */
     private GroupDef parseGroupDef(List<Annotation> annotations) {
         Position start = peek().start();
         expect(TokenType.LPAREN, "a field group's opening '('");
-        List<GroupDef.Member> members = new ArrayList<>();
-        members.add(parseGroupMember());
-        if (!check(TokenType.PIPE)) {
-            throw new ParseException("a field group requires at least two members separated by '|' (§5.11)", start);
-        }
+        List<List<GroupDef.Member>> options = new ArrayList<>();
+        options.add(parseGroupOption());
         while (check(TokenType.PIPE)) {
             advance();
-            members.add(parseGroupMember());
+            options.add(parseGroupOption());
         }
         expect(TokenType.RPAREN, "a field group's closing ')'");
-        boolean optional = consumeAdjacentQuestion();
-        return new GroupDef(annotations, members, optional);
+        GroupDef.Quantifier quantifier = consumeAdjacent(TokenType.QUESTION) ? GroupDef.Quantifier.AT_MOST_ONE
+                : consumeAdjacent(TokenType.PLUS) ? GroupDef.Quantifier.AT_LEAST_ONE
+                : GroupDef.Quantifier.EXACTLY_ONE;
+        if (quantifier != GroupDef.Quantifier.EXACTLY_ONE && (check(TokenType.QUESTION) || check(TokenType.PLUS))
+                && lastTokenEnd().equals(peek().start())) {
+            throw parseError("a field group takes one mark after its ')': '?' for at most one option, or '+' for "
+                    + "at least one of its members (§5.11)");
+        }
+        GroupDef group = new GroupDef(annotations, options, quantifier);
+        checkGroupShape(group, start);
+        return group;
+    }
+
+    private List<GroupDef.Member> parseGroupOption() {
+        List<GroupDef.Member> members = new ArrayList<>();
+        members.add(parseGroupMember());
+        while (!check(TokenType.PIPE) && !check(TokenType.RPAREN) && !check(TokenType.EOF)) {
+            if (check(TokenType.COMMA)) {
+                advance();
+            }
+            members.add(parseGroupMember());
+        }
+        return members;
     }
 
     private GroupDef.Member parseGroupMember() {
         List<Annotation> annotations = parseAnnotationList();
         Token name = expectFieldNameToken("a field group member's name");
-        if (check(TokenType.QUESTION)) {
-            throw parseError("a field group member takes no '?' on its name -- the group decides whether a "
-                    + "member is present (§5.11); '?' after the member's type admits '_'");
-        }
+        // Optional once the member's option is chosen: the option, not the record, is what the mark is about.
+        boolean omittable = consumeAdjacentQuestion();
         expect(TokenType.COLON, "a field group member's ':'");
         TypeRef type = parseTypeRef();
         boolean voidable = consumeAdjacentQuestion();
@@ -648,7 +673,58 @@ public final class TsonSchemaParser extends TsonDataParser {
                     + "member's presence, so none of them takes a default, a pin, or the discriminator mark "
                     + "'=?', whose field must be required");
         }
-        return new GroupDef.Member(annotations, name.text(), type, voidable);
+        return new GroupDef.Member(annotations, name.text(), omittable, type, voidable);
+    }
+
+    /**
+     * The shapes a group may take (§5.11), each refused with the spelling it restates:
+     * <ul>
+     *   <li>the only member of an option takes no {@code ?}, being present exactly when its option is chosen;
+     *   <li>{@code +} takes options of one field each, at least two of them;
+     *   <li>a group of one option is {@code ?}, with at least two members and one of them unmarked. A bare one
+     *       is plain fields, or with every member marked the {@code +} group; a {@code ?} one with a single
+     *       member, or with every member marked, is plain optional fields.
+     * </ul>
+     */
+    private static void checkGroupShape(GroupDef group, Position start) {
+        for (List<GroupDef.Member> option : group.options()) {
+            if (option.size() == 1 && option.getFirst().omittable()) {
+                throw new ParseException("'" + option.getFirst().name() + "' is the only member of its option, "
+                        + "so the '?' on its name changes nothing -- it is present exactly when its option is "
+                        + "chosen (§5.11); write it without the '?'", start);
+            }
+        }
+        List<GroupDef.Member> members = group.members();
+        String names = String.join(", ", members.stream().map(GroupDef.Member::name).toList());
+        if (group.quantifier() == GroupDef.Quantifier.AT_LEAST_ONE) {
+            if (group.options().stream().anyMatch(option -> option.size() > 1)) {
+                throw new ParseException("a '+' group's options are single fields, at least one of them present "
+                        + "-- an option holding several fields belongs to a bare or '?' group (§5.11)", start);
+            }
+            if (members.size() < 2) {
+                throw new ParseException("a '+' group needs at least two members -- at least one of a single "
+                        + "field is that field, required (§5.11)", start);
+            }
+            return;
+        }
+        if (group.options().size() > 1) {
+            return;
+        }
+        boolean anyUnmarked = members.stream().anyMatch(member -> !member.omittable());
+        if (group.quantifier() == GroupDef.Quantifier.EXACTLY_ONE) {
+            throw new ParseException(anyUnmarked
+                    ? "a bare group of one option states plain fields -- its option is always chosen, so its "
+                            + "unmarked members are required and its marked ones optional; declare (" + names
+                            + ") as fields (§5.11)"
+                    : "a bare group of one option whose members are all marked admits at least one of them -- "
+                            + "write it with '+', each member its own option: (" + String.join(" | ",
+                            members.stream().map(GroupDef.Member::name).toList()) + ")+ (§5.11)", start);
+        }
+        if (members.size() < 2 || !anyUnmarked) {
+            throw new ParseException("a '?' group of one option " + (members.size() < 2 ? "and one member"
+                    : "whose members are all marked") + " admits each member independently -- declare ("
+                    + names + ") as optional fields (§5.11)", start);
+        }
     }
 
     // ── Type References (§5.3, §12.1) ────────────────────────────────────
@@ -753,7 +829,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * A map's <em>key</em> never admits {@code ?}. [TSON-DATA] §2.9 forbids the absent sentinel in key
+     * A map's <em>key</em> never admits {@code ?}. [TSON-DATA] §2.9 forbids the void sentinel in key
      * position outright and [TSON-SCHEMA] §7.6 restates it, so there is no state for the marker to bind and
      * no reading under which one could be wanted -- unlike the value side, which takes it ({@link
      * #parseMapBody}).
@@ -817,8 +893,8 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (t.type() == TokenType.LBRACE) {
             return new TypeArg.Ref(parseMap());
         }
-        if (t.type() == TokenType.ABSENT) {
-            throw parseError("the absent sentinel '_' is not valid in a type argument position (§7.6)");
+        if (t.type() == TokenType.VOID) {
+            throw parseError("the void sentinel '_' is not valid in a type argument position (§7.6)");
         }
         throw mismatch("a type argument (a type reference or a scalar value)");
     }
@@ -893,18 +969,33 @@ public final class TsonSchemaParser extends TsonDataParser {
         return annotations;
     }
 
+    /**
+     * {@code type-params = "<" ws type-param *( separator type-param ) [ws ","] ws ">"}, with {@code type-param =
+     * param-name [ws ":" ws type-ref]} (§12.1). The names are the list every consumer reads; a written type is
+     * collected into {@link #parameterTypes} for the declaration being parsed, since it narrows what resolution
+     * derives rather than shaping the type-def.
+     */
     private List<String> parseTypeParamsOpt() {
         if (!check(TokenType.LESS_THAN)) {
             return List.of();
         }
         advance();
         List<String> params = new ArrayList<>();
-        params.add(expectTypeName("a type parameter"));
+        params.add(parseTypeParam());
         while (consumeSeparatorOrCloseCheck(TokenType.GREATER_THAN)) {
-            params.add(expectTypeName("a type parameter"));
+            params.add(parseTypeParam());
         }
         expect(TokenType.GREATER_THAN, "a type parameter list's closing '>'");
         return params;
+    }
+
+    private String parseTypeParam() {
+        String name = expectTypeName("a type parameter");
+        if (check(TokenType.COLON)) {
+            advance();
+            parameterTypes.put(name, parseTypeRef());
+        }
+        return name;
     }
 
     /**
@@ -936,12 +1027,17 @@ public final class TsonSchemaParser extends TsonDataParser {
      * tuple/array position, or field group.
      */
     private boolean consumeAdjacentQuestion() {
-        if (!check(TokenType.QUESTION)) {
+        return consumeAdjacent(TokenType.QUESTION);
+    }
+
+    /** A {@code ?} or {@code +} mark, which binds to the token before it and so must touch it. */
+    private boolean consumeAdjacent(TokenType mark) {
+        if (!check(mark)) {
             return false;
         }
         Position prevEnd = lastTokenEnd();
         if (!prevEnd.equals(peek().start())) {
-            throw parseError("'?' must be immediately adjacent to the name or type it marks (no whitespace)");
+            throw parseError("'" + peek().text() + "' must be immediately adjacent to what it marks (no whitespace)");
         }
         advance();
         return true;

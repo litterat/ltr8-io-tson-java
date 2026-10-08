@@ -21,6 +21,9 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
   binds to its family's host type (`ValueParser.at`), so temporal and duration bounds are compared as values.
 - `text_type`'s `pattern` and `members` are each **settable once** — they occupy one logical position and the pattern
   half cannot be narrowed, so the position takes one rule. A member set may still be *added* to a patterned source.
+- `text_type`'s `normalization` is **identity-only**, default or not: setting it where the source left `NONE` changes
+  what a token means rather than narrowing the values, so no refinement moves it. Its members are judged as values in
+  the form, and two that are one value are refused.
 - `members` against `pattern` is checked on the family with the length facets — one rule, one place. `tson-schema`
   depends on `tson-regex` for it; the engine is an internal library like any other.
 
@@ -58,7 +61,11 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the numeric tiers use: one rule for a position whose other half cannot be narrowed) and **selector** facets
   (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
   rejecting one would reject a documented construct — §5.7 states the rule per facet kind, and a selector is
-  settable where the source leaves it at the constructor's default, identity-only once bound.
+  settable where the source leaves it at the constructor's default, identity-only once bound. An
+  `identifier_type`'s **profile** facets are identity-only outright, default or not: setting an addition set the
+  source left unset widens the profile, so no set-once form of the rule is sound (`IdentifierType`). Every text
+  family's `normalization` is identity-only on the same terms (`TextType`): turning folding on would make
+  `Content-Type` one value under the source and another under the refinement.
 - **A body must also be coherent with itself**, which is the other question about the same facets and
   needs no source to compare against. `checkCoherent` asks `Atom.coherenceCheck()` — one rule per family over
   the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `SchemaValidationException`
@@ -77,7 +84,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   template whose bounds were `MIN`/`MAX` until an application supplied both. meta.tn's own header `@doc`
   states the same obligation from the other side: bounds are field
   groups so an inclusive/exclusive pair on one side is unrepresentable, while "value-level coherence (the
-  lower bound not exceeding the upper) remains a schema-load check". `cidr4_type`'s `@doc` adds the family
+  lower bound not exceeding the upper) is a schema-load check". `cidr4_type`'s `@doc` adds the family
   range — prefixes narrow "within the family range 0-32", and "bounds outside that range are invalid at the
   schema level" — so the CIDR pair is judged against its address width as well as against itself.
   - **The linker asks every family, and needs no list to do it.** `TsonSchemaLinker` asks **every** family the
@@ -108,7 +115,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
     `AtomCoherence.checkNetworks`: the facets are typed `[value]` in meta.tn and must stay so (they list
     networks, and meta declares no network instance to type them by — core.tn does, and core imports meta),
     so they arrive as text and the family that owns the rule is the only place that can judge them. That is
-    why `base.atom` carries the `CidrNetwork` pair and `InternetAddress` at all: a check in the linker or the
+    why the `CidrNetwork` pair and `InternetAddress` sit beneath `tson-schema`, in `tson-net`: a check in the linker or the
     resolver would be a second home for one family's rule, which is what `Atom.coherenceCheck` exists to
     prevent. **The pair's own emptiness is judged there too** (`checkAdmitsAValue`): an `excluding` set
     covering every network `within` permits admits nothing, which is `{ min: 10 max: 3 }` with a different

@@ -1,7 +1,8 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -51,14 +52,14 @@ class ConfusableNameScopesTest {
     private static final String ID = "https://example.test/confusable.tn";
 
     private static TsonCompiledSchema compile(String declarations) {
-        return compileWith(UnicodePolicy.highlyRestrictive(), declarations);
+        return compileWith(IdentifierPolicy.defaults(), declarations);
     }
 
-    private static TsonCompiledSchema compileWith(UnicodePolicy identifiers, String declarations) {
+    private static TsonCompiledSchema compileWith(IdentifierPolicy identifiers, String declarations) {
         String schema = """
                 !!id:"https://example.test/confusable.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                 %s
                 }
@@ -143,18 +144,18 @@ class ConfusableNameScopesTest {
     }
 
     /**
-     * <b>{@code profile: TEXT} takes the members out of §8.2's two per-<em>name</em> rules and leaves the
-     * collision relation in place</b>, which is the split the declaration buys (§7.4). A value set carries
-     * whatever its domain carries, so policing its characters and scripts is a category error; two members that
-     * render alike is still the hazard, because the set is still what a value is matched against.
+     * <b>A {@code text_enum} takes the members out of §8.2's two per-<em>name</em> rules and leaves the
+     * collision relation in place</b> (§7.4): its type is {@code text}, not an identifier family, so its members
+     * are not names and policing their characters and scripts is a category error; two members that render alike
+     * is still the hazard, because the set is still what a value is matched against.
      */
     @Test
-    void aTextProfileDropsThePerNameRulesAndKeepsTheCollisionOne() {
+    void aTextEnumDropsThePerNameRulesAndKeepsTheCollisionOne() {
         String restricted = "a" + new String(Character.toChars(0x0132)) + "b";
         // The restricted-character rule is per-name, and these are not names.
-        assertNotNull(compile("  st => !enum { members: [\"" + restricted + "\"]  profile: TEXT }"));
+        assertNotNull(compile("  st => !text_enum [\"" + restricted + "\"]"));
 
-        assertTrue(refused("  st => !enum { members: [\"ACTIVE\" \"" + CYR_CAP_A + "CTIVE\"]  profile: TEXT }")
+        assertTrue(refused("  st => !text_enum [\"ACTIVE\" \"" + CYR_CAP_A + "CTIVE\"]")
                 .contains("has members that read alike"));
     }
 
@@ -182,7 +183,7 @@ class ConfusableNameScopesTest {
      */
     @Test
     void theConfusableRuleNeverFiresOnALoneName() {
-        assertNotNull(compileWith(UnicodePolicy.highlyRestrictive().perSegment(),
+        assertNotNull(compileWith(IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()).perSegment(),
                 "  rec => { id_" + new String(Character.toChars(0x043F))
                         + ": text  url_" + new String(Character.toChars(0x0430)) + ": text }"));
     }

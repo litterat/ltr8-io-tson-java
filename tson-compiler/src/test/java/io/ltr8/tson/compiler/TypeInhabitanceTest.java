@@ -40,8 +40,8 @@ class TypeInhabitanceTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/inhabit.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                 %s
                 }
@@ -105,6 +105,24 @@ class TypeInhabitanceTest {
     @Test
     void aRequiredGroupWhoseEveryMemberRecursIsRejected() {
         rejection("  g => { ( a: g | b: g ) }");
+    }
+
+    /**
+     * An option is chosen whole ([TSON-SCHEMA] §5.11): it needs every member its group does not mark, so one
+     * recurring unmarked member blocks it, while a recurring marked one can be left out.
+     */
+    @Test
+    void anOptionIsChoosableWhenEveryUnmarkedMemberIs() {
+        rejection("  g => { ( a: g  b: text | c: g ) }");
+        accepted("  g => { ( a: text  b?: g | c: g ) }");
+        accepted("  g => { ( a: g | b: text  c: text ) }");
+    }
+
+    /** At least one of the members is enough, so one that terminates is. */
+    @Test
+    void anAtLeastOneGroupNeedsOneMemberThatTerminates() {
+        rejection("  g => { ( a: g | b: g )+ }");
+        accepted("  g => { ( a: g | b: text )+ }");
     }
 
     /**

@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -49,7 +50,7 @@ class HeldBodyTest {
         Top body = template("record").body();
 
         TemplateBody held = assertInstanceOf(TemplateBody.class, body);
-        assertEquals(List.of("T"), held.parameters());
+        assertEquals(List.of("T"), held.parameterNames());
         assertEquals("!record {}", held.template());
     }
 
@@ -107,6 +108,6 @@ class HeldBodyTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new TemplateBody(List.of(), "!record {}", Optional.empty()));
         assertThrows(NullPointerException.class,
-                () -> new TemplateBody(List.of("T"), null, Optional.empty()));
+                () -> new TemplateBody(List.of(TemplateParam.typeParameter("T")), null, Optional.empty()));
     }
 }

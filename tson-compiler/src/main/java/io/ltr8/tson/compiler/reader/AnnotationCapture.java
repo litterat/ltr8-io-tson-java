@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.base.Diagnostic;
@@ -154,7 +154,7 @@ final class AnnotationCapture {
      * tree mode, a bound object in binding mode -- with the structural fallback yielding a node either way.
      * A soft failure in collecting mode yields {@code null}, already reported, and reads as absent here.
      * Empty for the valueless form ({@code @name}), where §6 makes bare {@code @T} shorthand for {@code @T:_}
-     * -- so the type still has to admit the absent sentinel, which {@link #checkBareAdmitted} verifies rather
+     * -- so the type still has to admit the void sentinel, which {@link #checkBareAdmitted} verifies rather
      * than assuming.
      */
     private static Optional<Object> value(TsonReadContext ctx, AnnotationStart start, AnnotationTypes types,
@@ -180,7 +180,7 @@ final class AnnotationCapture {
 
     /**
      * §6's bare form, checked rather than assumed: {@code @T} is shorthand for {@code @T:_}, so {@code T} must
-     * admit the absent sentinel -- true of the {@code void}-targeted markers the form exists for ({@code
+     * admit the void sentinel -- true of the {@code void}-targeted markers the form exists for ({@code
      * @disjoint}, {@code @numeric}) and false of, say, a text-targeted {@code @doc}.
      *
      * <p>There is no value in the stream to hand the reader, so one absent event is synthesised at the
@@ -190,11 +190,11 @@ final class AnnotationCapture {
      * misleading locations.
      */
     private static void checkBareAdmitted(TsonReadContext ctx, AnnotationStart start, TsonTypeReader<?> reader) {
-        // Unrestricted deliberately: this event is synthesised here, not read from the document, so there is
+        // No policy deliberately: this event is synthesised here, not read from the document, so there is
         // no author token to judge -- and the real one it stands for was checked when it left the stream.
         TsonReadContext probe = TsonReadContext.of(
-                new ListEventSource(List.of(new AbsentEvent(start.position()))), diagnostic -> { },
-                UnicodePolicy.unrestricted());
+                new ListEventSource(List.of(new VoidEvent(start.position()))), diagnostic -> { },
+                IdentifierPolicy.none());
         boolean admitted;
         try {
             reader.read(probe);
@@ -205,7 +205,7 @@ final class AnnotationCapture {
         if (!admitted) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                     "annotation '@" + start.name() + "' is written bare, which §6 treats as '@" + start.name()
-                            + ":_', but '" + start.name() + "' does not admit the absent sentinel",
+                            + ":_', but '" + start.name() + "' does not admit the void sentinel",
                     "a value of '" + start.name() + "'", "@" + start.name() + " (no value)");
         }
     }

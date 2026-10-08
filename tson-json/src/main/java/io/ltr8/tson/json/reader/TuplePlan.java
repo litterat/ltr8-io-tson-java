@@ -3,7 +3,6 @@ package io.ltr8.tson.json.reader;
 import io.ltr8.tson.base.diagnostics.TupleDiagnostics;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -14,20 +13,20 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * mode's factory decides which reader each position is read at and hands both to {@link TupleReader}; bind mode
  * keeps the plan to build the same position again for a component's own tuple class ({@link BindTargets}).
  */
-record TuplePlan(String displayName, JsonSchemaLocation schemaLocation, boolean[] optional,
+record TuplePlan(String displayName, JsonSchemaLocation schemaLocation, boolean[] voidable,
                  JsonTypeReader<?>[] schemaSlots, TupleDiagnostics rules) {
 
     static TuplePlan of(String name, TypeDefinition definition, ValueReaderContext context) {
         TupleBody body = (TupleBody) definition.body();
         int arity = body.elements().size();
-        boolean[] optional = new boolean[arity];
+        boolean[] voidable = new boolean[arity];
         JsonTypeReader<?>[] slots = new JsonTypeReader<?>[arity];
         for (int i = 0; i < arity; i++) {
-            optional[i] = body.elements().get(i).state() == ElementState.OPTIONAL;
+            voidable[i] = body.elements().get(i).voidable();
             slots[i] = context.readers().resolve(body.elements().get(i).elementType().name());
         }
         String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
-        return new TuplePlan(displayName, context.locationOf(name, definition), optional, slots,
+        return new TuplePlan(displayName, context.locationOf(name, definition), voidable, slots,
                 new TupleDiagnostics(displayName, arity));
     }
 

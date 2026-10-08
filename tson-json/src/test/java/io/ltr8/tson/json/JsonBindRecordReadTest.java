@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -37,8 +38,8 @@ class JsonBindRecordReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/bind-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               address => { street: text  city: text }
               person  => {
@@ -57,6 +58,10 @@ class JsonBindRecordReadTest {
               dog     => animal & { breed: text }
               cat     => animal & { indoor: boolean }
               owner   => { pet: animal }
+              checked        => { n: int32 }
+              counts         => { m: {text => int32?} }
+              voidable_count => { n: int32? }
+              optional_count => { n?: int32 }
             }
             """;
 
@@ -88,7 +93,8 @@ class JsonBindRecordReadTest {
 
     private static final Map<String, Class<?>> BINDINGS = Map.of(
             "address", Address.class, "person", Person.class, "square", Square.class,
-            "animal", Animal.class, "dog", Dog.class, "cat", Cat.class, "owner", Owner.class);
+            "animal", Animal.class, "dog", Dog.class, "cat", Cat.class, "owner", Owner.class,
+            "checked", Checked.class, "counts", Counts.class);
 
     private static JsonCompiledSchema compile(Map<String, Class<?>> bindings) {
         DataBindContext binding = DataBindContext.builder().nameBinder(DataNameBinder.ofMap(bindings))
@@ -253,5 +259,58 @@ class JsonBindRecordReadTest {
         bindings.put("cat", Stray.class);
         BindMismatchException e = assertThrows(BindMismatchException.class, () -> compile(bindings));
         assertTrue(e.getMessage().contains("subtype 'cat' binds"), e.getMessage());
+    }
+
+    // ── A bound class refusing what the schema admits ────────────────────
+    // The schema is the contract, so the class refusing a value it admits is BIND_MISMATCH, no verdict on the
+    // document; and what is known before any document is refused when the schema is compiled.
+
+    public record Checked(int n) {
+        public Checked {
+            if (n < 0) {
+                throw new IllegalArgumentException("n must not be negative");
+            }
+        }
+    }
+
+    public record Counts(ConcurrentHashMap<String, Integer> m) {
+    }
+
+    public record Count(int n) {
+    }
+
+    @Test
+    void aConstructorRefusingAValueTheSchemaAdmitsIsABindMismatch() {
+        Read read = read("checked", """
+                {"n": -1}""");
+        assertNull(read.value());
+        assertEquals(List.of(Diagnostic.Code.BIND_MISMATCH), read.problems().stream().map(Diagnostic::code).toList());
+        assertTrue(read.problems().getFirst().message().contains("n must not be negative"), read.problems().toString());
+    }
+
+    @Test
+    void aVoidValueAMapCannotHoldIsABindMismatch() {
+        Read read = read("counts", """
+                {"m": {"a": 1, "b": null}}""");
+        assertNull(read.value());
+        assertEquals(List.of(Diagnostic.Code.BIND_MISMATCH), read.problems().stream().map(Diagnostic::code).toList());
+    }
+
+    @Test
+    void aVoidableFieldBoundToAPrimitiveFailsTheCompile() {
+        Map<String, Class<?>> bindings = new java.util.HashMap<>(BINDINGS);
+        bindings.put("voidable_count", Count.class);
+        BindMismatchException e = assertThrows(BindMismatchException.class, () -> compile(bindings));
+        assertTrue(e.getMessage().contains("field 'n' is voidable, and component 'n' binds int, which has no null "
+                + "to hold it"), e.getMessage());
+    }
+
+    @Test
+    void anOptionalFieldWithNoDefaultBoundToAPrimitiveFailsTheCompile() {
+        Map<String, Class<?>> bindings = new java.util.HashMap<>(BINDINGS);
+        bindings.put("optional_count", Count.class);
+        BindMismatchException e = assertThrows(BindMismatchException.class, () -> compile(bindings));
+        assertTrue(e.getMessage().contains("field 'n' may be left out with nothing injected, and component 'n' "
+                + "binds int"), e.getMessage());
     }
 }

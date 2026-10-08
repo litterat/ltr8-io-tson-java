@@ -13,6 +13,7 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -100,7 +101,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         this.rules = rules;
         TsonSchema schema = context.schema();
         Map<String, TypeDefinition> entries = schema.entries();
-        this.selectors = selectorFields.stream().map(field -> selectorOf(field, schema)).toList();
+        this.selectors = selectorFields.stream().map(field -> selectorOf(field, context.linked())).toList();
         this.selectorNames = selectors.stream().map(Selector::name).collect(LinkedHashSet::new,
                 Set::add, Set::addAll);
         this.members = new LinkedHashMap<>();
@@ -130,11 +131,12 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
-    private static Selector selectorOf(RecordField field, TsonSchema schema) {
-        ReferenceChain.Resolved target = ReferenceChain.terminal(schema, field.type().name()).orElseThrow(
+    private static Selector selectorOf(RecordField field, TsonLinkedSchema linked) {
+        ReferenceChain.Resolved target = ReferenceChain.terminal(linked.schema(), field.type().name()).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' names nothing this schema declares"));
-        AtomType<?> parser = AtomParsers.forType(target.name(), target.definition().body()).orElseThrow(
+        AtomType<?> parser = AtomParsers.forType(target.definition().body(), linked.enumForm(target.name()))
+                .orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
         return new Selector(Nfc.of(field.name()), parser, AtomForm.of(target.definition().body()));
@@ -241,7 +243,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         Refusal missing = extension.discriminatorMissing(field);
         return new Refusal(missing.code(), "missing discriminator '%s' for '%s' -- a sealed family selects its "
                 .formatted(field, displayName) + "member by reading it, so its discriminators lead the object, "
-                + "after any '$type' (§6.1.5), and '" + field + "' is absent or follows another member",
+                + "after any '$type' (§6.1.5), and '" + field + "' is missing or follows another member",
                 "'" + field + "' as a leading member", missing.actual());
     }
 

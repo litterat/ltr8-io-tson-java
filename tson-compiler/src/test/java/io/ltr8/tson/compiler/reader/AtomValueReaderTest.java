@@ -22,7 +22,8 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.UuidType;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -122,26 +123,32 @@ class AtomValueReaderTest {
     }
 
     @Test
-    void unit() {
-        assertEquals("anything", readValue(new Unit(), "{ value: anything }"));
+    void identifier() {
+        assertEquals("order_id", readValue(IdentifierType.IDENTIFIER, "{ value: order_id }"));
+    }
+
+    @Test
+    void value() {
+        assertEquals("anything", readValue(new ValueType(), "{ value: anything }"));
     }
 
     /**
-     * {@code uri_type}/{@code regex_type} are the one known exception discussed in {@link
+     * {@code iri_type}/{@code regex_type} are the one known exception discussed in {@link
      * AtomTypeReader}'s own Javadoc -- their RFC citation is a *schema-composed* default that
      * generic binding can't fill in during schema *resolution*, so {@code MetaKernelBootstrapResolver} hand-
      * picks their binding instead. That gap is upstream of this layer entirely: by the time the
-     * real {@code uri}/{@code regex} entries reach here, their constraints are already correctly
+     * real {@code iri}/{@code regex} entries reach here, their constraints are already correctly
      * filled in, so reading real *data* against them works exactly like every other family --
      * confirmed here against the real resolved entries, not a hand-built stand-in.
      */
     @Test
-    void uriUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
+    void iriUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
         TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        Map<String, Object> result = readAgainstRealEntry("uri", metaKernel.entries().get("uri"),
+        Map<String, Object> result = readAgainstRealEntry("iri", metaKernel.entries().get("iri"),
                 "{ value: \"https://example.com/a/b?x=1#frag\" }");
 
-        assertEquals(java.net.URI.create("https://example.com/a/b?x=1#frag"), result.get("value"));
+        assertEquals(io.ltr8.net.Iri.parse("https://example.com/a/b?x=1#frag", io.ltr8.net.Iri.Grammar.IRI),
+                result.get("value"));
     }
 
     @Test

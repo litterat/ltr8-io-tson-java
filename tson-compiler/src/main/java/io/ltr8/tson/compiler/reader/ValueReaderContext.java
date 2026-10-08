@@ -88,8 +88,8 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
-     * The names a bind lookup for entry {@code name} tries, in order: the names an author wrote for it, then
-     * the entry's own.
+     * The names a bind lookup for entry {@code name} tries, in order: the names an author wrote for it, the
+     * entry's own, then -- for a constructor that tightens another -- that constructor's, up its chain.
      *
      * <p><b>A binding map is written in the names the author wrote.</b> An entry a template application
      * materialised is named by content ([TSON-SCHEMA] §8.2 -- resolver-chosen and unreachable from source),
@@ -99,15 +99,37 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      * <p><b>Only a derived entry is reached this way</b>, which is the same test {@code EntryDisplayName}
      * applies: an entry with a source position was declared, so its own name is the one the author wrote and
      * an alias naming it must never redirect its binding.
+     *
+     * <p><b>A tightened constructor binds as the one it tightens.</b> {@code set_type => array ^ { ... }} and
+     * {@code text_enum => enum_type ^ { type?: = text }} restate fields and add none (§5.7), so their instances
+     * have the shape of the source's, and a class for the source is a class for them. Without the fallback every
+     * such constructor -- a meta layer's {@code kebab_enum => enum_type ^ { type?: = kebab }} included -- would
+     * need a class of its own for a shape it does not change. It is tried last, so a class mapped under the
+     * tightening's own name still wins, and it is confined to constructors: an ordinary record refining another
+     * may be bound to a narrower class, and falling back to its parent's would lose that silently.
      */
     public List<String> bindingNamesFor(String name, TypeDefinition definition) {
         List<String> written = definition.position().isPresent()
                 ? List.of() : referrers.getOrDefault(name, List.of());
-        if (written.isEmpty()) {
-            return List.of(name);
-        }
         List<String> candidates = new ArrayList<>(written);
         candidates.add(name);
+        for (TypeDefinition step = definition; tightensConstructor(step); ) {
+            String source = step.source().orElseThrow().name();
+            if (candidates.contains(source)) {
+                break;
+            }
+            candidates.add(source);
+            step = schema().entries().get(source);
+            if (step == null) {
+                break;
+            }
+        }
         return List.copyOf(candidates);
+    }
+
+    /** A constructor ({@code top} in its chain) built by tightening its {@code source}, which it IS-A. */
+    private static boolean tightensConstructor(TypeDefinition definition) {
+        return definition.supertypes().contains("top") && definition.source().isPresent()
+                && definition.supertypes().contains(definition.source().get().name());
     }
 }

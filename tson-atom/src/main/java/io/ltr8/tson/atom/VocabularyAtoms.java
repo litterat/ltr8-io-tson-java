@@ -11,6 +11,7 @@ import io.ltr8.tson.atom.parser.Ipv6Parser;
 import io.ltr8.tson.atom.parser.PeriodParser;
 import io.ltr8.tson.atom.parser.RationalParser;
 import io.ltr8.tson.atom.parser.TimeParser;
+import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
 import io.ltr8.tson.atom.parser.*;
@@ -18,6 +19,7 @@ import io.ltr8.tson.base.atom.Complex;
 import io.ltr8.tson.base.atom.Rational;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
+import io.ltr8.net.Iri;
 import java.net.URI;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -25,6 +27,7 @@ import java.time.OffsetTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 
 /**
  * The reverse of {@link BuiltinTypeVocabulary}'s name-&gt;{@link AtomType} table: which {@code AtomType}
@@ -46,8 +49,25 @@ import java.util.UUID;
  */
 public final class VocabularyAtoms {
 
-    /** Pairs an {@link AtomType} with the type-ref name a writer emits its values under. */
-    public record Entry(String typeRef, AtomType<?> atomType) {
+    /**
+     * Pairs an {@link AtomType} with the type-ref name a writer emits a value under. The name is the
+     * value's: one host class can hold values of more than one atom, and a {@code java.net.URI} is written
+     * under the narrowest of {@code uri}, {@code uri_reference}, {@code iri} and {@code iri_reference} that
+     * admits it -- {@code iri} once a character is beyond US-ASCII, {@code _reference} where there is no
+     * scheme -- so that it reads back.
+     */
+    public record Entry(Function<Object, String> typeRefOf, AtomType<?> atomType) {
+
+        /** One type-ref name for every value of the host class. */
+        public Entry(String typeRef, AtomType<?> atomType) {
+            this(value -> typeRef, atomType);
+        }
+
+        /** The type-ref name {@code value} is written under. */
+        public String typeRef(Object value) {
+            return typeRefOf.apply(value);
+        }
+
         @SuppressWarnings("unchecked")
         public String write(Object value) {
             return ((AtomType<Object>) atomType).write(value);
@@ -55,6 +75,24 @@ public final class VocabularyAtoms {
     }
 
     private VocabularyAtoms() {
+    }
+
+    private static String uriTypeRef(Object value) {
+        URI uri = (URI) value;
+        return typeRef(uri.toString(), uri.isAbsolute());
+    }
+
+    private static String iriTypeRef(Object value) {
+        Iri iri = (Iri) value;
+        return typeRef(iri.text(), !iri.isRelative());
+    }
+
+    private static String typeRef(String text, boolean absolute) {
+        boolean ascii = text.chars().allMatch(c -> c <= 0x7F);
+        if (ascii) {
+            return absolute ? UriParser.TYPENAME : UriParser.REFERENCE_TYPENAME;
+        }
+        return absolute ? IriParser.TYPENAME : IriParser.REFERENCE_TYPENAME;
     }
 
     /**
@@ -72,7 +110,8 @@ public final class VocabularyAtoms {
     public static Map<Class<?>, Entry> defaults() {
         Map<Class<?>, Entry> atoms = new HashMap<>();
         atoms.put(UUID.class, new Entry(UuidParser.TYPENAME, UuidParser.UNCONSTRAINED));
-        atoms.put(URI.class, new Entry(UriParser.TYPENAME, UriParser.UNCONSTRAINED));
+        atoms.put(URI.class, new Entry(VocabularyAtoms::uriTypeRef, IriParser.REFERENCE_AS_JAVA_URI));
+        atoms.put(Iri.class, new Entry(VocabularyAtoms::iriTypeRef, IriParser.REFERENCE));
         atoms.put(Inet4Address.class, new Entry(Ipv4Parser.TYPENAME, Ipv4Parser.UNCONSTRAINED));
         atoms.put(Inet6Address.class, new Entry(Ipv6Parser.TYPENAME, Ipv6Parser.UNCONSTRAINED));
         atoms.put(LocalDate.class, new Entry(DateParser.TYPENAME, DateParser.UNCONSTRAINED));

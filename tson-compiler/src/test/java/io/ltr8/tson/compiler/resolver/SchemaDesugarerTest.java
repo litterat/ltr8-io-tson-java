@@ -54,7 +54,7 @@ class SchemaDesugarerTest {
 
     private static SchemaDocument parse(String declarations) {
         return new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
                 {
                 %s
                 }
@@ -99,7 +99,7 @@ class SchemaDesugarerTest {
     @Test
     void aRewrittenDeclarationKeepsItsSourcePosition() {
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
                 {
                   plain => { a: text }
 
@@ -159,26 +159,26 @@ class SchemaDesugarerTest {
     }
 
     /**
-     * <code>{K =&gt; V?}</code> binds {@code state: OPTIONAL} on the value, the same field and the same enum
-     * member {@code [T?]} binds on an element -- the {@code state} field the kernel gives {@code map} (issue
-     * #227). The marker rides the value only; a key never admits one, so there is no second slot to fill.
+     * <code>{K =&gt; V?}</code> binds {@code voidable: true} on the value, the same field {@code [T?]} binds on an
+     * element -- the {@code voidable} field the kernel gives {@code map}. The marker rides the value only; a key
+     * never admits one, so there is no second slot to fill.
      */
     @Test
-    void anOptionalMapValueBindsTheStateField() {
+    void aVoidableMapValueBindsTheVoidableField() {
         SchemaDocument document = desugar("  holder => { entries: {text => integer?} }");
 
         Instance instance = (Instance) onlyInjected(document, "map").typeDef();
-        assertEquals("{ key_type: text  value_type: integer  state: OPTIONAL }", instanceBody(instance));
+        assertEquals("{ key_type: text  value_type: integer  voidable: true }", instanceBody(instance));
     }
 
     /**
-     * And an unmarked value writes no {@code state} at all, for the reason the array form omits an unmarked
-     * element's: REQUIRED is the kernel's default, so writing it would put a field at its default value into
+     * And an unmarked value writes no {@code voidable} at all, for the reason the array form omits an unmarked
+     * element's: false is the kernel's default, so writing it would put a field at its default value into
      * every map ever desugared. The two spellings are therefore different entries, which is what makes
      * {@code {text => integer}} and {@code {text => integer?}} different types.
      */
     @Test
-    void anUnmarkedMapValueWritesNoStateAndIsADifferentEntry() {
+    void anUnmarkedMapValueWritesNoVoidableAndIsADifferentEntry() {
         SchemaDocument document = desugar("  holder => { a: {text => integer}  b: {text => integer?} }");
 
         List<SchemaMap.Declaration> maps = document.body().declarations().values().stream()
@@ -186,7 +186,7 @@ class SchemaDesugarerTest {
         assertEquals(2, maps.size(), maps.stream().map(SchemaMap.Declaration::name).toList().toString());
         assertEquals("{ key_type: text  value_type: integer }",
                 instanceBody((Instance) maps.get(0).typeDef()));
-        assertEquals("{ key_type: text  value_type: integer  state: OPTIONAL }",
+        assertEquals("{ key_type: text  value_type: integer  voidable: true }",
                 instanceBody((Instance) maps.get(1).typeDef()));
     }
 
@@ -383,12 +383,12 @@ class SchemaDesugarerTest {
 
     /**
      * A position's own {@code ?} (declaration position only -- the parser rejects one inline) becomes {@code
-     * state: OPTIONAL}. A REQUIRED position writes no {@code state} at all: the member is REQUIRED_DEFAULT
-     * ({@code state: element_state ~ REQUIRED}), so §5.2's default injection supplies it.
+     * voidable: true}. An unmarked position writes no {@code voidable} at all: the member is a default
+     * ({@code voidable?: boolean ~ false}), so §5.2's default injection supplies it.
      */
     @Test
-    void anOptionalPositionStatesItsStateAndARequiredOneLetsTheDefaultSupplyIt() {
-        assertEquals("[ { element_type: integer  state: OPTIONAL } { element_type: text } ]",
+    void aVoidablePositionStatesItAndAnUnmarkedOneLetsTheDefaultSupplyIt() {
+        assertEquals("[ { element_type: integer  voidable: true } { element_type: text } ]",
                 tupleElements(instanceOf(desugar("  pair => [integer?, text]"), "pair")));
     }
 
@@ -479,7 +479,7 @@ class SchemaDesugarerTest {
                 + injected.stream().map(SchemaMap.Declaration::name).toList());
         assertEquals("[ { element_type: integer } { element_type: text } ]",
                 tupleElements(assertInstanceOf(Instance.class, injected.get(0).typeDef())));
-        assertEquals("[ { element_type: integer } { element_type: text  state: OPTIONAL } ]",
+        assertEquals("[ { element_type: integer } { element_type: text  voidable: true } ]",
                 tupleElements(assertInstanceOf(Instance.class, injected.get(1).typeDef())));
     }
 
@@ -489,36 +489,36 @@ class SchemaDesugarerTest {
         SchemaDocument document = desugar("  loose => [[integer, text]?, boolean]");
 
         SchemaMap.Declaration inner = onlyInjected(document, "tuple");
-        assertEquals("[ { element_type: " + inner.name() + "  state: OPTIONAL } { element_type: boolean } ]",
+        assertEquals("[ { element_type: " + inner.name() + "  voidable: true } { element_type: boolean } ]",
                 tupleElements(instanceOf(document, "loose")));
     }
 
     // ── The element `?` on an array (§5.3) ───────────────────────────────
-    //    `state: OPTIONAL` on the resolved array, bound directly alongside the bounds rather than routed
+    //    `voidable: true` on the resolved array, bound directly alongside the bounds rather than routed
     //    through anything: `[T?; 3]` states both at once and both land on one binding record.
 
     @Test
-    void anOptionalElementStatesItsStateAndARequiredOneLetsTheDefaultSupplyIt() {
+    void aVoidableElementStatesItAndAnUnmarkedOneLetsTheDefaultSupplyIt() {
         SchemaDocument document = desugar("""
                   slots  => [integer?]
                   strict => [integer]""");
 
-        assertEquals("{ element_type: integer  state: OPTIONAL }", instanceBody(instanceOf(document, "slots")));
+        assertEquals("{ element_type: integer  voidable: true }", instanceBody(instanceOf(document, "slots")));
         assertEquals("{ element_type: integer }", instanceBody(instanceOf(document, "strict")));
     }
 
     @Test
-    void anOptionalElementAndASizeLandOnOneBindingRecord() {
-        assertEquals("{ element_type: integer  state: OPTIONAL  min_items: 3  max_items: 3 }",
+    void aVoidableElementAndASizeLandOnOneBindingRecord() {
+        assertEquals("{ element_type: integer  voidable: true  min_items: 3  max_items: 3 }",
                 instanceBody(instanceOf(desugar("  triple => [integer?; 3]"), "triple")));
     }
 
     /**
-     * The state reaches the derived name: without it {@code [T?]} and {@code [T]} derive the same name and the
+     * {@code voidable} reaches the derived name: without it {@code [T?]} and {@code [T]} derive the same name and the
      * second one written collapses onto the first one injected.
      */
     @Test
-    void twoNestedArraysDifferingOnlyInElementStateGetSeparateDeclarations() {
+    void twoNestedArraysDifferingOnlyInVoidableGetSeparateDeclarations() {
         SchemaDocument document = desugar("""
                   loose  => [[integer?; 3], text]
                   strict => [[integer; 3], text]""");
@@ -527,7 +527,7 @@ class SchemaDesugarerTest {
                 .filter(declaration -> declaration.name().startsWith("array_integer_")).toList();
         assertEquals(2, injected.size(), () -> "expected two injected arrays, got "
                 + injected.stream().map(SchemaMap.Declaration::name).toList());
-        assertEquals("{ element_type: integer  state: OPTIONAL  min_items: 3  max_items: 3 }",
+        assertEquals("{ element_type: integer  voidable: true  min_items: 3  max_items: 3 }",
                 instanceBody(assertInstanceOf(Instance.class, injected.get(0).typeDef())));
         assertEquals("{ element_type: integer  min_items: 3  max_items: 3 }",
                 instanceBody(assertInstanceOf(Instance.class, injected.get(1).typeDef())));

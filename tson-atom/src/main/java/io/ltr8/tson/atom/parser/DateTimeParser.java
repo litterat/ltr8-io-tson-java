@@ -10,19 +10,19 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * Parses and validates against meta-kernel's {@code datetime_type} constructor (§5.4's {@code
+ * Parses and validates against meta's {@code datetime_type} constructor (§5.4's {@code
  * datetime} atom, RFC 3339 {@code date-time}). Same shape-then-delegate pattern as {@link
  * DateParser}/{@link TimeParser} -- the shape regex exists specifically to reject {@link
  * OffsetDateTime#parse}'s own leniency on the year (ISO 8601's "extended year" form, confirmed
  * empirically: {@code OffsetDateTime.parse("+12025-03-13T10:00:00Z")} succeeds, which RFC 3339's
  * {@code full-date} grammar -- exactly 4 digits, no sign -- doesn't permit). The case-insensitive
  * {@code T}/{@code Z} and required-offset behavior are both already correct natively, same as
- * {@link TimeParser}, and the same leap-second gap {@link TimeParser} documents applies here too
- * (inherited from the same {@code full-time} production). Holds a {@link DateTimeType} -- the pure
+ * {@link TimeParser}, and a leap second is refused as {@link TimeParser} refuses it: second {@code 60}
+ * is not an instant on the UTC timeline core's {@code datetime} is. Holds a {@link DateTimeType} -- the pure
  * constraint values, unchanged by this split -- rather than declaring those fields itself.
  *
- * <p>{@code precision} is enforced on the token as written (§5.5), the same upper bound on fractional-second
- * digits {@link TimeParser} applies and for the same reason.
+ * <p>{@code precision} constrains the value, not the spelling (§5.5), through {@link FractionalSeconds}, as
+ * for {@link TimeParser}.
  */
 public record DateTimeParser(DateTimeType constraints) implements AtomTypeParser<OffsetDateTime> {
 

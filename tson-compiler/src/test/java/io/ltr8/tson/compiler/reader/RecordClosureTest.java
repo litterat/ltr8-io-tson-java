@@ -11,10 +11,12 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -54,6 +56,8 @@ class RecordClosureTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("text", atom(TextType.UNCONSTRAINED));
         entries.put("text_member_set", TypeDefinition.product(ArrayBody.of(TypeRef.of("text"))));
+        entries.put("normalization", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new EnumBody(
+                List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD"))));
         entries.put("integer", atom(IntegerType.UNCONSTRAINED));
         entries.put("addr", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("city", TypeRef.of("text"))))));
@@ -142,12 +146,16 @@ class RecordClosureTest {
         entries.put("integer", atom(IntegerType.UNCONSTRAINED));
         entries.put("text", atom(TextType.UNCONSTRAINED));
         entries.put("text_member_set", TypeDefinition.product(ArrayBody.of(TypeRef.of("text"))));
+        entries.put("normalization", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new EnumBody(
+                List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD"))));
         entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.optionalVoidable("min_length", TypeRef.of("integer")),
                 RecordField.optionalVoidable("max_length", TypeRef.of("integer")),
                 RecordField.optionalVoidable("length", TypeRef.of("integer")),
                 RecordField.optionalVoidable("pattern", TypeRef.of("text")),
-                RecordField.optionalVoidable("members", TypeRef.of("text_member_set"))))));
+                RecordField.optionalVoidable("members", TypeRef.of("text_member_set")),
+                RecordField.defaulted("normalization", TypeRef.of("normalization"),
+                        new Token("NONE", Token.Form.UNQUOTED))))));
         TsonSchema schema = new TsonSchema("https://example.test/bind-closure.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
@@ -161,7 +169,7 @@ class RecordClosureTest {
         Diagnostic diagnostic = problems.diagnostics().getFirst();
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, diagnostic.code());
         assertEquals(Optional.of("/minLength"), diagnostic.path());
-        assertEquals("min_length | max_length | length | pattern | members", diagnostic.expected());
+        assertEquals("min_length | max_length | length | pattern | members | normalization", diagnostic.expected());
         assertNull(bound);
 
         // The same schema, the same reader, nothing unknown: the binding itself still works.

@@ -1,14 +1,16 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.diagnostics.ArrayDiagnostics;
+import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.meta.IdentifierType;
 
 import java.math.BigInteger;
 import java.util.Optional;
@@ -22,16 +24,16 @@ import java.util.function.Consumer;
  * {@code ArrayStart}, and decoding elements one at a time straight off the event stream --
  * validating {@code min_items}/{@code max_items} (against the final count, known only once {@code
  * ArrayEnd} arrives -- a stream has no up-front length the way an already-built element list did),
- * tolerating (or rejecting) an absent element per {@link ElementState}, and rejecting a duplicate
+ * tolerating (or rejecting) a void element per {@code voidable}, and rejecting a duplicate
  * *decoded* element when {@code unique_items} says to -- handing each decoded element to a {@link
  * Consumer} rather than assembling a result itself, since how a decoded element gets stored (a plain
  * {@code List.add}, or a {@code tson-bind} {@code DataClassArray}'s own {@code put()} {@link
  * java.lang.invoke.MethodHandle}) differs completely between the two subclasses. Array elements have
- * no default/fixed-value concept at all ({@link ElementState} has only {@code REQUIRED}/{@code
- * OPTIONAL}, where a record field carries a role and a value), so there's nothing here
+ * no default/fixed-value concept at all ({@code voidable} is the element's one fact, where a record field
+ * carries a role and a value), so there's nothing here
  * resembling {@link RecordAbstractReader}'s own precomputed-default machinery.
  *
- * <p>{@code unordered} is deliberately never validated here -- there's nothing to check about a
+ * <p>{@code ordered} is deliberately never validated here -- there's nothing to check about a
  * single array value's own ordering in isolation, only meaningful when *comparing* two arrays.
  *
  * <p><b>{@code max_items} is checked once, at {@code ArrayEnd}, not as soon as the count is
@@ -58,9 +60,15 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
     /** This array's rules, shared with the JSON reader ([TSON-JSON] §9.4). */
     final ArrayDiagnostics rules;
 
+    /**
+     * Whether this array's elements are unique names -- {@link #elementsAreNames} -- and so one look-alike scope.
+     */
+    final boolean elementsAreNames;
+
     ArrayAbstractReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
-                         SchemaLocation schemaLocation) {
-        this(name, displayName, body, resolver.resolve(body.elementType().name()), schemaLocation);
+                         SchemaLocation schemaLocation, boolean elementsAreNames) {
+        this(name, displayName, body, resolver.resolve(body.elementType().name()), schemaLocation,
+                elementsAreNames);
     }
 
     /**
@@ -70,13 +78,27 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      * them needs.
      */
     ArrayAbstractReader(String name, String displayName, ArrayBody body, TsonTypeReader<?> elementParser,
-                         SchemaLocation schemaLocation) {
+                         SchemaLocation schemaLocation, boolean elementsAreNames) {
         this.name = name;
         this.displayName = displayName;
         this.body = body;
         this.elementParser = elementParser;
         this.schemaLocation = schemaLocation;
         this.rules = new ArrayDiagnostics(displayName);
+        this.elementsAreNames = elementsAreNames;
+    }
+
+    /**
+     * Whether {@code body}'s elements are unique names: {@code unique_items} holds -- a set, or any array marked so
+     * -- and its element type is an identifier family, so the elements are one naming scope as an identifier-keyed
+     * map's keys are ([TSON-SCHEMA] §11.4). Uniqueness is what says two elements name two things, so an array that
+     * admits repetition is not one.
+     */
+    static boolean elementsAreNames(ArrayBody body, ValueReaderContext context) {
+        return body.uniqueItems() && ReferenceChain.terminalDefinition(body.elementType().name(),
+                        context.schema().entries())
+                .map(element -> element.body() instanceof IdentifierType)
+                .orElse(false);
     }
 
     /**
@@ -105,19 +127,34 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      * ArrayEnd} arrives. Keeps decoding every remaining element after one fails (a {@code null}
      * placeholder is handed to {@code sink} for that element, never skipped) so later elements' own
      * {@link TsonReadContext#index} positions stay accurate against the original data.
+     *
+     * <p>A {@code null} element -- absent, or one whose reading refused it -- is no member of a set's duplicate
+     * check, there being no value to compare. Where {@link #elementsAreNames}, an element reading alike with an
+     * earlier one is reported ({@code CONFUSABLE_NAMES}) at its own index, as §8.2 places a refused pair; a
+     * duplicate is the duplicate it is and nothing else. The scope is built only for such a set, and only where
+     * the read's identifier policy applies skeleton distinctness.
      */
     final void readInto(TsonReadContext ctx, Consumer<Object> sink) {
         Set<Object> seen = body.uniqueItems() ? new LinkedHashSet<>() : null;
+        ConfusableNames.Scope names = elementsAreNames && ctx.identifierPolicy().appliesSkeletonDistinctness()
+                ? new ConfusableNames.Scope() : null;
         int index = 0;
         while (!(ctx.peek() instanceof ArrayEnd)) {
             SchemaRef push = ScopePush.notAdmitted(ctx, elementParser);
             if (push != null) {
                 ScopePush.refuse(ctx.index(index), body.elementType().name(), push);
             }
-            Object decoded = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(index, ctx)
+            Object decoded = ctx.peek() instanceof VoidEvent ? defaultOrRequire(index, ctx)
                     : elementParser.read(ctx.index(index));
-            if (seen != null && !seen.add(ValueIdentity.of(decoded))) {
-                ctx.index(index).report(rules.repeatedElement(Rendered.value(decoded)));
+            if (seen != null && decoded != null) {
+                if (!seen.add(ValueIdentity.of(decoded))) {
+                    ctx.index(index).report(rules.repeatedElement(Rendered.value(decoded)));
+                } else if (names != null && ValueIdentity.nameOf(decoded) instanceof String name) {
+                    Optional<ConfusableNames.Collision> collision = names.add(name);
+                    if (collision.isPresent()) {
+                        ctx.index(index).report(rules.confusableElements(collision.get()));
+                    }
+                }
             }
             sink.accept(decoded);
             index++;
@@ -125,14 +162,13 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         ctx.next(); // ArrayEnd
         validateSize(index, ctx);
     }
-
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for the `actual` of an element-state rule. */
-    private static final String ABSENT = "_";
+    private static final String VOID = "_";
 
     private Object defaultOrRequire(int index, TsonReadContext ctx) {
-        ctx.next(); // consume the AbsentEvent regardless of REQUIRED/OPTIONAL
-        if (body.state() == ElementState.REQUIRED) {
-            ctx.index(index).report(rules.absentElement(index, ABSENT));
+        ctx.next(); // consume the VoidEvent whether or not the element is voidable
+        if (!body.voidable()) {
+            ctx.index(index).report(rules.voidElement(index, VOID));
         }
         return null;
     }

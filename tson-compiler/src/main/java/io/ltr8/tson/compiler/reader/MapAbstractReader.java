@@ -1,13 +1,14 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.MapDiagnostics;
+import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.*;
-import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
 
 import java.math.BigInteger;
@@ -22,7 +23,7 @@ import java.util.function.BiConsumer;
  * {@code EmptyBraceEvent}, zero entries, matching {@code TsonObjectReader.toMap}'s own treatment of
  * {@code {}}), and decoding entries one at a time straight off the event stream -- validating {@code
  * min_items}/{@code max_items} against the final count (known only once {@code MapEnd} arrives),
- * rejecting the absent sentinel {@code _} in key position and admitting it in value position (§2.9) --
+ * rejecting the void sentinel {@code _} in key position and admitting it in value position (§2.9) --
  * handing each decoded key/value pair to a {@link BiConsumer} rather than assembling a result itself, the
  * same reasoning {@link ArrayAbstractReader#readInto} documents for arrays.
  *
@@ -32,12 +33,11 @@ import java.util.function.BiConsumer;
  * min_items: 1} forbids. The count is therefore validated in {@link #expectMapShape}, the one funnel every
  * map reader passes through, rather than in {@link #readInto}, which a {@code {}} never reaches.
  *
- * <p>Unlike {@link ArrayAbstractReader}, there's no {@code unique_items}/{@code ElementState}
- * concept here at all -- {@link MapBody} carries no {@code unique_items}. It does carry an {@link
- * ElementState}, governing the <b>value</b> ({@code {K => V?}}): an entry's value may be the absent
- * sentinel under OPTIONAL and is {@code FIELD_REQUIRED} otherwise, which is the array element's own rule
- * (see {@link #decodedValue}). The key is the opposite and unconditional -- §2.9 forbids the sentinel
- * there whatever the declaration says, checked in {@link #readInto} before the key is decoded at all.
+ * <p>Unlike {@link ArrayAbstractReader}, there's no {@code unique_items} concept here at all -- {@link MapBody}
+ * carries no {@code unique_items}. It does carry {@code voidable}, governing the <b>value</b> ({@code {K => V?}}):
+ * an entry's value may be the void sentinel where it is set and is {@code FIELD_REQUIRED} otherwise, which is the
+ * array element's own rule (see {@link #decodedValue}). The key is the opposite and unconditional -- §2.9 forbids the
+ * sentinel there whatever the declaration says, checked in {@link #readInto} before the key is decoded at all.
  *
  * <p><b>A repeated key is a validation error</b> ({@code DUPLICATE_MAP_KEY}), reported at the repeat's
  * own position and then decoded like any other entry so the sink still ends up "last value wins".
@@ -72,13 +72,19 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
     /** This map's rules, shared with the JSON reader ([TSON-JSON] §9.4). */
     final MapDiagnostics rules;
 
+    /**
+     * Whether the key type is an identifier family, which makes the keys one naming scope ([TSON-SCHEMA]
+     * §11.4): no two may read alike ([TSON-DATA] §8.2). Each key's own per-name rules are its reader's.
+     */
+    final boolean keysAreNames;
+
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for a key's or entry value's state rule. */
-    private static final String ABSENT = "_";
+    private static final String VOID = "_";
 
     MapAbstractReader(String name, String displayName, MapBody body, TsonTypeReaderResolver resolver,
-                       SchemaLocation schemaLocation) {
+                       SchemaLocation schemaLocation, boolean keysAreNames) {
         this(name, displayName, body, resolver.resolve(body.keyType().name()),
-                resolver.resolve(body.valueType().name()), schemaLocation);
+                resolver.resolve(body.valueType().name()), schemaLocation, keysAreNames);
     }
 
     /**
@@ -88,7 +94,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * which both modes share, free of anything only one of them needs.
      */
     MapAbstractReader(String name, String displayName, MapBody body, TsonTypeReader<?> keyParser,
-                      TsonTypeReader<?> valueParser, SchemaLocation schemaLocation) {
+                      TsonTypeReader<?> valueParser, SchemaLocation schemaLocation, boolean keysAreNames) {
         this.name = name;
         this.displayName = displayName;
         this.body = body;
@@ -96,6 +102,18 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
         this.valueParser = valueParser;
         this.schemaLocation = schemaLocation;
         this.rules = new MapDiagnostics(displayName);
+        this.keysAreNames = keysAreNames;
+    }
+
+    /**
+     * Whether {@code body}'s key type is an identifier family: its reference chain ends at an entry whose body
+     * the {@code identifier_type} constructor made, the kernel's {@code identifier}, a schema's own, or a
+     * refinement of either.
+     */
+    static boolean keysAreNames(MapBody body, ValueReaderContext context) {
+        return ReferenceChain.terminalDefinition(body.keyType().name(), context.schema().entries())
+                .map(key -> key.body() instanceof IdentifierType)
+                .orElse(false);
     }
 
     /**
@@ -137,15 +155,23 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * and what leaves the sink holding the last value for the key either way. A key whose own decoding
      * reported is left out of {@code seen} entirely: it is not a key the document stated, so a second
      * equally-undecodable key would otherwise be reported a second time as a repeat of the first.
+     *
+     * <p>Where {@link #keysAreNames}, a key reading alike with an earlier one is reported ({@code
+     * CONFUSABLE_NAMES}) at its own position, as §8.2 places a refused pair, and its entry read normally. A key
+     * whose reading reported -- its policy refusal included -- is no name of the scope, for the reason it is
+     * not in {@code seen}. The scope is built only for such a map, and only where the read's identifier policy
+     * applies skeleton distinctness.
      */
     final void readInto(TsonReadContext ctx, BiConsumer<Object, Object> sink) {
         int count = 0;
         Set<Object> seen = new HashSet<>();
+        ConfusableNames.Scope names = keysAreNames && ctx.identifierPolicy().appliesSkeletonDistinctness()
+                ? new ConfusableNames.Scope() : null;
         while (!(ctx.peek() instanceof MapEnd)) {
             TsonEvent keyPeek = ctx.peek();
-            if (keyPeek instanceof AbsentEvent) {
+            if (keyPeek instanceof VoidEvent) {
                 ctx.next(); // the absent key itself
-                ctx.report(rules.absentKey(ABSENT));
+                ctx.report(rules.voidKey(VOID));
                 ctx.next(); // MapArrow
                 EventSkip.scopedValue(ctx); // no meaningful key to associate the value with -- discard it
                 count++;
@@ -154,8 +180,15 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             String keySegment = keySegmentFor(keyPeek);
             int before = ctx.reported();
             Object key = keyParser.read(ctx.field(keySegment));
-            if (ctx.reported() == before && !seen.add(ValueIdentity.of(key))) {
-                ctx.field(keySegment).report(rules.duplicateKey(keySegment));
+            if (ctx.reported() == before) {
+                if (!seen.add(ValueIdentity.of(key))) {
+                    ctx.field(keySegment).report(rules.duplicateKey(keySegment));
+                } else if (names != null && ValueIdentity.nameOf(key) instanceof String name) {
+                    Optional<ConfusableNames.Collision> collision = names.add(name);
+                    if (collision.isPresent()) {
+                        ctx.field(keySegment).report(rules.confusableKeys(collision.get()));
+                    }
+                }
             }
             ctx.next(); // MapArrow
             SchemaRef push = ScopePush.notAdmitted(ctx, valueParser);
@@ -171,23 +204,23 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * The entry's value, or nothing where the document wrote {@code _} there -- permitted under {@code
-     * {K => V?}} ({@link ElementState#OPTIONAL}) and {@code FIELD_REQUIRED} otherwise, the same two answers
+     * {K => V?}} ({@code voidable}) and {@code FIELD_REQUIRED} otherwise, the same two answers
      * {@link ArrayAbstractReader#defaultOrRequire} gives an element. Either way the entry is present with an
-     * absent value ([TSON-DATA] §2.9) and counts toward the size bounds. Answered here rather than by the
+     * void value ([TSON-DATA] §2.9) and counts toward the size bounds. Answered here rather than by the
      * value's own reader, which is right to refuse the sentinel: {@code _} is a value of no atom type, so
      * absence is the container's question, exactly as {@link ArrayAbstractReader#readInto} asks it of an
      * element before reaching for the element parser.
      *
      * <p>{@code null} is what both subclasses already turn into their own no-value form ({@link
-     * MapTreeReader} a {@code TsonAbsent}, {@link MapBindReader} a null map value), which is also what a
+     * MapTreeReader} a {@code TsonVoid}, {@link MapBindReader} a null map value), which is also what a
      * soft-failed value read hands them in collecting mode -- the same conflation an absent array element
      * carries, and for the same reason: what went wrong is the diagnostic's to say, not the value's.
      */
     private Object decodedValue(String keySegment, TsonReadContext ctx) {
-        if (ctx.peek() instanceof AbsentEvent) {
-            ctx.next(); // consumed regardless of REQUIRED/OPTIONAL, so the entry keeps its place either way
-            if (body.state() == ElementState.REQUIRED) {
-                ctx.field(keySegment).report(rules.absentEntryValue(keySegment, ABSENT));
+        if (ctx.peek() instanceof VoidEvent) {
+            ctx.next(); // consumed whether or not the value is voidable, so the entry keeps its place either way
+            if (!body.voidable()) {
+                ctx.field(keySegment).report(rules.voidEntryValue(keySegment, VOID));
             }
             return null;
         }

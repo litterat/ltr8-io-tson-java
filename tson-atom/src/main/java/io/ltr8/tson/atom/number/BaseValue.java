@@ -5,17 +5,17 @@ package io.ltr8.tson.atom.number;
  * {@link NumberValue} wraps a {@link NumberForm} (the recognized grammar shape), not a bound Java
  * numeric type. See {@link NumberForm}'s Javadoc for why binding is a separate, later step.
  *
- * <p>{@link AbsentValue} is the one member {@code BaseTypeResolver} never returns. §4 resolves three
+ * <p>{@link VoidValue} is the one member {@code BaseTypeResolver} never returns. §4 resolves three
  * classes and absence is not one of them: {@code _} is lexical, arriving as its own token type and its own
  * event, and never as a token this resolver sees. It is a member here because binding an identified value
  * to a host type is one switch ({@code AtomBinder.bind}), and a schemaless bind reaching {@code _} needs a
  * way into it; the alternative is a second entry point for absence alone.
  */
 public sealed interface BaseValue
-        permits BaseValue.AbsentValue, BaseValue.BooleanValue, BaseValue.NumberValue, BaseValue.StringValue {
+        permits BaseValue.VoidValue, BaseValue.BooleanValue, BaseValue.NumberValue, BaseValue.StringValue {
 
-    /** The absent sentinel {@code _} (§2.9): no value occupies the position. Never produced by base resolution. */
-    record AbsentValue() implements BaseValue {}
+    /** The void sentinel {@code _} (§2.9): no value occupies the position. Never produced by base resolution. */
+    record VoidValue() implements BaseValue {}
 
     /** {@code true} or {@code false} (§4.2). */
     record BooleanValue(boolean value) implements BaseValue {}

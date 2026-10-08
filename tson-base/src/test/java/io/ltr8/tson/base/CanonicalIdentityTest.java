@@ -12,26 +12,26 @@ class CanonicalIdentityTest {
 
     @Test
     void stripsSchemeAndDelimiterFromTheRealMetaKernelId() {
-        Assertions.assertEquals("tson.io/2026/36/m/meta-kernel.tn",
-                CanonicalIdentity.canonicalize("https://tson.io/2026/36/m/meta-kernel.tn"));
+        Assertions.assertEquals("tson.io/2026/37/m/meta-kernel.tn",
+                CanonicalIdentity.canonicalize("https://tson.io/2026/37/m/meta-kernel.tn"));
     }
 
     @Test
     void httpAndHttpsResolveToTheSameIdentity() {
-        assertEquals(CanonicalIdentity.canonicalize("https://tson.io/2026/36/m/meta-kernel.tn"),
-                CanonicalIdentity.canonicalize("http://tson.io/2026/36/m/meta-kernel.tn"));
+        assertEquals(CanonicalIdentity.canonicalize("https://tson.io/2026/37/m/meta-kernel.tn"),
+                CanonicalIdentity.canonicalize("http://tson.io/2026/37/m/meta-kernel.tn"));
     }
 
     @Test
     void queryIsDropped() {
-        assertEquals("tson.io/2026/36/m/meta-kernel.tn",
-                CanonicalIdentity.canonicalize("https://tson.io/2026/36/m/meta-kernel.tn?sha256=abc123"));
+        assertEquals("tson.io/2026/37/m/meta-kernel.tn",
+                CanonicalIdentity.canonicalize("https://tson.io/2026/37/m/meta-kernel.tn?sha256=abc123"));
     }
 
     @Test
     void rejectsNonLowercaseHost() {
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("https://Tson.io/2026/36/m/meta-kernel.tn"));
+                () -> CanonicalIdentity.canonicalize("https://Tson.io/2026/37/m/meta-kernel.tn"));
     }
 
     @Test
@@ -43,26 +43,26 @@ class CanonicalIdentityTest {
     @Test
     void rejectsUserinfo() {
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("https://user@tson.io/2026/36/m/meta-kernel.tn"));
+                () -> CanonicalIdentity.canonicalize("https://user@tson.io/2026/37/m/meta-kernel.tn"));
     }
 
     @Test
     void rejectsExplicitPort() {
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("https://tson.io:443/2026/36/m/meta-kernel.tn"));
+                () -> CanonicalIdentity.canonicalize("https://tson.io:443/2026/37/m/meta-kernel.tn"));
     }
 
     @Test
     void rejectsFragment() {
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("https://tson.io/2026/36/m/meta-kernel.tn#section"));
+                () -> CanonicalIdentity.canonicalize("https://tson.io/2026/37/m/meta-kernel.tn#section"));
     }
 
     @Test
     void rejectsPercentEncodedUnreservedCharacter() {
         // %7E decodes to '~', an unreserved character -- MUST NOT be percent-encoded.
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("https://tson.io/2026/36/m/meta-kernel%7E.tn"));
+                () -> CanonicalIdentity.canonicalize("https://tson.io/2026/37/m/meta-kernel%7E.tn"));
     }
 
     @Test
@@ -72,10 +72,37 @@ class CanonicalIdentityTest {
                 CanonicalIdentity.canonicalize("https://tson.io/2026%2F32/m/meta-kernel.tn"));
     }
 
+    /**
+     * The reference is an IRI-reference ([TSON-DATA] §2.2.1, §3.3), so a host and path beyond US-ASCII are an
+     * identity, held and compared as written; the percent-encoded spelling of the same path is another identity.
+     */
+    @Test
+    void acceptsAHostAndPathBeyondUsAscii() {
+        assertEquals("\u4F8B\u3048.test/\u6CE8\u6587.tn",
+                CanonicalIdentity.canonicalize("https://\u4F8B\u3048.test/\u6CE8\u6587.tn"));
+        assertEquals("example.test/%E6%B3%A8.tn", CanonicalIdentity.canonicalize("https://example.test/%E6%B3%A8.tn"));
+        assertFalse(CanonicalIdentity.sameIdentity("https://example.test/\u6CE8.tn", "https://example.test/%E6%B3%A8.tn"));
+    }
+
+    /**
+     * A reference with no host names a library entry by its path (§2.2.1), which must be absolute so that it is never
+     * an identity a host and path also spell.
+     */
+    @Test
+    void aPathOnlyIdentityIsItsAbsolutePath() {
+        assertEquals("/local/orders.tn", CanonicalIdentity.canonicalize("/local/orders.tn"));
+        assertEquals("/local/orders.tn", CanonicalIdentity.canonicalize("file:/local/orders.tn"));
+        assertEquals("/local/orders.tn", CanonicalIdentity.canonicalize("file:///local/orders.tn"));
+        assertEquals("/local/orders.tn", CanonicalIdentity.canonicalize("/local/orders.tn?sha256=abc"));
+        assertThrows(SchemaValidationException.class, () -> CanonicalIdentity.canonicalize("mini.tn"));
+        assertThrows(SchemaValidationException.class, () -> CanonicalIdentity.canonicalize("/local/../orders.tn"));
+        assertThrows(SchemaValidationException.class, () -> CanonicalIdentity.canonicalize("/local/orders.tn#x"));
+    }
+
     @Test
     void rejectsMissingScheme() {
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("tson.io/2026/36/m/meta-kernel.tn"));
+                () -> CanonicalIdentity.canonicalize("tson.io/2026/37/m/meta-kernel.tn"));
     }
 
     @Test

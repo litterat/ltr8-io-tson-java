@@ -10,7 +10,6 @@ import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -76,7 +75,7 @@ class ArrayTreeReaderTest {
 
     @Test
     void minItemsRejectsAShorterArray() {
-        ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, false,
+        ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
                 Optional.of(BigInteger.TWO), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
@@ -86,7 +85,7 @@ class ArrayTreeReaderTest {
 
     @Test
     void maxItemsRejectsALongerArray() {
-        ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, false,
+        ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
                 Optional.empty(), Optional.of(BigInteger.TWO));
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
@@ -96,7 +95,7 @@ class ArrayTreeReaderTest {
 
     @Test
     void uniqueItemsRejectsADuplicateDecodedElement() {
-        ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, true,
+        ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, true,
                 Optional.empty(), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
@@ -111,7 +110,7 @@ class ArrayTreeReaderTest {
      */
     @Test
     void aDuplicateElementIsReportedAsItsValueNotAsATreeNodesComponents() {
-        ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, true,
+        ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, true,
                 Optional.empty(), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
@@ -124,8 +123,8 @@ class ArrayTreeReaderTest {
     }
 
     @Test
-    void optionalElementStateToleratesTheAbsentSentinel() {
-        ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.OPTIONAL, false, false,
+    void aVoidableElementToleratesTheVoidSentinel() {
+        ArrayBody body = new ArrayBody(TypeRef.of("integer"), true, true, false,
                 Optional.empty(), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
@@ -136,8 +135,8 @@ class ArrayTreeReaderTest {
     }
 
     @Test
-    void requiredElementStateRejectsTheAbsentSentinel() {
-        ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, false,
+    void aNonVoidableElementRejectsTheVoidSentinel() {
+        ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
                 Optional.empty(), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 

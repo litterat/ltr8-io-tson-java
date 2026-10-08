@@ -58,19 +58,17 @@ class MetaKernelSchemaRegistryTest {
         // sugar form is already a declared entry by the time linking runs.
         assertEquals(raw.entries().keySet(), linked.schema().entries().keySet());
 
-        // 47 real declarations + one desugared entry per distinct sugar form: one `array` entry per
-        // distinct X used through §5.3's `[X]`/`[X]?` field-type sugar (`arguments: [type_argument]?`,
-        // `fields: [record_field]`, `groups: [field_group]?`, `supertypes`/`subtypes`/`parameters:
-        // [type_name]?`/`[param_name]?` -- three separate `[type_name]?` uses correctly dedup to a
-        // single `array_type_name_*` entry, not three -- `elements: [tuple_element]`, `variants:
-        // [type_ref]`, `members: [field_name]`). `enum`'s member set is not among them: `enum_set` is
-        // a declaration the fixture writes, since `set` has no sugar of its own.
+        // One desugared entry per distinct sugar form: an `array` entry per distinct form of §5.3's `[X]`
+        // field-type sugar, repeated uses of one form deduplicating to one entry -- `[field_name; 1..]` serves
+        // both `discriminators`, `field_group.optional` and the options inside `field_group.members`. `enum`'s
+        // member set is not among them: `enum_set` is a declaration the fixture writes, since `set` has no sugar
+        // of its own.
         Set<String> expectedHeads = Set.of("array_tuple_element", "array_field_name",
-                "array_type_ref", "array_type_name", "array_type_argument", "array_param_name",
+                "array_type_ref", "array_type_name", "array_type_argument", "array_template_param",
                 "array_field_group", "array_record_field");
         Set<String> syntheticNames = new HashSet<>(linked.schema().entries().keySet());
         syntheticNames.removeIf(name -> expectedHeads.stream().noneMatch(head -> name.startsWith(head + "_")));
-        assertEquals(expectedHeads.size(), syntheticNames.size());
+        assertEquals(expectedHeads.size(), syntheticNames.size(), syntheticNames.toString());
         for (String head : expectedHeads) {
             assertTrue(syntheticNames.stream().anyMatch(name -> name.startsWith(head + "_")),
                     "expected a synthetic entry with head '" + head + "', found: " + syntheticNames);
@@ -117,8 +115,8 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.meta(), linked.schema().meta());
-        assertEquals(61, raw.entries().size());
-        assertEquals(61, linked.schema().entries().size());
+        assertEquals(68, raw.entries().size());
+        assertEquals(68, linked.schema().entries().size());
 
         assertThrows(SchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));
@@ -148,7 +146,7 @@ class MetaKernelSchemaRegistryTest {
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
-        assertEquals(61, registered.schema().entries().size());
+        assertEquals(68, registered.schema().entries().size());
         assertThrows(SchemaValidationException.class, () -> registry.register(registered));
     }
 }

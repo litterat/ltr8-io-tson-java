@@ -4,13 +4,13 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
+import io.ltr8.tson.compiler.stream.VoidEvent;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
 /**
- * Parses meta-kernel's {@code void} instance of the {@code unit} atom constructor -- per its own
- * kernel doc, "parsing contract admits only the absent sentinel {@code _}. The host value is
+ * Parses a {@code void_type} instance -- the kernel's {@code void} and core's sibling -- per its own
+ * kernel doc, "parsing contract admits only the void sentinel {@code _}. The host value is
  * absent." That contract can't be expressed as an {@code io.ltr8.tson.atom.AtomType<T>} at
  * all ({@code AtomType.read} only ever sees a token's text, and {@code _} has none), so this
  * reads the {@link DataValue} directly rather than going through {@link AtomTypeReader}.
@@ -37,9 +37,10 @@ final class VoidReader implements TsonTypeReader<Object> {
         ctx = ctx.underDeclaration(schemaLocation);
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
-        if (!(e instanceof AbsentEvent)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the absent sentinel '_' for void, found " + TypeRefCheck.describe(e),
-                    "the absent sentinel '_'", TypeRefCheck.describe(e));
+        if (!(e instanceof VoidEvent)) {
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                    "expected the void sentinel '_' for void, found " + TypeRefCheck.describe(e),
+                    "the void sentinel '_'", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }

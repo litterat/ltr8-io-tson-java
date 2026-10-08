@@ -78,7 +78,7 @@ public final class DataClassObjectWriter {
     public void write(Object value, TsonDataEmitter out) {
         try {
             if (value == null) {
-                out.absentValue();
+                out.voidValue();
                 return;
             }
             write(value, context.getDescriptor(value.getClass()), out);
@@ -100,7 +100,7 @@ public final class DataClassObjectWriter {
     // ── Core dispatch ────────────────────────────────────────────────────
 
     /**
-     * A host {@code null} aside -- which writes {@code _}, the absent sentinel, and reaches here only where
+     * A host {@code null} aside -- which writes {@code _}, the void sentinel, and reaches here only where
      * there is no field to omit it from (see {@link #writeRecord}): a bridge, if present, is unwrapped once, up front -- covers plain Java
      * {@code enum}s and {@code Rational}/{@code Complex}/{@code Duration} reached through a
      * caller's own {@code DataBridge} (all via {@code DataBindContext#registerAtom(Class,
@@ -135,7 +135,7 @@ public final class DataClassObjectWriter {
             throws DataBindException {
         try {
             if (value == null) {
-                writer.absentValue();
+                writer.voidValue();
                 return;
             }
             if (dataClass instanceof DataClassAnnotated boxed) {
@@ -226,7 +226,7 @@ public final class DataClassObjectWriter {
     private void writeAtom(Object value, TsonDataEmitter writer) throws DataBindException {
         VocabularyAtoms.Entry vocab = vocabularyAtoms.get(value.getClass());
         if (vocab != null) {
-            writer.typeRef(vocab.typeRef()).quotedString(vocab.write(value));
+            writer.typeRef(vocab.typeRef(value)).quotedString(vocab.write(value));
         } else {
             AtomWriter.writeDefaultAtom(value, writer);
         }

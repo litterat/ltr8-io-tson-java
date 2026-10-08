@@ -9,12 +9,12 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * The real, published identities of the three schema documents this library bundles and pre-loads --
+ * The real, published identities of the four schema documents this library bundles and pre-loads --
  * meta-kernel (the self-referencing bootstrap layer, spec §9's "meta layer"), meta (the canonical
- * meta-schema, the other half of the "meta layer"), and core (the core type library, governed by
- * meta but not itself part of the meta layer -- spec §9 is explicit that only two schemas, not
- * three, make up that layer) -- plus {@link #fetch}, their raw source text, straight off this
- * module's own classpath.
+ * meta-schema, the other half of the "meta layer"), core (the core type library, governed by meta but
+ * not itself part of the meta layer -- spec §9 is explicit that only two schemas make up that layer), and
+ * policy (the processor policy's vocabulary, [TSON-DATA] §8.2, §9.1) -- plus {@link #fetch}, their raw
+ * source text, straight off this module's own classpath.
  *
  * <p>Both the identities and their source text live here, in {@code tson-schema}: "what these documents
  * are" (identity) and "where their content lives" (fetch) sit in the one module every consumer of them
@@ -35,13 +35,16 @@ public final class TsonBundledSchemas {
      * {@code TsonSchemaLinker.isMetaKernelGoverned}'s own Javadoc for why that check needs this to be
      * a specific, fixed identity rather than a structural "is this schema self-referencing" test.
      */
-    public static final String META_KERNEL_ID = "https://tson.io/2026/36/m/meta-kernel.tn";
+    public static final String META_KERNEL_ID = "https://tson.io/2026/37/m/meta-kernel.tn";
 
     /** meta's own real, published identity -- see {@code spec/m/meta.tn}'s own {@code !!id}. */
-    public static final String META_ID = "https://tson.io/2026/36/m/meta.tn";
+    public static final String META_ID = "https://tson.io/2026/37/m/meta.tn";
 
     /** core's own real, published identity -- see {@code spec/m/core.tn}'s own {@code !!id}. */
-    public static final String CORE_ID = "https://tson.io/2026/36/m/core.tn";
+    public static final String CORE_ID = "https://tson.io/2026/37/m/core.tn";
+
+    /** policy's own real, published identity -- see {@code spec/m/policy.tn}'s own {@code !!id}. */
+    public static final String POLICY_ID = "https://tson.io/2026/37/m/policy.tn";
 
     /**
      * meta-kernel's own published content-hash digest -- the {@code ?sha256=} on {@code
@@ -49,23 +52,31 @@ public final class TsonBundledSchemas {
      * library holds it so a hash-pinned reference to a pre-loaded schema can be verified, and so the
      * shipped resource can be checked against its own published digest ({@link #declaredSha256}).
      */
-    public static final String META_KERNEL_SHA256 = "e778e463624a5163c31d5dbbc8376e52cac3980113ee4333fbd701878a26990c";
+    public static final String META_KERNEL_SHA256 = "f2c2b278405f4c02ae327f70df07d5778744916da613a814104af6a312fcc145";
 
     /** meta's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String META_SHA256 = "ede51d234992ccf229bf24e53d0e6e53ae30aa6a2c70760ae051e19b4f035cb4";
+    public static final String META_SHA256 = "568b589bdb162f5390ca46f6a941339d7b92ecb236bf233f8ed992b359b47a90";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "d924ef919b8fab247d7325d8fda9f4fbd4a790a4de696d39cee36d0aa9057c19";
+    public static final String CORE_SHA256 = "4845f0c17bd0753f70cfe34ed3a537445e6a5b551b3b68541696ffe9e50d5065";
+
+    /**
+     * policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s {@code
+     * !!id}. See {@link #META_KERNEL_SHA256}.
+     */
+    public static final String POLICY_SHA256 = "f2159051c9b7397203272dd5a92c229c1ca0829546032f323db39f4c3eaddca3";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",
             META_ID, "/meta.tn",
-            CORE_ID, "/core.tn");
+            CORE_ID, "/core.tn",
+            POLICY_ID, "/policy.tn");
 
     private static final Map<String, String> DIGESTS = Map.of(
             CanonicalIdentity.canonicalize(META_KERNEL_ID), META_KERNEL_SHA256,
             CanonicalIdentity.canonicalize(META_ID), META_SHA256,
-            CanonicalIdentity.canonicalize(CORE_ID), CORE_SHA256);
+            CanonicalIdentity.canonicalize(CORE_ID), CORE_SHA256,
+            CanonicalIdentity.canonicalize(POLICY_ID), POLICY_SHA256);
 
     private TsonBundledSchemas() {
     }
@@ -80,19 +91,19 @@ public final class TsonBundledSchemas {
     }
 
     /**
-     * Returns one of the three bundled schemas' own raw source text, straight off this module's own
+     * Returns one of the four bundled schemas' own raw source text, straight off this module's own
      * classpath -- the resources {@code tson-schema/build.gradle.kts}'s {@code processResources} task
      * copies in from the repo's own {@code spec/m/}.
      *
      * @throws IllegalStateException if {@code uri} isn't one of {@link #META_KERNEL_ID}/{@link
-     *                                #META_ID}/{@link #CORE_ID}
+     *                                #META_ID}/{@link #CORE_ID}/{@link #POLICY_ID}
      */
     public static String fetch(String uri) {
         String resource = RESOURCES.get(uri);
         if (resource == null) {
             throw new IllegalStateException(
                     "'" + uri + "' is not one of this library's own bundled schemas "
-                            + "(meta-kernel, meta, core)");
+                            + "(meta-kernel, meta, core, policy)");
         }
         try (InputStream in = TsonBundledSchemas.class.getResourceAsStream(resource)) {
             if (in == null) {

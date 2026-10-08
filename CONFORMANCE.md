@@ -61,19 +61,18 @@ bound itself falls inside the family range — "invalid at the schema level", pe
 constraint-family coherence rule tracked in `BACKLOG.md`, not enforced by the parser; an out-of-range
 bound is inert, since the family range is enforced regardless.
 
-**One accepted, unfixable gap.** RFC 3339's grammar permits `time-second` up to `60` (leap-second
-accommodation), but `java.time` has no leap-second concept at all — `!time`/`!datetime` reject a
-spec-legal leap-second token as a parse error. There's no reasonable fix short of a from-scratch time
-representation built solely for this one case, so it's documented (`TimeParser`'s Javadoc) rather than
-solved.
+**A leap second is refused.** RFC 3339's grammar admits `time-second` `60`, but `!time` is the time of day on
+`[00:00:00, 24:00:00)` and `!datetime` an instant on the UTC timeline, and second 60 is neither: `23:59:60Z` is a
+parse error, as hour 25 is ([TSON-DATA] §5.4).
 
-**One accepted, different-revision gap.** `!uri` (§5.5) is the one atom here that does *not* get an
-extra shape check ahead of the JDK type it delegates to — the opposite situation from the atoms above.
-§5.5 cites RFC 3986, but `java.net.URI`'s own Javadoc states it implements RFC 2396 (as amended by RFC
-2732), an older revision of the same standard, not a looser/stricter variant of the same grammar. There's
-no simple shape to shim in front of `URI`'s constructor the way a four-group hex pattern works for UUID,
-and writing an RFC 3986 validator from scratch isn't worth it at this stage, so `java.net.URI`'s behavior
-is accepted as `!uri`'s actual contract for now. See `UriParser`'s Javadoc.
+**URIs and IRIs are recognised natively.** `!uri`/`!uri_reference` (§5.5) are RFC 3986's grammar and
+`!iri`/`!iri_reference` RFC 3987's, both through `tson-net`'s `io.ltr8.net.Iri`, not `java.net.URI`, which
+implements RFC 2396: `https://`, `https://?q=1` (an empty host), `a:` (an empty path) and `http://[v7.abc]/`
+(IPvFuture) are URIs, and `http://a:b/` (a port that is not digits) is not. A URI is US-ASCII; an IRI admits
+`ucschar` wherever `unreserved` stands and `iprivate` in the query. RFC 3987 §4's bidirectional-text rules, a
+SHOULD, are not checked. The value is the text as written, so a percent-encoded spelling is another value; a
+component declared `java.net.URI` binds every value RFC 2396 can hold and refuses the rest as a binding failure,
+holding the handful of `ucschar` characters it reads as spaces (U+00A0, U+2000–U+200A, U+3000) percent-encoded.
 
 **The vocabulary is the published one.** §5.6 lists the full `int8`..`int256`/`uint8`..`uint256` ladder plus
 the four bound-only refinements, and §5.5 carries `!email` beside its "Network Types" siblings, so what is

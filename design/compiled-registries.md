@@ -36,9 +36,9 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   be compiled — its `!enum`/`!integer` instances are read into `schema.meta` objects during a governed
   schema's resolution) and `resolveLinked(uri) → TsonLinkedSchema` (an `!!import` target or a user schema
   — fetched/resolved/linked/registered but **never compiled** here). `withStandardLibrary(context,
-  source)` builds a core with the three bundled schemas loaded; **core.tn is not a meta** (its `!!meta` is
-  meta.tn) so it is resolve-only here — its readers are compiled per mode in a read registry when a user
-  schema importing it is read, never standalone in the core.
+  source)` builds a core with the four bundled schemas loaded (meta-kernel, meta, core, policy); **core.tn
+  is not a meta** (its `!!meta` is meta.tn) so it is resolve-only here, as policy.tn is — its readers are
+  compiled per mode in a read registry when a user schema importing it is read, never standalone in the core.
 - **`TsonCompiledSchemaRegistry`** is a **per-mode registry of compiled user schemas** over a core, built
   via `TsonCompiledSchemaRegistry.tree(core)` / `bind(core, context)`. **The read mode is which registry
   you hold**, not a compile parameter. `get(uri)` resolves through the core (`resolveLinked`) and compiles
@@ -122,7 +122,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   below that): the critical section is a map lookup, and a JVM absorbs an uncontended monitor well. It is
   lock-free because a monitor on the read path is a ceiling that arrives with the core count rather than a
   cost that shows up in a profile, and because the section can only grow.
-- **A read canonicalizes its schema URI once.** `CanonicalIdentity.canonicalize` is a `new URI(...)`
+- **A read canonicalizes its schema URI once.** `CanonicalIdentity.canonicalize` is an `Iri`
   parse, and three places want its result for one document — the compiled-schema cache's key, the resolution
   cache's key, and the schema registry's own lookup. The identity is computed at the top and passed
   down (`resolveLinked(uri, identity, receiver)`, `TsonSchemaRegistry.getByCanonicalIdentity`), with the

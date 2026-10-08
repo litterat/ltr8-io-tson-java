@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.DecimalType;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -17,7 +16,8 @@ import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.UuidType;
 import org.junit.jupiter.api.Test;
 
@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,7 +58,7 @@ class ChoiceDisjointnessTest {
     }
 
     private boolean disjoint(TypeRef... variants) {
-        return ChoiceDisjointness.derive(new ChoiceBody(List.of(variants)), namespace);
+        return ChoiceDisjointness.derive(new ChoiceBody(List.of(variants)), namespace, Set.of());
     }
 
     private static IntegerType boundedInteger(Long min, Long max) {
@@ -86,7 +87,7 @@ class ChoiceDisjointnessTest {
     void aBraceAndABracketVariantAreDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
         TypeRef record = product("point", RecordBody.of(List.of()));
-        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), ElementState.REQUIRED, false, false,
+        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), false, true, false,
                 Optional.empty(), Optional.empty()));
         assertTrue(disjoint(record, array));
     }
@@ -188,14 +189,15 @@ class ChoiceDisjointnessTest {
     void aRecordAndAMapAreNotDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
         TypeRef record = product("point", RecordBody.of(List.of()));
-        TypeRef map = product("lookup", new MapBody(TypeRef.of("text"), TypeRef.of("text"), ElementState.REQUIRED, Optional.empty(), Optional.empty()));
+        TypeRef map = product("lookup", new MapBody(TypeRef.of("text"), TypeRef.of("text"), false, false,
+                Optional.empty(), Optional.empty()));
         assertFalse(disjoint(record, map));
     }
 
     @Test
     void anArrayAndATupleAreNotDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
-        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), ElementState.REQUIRED, false, false,
+        TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), false, true, false,
                 Optional.empty(), Optional.empty()));
         TypeRef tuple = product("pair", new TupleBody(List.of()));
         assertFalse(disjoint(array, tuple));
@@ -213,10 +215,20 @@ class ChoiceDisjointnessTest {
     }
 
     @Test
-    void aUnitVariantMakesTheChoiceNotDisjoint() {
-        TypeRef token = atom("token", new Unit());
+    void aValueVariantMakesTheChoiceNotDisjoint() {
+        TypeRef value = atom("value", new ValueType());
         TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
-        assertFalse(disjoint(token, i));
+        assertFalse(disjoint(value, i));
+    }
+
+    /** An identifier is a text family, so it is string-class and apart from a number. */
+    @Test
+    void anIdentifierVariantIsStringClass() {
+        TypeRef id = atom("identifier", IdentifierType.IDENTIFIER);
+        TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
+        TypeRef t = atom("text", TextType.UNCONSTRAINED);
+        assertTrue(disjoint(id, i));
+        assertFalse(disjoint(id, t));
     }
 
     @Test

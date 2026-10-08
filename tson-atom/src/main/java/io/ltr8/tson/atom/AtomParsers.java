@@ -10,7 +10,7 @@ import io.ltr8.tson.atom.parser.DecimalParser;
 import io.ltr8.tson.atom.parser.DurationParser;
 import io.ltr8.tson.atom.parser.EmailParser;
 import io.ltr8.tson.atom.parser.EnumParser;
-import io.ltr8.tson.atom.parser.IdentifierAtom;
+import io.ltr8.tson.atom.parser.IdentifierParser;
 import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
 import io.ltr8.tson.atom.parser.Ipv4Parser;
@@ -21,8 +21,10 @@ import io.ltr8.tson.atom.parser.RationalParser;
 import io.ltr8.tson.atom.parser.RegexParser;
 import io.ltr8.tson.atom.parser.TextParser;
 import io.ltr8.tson.atom.parser.TimeParser;
+import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -34,6 +36,7 @@ import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
@@ -44,9 +47,11 @@ import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.meta.VoidType;
 import java.util.Optional;
 
 /**
@@ -75,33 +80,33 @@ public final class AtomParsers {
     }
 
     /**
-     * The parser for the entry named {@code declaredName} with body {@code body}, or empty if that entry is
-     * not a scalar type.
+     * The parser for an entry with body {@code body}, or empty if that entry is not a scalar type.
      *
      * <p>{@code complex}/{@code ipv4}/{@code ipv6} hand back their unconstrained singletons: their bodies
      * carry facets these parsers do not model (see each parser's own Javadoc), so the body selects the
      * parser without configuring it. Every other family is constructed from the body it was given.
      *
-     * <p><b>{@code declaredName} is needed for exactly one family, and §4.2 makes that normative.</b>
-     * {@code value}, {@code token} and {@code void} are three declarations sharing one deliberately
-     * uninformative resolved shape ({@code unit}), so the name is the only thing that tells them apart --
-     * the same dispatch the reader stack's own {@code unit} factory performs. Two of the three yield
-     * nothing here: {@code void} because it is the type with no value, so no token is one, and
-     * {@code value} because base type resolution is the <em>encoding's</em> ([TSON-DATA] §4 for the text
-     * encoding, [TSON-JSON] §5.7 for JSON) rather than this vocabulary's -- reading it depends on how the
-     * token was written, which an {@link AtomType} deliberately cannot see. A caller holding an encoding
+     * <p><b>{@code value} and {@code void} yield nothing.</b> {@code void} is the type with no value, so no token
+     * is one, and {@code value} is read by base type resolution, which is the <em>encoding's</em> ([TSON-DATA]
+     * §4 for the text encoding, [TSON-JSON] §5.7 for JSON) rather than this vocabulary's -- reading it depends on
+     * how the token was written, which an {@link AtomType} deliberately cannot see. A caller holding an encoding
      * supplies its own.
      */
-    public static Optional<AtomType<?>> forType(String declaredName, Top body) {
+    public static Optional<AtomType<?>> forType(Top body) {
+        return forType(body, Normalization.NONE);
+    }
+
+    /**
+     * {@link #forType(Top)}, with the form an enum matches its members in: its label type's {@code normalization}
+     * ([TSON-SCHEMA] §5.5), which the body does not carry -- {@code enum_type.type} names an entry the governing
+     * meta may hold, which only linking sees, so the caller supplies what linking recorded
+     * ({@code TsonLinkedSchema.enumForms}). Ignored for every other body.
+     */
+    public static Optional<AtomType<?>> forType(Top body, Normalization enumForm) {
         return Optional.ofNullable(switch (body) {
-            case Unit ignored -> switch (declaredName) {
-                // Neither is a token this vocabulary can answer for: `void` is the type with no value, so
-                // no token is one, and `value` is read by whatever base type resolution the *encoding*
-                // defines -- [TSON-DATA] §4 for the text encoding, [TSON-JSON] §5.7's own rule for JSON.
-                // A caller that has one supplies it; see the note above.
-                case "void", "value" -> null;
-                default -> IdentifierAtom.INSTANCE;
-            };
+            case ValueType ignored -> null;
+            case VoidType ignored -> null;
+            case IdentifierType t -> new IdentifierParser(t);
             case IntegerType t -> new IntegerParser(t);
             case TextType t -> new TextParser(t);
             case DecimalType t -> new DecimalParser(t);
@@ -116,12 +121,13 @@ public final class AtomParsers {
             case DurationType t -> new DurationParser(t);
             case PeriodType t -> new PeriodParser(t);
             case UriType t -> new UriParser(t);
+            case IriType t -> new IriParser(t);
             case RegexType t -> new RegexParser(t);
             case MacType t -> new MacParser(t);
             case EmailType t -> new EmailParser(t);
             case Cidr4Type t -> new Cidr4Parser(t);
             case Cidr6Type t -> new Cidr6Parser(t);
-            case EnumBody t -> new EnumParser(t);
+            case EnumBody t -> new EnumParser(t, enumForm);
             case ComplexType ignored -> ComplexParser.UNCONSTRAINED;
             case Ipv4Type t -> Ipv4Parser.of(t);
             case Ipv6Type t -> Ipv6Parser.of(t);

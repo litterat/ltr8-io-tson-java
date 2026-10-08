@@ -6,11 +6,13 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.Optional;
@@ -34,8 +36,8 @@ import java.util.Optional;
 final class AtomReader<T> implements JsonTypeReader<T> {
 
     /**
-     * Every atom constructor but {@code unit}. The family's parser comes from the declared name and the
-     * resolved body together -- {@code AtomParsers} is the one index both encodings ask, so there is never a
+     * Every atom constructor but {@code value_type} and {@code void_type}. The family's parser comes from the
+     * resolved body -- {@code AtomParsers} is the one index both encodings ask, so there is never a
      * second opinion about which parser reads which body.
      */
     static final ValueReaderFactory ATOM = AtomReader::of;
@@ -48,37 +50,44 @@ final class AtomReader<T> implements JsonTypeReader<T> {
     static final ValueReaderFactory ENUM = (name, definition, context) -> "boolean".equals(name)
             ? new AtomReader<>(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
                     () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
-                    AtomForm.BOOLEAN, context.locationOf(name, definition))
+                    AtomForm.BOOLEAN, context.locationOf(name, definition), null)
             : of(name, definition, context);
 
-    /**
-     * The three {@code unit} instances, dispatched on the declaration's own name -- [TSON-SCHEMA] §4.2 makes
-     * that dispatch normative, their resolved shapes being identical and deliberately uninformative. Two of
-     * the three are the encoding's rather than the vocabulary's, and §5.7 is where JSON states its own
-     * readings of them.
-     */
-    static final ValueReaderFactory UNIT = (name, definition, context) -> switch (name) {
-        case "void" -> new VoidReader(name, context.locationOf(name, definition));
-        case "value" -> new ValuePositionReader(name, context.locationOf(name, definition));
-        default -> of(name, definition, context);
-    };
+    /** {@code void_type}: the void sentinel and nothing else, read as [TSON-JSON] §5.7 states for JSON. */
+    static final ValueReaderFactory VOID = (name, definition, context) ->
+            new VoidReader(name, context.locationOf(name, definition));
+
+    /** {@code value_type}: read by [TSON-JSON] §5.7's own base-type rule, which is the encoding's, not the vocabulary's. */
+    static final ValueReaderFactory VALUE = (name, definition, context) ->
+            new ValuePositionReader(name, context.locationOf(name, definition));
 
     private final String name;
     private final AtomType<T> parser;
     private final AtomForm form;
     private final JsonSchemaLocation schemaLocation;
 
-    private AtomReader(String name, AtomType<T> parser, AtomForm form, JsonSchemaLocation schemaLocation) {
+    /**
+     * The profile of an identifier family, whose values are names ([TSON-DATA] §8.2), or {@code null} for every
+     * other atom. A name the identifier policy refuses is reported and read as nothing.
+     */
+    private final IdentifierProfile names;
+
+    private AtomReader(String name, AtomType<T> parser, AtomForm form, JsonSchemaLocation schemaLocation,
+                       IdentifierProfile names) {
         this.name = name;
         this.parser = parser;
         this.form = form;
         this.schemaLocation = schemaLocation;
+        this.names = names;
     }
 
     private static JsonTypeReader<?> of(String name, TypeDefinition definition, ValueReaderContext context) {
-        AtomType<?> parser = AtomParsers.forType(name, definition.body()).orElseThrow(() -> new IllegalStateException(
+        AtomType<?> parser = AtomParsers.forType(definition.body(), context.linked().enumForm(name)).orElseThrow(
+                () -> new IllegalStateException(
                 "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
-        return new AtomReader<>(name, parser, AtomForm.of(definition.body()), context.locationOf(name, definition));
+        IdentifierProfile names = definition.body() instanceof IdentifierType identifier ? identifier.profile() : null;
+        return new AtomReader<>(name, parser, AtomForm.of(definition.body()), context.locationOf(name, definition),
+                names);
     }
 
     /**
@@ -87,7 +96,7 @@ final class AtomReader<T> implements JsonTypeReader<T> {
      * that class, which is a disagreement between a schema and a bound class, found before any document.
      */
     Optional<AtomReader<?>> boundTo(Class<?> target) {
-        return parser.boundTo(target).map(bound -> new AtomReader<>(name, bound, form, schemaLocation));
+        return parser.boundTo(target).map(bound -> new AtomReader<>(name, bound, form, schemaLocation, names));
     }
 
     @Override
@@ -97,7 +106,7 @@ final class AtomReader<T> implements JsonTypeReader<T> {
         String content = form.contentOf(event);
         if (content == null) {
             // §5: a JSON value of the wrong kind at an atom position is a validation error -- and JSON null
-            // is one of them here, §7 having already spent it as the absent sentinel, which no REQUIRED
+            // is one of them here, §7 having already spent it as the void sentinel, which no REQUIRED
             // position admits. That is the same verdict TSON text gives `_` in the same position.
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' takes %s, and this is %s"
                     .formatted(name, form.describe(), JsonAtoms.describe(event)),
@@ -106,7 +115,10 @@ final class AtomReader<T> implements JsonTypeReader<T> {
             return null;
         }
         try {
-            return parser.read(content);
+            T value = parser.read(content);
+            // Hygiene judges the name the value is, in its type's normalization form, not the spelling.
+            return names != null && NameHygiene.refusesValue(ctx, value instanceof String name ? name : content, names)
+                    ? null : value;
         } catch (AtomTypeException e) {
             AtomRefusal refusal = AtomRefusal.of(e, content, Object.class).named(name);
             ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());

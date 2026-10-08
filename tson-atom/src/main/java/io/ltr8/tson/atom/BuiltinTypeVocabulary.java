@@ -19,10 +19,10 @@ import io.ltr8.tson.atom.parser.PeriodParser;
 import io.ltr8.tson.atom.parser.RationalParser;
 import io.ltr8.tson.atom.parser.TextParser;
 import io.ltr8.tson.atom.parser.TimeParser;
+import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
 import io.ltr8.tson.schema.meta.IntegerSize;
-import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -33,9 +33,7 @@ import java.util.Optional;
  * closed set (§5.1) that a Class 1 processor never resolves via schema machinery.
  *
  * <p>Seeded with the {@code integer_type} family as §5.6's table lists it and {@code core.tn} defines it:
- * the full {@code int8}..{@code int256}/{@code uint8}..{@code uint256} width ladder plus the
- * {@code positive_integer} / {@code non_negative_integer} / {@code negative_integer} /
- * {@code non_positive_integer} bound-only refinements.
+ * the full {@code int8}..{@code int256}/{@code uint8}..{@code uint256} width ladder.
  *
  * <p>Also seeded with {@code decimal_type} ({@code number}), {@code float_type} ({@code float32}/
  * {@code float64}), {@code rational_type} ({@code rational}), and {@code complex_type} ({@code
@@ -46,8 +44,10 @@ import java.util.Optional;
  * rather than offering a name per alphabet. And with the temporal
  * family (§5.4) -- {@code date_type} ({@code date}), {@code time_type} ({@code time}), {@code
  * datetime_type} ({@code datetime}), {@code duration_type} ({@code duration}). And with {@code
- * uri_type} ({@code uri}, §5.5) -- see {@link UriParser}'s Javadoc for why it's the one atom here that
- * doesn't validate its own shape ahead of the JDK type it delegates to. And with {@code ipv4_type}
+ * uri_type} ({@code uri} and {@code uri_reference}, §5.5) -- see {@link UriParser}'s Javadoc for why it's the
+ * one atom here that doesn't validate its own shape ahead of the JDK type it delegates to. And with {@code
+ * iri_type} ({@code iri} and {@code iri_reference}, RFC 3987), judged through the URI each maps to (see {@link
+ * IriParser}). And with {@code ipv4_type}
  * ({@code ipv4}, §5.5) -- see {@link Ipv4Parser}'s Javadoc for why its JDK leniency gap is a real
  * SSRF-adjacent concern, not just a spec-fidelity one, and how that's handled. And with {@code
  * ipv6_type} ({@code ipv6}, §5.5) -- a hand-rolled RFC 4291 §2.2 compiler for the same reason, see
@@ -81,10 +81,6 @@ public final class BuiltinTypeVocabulary {
             types.put("int" + bits, new IntegerParser(new IntegerSize(bits, true)));
             types.put("uint" + bits, new IntegerParser(new IntegerSize(bits, false)));
         }
-        types.put("positive_integer", IntegerParser.ofMin(BigInteger.ONE));
-        types.put("non_negative_integer", IntegerParser.ofMin(BigInteger.ZERO));
-        types.put("negative_integer", IntegerParser.ofMax(BigInteger.valueOf(-1)));
-        types.put("non_positive_integer", IntegerParser.ofMax(BigInteger.ZERO));
 
         types.put(DecimalParser.TYPENAME, DecimalParser.UNCONSTRAINED);
         types.put(FloatParser.FLOAT32.typeName(), FloatParser.FLOAT32);
@@ -105,6 +101,9 @@ public final class BuiltinTypeVocabulary {
         types.put(PeriodParser.TYPENAME, PeriodParser.UNCONSTRAINED);
 
         types.put(UriParser.TYPENAME, UriParser.UNCONSTRAINED);
+        types.put(UriParser.REFERENCE_TYPENAME, UriParser.REFERENCE);
+        types.put(IriParser.TYPENAME, IriParser.UNCONSTRAINED);
+        types.put(IriParser.REFERENCE_TYPENAME, IriParser.REFERENCE);
 
         types.put(MacParser.TYPENAME, MacParser.UNCONSTRAINED);
         types.put(EmailParser.TYPENAME, EmailParser.UNCONSTRAINED);

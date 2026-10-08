@@ -229,24 +229,24 @@ class JsonObjectReaderTest {
     }
 
     @Nested
-    class NullAndAbsence {
+    class NullAndVoid {
 
         @Test
-        void null_at_an_optional_member_is_the_absence_and_binds_null() {
-            // §7: JSON null is the absent sentinel's spelling, admitted where the position admits absence.
+        void null_at_a_voidable_member_is_void_and_binds_null() {
+            // §7: JSON null is the void sentinel's spelling, admitted where the position is voidable.
             assertEquals(new Person(null, 36), READER.read("{\"name\": null, \"age\": 36}", Person.class));
         }
 
         @Test
         void omitted_and_null_are_indistinguishable_in_the_result() {
             // §6.1.2 says so outright, and a bound object has no third state to tell them apart -- the
-            // asymmetry TsonAbsent exists for on the tree side.
+            // asymmetry TsonVoid exists for on the tree side.
             assertEquals(READER.read("{\"age\": 1}", Person.class),
                     READER.read("{\"name\": null, \"age\": 1}", Person.class));
         }
 
         @Test
-        void null_at_a_required_member_is_refused_as_the_absent_sentinel_is_in_text() {
+        void null_at_a_non_voidable_member_is_refused_as_the_void_sentinel_is_in_text() {
             // [TSON-SCHEMA] §7.6: `_` at a REQUIRED field is an error, and §7 makes null its JSON spelling.
             assertTrue(refused("{\"name\": \"a\", \"age\": null}", Person.class).message()
                     .contains("member 'age' is required and is written null"));
@@ -444,7 +444,7 @@ class JsonObjectReaderTest {
 
         @Test
         void a_map_key_reaches_the_same_parser_as_a_member_value() {
-            // §6.5 reads a member name by the key type's own contract rather than taking it as text, and
+            // §6.4 reads a member name by the key type's own contract rather than taking it as text, and
             // the key path runs through the same JsonAtoms.bind -- so a keyed family binds there too.
             assertEquals(LocalDate.of(2026, 1, 2), READER
                     .read("{\"byDate\": {\"2026-01-02\": 1}}", Diary.class)

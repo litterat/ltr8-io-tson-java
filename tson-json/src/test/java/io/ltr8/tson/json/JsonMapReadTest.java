@@ -16,15 +16,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * [TSON-JSON] §6.5: a map in one of its two JSON forms, the form selected by the key type and never by
+ * [TSON-JSON] §6.4: a map in one of its two JSON forms, the form selected by the key type and never by
  * inspecting the value.
  */
 class JsonMapReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/maps-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               counts    => { text => int32 }
               by_date   => { date => number }
@@ -73,7 +73,7 @@ class JsonMapReadTest {
                 {"a": 1, "b": 2}""").accepted().toString());
     }
 
-    /** §6.5: the member name's string content faces `K`'s contract exactly as §5.1 hands value strings. */
+    /** §6.4: the member name's string content faces `K`'s contract exactly as §5.1 hands value strings. */
     @Test
     void aMemberNameFacesTheKeyTypesOwnContract() {
         read("by_date", """
@@ -93,7 +93,7 @@ class JsonMapReadTest {
     }
 
     /**
-     * §6.5: identity under a declared key type is over its value space, so {@code "1"} and {@code "1.0"}
+     * §6.4: identity under a declared key type is over its value space, so {@code "1"} and {@code "1.0"}
      * under a {@code number} key are one key -- and the repeat is the duplicate error.
      */
     @Test
@@ -112,9 +112,9 @@ class JsonMapReadTest {
         assertNull(read.value());
     }
 
-    /** §6.5: `{K => V?}` admits null as an entry's absent value; under `{K => V}` it is a validation error. */
+    /** §6.4: `{K => V?}` admits null as an entry's void value; under `{K => V}` it is a validation error. */
     @Test
-    void anEntryValueIsAbsentOnlyWhereTheMapAdmitsOne() {
+    void anEntryValueIsVoidOnlyWhereTheMapAdmitsOne() {
         assertEquals("""
                 {"a":null}""", read("optional", """
                 {"a": null}""").accepted().toString());
@@ -122,7 +122,7 @@ class JsonMapReadTest {
                 {"a": null}""").refusal().code());
     }
 
-    /** §6.5: size facets count entries -- and an entry with an absent value is an entry. */
+    /** §6.4: size facets count entries -- and an entry with a void value is an entry. */
     @Test
     void sizeFacetsCountEntries() {
         read("sized", """
@@ -146,7 +146,7 @@ class JsonMapReadTest {
 
     // ── Pairs form ───────────────────────────────────────────────────────
 
-    /** §6.5: a compound key forces the pairs form -- a JSON array of two-element arrays. */
+    /** §6.4: a compound key forces the pairs form -- a JSON array of two-element arrays. */
     @Test
     void aCompoundKeyedMapIsAJsonArrayOfPairs() {
         assertEquals("""
@@ -161,7 +161,7 @@ class JsonMapReadTest {
                 [[["a", 1], "v"]]""").accepted().toString());
     }
 
-    /** §6.5: a pairs-form element that is not a two-element array is a validation error. */
+    /** §6.4: a pairs-form element that is not a two-element array is a validation error. */
     @Test
     void aPairsFormElementMustBeATwoElementArray() {
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("by_point", """

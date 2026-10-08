@@ -1,7 +1,10 @@
 package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomValidationException;
+import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.tson.schema.meta.TextType;
 import org.junit.jupiter.api.Test;
+import java.util.List;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -59,5 +62,33 @@ class TextParserTest {
     @Test
     void writeRoundTripsThroughRead() {
         assertEquals("hello", TextParser.UNCONSTRAINED.write(TextParser.UNCONSTRAINED.read(token("hello"))));
+    }
+
+    /** The value is the text in the type's form, and the facets judge that value ([TSON-SCHEMA] §5.5). */
+    @Test
+    void theValueIsTheTextInTheTypesNormalizationForm() {
+        TextParser charset = new TextParser(new TextType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of("[a-z0-9-]+"), Optional.of(List.of("UTF-8", "us-ascii")), Normalization.NFKC_CASEFOLD));
+        assertEquals("utf-8", charset.read(token("Utf-8")));
+        assertEquals("us-ascii", charset.read(token("US-ASCII")));
+        assertThrows(AtomValidationException.class, () -> charset.read(token("Latin1")));
+    }
+
+    @Test
+    void noNormalizationKeepsTheTextAsWritten() {
+        assertEquals("Content-Type", TextParser.UNCONSTRAINED.read(token("Content-Type")));
+    }
+
+    /** A length counts code points: a character outside the Basic Multilingual Plane is one, not two UTF-16 units. */
+    @Test
+    void aLengthCountsCodePoints() {
+        String grin = "\uD83D\uDE00";
+        TextParser one = new TextParser(Optional.empty(), Optional.of(1), Optional.empty(), Optional.empty());
+        assertEquals(grin, one.read(token(grin)));
+        assertThrows(AtomValidationException.class, () -> one.read(token("a" + grin)));
+        TextParser exactlyTwo = new TextParser(Optional.empty(), Optional.empty(), Optional.of(2), Optional.empty());
+        assertEquals("a" + grin, exactlyTwo.read(token("a" + grin)));
+        TextParser atLeastTwo = new TextParser(Optional.of(2), Optional.empty(), Optional.empty(), Optional.empty());
+        assertThrows(AtomValidationException.class, () -> atLeastTwo.read(token(grin)));
     }
 }

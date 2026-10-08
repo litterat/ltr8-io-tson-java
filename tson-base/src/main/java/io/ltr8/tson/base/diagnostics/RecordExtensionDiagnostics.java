@@ -101,7 +101,7 @@ public record RecordExtensionDiagnostics(String typeName, String members) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
                 "missing discriminator '%s' for '%s' -- a sealed family selects its member by reading it, so a "
                         .formatted(field, typeName) + "value that leaves it out selects nothing",
-                "a value for '" + field + "'", "(absent)");
+                "a value for '" + field + "'", "(missing)");
     }
 
     /**

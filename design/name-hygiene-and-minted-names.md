@@ -10,6 +10,8 @@ history lives in git.
 - What stays at the reading positions is §7.7's grammar (`IdentifierProfile.validate`); `IdentifierProfile.hygiene`
   returns a verdict rather than throwing.
 - A template's parameters are a checked scope although §11.4 declines to list them; a choice's variants are not.
+- A `data` body and an annotation value are judged at the payload read (`SchemaResolver.payloadNames`), not in the
+  walk, which cannot see into them; every other constructor payload is read under no policy.
 - A minted name is ASCII and an identifier by construction, and is never exempted from the walk.
 - Non-ASCII or non-admitted content in a minted name is hashed rather than dropped; a part is capped at 64 characters,
   hash included.
@@ -37,11 +39,29 @@ holes one walk exists to close. A **choice's variants are deliberately not check
 is a reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
 there could never fire.
 
-**The restriction level is refused per name, in the same pass** (`UnicodePolicy`, UTS #39 §5.2). The two
+**A field's default or fixed value is a name when its type is an identifier family** (`checkFieldValues`), and
+meets the two per-name rules in the same pass, under that family's own profile. It is not a scope — one value
+stands alone — but it is the schema's own copy of a value a read judges: a default reaches every document that
+omits the field, so a value the reader would refuse if written must not be one it injects
+(`design/name-hygiene-read-path.md`).
+
+**A `data` body and an annotation value are judged where they are read, not in the walk.** A `data` constructor's
+payload binds to the consumer's own class (`design/meta-layer-data-kind.md`) and an annotation value to whatever
+its type binds, so by link time the field types that make a value a name are behind them — a meta layer's
+`methods: {method_name => …}` arrives as a `Map<String, String>`. `SchemaResolver` reads those two payloads under
+the registry's policy instead, and the readers apply §8.2 exactly as they do in a data document: the keys of one
+identifier-keyed map are one scope, and an identifier-typed value meets the per-name rules. Every other
+constructor builds the schema layer's own vocabulary and is read under `IdentifierPolicy.none()`: its names are
+the walk's scopes, and its identifier-typed values outside them are references — a choice's variants, a
+supertype — whose verdict belongs to the declaration they name, possibly in another schema. Judging a reference
+too would report one name twice, against the wrong declaration, and stop the schema reaching the linker.
+
+**The restriction level is refused per name, in the same pass** (`IdentifierPolicy.judge`, UTS #39 §5.2). The two
 are complementary rather than overlapping: the confusable check is a *relation* and needs the whole set, so
 it can never fire on a lone name; the level is a *property* of one name, so it is what reaches a name nothing
 else in the schema resembles. Configured by `ProcessorConfig.withIdentifierPolicy` and carried on
-`TsonCompiledMetaRegistry`, which is the one object every resolve and every read passes through.
+`TsonCompiledMetaRegistry`, which is the one object every resolve and every read passes through. The same policy
+switches the confusable check (`appliesSkeletonDistinctness()`), which each scope asks before comparing.
 **Two axes, not a ladder** — a level and a unit — because per-segment Highly Restrictive and Moderately
 Restrictive are incomparable. The default is Highly Restrictive over a whole name, which refuses
 `id_пользователя`; the relaxation to reach for is the *unit*, since `perSegment()` admits that and still
@@ -107,14 +127,15 @@ restricted-character rule (`Identifier_Status`) where a name is *read* — the s
 positions only some of those reach: an enum member and a group's member labels get checked for reading alike
 and for script mixing, and never for a restricted character, invisibly.
 
-**`enum.profile` is the one scope whose per-name rules are conditional, and the condition is declared.** Under
-`IDENTIFIER` an enum's members are names and all three mechanisms reach them. Under `TEXT` they are values: the
-restricted-character and restricted-script rules are per-*name* and lapse — a value set carries whatever its
-domain carries, and nothing is looked up by name there — while the look-alike relation stays, because the set
-is still what a value is matched against and two members that render identically is the same hazard either way.
-`checkScope`'s `perNameRules` flag is that split, and it is the enum body's declaration that sets it, never the
-shape of the members: inferring "these look like names, so police them" would switch a spoofing check on and
-off by accident. A scope list
+**An enum's members are the one scope whose per-name rules are conditional, and the condition is declared.**
+When the enum's `type` is an identifier family (`enum`, or `!enum_type { type: kebab … }` over a refinement of
+`identifier`), its members are names and all three mechanisms reach them. Otherwise (`text_enum`) they are values:
+the restricted-character and restricted-script rules are per-*name* and lapse — a value set carries whatever its
+domain carries, and nothing is looked up by name there — while the look-alike relation stays, because the set is
+still what a value is matched against and two members that render identically is the same hazard either way.
+`checkScope`'s `perNameRules` flag is that split, and it is the enum's declared `type` that sets it
+(`EnumLabels`), never the shape of the members: inferring "these look like names, so police them" would switch a
+spoofing check on and off by accident. A scope list
 can be reviewed; three call sites cannot. What stays at the reading positions is §7.7's grammar
 (`IdentifierProfile.validate`), which is validity, is stable across Unicode versions, and really is a parse
 error; `IdentifierProfile.hygiene` returns the restricted-character rule's verdict rather than throwing,
@@ -127,7 +148,11 @@ for names that read alike, `RESTRICTED_CHARACTER` for a character outside the id
 a *read* reports for the same rules, so one schema and one document that break the same rule come back
 alike. §8.2 requires a refusal be distinguishable from a
 validity error, and a consumer that has to read prose to tell them apart is what the code exists to prevent.
-It is still a verdict: the schema must change, or the deployment must relax the policy in code.
+It is still a verdict: the schema must change, or the deployment must relax the policy in code. A refusal at a
+payload read travels as `SchemaRefusalException`, the one subtype of `SchemaValidationException`, so every collect
+site already takes it and `SchemaResolver.Problems` reports it under its code; the message names the pointer
+within the payload, which says which key of a map was refused. A fail-fast caller gets the exception itself,
+from the resolver and the linker alike.
 
 The one scope the linker cannot reach is a Class 1 record, which has no declaration; `SchemalessTreeReader`
 checks its own field set, and `DefaultTsonReadContext` applies the restricted-character and

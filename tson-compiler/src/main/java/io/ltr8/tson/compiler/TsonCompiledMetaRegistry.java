@@ -4,7 +4,7 @@ import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
@@ -44,8 +44,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Content hashes are recorded and verified per identity along the way ([TSON-DATA] §2.2.1, [TSON-SCHEMA]
  * §10.2).
  *
- * <p><b>{@link #withStandardLibrary} is the ordinary entry point</b>: it builds a registry with the three
- * bundled schemas (meta-kernel, meta, core) already loaded -- fetched straight from {@link
+ * <p><b>{@link #withStandardLibrary} is the ordinary entry point</b>: it builds a registry with the four
+ * bundled schemas (meta-kernel, meta, core, policy) already loaded -- fetched straight from {@link
  * TsonBundledSchemas}, so it works whatever the configured source. The plain constructors leave the
  * registry empty, for a caller that populates it itself. Any schema governed by (or importing) the
  * bundled three then reuses what's already in {@link #get} rather than recompiling its chain.
@@ -98,8 +98,9 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private static final String UNADDRESSABLE = "";
 
     /**
-     * UTS #39 §5.2's restriction level for declared names, applied by {@link TsonSchemaLinker} wherever a
-     * schema names something ([TSON-DATA] §8.2's restricted-script rule). Held here because this registry is the
+     * [TSON-DATA] §8.2's identifier policy for a schema's names, applied by {@link TsonSchemaLinker} wherever a
+     * schema names something and over every scope those names form, and by the resolver to the identifier-typed
+     * values a constructor payload carries. Held here because this registry is the
      * one object every resolve and every read already passes through, so a policy set on it reaches both
      * without a second channel.
      *
@@ -108,7 +109,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * this project's own documents. A deployment that finds it too strict reaches for the *unit* before the
      * level: {@code perSegment()} still refuses every within-word homograph.
      */
-    private UnicodePolicy identifierPolicy = UnicodePolicy.highlyRestrictive();
+    private IdentifierPolicy identifierPolicy = IdentifierPolicy.defaults();
 
     /**
      * The identities this thread is part-way through resolving, outermost first -- [TSON-DATA] §2.2.3's
@@ -189,31 +190,32 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     }
 
     /**
-     * A registry with this library's three bundled schemas -- meta-kernel, meta, core -- already loaded,
+     * A registry with this library's four bundled schemas -- meta-kernel, meta, core, policy -- already loaded,
      * plus {@code source} for any other, non-bundled URIs a caller later resolves. This is the ordinary
      * way to get a working registry; the plain constructors leave it empty (for a caller that populates
      * it itself, e.g. a test bootstrapping in isolation).
      */
     public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source) {
-        return withStandardLibrary(context, source, UnicodePolicy.highlyRestrictive());
+        return withStandardLibrary(context, source, IdentifierPolicy.defaults());
     }
 
     /** The same, with {@link #identifierPolicy} chosen rather than defaulted. */
     public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source,
-                                                               UnicodePolicy identifierPolicy) {
+                                                               IdentifierPolicy identifierPolicy) {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
         registry.identifierPolicy = identifierPolicy;
         registry.loadStandardLibrary();
         return registry;
     }
 
-    /** The restriction level this registry applies to declared names -- see {@link #identifierPolicy}. */
-    public UnicodePolicy identifierPolicy() {
+    /** The identifier policy this registry applies to a schema's names -- see {@link #identifierPolicy}. */
+    @Override
+    public IdentifierPolicy identifierPolicy() {
         return identifierPolicy;
     }
 
     /**
-     * Loads this library's three bundled schema documents into this registry in dependency order, so any
+     * Loads this library's four bundled schema documents into this registry in dependency order, so any
      * schema governed by (or importing) them resolves. Each is fetched straight from {@link
      * TsonBundledSchemas} (never the configured {@code source}) and registered; its own {@code
      * !!meta}/{@code !!import} targets are cache hits by the time they're needed (meta-kernel's own is
@@ -224,6 +226,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         registerBundled(TsonBundledSchemas.META_KERNEL_ID);
         registerBundled(TsonBundledSchemas.META_ID);
         registerBundled(TsonBundledSchemas.CORE_ID);
+        registerBundled(TsonBundledSchemas.POLICY_ID);
     }
 
     /**
@@ -268,15 +271,11 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         }
         if (META_KERNEL_IDENTITY.equals(identity)) {
             TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-            // TsonSchemaLinker.linkBootstrap runs its own materialization pass (synthesizing entries
-            // for argument-bearing type-refs like enum's own `members: set<token>`) before compiling,
-            // but persists nothing (not register -- TsonSchemaRegistry refuses a linked bootstrap
-            // schema outright, always), so this is discarded immediately after: every call still
-            // re-bootstraps and re-links from scratch, every time -- only the *quality* of the
-            // one-off result changes (58 entries, not 49), not its lifetime. The permanent, shared
-            // registry entry for meta-kernel comes from an explicit "load it and register it" step
-            // done once elsewhere; until then this one-off bootstrap stands in so nothing is ever
-            // left unable to resolve at all.
+            // The bootstrap's own output, linked and compiled but never registered -- TsonSchemaRegistry
+            // refuses a bootstrap schema outright -- so every call re-bootstraps from scratch. The
+            // permanent, shared registry entry for meta-kernel comes from an explicit "load it and
+            // register it" step done once elsewhere, resolving the kernel ordinarily against this one;
+            // until then this one-off bootstrap stands in so nothing is ever left unable to resolve.
             recordAndVerify(TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID), uri, identity);
             return bootstrap(TsonSchemaLinker.linkBootstrap(metaKernel));
         }

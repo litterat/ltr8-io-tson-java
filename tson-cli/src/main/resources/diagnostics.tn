@@ -1,30 +1,27 @@
-!!id:"https://tson.io/2026/36/ltr8/cli/diagnostics-11.tn"
-!!meta:"https://tson.io/2026/36/m/meta.tn"
-!!import:"https://tson.io/2026/36/m/core.tn"
+!!id:"https://tson.io/2026/37/io/ltr8/cli/diagnostics.tn"
+!!meta:"https://tson.io/2026/37/m/meta.tn"
+!!import:"https://tson.io/2026/37/m/core.tn"
+!!import:"https://tson.io/2026/37/m/policy.tn"
 @doc:"""
-  This project's own schema !!id convention (see CLAUDE.md's "Project-owned schema !!id
-  convention"): /2026/36 is the spec revision this schema is written against, ltr8 is the
-  publishing org, cli is this module's own schema group, and the trailing -11 is this schema's
-  own version.
+  The tson CLI's report: what a run found, and the policy it judged under. A
+  project-owned schema (CLAUDE.md's "Project-owned schema !!id"): /2026/37 is
+  the spec revision it is written against, io/ltr8 the publisher, cli this
+  module's schema group.
 
-  That version is bumped on a *release*, not on a change. [TSON-SCHEMA] §10's immutability rule
-  binds a published identity: once a release of this library ships carrying this schema, the
-  document under this !!id is fixed, and a later shape change mints -12 rather than editing it.
-  Between releases -- while the build version carries -SNAPSHOT -- nothing has published this
-  identity, so this document is in development and is edited in place. Bumping per change instead
-  mints versions nobody ever consumed, one for every field added during a development cycle.
-
-  diagnostic_code, outcome and restriction_level are hand-written copies of Diagnostic.Code,
-  Outcome and TsonUnicodePolicy.Level. DiagnosticsSchemaTest checks every copy against the Java enum
-  in both directions, which is what catches a member added to one and forgotten here -- before that
-  test existed, two such omissions were noticed only by a version bump.
+  The policy a report states is the spec's own `policy` (policy.tn), imported
+  rather than restated, so this report and any other processor's state one
+  shape. What is this library's own is the rest: diagnostic_code and outcome
+  are hand-written copies of Diagnostic.Code and Outcome, and
+  DiagnosticsSchemaTest checks both against the Java enum in both directions,
+  which is what catches a member added to one and forgotten here
+  (PolicySchemaTest does the same for policy.tn's restriction_level).
 
   This enum copies Diagnostic.Code whole, not the subset one consumer happens to emit -- the same
   reason DUPLICATE_FIELD's absence was a defect rather than an economy.
   """
 {
   diagnostic_code => !enum [
-    FIELD_REQUIRED FIELD_FIXED TYPE_MISMATCH WRONG_ARITY UNKNOWN_TYPE_REF
+    FIELD_REQUIRED FIELD_FIXED FIELD_GROUP TYPE_MISMATCH WRONG_ARITY UNKNOWN_TYPE_REF SCOPE_NOT_ADMITTED
     ATOM_FORM_INVALID ATOM_CONSTRAINT_VIOLATION
     UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD CONFUSABLE_NAMES RESTRICTED_CHARACTER RESTRICTED_SCRIPT
     SCHEMA_ERROR UNKNOWN_TYPE VALIDATION_ERROR NOT_IMPLEMENTED BIND_MISMATCH LIMIT_EXCEEDED
@@ -73,55 +70,6 @@
     actual?: text?
     data_position?: text?
     schema_position?: text?
-  }
-  @doc:"""
-    UTS #39 §5.2's restriction levels, a hand-written copy of TsonUnicodePolicy.Level checked against it
-    by DiagnosticsSchemaTest the way diagnostic_code and outcome are.
-    """
-  restriction_level => !enum [
-    ASCII_ONLY SINGLE_SCRIPT HIGHLY_RESTRICTIVE MODERATELY_RESTRICTIVE MINIMALLY_RESTRICTIVE UNRESTRICTED
-  ]
-  @doc:"""
-    One [TSON-DATA] §8.2 policy surface: the restriction level, whether it applies to each _/- delimited
-    segment rather than to the whole text, and any script combinations admitted over and above the level
-    (UTS #39 §5.2's own device for Latn+Jpan and its siblings). Each entry in `permitting` is one such
-    combination, named by java.lang.Character.UnicodeScript -- Latin, Cyrillic, Han.
-    """
-  unicode_policy => { level: restriction_level  per_segment: boolean  permitting: [[text]] }
-  @doc:"""
-    What this processor's configuration does to a document's fate, stated once per run.
-
-    §8.2's three name-hygiene rules read data the Unicode Consortium does not freeze, at a level the
-    reading deployment chooses, so the same bytes may be accepted here and refused elsewhere. This is the
-    statement of why: identifier_policy governs declared names, field names, type-refs and annotation
-    names, where all three rules apply; token_policy governs values, where only the restricted-script rule
-    can, a token having no identifier profile and no scope to be distinct within. Both keep the names
-    ProcessorConfig gives them, so a deployment's configuration and the report it produces are one
-    vocabulary.
-
-    unicode_data_version is the UCD release whose tables the rules were computed against, which is the
-    version §8.2 asks a report to name. It is here rather than on each
-    diagnostic because it is constant for the life of the process, and because what a sender needs in
-    order not to be refused is this record *before* it writes a document -- which `tson policy` prints
-    with no document in hand.
-    """
-  @doc:"""
-    [TSON-DATA] §9.1's resource limits: what this processor will spend reading one document, as against
-    what it will admit as a name. Only nesting depth is bounded so far -- §9.1 states eleven more with a
-    default each, and [TSON-SCHEMA] §11.5 five on the schema side under the same policy; each lands here as
-    it is built.
-
-    A limit refusal is LIMIT_EXCEEDED and is not a verdict: the document may be well-formed, valid, and
-    read in full by the next processor along. It is here for the same reason the Unicode policy is -- the
-    bound is this deployment's own choice, so a sender that reads it writes a document that fits.
-    """
-  limits => { max_depth: int32 }
-
-  policy => {
-    identifier_policy: unicode_policy
-    token_policy: unicode_policy
-    unicode_data_version: text
-    limits: limits
   }
   validation_report => { outcome: outcome  policy: policy  errors: [diagnostic] }
   file_report => { file: text  outcome: outcome  errors: [diagnostic] }

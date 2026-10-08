@@ -15,6 +15,7 @@ import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
@@ -27,6 +28,7 @@ import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
@@ -61,16 +63,23 @@ public enum DiscriminationClass {
     /**
      * The class of the named type's untagged wire values, or empty when it has none: an atom whose untagged
      * form §4's single pass cannot recover ({@code rational}/{@code complex}, whose typed forms straddle
-     * classes; {@code unit}; a mixed-class enum; an {@code unknown}), a nested choice or extern, or a name
+     * classes; {@code value} and {@code void}; a mixed-class enum; an {@code unknown}), a nested choice or extern, or a name
      * the namespace does not resolve. A reference chain is followed to its terminal entry first (§8.3 makes
      * an alias and its target one type); a cycle, having no terminal, has no class. An empty result makes
      * the enclosing choice non-disjoint and blocks untagged recovery -- the conservative side, the tag
      * stays required.
+     *
+     * <p>{@code textEnums} is linking's {@code TsonLinkedSchema.textEnums}: the enums whose members are texts
+     * rather than names, which are {@link #STRING} whatever their members' spellings ([TSON-SCHEMA] §7.4).
      */
-    public static Optional<DiscriminationClass> of(String name, Map<String, TypeDefinition> namespace) {
+    public static Optional<DiscriminationClass> of(String name, Map<String, TypeDefinition> namespace,
+                                                   Set<String> textEnums) {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
-        return ReferenceChain.terminalDefinition(name, namespace).flatMap(DiscriminationClass::classify);
+        return ReferenceChain.terminalDefinition(name, namespace).flatMap(definition ->
+                definition.body() instanceof EnumBody && textEnums.contains(ReferenceChain.terminal(name, namespace))
+                        ? Optional.of(STRING)
+                        : classify(definition));
     }
 
     private static Optional<DiscriminationClass> classify(TypeDefinition def) {
@@ -79,7 +88,9 @@ public enum DiscriminationClass {
             case DecimalType ignored -> Optional.of(NUMBER);
             case FloatType ignored -> Optional.of(NUMBER);
             case TextType ignored -> Optional.of(STRING);
+            case IdentifierType ignored -> Optional.of(STRING);
             case UriType ignored -> Optional.of(STRING);
+            case IriType ignored -> Optional.of(STRING);
             case RegexType ignored -> Optional.of(STRING);
             case UuidType ignored -> Optional.of(STRING);
             case DateType ignored -> Optional.of(STRING);
@@ -99,11 +110,14 @@ public enum DiscriminationClass {
             case MapBody ignored -> Optional.of(BRACE);
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
-            default -> Optional.empty(); // rational/complex (need a tag), unit, unknown, choice, extern
+            default -> Optional.empty(); // rational/complex (need a tag), value, void, unknown, choice, extern
         };
     }
 
-    /** An enum's class is its members' shared base-type class (e.g. {@code [true false]} is BOOLEAN); mixed -> empty. */
+    /**
+     * An enum over an identifier family: its members are names, written as bare tokens, so its class is their
+     * shared base-type class ({@code [true false]} is BOOLEAN); mixed -> empty.
+     */
     private static Optional<DiscriminationClass> ofEnum(EnumBody enumBody) {
         DiscriminationClass common = null;
         for (String member : enumBody.members()) {

@@ -145,7 +145,7 @@ final class DispatchScopedReader implements JsonTypeReader<Object> {
             return null;
         }
         String identity = CanonicalIdentity.canonicalize(uri);
-        // Absent `schemas` is "any foreign schema"; present, it is a closed set, matched by canonical identity so
+        // Missing, `schemas` is "any foreign schema"; present, it is a closed set, matched by canonical identity so
         // a pinned key and an unpinned reference are one schema ([TSON-DATA] §2.2.1).
         if (!admittedSchemas.isEmpty() && !admittedSchemas.containsKey(identity)) {
             return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR,

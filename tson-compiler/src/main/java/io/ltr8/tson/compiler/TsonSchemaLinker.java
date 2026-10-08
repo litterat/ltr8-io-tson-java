@@ -1,11 +1,13 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -31,7 +33,6 @@ import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.EnumProfile;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
@@ -59,10 +60,13 @@ import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.Sum;
+import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.UriType;
+import io.ltr8.tson.schema.meta.VoidType;
+import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.UuidType;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -72,6 +76,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link TsonLinkedSchema} -- pass 2, which a schema
@@ -168,15 +173,15 @@ public final class TsonSchemaLinker {
         }
         // The bootstrap is this library's own artifact, not user input, so it is linked under the default
         // rather than under whatever a caller configured -- a policy should not be able to break meta-kernel.
-        return linkWith(bootstrap, null, null, UnicodePolicy.highlyRestrictive());
+        return linkWith(bootstrap, null, null, IdentifierPolicy.defaults());
     }
 
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
-        return linkWith(schema, loader, null, UnicodePolicy.highlyRestrictive());
+        return linkWith(schema, loader, null, IdentifierPolicy.defaults());
     }
 
     /** {@link #link(TsonSchema, TsonSchemaLoader)} with the §5.2 restriction level for declared names chosen. */
-    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, UnicodePolicy identifiers) {
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, IdentifierPolicy identifiers) {
         return linkWith(schema, loader, null, identifiers);
     }
 
@@ -200,12 +205,12 @@ public final class TsonSchemaLinker {
      */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
                                         DiagnosticsReceiver receiver) {
-        return link(schema, loader, receiver, UnicodePolicy.highlyRestrictive());
+        return link(schema, loader, receiver, IdentifierPolicy.defaults());
     }
 
     /** The reporting overload with the §5.2 restriction level for declared names chosen. */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
-                                        DiagnosticsReceiver receiver, UnicodePolicy identifiers) {
+                                        DiagnosticsReceiver receiver, IdentifierPolicy identifiers) {
         Objects.requireNonNull(receiver, "receiver");
         return linkWith(schema, loader, receiver, identifiers);
     }
@@ -227,10 +232,14 @@ public final class TsonSchemaLinker {
      * record is the case that has no declaration, and is checked by the schemaless readers instead.
      */
     private static void checkNames(DiagnosticsReceiver receiver, TsonSchema schema,
-                                   Map<String, TypeDefinition> merged, UnicodePolicy identifiers) {
-        ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> refuse(receiver, schema,
-                collision.second(), merged.get(collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
-                "in the namespace of '" + schema.id() + "': " + collision.describe()));
+                                   Map<String, TypeDefinition> merged,
+                                   Function<String, TypeDefinition> structure, Set<String> refusedEnums,
+                                   IdentifierPolicy identifiers) {
+        if (identifiers.appliesSkeletonDistinctness()) {
+            ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> refuse(receiver, schema,
+                    collision.second(), merged.get(collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
+                    "in the namespace of '" + schema.id() + "': " + collision.describe()));
+        }
 
         // The restricted-character and restricted-script rules over the same names, in the same pass. Where the
         // collision check above is a
@@ -244,19 +253,25 @@ public final class TsonSchemaLinker {
             // A choice's variants are deliberately *not* a scope of their own: a variant is a reference to
             // a declared name, so two confusable variants are two confusable entries in `merged` and the
             // namespace check above has already reported them. A check here could never fire.
+            // An enum whose members its own type refused has had its verdict: judging those members as names
+            // too would report the one mistake twice.
             List<String> names = switch (body) {
                 case RecordBody record -> record.fields().stream().map(RecordField::name).toList();
-                case EnumBody enumBody -> List.copyOf(enumBody.members());
+                case EnumBody enumBody when !refusedEnums.contains(name) -> List.copyOf(enumBody.members());
                 default -> List.of();
             };
             String noun = body instanceof RecordBody ? "field names" : "members";
-            // An enum under `profile: TEXT` has members that are values rather than names, so §8.2's two
-            // per-name rules do not reach them: a value set carries whatever its domain carries, and there
-            // is nothing to spoof where nothing is looked up by name. The collision relation stays -- two
-            // members that render alike is the hazard either way, and it is a property of the set.
-            boolean perNameRules = !(body instanceof EnumBody enumBody)
-                    || enumBody.profile() == EnumProfile.IDENTIFIER;
+            // An enum whose type is not an identifier family (`text_enum`) has members that are values rather
+            // than names, so §8.2's two per-name rules do not reach them: a value set carries whatever its
+            // domain carries, and there is nothing to spoof where nothing is looked up by name. The collision
+            // relation stays -- two members that render alike is the hazard either way, and it is a property of
+            // the set (§7.4).
+            boolean perNameRules = !(body instanceof EnumBody)
+                    || EnumLabels.membersAreNames(definition, merged, structure);
             checkScope(receiver, schema, name, definition, names, noun, identifiers, perNameRules);
+            if (body instanceof RecordBody record) {
+                checkFieldValues(receiver, schema, name, definition, record, merged, identifiers);
+            }
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
             // them as one anyway -- §11.4 declines the scope. A parameter is a name, §11.4's own reasoning for
@@ -270,27 +285,58 @@ public final class TsonSchemaLinker {
     /** One named scope ([TSON-DATA] §8.2): its own collision relation, then each name's own two rules. */
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
-                                   UnicodePolicy identifiers) {
+                                   IdentifierPolicy identifiers) {
         checkScope(receiver, schema, entry, definition, names, noun, identifiers, true);
     }
 
     /**
-     * {@code perNameRules} is false for the one scope whose members are not names -- an enum declaring
-     * {@code profile: TEXT}. The collision relation runs either way; §8.2's restricted-character and
-     * restricted-script rules are per-<em>name</em> and lapse with the declaration.
+     * {@code perNameRules} is false for the one scope whose members are not names -- an enum whose type is not an
+     * identifier family, such as a {@code text_enum} ({@link EnumLabels}). The collision relation runs either way,
+     * where the policy applies it; §8.2's restricted-character and restricted-script rules are per-<em>name</em> and
+     * lapse with the declaration.
      */
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
-                                   UnicodePolicy identifiers, boolean perNameRules) {
-        ConfusableNames.firstCollision(names).ifPresent(collision -> refuse(receiver, schema, entry,
-                definition, Diagnostic.Code.CONFUSABLE_NAMES,
-                "'" + entry + "' has " + noun + " that read alike: " + collision.describe()));
+                                   IdentifierPolicy identifiers, boolean perNameRules) {
+        if (identifiers.appliesSkeletonDistinctness()) {
+            ConfusableNames.firstCollision(names).ifPresent(collision -> refuse(receiver, schema, entry,
+                    definition, Diagnostic.Code.CONFUSABLE_NAMES,
+                    "'" + entry + "' has " + noun + " that read alike: " + collision.describe()));
+        }
         if (!perNameRules) {
             return;
         }
         String singular = noun.substring(0, noun.length() - 1);
         names.forEach(member -> perName(receiver, schema, entry, definition, member,
                 "'" + entry + "' has a " + singular + " where ", identifiers));
+    }
+
+    /**
+     * §8.2's per-name rules over the values a schema supplies for its data: a field's default or fixed value,
+     * where the field's type is an identifier family. Such a value is a name, as the same token written in a
+     * document is -- and a default reaches every document that omits the field, so a value the reader would
+     * refuse if the document wrote it must not be one the reader injects. Judged under the family's own profile,
+     * as a read judges it: over the value, the text in the family's normalization form.
+     */
+    private static void checkFieldValues(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
+                                         TypeDefinition definition, RecordBody record,
+                                         Map<String, TypeDefinition> merged, IdentifierPolicy identifiers) {
+        for (RecordField field : record.fields()) {
+            if (field.value().isEmpty()) {
+                continue;
+            }
+            Optional<IdentifierType> family = ReferenceChain.terminalDefinition(field.type().name(), merged)
+                    .map(TypeDefinition::body)
+                    .filter(IdentifierType.class::isInstance)
+                    .map(IdentifierType.class::cast);
+            if (family.isPresent()) {
+                String what = field.role() == FieldRole.FIXED ? "a fixed value" : "a default";
+                perName(receiver, schema, entry, definition,
+                        family.get().normalization().apply(field.value().get().text()),
+                        "'" + entry + "' has " + what + " for '" + field.name() + "' where ", identifiers,
+                        family.get().profile());
+            }
+        }
     }
 
     /**
@@ -306,17 +352,21 @@ public final class TsonSchemaLinker {
      */
     private static void perName(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                 TypeDefinition definition, String name, String prefix,
-                                UnicodePolicy identifiers) {
-        // The restricted-character rule is gated on the level: §8.2's Unrestricted "drops the profile too",
-        // taking that rule with it. Script mixing gates itself inside violation(). Each reports under its own
-        // code, since the
-        // two want different fixes -- change the character, against rename or relax the policy.
-        if (identifiers.appliesIdentifierProfile()) {
-            IdentifierProfile.hygiene(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
-                    Diagnostic.Code.RESTRICTED_CHARACTER, prefix + "'" + name + "': " + why));
+                                IdentifierPolicy identifiers) {
+        perName(receiver, schema, entry, definition, name, prefix, identifiers, IdentifierProfile.NAME);
+    }
+
+    /** The same under {@code profile}, whose added characters are its own and meet no restricted-character rule. */
+    private static void perName(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
+                                TypeDefinition definition, String name, String prefix,
+                                IdentifierPolicy identifiers, IdentifierProfile profile) {
+        // Each rule reports under its own code, since the two want different fixes -- change the character, against
+        // rename or relax the policy. The restricted-character message names the name; the script one opens with it.
+        for (IdentifierPolicy.Violation violation : identifiers.judge(name, profile)) {
+            refuse(receiver, schema, entry, definition, violation.code(),
+                    violation.code() == Diagnostic.Code.RESTRICTED_CHARACTER
+                            ? prefix + "'" + name + "': " + violation.reason() : prefix + violation.reason());
         }
-        identifiers.violation(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
-                Diagnostic.Code.RESTRICTED_SCRIPT, prefix + why));
     }
 
     /**
@@ -327,7 +377,7 @@ public final class TsonSchemaLinker {
     private static void refuse(DiagnosticsReceiver receiver, TsonSchema schema, String name,
                                TypeDefinition def, Diagnostic.Code code, String message) {
         if (receiver == null) {
-            throw new SchemaValidationException(message);
+            throw new SchemaRefusalException(code, message, null);
         }
         receiver.report(TsonDiagnostics.ofSchemaRefusal(CanonicalIdentity.canonicalize(schema.id()), name,
                 code, message, def == null ? Optional.empty() : def.position()));
@@ -516,9 +566,11 @@ public final class TsonSchemaLinker {
 
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
-                                             DiagnosticsReceiver receiver, UnicodePolicy identifiers) {
+                                             DiagnosticsReceiver receiver, IdentifierPolicy identifiers) {
         Map<String, String> origins = new LinkedHashMap<>();
-        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins);
+        Set<String> textEnums = new LinkedHashSet<>();
+        Map<String, Normalization> enumForms = new LinkedHashMap<>();
+        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins, textEnums, enumForms);
 
         // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
         // merges another schema's entries into *this* schema's own returned entries()). !!meta only says
@@ -586,8 +638,23 @@ public final class TsonSchemaLinker {
         }
 
         merged = computeSubtypes(merged, localNames);
-        merged = computeDisjointness(merged);
-        checkNames(receiver, schema, merged, identifiers);
+        // Before disjointness: an enum whose members are texts is string-class, and only here can its `type`
+        // be followed into the governing meta, where a constructor's pinned one was written.
+        for (String name : localNames) {
+            TypeDefinition def = merged.get(name);
+            if (def.body() instanceof EnumBody && !EnumLabels.membersAreNames(def, merged, structureNamespace::get)) {
+                textEnums.add(name);
+            }
+            Normalization form = EnumLabels.labelForm(def, merged, structureNamespace::get);
+            if (form != Normalization.NONE) {
+                enumForms.put(name, form);
+            }
+        }
+        merged = computeDisjointness(merged, textEnums);
+        // Before the name checks: a member that is not a value of its enum's type is the more basic verdict,
+        // and the per-name rules would otherwise report it as a restricted character.
+        Set<String> refusedEnums = checkEnumTypes(schema, merged, localNames, structureNamespace::get, receiver);
+        checkNames(receiver, schema, merged, structureNamespace::get, refusedEnums, identifiers);
 
         Set<String> blamedOnce = new LinkedHashSet<>();
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
@@ -618,13 +685,13 @@ public final class TsonSchemaLinker {
         }
 
         checkEveryEntryIsInhabited(schema, merged, localNames, receiver);
-        checkRecordExtension(schema, merged, localNames, receiver);
+        checkRecordExtension(schema, merged, localNames, origins, enumForms, receiver);
 
         AnnotatedMap<String, TypeDefinition> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, localNames, receiver);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
-                annotated, schema.bootstrap()), origins);
+                annotated, schema.bootstrap()), origins, textEnums, enumForms);
     }
 
     /**
@@ -663,9 +730,25 @@ public final class TsonSchemaLinker {
     }
 
     /**
+     * What each enum's {@code type} obliges ({@link EnumLabels}): a text family, of which every member is a
+     * value, no two of them one. Refused at schema load, against the enum that states it; the names of the
+     * enums refused are returned, so the name checks do not judge the same members a second time.
+     */
+    private static Set<String> checkEnumTypes(TsonSchema schema, Map<String, TypeDefinition> merged,
+                                              Set<String> localNames, Function<String, TypeDefinition> structure,
+                                              DiagnosticsReceiver receiver) {
+        Set<String> refused = new LinkedHashSet<>();
+        for (EnumLabels.Violation violation : EnumLabels.check(merged, localNames, structure)) {
+            report(receiver, schema, violation.entry(), merged.get(violation.entry()), violation.message());
+            refused.add(violation.entry());
+        }
+        return refused;
+    }
+
+    /**
      * What each {@code record.extension} member obliges of the rest of the closure ({@link RecordExtension}) --
      * that nothing composes onto a FINAL record, that a sealed family's selectors are usable and its members
-     * pin them distinctly, and that the two marks agree with each other.
+     * pin them distinctly, that the two marks agree with each other, and that every member is declared.
      *
      * <p><b>Runs on the merged map rather than the annotated one</b>, unlike {@link #checkDisjointAssertions}:
      * the marks are consumed into the body by the resolver, so there is no annotation left to consult and the
@@ -673,12 +756,15 @@ public final class TsonSchemaLinker {
      *
      * <p>Reporting stays here because {@link RecordExtension} hands back the entry each violation belongs to
      * and nothing else -- a checker that knew about {@code DiagnosticsReceiver} would be a checker two callers
-     * could not share, and it is already the shape {@link ChoiceDisjointness} keeps.
+     * could not share, and it is already the shape {@link ChoiceDisjointness} keeps. A minted entry is reported
+     * against the declaration that wrote it ({@link #reportedAgainst}), having no line of its own.
      */
     private static void checkRecordExtension(TsonSchema schema, Map<String, TypeDefinition> merged,
-                                              Set<String> localNames, DiagnosticsReceiver receiver) {
-        for (RecordExtension.Violation violation : RecordExtension.check(merged, localNames)) {
-            report(receiver, schema, violation.entry(), merged.get(violation.entry()), violation.message());
+                                              Set<String> localNames, Map<String, String> origins,
+                                              Map<String, Normalization> enumForms, DiagnosticsReceiver receiver) {
+        for (RecordExtension.Violation violation : RecordExtension.check(merged, localNames, origins, enumForms)) {
+            String at = reportedAgainst(violation.entry(), merged);
+            report(receiver, schema, at, merged.get(at), violation.message());
         }
     }
 
@@ -881,7 +967,6 @@ public final class TsonSchemaLinker {
                 // member, so it is a type by the only test that matters -- something can stand at it.
                 continue;
             }
-            indexUnderItsTemplate(localName, local, merged, newSubtypesByName);
             for (String supertype : local.supertypes()) {
                 if (merged.containsKey(supertype)) {
                     newSubtypesByName.computeIfAbsent(supertype, ignored -> new LinkedHashSet<>()).add(localName);
@@ -897,31 +982,6 @@ public final class TsonSchemaLinker {
             result.put(entry.getKey(), withAddedSubtypes(result.get(entry.getKey()), entry.getValue()));
         }
         return result;
-    }
-
-    /**
-     * An <b>instantiation</b> is a member of the parent its template has (§5.10), so
-     * it indexes under the head it closes -- {@code pet<"dog", dog_type>} under {@code pet}.
-     *
-     * <p>The head is read off {@code source}, which §8.2 makes an instantiation record as written, head and
-     * arguments alike. Only an application has one, so nothing else here is touched.
-     *
-     * <p><b>Only where the template has a parent.</b> A container, a constructor application and a reference
-     * template are no types, so crediting {@code arr<text>} to {@code arr} would put members under something
-     * no position can name -- the same defect, in the other direction, that keeping a template out of its
-     * base's index removed.
-     */
-    private static void indexUnderItsTemplate(String name, TypeDefinition def,
-            Map<String, TypeDefinition> merged, Map<String, Set<String>> newSubtypesByName) {
-        String head = def.source().filter(source -> !source.arguments().isEmpty())
-                .map(TypeRef::name).orElse(null);
-        if (head == null) {
-            return;
-        }
-        TypeDefinition template = merged.get(head);
-        if (template != null && template.body() instanceof TemplateBody held && held.extension().isPresent()) {
-            newSubtypesByName.computeIfAbsent(head, ignored -> new LinkedHashSet<>()).add(name);
-        }
     }
 
     /**
@@ -961,12 +1021,13 @@ public final class TsonSchemaLinker {
      * An entry with no {@code !choice} body has nowhere to put the fact, so "absent on every other
      * definition" stops being a rule anyone can break.
      */
-    private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged) {
+    private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged,
+                                                                   Set<String> textEnums) {
         Map<String, TypeDefinition> result = new LinkedHashMap<>(merged);
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             if (entry.getValue().body() instanceof ChoiceBody choice) {
                 result.put(entry.getKey(), entry.getValue().withBody(new ChoiceBody(choice.variants(),
-                        Optional.of(ChoiceDisjointness.derive(choice, merged)))));
+                        Optional.of(ChoiceDisjointness.derive(choice, merged, textEnums)))));
             }
         }
         return result;
@@ -987,14 +1048,15 @@ public final class TsonSchemaLinker {
      * of entries, so re-arrival is unification, not conflict. Two *different* schemas declaring one name is
      * the real collision, and it is still an error: distinct types cannot share a name in a flat namespace.
      * That is also what makes a revision mismatch (one route reaching {@code /2026/32/m/core.tn}, another
-     * {@code /2026/36/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
+     * {@code /2026/37/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
      * conflict between two identically-spelled types much later.
      *
      * <p>Identity is the canonical one ([TSON-DATA] §2.2.1), so a pinned and an unpinned reference to one
      * schema unify -- which is what lets an author pin their own import while a peer's is unpinned.
      */
     private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader,
-                                                            Map<String, String> origins) {
+                                                            Map<String, String> origins, Set<String> textEnums,
+                                                            Map<String, Normalization> enumForms) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : imports) {
@@ -1025,6 +1087,13 @@ public final class TsonSchemaLinker {
                 }
                 merged.put(name, entry.getValue());
                 origins.put(name, origin);
+                if (imported.textEnums().contains(name)) {
+                    textEnums.add(name);
+                }
+                Normalization form = imported.enumForms().get(name);
+                if (form != null) {
+                    enumForms.put(name, form);
+                }
             }
         }
         return merged;
@@ -1057,8 +1126,8 @@ public final class TsonSchemaLinker {
             // refinement) the instance's own already-resolved constructor), both explicitly
             // structure-namespace-eligible, unlike an ordinary type-ref (§3.3.2: "NOT extended by the
             // structure namespace... field types... composition targets"). See #link's own note
-            // on `structureNamespace` for why this matters concretely: `void => !unit {}`'s own
-            // `source: unit` is exactly this case -- `unit` lives in meta-kernel, reachable from
+            // on `structureNamespace` for why this matters concretely: `void => !void_type {}`'s own
+            // `source: void_type` is exactly this case -- `void_type` lives in meta-kernel, reachable from
             // core.tn only via its `!!meta` chain, never a local declaration or `!!import`.
             //
             // The one `source` shape the fallback does *not* cover is an application -- a `source` carrying
@@ -1094,11 +1163,11 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def.body(), namespace, def.parameters());
+        validateBody(name, def.body(), namespace, structureNamespace, def.parameters());
     }
 
     private static void validateBody(String entryName, Top body, Map<String, TypeDefinition> namespace,
-                                      List<String> ownParameters) {
+                                      Map<String, TypeDefinition> structureNamespace, List<String> ownParameters) {
         checkCoherent(body);
         switch (body) {
             case RecordBody r -> {
@@ -1110,10 +1179,10 @@ public final class TsonSchemaLinker {
                 for (RecordField field : r.fields()) {
                     validateTypeRef(field.type(), namespace, ownParameters, entryName,
                             " field '" + field.name() + "'");
-                    checkFieldValue(entryName, field, namespace, ownParameters);
+                    checkFieldValue(entryName, field, namespace, structureNamespace, ownParameters);
                 }
                 for (FieldGroup group : r.groups()) {
-                    for (String member : group.members()) {
+                    for (String member : group.memberNames()) {
                         if (r.fields().stream().noneMatch(f -> f.name().equals(member))) {
                             throw new SchemaValidationException(
                                     "'" + entryName + "' has a field group referencing unknown field '" + member + "'");
@@ -1161,7 +1230,11 @@ public final class TsonSchemaLinker {
             // entry declares, which no argument changes. See checkHeldArity for why that has to be asked
             // here rather than left to an application that may never happen.
             case TemplateBody held -> checkHeldArity(entryName, held, namespace, ownParameters);
-            case Unit ignored -> {
+            case ValueType ignored -> {
+            }
+            case VoidType ignored -> {
+            }
+            case IdentifierType ignored -> {
             }
             case EnumBody ignored -> {
             }
@@ -1170,6 +1243,8 @@ public final class TsonSchemaLinker {
             case TextType ignored -> {
             }
             case UriType ignored -> {
+            }
+            case IriType ignored -> {
             }
             case RegexType ignored -> {
             }
@@ -1276,12 +1351,13 @@ public final class TsonSchemaLinker {
      * A variant must not resolve to {@code void} (§5.4): {@code (T | void)} spells
      * optionality as a choice, and optionality belongs to the position -- a field's {@code ?} state, the
      * {@code _} sentinel -- never to the type occupying it. Judged at the end of the chain, like
-     * distinctness, so an alias of {@code void} is caught under whatever name the author wrote.
+     * distinctness, so an alias of {@code void} is caught under whatever name the author wrote, and by its
+     * {@code !void_type} body, so core's sibling is caught as the kernel's is.
      */
     private static void checkVariantsAreNotVoid(String entryName, ChoiceBody choice,
                                                  Map<String, TypeDefinition> namespace) {
         for (TypeRef variant : choice.variants()) {
-            if (ReferenceChain.terminal(variant.name(), namespace).equals("void")) {
+            if (ReferenceChain.resolvesToVoid(variant.name(), namespace)) {
                 throw new SchemaValidationException("'" + entryName + "' has a variant"
                         + (variant.name().equals("void") ? "" : " '" + variant.name() + "'")
                         + " resolving to 'void' -- optionality is not choice (§5.4): a value's absence is the "
@@ -1428,8 +1504,8 @@ public final class TsonSchemaLinker {
      * a held body is not read as this vocabulary at all, so the only parametric field reaching here has
      * already been substituted by materialisation, and is checked against the argument it was closed with.
      */
-    private static void checkFieldValue(String entryName, RecordField field,
-                                         Map<String, TypeDefinition> namespace, List<String> ownParameters) {
+    private static void checkFieldValue(String entryName, RecordField field, Map<String, TypeDefinition> namespace,
+                                         Map<String, TypeDefinition> structureNamespace, List<String> ownParameters) {
         if (field.value().isEmpty() || ownParameters.contains(field.type().name())) {
             return;
         }
@@ -1447,7 +1523,8 @@ public final class TsonSchemaLinker {
             return;
         }
         Token value = field.value().get();
-        Optional<AtomType<?>> parser = AtomParsers.forType(terminal, target.body());
+        Optional<AtomType<?>> parser = AtomParsers.forType(target.body(),
+                EnumLabels.labelForm(target, namespace, structureNamespace::get));
         if (parser.isEmpty()) {
             throw notAScalarType(entryName, field, value, target.body());
         }
@@ -1506,7 +1583,7 @@ public final class TsonSchemaLinker {
             case TupleBody ignored -> "a tuple";
             case RecordBody ignored -> "a record";
             case ChoiceBody ignored -> "a choice";
-            case Unit ignored -> "the void type";
+            case VoidType ignored -> "the void type";
             case Scoped ignored -> "a scoped type, whose values name their own type rather than being a token shape";
             default -> "not a scalar type";
         };

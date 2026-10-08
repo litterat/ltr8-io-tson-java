@@ -6,7 +6,8 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.json.tree.JsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -44,8 +45,8 @@ class JsonNameHygieneTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/hygiene-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               account => { password: text  note?: text? }
               circle  => { radius: float64 }
@@ -148,7 +149,8 @@ class JsonNameHygieneTest {
      */
     @Test
     void anUnrestrictedPolicyRefusesNothingAndTheClosureRuleSpeaks() {
-        Json relaxed = jsonUnder(ProcessorPolicy.defaults().withIdentifierPolicy(UnicodePolicy.unrestricted()));
+        Json relaxed = jsonUnder(ProcessorPolicy.defaults()
+                .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.unrestricted())));
         List<Diagnostic> problems = read(relaxed, "account",
                 "{\"password\": \"s3cret\", \"p" + CYRILLIC_A + "ssword\": \"evil\"}").problems();
         assertEquals(1, problems.size(), () -> String.valueOf(problems));

@@ -114,16 +114,22 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   named by content (§8.2 — resolver-chosen, fresh, unreachable from source), so a binding map cannot be keyed
   on one: the hash is not knowable when the map is written, and a generator emitting bindings cannot invent
   it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
-  a `REFERENCE` body, in declaration order, then the entry's own name — and `RecordBindReader` and
-  `TupleBindReader` try them in that order, so `ping => msg_of<"ping", ping_body>` binds under `ping`.
+  a `REFERENCE` body, in declaration order, then the entry's own name, then — for a constructor tightening
+  another — that constructor's, up its chain — and `RecordBindReader` and `TupleBindReader` try them in that
+  order, so `ping => msg_of<"ping", ping_body>` binds under `ping`, and `set_type`, `text_enum` and a meta
+  layer's `kebab_enum => enum_type ^ { type?: = kebab }` bind as the constructor they tighten: a tightening
+  restates fields and adds none (§5.7), so the source's class is theirs. It is tried last, and confined to
+  constructors — an ordinary record refining another may be bound to a narrower class, and falling back to
+  its parent's would lose that silently.
   **Only a derived entry is reached this way**, which is the test `EntryDisplayName` already applies: an entry
   with a source position was declared, so its own name is the one the author wrote and an alias naming it must
   never redirect its binding. The index is built once per compile beside `namesMeaning`, for that one's
-  reason — a property of the schema, not of the entry being looked up. A failure keeps the **first**
-  candidate's cause, the author-written name's, so a class that was mapped and then failed analysis is not
-  masked by "the minted name is unbound"; `MissingBindingException` carries that cause rather than only its
-  text, which is what makes an erased component (`no valid data conversion for class java.lang.Object`)
-  visible from an ordinary read.
+  reason — a property of the schema, not of the entry being looked up. **A class that is mapped and fails
+  analysis stops the search at once** and says so — `'sets' binds Sets, which cannot be analysed: …`, each
+  cause along the chain — rather than reading as a name nothing binds; only `tson-bind`'s
+  `UnboundNameException` moves on to the next candidate, and a search that finds nothing reports the first,
+  the author-written name. That is what makes an erased component
+  (`no valid data conversion for class java.lang.Object`) visible from an ordinary read.
 - **A family check names its members the same way.** `RecordExtension`'s pin-collision message renders each
   colliding member through `EntryDisplayName`, so a family whose members are template applications reports
   `pet_of<cat, int32>` rather than `pet_of_cat_int32_1c52dc45` — a name that points at no declaration an
@@ -167,7 +173,7 @@ a singleton, which is the overwhelming majority of them.
 
 ## Untagged labelled choices (`reader/GroupUnionBindReader`)
 
-**A record whose fields form one REQUIRED group, bound onto a Java sealed interface whose members carry those
+**A record whose fields form one non-optional group, bound onto a Java sealed interface whose members carry those
 fields one apiece.** The kernel's `type_argument => { ( name: type_ref | value: value ) }` is the case that
 forces it: a record with no subtypes otherwise binds only onto a record descriptor (`requireRecord`), so
 without this reader no `type_ref` carrying `arguments` could be read at all.
@@ -181,7 +187,7 @@ without this reader no `type_ref` carrying `arguments` could be read at all.
   the component *is* the field; matching on anything else would need a second table to keep in step with the
   first. `TypeArgument.Ref` carries `@Field("name")` for this reason, which also brings `toTson` closer to the
   kernel's own spelling.
-- **Three conditions are checked, not assumed** — union target, one REQUIRED group covering every field, and
+- **Three conditions are checked, not assumed** — union target, one non-optional group covering every field, and
   every member carrying one component named for one of those fields. A near-miss falls through to the
   ordinary record path and is reported there; guessing at a partial match would bind a member to a field it
   does not carry.

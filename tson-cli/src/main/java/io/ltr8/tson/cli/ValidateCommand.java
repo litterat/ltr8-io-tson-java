@@ -290,11 +290,12 @@ final class ValidateCommand {
         return "cannot read " + input.name() + ": " + reason;
     }
 
-    /** The three bundled standard-library identities, which {@code ProcessorConfig} always serves from its own resources. */
+    /** The bundled standard-library identities, which {@code ProcessorConfig} always serves from its own resources. */
     private static boolean isBundledId(String id) {
         return id.equals(TsonBundledSchemas.META_KERNEL_ID)
                 || id.equals(TsonBundledSchemas.META_ID)
-                || id.equals(TsonBundledSchemas.CORE_ID);
+                || id.equals(TsonBundledSchemas.CORE_ID)
+                || id.equals(TsonBundledSchemas.POLICY_ID);
     }
 
     /**

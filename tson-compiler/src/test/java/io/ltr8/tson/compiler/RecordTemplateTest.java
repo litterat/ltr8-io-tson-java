@@ -48,8 +48,8 @@ class RecordTemplateTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/template.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                 %s
                 }
@@ -501,27 +501,21 @@ class RecordTemplateTest {
     }
 
     /**
-     * <b>The converse is caught, and not by the kind rule.</b> A type name applied where the body routes the
-     * parameter into a field's <em>value</em> substitutes {@code text} into the {@code value} slot -- both
-     * sides correctly kinded, so §5.10's argument-kind rule has nothing to say. What catches it is §5.2's own
-     * dependency: {@code record_field.value} must be the field's declared type, and {@code text} is not an
-     * {@code int32} whether a parameter put it there or the author wrote it literally.
-     *
-     * <p>So the two halves of the kind rule are answered by two different rules, which is what §5.10 states:
-     * an argument is "read by the position it lands in" -- the type-position half above by an unresolved
-     * reference, this one by §5.2's value conformance. The residue value
-     * conformance does not catch -- a type name applied into a {@code text}-typed value slot -- is a value
-     * slot holding a valid value, which is no error to give.
+     * <b>The converse is caught at the application.</b> A type name applied where the body routes the parameter
+     * into a field's <em>value</em> binds {@code N}, whose recorded type is the field's own {@code int32}
+     * ({@code template_param.type}, §5.10), so {@code text} is refused as an argument that is not an
+     * {@code int32} value -- at {@code retry<text>}, before substitution puts it in the {@code value} slot where
+     * §5.2's value conformance would otherwise be the first rule to see it.
      */
     @Test
-    void applyingATypeWhereTheBodyRoutesAValueIsCaughtByValueConformance() {
+    void applyingATypeWhereTheBodyRoutesAValueIsCaughtAtTheApplication() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           retry => <N> { attempts?: int32 ~ N }
                           holder => { r: retry<text> }"""));
 
-        assertTrue(thrown.getMessage().contains("field 'attempts'"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("declared 'int32'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'retry<...>' binds 'N' to 'text'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("not a value of int32"), thrown.getMessage());
     }
 
     /**

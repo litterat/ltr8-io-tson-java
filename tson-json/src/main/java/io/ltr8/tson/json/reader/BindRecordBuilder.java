@@ -1,9 +1,13 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.UnboundNameException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
@@ -84,6 +88,12 @@ final class BindRecordBuilder implements RecordBuilder {
                 DataClassField component = descriptor.fields()[at];
                 argument[i] = component.index();
                 filled[at] = true;
+                String deliversNull = deliversNull(plan.fields[i], plan.omitted[i]);
+                if (deliversNull != null && component.dataClass().typeClass().isPrimitive()) {
+                    mismatches.add("field '" + plan.fields[i].name() + "' " + deliversNull + ", and component '"
+                            + component.name() + "' binds " + component.dataClass().typeClass().getName()
+                            + ", which has no null to hold it");
+                }
                 readers[i] = BindTargets.to(readers[i], component.dataClass(), "field '" + plan.fields[i].name()
                         + "'", "component '" + component.name() + "'", mismatches);
                 if (plan.stated[i] != null && component.dataClass() instanceof DataClassAtom bound) {
@@ -142,7 +152,7 @@ final class BindRecordBuilder implements RecordBuilder {
         }
         for (int i = 0; i < slots.length; i++) {
             Object slot = slots[i];
-            if (argument[i] >= 0 && slot != Slots.ABSENT) {
+            if (argument[i] >= 0 && slot != Slots.VOID) {
                 arguments[argument[i]] = slot;
             }
         }
@@ -159,12 +169,11 @@ final class BindRecordBuilder implements RecordBuilder {
 
     /**
      * A bound class's own rule refusing the values read for it -- a compact constructor's check, most often, or a
-     * bridge's -- which is a fact about this document and not a fault in this library.
+     * bridge's. The schema admitted those values, so this is the class and the schema disagreeing: a
+     * {@code BIND_MISMATCH} ({@link BindingDiagnostics}).
      */
     static void rejected(JsonReadContext ctx, Class<?> type, Throwable e) {
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "%s rejected the value read for it: %s"
-                .formatted(type.getSimpleName(), e), "a value " + type.getSimpleName() + " accepts",
-                String.valueOf(e.getMessage()));
+        ctx.report(BindingDiagnostics.rejectedUnderSchema(type, Handed.VALUE, e));
     }
 
     @Override
@@ -242,8 +251,11 @@ final class BindRecordBuilder implements RecordBuilder {
         for (String candidate : candidates) {
             try {
                 return binding.getDescriptor(candidate);
-            } catch (DataBindException e) {
+            } catch (UnboundNameException e) {
                 first = first == null ? e : first;
+            } catch (DataBindException e) {
+                // Bound, to a class this context cannot analyse: deferred like a type nobody bound, named for what it is.
+                throw new MissingBindingException(e.getMessage(), e);
             }
         }
         throw new MissingBindingException("no bound Java class for '" + String.join("' or '", candidates)
@@ -269,6 +281,20 @@ final class BindRecordBuilder implements RecordBuilder {
         candidates.remove(name);
         candidates.add(name);
         return candidates;
+    }
+
+    /**
+     * How {@code field} can deliver no value to its component, or {@code null} where it cannot: a voidable field
+     * whose value may be void, and one that yields nothing when the document leaves it out -- optional with no
+     * default, or a field group's member. Either reaches the constructor as {@code null}, which a primitive
+     * component cannot take, and both are known before any document -- so the class is refused at compile rather
+     * than at the read that writes one.
+     */
+    private static String deliversNull(RecordField field, RecordField.Omitted omitted) {
+        if (field.voidable()) {
+            return "is voidable";
+        }
+        return omitted == RecordField.Omitted.NOTHING ? "may be left out with nothing injected" : null;
     }
 
     /** A default or a pin in the component's own class, recorded as a mismatch where the family cannot say it so. */

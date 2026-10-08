@@ -54,7 +54,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     public Refusal missingRequiredField(String field) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
                 "missing required field '%s' for '%s'".formatted(field, typeName),
-                "a value for '" + field + "'", "(absent)");
+                "a value for '" + field + "'", "(missing)");
     }
 
     /**
@@ -64,7 +64,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
      * appears in {@code actual} rather than in the prose, because the rule is about the field and not
      * about how absence was spelled.
      */
-    public Refusal absenceAtRequiredField(String field, String spelling) {
+    public Refusal voidAtRequiredField(String field, String spelling) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
                 "'%s' on '%s' admits no absence".formatted(field, typeName),
                 "a value for '" + field + "'", spelling);
@@ -75,7 +75,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
      * the fix is to omit the field rather than to disclaim its value -- and the default is still what the
      * field decodes to, only the verdict changes.
      */
-    public Refusal absenceAtDefaultedField(String field, String spelling) {
+    public Refusal voidAtDefaultedField(String field, String spelling) {
         return new Refusal(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
                 "'%s' on '%s' is always filled from the schema and cannot be written as absent -- omit the field "
                         .formatted(field, typeName) + "to take its default (§5.2)",
@@ -83,7 +83,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     }
 
     /** Absence written at a field pinned to a value, which the schema settles and which is never absent. */
-    public Refusal fixedFieldAbsent(String field, String pinned, String spelling) {
+    public Refusal voidAtFixedField(String field, String pinned, String spelling) {
         return new Refusal(Diagnostic.Code.FIELD_FIXED,
                 "'%s' is fixed on '%s' and cannot be absent".formatted(field, typeName), pinned, spelling);
     }
@@ -99,17 +99,38 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
                 pinned, written);
     }
 
-    /** [TSON-SCHEMA] §5.11: an OPTIONAL group admits at most one member, a REQUIRED group exactly one. */
-    public Refusal groupAdmitsAtMostOne(String members, int present) {
-        return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
-                "at most one of (%s) may be present for '%s', found %d".formatted(members, typeName, present),
-                "at most one of (" + members + ")", present + " present");
+    /**
+     * [TSON-SCHEMA] §5.11: a REQUIRED group with no option chosen, or more than one. An option is chosen when any
+     * of its members is present; the message counts options, since an option may hold several fields.
+     */
+    public Refusal groupChoosesExactlyOne(String options, int chosen) {
+        return new Refusal(Diagnostic.Code.FIELD_GROUP,
+                "exactly one option of (%s) must be chosen for '%s', found %s".formatted(options, typeName,
+                        chosen == 0 ? "none" : chosen),
+                "exactly one option of (" + options + ")", chosen == 0 ? "none chosen" : chosen + " chosen");
     }
 
-    /** A REQUIRED group with no member present -- §5.11 counts presence after ordinary field validation. */
-    public Refusal groupRequiresOne(String members) {
-        return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
-                "exactly one of (%s) must be present for '%s'".formatted(members, typeName),
-                "one of (" + members + ")", "none present");
+    /** An OPTIONAL group with more than one option chosen. */
+    public Refusal groupChoosesAtMostOne(String options, int chosen) {
+        return new Refusal(Diagnostic.Code.FIELD_GROUP,
+                "at most one option of (%s) may be chosen for '%s', found %d".formatted(options, typeName, chosen),
+                "at most one option of (" + options + ")", chosen + " chosen");
+    }
+
+    /** The at-least-one group ({@code +}, [TSON-SCHEMA] §5.11) with none of its members present. */
+    public Refusal groupRequiresAtLeastOne(String members) {
+        return new Refusal(Diagnostic.Code.FIELD_GROUP,
+                "at least one of (%s) must be present for '%s'".formatted(members, typeName),
+                "at least one of (" + members + ")", "none present");
+    }
+
+    /**
+     * A chosen option missing a member its group does not mark {@code ?} (§5.11): the
+     * member present chose the option, and the option needs the one that is missing.
+     */
+    public Refusal optionNeeds(String chosenBy, String option, String missing) {
+        return new Refusal(Diagnostic.Code.FIELD_GROUP,
+                "'%s' chose (%s) on '%s', which needs '%s'".formatted(chosenBy, option, typeName, missing),
+                "'" + missing + "' beside '" + chosenBy + "'", "missing");
     }
 }

@@ -14,11 +14,23 @@ hand — so **the target class must be `public`**, since the library reaches it 
 | a `record`                                  | a `record` — named fields, bound by component name                |
 | a hand-written immutable class with `@Record` on its canonical constructor | the same                          |
 | a `record` carrying `@Tuple`                | a `tuple` — positional, by constructor-argument order             |
-| `List<E>`                                   | an array                                                          |
+| `List<E>`, `Set<E>`, any `Collection<E>`   | an array (`set<T>` included)                                      |
 | `Map<K, V>`                                 | a map                                                             |
+| `SequencedMap<K, V>`                        | a map, keeping the order the document wrote its entries in        |
 | a plain `enum`                              | an enum                                                           |
 | a sealed interface, or one with `@Union`    | a choice                                                          |
 | the built-in atom vocabulary                | the `java.base` types in the table below                          |
+
+A component declaring an interface is built as a default class for it — `List` and `Collection` as
+`ArrayList`, `Set` as `HashSet`, `SortedSet` as `TreeSet`, `SequencedSet` as `LinkedHashSet`, `SortedMap` as
+`TreeMap`, `ConcurrentMap` as `ConcurrentHashMap` — and a concrete class through its capacity constructor where
+it has one and its no-argument constructor otherwise (`TreeSet`, `LinkedList`, `TreeMap`).
+
+A bare `Map` is built as a `HashMap`, which does not keep entry order. An ordered map
+(`!map { … ordered: true }`) under a schema needs a component that does — `SequencedMap` (built as a
+`LinkedHashMap`), or a concrete class that is a `SequencedMap` but not a `SortedMap`, which sorts by key
+instead — or the bind-mode compile refuses it with a `BindMismatchException`. An unordered map binds to
+either.
 
 A cyclic type graph resolves: `getDescriptor` hands a re-entrant call a deferred supplier and each
 holder keeps it in a final `Memoized`, so laziness is confined to the cyclic edge and every other
@@ -37,7 +49,7 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `uint16`, `int32`                               | `Integer`                                       |
 | `uint32`, `int64`                               | `Long`                                          |
 | `uint64`, `int128`/`uint128`, `int256`/`uint256`| `BigInteger`                                    |
-| `positive_integer`, `non_negative_integer`, `negative_integer`, `non_positive_integer` | `BigInteger`  |
+| `integer`, and a bound on it (`!integer ^ { min: 0 }`) | `BigInteger`              |
 | `number`                                        | `BigDecimal`                                    |
 | `float32` / `float64`                           | `Float` / `Double`                              |
 | `rational`                                      | `io.ltr8.tson.base.atom.Rational`               |
@@ -46,12 +58,12 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `uuid`                                          | `UUID`                                          |
 | `date` / `time` / `datetime`                    | `LocalDate` / `OffsetTime` / `OffsetDateTime`   |
 | `duration` / `period`                           | `java.time.Duration` / `java.time.Period`       |
-| `uri`                                           | `URI`                                           |
+| `uri` / `uri_reference` / `iri` / `iri_reference` | `URI`                                         |
 | `ipv4` / `ipv6`                                 | `Inet4Address` / `Inet6Address`                 |
 | `cidr4` / `cidr6`                               | `io.ltr8.tson.base.atom.CidrInet4Network` / `CidrInet6Network` |
 | `bytes` (and any `!bytes_type { encoding: … }` instance) | `byte[]`                               |
 | an untyped token (§4 base resolution)           | `Boolean`, `BigInteger`, `BigDecimal`, `String` |
-| `_` (the only no-value spelling)                | a `TsonAbsent` node / `null`                    |
+| `_` (the only no-value spelling)                | a `TsonVoid` node / `null`                    |
 
 An integer's host type is the **narrowest** that holds its declared range, so `int8` never hands back a
 `BigInteger` for a value that fits a `Byte`.

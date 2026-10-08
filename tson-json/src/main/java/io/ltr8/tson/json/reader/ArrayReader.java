@@ -1,5 +1,6 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
@@ -9,23 +10,28 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
  * An array or a set as a JSON array, in every read mode: [TSON-JSON] §6.3. Elements at the element reader, in
  * order, with the size facets validating the slot count; the mode's {@link ArrayBuilder} builds the value once.
  *
- * <p><b>{@code [T?]} admits null at any slot as the absent element</b> -- the slot exists and counts ([TSON-DATA]
+ * <p><b>{@code [T?]} admits null at any slot as a void element</b> -- the slot exists and counts ([TSON-DATA]
  * §2.9). Under {@code [T]} null at a slot is a validation error, as {@code _} is in text: it is never a value (§7).
  *
  * <p><b>A set's duplicates are judged on the element's value</b>, through {@link ValueIdentity}: what a
  * duplicate is depends on what the element reader produced, so bind mode compares the host values its elements
  * decode to, and tree mode the identity its atom elements carry beside their nodes
  * ({@link ValueIdentity.Identified}).
+ *
+ * <p><b>Unique names are a look-alike scope</b> ({@link ArrayPlan#elementsAreNames}): an element reading alike with
+ * an earlier one is refused at its own index, the name being the identity its element decoded to. A refused or
+ * void element is in neither check, there being no value to compare.
  */
 final class ArrayReader implements JsonTypeReader<Object> {
 
-    /** How a JSON document spells absence (§7), for the {@code actual} of a rule about an element's state. */
+    /** How a JSON document spells the void sentinel (§7), for the {@code actual} of a rule about a voidable element. */
     private static final String NULL = "null";
 
     private final ArrayPlan plan;
@@ -62,17 +68,19 @@ final class ArrayReader implements JsonTypeReader<Object> {
         int reportedBefore = ctx.reported();
         List<Object> elements = new ArrayList<>();
         Set<Object> seen = plan.unique() ? new HashSet<>() : null;
+        ConfusableNames.Scope names = plan.elementsAreNames() && ctx.identifierPolicy().appliesSkeletonDistinctness()
+                ? new ConfusableNames.Scope() : null;
         while (!(ctx.peek() instanceof JsonEvent.ArrayEnd)) {
             int index = elements.size();
             JsonReadContext at = ctx.index(index);
             if (at.peek() instanceof JsonEvent.NullValue) {
                 at.next();
-                if (!plan.optionalElements()) {
-                    at.report(plan.rules().absentElement(index, NULL));
+                if (!plan.voidableElements()) {
+                    at.report(plan.rules().voidElement(index, NULL));
                 }
                 // The slot exists and counts either way, so it stays rather than shifting every later element's
                 // index against the document ([TSON-DATA] §2.9).
-                elements.add(Slots.ABSENT);
+                elements.add(Slots.VOID);
                 continue;
             }
             Object value = element.read(at);
@@ -87,6 +95,11 @@ final class ArrayReader implements JsonTypeReader<Object> {
                 }
                 if (!seen.add(identity)) {
                     at.report(plan.rules().repeatedElement(Nodes.rendered(value)));
+                } else if (names != null && identity instanceof String name) {
+                    Optional<ConfusableNames.Collision> collision = names.add(name);
+                    if (collision.isPresent()) {
+                        at.report(plan.rules().confusableElements(collision.get()));
+                    }
                 }
             }
             elements.add(value);
@@ -97,7 +110,7 @@ final class ArrayReader implements JsonTypeReader<Object> {
     }
 
     /**
-     * §6.3: the size facets validate the slot count -- an absent element occupies a slot and is counted.
+     * §6.3: the size facets validate the slot count -- a void element occupies a slot and is counted.
      * {@code TYPE_MISMATCH} rather than a constraint code, which is the TSON reader's answer for the same rule:
      * [TSON-JSON] §9.4 gives both encodings one closed vocabulary.
      */

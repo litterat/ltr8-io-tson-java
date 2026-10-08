@@ -90,8 +90,8 @@ public final class DataClassObjectWriter {
     private void write(Object value, DataClass dataClass, JsonDataEmitter out) throws DataBindException {
         try {
             if (value == null) {
-                // §7 makes JSON null the absent sentinel's spelling at a typed position, which is what a
-                // reader of this document will apply. Here it is simply the one spelling absence has.
+                // §7 makes JSON null the void sentinel's spelling at a typed position, which is what a
+                // reader of this document will apply. Here it is simply the one spelling a void value has.
                 out.nullValue();
                 return;
             }
@@ -188,7 +188,7 @@ public final class DataClassObjectWriter {
     /**
      * A record as a JSON object.
      *
-     * <p>An absent field is left out rather than written {@code null}: §7 makes JSON null the absent
+     * <p>A null component is left out rather than written {@code null}: §7 makes JSON null the void
      * sentinel at a typed position, so the two say the same thing, and the shorter one is what a reader
      * of any strictness takes. The annotations carrier is skipped because it is not data -- see {@link
      * #write}.
@@ -221,7 +221,7 @@ public final class DataClassObjectWriter {
      * A map as a JSON object, its keys as member names.
      *
      * <p><b>A key must be an atom</b>, which is this module's reader's own rule stated from the other side:
-     * a member name is a string, so a key type a name cannot spell has nowhere to go, and §6.5's pairs form
+     * a member name is a string, so a key type a name cannot spell has nowhere to go, and §6.4's pairs form
      * (which carries a compound key) is not read here. The name is the key's own text -- §5.1 hands a
      * string's content to the atom's parser, so a {@code UUID} key writes its {@code uuid} spelling and
      * reads back through the same one.
@@ -230,7 +230,7 @@ public final class DataClassObjectWriter {
         if (!(dataClass.keyDataClass() instanceof DataClassAtom)) {
             throw new WriteException(
                     ("a JSON object's member names are %s's keys, so its key type must be one a name can "
-                            + "spell -- §6.5's pairs form, which carries a compound key, is not written here")
+                            + "spell -- §6.4's pairs form, which carries a compound key, is not written here")
                             .formatted(dataClass.typeClass().getSimpleName()));
         }
         out.beginObject();
@@ -247,7 +247,7 @@ public final class DataClassObjectWriter {
     /** A key's text, through the same vocabulary a value would use, with any bridge applied first. */
     private String memberName(Object key, DataClass keyClass) throws Throwable {
         if (key == null) {
-            throw new WriteException("a JSON member name cannot be absent, so a map with a null key "
+            throw new WriteException("a JSON member name is never null, so a map with a null key "
                     + "has no JSON spelling");
         }
         Object wire = keyClass.bridge().isPresent() ? keyClass.bridge().get().toData().invoke(key) : key;

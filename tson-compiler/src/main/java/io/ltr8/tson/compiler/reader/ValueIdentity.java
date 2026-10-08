@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.annotation.Annotated;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonAtom;
@@ -82,6 +83,20 @@ public final class ValueIdentity {
             case OffsetTime clock -> clock.withOffsetSameInstant(ZoneOffset.UTC).toLocalTime();
             case TsonAtom atom -> new Atom(of(atom.value()), atom.typeRef(), atom.annotations());
             default -> decoded;
+        };
+    }
+
+    /**
+     * The name a value of an identifier-keyed map or a unique array of names decoded to, whichever mode read it: the
+     * text itself in object binding, boxed where the bound value is {@code Annotated}, and a tree's atom node. It
+     * is the value, in its type's normalization form, that a look-alike scope judges, never the spelling.
+     */
+    static String nameOf(Object decoded) {
+        return switch (decoded) {
+            case String text -> text;
+            case TsonAtom atom when atom.value() instanceof String text -> text;
+            case Annotated<?> annotated when annotated.value() instanceof String text -> text;
+            case null, default -> null;
         };
     }
 

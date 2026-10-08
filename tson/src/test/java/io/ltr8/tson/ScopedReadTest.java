@@ -36,12 +36,15 @@ class ScopedReadTest {
     private static final String HOST = "https://example.test/scope-host.tn";
     private static final String CLAIM = "https://example.test/scope-claim.tn";
     private static final String REPORT = "https://example.test/scope-report.tn";
+    private static final String WIDE = "https://\u4F8B\u3048.test/\u6CE8\u6587.tn";
+    private static final String LIBRARY = "/local/scope-orders.tn";
+    private static final String IDENTITY_HOST = "https://example.test/scope-identity-host.tn";
 
     private static final Map<String, String> SCHEMAS = Map.of(
             HOST, """
                     !!id:"https://example.test/scope-host.tn"
-                    !!meta:"https://tson.io/2026/36/m/meta.tn"
-                    !!import:"https://tson.io/2026/36/m/core.tn"
+                    !!meta:"https://tson.io/2026/37/m/meta.tn"
+                    !!import:"https://tson.io/2026/37/m/core.tn"
                     {
                       note      => { body: text }
                       memo      => { body: text  urgent: boolean }
@@ -55,8 +58,8 @@ class ScopedReadTest {
                     """,
             CLAIM, """
                     !!id:"https://example.test/scope-claim.tn"
-                    !!meta:"https://tson.io/2026/36/m/meta.tn"
-                    !!import:"https://tson.io/2026/36/m/core.tn"
+                    !!meta:"https://tson.io/2026/37/m/meta.tn"
+                    !!import:"https://tson.io/2026/37/m/core.tn"
                     {
                       claim  => { id: text  amount: int32 }
                       remark => { text: text }
@@ -64,12 +67,35 @@ class ScopedReadTest {
                     """,
             REPORT, """
                     !!id:"https://example.test/scope-report.tn"
-                    !!meta:"https://tson.io/2026/36/m/meta.tn"
-                    !!import:"https://tson.io/2026/36/m/core.tn"
+                    !!meta:"https://tson.io/2026/37/m/meta.tn"
+                    !!import:"https://tson.io/2026/37/m/core.tn"
                     {
                       report => { study: text }
                     }
-                    """);
+                    """,
+            WIDE, "!!id:\"" + WIDE + "\"\n" + """
+                    !!meta:"https://tson.io/2026/37/m/meta.tn"
+                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    {
+                      order => { n: int32 }
+                    }
+                    """,
+            LIBRARY, """
+                    !!id:"/local/scope-orders.tn"
+                    !!meta:"https://tson.io/2026/37/m/meta.tn"
+                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    {
+                      order => { n: int32 }
+                    }
+                    """,
+            IDENTITY_HOST, """
+                    !!id:"https://example.test/scope-identity-host.tn"
+                    !!meta:"https://tson.io/2026/37/m/meta.tn"
+                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    {
+                      routed => { wide: extern_of<"%s">  library: extern_of<"%s"> }
+                    }
+                    """.formatted(WIDE, LIBRARY));
 
     private static final SchemaSource SOURCE = uri -> {
         for (Map.Entry<String, String> document : SCHEMAS.entrySet()) {
@@ -247,6 +273,35 @@ class ScopedReadTest {
         assertEquals(Optional.of("/two"), problems.get(1).path());
     }
 
+    /**
+     * A schema is named by its identity, which [TSON-DATA] §2.2.1 reads as an IRI-reference: a host or path beyond
+     * US-ASCII, or a path-only reference naming a library entry, is an identity a document may carry, so meta's
+     * {@code schema_identity} admits both as a key of {@code scoped.schemas} and {@code extern_of<S>} names them.
+     */
+    @Test
+    void externOfNamesASchemaByAnyIdentityADocumentMayCarry() {
+        String data = "!!schema:\"" + IDENTITY_HOST + "\"\n!routed { wide: !!schema:\"" + WIDE + "\" !order { n: 1 }"
+                + "  library: !!schema:\"" + LIBRARY + "\" !order { n: 2 } }";
+
+        assertEquals(List.of(), tson().validate(data));
+    }
+
+    /** No identity carries a fragment (§2.2.1), so {@code schema_identity} refuses one as a key at load. */
+    @Test
+    void externOfRefusesAFragmentNoIdentityCarries() {
+        List<Diagnostic> problems = tson().validateSchema("""
+                !!id:"https://example.test/scope-fragment.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
+                {
+                  routed => { one: extern_of<"https://example.test/scope-claim.tn#part"> }
+                }
+                """);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("schema_identity"), problems::toString);
+    }
+
     /** {@code extern_type<S, T>} names one type in one schema, and the schema's other types are not it. */
     @Test
     void externTypeAdmitsOnlyTheTypeItNames() {
@@ -301,7 +356,8 @@ class ScopedReadTest {
         List<Diagnostic> problems = problems("!closed { n: !!schema:\"" + CLAIM + "\" 1 }");
 
         assertEquals(1, problems.size(), problems::toString);
-        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code());
+        // A resolver error, there being no cell to refuse it; the cell rule's refusal is the validation one.
+        assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, problems.getFirst().code());
         assertTrue(problems.getFirst().message().contains("not a scoped type"), problems::toString);
     }
 
@@ -320,7 +376,7 @@ class ScopedReadTest {
     /**
      * <b>Bind mode reads the pushed value and hands back the object, unwrapped.</b> A bound class has nowhere
      * to carry a schema URI, and inventing somewhere would change what a consumer's own class means -- so the
-     * scope is a tree-mode fact, the same asymmetry {@code TsonAbsent} already makes for [TSON-DATA] §2.9.
+     * scope is a tree-mode fact, the same asymmetry {@code TsonVoid} already makes for [TSON-DATA] §2.9.
      *
      * <p>{@code extern_type<S, T>} is the shape bind mode can state: one type in one schema, so the component
      * has a static type to be. The wider instances are read the same way and land in an {@code Object}

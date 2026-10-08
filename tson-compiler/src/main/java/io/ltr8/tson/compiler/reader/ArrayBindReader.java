@@ -5,6 +5,9 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataParameterizedType;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
+import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -38,9 +41,15 @@ import java.util.List;
  * into {@code descriptor}'s own assembly machinery.
  *
  * <p>Everything else -- resolving the element reader, confirming an array shape, size/uniqueness/
- * absent-element validation -- lives on {@link ArrayAbstractReader}; {@code unique_items} is still
+ * void-element validation -- lives on {@link ArrayAbstractReader}; {@code unique_items} is still
  * enforced there regardless of what {@code descriptor}'s own backing collection would otherwise
  * silently tolerate.
+ *
+ * <p><b>Nothing is handed to the collection once the value is lost</b> ({@link ConstructionGuard}): a refused
+ * element travels as {@code null}, which a collection that refuses {@code null} would throw on, so each
+ * {@code put} is skipped once anything has been reported since the mark. What the collection itself throws --
+ * a void element meeting an {@code ArrayDeque}, say -- is reported, a
+ * {@code BIND_MISMATCH}: the schema admitted what the bound class cannot hold.
  *
  * <p><b>A real Java array target needs its own exact final size known before construction, unlike a
  * growable {@code List}/{@code Set}</b> ({@code descriptor.constructor()} for an array type is
@@ -56,71 +65,80 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
     private final DataClassArray descriptor;
 
     public ArrayBindReader(String name, String displayName, ArrayBody body, DataClassArray descriptor,
-                           TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
-        this(name, displayName, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
-    }
-
-    public ArrayBindReader(String name, String displayName, ArrayBody body, DataClassArray descriptor,
-                           TsonTypeReaderResolver resolver,
-                           SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
+                           TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
+                           AnnotationTypes annotationTypes, boolean elementsAreNames) {
         super(name, displayName, body,
                 ElementBridging.wrap(
                         AnnotationBoxing.wrap(resolver.resolve(body.elementType().name()),
                                 descriptor.arrayDataClass(), annotationTypes),
                         descriptor.arrayDataClass()),
-                schemaLocation);
+                schemaLocation, elementsAreNames);
+        this.descriptor = descriptor;
+    }
+
+    /** Over an element reader already bound to {@code descriptor}'s element -- {@link BindTargets}' rebuild. */
+    ArrayBindReader(String name, String displayName, ArrayBody body, DataClassArray descriptor,
+                    TsonTypeReader<?> element, SchemaLocation schemaLocation, boolean elementsAreNames) {
+        super(name, displayName, body, element, schemaLocation, elementsAreNames);
         this.descriptor = descriptor;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.underDeclaration(schemaLocation);
-        if (!expectArrayStart(ctx)) {
+        TsonReadContext at = ctx.underDeclaration(schemaLocation);
+        if (!expectArrayStart(at)) {
             return null;
         }
-        int mark = ConstructionGuard.mark(ctx);
-        try {
-            if (descriptor.typeClass().isArray()) {
-                return readIntoFixedSizeArray(ctx, mark);
-            }
-            Object arrayData = descriptor.constructor().invoke(0);
-            Object iterator = descriptor.iterator().invoke(arrayData);
-            readInto(ctx, decoded -> put(arrayData, iterator, decoded));
-            return ConstructionGuard.abandoned(ctx, mark) ? null : arrayData;
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Throwable t) {
-            throw new IllegalStateException("failed to construct " + descriptor.typeClass() + " from '" + name
-                    + "'s own decoded elements", t);
+        int mark = ConstructionGuard.mark(at);
+        if (descriptor.typeClass().isArray()) {
+            return readIntoFixedSizeArray(at, mark);
         }
+        Object arrayData;
+        Object iterator;
+        try {
+            arrayData = descriptor.constructor().invoke(0);
+            iterator = descriptor.iterator().invoke(arrayData);
+        } catch (Throwable t) {
+            at.report(rejected(t));
+            arrayData = null;
+            iterator = null;
+        }
+        Object collection = arrayData;
+        Object cursor = iterator;
+        readInto(at, decoded -> {
+            if (!ConstructionGuard.abandoned(at, mark)) {
+                try {
+                    descriptor.put().invoke(collection, cursor, decoded);
+                } catch (Throwable t) {
+                    at.report(rejected(t));
+                }
+            }
+        });
+        return ConstructionGuard.abandoned(at, mark) ? null : collection;
     }
 
-    private Object readIntoFixedSizeArray(TsonReadContext ctx, int mark) throws Throwable {
+    private Object readIntoFixedSizeArray(TsonReadContext ctx, int mark) {
         List<Object> buffered = new ArrayList<>();
         readInto(ctx, buffered::add);
         if (ConstructionGuard.abandoned(ctx, mark)) {
-            // Checked before allocating, not just before returning: a failed element is buffered as null, and
-            // storing one into a primitive-component array unboxes it and throws NPE out of `put`'s own
-            // MethodHandle -- the secondary failure ConstructionGuard exists to keep off a caller's stack.
             return null;
         }
-        Object arrayData = descriptor.constructor().invoke(buffered.size());
-        Object iterator = descriptor.iterator().invoke(arrayData);
-        for (Object decoded : buffered) {
-            put(arrayData, iterator, decoded);
+        try {
+            Object arrayData = descriptor.constructor().invoke(buffered.size());
+            Object iterator = descriptor.iterator().invoke(arrayData);
+            for (Object decoded : buffered) {
+                descriptor.put().invoke(arrayData, iterator, decoded);
+            }
+            return arrayData;
+        } catch (Throwable t) {
+            ctx.report(rejected(t));
+            return null;
         }
-        return arrayData;
     }
 
-    /** {@code descriptor.put()} is a {@link java.lang.invoke.MethodHandle}, declared to throw {@code Throwable} -- caught and rewrapped here since this is called from within a {@code Consumer}, which can't declare it. */
-    private void put(Object arrayData, Object iterator, Object decoded) {
-        try {
-            descriptor.put().invoke(arrayData, iterator, decoded);
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Throwable t) {
-            throw new IllegalStateException("failed to add a decoded element to " + descriptor.typeClass(), t);
-        }
+    /** The bound collection refusing what this read handed it, which the schema admitted. */
+    private Refusal rejected(Throwable cause) {
+        return BindingDiagnostics.rejectedUnderSchema(descriptor.typeClass(), Handed.ELEMENTS, cause);
     }
 
     /**
@@ -178,7 +196,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
             }
             return new ArrayBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
                     context.locationOf(name, typeDefinition),
-                    AnnotationTypes.of(context));
+                    AnnotationTypes.of(context), elementsAreNames(body, context));
         }
 
         /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */

@@ -20,13 +20,18 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SequencedMap;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,8 +45,8 @@ class JsonBindContainerReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/bind-containers-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             {
               address => { street: text  city: text }
               names   => [text]
@@ -64,6 +69,9 @@ class JsonBindContainerReadTest {
                 maybe:    {text => text?}
                 byPoint:  {point => text}
               }
+              sorted => { tags: set<text> }
+              ranked => !map { key_type: text  value_type: int32  ordered: true }
+              league => { table: ranked }
             }
             """;
 
@@ -81,7 +89,7 @@ class JsonBindContainerReadTest {
     public record Pair(String label, long count) {
     }
 
-    /** An optional position binds to a boxed element, which can hold the absence. */
+    /** A voidable position binds to a boxed element, which can hold a void value. */
     @Tuple
     public record Loose(String label, Integer count) {
     }
@@ -203,13 +211,13 @@ class JsonBindContainerReadTest {
         assertTrue(e.getMessage().contains("field 'tags''s element cannot produce"), e.getMessage());
     }
 
-    /** {@code [int32?]} admits an absent element, which an {@code int[]} has nowhere to hold. */
+    /** {@code [int32?]} admits a void element, which an {@code int[]} has nowhere to hold. */
     @Test
     void optionalElementsCannotReachAPrimitiveArray() {
         Map<String, Class<?>> bindings = new HashMap<>(BINDINGS);
         bindings.put("optional_ints", OptionalInts.class);
         BindMismatchException e = assertThrows(BindMismatchException.class, () -> compile(bindings));
-        assertTrue(e.getMessage().contains("admits absent elements"), e.getMessage());
+        assertTrue(e.getMessage().contains("admits void elements"), e.getMessage());
     }
 
     // ── Tuples ───────────────────────────────────────────────────────────
@@ -324,5 +332,71 @@ class JsonBindContainerReadTest {
         bindings.put("weights", WeightsWithIntKeys.class);
         BindMismatchException e = assertThrows(BindMismatchException.class, () -> compile(bindings));
         assertTrue(e.getMessage().contains("field 'counts''s key cannot produce"), e.getMessage());
+    }
+
+    // ── Ordered maps ─────────────────────────────────────────────────────
+    // An ordered map needs a component that keeps insertion order, the order the document wrote; an unordered
+    // map takes either kind, since keeping its order loses nothing.
+
+    public record League(SequencedMap<String, Long> table) {
+    }
+
+    public record LeagueAsMap(Map<String, Long> table) {
+    }
+
+    public record WeightsLinked(Map<LocalDate, BigDecimal> byDate, LinkedHashMap<String, Long> counts,
+                                Map<String, String> maybe, Map<Point, String> byPoint) {
+    }
+
+    @Test
+    void anOrderedMapKeepsTheOrderTheDocumentWrote() {
+        Map<String, Class<?>> bindings = new HashMap<>(BINDINGS);
+        bindings.put("league", League.class);
+        League league = (League) readWith(compile(bindings), "league", """
+                {"table": {"zeta": 1, "alpha": 2, "mid": 3}}""");
+        assertEquals(List.of("zeta", "alpha", "mid"), List.copyOf(league.table().keySet()));
+    }
+
+    @Test
+    void anOrderedMapBoundToAComponentThatDoesNotKeepOrderFailsTheCompile() {
+        Map<String, Class<?>> bindings = new HashMap<>(BINDINGS);
+        bindings.put("league", LeagueAsMap.class);
+        BindMismatchException e = assertThrows(BindMismatchException.class, () -> compile(bindings));
+        assertTrue(e.getMessage().contains("field 'table' is an ordered map, and Map does not keep insertion order "
+                + "-- declare a SequencedMap"),
+                e.getMessage());
+    }
+
+    @Test
+    void anUnorderedMapBindsToAComponentThatKeepsOrder() {
+        Map<String, Class<?>> bindings = new HashMap<>(BINDINGS);
+        bindings.put("weights", WeightsLinked.class);
+        assertEquals(List.of("b", "a"), List.copyOf(((WeightsLinked) readWith(compile(bindings), "weights",
+                WEIGHTS.replace("{\"a\": 1}", "{\"b\": 2, \"a\": 1}"))).counts().keySet()));
+    }
+
+    private static Object readWith(JsonCompiledSchema compiled, String type, String json) {
+        try (ByteSource bytes = ByteSource.of(json)) {
+            DiagnosticsReceiver receiver = DiagnosticsReceiver.throwing();
+            JsonReadContext ctx = JsonReadContext.of(new JsonStream(bytes, ProcessorPolicy.defaults(), receiver),
+                    receiver);
+            return compiled.get(type).read(ctx);
+        }
+    }
+
+    // ── Collections with no capacity constructor ─────────────────────────
+
+    public record Sorted(SortedSet<String> tags) {
+    }
+
+    /** A {@code SortedSet} component is built as a {@code TreeSet}, through its no-argument constructor. */
+    @Test
+    void aSortedSetComponentReceivesASortedSet() {
+        Map<String, Class<?>> bindings = new HashMap<>(BINDINGS);
+        bindings.put("sorted", Sorted.class);
+        Sorted sorted = (Sorted) readWith(compile(bindings), "sorted", """
+                {"tags": ["c", "a", "b"]}""");
+        assertInstanceOf(TreeSet.class, sorted.tags());
+        assertEquals(List.of("a", "b", "c"), List.copyOf(sorted.tags()));
     }
 }

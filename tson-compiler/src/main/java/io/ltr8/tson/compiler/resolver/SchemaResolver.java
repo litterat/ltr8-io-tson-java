@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
@@ -19,10 +19,13 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
@@ -32,7 +35,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.SequencedSet;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
@@ -201,6 +206,7 @@ public final class SchemaResolver {
         }
 
         TsonCompiledMetaSchema metaParser = loader.loadMeta(document.meta());
+        IdentifierPolicy names = loader.identifierPolicy();
         Map<String, Annotations> nameAnnotations = new LinkedHashMap<>();
         Map<String, TypeDefinition> namespace = mergeImports(document, nameAnnotations);
 
@@ -248,16 +254,18 @@ public final class SchemaResolver {
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
         // closing and a later batch closing of the same application land on one entry.
         TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put,
-                (type, value) -> (Top) read(metaParser.reader(type), value), generated,
-                metaParser.schema().entries()::get);
+                (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names)),
+                generated,
+                metaParser.schema().entries()::get, namespaceGetter::current);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
         DefinitionResolver resolver = new DefinitionResolver(
-                (type, value) -> (Top) read(metaParser.reader(type), value),
+                (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names)),
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
-                // compiled schema's own reader for that name rather than the constructor vocabulary.
-                (type, value) -> read(metaParser.get(type), value),
+                // compiled schema's own reader for that name rather than the constructor vocabulary. Its value is
+                // as opaque to the linker as a data body, so it is read under the policy too.
+                (type, value) -> read(metaParser.get(type), value, names),
                 metaParser.schema().entries()::get, namespaceGetter, new ApplicationCloser() {
 
                     @Override
@@ -318,16 +326,33 @@ public final class SchemaResolver {
         // position it lands in", and once a parameter's kind is known that position is known at the
         // application rather than after substitution. Here because it needs every declaration resolved (a
         // slot's declared type comes from the constructor's own vocabulary) and nothing yet closed.
+        // The declared templates' parameters are stamped here too, not only their kinds, so an application can
+        // check its arguments against them as it closes (§5.10).
         Set<String> unkinded = new LinkedHashSet<>();
-        materialiser.parameterKinds(ParameterKinds.inferAll(namespace, declarations.keySet(),
-                metaParser.schema().entries()::get,
+        Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> written =
+                writtenParameterTypes(declarations, resolver, problems);
+        Map<String, Map<String, TemplateParam>> declaredParameters = ParameterTypes.inferAll(namespace,
+                declarations.keySet(), written, metaParser.schema().entries()::get,
                 (name, error) -> {
                     if (!problems.collecting()) {
                         throw error;
                     }
                     unkinded.add(name);
                     problems.report(declarations.get(name), "'" + name + "': " + error.getMessage(), error);
-                }));
+                });
+        stampParameters(declaredParameters, List.of(resolvedLocals, namespace));
+        materialiser.parameterKinds(ParameterTypes.kinds(declaredParameters));
+        // An application closed during the driving loop was checked against parameters carrying no bound yet,
+        // so its check runs again now that they are stamped (§5.10) -- before anything else closes.
+        // A declaration that already failed has its verdict, so a replayed check is not a second one.
+        materialiser.recheckEarly((name, error) -> {
+            if (!problems.collecting()) {
+                throw error;
+            }
+            if (!namespaceGetter.failed(name)) {
+                problems.report(declarations.get(name), error);
+            }
+        });
         // Condemned on the same terms as an irregular template: the verdict is in, and closing an application
         // of a template whose parameters cannot be classified only reports the consequence -- the substituted
         // body failing its constructor's vocabulary -- against whichever entry happened to apply it.
@@ -337,6 +362,7 @@ public final class SchemaResolver {
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
         republish(namespace, resolvedLocals, instantiations);
         appliedParentEdges(namespace, resolvedLocals, instantiations);
+        familyBaseEdges(namespace, resolvedLocals, generated);
 
         // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
         // have resolved". A form the desugar phase lifted with an application in a slot was named before that
@@ -359,6 +385,15 @@ public final class SchemaResolver {
             });
             republish(namespace, resolvedLocals, instantiations);
         }
+
+        // §5.10's parameters, recorded on every open entry this schema produced -- the materialiser mints open
+        // entries of its own, which is why this runs once everything has closed as well as before. A failure was
+        // reported by the first pass against the declaration that wrote it; one here is the same verdict, and
+        // the entry keeps what it had.
+        Set<String> local = new LinkedHashSet<>(resolvedLocals.keySet());
+        local.addAll(instantiations.keySet());
+        stampParameters(ParameterTypes.inferAll(namespace, local, written, metaParser.schema().entries()::get,
+                (name, error) -> { }), List.of(resolvedLocals, instantiations, namespace));
 
         // §6's name-position annotations. Binding one can fail the way a definition's can (an annotation type
         // §3.3.3 cannot reach), and this loop runs outside the memoized getter that catches those -- so it
@@ -437,7 +472,8 @@ public final class SchemaResolver {
      * is wired wrong, and it is the one a caller most easily acts on, the message naming one of their own
      * classes. Collapsing it into either of the others is what {@code MissingBindingException} exists to
      * prevent -- its Javadoc records a downstream service turning the library-gap shape into a 501 for what
-     * was a missing line of configuration.
+     * was a missing line of configuration. A {@link SchemaRefusalException} is the author's schema declined
+     * under the identifier policy rather than called wrong, and keeps the §8.2 rule's code.
      *
      * <p>All three are reported per declaration and all three leave a placeholder, so one failing
      * declaration does not cost every other declaration its verdict.
@@ -459,6 +495,8 @@ public final class SchemaResolver {
             receiver.report(switch (error) {
                 case BindMismatchException mismatch ->
                         TsonDiagnostics.ofSchemaBindMismatch(schemaId, declaration.name(), mismatch, position);
+                case SchemaRefusalException refusal ->
+                        TsonDiagnostics.ofSchemaRefusal(schemaId, declaration.name(), refusal.code(), message, position);
                 case UnsupportedOperationException ignored ->
                         TsonDiagnostics.ofSchemaGap(schemaId, declaration.name(), message, position);
                 default -> TsonDiagnostics.ofSchemaError(schemaId, declaration.name(), message, position);
@@ -541,6 +579,39 @@ public final class SchemaResolver {
         }
     }
 
+    /**
+     * §5.10's membership: a <b>declared</b> application of a family base -- {@code bt => box<int32>} over
+     * {@code box => <T> { v: T }} -- is a member, so its contract names the template (§8.2's entry shape) and the
+     * linker's inverse puts it in {@code box.subtypes}. An application minted at a use site ({@code k: box<text>})
+     * is not: it is a type, read where it was written, with no edge to the base, so it is never a candidate at a
+     * position typed {@code box} and never needs the name nobody can write. A family's members are exactly the
+     * applications some declaration names -- §5.2's "a family member is declared", kept by leaving the minted
+     * one out rather than by refusing the schema.
+     *
+     * <p>A lifted synthetic is never a member either: it was named by no declaration, which is the whole test.
+     */
+    private static void familyBaseEdges(Map<String, TypeDefinition> namespace,
+                                        Map<String, TypeDefinition> resolvedLocals, Set<String> generated) {
+        for (Map.Entry<String, TypeDefinition> entry : resolvedLocals.entrySet()) {
+            TypeDefinition definition = entry.getValue();
+            String head = definition.source().filter(source -> !source.arguments().isEmpty())
+                    .map(io.ltr8.tson.schema.meta.TypeRef::name).orElse(null);
+            if (head == null || generated.contains(entry.getKey()) || definition.supertypes().contains(head)) {
+                continue;
+            }
+            TypeDefinition template = namespace.get(head);
+            if (template == null || !(template.body() instanceof TemplateBody held) || held.extension().isEmpty()) {
+                continue;
+            }
+            List<String> contract = new java.util.ArrayList<>(definition.supertypes());
+            contract.add(head);
+            TypeDefinition member = new TypeDefinition(definition.source(), definition.kind(), List.copyOf(contract),
+                    definition.subtypes(), definition.body(), definition.position(), definition.annotations());
+            entry.setValue(member);
+            namespace.put(entry.getKey(), member);
+        }
+    }
+
     /** One round of {@link #appliedParentEdges} over one map -- {@code true} when any contract grew. */
     private static boolean fold(Map<String, TypeDefinition> entries, Map<String, String> byApplication,
                                  Map<String, TypeDefinition> namespace) {
@@ -602,6 +673,46 @@ public final class SchemaResolver {
     }
 
     /**
+     * What each declaration's parameter list wrote after a name ({@code <T: text>}), as the type-refs resolution
+     * uses, keyed by declaration then parameter.
+     */
+    private static Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> writtenParameterTypes(
+            Map<String, SchemaMap.Declaration> declarations, DefinitionResolver resolver, Problems problems) {
+        Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> written = new LinkedHashMap<>();
+        declarations.forEach((name, declaration) -> {
+            Map<String, io.ltr8.tson.schema.meta.TypeRef> types = new LinkedHashMap<>();
+            declaration.parameterTypes().forEach((parameter, ref) -> {
+                try {
+                    types.put(parameter, resolver.parameterType(parameter, ref));
+                } catch (SchemaValidationException e) {
+                    if (!problems.collecting()) {
+                        throw e;
+                    }
+                    problems.report(declaration, e);
+                }
+            });
+            if (!types.isEmpty()) {
+                written.put(name, types);
+            }
+        });
+        return written;
+    }
+
+    /**
+     * Stamps each local open entry's parameters ({@link ParameterTypes}) -- the entries {@code local} names -- in
+     * {@code resolvedLocals}, {@code instantiations} and {@code namespace} alike, so every view of an entry
+     * agrees.
+     */
+    private static void stampParameters(Map<String, Map<String, TemplateParam>> parameters,
+                                        List<Map<String, TypeDefinition>> views) {
+        for (Map<String, TypeDefinition> view : views) {
+            view.replaceAll((name, definition) -> parameters.containsKey(name)
+                    && definition.body() instanceof TemplateBody held
+                    ? definition.withBody(held.withParameters(parameters.get(name))) : definition);
+        }
+    }
+
+    /**
      * Puts the local and materialised entries back into the namespace, which every later phase and the
      * on-demand getter both read through. Called after each pass that rewrites either map, since the two are
      * kept in step by hand: the namespace also holds the imported entries, so it cannot simply be replaced.
@@ -640,7 +751,10 @@ public final class SchemaResolver {
         private final Problems problems;
 
         /** The chain currently being resolved -- a name arriving twice is a composition/refinement cycle. */
-        private final Set<String> resolving = new LinkedHashSet<>();
+        private final SequencedSet<String> resolving = new LinkedHashSet<>();
+
+        /** The declarations whose resolution failed and was reported. */
+        private final Set<String> failed = new LinkedHashSet<>();
 
         private DefinitionResolver resolver;
 
@@ -649,6 +763,16 @@ public final class SchemaResolver {
             this.entries = entries;
             this.declarations = declarations;
             this.problems = problems;
+        }
+
+        /** Whether {@code name}'s resolution failed and was reported. */
+        boolean failed(String name) {
+            return failed.contains(name);
+        }
+
+        /** The innermost local declaration being resolved, or {@code null} outside the driving loop. */
+        String current() {
+            return resolving.isEmpty() ? null : resolving.getLast();
         }
 
         /** Supplies the resolver this getter drives; called once, immediately after it is built. */
@@ -684,6 +808,7 @@ public final class SchemaResolver {
                     throw e;
                 }
                 problems.report(declaration, e);
+                failed.add(name);
                 entries.put(name, unresolved(position, SchemaDesugarer.typeParams(declaration.typeDef())));
                 return entries.get(name);
             } finally {
@@ -754,13 +879,28 @@ public final class SchemaResolver {
                 parameters.isEmpty() ? TypeKind.PRODUCT : TypeKind.TEMPLATE, List.of(), List.of(), body, position, Annotations.empty());
     }
 
-    /** One already-resolved {@code DataValue} replayed through a compiled reader. */
-    private static Object read(TsonTypeReader<?> reader,
-                               io.ltr8.tson.compiler.ast.DataValue value) {
-        // Unrestricted deliberately: these events come from a resolved schema value, not from document text.
-        // A schema's own names are the identifier policy's surface, applied by TsonSchemaLinker.
-        return reader.read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)),
-                UnicodePolicy.unrestricted()));
+    /** One already-resolved {@code DataValue} replayed through a compiled reader, judging names under {@code names}. */
+    private static Object read(TsonTypeReader<?> reader, io.ltr8.tson.compiler.ast.DataValue value,
+                               IdentifierPolicy names) {
+        return reader.read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)), names));
+    }
+
+    /**
+     * The identifier policy a constructor's payload is read under: the loader's for a {@code data} constructor,
+     * none for the rest.
+     *
+     * <p><b>A {@code data} body is the one payload the linker cannot see into</b> -- it binds to the consumer's
+     * own class, its fields' types left behind in the meta -- so its identifier-typed values, a key of an
+     * identifier-keyed map among them, are judged here, at the read, as the same values are in a data document.
+     * Every other constructor builds the schema layer's own vocabulary, whose names [TSON-SCHEMA] §11.4's scopes
+     * cover and {@code TsonSchemaLinker} judges: field names, enum members, parameters. Its identifier-typed
+     * values outside those scopes are references -- a choice's variants, a supertype -- whose verdict belongs to
+     * the declaration they name, which may be another schema's.
+     */
+    private static IdentifierPolicy payloadNames(TsonCompiledMetaSchema meta, String constructor,
+                                                 IdentifierPolicy names) {
+        TypeDefinition definition = meta.schema().entries().get(constructor);
+        return definition != null && definition.kind() == TypeKind.DATA ? names : IdentifierPolicy.none();
     }
 
     /**

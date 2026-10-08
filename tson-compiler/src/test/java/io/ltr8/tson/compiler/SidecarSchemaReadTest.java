@@ -113,7 +113,7 @@ class SidecarSchemaReadTest {
         accepts("lexer", """
                 {
                   spec: "§7.2.4"
-                  description: "A bare '+' has no grammar role"
+                  description: "A bare '.' has no grammar role"
                   error: { category: lexer }
                 }""");
     }
@@ -139,7 +139,7 @@ class SidecarSchemaReadTest {
                   valid: { tokens: [] }
                   error: { category: lexer }
                 }""");
-        assertTrue(message.contains("at most one"), message);
+        assertTrue(message.contains("exactly one option"), message);
     }
 
     @Test
@@ -196,12 +196,12 @@ class SidecarSchemaReadTest {
 
     /** `absent` and `empty-brace` have no payload, so they are typed void and written `_`. */
     @Test
-    void aPayloadlessCoreValueIsWrittenAsTheAbsentSentinel() {
+    void aPayloadlessCoreValueIsWrittenAsTheVoidSentinel() {
         SuiteCheckout.assumeAvailable();
         accepts("parser", """
                 {
                   spec: "§2.9"
-                  description: "The absent sentinel as a root value"
+                  description: "The void sentinel as a root value"
                   valid: {
                     document: {
                       id: _  schema: _
@@ -228,7 +228,7 @@ class SidecarSchemaReadTest {
                     }
                   }
                 }""");
-        assertTrue(message.contains("at most one"), message);
+        assertTrue(message.contains("exactly one option"), message);
     }
 
     @Test

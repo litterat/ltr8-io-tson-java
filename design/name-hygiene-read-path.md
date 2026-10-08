@@ -9,12 +9,16 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 - The per-name rules run in `DefaultTsonReadContext`, only on a freshly pulled event — never on a replayed one.
 - A refused name draws no verdict beside its refusal: both record readers checkpoint `ctx.reported()` across the pull
   and skip their `UNRECOGNIZED_FIELD`.
-- Both surfaces are allocation-free when nothing is refused; the call sites test the `Optional` rather than passing a
-  lambda to `ifPresent`.
+- Both surfaces are allocation-free when nothing is refused: `IdentifierPolicy.judge` answers a passing name with the
+  constant empty list, and the call sites test `isEmpty()` rather than passing a lambda to `forEach`.
 - `Confusables.skeleton` must never skip the table for ASCII: `m → rn` and `1 → l` carry mappings.
-- `withTokenPolicy` defaults to `unrestricted()`, `withIdentifierPolicy` to Highly Restrictive over the whole name; a
-  relaxation is a method, never ambient.
-- The restricted-character rule is gated on the level (`appliesIdentifierProfile()`), at both walks.
+- `withTokenPolicy` defaults to `unrestricted()`, `withIdentifierPolicy` to `IdentifierPolicy.defaults()` — all three
+  mechanisms, Highly Restrictive over the whole name; a relaxation is a method, never ambient.
+- The per-name rules are applied by `IdentifierPolicy.judge(name, profile)` alone, which gates the restricted-character
+  rule on the level; every look-alike scope asks `appliesSkeletonDistinctness()` before it builds one.
+- A value whose type is an identifier family is a name: it meets the per-name rules under its family's own profile and
+  is read as nothing when refused, and the keys of a map keyed by one, and the elements of a set of one, are a
+  look-alike scope checked as each arrives.
 
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
 `design/record-dispatch.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
@@ -76,13 +80,13 @@ stream's check is a field read and a branch, where the name rules §8.2 defaults
 name is actually delivered.
 
 **Both surfaces are allocation-free when nothing is refused**, which is what makes the on-by-default one
-affordable. `UnicodePolicy.violation` and `IdentifierProfile.hygiene` each scan and return
-`Optional.empty()` — no split array, no script set, no stream — and the two call sites test that `Optional`
-rather than passing a lambda to `ifPresent`. That last part is not a style preference: a lambda capturing
-the name and the receiver allocates whether or not the `Optional` holds anything, and at one per rule per
-name it is the whole measured cost of a check that is otherwise free — ~110 bytes per bound record and ~640
-per read on the name surface, and most of what a raised *token* policy would add. `AllocationHarnessTest`
-carries the figures and the ceiling that catches a capturing lambda.
+affordable. `IdentifierPolicy.judge` scans each rule — the script rule over a range, so even a per-segment unit takes
+no substring — and answers a passing name with the constant `List.of()`: no split array, no script set, no stream. The
+call sites test `isEmpty()` rather than passing a lambda to `forEach`. That last part is not a style preference: a
+lambda capturing the name and the receiver allocates whether or not there is anything to report, and at one per rule
+per name it is the whole measured cost of a check that is otherwise free — ~110 bytes per bound record and ~640 per
+read on the name surface, and most of what a raised *token* policy would add. `AllocationHarnessTest` carries the
+figures and the ceiling that catches a capturing lambda.
 
 **The look-alike rule is the expensive one, and `Confusables.skeleton` is where its cost is controlled.** It runs
 per name per record on the schemaless tree path, so normalising, building and re-normalising for every name
@@ -93,16 +97,24 @@ do is skip the table for ASCII**: eight ASCII code points carry a mapping, `m �
 so `payment` and `payrnent` read alike without a single non-ASCII character. `ConfusablesTest`
 pins that pair for exactly this reason.
 
-**Two surfaces, two defaults, and §8.2 sets both.** `withTokenPolicy` defaults to `unrestricted()` because a
-value is data and may legitimately be anything; `withIdentifierPolicy` defaults to Highly Restrictive over
-the whole name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able to
-relax any of the three rules and requires the relaxation not be silent, and a policy read from the
-environment is
-invisible at the call site and absent from review. The relaxation to reach for first is the *unit*
-(`perSegment()`), which still refuses `id_pаy` while admitting `url_адрес`. A token policy stricter than the
-identifier policy subsumes it: a name is a token — which §8.2 asks an implementation's documentation to say,
-and this is where it is said. The two names are §8.2's own: it defines the **identifier policy** and the
-**token policy** as the two parts of a processor's configuration for that section, precisely so that two
+**A small scope is compared pairwise** (`ConfusableNames.firstCollision`): with a skeleton free for most names, the
+map a scope used to build per record was nearly the whole cost of the rule, so up to sixteen names are checked as
+one array of names and skeletons, and only a larger scope builds a map. A schemaless read's check is ~420 bytes over
+the harness document's four records (`AllocationHarnessTest`), where the map cost ~1,140. No skeleton is cached
+across records: the few names that map allocate one per record, and a per-read cache would cost a map of its own.
+
+**Two surfaces, two defaults, and §8.2 sets both.** `withTokenPolicy` defaults to `unrestricted()` because a value is
+data and may legitimately be anything; `withIdentifierPolicy` defaults to all three mechanisms with Highly Restrictive
+over the whole name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able
+to relax any of the three rules and requires the relaxation not be silent, and a policy read from the environment is
+invisible at the call site and absent from review. The relaxation to reach for first is the *unit* (`perSegment()`),
+which still refuses `id_pаy` while admitting `url_адрес`; a name's segments are divided at its profile's own
+separators (`IdentifierProfile.separates`), `_` and `-` for §7.7's profile, and `$` or a medial `.` for a family that
+adds one. Skeleton distinctness has a switch of its own (`withSkeletonDistinctness`), reaching every scope — a
+schemaless record, the schema-layer scopes, an identifier-keyed map's keys and a unique array of names in either encoding. A
+token policy stricter than the identifier policy subsumes it: a name is a token — which §8.2 asks an implementation's
+documentation to say, and this is where it is said. The two names are §8.2's own: it defines the **identifier policy**
+and the **token policy** as the two parts of a processor's configuration for that section, precisely so that two
 implementations reporting them agree on what they are called, and `ProcessorConfig` uses those names.
 
 **Field** names see all three, being names at every layer (§2.5, §7.7): the two per-name rules in the read
@@ -114,6 +126,34 @@ single-script. A refusal reports one code per rule —
 `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT` — each a verdict on the document like any other in
 that the caller must change it or relax the policy. What these codes carry that a validity error does not is
 that another processor at another Unicode version may accept the same document.
+
+**A value whose type is an identifier family is a name too**, because the type says so (§8.2, [TSON-SCHEMA]
+§11.4): a field value or a map key typed by any entry whose body `identifier_type` made — the kernel's
+`identifier`, a schema's own, a refinement of either. `AtomTypeReader` holds the family's profile, built once when
+the reader compiles, and after the family parses a value it asks `TsonReadContext.refusesName` of that value — the
+text in the family's `normalization` form, never the spelling, so a folded name is judged as the name it is — the
+same two rules
+`checkNameHygiene` applies to the stream's names, through one method, under that profile rather than §7.7's, so a
+character the profile adds (`$` in a JavaScript-name profile) is the profile's and meets no restricted-character
+rule (`IdentifierProfile.restrictedCharacter`), as §7.7's `-` is. A refused value reads as nothing, as a refused
+field name is never looked up, so it is in no scope a later rule judges.
+
+**The keys of an identifier-keyed map are a data scope under a schema, and the elements of a unique array of
+names the other.** `MapAbstractReader` knows from the
+compiled key type whether its keys are names (`keysAreNames`, decided once per reader), and for such a map builds a
+`ConfusableNames.Scope` per read and adds each cleanly-read key's value as it arrives (`ValueIdentity.nameOf`, the
+name in its type's form rather than the token), so a pair is reported at the second
+key's own position, as §8.2's detection rule asks, and its entry read normally. A repeat is `DUPLICATE_MAP_KEY` and
+nothing else: the scope ignores an equal name. A map keyed by `text` builds nothing — its keys are data. The scope
+costs one small `HashMap` per such map read, and the per-name rules nothing; `AllocationHarnessTest` reports both
+against the same map keyed by `text`. JSON applies the same two rules at the same positions (`json-unicode-policies.md`).
+
+An array whose elements are unique — a set, or any array marked `unique_items` — and whose element type is an
+identifier family is the same scope over its elements (`ArrayAbstractReader`,
+`elementsAreNames`, decided once per reader): a pair is reported at the second element's index, and a repeat is the
+set's duplicate and nothing else. An array that admits repetition is no scope — nothing says two of its elements
+name two things — and neither is a set of `text`. **An element that fails to read is in neither check**: it reads as
+`null`, which has no identity to compare, whether its form failed or the policy refused it as a name.
 
 **The restricted-character rule is gated on the level, as the restricted-script rule is.** §8.2's
 Unrestricted "drops the

@@ -7,12 +7,14 @@ field states, groups, subtraction, and the exception boundary. Current form only
 **Invariants**
 
 - An annotation on a declaration resolves one hop against the governing meta and nowhere else (§3.3.3); a name that
-  misses is a resolver error, the valueless form included. Only the meta-kernel bootstrap skips the check.
+  misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its type. Only
+  the meta-kernel bootstrap skips the check.
 - `abstract`/`final` are grammar, not annotations; `=?` is field syntax; and the definition mark is
   applied once, in `resolve`, not inside whichever `resolve*` built the body.
 - A restated field's annotations concatenate over the inherited ones, restatement first — never replacement by name.
 - A field's name `?`, type `?` and modifier each set one fact; the name's is never inherited, and a modifier-only
-  tightening inherits the type's with the elided type. A restated group member stays a member: no name `?`, no
+  tightening inherits the type's with the elided type. A restated group member stays a member: its name `?`
+  speaks for its option and may be dropped, never added (a `+` group's members are restated as written), no
   default, and a pin that is never supplied.
 - Refinement of a field is three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
   omission yields, so the order on it is checked on `RecordField.omitted`.
@@ -60,7 +62,9 @@ are kept in step deliberately.
   to prevent — an annotation keeping its name and losing its value lets the schema load clean with the
   metadata not there; §6 makes an unresolved annotation name a resolver error, the valueless
   form included (`SchemaAnnotationScopeTest`). A value that *does*
-  resolve is read by that type's own compiled reader, so `@doc:"..."` arrives as a `String`. **The one
+  resolve is read by that type's own compiled reader, so `@doc:"..."` arrives as a `String`, and a bare mark
+  is read the same way as a synthetic `_` — admitted by a void type, refused by any other, as the data path
+  does (`BareAnnotationTest`). **The one
   resolver that skips the check is the meta-kernel bootstrap**, which passes no `AnnotationValueReader` at
   all: it is producing the very entries such a reader would read through, so every name would fail, and there
   the name is kept and the value dropped. Both annotation sets go through this — the ones after
@@ -125,23 +129,25 @@ are kept in step deliberately.
   *fields* rather than a body, and `FamilySelectors.of` (`schema.meta`) derives them — a closed base from its own
   fields, a template base from its members' fields of those names, its own body being held text.
   `RecordExtension` checks the family against that same derivation.
-- **Two different edges populate a family's `subtypes`, and they are minted by two different mechanisms.**
-  The first is §5.8's reference-valued `supertypes`: `result => abstract <T> { payload: T }` with `ok => <T>
-  result<T> & { note: text }` closes at `result<text>` to an ABSTRACT entry whose `subtypes` holds `ok<text>`
-  and not `ok<int32>` — the edge being to the instantiation the arguments name, minted by `contractOf` and
-  inverted by the linker's ordinary supertype walk. The second is **membership in the family base itself**,
-  which for a marked template is the template: every instantiation indexes under the head it closes,
-  `pet<"dog", dog_type>` under `pet`,
-  read off `source` by `TsonSchemaLinker.indexUnderItsTemplate` and credited only where the template's held
-  body carries an `extension` (a container, a constructor application and a reference template have no parent,
-  so their applications index nowhere). A closed entry's own `subtypes` is empty when it is minted:
-  `subtypes` is linking's throughout, one phase after resolution, which is what keeps two schemas closing one
-  application agreeing on the entry §2.2.3 unifies them by (`MintedEntryUnificationTest`). Marking a template
-  whose family could never be populated would be marking a type nothing can ever stand at, which is why the
-  mark and the family edges are one feature (`AbstractTemplateFamilyTest`).
-  **Every entry in such a family is minted**, so §8.2 makes every name in it non-normative and an alias is the
-  only spelling a document has for a member *or* for the base — which is what makes §7.2's flattening
-  load-bearing at both record dispatchers rather than only at the concrete record readers (`RecordDispatch`).
+- **Two different edges populate a family's `subtypes`, and they are minted by two different mechanisms.** The first
+  is §5.8's reference-valued `supertypes`: `result => abstract <T> { payload: T }` with `ok => <T> result<T> & {
+  note: text }` closes at `result<text>` to an ABSTRACT entry whose `subtypes` holds `ok<text>` and not `ok<int32>`
+  — the edge being to the instantiation the arguments name, minted by `contractOf` and inverted by the linker's
+  ordinary supertype walk. The second is **membership in the family base itself**, which for a marked template is
+  the template: a **declared** instantiation (`dogpet => pet<"dog", dog_type>`) carries the head it closes in its
+  own `supertypes` (§8.2's entry shape), added by `SchemaResolver.familyBaseEdges` where the template's held body
+  carries an `extension`, and the linker's ordinary inverse puts it in `pet.subtypes`. A **minted** instantiation
+  (`k: pet<"dog", dog_type>` at a use site) gets no such edge: it is a type read where it was written, never a
+  candidate at a `pet` position, so no diagnostic ever asks a document for its content-derived name (§5.10). A
+  container, a constructor application and a reference template have no parent, so their applications are members of
+  nothing. A closed entry's own `subtypes` is empty when it is minted: `subtypes` is linking's throughout, one phase
+  after resolution, which is what keeps two schemas closing one application agreeing on the entry §2.2.3 unifies
+  them by (`MintedEntryUnificationTest`). Marking a template whose family could never be populated would be marking
+  a type nothing can ever stand at, which is why the mark and the family edges are one feature
+  (`AbstractTemplateFamilyTest`). **Every entry in such a family is minted**, so §8.2 makes every name in it
+  non-normative and an alias is the only spelling a document has for a member *or* for the base — which is what
+  makes §7.2's flattening load-bearing at both record dispatchers rather than only at the concrete record readers
+  (`RecordDispatch`).
 - **A restated field's annotations merge over the inherited ones, restatement first** (`resolveField`/`merged`).
   §5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one; absorbing an
   inherited field whole while rebuilding a restated one from only what the restatement wrote would give one
@@ -166,9 +172,9 @@ are kept in step deliberately.
   `@Typename`; a kernel body is a leaf of the sealed hierarchy, and a meta-schema's own constructor is an
   implementation of the open `Data` branch, admitted by the same lookup); atom refinement (`!I ^ { ... }`, §5.5/§5.7);
   subtraction (`A & { ... } - { f }`, §5.9);
-  restating a field group in a refinement or composition body (§5.11 — same member labels in the same order,
-  types verbatim, state tightening OPTIONAL→REQUIRED only; only the *group's* state moves, since members
-  flatten as optional regardless).
+  restating a field group in a refinement or composition body (§5.11 — the same options, their members in the
+  same order, types verbatim, a member's `?` dropped but never added, state tightening OPTIONAL→REQUIRED only;
+  the member fields never change, since members flatten as optional regardless).
 - **A resolved field is four facts, not a state** (`RecordField`, the kernel's `record_field`), and §5.2's
   spelling `name?: type? ~ value` has one mark per fact: the name's `?` is `optional` (the key may be omitted),
   the type's `?` is `voidable` (a written `_` is admitted), and `~`/`=` give the `role` (DEFAULT or FIXED) and
@@ -181,10 +187,19 @@ are kept in step deliberately.
   `RecordField`. A **parametric** `= P` is FREE with the parameter in `value` (§5.7's "Open modifiers") until
   materialisation closes it to FIXED, keeping the name's mark, so the parameter branch sits ahead of the
   literal pin.
-- **A restated group member stays a member** (`resolveTighteningField`). Its presence is the group's, so the
-  restatement takes no name `?` and the member stays optional whatever it writes; a default is refused; and a
-  pin is admitted and **never supplied** (`RecordField.omitted` answers NOTHING for a member), since an
-  injected member would be present and presence is what selects the alternative. So no member is ever always
+- **A field group is options of members** (`GroupDef`, the kernel's `field_group`; §5.11). An
+  option is chosen when any member is present, a chosen option holds every member `field_group.optional_members`
+  does not name, and `field_group.optional` decides whether no option may be chosen. `GroupDef.fieldGroup` is the
+  one lowering, used by a fresh body and by a held one alike: `+` becomes the non-optional group of one option
+  whose members are all optional, which is why a one-option non-optional group is always a `+` group. The parser
+  refuses every shape that restates plain fields or another group (`TsonSchemaParser.checkGroupShape`).
+- **A restated group member stays a member** (`resolveTighteningField`, `restateMemberMark`). Its presence is
+  the group's, so the member field stays optional whatever it writes. Its name `?` speaks for its option: as at
+  any field it is never inherited, so leaving it off removes the member from `optional_members`, and adding one where
+  the group has none is refused as a loosening. A `+` group's members were written without a `?` and are
+  restated that way. A default is refused; and a pin is admitted and **never supplied**
+  (`RecordField.omitted` answers NOTHING for a member), since an injected member would be present and
+  presence is what selects the alternative. So no member is ever always
   present, and §5.11's rule against two always-present members has nothing left to refuse: there is no check
   for it.
 - **Refinement is three orders** (`refines`), one per question a field answers, each least to most
@@ -207,11 +222,11 @@ are kept in step deliberately.
   at composition's own precision ("subtraction revokes IS-A for every parent while keeping lineage") and
   §5.9 gives the reason: the clause is head-level, so its effect is readable without scanning the parents'
   field sets. Subtract first and compose second where an author wants partial retention.
-  Groups follow §5.11: a removed member leaves `members`, a group down to one member is
-  dissolved into a plain field taking the *group's* state (members flatten as optional whatever the group
-  says, so the survivor would otherwise silently lose a REQUIRED group's "exactly one"), and a group with no
-  members left is dropped — §5.11 runs the arity ladder to zero and states the two-member minimum as an
-  invariant of resolved output.
+  Groups follow §5.11: a removed member leaves its option, an emptied option leaves the group, and a member
+  left alone in its option loses its `?`. A group down to one option that no schema could write is dissolved
+  into the plain fields it equals (`keepsOneOption`, `dissolveInto`): in a group that is not optional its
+  unmarked members become required and its marked ones optional, in an optional group every member optional,
+  and a sole survivor takes the group's `optional` for both marks. A group with no members left is dropped.
 - **Two exception types, and which one is deliberate.** `UnsupportedOperationException` means *this library
   hasn't implemented that yet*. No schema construct reaches one: the sites left in `DefinitionResolver` are the
   catch-alls around the compiled meta reader and the re-serialisation of a body (a failure that is not a

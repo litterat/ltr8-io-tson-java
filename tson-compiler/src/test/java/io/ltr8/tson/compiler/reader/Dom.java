@@ -37,7 +37,7 @@ public final class Dom {
             case TsonArray array -> ofElements(array.elements());
             case TsonTuple tuple -> ofElements(tuple.elements());
             case TsonAtom atom -> atom.value();
-            default -> null; // TsonAbsent / TsonMissing
+            default -> null; // TsonVoid / TsonMissing
         };
     }
 

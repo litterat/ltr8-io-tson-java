@@ -148,12 +148,12 @@ grammar, split by role, not duplicated:
 
 - **`TsonDataStream` (Tier 2)** is the only thing that walks source text: a lazy, pull-based
   `TsonEventSource` (`stream` package — `hasNext()`/`next()`/`peek()` over a sealed `TsonEvent` hierarchy:
-  `RecordStart`/`MapArrow`/`ArrayStart`/`TypeRef`/`SchemaRef`/`TokenEvent`/`AbsentEvent`/... each carrying
+  `RecordStart`/`MapArrow`/`ArrayStart`/`TypeRef`/`SchemaRef`/`TokenEvent`/`VoidEvent`/... each carrying
   its own `Position`). Driven off `Lexer.nextToken()` with an explicit frame stack (memory is proportional
   to open-container depth, never document size) and at most two tokens of lookahead (only to disambiguate
   `{}` record-vs-map).
 - **`TsonDataParser` (Tier 3)** builds the full AST — the sealed `CoreValue` hierarchy in `ast`
-  (`RecordValue`/`MapValue`/`ArrayValue`/`EmptyBrace`/`AbsentValue`/`TokenValue`) — by reducing the flat
+  (`RecordValue`/`MapValue`/`ArrayValue`/`EmptyBrace`/`VoidValue`/`TokenValue`) — by reducing the flat
   event sequence back into a tree. It holds no grammar logic of its own.
 
 Key points:

@@ -24,8 +24,8 @@ class TsonValidateTest {
     private static final String POINT_ID = "https://example.test/point-1.tn";
     private static final String POINT_SCHEMA = """
             !!id:"https://example.test/point-1.tn"
-            !!meta:"https://tson.io/2026/36/m/meta.tn"
-            !!import:"https://tson.io/2026/36/m/core.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
             { point => { x: int32  y: int32 } }
             """;
 
@@ -108,7 +108,7 @@ class TsonValidateTest {
     @Test
     void anUnknownRootTypeNamesWhatTheSchemaDoesDeclare() {
         // The root-position analogue of UNRECOGNIZED_FIELD: the prose suggests the nearest declared name and
-        // `expected` carries the whole closed set, including the ~47 core.tn entries the !!import flattens
+        // `expected` carries the whole closed set, including the core.tn entries the !!import flattens
         // in -- which is why the prose lists only a few of them rather than all.
         List<Diagnostic> problems = tsonWithPoint().validate("""
                 !!schema:"https://example.test/point-1.tn"
@@ -117,7 +117,7 @@ class TsonValidateTest {
         Diagnostic problem = problems.getFirst();
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE, problem.code());
         assertTrue(problem.message().contains("did you mean 'point'?"), problem.message());
-        assertTrue(problem.message().contains("and 43 more"), problem.message());
+        assertTrue(problem.message().contains("and 41 more"), problem.message());
         assertEquals("pont", problem.actual());
         assertTrue(problem.expected().endsWith("| point"), problem.expected());
         assertTrue(problem.expected().contains("int32"), problem.expected());
@@ -225,8 +225,8 @@ class TsonValidateTest {
         // no reference may pin -- not one that fails to load. Hashing every schema on load must therefore
         // record the absence rather than refuse the document, and refuse the pin when one arrives.
         String oneLine = "!!id:\"https://example.test/one-1.tn\" "
-                + "!!meta:\"https://tson.io/2026/36/m/meta.tn\" "
-                + "!!import:\"https://tson.io/2026/36/m/core.tn\" { point => { x: int32 } }";
+                + "!!meta:\"https://tson.io/2026/37/m/meta.tn\" "
+                + "!!import:\"https://tson.io/2026/37/m/core.tn\" { point => { x: int32 } }";
         Tson tson = Tson.standard();
         tson.resolve(oneLine);
 
@@ -340,8 +340,8 @@ class TsonValidateTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/nested-1.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                   person => { home: address }
 
@@ -372,7 +372,7 @@ class TsonValidateTest {
 
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
         assertEquals(Optional.of("/int32"), problem.schemaPointer());
-        assertEquals("tson.io/2026/36/m/core.tn", problem.schemaId(), "where int32 is actually declared");
+        assertEquals("tson.io/2026/37/m/core.tn", problem.schemaId(), "where int32 is actually declared");
     }
 
     /**
@@ -386,8 +386,8 @@ class TsonValidateTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/tags-1.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 { tagged => { tags: [text] } }
                 """);
 
@@ -446,10 +446,10 @@ class TsonValidateTest {
         String schemaId = "https://example.test/pct-1.tn";
         String schema = """
                 !!id:"https://example.test/pct-1.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
-                  my_percentage => !positive_integer ^ { max: 100 }
+                  my_percentage => !integer ^ { min: 1  max: 100 }
                   reading => { pct: my_percentage }
                 }
                 """;
@@ -501,8 +501,8 @@ class TsonValidateTest {
         String schemaId = "https://example.test/facets-1.tn";
         String schema = """
                 !!id:"https://example.test/facets-1.tn"
-                !!meta:"https://tson.io/2026/36/m/meta.tn"
-                !!import:"https://tson.io/2026/36/m/core.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
                 {
                   status => !enum [PENDING SHIPPED DELIVERED]
                   label  => !text ^ { max_length: 4 }

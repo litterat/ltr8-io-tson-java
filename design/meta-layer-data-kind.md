@@ -52,6 +52,12 @@ sit at the schema layer because that is the only layer able to name request and 
   reference slot `type_ref` rather than `type_name` (§5.6's positional form keeps the author writing a bare
   name either way). §9's guidance for extension meta-schemas is the other half: a slot holding a type reference
   MUST be typed `type_ref`, which is what makes it participate in reference walking and identity.
+- **§8.2 reaches a body's values at the read, not at the link.** The linker's name walk sees a bound `Data`
+  body as an opaque object, so `SchemaResolver` reads a `data` constructor's payload under the registry's
+  identifier policy and the readers judge it as they judge a data document: the keys of an identifier-keyed map
+  are one scope, and an identifier-typed value is a name (`design/name-hygiene-and-minted-names.md`). A
+  `type_ref` in the body is judged there too, being one; it names a declaration the walk judges anyway, so the
+  only difference is that a name refused at both is reported once, against the body that references it.
 - **The silent defaults are worth knowing.** `TypeInhabitance` calls a `Data` body inhabited and
   `DiscriminationClass` gives it none, both by their `default` arm. Neither matters while the linker refuses
   to let anything name such an entry as a type — which is what makes that refusal load-bearing rather than

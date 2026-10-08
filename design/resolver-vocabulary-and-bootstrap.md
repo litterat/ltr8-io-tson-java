@@ -15,7 +15,7 @@ that resolves meta-kernel itself. Current form only; history lives in git.
 - `DerivedName`'s two families stay apart, `ofBinding` is called by **both** lift channels, and a derived name is
   asserted by value, never by `startsWith`.
 - Resolved output states the reference chain as written; the chain collapses only where `TsonSchemaCompiler` compiles a
-  `REFERENCE` entry. `ReferenceChain` is the one walk — `ParameterKinds` keeps its own loop deliberately.
+  `REFERENCE` entry. `ReferenceChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
 - `@synthetic` goes on the **key** of exactly the sugar-form entries (both channels), never on an instantiation entry
   or a `TypeDefinition` value, and the linker re-attaches it (`withNameAnnotations`), imports included.
 - The bootstrap is three passes — ordinary declarations, instances, atom refinements — over a closed `instanceBody`
@@ -39,10 +39,10 @@ a held body.
 - **Why one class and not a producer beside one phase and a consumer beside another.** A held body is written
   by two phases (`SchemaDesugarer` lifting a sugar form, `DefinitionResolver` holding a composition or
   refinement template) and read by four (`TemplateMaterialiser` closing one, `HeldBody` answering §5.10's
-  declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterKinds`
+  declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterTypes`
   walking one for parameter kinds). `isApplication`'s own contract is that a held body is written by one
   phase and read by several, so a second opinion about what an application looks like is what makes one of
-  them wrong. The writer, the reader and `ParameterKinds` all go through it; a walker matching
+  them wrong. The writer, the reader and `ParameterTypes` all go through it; a walker matching
   `name`/`arguments` against its own string literals is the copy that drifts silently, since nothing fails,
   only a parameter kind quietly not inferred.
 - **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
@@ -54,10 +54,10 @@ a held body.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the
   materialisation note (`design/template-materialisation.md`).
 - **Every walk over a held body descends into a map slot.** meta.tn's
-  `scoped.schemas` is `{uri => [type_name; 1..]?; 1..}`, so core's `extern_of => <S> !scoped { scope:
+  `scoped.schemas` is `{schema_identity => [type_name; 1..]?; 1..}`, so core's `extern_of => <S> !scoped { scope:
   [EXTERN]  schemas: { S => _ } }` and `extern_type => <S, T> ... { S => [T] }` put a parameter inside a
   map — one in a key, one inside the array its value names. Each of the three walks fails differently if it
-  skips one: `substitute` leaves the parameter name standing where the argument belongs; `ParameterKinds`
+  skips one: `substitute` leaves the parameter name standing where the argument belongs; `ParameterTypes`
   never observes the parameter, so its kind is never inferred and a `type_name` argument stays on the
   reference channel and fails as an unresolved reference; and `DerivedName`'s canonical rendering — the half
   §8.2 keys identity on — renders the whole map as the unknown-value mark, so two bindings differing only
@@ -121,7 +121,7 @@ namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a 
   **argument-bearing** target (an application, with no entry until materialisation mints one), or on a cycle*
   — kept in four loops is four decisions that can drift. `terminal` answers with a name, `terminalDefinition` with the entry;
   they differ only on an undeclared name and a cycle, where the first has an answer its caller wants (a type
-  parameter is its own terminal) and the second has none. **`ParameterKinds` keeps its own loop deliberately**:
+  parameter is its own terminal) and the second has none. **`ParameterTypes` keeps its own loop deliberately**:
   it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the template
   being the answer there. `ReferenceChainWalkTest` pins all four stops.
 - **Anything that needs the chain end walks it and says so.** `TsonSchemaLinker.checkFieldValue` walks to the
@@ -192,7 +192,7 @@ within meta-kernel.
 
 `MetaKernelBootstrapResolver.getMetaKernelSchema()` (its only public method) produces the resolved
 meta-kernel `TsonSchema` in **three passes** over its declarations: ordinary declarations first
-(`DefinitionResolver`), then the deferred `Instance` declarations (`value => !unit {}`, `boolean
+(`DefinitionResolver`), then the deferred `Instance` declarations (`value => !value_type {}`, `boolean
 => !enum [true false]`, …) once every constructor they reference — including ones declared later in the
 file — has an entry to transfer a kind from, then the deferred atom refinements, whose source is an instance
 and so exists only after the second pass. `TsonSchemaResolver` alone is single-pass, strict source order, so

@@ -5,14 +5,13 @@ import java.text.Normalizer;
 /**
  * NFC, applied where the series makes it identity rather than content.
  *
- * <p>[TSON-DATA] §7.2.1 requires it outright: "quoted tokens that occupy identifier positions -- record
- * field names, and any position a higher part designates as an identifier -- are NFC-normalised by the
- * resolver before identity comparison. String-typed positions are not normalised. Consequently,
- * {@code "café"} (decomposed) and {@code "café"} (precomposed) collide as duplicate field names, while two
- * string *values* with the same difference remain distinct strings." §2.5 and §2.6 state the same identity
- * from the other end.
+ * <p>[TSON-DATA] §7.2.1 requires it outright: quoted tokens at identifier positions are NFC-normalised
+ * before they are matched and compared, so {@code "cafe\u0301"} and {@code "caf\u00E9"} collide as duplicate
+ * field names, while two string values with the same difference stay distinct as written and compare in NFC
+ * wherever they are compared -- as map keys (§2.6), and under a schema in every comparison a text type makes
+ * ([TSON-SCHEMA] §5.5, {@code ValueIdentity}). §2.5 and §2.6 state the same identity from the other end.
  *
- * <p>So the axis is the <b>position</b>, not the quoting: a name normalises and a value does not. The lexer
+ * <p>So the axis is the <b>position</b>, not the quoting: a name normalises and a value keeps its spelling. The lexer
  * cannot draw it, because at lex time a quoted token's position is not yet known -- what follows it decides
  * -- which is why §7.2.1 puts this above the lexer and why the first paragraph's "the lexer never alters
  * token text" holds unchanged. Applied here at the point the position <em>is</em> known: see {@code

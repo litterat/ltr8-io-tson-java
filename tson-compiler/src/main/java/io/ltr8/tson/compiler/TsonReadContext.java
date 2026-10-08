@@ -2,7 +2,8 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.diagnostics.Refusal;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 
@@ -162,6 +163,22 @@ public interface TsonReadContext {
     // the diagnostics -- ProcessorPolicy -- rather than stamped onto each one.
 
     /**
+     * [TSON-DATA] §8.2's restricted-character and restricted-script rules over a value whose type is an
+     * identifier family, under this read's identifier policy and {@code profile}: the per-name rules reach
+     * every identifier-typed value, a map key or a field value alike, as they reach every name the stream
+     * carries. A refusal is reported at this context's position; the answer is whether there was one, so a
+     * caller can leave the value out rather than admit a name the processor declined.
+     */
+    boolean refusesName(String name, IdentifierProfile profile);
+
+    /**
+     * The identifier policy this read judges names under -- what a reader enumerating a scope asks before it
+     * builds one, since skeleton distinctness is the policy's to switch off ({@link
+     * IdentifierPolicy#appliesSkeletonDistinctness()}). Never a validity rule.
+     */
+    IdentifierPolicy identifierPolicy();
+
+    /**
      * How many problems have been reported through this read so far, counting every scoped copy since they
      * share one cursor. Monotonic, and independent of what the receiver does with them, so a reader can
      * checkpoint around a child read ({@code int before = ctx.reported(); ...; if (ctx.reported() > before)})
@@ -180,41 +197,41 @@ public interface TsonReadContext {
      * a consumer reads through. Driving a {@link TsonTypeReader} over a raw source here reads one value at
      * the cursor and polices nothing around it.
      *
-     * <p><b>The identifier policy is [TSON-DATA] §8.2's default</b> -- {@link UnicodePolicy#highlyRestrictive()}
-     * over the whole name, which §8.2 says a name's scripts SHOULD be judged at -- so a caller that states no
+     * <p><b>The identifier policy is [TSON-DATA] §8.2's default</b> -- {@link IdentifierPolicy#defaults()}, Highly
+     * Restrictive over the whole name, which §8.2 says a name's scripts SHOULD be judged at -- so a caller that states no
      * policy still gets every type-ref, annotation and field name checked. The <em>token</em> policy is no
      * part of a context: it is {@link TsonDataStream}'s, applied as an event leaves the stream, so a source
      * that is not one carries none.
      */
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver) {
-        return of(events, receiver, UnicodePolicy.highlyRestrictive());
+        return of(events, receiver, IdentifierPolicy.defaults());
     }
 
     /**
-     * As above, stating the <b>identifier</b> policy -- [TSON-DATA] §8.2's restricted-character and
-     * restricted-script rules, applied where a type-ref, annotation or field name is delivered rather than to
-     * every token. §8.2 makes names and tokens separate surfaces: a value may legitimately be anything, so
-     * the token policy defaults to Unrestricted and is {@link TsonDataStream}'s to apply, while a name's
-     * scripts SHOULD be judged at Highly Restrictive, which is the default the overload above carries.
+     * As above, stating the <b>identifier</b> policy -- [TSON-DATA] §8.2's name-hygiene mechanisms, applied where a
+     * type-ref, annotation or field name is delivered rather than to every token. §8.2 makes names and tokens separate
+     * surfaces: a value may legitimately be anything, so the token policy defaults to Unrestricted and is {@link
+     * TsonDataStream}'s to apply, while a name's scripts SHOULD be judged at Highly Restrictive, which is the default
+     * the overload above carries.
      *
      * <p><b>Required rather than nullable.</b> §8.2 requires that a relaxation be a code decision, greppable
      * and attributable rather than ambient, so a caller relaxing the name surface names
-     * {@link UnicodePolicy#unrestricted()} -- a fine answer, and the right one for a source whose events did
+     * {@link IdentifierPolicy#none()} -- a fine answer, and the right one for a source whose events did
      * not come from document text; it is just not an answer a caller gives by accident.
      */
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
-                              UnicodePolicy identifierPolicy) {
-        Objects.requireNonNull(identifierPolicy, "identifierPolicy -- state one, UnicodePolicy"
-                + ".unrestricted() if this source's names are not to be checked");
+                              IdentifierPolicy identifierPolicy) {
+        Objects.requireNonNull(identifierPolicy, "identifierPolicy -- state one, IdentifierPolicy.none() if this"
+                + " source's names are not to be checked");
         return DefaultTsonReadContext.of(events, receiver, identifierPolicy);
     }
 
     /**
-     * {@link #of(TsonEventSource, DiagnosticsReceiver, UnicodePolicy)} with the fail-fast receiver --
+     * {@link #of(TsonEventSource, DiagnosticsReceiver, IdentifierPolicy)} with the fail-fast receiver --
      * the first problem throws {@link ReadException}. {@code identifierPolicy} judges names and not tokens;
      * the token policy is the stream's.
      */
-    static TsonReadContext throwing(TsonEventSource events, UnicodePolicy identifierPolicy) {
+    static TsonReadContext throwing(TsonEventSource events, IdentifierPolicy identifierPolicy) {
         return of(events, DiagnosticsReceiver.throwing(), identifierPolicy);
     }
 

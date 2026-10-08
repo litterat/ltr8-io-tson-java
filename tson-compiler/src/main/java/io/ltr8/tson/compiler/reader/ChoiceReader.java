@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.schema.meta.EntryDisplayName;
-import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -56,7 +56,7 @@ final class ChoiceReader {
                 "is a choice -- a value at this position requires an explicit type annotation (!typeName) "
                         + "naming one of its declared variants to disambiguate",
                 "declared variant", variantNames, context.readers(),
-                untaggedRecovery(typeDefinition, body, context.schema()));
+                untaggedRecovery(typeDefinition, body, context.linked()));
     };
 
     /**
@@ -67,13 +67,14 @@ final class ChoiceReader {
      * recovery.
      */
     private static Map<DiscriminationClass, String> untaggedRecovery(TypeDefinition def, ChoiceBody body,
-            TsonSchema schema) {
+            TsonLinkedSchema linked) {
         if (!def.disjoint().equals(Optional.of(true))) {
             return Map.of();
         }
         Map<DiscriminationClass, String> byClass = new EnumMap<>(DiscriminationClass.class);
         for (TypeRef variant : body.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(), schema.entries());
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(),
+                    linked.schema().entries(), linked.textEnums());
             if (variantClass.isEmpty() || !variantClass.get().scalar()
                     || byClass.putIfAbsent(variantClass.get(), variant.name()) != null) {
                 return Map.of(); // a classless or container variant, or two variants sharing a class -> keep the tag

@@ -1,5 +1,7 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
+import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
@@ -16,7 +18,7 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
@@ -27,7 +29,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -76,10 +77,10 @@ public final class DataClassObjectReader {
      * <p>That is why this lives on the engine rather than on {@code JsonReadContext}: the context is shared
      * with the tree engine, which has no position to consult and so would carry a policy it must ignore.
      */
-    private final UnicodePolicy identifierPolicy;
+    private final IdentifierPolicy identifierPolicy;
 
     public DataClassObjectReader(DataBindContext context, boolean ignoreUnknownMembers,
-                                 UnicodePolicy identifierPolicy) {
+                                 IdentifierPolicy identifierPolicy) {
         this.context = context;
         this.ignoreUnknownMembers = ignoreUnknownMembers;
         this.identifierPolicy = identifierPolicy;
@@ -107,7 +108,7 @@ public final class DataClassObjectReader {
     /** One value at one descriptor, {@code first} being its opening event, already pulled. */
     private Object bind(JsonReadContext ctx, JsonEvent first, DataClass target) {
         if (first instanceof JsonEvent.NullValue && !(target instanceof DataClassAtom)) {
-            // A container or record component written null: absence, which the caller's own state rule
+            // A container or record component written null: a void value, which the caller's own voidable rule
             // has already admitted -- a required one never reaches here (see bindMember/element).
             return null;
         }
@@ -242,7 +243,7 @@ public final class DataClassObjectReader {
                 ctx.field(fields[i].name()).report(Diagnostic.Code.FIELD_REQUIRED,
                         "%s requires a member '%s', and this object has none"
                                 .formatted(target.typeClass().getSimpleName(), fields[i].name()),
-                        "a value for '" + fields[i].name() + "'", "(absent)");
+                        "a value for '" + fields[i].name() + "'", "(missing)");
             }
         }
         if (ctx.reported() > mark) {
@@ -252,7 +253,7 @@ public final class DataClassObjectReader {
             // ConstructionGuard's on the TSON side.
             return null;
         }
-        return construct(ctx, target.constructor(), construct, target.typeClass());
+        return construct(ctx, target.constructor(), construct, target.typeClass(), Handed.VALUE);
     }
 
     /** §3.1's repeat, reported wherever the member was noticed to be one. */
@@ -266,15 +267,15 @@ public final class DataClassObjectReader {
      * One member's value.
      *
      * <p>Where §7 lands: a member written {@code null} at a required component is refused, exactly as
-     * {@code _} is at a REQUIRED field in text ([TSON-SCHEMA] §7.6), and at any other component it is the
-     * absence — which a bound object spells {@code null}, having no third state.
+     * {@code _} is at a REQUIRED field in text ([TSON-SCHEMA] §7.6), and at any other component it is a
+     * void value — which a bound object spells {@code null}, having no third state.
      */
     private Object bindMember(JsonReadContext ctx, DataClassField field) {
         JsonReadContext at = ctx.field(field.name());
         JsonEvent value = at.next();
         if (value instanceof JsonEvent.NullValue && field.isRequired()) {
             at.report(Diagnostic.Code.FIELD_REQUIRED,
-                    "member '%s' is required and is written null, which is the absent value"
+                    "member '%s' is required and is written null, which is the void value"
                             .formatted(field.name()),
                     "a value for '" + field.name() + "'", "null");
             return null;
@@ -336,22 +337,14 @@ public final class DataClassObjectReader {
      * class was going to keep the value under it.
      */
     private void checkNameHygiene(JsonReadContext ctx, String name) {
-        // Tested rather than `ifPresent`-ed, and measurably so: both rules are allocation-free when a name
-        // passes, which is every name of an ordinary document, but a capturing lambda is not -- it captures
-        // `ctx` and `name` and so allocates per member name whether or not the Optional holds anything.
-        // Two of those per name cost ~140 bytes per bound record in JsonAllocationHarnessTest.
-
-        // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile
-        // too", taking that rule with it. Script mixing gates itself inside violation().
-        if (identifierPolicy.appliesIdentifierProfile()) {
-            Optional<String> restricted = IdentifierProfile.hygiene(name);
-            if (restricted.isPresent()) {
-                refuse(ctx, name, restricted.get(), Diagnostic.Code.RESTRICTED_CHARACTER);
-            }
+        // Looped rather than `forEach`-ed: judging is allocation-free when a name passes, which is every name of
+        // an ordinary document, where a capturing lambda allocates per member name whatever it is handed.
+        List<IdentifierPolicy.Violation> violations = identifierPolicy.judge(name, IdentifierProfile.NAME);
+        if (violations.isEmpty()) {
+            return;
         }
-        Optional<String> script = identifierPolicy.violation(name);
-        if (script.isPresent()) {
-            refuse(ctx, name, script.get(), Diagnostic.Code.RESTRICTED_SCRIPT);
+        for (IdentifierPolicy.Violation violation : violations) {
+            refuse(ctx, name, violation.reason(), violation.code());
         }
     }
 
@@ -399,7 +392,7 @@ public final class DataClassObjectReader {
             }
             return array;
         } catch (Throwable e) {
-            return failed(ctx, target.typeClass(), e);
+            return failed(ctx, target.typeClass(), Handed.ELEMENTS, e);
         }
     }
 
@@ -444,14 +437,14 @@ public final class DataClassObjectReader {
         if (ctx.reported() > mark) {
             return null;
         }
-        return construct(ctx, target.constructor(), construct, target.typeClass());
+        return construct(ctx, target.constructor(), construct, target.typeClass(), Handed.POSITIONS);
     }
 
     /**
-     * §6.5's object form: each member name is a key token, its content read by the key type's own
+     * §6.4's object form: each member name is a key token, its content read by the key type's own
      * contract rather than taken as text.
      *
-     * <p>The pairs form is not read here. §6.5 selects it by the key type, and a key type this reader can
+     * <p>The pairs form is not read here. §6.4 selects it by the key type, and a key type this reader can
      * reach is one a JSON member name can spell — so the form a compound key would need never arises from
      * a class whose keys this reader can bind at all, and inventing it would be a rule with no caller.
      */
@@ -465,7 +458,7 @@ public final class DataClassObjectReader {
             // BIND_MISMATCH, not a verdict: the document is fine and the class cannot receive it.
             ctx.report(Diagnostic.Code.BIND_MISMATCH,
                     ("a JSON object's member names are the map's keys, so %s's key type must be one a name "
-                            + "can spell -- §6.5's pairs form, which carries a compound key, is not read here")
+                            + "can spell -- §6.4's pairs form, which carries a compound key, is not read here")
                             .formatted(target.typeClass().getSimpleName()),
                     "a key type a member name can spell", target.keyDataClass().typeClass().getSimpleName());
             EventSkip.value(ctx, first);
@@ -499,7 +492,7 @@ public final class DataClassObjectReader {
                 }
             }
         } catch (Throwable e) {
-            return failed(ctx, target.typeClass(), e);
+            return failed(ctx, target.typeClass(), Handed.ENTRIES, e);
         }
     }
 
@@ -511,17 +504,18 @@ public final class DataClassObjectReader {
         try {
             return target.constructor().invoke(value, Annotations.empty());
         } catch (Throwable e) {
-            return failed(ctx, target.typeClass(), e);
+            return failed(ctx, target.typeClass(), Handed.VALUE, e);
         }
     }
 
     // ── Skipping, construction, errors ───────────────────────────────────
 
-    private Object construct(JsonReadContext ctx, MethodHandle constructor, Object[] arguments, Class<?> type) {
+    private Object construct(JsonReadContext ctx, MethodHandle constructor, Object[] arguments, Class<?> type,
+                             Handed handed) {
         try {
             return constructor.invoke(arguments);
         } catch (Throwable e) {
-            return failed(ctx, type, e);
+            return failed(ctx, type, handed, e);
         }
     }
 
@@ -532,13 +526,12 @@ public final class DataClassObjectReader {
     }
 
     /**
-     * A constructor or collection call that threw — the class's own rule refusing the value, most often,
-     * which is a fact about this document and not a fault in this library.
+     * A constructor or collection call that threw — the class's own rule refusing the value, most often, which is
+     * a fact about this document and not a fault in this library. With no schema the class is the contract, so
+     * its refusal is a {@code TYPE_MISMATCH} ({@link BindingDiagnostics}).
      */
-    private static Object failed(JsonReadContext ctx, Class<?> type, Throwable cause) {
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                "%s rejected the value read for it: %s".formatted(type.getSimpleName(), cause),
-                "a value " + type.getSimpleName() + " accepts", String.valueOf(cause.getMessage()));
+    private static Object failed(JsonReadContext ctx, Class<?> type, Handed handed, Throwable cause) {
+        ctx.report(BindingDiagnostics.rejectedByClass(type, handed, cause));
         return null;
     }
 }

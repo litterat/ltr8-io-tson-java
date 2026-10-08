@@ -8,4 +8,4 @@ Read `design/cli-config-hashing.md`.
 - Schemas are classified by embedded `!!id`, never by filename; `.json` is the one extension read, and its
   `--schema`/`--type` binding errors are usage errors.
 - The report goes to stdout unchanged; non-verdict notes go to stderr. Machine formats always carry the `policy` field.
-- The CLI's own schemas are `https://tson.io/2026/36/ltr8/cli/<name>-<version>.tn`, versioned per release.
+- The CLI's own schemas are `https://tson.io/2026/37/io/ltr8/cli/<name>.tn`; `diagnostics.tn` imports the spec's `policy.tn`.

@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.compiler.Position;
@@ -10,7 +10,6 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.*;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -121,6 +120,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final List<CompiledField> fields;
     final Map<String, Integer> fieldIndex;
     final List<FieldGroup> groups;
+
+    /** Each field group as field indexes, compiled once ({@link GroupPlan}). */
+    private final GroupPlan[] groupPlans;
     final Object[] precomputedValue;
     /** What each field yields when the document never writes it ({@link RecordField#omitted}). */
     private final RecordField.Omitted[] omitted;
@@ -158,7 +160,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             if (schema.value().isPresent()) {
                 precomputedValue[i] = readSchemaDefault(field);
             }
-            omitted[i] = schema.omitted(groups.stream().anyMatch(group -> group.members().contains(schema.name())));
+            omitted[i] = schema.omitted(groups.stream().anyMatch(group -> group.hasMember(schema.name())));
             if (schema.role() == FieldRole.FIXED) {
                 fixedChecks[i] = new FixedCheck(precomputedValue[i], field.parser());
             }
@@ -168,6 +170,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
         }
         this.fixedCheck = fixedChecks;
+        this.groupPlans = groups.stream().map(group -> GroupPlan.of(group, fieldIndex)).toArray(GroupPlan[]::new);
         this.positionalFieldIndex = requiredCount == 1 ? solePositionalField : -1;
         this.declaredFields = fields.stream().map(field -> field.schema().name()).collect(Collectors.joining(" | "));
         this.rules = new RecordDiagnostics(displayName, declaredFields);
@@ -296,9 +299,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                         fields.get(schemaIndex).schema().type().name(), push);
             }
             Object decoded;
-            if (ctx.peek() instanceof AbsentEvent) {
+            if (ctx.peek() instanceof VoidEvent) {
                 ctx.next();
-                decoded = valueForStatedAbsentField(schemaIndex, ctx);
+                decoded = valueForVoidField(schemaIndex, ctx);
             } else {
                 decoded = fields.get(schemaIndex).parser()
                         .read(ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position()));
@@ -322,39 +325,84 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for the `actual` of a field-state rule. */
-    private static final String ABSENT = "_";
+    private static final String VOID = "_";
 
     /**
-     * Field-group presence check (§5.11): a bare (REQUIRED) group must have exactly one member
-     * present, a {@code ?} (OPTIONAL) group at most one -- the group's members flatten into ordinary
-     * optional fields (§5.11's own resolution), so this is the only place the group's own
-     * "at most/exactly one" multiplicity is actually enforced at read time. "Present" means the
-     * member's field name appeared in the data ({@code seen}); a voidable member written as the absent
-     * sentinel {@code _} counts as appearing, which is what selects its alternative. Reported
-     * through {@code ctx} like any other problem, so both readers gain it by calling this once after
-     * their own field pass, and collecting mode surfaces a group violation alongside sibling ones.
+     * Field-group presence check (§5.11). The group's members flatten into ordinary
+     * optional fields, so this is the only place a group is enforced at read time. "Present" means the member's
+     * field name appeared in the data ({@code seen}); a voidable member written as the void sentinel {@code _}
+     * counts as appearing, which is what chooses its option. Per group: an option is chosen when any member
+     * appeared, each chosen option reports every member it needs and lacks, in option order, and then the count
+     * of chosen options is judged -- exactly one for a group, at most one for an optional group, at least one
+     * for the {@code +} group. Reported through {@code ctx} like any other problem, so both readers
+     * gain it by calling this once after their own field pass, and collecting mode surfaces a group violation
+     * alongside sibling ones.
      */
     final void validateGroups(TsonReadContext ctx, boolean[] seen) {
-        for (FieldGroup group : groups) {
-            int present = 0;
-            for (String member : group.members()) {
-                Integer idx = fieldIndex.get(member);
-                if (idx != null && seen[idx]) {
-                    present++;
+        for (GroupPlan plan : groupPlans) {
+            int chosen = 0;
+            for (int o = 0; o < plan.options.length; o++) {
+                int by = firstSeen(plan.options[o], seen);
+                if (by < 0) {
+                    continue;
+                }
+                chosen++;
+                for (int at : plan.required[o]) {
+                    if (at >= 0 && !seen[at]) {
+                        ctx.report(rules.optionNeeds(fields.get(by).schema().name(), plan.optionText[o],
+                                fields.get(at).schema().name()));
+                    }
                 }
             }
-            String members = String.join(" | ", group.members());
-            if (present > 1) {
-                ctx.report(rules.groupAdmitsAtMostOne(members, present));
-            } else if (group.state() == ElementState.REQUIRED && present == 0) {
-                ctx.report(rules.groupRequiresOne(members));
+            if (plan.group.atLeastOne()) {
+                if (chosen == 0) {
+                    ctx.report(rules.groupRequiresAtLeastOne(plan.text));
+                }
+            } else if (plan.group.optional() ? chosen > 1 : chosen != 1) {
+                ctx.report(plan.group.optional()
+                        ? rules.groupChoosesAtMostOne(plan.text, chosen)
+                        : rules.groupChoosesExactlyOne(plan.text, chosen));
             }
+        }
+    }
+
+    /** The first index of {@code option} the document wrote, or -1. */
+    private static int firstSeen(int[] option, boolean[] seen) {
+        for (int at : option) {
+            if (at >= 0 && seen[at]) {
+                return at;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * One field group as field indexes: each option's members, and the subset its group does not mark
+     * {@code ?}. A member naming no field of this record is -1. The texts are the option and the group as
+     * messages show them, built once so a read builds none.
+     */
+    private record GroupPlan(FieldGroup group, int[][] options, int[][] required, String[] optionText,
+                             String text) {
+
+        static GroupPlan of(FieldGroup group, Map<String, Integer> fieldIndex) {
+            List<List<String>> members = group.members();
+            int[][] options = new int[members.size()][];
+            int[][] required = new int[members.size()][];
+            String[] optionText = new String[members.size()];
+            for (int o = 0; o < members.size(); o++) {
+                List<String> option = members.get(o);
+                options[o] = option.stream().mapToInt(member -> fieldIndex.getOrDefault(member, -1)).toArray();
+                required[o] = option.stream().filter(member -> !group.optionalMembers().contains(member))
+                        .mapToInt(member -> fieldIndex.getOrDefault(member, -1)).toArray();
+                optionText[o] = String.join(" ", option);
+            }
+            return new GroupPlan(group, options, required, optionText, group.describe());
         }
     }
 
     /**
      * The value a field takes when the document wrote {@code _} at it, which differs from never mentioning
-     * it at all ({@link #valueForAbsentField}). A voidable field admits it; at any other, §7.6 makes an
+     * it at all ({@link #valueForMissingField}). A voidable field admits it; at any other, §7.6 makes an
      * explicit {@code _} a validation error. At a defaulted field this reports it and injects anyway:
      * omission is the injection route, and injecting silently would substitute a value the document
      * explicitly disclaimed -- for the retry loop the format targets, {@code _} at a defaulted field means
@@ -366,26 +414,26 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * field never reaches here: {@link #readFields} routes it through {@link #verifyFixed}, which answers
      * {@code _} for itself.
      */
-    final Object valueForStatedAbsentField(int schemaIndex, TsonReadContext ctx) {
+    final Object valueForVoidField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
         if (schema.voidable()) {
-            // [TSON-DATA] §2.9: "A field or entry set to `_` is present with an absent value -- distinct from
-            // not appearing at all." Answering `valueForAbsentField`'s `null` here would collapse the two,
+            // [TSON-DATA] §2.9: "A field or entry set to `_` is present with a void value -- distinct from
+            // not appearing at all." Answering `valueForMissingField`'s `null` here would collapse the two,
             // and a voidable field is one where both are legal, so it is where the distinction has anything
             // to carry.
-            return statedAbsentValue();
+            return statedVoidValue();
         }
         if (schema.role() == FieldRole.DEFAULT) {
             ctx.schemaField(schema.name(), schema.position())
-                    .report(rules.absenceAtDefaultedField(schema.name(), ABSENT));
+                    .report(rules.voidAtDefaultedField(schema.name(), VOID));
             return precomputedValue[schemaIndex];
         }
         // A required field: the document *stated* absence, so it is not missing. Delegating to
-        // valueForAbsentField reported "missing required field", which tells an author they forgot a field
+        // valueForMissingField reported "missing required field", which tells an author they forgot a field
         // they can see themselves writing -- §5.2's rule is that `_` asserts absence at a position the schema
         // always fills, and that is what the diagnostic should say.
         ctx.schemaField(schema.name(), schema.position())
-                .report(rules.absenceAtRequiredField(schema.name(), ABSENT));
+                .report(rules.voidAtRequiredField(schema.name(), VOID));
         return null;
     }
 
@@ -393,14 +441,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * The no-value form this reader's own output mode uses for a field the document wrote {@code _} at.
      *
      * <p>Per subclass because the two modes can represent different things. A tree has a node for it
-     * ({@code TsonAbsent}), so it keeps [TSON-DATA] §2.9's distinction between a field written {@code _} and
+     * ({@code TsonVoid}), so it keeps [TSON-DATA] §2.9's distinction between a field written {@code _} and
      * one never written -- which an array element and a tuple slot keep too, the record being the one
      * container of the four that would otherwise lose it. A bound object has no third state between {@code null} and a
      * component that was never set, so bind mode answers {@code null} and the two collapse there; that is a
      * limit of the target, not a reading of §2.9, and it is why this is a subclass's answer rather than one
      * shared here.
      */
-    abstract Object statedAbsentValue();
+    abstract Object statedVoidValue();
 
     /**
      * The value a field takes when the document never stated it -- {@link RecordField#omitted} answered here,
@@ -415,7 +463,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * TsonReadContext#withPosition}) for the second "never mentioned at all" pass, where the live
      * cursor has already moved past the whole record.
      */
-    final Object valueForAbsentField(int schemaIndex, TsonReadContext ctx) {
+    final Object valueForMissingField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
         return switch (omitted[schemaIndex]) {
             case MISSING -> {
@@ -454,10 +502,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             // always refused here -- but it is refused rather than ignored, which is the point.
             ScopePush.refuse(fieldCtx, schema.type().name(), push);
         }
-        if (ctx.peek() instanceof AbsentEvent) {
+        if (ctx.peek() instanceof VoidEvent) {
             // A pinned field is never voidable -- `_` is not the pin -- so absence here is always the refusal.
             ctx.next();
-            fieldCtx.report(rules.fixedFieldAbsent(fieldName, String.valueOf(check.value()), ABSENT));
+            fieldCtx.report(rules.voidAtFixedField(fieldName, String.valueOf(check.value()), VOID));
             return;
         }
         int before = ctx.reported();
@@ -503,10 +551,15 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 + displayName + "' is " + schema.describe() + " but the schema carries no value for it -- "
                 + "DefinitionResolver should never produce this"));
         TokenEvent event = new TokenEvent(token.text(), TokenForm.valueOf(token.form().name()), new Position(0, 0, 0));
-        // Unrestricted deliberately: this replays a token the real stream already delivered, so it has been
+        // No policy deliberately: this replays a token the real stream already delivered, so it has been
         // judged once. Checking it again here would report one author token twice.
         TsonReadContext syntheticCtx = TsonReadContext.throwing(new ListEventSource(List.of(event)),
-                UnicodePolicy.unrestricted());
+                IdentifierPolicy.none());
         return field.parser().read(syntheticCtx);
+    }
+
+    /** What field {@code i} yields when a document never writes it ({@link RecordField#omitted}). */
+    final RecordField.Omitted omitted(int i) {
+        return omitted[i];
     }
 }

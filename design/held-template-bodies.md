@@ -102,19 +102,56 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     schemas reaching one form by different spellings agree on it, where the eager name or the smaller of the
     two would make an entry's name depend on what appeared beside it. Only a form whose binding held an
     application moves; every other synthetic re-derives to the name it already has.
-  - **An argument is classified by the parameter it binds** (`ParameterKinds`, §5.10's "two parameter kinds,
-    inferred by use"). §12.1 decides the channel by token shape, so an unquoted non-numeric argument arrives
-    as a reference — the right default with nothing else known, and wrong for `e => <M> !enum { members:
-    [a b M] }` applied as `e<c>`, where `c` is a member. What settles it is the **declared type of the slot
-    the parameter stands in**, read from the constructor's own vocabulary: `type_ref` gives a TYPE parameter,
-    a slot resolving to an `Atom` (which covers `identifier`, `value` and every enum) a VALUE parameter.
-    §9 makes that general rather than a table of kernel names — a slot holding a type reference MUST be typed
-    `type_ref` — so an extension meta-schema's constructors classify by the same walk.
+  - **Each parameter records the type an argument for it is read as** (`template_param.type`, derived by
+    `ParameterTypes`), and an argument is classified by the parameter it binds (§5.10's "two parameter kinds, inferred by
+    use"): a TYPE parameter exactly when that type is `type_ref`. §12.1 decides the channel by token shape, so an
+    unquoted non-numeric argument arrives as a reference — the right default with nothing else known, and wrong for `e =>
+    <M> !enum { members: [a b M] }` applied as `e<c>`, where `c` is a member. What settles it is the **declared type of
+    the slot the parameter stands in**, read from the constructor's own vocabulary: `type_ref` for a type slot, and the
+    slot's own type (`non_negative_integer` for `min_items`) for a slot resolving to an `Atom`. §9 makes that general
+    rather than a table of kernel names — a slot holding a type reference MUST be typed `type_ref` — so an extension
+    meta-schema's constructors classify by the same walk. Two more sources: a **routed default or fixed value** (a
+    parameter at `record_field.value`) is read as the field's own declared type, from the sibling `type` slot — `c?:
+    percent ~ C` gives `percent`, and `w?: T ~ N` gives `N` the type `T`, an earlier parameter — and a payload in
+    **§5.6's positional form** (`!enum [a b M]`) is walked as the one unmarked field it binds (`members`).
+    - **Stamped last, derived twice.** A held body is built before anything can be typed, so `HeldBody.held`
+      gives every parameter the provisional `type_ref`. The kinds pass (before materialisation) feeds the
+      materialiser; `SchemaResolver.recordParameterTypes` re-derives once everything has closed and stamps the
+      types on every local open entry, declared and minted alike. Its failures are the kinds pass's, already
+      reported, so it reports nothing.
+    - **Several uses must agree**: the parameter's type is the use type that IS-A every other, and uses unordered
+      by IS-A are refused at the declaration. A slot's type is looked up in the governing meta, a routed type in
+      the schema's own namespace. A core copy and its kernel original (same name, same body) count as one type.
+    - **The template's form decides where its value types are read** (`ParameterTypes.readsInStructure`, §5.10).
+      A template applying a meta constructor other than `record` (`!array`, `!scoped`, `!integer_type`, …) reads
+      every value parameter's type, written ones included, in the structure namespace, and the materialiser's
+      call-site check resolves it there: a schema's own `non_negative_integer` never stands in for the meta's at
+      `min_items: N`. A record template reads its parameters in the schema's namespace; a reference template
+      takes its callee's form; a type parameter's bound is the schema's in every form.
+    - **A written type narrows, read by the derived kind** (`<T: text, N: int8>`, carried on
+      `SchemaMap.Declaration.parameterTypes`): on a value parameter it replaces `type` and must IS-A the derived
+      one; on a type parameter it is `template_param.bound`, and must IS-A every bound the uses inherit. Bounds
+      travel through the fixed point like types (`rebox => <T> boxed<T>` is bounded by `boxed`'s bound), and an
+      imported template is taken as recorded rather than re-walked, since its held body does not carry what its
+      author wrote. A written bound names a type, so it must resolve in the type-name namespace
+      (`ParameterTypes.requireType`): the fallback to the governing meta that a slot's declared type needs would
+      otherwise let `<T: text_type>` bind to a constructor, which no type argument can IS-A.
+    - **Stamped before materialisation too**, so `TemplateMaterialiser.byParameterKind` can check each argument
+      as an application closes (`checkArguments`): a type argument must IS-A the bound, following reference
+      chains; a value argument must parse as the parameter's type, or as the type an earlier parameter's argument
+      names. What it cannot judge -- an application as an argument, an unresolved name -- falls to the
+      substituted body as before.
+    - **An application closed during resolution is checked twice.** A declaration naming one
+      (`held => boxed<int32>`), a composition operand, a refinement source and an argument nested in any of them
+      close in the driving loop, before anything is stamped, so their first check sees no bound. The materialiser
+      records each check that passes then, with the declaration whose resolution ran it, and `recheckEarly`
+      replays them once the parameters are stamped -- one verdict per declaration, and none for a declaration
+      that already failed.
     - **A fixed point, not one walk.** meta-kernel's own `type_argument` puts a parameter of *either* kind on
       the reference channel ("parameters ride the reference channel because a token there is always a
       reference"), so a parameter passed to another template says nothing locally: it takes the callee's kind
       at that position, and two templates may wait on each other. A parameter the fixed point leaves
-      undetermined is a TYPE parameter (`ParameterKinds.groundRemainingAsType`), as §5.10 states: a value
+      ungrounded is a TYPE parameter (its type defaults to `type_ref`), as §5.10 states: a value
       parameter is one standing in a scalar slot, so a parameter with no concrete use anywhere in its cycle
       cannot be one. `loop => <T> loop<T>` is then judged on what is wrong with it — it applies itself forever.
     - **Two declaration-time verdicts fall out**, neither of which has to wait for an application: a

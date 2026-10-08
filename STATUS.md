@@ -2,8 +2,8 @@
 
 ← back to the [README](README.md)
 
-Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/36/tson-part1-data.md,
-and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/36/tson-part2-schema.md
+Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/37/tson-part1-data.md,
+and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/37/tson-part2-schema.md
 
 This is the spec's first implementation. Issues and ambiguities found in the spec while implementing are
 tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
@@ -14,10 +14,10 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `!!schema`/`!!meta` arguments are validated as URIs, not just single-line tokens)
 - [x] Base types — boolean, string, numbers (integer, float, hex-float, based-integer), and the absent
       sentinel `_`
-- [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, `positive_integer` and siblings
+- [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, and `integer` with its bounds
 - [x] Decimal/float types — `number`, `float32`, `float64`, `rational`, `complex`
-- [x] Identifier/network/text types — `uuid`, `uri`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `email`,
-      `text`, `regex` (RFC 9485 I-Regexp)
+- [x] Identifier/network/text types — `uuid`, `uri`, `uri_reference`, `iri`, `iri_reference`, `ipv4`, `ipv6`, `cidr4`,
+      `cidr6`, `mac`, `email`, `text`, `regex` (RFC 9485 I-Regexp)
 - [x] Binary type — `bytes`, with its encoding (`base64`, `base64url`, `base32`, `hex`) chosen by the type
 - [x] Temporal types — `date`, `time`, `datetime`, `duration`, `period`
 - [x] Object binding — Java records, hand-written immutable classes, `Map<K, V>`, tuples, plain
