@@ -623,10 +623,10 @@ unicode data:      16.0
 max depth:         64
 ```
 
-**A limit refusal is not a verdict on your document.** A document nested deeper than `--max-depth` is
-reported as `LIMIT_EXCEEDED` with the run's outcome `NOT_CHECKED`: it was never read, and a processor
-configured for more would read it in full. (`tson validate` still exits 1, because at a command line you hold
-the fix — raise the bound, or send something shallower.)
+**A limit refusal is not a verdict on your document's validity.** A document nested deeper than
+`--max-depth` is reported as `LIMIT_EXCEEDED` with the run's outcome `REJECTED`: this processor will not accept
+it, though one configured for more would read it in full. `tson validate` exits 1, because you hold the fix —
+raise the bound, or send something shallower.
 
 Every `validate`/`compile` report carries the same record in its `policy` field, so a refusal is always
 readable beside what produced it. The useful direction is the other one: read the policy *before* you
@@ -701,10 +701,10 @@ $ tson validate person.tn ada.tn      # ada.tn = !!schema:"…/person-1.tn" !per
 OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
-{"outcome":"INVALID","policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,
+{"outcome":"REJECTED","policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,
   "skeleton_distinctness":true,"permitting":[]},"token_policy":{"level":"UNRESTRICTED","permitting":[]},
   "unicode_data_version":"16.0"},
-  "files":[{"file":"bad.tn","outcome":"INVALID","errors":[{"path":"/name",
+  "files":[{"file":"bad.tn","outcome":"REJECTED","errors":[{"path":"/name",
   "schema_pointer":"/person/name","schema_id":"example.com/2026/37/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(missing)","data_position":"2:9:63",
@@ -719,14 +719,13 @@ OK
   no branch on file count. The top-level `errors` carries only what stopped the run before any document
   was read (exit 2); a document that read but didn't validate reports inside its own entry (exit 1).
   `--output text` keeps the human-facing `# <file>` headers instead.
-- **`outcome` is `VALID`, `INVALID` or `NOT_CHECKED`**, not a `valid` boolean, because those are two
-  questions and one bit cannot carry both: a document whose schema was never obtained, or whose types have
-  no Java class in this tool, was never read at all, and reporting it `valid: false` asserts a verdict the
-  run cannot make — which is exactly the assertion an agent acts on when it reads `if (!valid)`.
-  `NOT_CHECKED` is precisely the set of codes that are not a verdict (`Diagnostic.Code.verdict`): the five
-  `SCHEMA_*` fetch codes, `BIND_MISMATCH` and `NOT_IMPLEMENTED`. One of them anywhere in a file makes that
-  file `NOT_CHECKED`, and one such file makes the run `NOT_CHECKED`; a §8.2 name-hygiene refusal is
-  `INVALID`, the processor having looked and declined with the sender holding the fix.
+- **`outcome` answers "will this be accepted": `ACCEPTED`, `REJECTED` or `UNDETERMINED`**, not a `valid`
+  boolean. `REJECTED` is an invalidity, or a refusal under this processor's §8.2 policy or §9.1 limits —
+  either way it will not be accepted here, and one rejection settles it whatever else went unjudged; each
+  diagnostic's code says which kind it was. `UNDETERMINED` is a document nothing rejected but something could
+  not judge — a schema never obtained, a type with no Java class in this tool, a construct not implemented —
+  and reporting it `valid: false` would assert a rejection the run cannot make, which is exactly what an agent
+  acts on when it reads `if (!valid)`. A run is `REJECTED` if any file is, else `UNDETERMINED` if any file is.
 - **Both machine formats spell one report one way** — `snake_case` keys, and a field with nothing to say
   left out rather than written `null`. That is what `tson-cli`'s own `diagnostics.tn` declares, what
   `--output tson` always emitted, and what the TypeScript CLI emits in both of its formats.

@@ -16,7 +16,7 @@ import java.util.List;
  * <p><b>The two error lists say two different things.</b> {@code errors} is populated only by the
  * failures that stop the run before any data is read -- a file that can't be read while being
  * classified, a schema document with no {@code !!id}, an argument list with no data files in it -- and
- * those are exit 2, with the run {@link Outcome#NOT_CHECKED} because nothing was. A document that read
+ * those are exit 2, with the run {@link Outcome#UNDETERMINED} because nothing was judged. A document that read
  * lands in its own {@link FileReport} carrying its own outcome. So {@code errors} non-empty means "the
  * invocation was wrong", never "your document was", and a consumer can tell the two apart without reading
  * the messages. Shape matches {@code
@@ -41,8 +41,8 @@ public record ValidationRun(Outcome outcome, CliPolicy policy, List<FileReport> 
 
     /** A run that never reached a document -- no files, one run-level problem, and exit 2. */
     static ValidationRun failed(CliPolicy policy, Diagnostic.Code code, String message) {
-        // Exit 2: the invocation was wrong, so nothing was checked and no verdict is being given.
-        return new ValidationRun(Outcome.NOT_CHECKED, policy, List.of(),
+        // Exit 2: the invocation was wrong, so nothing was judged and acceptance cannot be stated.
+        return new ValidationRun(Outcome.UNDETERMINED, policy, List.of(),
                 List.of(CliDiagnostic.minimal(code, message)));
     }
 }

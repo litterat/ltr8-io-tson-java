@@ -393,5 +393,15 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         public boolean isNameRefusal() {
             return this == CONFUSABLE_NAMES || this == RESTRICTED_CHARACTER || this == RESTRICTED_SCRIPT;
         }
+
+        /**
+         * Whether this code is a refusal -- {@link #isNameRefusal()}'s three or §9.1's {@link #LIMIT_EXCEEDED}:
+         * this processor declined the document under its own policy and limits. Not a {@link #verdict()}, since
+         * one configured otherwise may accept the same bytes, yet a rejection by <em>this</em> processor, which
+         * is the answer a sender asking "will it be accepted here" needs (SPEC-FEEDBACK.md #1).
+         */
+        public boolean isRefusal() {
+            return isNameRefusal() || this == LIMIT_EXCEEDED;
+        }
     }
 }

@@ -394,7 +394,7 @@ class TsonCliTest {
      * {@link Error}, so it passed through every {@code catch (RuntimeException)} here and printed a bare JVM
      * stack trace to stderr, nothing to stdout, and exited 1. Exit 1 is still the answer, and now it is one
      * the run actually made: the report is on stdout, the code is {@code LIMIT_EXCEEDED}, and the outcome is
-     * {@code NOT_CHECKED} because the document was not read.
+     * {@code REJECTED}: this processor refused the document under its limits.
      *
      * <p>The refusal note is the §8.2 one, and belongs here for the same reason: what refused the document is
      * this deployment's configuration, and {@code --max-depth} is where the reader can see that stated.
@@ -422,35 +422,34 @@ class TsonCliTest {
     }
 
     /**
-     * The run says {@code NOT_CHECKED} where the exit code says 1 -- a refusal, [TSON-DATA] §8.1's fifth
-     * outcome, being where the two diverge.
+     * A §9.1 limit refusal is a rejection by this processor: {@code REJECTED}, exit 1, the code saying it was
+     * the limit rather than the document.
      */
     @Test
-    void aLimitRefusalIsNotCheckedInTheEnvelopeThoughItExitsOne(@TempDir Path dir) throws IOException {
+    void aLimitRefusalIsRejected(@TempDir Path dir) throws IOException {
         Path data = writeFile(dir, "deep.tson", "[".repeat(200) + "1" + "]".repeat(200));
 
         String json = captureStdout(() -> assertEquals(1, TsonCli.run(new String[] {
                 "validate", "--output", "json", data.toString()})));
 
-        assertTrue(json.contains("\"outcome\":\"NOT_CHECKED\""), json);
+        assertTrue(json.contains("\"outcome\":\"REJECTED\""), json);
         assertTrue(json.contains("\"code\":\"LIMIT_EXCEEDED\""), json);
         assertTrue(json.contains("\"max_depth\":64"), json);
     }
 
     /**
-     * A §8.2 name-hygiene refusal is §8.1's fifth outcome too: the envelope says {@code NOT_CHECKED}, since
-     * another deployment may accept the same document, and the exit code still says 1, the sender holding
-     * the fix.
+     * A §8.2 name-hygiene refusal is a rejection here, though not an invalidity: {@code REJECTED}, exit 1, and
+     * the code is not a verdict, since another deployment may accept the same document.
      */
     @Test
-    void aNameRefusalIsNotCheckedInTheEnvelopeThoughItExitsOne(@TempDir Path dir) throws IOException {
+    void aNameRefusalIsRejected(@TempDir Path dir) throws IOException {
         String mixed = "p" + new String(Character.toChars(0x0430)) + "y";
         Path data = writeFile(dir, "mixed.tson", "@" + mixed + ":1 2");
 
         String json = captureStdout(() -> assertEquals(1, TsonCli.run(new String[] {
                 "validate", "--output", "json", data.toString()})));
 
-        assertTrue(json.contains("\"outcome\":\"NOT_CHECKED\""), json);
+        assertTrue(json.contains("\"outcome\":\"REJECTED\""), json);
         assertTrue(json.contains("\"code\":\"RESTRICTED_SCRIPT\""), json);
     }
 
@@ -521,7 +520,7 @@ class TsonCliTest {
         String out = withStdin(data, () -> captureStdout(() -> assertEquals(0,
                 TsonCli.run(new String[] {"validate", "--output", "json", schema.toString(), "-"}))));
 
-        assertTrue(out.contains("\"file\":\"-\",\"outcome\":\"VALID\""), out);
+        assertTrue(out.contains("\"file\":\"-\",\"outcome\":\"ACCEPTED\""), out);
     }
 
     /**
