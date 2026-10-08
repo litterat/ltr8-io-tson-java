@@ -40,15 +40,14 @@ spanning both stays, and says which half is which.
 for an entry below, where there is no section to point at yet. When an entry closes, its citations become spec
 citations and the entry is deleted — nothing here is an archive.
 
-**#1–#4 are directions rather than defects.** Each is a place the series stops short of a rule on purpose:
-where a deployment's policy lives (#1), a bounded type slot at a field, which lets one field's type depend on
-another's (#2), a bound on the constructor an argument's type was built with (#3), and an edge between a core
-sibling and its kernel original, which resolved output needs and the same-body rule cannot give it (#4).
-**#5 was raised against Revision 37 itself**, in verifying its text against the closed entries: §5.2 exempts a
-use-site application of a template family base, which mints exactly the unnameable member §5.2's rule removes. The
-rest of what that verification found is in Revision 37's text and artifacts. **Two directions Revision 37 carried
-open are not here**: a namespace as a value and a JSON member name that is not an identifier are being reworked
-together, and will be raised against Revision 38 as entries of their own.
+**#1–#4 are directions rather than defects.** Each is a place the series stops short of a rule on purpose: where a
+deployment's policy lives (#1), a bounded type slot at a field, which lets one field's type depend on another's
+(#2), a bound on the constructor an argument's type was built with (#3), and an edge between a core sibling and its
+kernel original, which resolved output needs and the same-body rule cannot give it (#4). What verifying Revision
+37's text against the closed entries found is in that revision's text and artifacts. **Two directions Revision 37
+carried open are not here**: a namespace as a value and a JSON member name that is not an identifier are being
+reworked together, and will be raised against Revision 38 as entries of their own.
+
 ---
 
 ## 1. §8.2's policy has no artifact, and the two obvious homes are both wrong
@@ -291,42 +290,5 @@ answers every check, either reading of a recorded `type` gives the same answer, 
 What it costs is §3.3.5's "a core sibling remains a distinct type", which the edge would make a subtype instead.
 
 **Interpretation chosen:** the spec as written.
-
-**Status against Revision 37:** open.
-
----
-
-## 5. A use-site application of a template family base mints the unnameable member §5.2 refuses
-
-**Section:** [TSON-SCHEMA] §5.2 (*A family member is declared*), §5.10 (a record-bodied template is a family
-base), §8.1 (a template base "is indexed by its own name, its members being its applications"), §8.2.
-
-**Kind:** defect — an exemption that reaches the case its rule exists for.
-
-**The rule and its exemption.** §5.2 makes a use-site application whose result composes onto a record a
-resolver error — "a family member is declared" — and "leaves every other use-site application alone: arrays,
-sets, choices, and applications of a family's base, which compose onto nothing." For a base that is a record
-entry, that is right: `pet<…>` where `pet` is a record is not an application at all. But since Revision 36 a
-record-bodied **template** may itself be a family base (§5.10), and then "the template entry *is* the base: it is
-what the position names, what `subtypes` indexes", its members being its applications (§8.1). An application of
-that base composes onto nothing *and* is a member.
-
-**What follows.** With `box => <T> { v: T }` and `holder => { any: box  k: box<text> }`, the use site `k:
-box<text>` mints an entry under a content-derived name, and that entry is the family's member. This
-implementation, following the text, admits the schema, and a value at `any` is then refused with: "'box' is
-abstract and has no direct instances, so a value here must name its type -- one of (box_text_04117bb4)" — a name
-no document may write (§8.2). With a selector on the base the minted member fails the pin rule instead, which
-reports the minted name the same way. Both are the defect §5.2's rule removes, reached through its exemption.
-
-**Suggested resolution:** narrow the exemption to applications that are not members: "applications of a
-family's base, which compose onto nothing — except where the base is a record-bodied template, whose
-applications are its members (§5.10), and a use-site application of which is the error above". Refusing every
-use-site application of a record-bodied template would refuse `k: box<text>` where nothing names `box` bare, so
-the narrower reading is the error only where the template is a family base in fact — named bare at a type
-position somewhere in the closure, or declaring discriminators. Which of the two is the spec author's call; the
-first is total and simpler, and refuses a schema that never dispatches on `box`.
-
-**Interpretation chosen:** the text — the exemption holds, the schema loads, and dispatch at the base reports
-the minted name.
 
 **Status against Revision 37:** open.

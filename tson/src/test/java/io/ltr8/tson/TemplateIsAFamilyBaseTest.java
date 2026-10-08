@@ -193,4 +193,41 @@ class TemplateIsAFamilyBaseTest {
                   holder => { p: arr }
                 """).stream().anyMatch(d -> d.message().contains("is a template taking")));
     }
+
+    // ── A family's members are the applications a declaration names ────────────
+
+    /**
+     * {@code k: box<text>} is a type, read where it was written, and not a member of {@code box}'s family (§5.10):
+     * no declaration names it, so it never stands as a candidate at a position typed {@code box} and never asks
+     * for a name nobody can write. {@code bt => box<int32>} is declared, so it is the family.
+     */
+    @Test
+    void aUseSiteApplicationIsReadWhereItIsWrittenAndIsNoMember() {
+        String declarations = """
+                  box    => <T> { v: T }
+                  bt     => box<int32>
+                  holder => { any: box  k: box<text> }
+                """;
+        TsonLinkedSchema schema = linked("f11", declarations);
+        assertEquals(List.of("bt"), schema.schema().entries().get("box").subtypes());
+        assertEquals(List.of("box"), schema.schema().entries().get("bt").supertypes());
+
+        assertEquals(List.of(), read("f11", declarations, "!holder { any: !bt { v: 1 }  k: { v: x } }"));
+        List<Diagnostic> untagged = read("f11", declarations, "!holder { any: { v: 1 }  k: { v: x } }");
+        assertEquals(1, untagged.size(), untagged::toString);
+        assertTrue(untagged.getFirst().message().contains("one of (bt)"), untagged::toString);
+    }
+
+    /**
+     * A base declaring a selector, applied inline, mints a type with the selector field and no member to pin it:
+     * the minted entry is not a member, so §5.2's pin rule has nothing to ask of it, and the schema loads.
+     */
+    @Test
+    void aSelectorBaseAppliedInlineLoads() {
+        assertEquals(List.of(), load("f12", """
+                  circle => { r: int32 }
+                  shape  => <T> { kind: text =?  data: T }
+                  plot   => { s: shape<circle> }
+                """));
+    }
 }

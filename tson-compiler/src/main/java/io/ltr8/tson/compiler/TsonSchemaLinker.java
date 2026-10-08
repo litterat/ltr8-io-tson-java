@@ -967,7 +967,6 @@ public final class TsonSchemaLinker {
                 // member, so it is a type by the only test that matters -- something can stand at it.
                 continue;
             }
-            indexUnderItsTemplate(localName, local, merged, newSubtypesByName);
             for (String supertype : local.supertypes()) {
                 if (merged.containsKey(supertype)) {
                     newSubtypesByName.computeIfAbsent(supertype, ignored -> new LinkedHashSet<>()).add(localName);
@@ -983,31 +982,6 @@ public final class TsonSchemaLinker {
             result.put(entry.getKey(), withAddedSubtypes(result.get(entry.getKey()), entry.getValue()));
         }
         return result;
-    }
-
-    /**
-     * An <b>instantiation</b> is a member of the parent its template has (§5.10), so
-     * it indexes under the head it closes -- {@code pet<"dog", dog_type>} under {@code pet}.
-     *
-     * <p>The head is read off {@code source}, which §8.2 makes an instantiation record as written, head and
-     * arguments alike. Only an application has one, so nothing else here is touched.
-     *
-     * <p><b>Only where the template has a parent.</b> A container, a constructor application and a reference
-     * template are no types, so crediting {@code arr<text>} to {@code arr} would put members under something
-     * no position can name -- the same defect, in the other direction, that keeping a template out of its
-     * base's index removed.
-     */
-    private static void indexUnderItsTemplate(String name, TypeDefinition def,
-            Map<String, TypeDefinition> merged, Map<String, Set<String>> newSubtypesByName) {
-        String head = def.source().filter(source -> !source.arguments().isEmpty())
-                .map(TypeRef::name).orElse(null);
-        if (head == null) {
-            return;
-        }
-        TypeDefinition template = merged.get(head);
-        if (template != null && template.body() instanceof TemplateBody held && held.extension().isPresent()) {
-            newSubtypesByName.computeIfAbsent(head, ignored -> new LinkedHashSet<>()).add(name);
-        }
     }
 
     /**

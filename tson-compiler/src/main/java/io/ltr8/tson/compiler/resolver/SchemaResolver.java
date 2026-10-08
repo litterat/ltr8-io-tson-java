@@ -362,6 +362,7 @@ public final class SchemaResolver {
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
         republish(namespace, resolvedLocals, instantiations);
         appliedParentEdges(namespace, resolvedLocals, instantiations);
+        familyBaseEdges(namespace, resolvedLocals, generated);
 
         // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
         // have resolved". A form the desugar phase lifted with an application in a slot was named before that
@@ -575,6 +576,39 @@ public final class SchemaResolver {
             if (!changed) {
                 return;
             }
+        }
+    }
+
+    /**
+     * §5.10's membership: a <b>declared</b> application of a family base -- {@code bt => box<int32>} over
+     * {@code box => <T> { v: T }} -- is a member, so its contract names the template (§8.2's entry shape) and the
+     * linker's inverse puts it in {@code box.subtypes}. An application minted at a use site ({@code k: box<text>})
+     * is not: it is a type, read where it was written, with no edge to the base, so it is never a candidate at a
+     * position typed {@code box} and never needs the name nobody can write. A family's members are exactly the
+     * applications some declaration names -- §5.2's "a family member is declared", kept by leaving the minted
+     * one out rather than by refusing the schema.
+     *
+     * <p>A lifted synthetic is never a member either: it was named by no declaration, which is the whole test.
+     */
+    private static void familyBaseEdges(Map<String, TypeDefinition> namespace,
+                                        Map<String, TypeDefinition> resolvedLocals, Set<String> generated) {
+        for (Map.Entry<String, TypeDefinition> entry : resolvedLocals.entrySet()) {
+            TypeDefinition definition = entry.getValue();
+            String head = definition.source().filter(source -> !source.arguments().isEmpty())
+                    .map(io.ltr8.tson.schema.meta.TypeRef::name).orElse(null);
+            if (head == null || generated.contains(entry.getKey()) || definition.supertypes().contains(head)) {
+                continue;
+            }
+            TypeDefinition template = namespace.get(head);
+            if (template == null || !(template.body() instanceof TemplateBody held) || held.extension().isEmpty()) {
+                continue;
+            }
+            List<String> contract = new java.util.ArrayList<>(definition.supertypes());
+            contract.add(head);
+            TypeDefinition member = new TypeDefinition(definition.source(), definition.kind(), List.copyOf(contract),
+                    definition.subtypes(), definition.body(), definition.position(), definition.annotations());
+            entry.setValue(member);
+            namespace.put(entry.getKey(), member);
         }
     }
 
