@@ -603,6 +603,14 @@ SPEC-FEEDBACK.md's, renumbered against this revision.
    moves to meta. `extern_of` and `extern_type` record `S: schema_identity`. **[settled]**
    by the spec author.
 
+10. **§5.2, §5.10, §8.1, §8.2 — a family's members are the applications a declaration names.** §5.2's
+    "a family member is declared" exempted applications of a family's base, but a record-bodied template's
+    applications were its members, so `k: box<text>` at a use site minted a member of `box`'s family under a
+    content-derived name, and a value at a position typed `box` was then told to name it. A use-site
+    application is now a type read where it is written and no member: an instantiation of a family base
+    carries the template in its `supertypes` only where a declaration names it. Nothing is refused that loaded
+    before. **[settled]** by the spec author.
+
 ### 8.3 Part 3
 
 1. **§1.6 item 14** cites §8.5 and §9.4 for a `$schema` at a `declared` position, where it

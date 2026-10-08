@@ -129,23 +129,25 @@ are kept in step deliberately.
   *fields* rather than a body, and `FamilySelectors.of` (`schema.meta`) derives them — a closed base from its own
   fields, a template base from its members' fields of those names, its own body being held text.
   `RecordExtension` checks the family against that same derivation.
-- **Two different edges populate a family's `subtypes`, and they are minted by two different mechanisms.**
-  The first is §5.8's reference-valued `supertypes`: `result => abstract <T> { payload: T }` with `ok => <T>
-  result<T> & { note: text }` closes at `result<text>` to an ABSTRACT entry whose `subtypes` holds `ok<text>`
-  and not `ok<int32>` — the edge being to the instantiation the arguments name, minted by `contractOf` and
-  inverted by the linker's ordinary supertype walk. The second is **membership in the family base itself**,
-  which for a marked template is the template: every instantiation indexes under the head it closes,
-  `pet<"dog", dog_type>` under `pet`,
-  read off `source` by `TsonSchemaLinker.indexUnderItsTemplate` and credited only where the template's held
-  body carries an `extension` (a container, a constructor application and a reference template have no parent,
-  so their applications index nowhere). A closed entry's own `subtypes` is empty when it is minted:
-  `subtypes` is linking's throughout, one phase after resolution, which is what keeps two schemas closing one
-  application agreeing on the entry §2.2.3 unifies them by (`MintedEntryUnificationTest`). Marking a template
-  whose family could never be populated would be marking a type nothing can ever stand at, which is why the
-  mark and the family edges are one feature (`AbstractTemplateFamilyTest`).
-  **Every entry in such a family is minted**, so §8.2 makes every name in it non-normative and an alias is the
-  only spelling a document has for a member *or* for the base — which is what makes §7.2's flattening
-  load-bearing at both record dispatchers rather than only at the concrete record readers (`RecordDispatch`).
+- **Two different edges populate a family's `subtypes`, and they are minted by two different mechanisms.** The first
+  is §5.8's reference-valued `supertypes`: `result => abstract <T> { payload: T }` with `ok => <T> result<T> & {
+  note: text }` closes at `result<text>` to an ABSTRACT entry whose `subtypes` holds `ok<text>` and not `ok<int32>`
+  — the edge being to the instantiation the arguments name, minted by `contractOf` and inverted by the linker's
+  ordinary supertype walk. The second is **membership in the family base itself**, which for a marked template is
+  the template: a **declared** instantiation (`dogpet => pet<"dog", dog_type>`) carries the head it closes in its
+  own `supertypes` (§8.2's entry shape), added by `SchemaResolver.familyBaseEdges` where the template's held body
+  carries an `extension`, and the linker's ordinary inverse puts it in `pet.subtypes`. A **minted** instantiation
+  (`k: pet<"dog", dog_type>` at a use site) gets no such edge: it is a type read where it was written, never a
+  candidate at a `pet` position, so no diagnostic ever asks a document for its content-derived name (§5.10). A
+  container, a constructor application and a reference template have no parent, so their applications are members of
+  nothing. A closed entry's own `subtypes` is empty when it is minted: `subtypes` is linking's throughout, one phase
+  after resolution, which is what keeps two schemas closing one application agreeing on the entry §2.2.3 unifies
+  them by (`MintedEntryUnificationTest`). Marking a template whose family could never be populated would be marking
+  a type nothing can ever stand at, which is why the mark and the family edges are one feature
+  (`AbstractTemplateFamilyTest`). **Every entry in such a family is minted**, so §8.2 makes every name in it
+  non-normative and an alias is the only spelling a document has for a member *or* for the base — which is what
+  makes §7.2's flattening load-bearing at both record dispatchers rather than only at the concrete record readers
+  (`RecordDispatch`).
 - **A restated field's annotations merge over the inherited ones, restatement first** (`resolveField`/`merged`).
   §5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one; absorbing an
   inherited field whole while rebuilding a restated one from only what the restatement wrote would give one
