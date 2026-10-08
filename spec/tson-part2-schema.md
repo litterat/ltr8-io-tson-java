@@ -82,13 +82,14 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### 1.5 Companion Artifacts
 
-This document is published with six companion artifacts. The normative artifacts are pinned by content hash at publication. Per §3.4, implementations pre-load the kernel and meta-schema as in-memory structures; the artifact documents are descriptions of those structures, and the in-memory model is authoritative.
+This document is published with seven companion artifacts. The normative artifacts are pinned by content hash at publication. Per §3.4, implementations pre-load the kernel and meta-schema as in-memory structures; the artifact documents are descriptions of those structures, and the in-memory model is authoritative.
 
 | Artifact | Status | Content |
 |----------|--------|---------|
 | `meta-kernel.tn` | Normative | The self-referencing bootstrap layer (§9) |
 | `meta.tn` | Normative | The canonical meta-schema (§9) |
 | `core.tn` | Normative | The core type library (§9, [TSON-DATA] §5) |
+| `policy.tn` | Normative | The processor policy's vocabulary: the identifier and token policies and the resource limits ([TSON-DATA] §8.2, §9.1) |
 | `meta-kernel-resolved.tn` | Non-normative | Resolver-output fixture for the meta-kernel (§8) |
 | `meta-resolved.tn` | Non-normative | Resolver-output fixture for the meta-schema (§8) |
 | `core-resolved.tn` | Non-normative | Resolver-output fixture for the core type library (§8) |
@@ -1971,6 +1972,7 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/37/m/meta-kernel.tn?sha256=f2c2b278405f4c02ae327f70df07d5778744916da613a814104af6a312fcc145 |
 | meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/37/m/meta.tn?sha256=568b589bdb162f5390ca46f6a941339d7b92ecb236bf233f8ed992b359b47a90 |
 | core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/37/m/core.tn?sha256=4845f0c17bd0753f70cfe34ed3a537445e6a5b551b3b68541696ffe9e50d5065 |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/37/m/policy.tn?sha256=f2159051c9b7397203272dd5a92c229c1ca0829546032f323db39f4c3eaddca3 |
 
 ### 13.3 Informative References
 

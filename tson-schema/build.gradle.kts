@@ -30,6 +30,6 @@ dependencies {
 // (2026-07-29) alongside TsonBundledSchemas itself -- see that class's own Javadoc.
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
     from(rootProject.layout.projectDirectory.dir("spec/m")) {
-        include("meta-kernel.tn", "meta.tn", "core.tn")
+        include("meta-kernel.tn", "meta.tn", "core.tn", "policy.tn")
     }
 }

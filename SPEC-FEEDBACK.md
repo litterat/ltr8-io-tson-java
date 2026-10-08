@@ -13,18 +13,17 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-**Revision 37 closed seventeen of the twenty-one open against Revision 36**, and #1 below is what remains of the
-four that revision's change log carries open. The closed entries are gone: the spec now carries their rules — a
-family member is declared and a family is judged over its closure, the cell rule at every scoped position,
-`identifier` as a text family and `enum_type.type`, `value_type` and `void_type`, typed template parameters with
-their bounds and the call-site check, `ordered` on every container, the empty set, `tuple1<T>`, `uri` beside
-`uri_reference` and `iri_type`, the smaller core, meta's annotation vocabulary, `@doc` as CommonMark, field-group
-options and `+`, `normalization` on `text_type`, the leap second, and `optional` against `voidable`. **This file is
-the as-built record**, not a pointer to one: where an entry proposes a design this implementation has built, the
-entry states the design, what is running, and what is not, so that a reviewer editing the spec needs nothing beside
-it. **Where the evidence is a consumer of this library rather than this library** — #1 was found building the HTTP
-layer in `ltr8-io-tson-java-http`, and this register is the collection point for all of it — the entry says so and
-states what is running there on the same terms.
+**The register is empty: Revision 37 closes every entry open against Revision 36.** The closed entries are gone:
+the spec now carries their rules — a family member is declared and a family is judged over its closure, the cell
+rule at every scoped position, `identifier` as a text family and `enum_type.type`, `value_type` and `void_type`,
+typed template parameters with their bounds and the call-site check, `ordered` on every container, the empty set,
+`tuple1<T>`, `uri` beside `uri_reference` and `iri_type`, the smaller core, meta's annotation vocabulary, `@doc` as
+CommonMark, field-group options and `+`, `normalization` on `text_type`, the leap second, and `optional` against
+`voidable`. **This file is the as-built record**, not a pointer to one: where an entry proposes a design this
+implementation has built, the entry states the design, what is running, and what is not, so that a reviewer editing
+the spec needs nothing beside it. **Where the evidence is a consumer of this library rather than this library** —
+the HTTP layer in `ltr8-io-tson-java-http` is one, and this register is the collection point for all of it — the
+entry says so and states what is running there on the same terms.
 
 **Part 3 is not in this register.** [TSON-JSON] is an early draft this implementation exists to validate, and
 `spec/tson-part3-json.md` is edited **directly** as findings arise — so a Part 3 finding becomes a spec change
@@ -39,79 +38,7 @@ spanning both stays, and says which half is which.
 for an entry below, where there is no section to point at yet. When an entry closes, its citations become spec
 citations and the entry is deleted — nothing here is an archive.
 
-**#1 is a direction rather than a defect**: a place the series stops short of a rule on purpose, where a
-deployment's policy lives. The bounded type slot at a field is withdrawn rather than carried, Revision 37's change
-log recording that now is the wrong time to introduce it. What verifying Revision 37's text against the closed
-entries found is in that revision's text and artifacts. **Two directions Revision 37 carried open are not here**: a
-namespace as a value and a JSON member name that is not an identifier are being reworked together, and will be
-raised against Revision 38 as entries of their own.
-
----
-
-## 1. §8.2's policy has no artifact, and the two obvious homes are both wrong
-
-**Section:** [TSON-DATA] §8.2 (name hygiene, "The policy is not a property of a schema"), §9.1 (the limits
-policy), with consequences for [TSON-SCHEMA] §3.5 (schema immutability) and [TSON-DATA] §2.2.1 (canonical
-identity).
-
-**What Revision 35 settled, so that what is left is visible.** §8.2 now names the two policies, makes them
-properties of the *report* rather than of a refusal, requires a processor to state them with no document in
-hand, makes relaxation a code decision rather than an ambient one, and says outright that the policy is **not
-a property of a schema and no schema carries one** — with all three reasons: self-certification, immutability,
-and mechanism 1's failure to compose across `!!import`. §9.1 does the same for the limits policy and reports
-it through the same surfaces. Every half of this entry that was about *reporting* is closed.
-
-**What is left is the artifact.** §8.2 ends on "a deployment's own configuration, or an artifact of a kind
-this series does not yet define — it is named at the call site and never resolved by identity." That sentence
-is exactly right and is a placeholder. Two policies and, in a real deployment, a fetch allow-list and a set of
-host mappings have to live somewhere, and the series names no kind for them while naming a kind for everything
-else it asks a deployment to hold.
-
-**What is missing is a third artifact kind, and it already has a homeless occupant.** §2.2.1 evicted the port
-from identity — "no port (default or otherwise)" — and never said where location went. A **deployment
-descriptor** is what that has been trying to be: location, fetch allow-lists and host mappings, and the two
-§8.2 policies beside §9.1's. It should be **data, not a schema**, and that line is worth stating in the
-series: an API description must be a schema because `request: order` is a type reference the resolver resolves
-(§4.1's `data` kind, §9's `type_ref` rule), where a deployment descriptor references no types — a level is an
-enum member, a host is text, and even a per-schema policy holds *identities*, which are URIs.
-
-| Artifact | Kind | Shared with counterparties | Immutable |
-|---|---|---|---|
-| Schema | schema | yes, by identity | yes ([TSON-SCHEMA] §3.5) |
-| API description | schema (holds type refs) | yes, by identity | yes |
-| Deployment descriptor | **data** (holds no type refs) | no — see discovery below | **no** |
-
-**§8.2's closing constraint is one of the two that matter; the other is unstated.** *Named at the call site,
-never discovered* is there — a runtime that loads whatever descriptor is on its path lets a container image
-swap change a security policy with no code diff. *Never resolvable by identity* is half there: §8.2 says the
-policy is never resolved by identity, which is the property, but nothing says a **descriptor** may not be
-`!!import`ed or named from a document. The moment a document can point at one it selects its own enforcement
-level, and self-certification returns by the back door the front one was just closed against.
-
-**Discovery is the half a format can usefully standardise.** A counterparty has a legitimate question — what
-will this endpoint accept? — and three answers with different standing. **The refusal is the authority**,
-being the only report that cannot be stale, which is what §8.2's reporting rule now secures. **A
-`.well-known` path (RFC 8615) for the origin's acceptance profile** is the neat one: in this series everything
-with an identity is served at its identity's path, and a deployment descriptor is precisely the artifact that
-must *not* have an identity, so a well-known path is the right shape for it for the same reason it is the
-wrong shape for a schema — but what is published there must be a *projection*, since fetch allow-lists and
-host mappings are internal topology. **Not the API description**, which would advertise a mutable policy from
-an immutable artifact. Per-endpoint policy is the awkward case, a well-known document being origin-scoped:
-the honest answer is probably that the profile advertises the origin's default and the refusal reports what
-actually applied.
-
-**Interpretation chosen:** all three policies are code calls on `ProcessorConfig` (`withIdentifierPolicy`,
-`withTokenPolicy`, `withLimits`), with no artifact of any kind; `Tson.processorPolicy()`, `Tson.limitsPolicy()`,
-either read facade's, and `tson policy` are the no-document-in-hand surfaces §8.2 and §9.1 ask for. The
-consuming HTTP project leaves them at this library's defaults with its position written down in prose rather
-than expressed in a document — which is the gap this entry reports, met from the other side.
-
-**Suggested resolution** (a proposal — nothing here is built): name the third artifact kind, say that it is
-data rather than a schema and why, and make the second constraint normative beside the first — no `!!import`
-of a descriptor and no document able to name one. Failing that, the placeholder sentence is a reasonable place
-to stop, and this entry is content to be answered with "not this revision."
-
-**Status against Revision 37:** open, carried unchanged. Revision 34 introduced the policy layer that had
-nowhere to live; Revision 35 gave it everywhere to be *reported* and left where it lives undefined on purpose;
-Revisions 36 and 37 carry the entry open with both constraints recorded, and §8.2's closing sentence stands as
-the placeholder it is. Adopting this entry is a new section; declining it costs nothing that is currently broken.
+**Two directions Revision 37 carried open are not here**: a namespace as a value and a JSON member name that is not
+an identifier are being reworked together, and will be raised against Revision 38 as entries of their own. The rest
+of what was carried is settled in Revision 37's change log: the policy's home is `policy.tn`, the constructor bound
+is declined, and the bounded type slot at a field is withdrawn as the wrong feature for now.

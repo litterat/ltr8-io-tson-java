@@ -27,7 +27,7 @@ Related: `design/readers-and-diagnostics.md` (the `Diagnostic` model and codes t
 
 ## Bundled schema documents (`tson-schema/TsonBundledSchemas.java`)
 
-The published identities of the three bundled schemas (`META_KERNEL_ID`/`META_ID`/`CORE_ID`) **and** their
+The published identities of the four bundled schemas (`META_KERNEL_ID`/`META_ID`/`CORE_ID`/`POLICY_ID`) **and** their
 raw source text (`fetch(uri)`), off `tson-schema`'s classpath — the `.tn` resources are copied from
 `spec/m/` at build time (`processResources`), so there's one copy on disk to keep in sync with the spec.
 `fetch` is a static method rather than a `SchemaSource` instance (`tson-base`'s `base.source`, a functional

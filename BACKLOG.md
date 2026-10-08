@@ -43,7 +43,7 @@ own prose (which had gone stale on it):
   collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (including this session's own `TinySchemaImportsCoreTn1Test`) has to
   already know and hand-sequence the correct registration order itself. Distinct from what
-  `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
+  `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the four bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,

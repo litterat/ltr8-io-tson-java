@@ -137,8 +137,8 @@ says so. `UnsupportedOperationException`: this library has not implemented that 
 internal invariant broke. The test: *a schema error's verdict doesn't change when this library improves; a gap's does.*
 A gap travels as `Diagnostic.Code.NOT_IMPLEMENTED`, and the CLI's exit 1 vs 70 rides on that code.
 
-**Project-owned schema `!!id`:** `https://tson.io/2026/37/ltr8/<group>/<name>-<version>.tn`. The version is bumped on
-a *release*, not on a change — between releases the schema is edited in place. Use `.tn`, never `.tn1`.
+**Project-owned schema `!!id`:** `https://tson.io/2026/37/io/ltr8/<group>/<name>.tn`. Between releases the schema is
+edited in place; a release fixes the document under its identity (§10). Use `.tn`, never `.tn1`.
 
 **Line wrapping:** 125 characters, comments and code. Count characters, not bytes (`scripts/check-line-length.sh`).
 
