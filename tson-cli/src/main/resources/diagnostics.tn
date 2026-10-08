@@ -32,11 +32,12 @@
     and limits.
 
     ACCEPTED: nothing was reported. REJECTED: the document is invalid, or this processor refused it
-    under its [TSON-DATA] §8.2 policy or §9.1 limits; either way it will not be accepted here, and one
-    rejection settles it whatever else went unjudged. Which kind each problem is, the portable finding
-    or the local refusal, is its diagnostic_code. UNDETERMINED: nothing rejected the document, but
-    something could not be judged -- a schema not obtained, a type with no Java class here, a construct
-    not implemented -- so acceptance cannot be stated.
+    under its own configuration -- its [TSON-DATA] §8.2 policy, its §9.1 limits, or a schema it does
+    not hold and will not fetch; either way it will not be accepted here, and one rejection settles it
+    whatever else went unjudged. Which kind each problem is, the portable finding or the local refusal,
+    is its diagnostic_code. UNDETERMINED: nothing rejected the document, but something could not be
+    judged -- a schema that could not be obtained, a type with no Java class here, a construct not
+    implemented -- so acceptance cannot be stated.
     """
   outcome => !enum [ ACCEPTED REJECTED UNDETERMINED ]
   @doc:"""

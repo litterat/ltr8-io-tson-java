@@ -28,8 +28,8 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `NOT_IMPLEMENTED`           | **a library gap, not bad input**                                                             |
 | `BIND_MISMATCH`             | a schema type and its bound class disagree — about its fields, or a value the class refuses   |
 | `LIMIT_EXCEEDED`            | a §9.1 resource limit refused the document — nested deeper than `LimitsPolicy.maxDepth`      |
-| `SCHEMA_NOT_PERMITTED`      | policy refused the reference — not an allowed host, not a legal identity, no pin where required |
-| `SCHEMA_NOT_FOUND`          | the location was reached and does not have it                                                |
+| `SCHEMA_NOT_PERMITTED`      | this deployment would not supply it — not held, not an allowed host or legal identity, no pin |
+| `SCHEMA_NOT_FOUND`          | a source looking beyond its configuration (an origin, a directory) found nothing there      |
 | `SCHEMA_UNREACHABLE`        | the location could not be reached, or answered with something other than a document          |
 | `SCHEMA_TIMEOUT`            | the location did not answer in time                                                          |
 | `SCHEMA_TOO_LARGE`          | the location answered with more bytes than a schema document may be                          |
@@ -65,11 +65,12 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
   the schema the document names. Nothing is wrong with the document, and nothing may be wrong with the
   schema either — it was never obtained, so it was never read. **`SCHEMA_ERROR` vs the five** is the
   distinction a caller deciding whether to retry needs: `SCHEMA_ERROR` is a verdict, the schema *was*
-  obtained and does not resolve. And "everyone else" is several people, which is why there are five:
-  `SCHEMA_NOT_PERMITTED` and `SCHEMA_NOT_FOUND` mean the document named something this deployment will
-  not fetch or nothing serves, `SCHEMA_TOO_LARGE` that it named something too big to accept, and
-  `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` that the reference was fine and the world did not answer — only
-  those last two are worth a retry.
+  obtained and does not resolve. And "everyone else" is several people, which is why there are five.
+  `SCHEMA_NOT_PERMITTED` (a schema this deployment does not hold and will not fetch) and `SCHEMA_TOO_LARGE`
+  (one past its size cap) are this deployment *would not* — refusals, `Code.isRefusal()`, so the CLI's
+  `outcome` is `REJECTED`. `SCHEMA_NOT_FOUND` (an origin or directory had nothing there, most often the
+  sender's typo) and `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` are *could not*: nothing was judged, so
+  `UNDETERMINED` — and only those last two are worth a retry.
 
 **The three refusal codes are not verdicts either.** Each rule reads Unicode data the UCD does not
 freeze, so a refusal is [TSON-DATA] §8.1's fifth outcome beside `LIMIT_EXCEEDED`: this processor declined
@@ -241,12 +242,13 @@ they can raise, a document they can change; everything above `2` is the absence 
 could not give it. A refusal is no verdict on validity, but it is a rejection by this processor, so its
 `outcome` is `REJECTED` and it exits `1`.
 
-`TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by **who must act before anyone else's fix
-counts**, permanence breaking the tie: **70 > 78 > 69 > 75 > 1**. 70 and 78 name nobody present (a
-release of this library; an application wired to bind that type), 69 the runner editing the reference or
-the allow-list it is checked against, 75 the runner simply rerunning, and 1 the runner editing the
-document. Every non-verdict also rides in the report as its own code, with a note on stderr; the report
-on stdout is unchanged: its `outcome` is `UNDETERMINED` for the codes above `2`, and `REJECTED` for a refusal.
+`TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by **who must act first**: **70 > 78 > 69 > 1 >
+75**. 70 and 78 name nobody present (a release of this library; an application wired to bind that type), 69
+the runner editing the reference or supplying the schema, 1 the runner editing the document, and 75 the runner
+simply rerunning — last, because every other fix ends in a rerun, and a bare rerun of a rejected document is
+rejected again. Every non-verdict also rides in the report as its own code, with a note on stderr; the report
+on stdout is unchanged: its `outcome` is `REJECTED` for a refusal (`SCHEMA_NOT_PERMITTED` and
+`SCHEMA_TOO_LARGE` included) and `UNDETERMINED` for the rest above `2`.
 
 70's two halves print differently: a gap prints `not implemented yet: <message>`, whose text usually
 names the workaround; a fault gets the please-report-it banner and its stack trace.

@@ -720,35 +720,35 @@ OK
   was read (exit 2); a document that read but didn't validate reports inside its own entry (exit 1).
   `--output text` keeps the human-facing `# <file>` headers instead.
 - **`outcome` answers "will this be accepted": `ACCEPTED`, `REJECTED` or `UNDETERMINED`**, not a `valid`
-  boolean. `REJECTED` is an invalidity, or a refusal under this processor's §8.2 policy or §9.1 limits —
-  either way it will not be accepted here, and one rejection settles it whatever else went unjudged; each
-  diagnostic's code says which kind it was. `UNDETERMINED` is a document nothing rejected but something could
-  not judge — a schema never obtained, a type with no Java class in this tool, a construct not implemented —
-  and reporting it `valid: false` would assert a rejection the run cannot make, which is exactly what an agent
-  acts on when it reads `if (!valid)`. A run is `REJECTED` if any file is, else `UNDETERMINED` if any file is.
+  boolean. `REJECTED` is an invalidity, or a refusal under this processor's configuration — §8.2 policy, §9.1
+  limits, or a schema it will not supply — either way it will not be accepted here, and one rejection settles it
+  whatever else went unjudged; each diagnostic's code says which kind it was. `UNDETERMINED` is a document
+  nothing rejected but something could not judge — a schema that could not be obtained, a type with no Java
+  class in this tool, a construct not implemented — and reporting it `valid: false` would assert a rejection the
+  run cannot make, which is exactly what an agent acts on when it reads `if (!valid)`. A run is `REJECTED` if
+  any file is, else `UNDETERMINED` if any file is.
 - **Both machine formats spell one report one way** — `snake_case` keys, and a field with nothing to say
   left out rather than written `null`. That is what `tson-cli`'s own `diagnostics.tn` declares, what
   `--output tson` always emitted, and what the TypeScript CLI emits in both of its formats.
-- **A diagnostic locates a problem at up to two ends** — the value in the data (`path`, `data_position`)
-  and the rule in the schema (`schema_id`, `schema_pointer`, `schema_position`) — and either end may be
-  absent. The schema end is the path taken through *your* schema — an `age: int32` field that violates its
-  bound reports `/person/age`, not `/int32` in core.tn, because a pointer into a library file you didn't
-  write and can't edit is not where you go to fix it (the constraint is still in `message` and `expected`).
-  A field with nothing to say is omitted, never `""`, the two RFC 6901 pointers included: for a pointer
-  `""` is the *root*, a real location a document-level problem genuinely carries, so a present `""` and an
-  absent key stay apart there. A position is `line:column:byteOffset`, the first two
-  1-based and the offset counting UTF-8 bytes from 0. **Every field is a location, and the one fact that is
-  not — why no schema was obtained — rides the `code` rather than a field beside it**: `SCHEMA_NOT_PERMITTED`
-  and `SCHEMA_NOT_FOUND` mean the document named something this deployment will not fetch or nothing serves,
-  where `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT` and `SCHEMA_TOO_LARGE` mean the reference itself was fine — and
-  of those, only the first two are worth retrying. Five codes rather than one plus a reason field because
-  which one it is is a *routing* question, and a code is what a consumer routes on; consumers partition the
-  five differently (this CLI by whether a rerun could help, an HTTP surface by whose doing it was), so one
-  code per reason privileges no partition. A §8.2 name-hygiene refusal is an ordinary
-  diagnostic told apart by its code — `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT`, one
-  per rule — and carries nothing extra; what judged it rides on the envelope (below). The whole shape is
-  declared as a real schema in `tson-cli`'s own `diagnostics.tn`, which `--output tson` is validated
-  against.
+- **A diagnostic locates a problem at up to two ends** — the value in the data (`path`, `data_position`) and the
+  rule in the schema (`schema_id`, `schema_pointer`, `schema_position`) — and either end may be absent. The
+  schema end is the path taken through *your* schema — an `age: int32` field that violates its bound reports
+  `/person/age`, not `/int32` in core.tn, because a pointer into a library file you didn't write and can't edit
+  is not where you go to fix it (the constraint is still in `message` and `expected`). A field with nothing to
+  say is omitted, never `""`, the two RFC 6901 pointers included: for a pointer `""` is the *root*, a real
+  location a document-level problem genuinely carries, so a present `""` and an absent key stay apart there. A
+  position is `line:column:byteOffset`, the first two 1-based and the offset counting UTF-8 bytes from 0.
+  **Every field is a location, and the one fact that is not — why no schema was obtained — rides the `code`
+  rather than a field beside it**: `SCHEMA_NOT_PERMITTED` and `SCHEMA_TOO_LARGE` are this deployment declining —
+  a schema it does not hold and will not fetch, or one past its size cap — and so a rejection here, where
+  `SCHEMA_NOT_FOUND`, `SCHEMA_UNREACHABLE` and `SCHEMA_TIMEOUT` are what could not be obtained, and only
+  the last two are worth retrying. Five codes rather than one plus a reason field because which one it is is a
+  *routing* question, and a code is what a consumer routes on; consumers partition the five differently (this
+  CLI by whether a rerun could help, an HTTP surface by whose doing it was), so one code per reason privileges
+  no partition. A §8.2 name-hygiene refusal is an ordinary diagnostic told apart by its code —
+  `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT`, one per rule — and carries nothing extra;
+  what judged it rides on the envelope (below). The whole shape is declared as a real schema in `tson-cli`'s own
+  `diagnostics.tn`, which `--output tson` is validated against.
 - **Every report states the policy it was judged under**, once, in `policy`: the Unicode level applied to
   names and to values, whether it applies per `_`/`-` segment, any script combinations specially admitted,
   and the Unicode data version behind all three. §8.2's name rules read data the Unicode Consortium does not
@@ -762,25 +762,26 @@ OK
   (an LLM repair loop, say) never has to parse `message` to recover a bound or a member list.
 - **Schema selection** is entirely the data's own doing: its `!!schema` names the schema and its root
   type-ref (`!person`) names the type. The CLI itself does no URL *fetching* — schemas come from the files
-  you list, and one it can't match is `SCHEMA_NOT_FOUND` (exit 69), not a verdict on your data. The
+  you list, and one it can't match is `SCHEMA_NOT_PERMITTED` (exit 69): this run will not supply it, so the
+  document is rejected here, though nothing says it is invalid. The
   library has fetching sources (`HttpSchemaSource`, `FileSchemaSource`); wiring one into the CLI is
   separate.
 - **`--output`**: `text` (default, human-readable), `json` (for scripts/agents — the shape aligns with
   Pydantic's own `errors()`), or `tson` (the diagnostics rendered as a real, schema-validated TSON
   document — the CLI dogfooding the library).
-- **Exit codes** are Unix-conventional: `0` everything checked and nothing reported, `1` **checked and
-  rejected**, `2` a usage error (bad arguments, an unreadable file), `69` (`EX_UNAVAILABLE`) a schema not
+- **Exit codes** are Unix-conventional: `0` accepted, `1` **rejected** — invalid, or refused under this run's
+  policy or limits — `2` a usage error (bad arguments, an unreadable file), `69` (`EX_UNAVAILABLE`) a schema not
   obtained and a rerun will not obtain it (you didn't pass the schema file, or the reference is one this
   deployment refuses), `75` (`EX_TEMPFAIL`) a schema not obtained because a host didn't answer or timed out —
-  the one worth running again, `78` (`EX_CONFIG`) a type the schema needs has no Java class in this tool, and
-  `70` (`EX_SOFTWARE`) `tson` failing to reach a verdict at all — either a gap (`not implemented yet: …`,
-  whose message usually names the way to write the thing today) or a bug, which prints its stack trace and
-  asks for a report. Everything above `2` is deliberately kept distinct from `1` so a script never reads a
-  crash, a missing binding, or a schema it never fetched, as "your document is invalid" — so a script gets a
-  clean pass/fail without parsing prose. `1` includes a §8.2 name-hygiene refusal: the processor looked and
-  declined, and the sender holds the fix. A mixed run is lifted to whichever code is most permanent —
-  **`70` > `78` > `69` > `75` > `1`** — since rerunning reaches a gap again. `validate` collects
-  *every* problem in a file in one pass, not just the first.
+  the one worth running again, and only when nothing else needs fixing, `78` (`EX_CONFIG`) a type the schema
+  needs has no Java class in this tool, and `70` (`EX_SOFTWARE`) `tson` failing to reach a verdict at all —
+  either a gap (`not implemented yet: …`, whose message usually names the way to write the thing today) or a
+  bug, which prints its stack trace and asks for a report. Everything above `2` is deliberately kept distinct
+  from `1` so a script never reads a crash, a missing binding, or a schema it never fetched, as "your document
+  is invalid" — so a script gets a clean pass/fail without parsing prose. A mixed run is lifted to whoever must
+  act first — **`70` > `78` > `69` > `1` > `75`** — a gap and a missing binding before anything the runner can
+  do, and a rerun last, since every other fix ends in one and a bare rerun of a rejected document is rejected
+  again. `validate` collects *every* problem in a file in one pass, not just the first.
 
 ## Use it from another project
 

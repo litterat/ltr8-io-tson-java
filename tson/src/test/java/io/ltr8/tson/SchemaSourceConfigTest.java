@@ -131,8 +131,8 @@ class SchemaSourceConfigTest {
     }
 
     /**
-     * <b>And a schema it does not hold is a verdict on nothing</b> -- {@code SCHEMA_NOT_FOUND}, which is
-     * what a server routes on to answer the sender rather than blaming itself.
+     * <b>And a schema it does not hold is a refusal, not a verdict</b> -- {@code SCHEMA_NOT_PERMITTED}: this
+     * deployment will not supply it, which a server routes on to answer the sender rather than blaming itself.
      * The identity comes from the document, so this is the branch any caller can reach.
      */
     @Test
@@ -142,8 +142,9 @@ class SchemaSourceConfigTest {
         List<Diagnostic> problems = tson.validate(UNPUBLISHED);
 
         assertEquals(1, problems.size(), problems::toString);
-        assertEquals(Diagnostic.Code.SCHEMA_NOT_FOUND, problems.getFirst().code());
+        assertEquals(Diagnostic.Code.SCHEMA_NOT_PERMITTED, problems.getFirst().code());
         assertFalse(problems.getFirst().code().verdict(), "nothing was read, so nothing is being judged");
+        assertTrue(problems.getFirst().code().isRefusal(), "this deployment would not supply it");
     }
 
     /**

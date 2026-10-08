@@ -159,8 +159,9 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   - **`SchemaSource.ofMap` is the third shipped source, and exists because the trap above has one
     author.** `schemaSource(schemas::get)` is the natural first implementation — it compiles, serves every
     identity in the map, and returns `null` for the rest, which the document chooses. `ofMap` is that lookup
-    done to contract: a miss is `NOT_FOUND` (this source had somewhere to look, where `registeredOnly`'s
-    `NOT_PERMITTED` means nothing was looked for), and lookup is **by canonical identity**, so a reference
+    done to contract: a miss is `NOT_PERMITTED`, as `registeredOnly`'s is (the map is the deployment's whole
+    configuration, so a schema outside it is one this deployment will not supply), and lookup is **by
+    canonical identity**, so a reference
     carrying a `?sha256=` pin finds the entry registered without one. That last part is the half a raw map
     lookup gets wrong silently: it fails only for documents that pin, which are the ones written where
     integrity is taken seriously. Two keys canonicalizing alike are refused rather than collapsed, and the map

@@ -360,9 +360,10 @@ public final class JsonObjectReader {
      * returns {@code null}.
      *
      * <p><b>What stands in the way of a read is a diagnostic, and a verdict only where it is one.</b> A schema
-     * nothing supplies is {@code SCHEMA_NOT_FOUND}, a type it does not declare {@code UNKNOWN_TYPE}, a schema
-     * whose types the bound classes do not match {@code BIND_MISMATCH}, and a root type bound to a class {@code
-     * type} cannot hold {@code TYPE_MISMATCH} -- that last checked before the value is read. A schema type with
+     * this processor holds none of and has no source for is {@code SCHEMA_NOT_PERMITTED}, a type it does not
+     * declare {@code UNKNOWN_TYPE}, a schema whose types the bound classes do not match {@code BIND_MISMATCH},
+     * and a root type bound to a class {@code type} cannot hold {@code TYPE_MISMATCH} -- that last checked
+     * before the value is read. A schema type with
      * no bound class at all reaches the read that needs it as {@code MissingBindingException}: the reading
      * application's own wiring, in every mode.
      */
@@ -421,7 +422,7 @@ public final class JsonObjectReader {
             return null;
         }
         if (schema.isEmpty()) {
-            report(Diagnostic.Code.SCHEMA_NOT_FOUND, "no schema was supplied for \"" + schemaUri + "\"",
+            report(Diagnostic.Code.SCHEMA_NOT_PERMITTED, "no schema was supplied for \"" + schemaUri + "\"",
                     "a schema this processor can obtain", schemaUri);
             return null;
         }

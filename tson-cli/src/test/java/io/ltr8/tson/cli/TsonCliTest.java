@@ -111,12 +111,12 @@ class TsonCliTest {
      * <p><b>Over the codes here, and end to end in {@link #aNonVerdictCostsItsOwnFieldAVerdictAndNoOthers}.</b>
      * The end-to-end case is an unavailable schema rather than a gap: nothing this library refuses to
      * implement is reachable from a document any more, so {@code NOT_IMPLEMENTED} has no fixture, while a
-     * scope push onto a schema nobody would supply reaches the same ranking through {@code SCHEMA_NOT_FOUND}.
+     * scope push onto a schema this run would not supply reaches it through {@code SCHEMA_NOT_PERMITTED}.
      * The unit form states all five cases of the rule in one place, gap included.
      */
     @Test
     void aRunHoldingMoreThanOneKindOfProblemTakesTheMostPermanentCode() {
-        // Each rank alone, then beaten by the one above it: 70 > 78 > 69 > 75 > 1.
+        // Each rank alone, then beaten by the one above it: 70 > 78 > 69 > 1 > 75.
         assertEquals(70, TsonCli.exitCodeFor(List.of(Diagnostic.Code.NOT_IMPLEMENTED)));
         assertEquals(78, TsonCli.exitCodeFor(List.of(Diagnostic.Code.BIND_MISMATCH)));
         assertEquals(69, TsonCli.exitCodeFor(List.of(Diagnostic.Code.SCHEMA_NOT_PERMITTED)));
@@ -129,8 +129,12 @@ class TsonCliTest {
                 Diagnostic.Code.BIND_MISMATCH, Diagnostic.Code.SCHEMA_NOT_FOUND)));
         assertEquals(69, TsonCli.exitCodeFor(List.of(
                 Diagnostic.Code.SCHEMA_NOT_FOUND, Diagnostic.Code.SCHEMA_TIMEOUT)));
-        assertEquals(75, TsonCli.exitCodeFor(List.of(
+        assertEquals(1, TsonCli.exitCodeFor(List.of(
                 Diagnostic.Code.SCHEMA_UNREACHABLE, Diagnostic.Code.SCHEMA_ERROR)));
+        assertEquals(1, TsonCli.exitCodeFor(List.of(
+                Diagnostic.Code.SCHEMA_TIMEOUT, Diagnostic.Code.RESTRICTED_SCRIPT)));
+        assertEquals(75, TsonCli.exitCodeFor(List.of(
+                Diagnostic.Code.SCHEMA_UNREACHABLE, Diagnostic.Code.SCHEMA_TIMEOUT)));
 
         // Every fetch code lands in one of the two ranks -- no reason falls through to "checked and rejected".
         for (SchemaFetchException.Reason reason
@@ -141,10 +145,10 @@ class TsonCliTest {
     }
 
     /**
-     * <b>A schema that could not be obtained mid-document is not a verdict, end to end.</b> The outer schema
+     * <b>A schema this run will not supply mid-document is not a verdict, end to end.</b> The outer schema
      * loads clean, the document is well formed, and the field it fills is declared {@code extern} -- so the
      * scope push is authored intent, and the only thing that failed is obtaining the schema the value names.
-     * That rides in the report as {@code SCHEMA_NOT_FOUND} -- with the data path and position of the value
+     * That rides in the report as {@code SCHEMA_NOT_PERMITTED} -- with the data path and position of the value
      * that could not be read, like any other read diagnostic -- and {@link TsonCli#exitCodeFor} lifts the run
      * to 69 with the note on stderr, so the report on stdout stays exactly what {@code --output json|tson}
      * promises.
@@ -160,7 +164,7 @@ class TsonCliTest {
         String err = captureStderr(() -> {
             String out = captureStdout(() ->
                     assertEquals(69, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
-            assertTrue(out.contains("SCHEMA_NOT_FOUND"), out);
+            assertTrue(out.contains("SCHEMA_NOT_PERMITTED"), out);
             assertTrue(out.contains("cli-absent.tn"), () -> "it names the schema it wanted: " + out);
             assertTrue(out.contains("/at"), () -> "located at the value it could not read: " + out);
         });
@@ -203,7 +207,7 @@ class TsonCliTest {
             }
             captureStderr(() -> {
                 String out = captureStdout(() -> assertEquals(69, TsonCli.run(args), run::toString));
-                assertTrue(out.contains("SCHEMA_NOT_FOUND"), () -> run + " -> " + out);
+                assertTrue(out.contains("SCHEMA_NOT_PERMITTED"), () -> run + " -> " + out);
                 assertTrue(out.contains("ATOM_FORM_INVALID"),
                         () -> "the ordinary error still got its verdict: " + run + " -> " + out);
             });

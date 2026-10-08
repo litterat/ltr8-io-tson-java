@@ -136,7 +136,7 @@ class JsonValidateTest {
         String out = captureStdout(() -> assertEquals(2, TsonCli.run(new String[] {
                 "validate", "--schema", "https://example.test/absent.tn", "--type", "person",
                 schema.toString(), json.toString()})));
-        assertTrue(out.contains("SCHEMA_NOT_FOUND"), out);
+        assertTrue(out.contains("SCHEMA_NOT_PERMITTED"), out);
         assertTrue(out.contains(ID), "the identities the files do declare are listed: " + out);
     }
 
@@ -183,7 +183,7 @@ class JsonValidateTest {
         Path json = write(dir, "good.json", "{}");
         String out = captureStdout(() -> assertEquals(2, TsonCli.run(new String[] {
                 "validate", "--schema", "persno.tn", "--type", "person", schema.toString(), json.toString()})));
-        assertTrue(out.contains("SCHEMA_NOT_FOUND"), out);
+        assertTrue(out.contains("SCHEMA_NOT_PERMITTED"), out);
         assertTrue(out.contains("neither a file nor a schema identity"), out);
         assertTrue(out.contains(ID), "the identities the files do declare are listed: " + out);
     }

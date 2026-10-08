@@ -30,8 +30,15 @@ class OutcomeTest {
         assertEquals(Outcome.REJECTED, of(Code.LIMIT_EXCEEDED));
     }
 
+    /** A schema this deployment would not supply is its own refusal: what it holds, what it fetches, its cap. */
     @Test
-    void whatNobodyPresentCouldJudgeIsUndetermined() {
+    void aSchemaThisDeploymentWouldNotSupplyIsRejected() {
+        assertEquals(Outcome.REJECTED, of(Code.SCHEMA_NOT_PERMITTED));
+        assertEquals(Outcome.REJECTED, of(Code.SCHEMA_TOO_LARGE));
+    }
+
+    @Test
+    void whatCouldNotBeObtainedOrJudgedIsUndetermined() {
         assertEquals(Outcome.UNDETERMINED, of(Code.SCHEMA_NOT_FOUND));
         assertEquals(Outcome.UNDETERMINED, of(Code.SCHEMA_TIMEOUT));
         assertEquals(Outcome.UNDETERMINED, of(Code.BIND_MISMATCH));

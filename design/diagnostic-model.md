@@ -55,11 +55,15 @@ because the variation is locational, not categorical** — a value violating `in
 populates both ends at once, and `javax.tools.Diagnostic`, LSP's `Diagnostic` and rustc's `DiagInner` all
 model it the same way (rustc's `MultiSpan` being the mature form of the same idea).
 
-**A fetch failure is five codes, not one code and a field.** `SCHEMA_NOT_PERMITTED` names a reference this
-deployment will not fetch and `SCHEMA_NOT_FOUND` one nothing serves, both the document's to fix, where
-`SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT`/`SCHEMA_TOO_LARGE` say the reference was fine and the world was not.
-That is the difference between telling a sender to correct its document and telling it to retry, and it is a
-question consumers *route* on — so it lives where routing values live. A field beside the code would be a
+**A fetch failure is five codes, not one code and a field.** Two are this deployment *would not*, and so
+refusals (`Code.isRefusal()`): `SCHEMA_NOT_PERMITTED`, a schema it does not hold and will not fetch (a closed
+lookup's miss, a host off its allow-list, an illegal identity, a missing required pin), and `SCHEMA_TOO_LARGE`,
+one past its size cap ([TSON-SCHEMA] §11.2). Three are *could not*: `SCHEMA_NOT_FOUND`, a source that looks
+beyond its configuration (an origin, a directory) and finds nothing — nobody judged the document, though the
+sender most likely holds the fix, a reference with nothing behind it being most often a typo — and
+`SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT`, the only two a retry may change. That is the difference between telling a sender this
+deployment will not accept the document and telling it nobody could judge it, and it is a question consumers
+*route* on — so it lives where routing values live. A field beside the code would be a
 second carrier for one fact, and would cost a `Diagnostic` component, a `TsonReadContext.report` overload
 existing only to carry it, a `SchemaFailure` component, a `CliDiagnostic` component and a hand-copied enum
 in `diagnostics.tn`.

@@ -99,7 +99,7 @@ class JsonObjectReaderSchemaTest {
         List<Diagnostic> problems = new ArrayList<>();
         assertNull(JSON.objectReader().withDiagnostics(problems::add).withSchema("https://example.test/none.tn")
                 .readAs(ORDER, "order", Order.class));
-        assertEquals(Diagnostic.Code.SCHEMA_NOT_FOUND, problems.getFirst().code());
+        assertEquals(Diagnostic.Code.SCHEMA_NOT_PERMITTED, problems.getFirst().code());
     }
 
     @Test

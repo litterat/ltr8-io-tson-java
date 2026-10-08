@@ -180,10 +180,10 @@ public final class JsonTreeReader {
      * what §5.1 makes the validation, and the document comes back as the JSON it was. A caller wanting a
      * typed value is asking a different question and reads in bind mode.
      *
-     * <p><b>Failing to reach the schema is a diagnostic, never an exception</b>, and never a verdict on the
-     * document: {@code SCHEMA_NOT_FOUND} for an identity the loader has none for, {@code UNKNOWN_TYPE} for a
-     * root type the schema does not declare. {@code Code.verdict()} is false for both, so a consumer routing
-     * on the code cannot mistake either for the document being wrong.
+     * <p><b>What stands in the way of the read is a diagnostic, never an exception</b>: {@code
+     * SCHEMA_NOT_PERMITTED} for an identity the loader holds no schema for and has no source for, which is no
+     * verdict on the document ({@code Code.verdict()} false), and {@code UNKNOWN_TYPE} for a root type the
+     * schema does not declare, which is one -- the type named is the caller's error.
      */
     public JsonValue readAs(ByteSource source, String rootType) {
         return counted(r -> r.readRootAs(source, rootType));
@@ -197,7 +197,7 @@ public final class JsonTreeReader {
         Optional<JsonCompiledSchema> schema = schemas.get(schemaUri);
         if (schema.isEmpty()) {
             receiver.report(new Diagnostic(Optional.of(""), Optional.empty(), schemaUri,
-                    Diagnostic.Code.SCHEMA_NOT_FOUND, "no schema was supplied for \"" + schemaUri + "\"",
+                    Diagnostic.Code.SCHEMA_NOT_PERMITTED, "no schema was supplied for \"" + schemaUri + "\"",
                     "a schema this processor can obtain", schemaUri, Optional.empty(), Optional.empty()));
             return null;
         }

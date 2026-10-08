@@ -50,7 +50,7 @@ public interface ForeignSchemas {
         try {
             Optional<JsonCompiledSchema> found = get(uri);
             if (found.isEmpty()) {
-                ctx.report(Diagnostic.Code.SCHEMA_NOT_FOUND, "no schema was supplied for \"" + uri + "\"",
+                ctx.report(Diagnostic.Code.SCHEMA_NOT_PERMITTED, "no schema was supplied for \"" + uri + "\"",
                         "a schema this processor can obtain", uri);
             }
             return found.orElse(null);

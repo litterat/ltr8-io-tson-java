@@ -170,7 +170,7 @@ against one is always the caller's statement, made with `withSchema` and a root 
 
 **`readAs` in bind mode mirrors `TsonObjectReader`'s**, and is all-or-nothing at the document as every bind read
 is: a document that reported anything binds to `null`. What stands in the way of a read is reported before any of
-the document is touched, each with the code a consumer routes on — `SCHEMA_NOT_FOUND`, `UNKNOWN_TYPE`,
+the document is touched, each with the code a consumer routes on — `SCHEMA_NOT_PERMITTED`, `UNKNOWN_TYPE`,
 `BIND_MISMATCH` for a schema whose types the bound classes do not match (`JsonCompiledSchemaRegistry.get` compiles
 it and the compile refuses), and `TYPE_MISMATCH` for a root type bound to a class the caller cannot hold. A schema
 type with no bound class at all reaches the caller as `MissingBindingException`, the reading application's own

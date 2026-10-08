@@ -14,8 +14,8 @@ application, and the configuration package. Current form only; history lives in 
   stdin, at most once, always data.
 - `validate` emits one `ValidationRun` envelope per invocation; run-level `errors` are exit 2, a document's own are
   exit 1.
-- `TsonCli.exitCodeFor` reads diagnostic codes and nothing else, ranking `70 > 78 > 69 > 75 > 1`; everything but 0, 1
-  and 2 is the run declining to give a verdict.
+- `TsonCli.exitCodeFor` reads diagnostic codes and nothing else, ranking `70 > 78 > 69 > 1 > 75`; 1 is a rejection,
+  and everything else but 0 and 2 the run unable to judge, or (69) a schema it will not supply.
 - A policy flag never means nothing: `--token-scripts` alone raises the token level to `SINGLE_SCRIPT`, a relaxation
   against a stated level that scans nothing is a usage error, and `--max-depth` below 1 is refused rather than clamped.
 - The two default bind contexts share one atom list (`AtomContext.hostTypes()`); the resolver's adds a name binder and
@@ -154,10 +154,12 @@ run's code is decided, each branch with a one-line note on stderr and the report
 
 **A mixed run is the normal path**, so the order is a stated rule: **rank by who must act first, with
 permanence breaking the tie** between ranks where nobody present can act. At a command line the actors are
-the runner and their files, which gives `70 > 78 > 69 > 75 > 1` — a library release, a differently-wired
-application, an edit to a reference or an allow-list, a rerun, an edit to the document. The ordinary problems
-are real and still printed, but something was not checked at all, so "invalid" is a claim the run cannot
-make, and exit 1 would tell a script the document had been judged and rejected. What this buys the author is
+the runner and their files, which gives `70 > 78 > 69 > 1 > 75` — a library release, a differently-wired
+application, an edit to a reference, an edit to the document, and a rerun. **The rerun is last** because it
+is advice only when nothing else needs doing: every other fix ends in a rerun, which retries an unreachable
+schema for free, while a bare rerun of a rejected document reaches the same rejection. A gap or a missing
+binding outranks a rejection because nobody present can act on it, and the ordinary problems beside it are
+still printed. What this buys the author is
 the pass staying single: a schema with a gap in one declaration and a mistake in another reports both, where
 a thrown gap would take the second verdict with it.
 
@@ -174,7 +176,10 @@ catch as `TsonDiagnostics.ofSchemaUnavailable`, located at the root pointer. So 
 file and `tson compile` on a schema importing something the CLI cannot fetch land alike: neither run read the
 thing it needed. **Which way it failed is the code**, one per `Reason` —
 `SCHEMA_NOT_PERMITTED`/`SCHEMA_NOT_FOUND`/`SCHEMA_TOO_LARGE` are 69 because no rerun obtains them, and
-`SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` are 75 because one might. A field beside the code would have been a
+`SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` are 75 because one might. The CLI's own source is the files on the
+command line, the run's whole configuration, so a schema none of them declares is `SCHEMA_NOT_PERMITTED` --
+this run will not supply it, a refusal whose `outcome` is `REJECTED` -- and never `SCHEMA_NOT_FOUND`, which
+is a source that looks beyond its configuration and finds nothing. A field beside the code would have been a
 second carrier for a question the consumer routes on, and `exitCodeFor` reads codes and nothing else because
 of it.
 
