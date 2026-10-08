@@ -43,7 +43,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
 - **`tson-schema`** — `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
   records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
   deliberately open branch, `Data`, which a consumer's own class implements — see below). **The host value
-  types are not here**: `Rational`, `Complex`, the `CidrNetwork` pair and `InternetAddress` are `base.atom`'s, because
+  types are not here**: `Rational` and `Complex` are `base.atom`'s and the `CidrNetwork` pair `tson-net`'s, because
   *what do I get back from `!rational`?* is a question about the type system rather than about §8's model,
   and they depend on nothing. `schema.meta` reads them structurally — `RationalType`'s
   `min`/`max`/`multiple_of` are `Rational` values — a pull from above rather than a reason to live above. Plus the schema
@@ -96,10 +96,13 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `Iri.parse` reads an RFC 3986 URI-reference or RFC 3987 IRI-reference into its components as written (or
   throws `IriSyntaxException`), never resolving, normalising or percent-decoding. A true leaf, and the second
   library here with no `Tson` prefix, as `io.ltr8.bind` has none: it knows nothing of TSON and is usable on its
-  own. It exists because `java.net.URI` implements RFC 2396, not the RFC §5.5 cites, and cannot hold a host
-  beyond US-ASCII, which [TSON-DATA] §2.2.1's identities admit. `tson-base` requires it transitively
-  (`CanonicalIdentity`, `SchemaReference`, and its values as host types), and `tson-atom` wraps each format in an
-  `AtomTypeParser` that adds the facets.
+  own. Beside `Iri`: `InternetAddress` (RFC 3986's IPv4 and RFC 4291's IPv6 text forms, to octets and back, which
+  `Iri`'s IP literals read through), the `CidrNetwork` pair (RFC 4632 / RFC 4291 §2.3 prefixes, with containment
+  and the host-bits rule) and `MacAddress` (RFC 9542's EUI-48). Each exists because the JDK's answer is another
+  grammar: `java.net.URI` implements RFC 2396 and cannot hold a host beyond US-ASCII, and `InetAddress` admits
+  leading zeros, short forms and bare integers. `tson-base` requires it transitively (`CanonicalIdentity`,
+  `SchemaReference`, and its values as host types), `tson-schema`'s coherence checks judge facet entries with it,
+  and `tson-atom` wraps each format in an `AtomTypeParser` that adds the facets.
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the token-side atom glue
   (`atom`: `RawTokenParser`, `TokenAtomType`, `ValueParser` — the vocabulary itself is `tson-atom`'s),
   schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades

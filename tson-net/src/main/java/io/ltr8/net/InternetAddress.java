@@ -1,26 +1,19 @@
-package io.ltr8.tson.base.atom;
+package io.ltr8.net;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The IPv4 and IPv6 address grammars, as pure text-to-octets functions.
+ * The IPv4 and IPv6 address grammars, as pure text-to-octets functions and back: RFC 3986's {@code IPv4address}
+ * (four {@code dec-octet}s, no leading zeros, no short or integer forms) and RFC 4291 §2.2's IPv6 text forms, with
+ * RFC 5952's recommended spelling for writing one.
  *
- * <p><b>Why a grammar lives in the value model, when {@link Rational} and {@link Complex} carry none.</b>
- * Those two are reached by a facet that is already a host value: {@code rational_type.min} binds to a
- * {@code Rational}, so a constraint check compares values and never sees text. An address family's
- * {@code within}/{@code excluding} cannot be: the facets are typed {@code [value]} in meta.tn, and they must
- * stay that way, because they list <em>networks</em> and meta declares no network instance to type them by --
- * core.tn does, and core imports meta, so the dependency runs the wrong way.
+ * <p><b>Not {@code java.net.InetAddress}.</b> Its literal parsing is far more lenient than the RFC grammars: it
+ * accepts {@code 0177.0.0.1}, the BSD short form {@code 1.2.3} and a bare 32-bit integer, the leniency behind
+ * well-known SSRF filter bypasses. The octets these functions return are what {@code InetAddress.getByAddress}
+ * takes, which parses nothing and looks nothing up.
  *
- * <p>So those facets arrive as text, and the family that owns the rule is the only place that can judge them.
- * A check somewhere else -- in the linker, or the resolver -- would be a second home for one family's rule,
- * which is the thing {@code Atom.coherenceCheck} exists to prevent. The grammar comes here so the rule can
- * stay where it belongs.
- *
- * <p><b>Null-returning, never throwing.</b> Each caller names the value it was reading in its own message: a
- * reader says "not a valid IPv4 address", a coherence check says "{@code within} lists something that is not
- * a network". A shared exception would flatten those into one.
+ * <p><b>Null-returning, never throwing.</b> Each caller names the value it was reading in its own message.
  */
 public final class InternetAddress {
 

@@ -214,18 +214,17 @@ on every text family.
   declares no `identifier`; a schema wanting one writes the kernel's line. Core's `void` is `!void_type {}` too, so
   the linker's refusal of a `void` variant and the inhabitance check ask the body (`ReferenceChain.resolvesToVoid`),
   not the name.
-- **The network family reuses one grammar per address form, never a second copy.** Both grammars are
-  `base.atom.InternetAddress`'s: its IPv6 half parses RFC 4291 §2.2's embedded IPv4 tail through the same
-  strict `dec-octet` pattern `Ipv4Parser` reads, and
-  `Cidr4Parser`/`Cidr6Parser` parse the address half of a network through those two — so the leniency gap
-  `Ipv4Parser`'s Javadoc documents is shut down once, in one place. What the CIDR pair adds on top is
-  §5.5's own two validation rules (prefix length inside the family range; host bits zero under that
-  prefix, since a network that accepted and masked would be lossy) plus the `min_prefix`/`max_prefix`
-  facets. **`within`/`excluding` apply across all four**, each family asking its own question of the same
-  arithmetic: an address must fall inside some permitted network and outside every excluded one, and a
-  network must be a subnet of a permitted one and must not overlap an excluded one — the difference being
-  that a block partly inside an exclusion is partly excluded, which for a value denoting a whole block is a
-  rejection.
+- **The network family reuses one grammar per address form, never a second copy.** Both grammars are `tson-net`'s
+  `io.ltr8.net.InternetAddress`, which `Iri` reads its IP literals through too: its IPv6 half parses RFC 4291 §2.2's
+  embedded IPv4 tail through the same strict `dec-octet` pattern `Ipv4Parser` reads, and `Cidr4Parser`/`Cidr6Parser`
+  parse the address half of a network through those two — so the leniency gap `Ipv4Parser`'s Javadoc documents is
+  shut down once, in one place. What the CIDR pair adds on top is §5.5's own two validation rules (prefix length
+  inside the family range; host bits zero under that prefix, since a network that accepted and masked would be
+  lossy) plus the `min_prefix`/`max_prefix` facets. **`within`/`excluding` apply across all four**, each family
+  asking its own question of the same arithmetic: an address must fall inside some permitted network and outside
+  every excluded one, and a network must be a subnet of a permitted one and must not overlap an excluded one — the
+  difference being that a block partly inside an exclusion is partly excluded, which for a value denoting a whole
+  block is a rejection.
 - **`uri`/`uri_reference` (`uri_type`, RFC 3986) and `iri`/`iri_reference` (`iri_type`, RFC 3987) share one
   recognizer, `tson-net`'s `Iri`**, under its URI or IRI grammar, and read to the `Iri` itself: the text as
   written, split into its components. `java.net.URI` (RFC 2396) is a binding target, never the judge —
@@ -246,7 +245,7 @@ on every text family.
   value's scheme in that form (RFC 3986 §3.1) — and `allow_relative` and `allow_fragment` are permissions, as
   `float_type`'s `allow_*` flags are.
 - **A CIDR value is a network, not its text, and a family each** — `cidr4` reads to
-  `base.atom.CidrInet4Network` and `cidr6` to `CidrInet6Network` (the prefix octets and the prefix length),
+  `io.ltr8.net.CidrInet4Network` and `cidr6` to `CidrInet6Network` (the prefix octets and the prefix length),
   so two spellings of one network are one value and `2001:0db8:0000:…/32` binds equal to `2001:db8::/32`.
   Writing goes back through RFC 5952's canonical form rather than the authored spelling, which is what it
   means for the value to be the octets. **A type each because a host type is how a component names a family**:
@@ -314,8 +313,8 @@ on every text family.
   CIDR pair reusing the two address grammars and validating §5.5's family-range and host-bits-zero rules on top. All
   four network families apply `within`/`excluding` and judge the pair for emptiness at schema load — exactly,
   prefix-tree cover being counting rather than searching, with a network family's prefix bounds folded in, both halves
-  stated by §5.5. The address grammars (`InternetAddress`) and the network values live in `tson-base`'s `base.atom`,
-  beneath `tson-schema`, so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries
+  stated by §5.5. The address grammars (`InternetAddress`, `MacAddress`) and the network values live in `tson-net`, a
+  leaf beneath `tson-schema`, so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries
   without the linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its
   siblings**, and its format check is the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted
   local parts, domain literals or comments.

@@ -12,7 +12,8 @@ import java.util.Optional;
  * {@code /}, {@code ?} or {@code #}, userinfo is what precedes its first {@code @} (userinfo holds none), a
  * registered name's port follows its first {@code :} (a registered name holds none), and the query and fragment begin
  * at the first {@code ?} and {@code #}. What is left is each component's own character set, checked over its span,
- * and the two host forms with structure: IPv6's nine shapes and IPv4's {@code dec-octet}.
+ * and the two host forms with structure, IPv6 and IPv4, which are {@link InternetAddress}'s grammars: an IP
+ * literal and an address are one production wherever they appear.
  */
 final class IriGrammar {
 
@@ -142,7 +143,7 @@ final class IriGrammar {
             }
             return new Iri.Host(Iri.Host.Kind.IP_FUTURE, literal);
         }
-        if (!isIpv6(literal)) {
+        if (InternetAddress.ipv6(literal) == null) {
             throw fail("has '[" + literal + "]', which is not an IPv6 address (RFC 3986 §3.2.2)", from);
         }
         return new Iri.Host(Iri.Host.Kind.IPV6, literal);
@@ -197,79 +198,9 @@ final class IriGrammar {
         }
     }
 
-    /** {@code dec-octet "." dec-octet "." dec-octet "." dec-octet}. */
+    /** RFC 3986's {@code IPv4address}, by {@link InternetAddress}'s grammar, which the IPv4 family shares. */
     private boolean isIpv4(int from, int to) {
-        return isIpv4(text.substring(from, to));
-    }
-
-    private static boolean isIpv4(String s) {
-        String[] octets = s.split("\\.", -1);
-        if (octets.length != 4) {
-            return false;
-        }
-        for (String octet : octets) {
-            if (octet.isEmpty() || octet.length() > 3 || octet.length() > 1 && octet.charAt(0) == '0') {
-                return false;
-            }
-            for (int i = 0; i < octet.length(); i++) {
-                if (!isDigit(octet.charAt(i))) {
-                    return false;
-                }
-            }
-            if (Integer.parseInt(octet) > 255) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * RFC 3986 §3.2.2's nine {@code IPv6address} shapes, read as one rule: eight 16-bit pieces, an {@code ls32} IPv4
-     * tail counting as two, with at most one {@code ::} standing for one or more zero pieces.
-     */
-    private static boolean isIpv6(String s) {
-        int elision = s.indexOf("::");
-        if (elision >= 0 && s.indexOf("::", elision + 1) >= 0) {
-            return false;
-        }
-        if (elision < 0) {
-            int pieces = pieces(s, true);
-            return pieces == 8;
-        }
-        String left = s.substring(0, elision);
-        String right = s.substring(elision + 2);
-        int leftPieces = left.isEmpty() ? 0 : pieces(left, false);
-        int rightPieces = right.isEmpty() ? 0 : pieces(right, true);
-        return leftPieces >= 0 && rightPieces >= 0 && leftPieces + rightPieces <= 7;
-    }
-
-    /**
-     * How many 16-bit pieces {@code s} spells as {@code h16} separated by single colons, an IPv4 tail counting two
-     * where {@code tailMayBeIpv4}; {@code -1} where it spells none.
-     */
-    private static int pieces(String s, boolean tailMayBeIpv4) {
-        String[] groups = s.split(":", -1);
-        int pieces = 0;
-        for (int g = 0; g < groups.length; g++) {
-            String group = groups[g];
-            if (g == groups.length - 1 && tailMayBeIpv4 && group.indexOf('.') >= 0) {
-                if (!isIpv4(group)) {
-                    return -1;
-                }
-                pieces += 2;
-                continue;
-            }
-            if (group.isEmpty() || group.length() > 4) {
-                return -1;
-            }
-            for (int i = 0; i < group.length(); i++) {
-                if (!isHex(group.charAt(i))) {
-                    return -1;
-                }
-            }
-            pieces++;
-        }
-        return pieces;
+        return InternetAddress.ipv4(text.substring(from, to)) != null;
     }
 
     /** RFC 3987 §2.2's {@code ucschar}: the BMP's letters and marks, then each supplementary plane but the last two. */

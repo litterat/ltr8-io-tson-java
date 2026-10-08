@@ -166,6 +166,18 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
 
 ## Module structure
 
+- [ ] **The Unicode identifier machinery becomes a library of its own, `io.ltr8.unicode`, as `tson-net` did for
+  network formats.** `tson-base.unicode` holds UAX #31 profiles (`IdentifierProfile`, `Xid`), UTS #39's confusable
+  skeletons, `Identifier_Status` and joining-control contexts, and `NfkcCasefold`; `base.policy.ScriptPolicy` holds
+  UTS #39's restriction levels. None of it knows TSON, and the JDK implements none of UTS #39 (ICU4J is the usual
+  answer). What constrains it: the lexer and the identifier policy read these tables on the hot path, so the move
+  must keep `Nfc`'s allocation-free fast path and the allocation harness flat, and `ScriptPolicy` splits into the
+  UTS #39 levels (the library) and the policy a deployment states (`tson-base`).
+- [ ] **`tson-regex` drops its `Tson` prefix** — `io.ltr8.regex`, `TsonRegex` → a name for what it is (an
+  I-Regexp), `TsonRegexSyntaxException` likewise — on the rule `tson-net` and `tson-bind` follow: a library that
+  knows nothing of TSON carries no `Tson` prefix. A mechanical rename across `tson-schema`, `tson-atom` and
+  `tson-compiler`.
+
 - [ ] **The encoding-neutral reader parts move into a module both stacks share — `tson-encoding` or similar, not
   `tson-base`.** With two working stacks the seam is visible (`design/json-encoding.md` deferred this until there
   were two to find it from): everything above the event level is encoding-neutral, and today it exists twice,

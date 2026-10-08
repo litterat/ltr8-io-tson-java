@@ -22,7 +22,7 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
-import io.ltr8.tson.base.atom.CidrNetwork;
+import io.ltr8.net.CidrNetwork;
 import io.ltr8.tson.base.atom.Complex;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;

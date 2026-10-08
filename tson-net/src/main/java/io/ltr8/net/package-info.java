@@ -1,6 +1,18 @@
 /**
  * Native recognizers for the text forms of network identifiers, each to its RFC and none delegated to the JDK.
  *
+ * <ul>
+ *   <li>{@link io.ltr8.net.Iri} -- RFC 3986 URI-references and RFC 3987 IRI-references.</li>
+ *   <li>{@link io.ltr8.net.InternetAddress} -- RFC 3986's IPv4 and RFC 4291's IPv6 text forms, to octets and back.</li>
+ *   <li>{@link io.ltr8.net.CidrNetwork} -- CIDR networks, one type per family, with containment and the host-bits
+ *       rule.</li>
+ *   <li>{@link io.ltr8.net.MacAddress} -- RFC 9542's EUI-48 text form.</li>
+ * </ul>
+ *
+ * <p>Every one exists because the JDK's answer is a different grammar: {@code java.net.URI} implements RFC 2396
+ * and cannot hold a host beyond US-ASCII, and {@code java.net.InetAddress}'s literal parsing admits leading zeros,
+ * short forms and bare integers. JDK types are where values may be held, never what judges text.
+ *
  * <h2>URIs and IRIs</h2>
  *
  * <p>{@link io.ltr8.net.Iri#parse} decides whether text is an RFC 3986 URI-reference or an RFC 3987 IRI-reference and

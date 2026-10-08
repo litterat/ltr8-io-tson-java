@@ -1,8 +1,8 @@
 package io.ltr8.tson.base.bind;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.base.atom.CidrInet4Network;
-import io.ltr8.tson.base.atom.CidrInet6Network;
+import io.ltr8.net.CidrInet4Network;
+import io.ltr8.net.CidrInet6Network;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
