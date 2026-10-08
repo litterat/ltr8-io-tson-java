@@ -440,12 +440,12 @@ a data document's own `!!schema` plus its root type-ref select what it is checke
 is JSON data — the one place the tool reads an extension — and, naming neither its schema nor its type,
 takes `--schema <file|uri> --type <name>` together; they bind every JSON input in the run. A schema file given
 to `--schema` joins the run and binds by the `!!id` it declares, wherever it sits. Nothing is fetched
-over the network. Exit codes: `0` checked and nothing reported · `1` checked and rejected, or refused (§8.2
-name hygiene, a §9.1 limit) · `2` usage · `69` a schema not obtained and a rerun will not help · `75` a schema not reached,
-where a rerun may · `78` a type with no Java class in this tool · `70` a library gap or fault — a mixed run
+over the network. Exit codes: `0` accepted · `1` rejected, as invalid or refused (§8.2 name hygiene, a §9.1
+limit) · `2` usage · `69` a schema not obtained and a rerun will not help · `75` a schema not reached, where a rerun
+may · `78` a type with no Java class in this tool · `70` a library gap or fault — a mixed run
 lifting to the most permanent (`70` > `78` > `69` > `75` > `1`). The report envelope's `outcome` answers the
-other question, `VALID`, `INVALID` or `NOT_CHECKED`: a refused run is `NOT_CHECKED` yet exits `1`, because the
-runner holds the fix (a relaxed policy, `--max-depth`, or a changed document).
+question a sender asks, "will this be accepted": `ACCEPTED`, `REJECTED` (invalid, or refused under this
+processor's policy or limits) or `UNDETERMINED` (nothing rejected it, but something could not be judged).
 
 `tson --help` lists the commands; `tson <command> --help` carries that command's own options, including
 the policy flags (§8.2's name hygiene and §9.1's `--max-depth`) for the three that judge a document.

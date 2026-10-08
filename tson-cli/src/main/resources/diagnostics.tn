@@ -28,17 +28,17 @@
     SCHEMA_NOT_PERMITTED SCHEMA_NOT_FOUND SCHEMA_UNREACHABLE SCHEMA_TIMEOUT SCHEMA_TOO_LARGE
   ]
   @doc:"""
-    Whether a document was checked, and if it was, what checking found. Two questions that a single
-    `valid` boolean carried on one bit: a document whose schema could not be obtained, or whose types
-    have no Java class here, was never read at all -- reporting it as invalid asserts a verdict this
-    run cannot make, and an agent reading `if (!valid)` acts on that assertion.
+    Whether the document will be accepted by the processor that judged it, under its schema, policy
+    and limits.
 
-    NOT_CHECKED is exactly the set of diagnostic codes that are not a verdict (Diagnostic.Code.verdict):
-    [TSON-DATA] §8.1's fifth outcome -- the three name-hygiene refusals, LIMIT_EXCEEDED and the five
-    SCHEMA_ codes -- with BIND_MISMATCH and NOT_IMPLEMENTED. A refusal says this processor declined, and
-    the same document may be accepted in full by one configured otherwise.
+    ACCEPTED: nothing was reported. REJECTED: the document is invalid, or this processor refused it
+    under its [TSON-DATA] §8.2 policy or §9.1 limits; either way it will not be accepted here, and one
+    rejection settles it whatever else went unjudged. Which kind each problem is, the portable finding
+    or the local refusal, is its diagnostic_code. UNDETERMINED: nothing rejected the document, but
+    something could not be judged -- a schema not obtained, a type with no Java class here, a construct
+    not implemented -- so acceptance cannot be stated.
     """
-  outcome => !enum [ VALID INVALID NOT_CHECKED ]
+  outcome => !enum [ ACCEPTED REJECTED UNDETERMINED ]
   @doc:"""
     One problem, located at up to two ends: the value in the data (path, data_position) and the rule
     in the schema (schema_id, schema_pointer, schema_position). Either end may be missing -- a problem

@@ -22,7 +22,7 @@ import java.util.List;
 public record ValidationReport(Outcome outcome, CliPolicy policy, List<CliDiagnostic> errors) {
 
     static ValidationReport ok(CliPolicy policy) {
-        return new ValidationReport(Outcome.VALID, policy, List.of());
+        return new ValidationReport(Outcome.ACCEPTED, policy, List.of());
     }
 
     static ValidationReport failed(CliPolicy policy, Diagnostic.Code code, String message) {

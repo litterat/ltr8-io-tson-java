@@ -139,7 +139,6 @@ a document reports instead.
 well-formed, valid, and read in full by the next processor along. It has its own classifier
 (`Diagnostic.ofLimitExceeded`) rather than a case inside `ofBaseSyntaxError`, because a base-syntax failure is
 a verdict every processor repeats and this one is a statement about the reader's configuration; both facades
-catch it ahead of the `RuntimeException` that reaches the other. The CLI still **exits 1** — its envelope says
-`NOT_CHECKED`, the truth about the document, while the exit code answers what the runner should do now, and
-here they can act (`--max-depth`, or a smaller document). A §8.2 name refusal is the same fifth outcome
-and diverges the same way; `TsonCli.exitCodeFor` says so.
+catch it ahead of the `RuntimeException` that reaches the other. It is still a **rejection by this processor**
+(`Code.isRefusal()`), as a §8.2 name refusal is: the CLI's envelope says `REJECTED` and it exits 1, the runner
+holding the fix (`--max-depth`, or a smaller document).

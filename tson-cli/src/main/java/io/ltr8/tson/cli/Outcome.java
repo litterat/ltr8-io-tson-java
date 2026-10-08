@@ -5,55 +5,52 @@ import io.ltr8.tson.base.Diagnostic;
 import java.util.List;
 
 /**
- * Whether a document was checked, and if it was, what checking found.
+ * Whether a document will be accepted -- the question a sender checking a file or a request against a
+ * deployment's schema and policy is asking.
  *
- * <p><b>Two questions that a single {@code valid} boolean carried on one bit.</b> A document whose schema
- * could not be obtained, or whose types have no Java class here, was never read at all -- reporting it as
- * {@code valid: false} asserts a verdict the run cannot make, and it is the assertion an agent acts on when
- * it reads {@code if (!valid)}. The exit code has said this for as long as 69 has existed; the envelope
- * beside it said "rejected".
+ * <p><b>Acceptance, not validity, is the headline.</b> A document is rejected by an invalidity every processor
+ * repeats, and equally by a refusal under this deployment's own policy or limits ([TSON-DATA] §8.2, §9.1):
+ * either way it will not be accepted here, and the sender holds the fix. Which of the two it was -- the
+ * portable finding or the local one -- is each diagnostic's {@link Diagnostic.Code}, where {@link
+ * Diagnostic.Code#verdict()} and {@link Diagnostic.Code#isRefusal()} tell them apart. What leaves a document
+ * {@link #UNDETERMINED} is nothing anyone present could judge it by: a schema not obtained, a gap in this
+ * library, a type with no class here (SPEC-FEEDBACK.md #1).
  *
- * <p><b>An enum rather than a second boolean</b>, for the reason {@link Diagnostic.Code} carries a fetch
- * failure rather than a field beside it: {@code checked = false, valid = true} would be representable and
- * meaningless, and a second boolean does not defeat the read that caused the problem -- {@code if (!valid)}
- * still says rejected. Making {@code valid} optional would not either, {@code null} being falsy in the
- * languages that consume this. There is no falsy shortcut past a three-member enum.
+ * <p><b>An enum rather than a {@code valid} boolean</b>, since {@code if (!valid)} reads "undetermined" as
+ * "rejected" -- the assertion an agent acts on. There is no falsy shortcut past a three-member enum.
  */
 public enum Outcome {
 
-    /** Checked, and nothing was reported. */
-    VALID,
+    /** Judged, and nothing was reported. */
+    ACCEPTED,
 
-    /** Checked and rejected. */
-    INVALID,
+    /** Rejected: the document is invalid, or this processor refused it under its policy or limits. */
+    REJECTED,
 
-    /**
-     * No verdict: something was reported that says the document was not judged -- [TSON-DATA] §8.1's fifth
-     * outcome (a §8.2 or §9.1 refusal, a schema not obtained), or a gap or a binding this tool lacks.
-     */
-    NOT_CHECKED;
+    /** Not rejected, but something could not be judged, so acceptance cannot be stated. */
+    UNDETERMINED;
 
     /**
-     * The outcome a list of problems denotes: nothing reported is {@link #VALID}, anything that is not a
-     * verdict makes the whole thing {@link #NOT_CHECKED}, and what is left is {@link #INVALID}.
+     * The outcome a list of problems denotes: nothing reported is {@link #ACCEPTED}, any invalidity or refusal
+     * is {@link #REJECTED}, and what is left is {@link #UNDETERMINED}.
      *
-     * <p><b>One non-verdict is enough</b>, the same way one makes the run's exit code a non-verdict: the
-     * ordinary problems beside it are real and still reported, but part of the document went unchecked, so
-     * "invalid" is a claim about the whole that cannot be made. Which codes those are is {@link
-     * Diagnostic.Code#verdict}'s to say, so this does not keep a second copy of the set.
+     * <p><b>One rejection is enough</b>, beside anything else reported: what went unjudged cannot make a
+     * rejected document acceptable, only an unrejected one unknown. Which codes reject is {@link
+     * Diagnostic.Code}'s to say, so this keeps no copy of the set.
      */
     static Outcome of(List<CliDiagnostic> errors) {
         if (errors.isEmpty()) {
-            return VALID;
+            return ACCEPTED;
         }
-        return errors.stream().allMatch(error -> error.code().verdict()) ? INVALID : NOT_CHECKED;
+        return errors.stream().anyMatch(error -> error.code().verdict() || error.code().isRefusal())
+                ? REJECTED : UNDETERMINED;
     }
 
-    /** The outcome of a whole run: the least settled of its files', a run being no better than its parts. */
+    /** The outcome of a whole run, on the same terms: any file rejected, else any undetermined, else accepted. */
     static Outcome ofFiles(List<FileReport> files) {
-        if (files.stream().anyMatch(file -> file.outcome() == NOT_CHECKED)) {
-            return NOT_CHECKED;
+        if (files.stream().anyMatch(file -> file.outcome() == REJECTED)) {
+            return REJECTED;
         }
-        return files.stream().allMatch(file -> file.outcome() == VALID) ? VALID : INVALID;
+        return files.stream().allMatch(file -> file.outcome() == ACCEPTED) ? ACCEPTED : UNDETERMINED;
     }
 }

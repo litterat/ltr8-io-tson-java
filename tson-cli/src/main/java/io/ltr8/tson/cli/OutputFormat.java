@@ -129,7 +129,7 @@ enum OutputFormat {
      * files through it and a run has one policy, not one per file.
      */
     private static String renderText(Outcome outcome, List<CliDiagnostic> errors) {
-        if (outcome == Outcome.VALID) {
+        if (outcome == Outcome.ACCEPTED) {
             return "OK";
         }
         StringBuilder text = new StringBuilder();
@@ -169,24 +169,13 @@ enum OutputFormat {
      * </ul>
      */
     private static String policyNote(CliPolicy policy, List<CliDiagnostic> errors) {
-        boolean refused = errors.stream().anyMatch(error -> isRefusal(error.code()));
+        boolean refused = errors.stream().anyMatch(error -> error.code().isRefusal());
         if (!refused && policy.isDefault()) {
             return "";
         }
         return "note: " + (refused ? "refused" : "judged") + " under " + summary(policy) + " -- this"
                 + " processor's own configuration, not a property of your document. `tson policy` prints it"
                 + " in full.";
-    }
-
-    /**
-     * The codes {@link CliPolicy} explains -- [TSON-DATA] §8.2's three name-hygiene rules, one code each,
-     * plus §9.1's limit refusal.
-     *
-     * <p>All four say the same thing about portability: this deployment declined, and another configured
-     * differently would not have. That is the whole of why the policy is worth printing beside them.
-     */
-    private static boolean isRefusal(Diagnostic.Code code) {
-        return code.isNameRefusal() || code == Diagnostic.Code.LIMIT_EXCEEDED;
     }
 
     /** A policy on one line: what differs between two deployments that disagree about one name. */

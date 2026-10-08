@@ -227,7 +227,7 @@ class ValidateCommandTest {
         String output = captureStdout(() ->
                 assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
 
-        assertTrue(output.contains("\"outcome\":\"INVALID\""), output);
+        assertTrue(output.contains("\"outcome\":\"REJECTED\""), output);
         assertTrue(output.contains("\"code\":\"ATOM_CONSTRAINT_VIOLATION\""), output);
     }
 
@@ -247,10 +247,10 @@ class ValidateCommandTest {
 
         assertEquals(1, output.strip().lines().count(), output);
         assertFalse(output.contains("# "), output);
-        assertTrue(output.startsWith("{\"outcome\":\"INVALID\",\"policy\":"), output);
+        assertTrue(output.startsWith("{\"outcome\":\"REJECTED\",\"policy\":"), output);
         assertTrue(output.contains(",\"files\":["), output);
-        assertTrue(output.contains("\"file\":\"" + good + "\",\"outcome\":\"VALID\",\"errors\":[]"), output);
-        assertTrue(output.contains("\"file\":\"" + bad + "\",\"outcome\":\"INVALID\""), output);
+        assertTrue(output.contains("\"file\":\"" + good + "\",\"outcome\":\"ACCEPTED\",\"errors\":[]"), output);
+        assertTrue(output.contains("\"file\":\"" + bad + "\",\"outcome\":\"REJECTED\""), output);
         assertTrue(output.contains("\"code\":\"FIELD_REQUIRED\""), output);
     }
 
@@ -265,8 +265,8 @@ class ValidateCommandTest {
         // The policy is stated between the verdict and the files, once for the run: [TSON-DATA] §8.2's
         // rules are this deployment's configuration, and every envelope carries them whether or not it
         // refused anything.
-        assertTrue(output.strip().startsWith("{\"outcome\":\"VALID\",\"policy\":{\"identifier_policy\":"), output);
-        assertTrue(output.contains(",\"files\":[{\"file\":\"" + data + "\",\"outcome\":\"VALID\",\"errors\":[]}],"
+        assertTrue(output.strip().startsWith("{\"outcome\":\"ACCEPTED\",\"policy\":{\"identifier_policy\":"), output);
+        assertTrue(output.contains(",\"files\":[{\"file\":\"" + data + "\",\"outcome\":\"ACCEPTED\",\"errors\":[]}],"
                 + "\"errors\":[]}"), output);
     }
 
@@ -282,7 +282,7 @@ class ValidateCommandTest {
         String output = captureStdout(() ->
                 assertEquals(2, ValidateCommand.run(inputs(schema), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
 
-        assertTrue(output.strip().startsWith("{\"outcome\":\"NOT_CHECKED\",\"policy\":"), output);
+        assertTrue(output.strip().startsWith("{\"outcome\":\"UNDETERMINED\",\"policy\":"), output);
         assertTrue(output.contains(",\"files\":[],\"errors\":[{"), output);
         assertTrue(output.contains("no data files"), output);
     }
@@ -364,7 +364,7 @@ class ValidateCommandTest {
                         List.of(new ValidateInput.OfFile(schema), new ValidateInput.OfStdin()),
                         OutputFormat.JSON, PolicyOptions.DEFAULTS))));
 
-        assertTrue(output.contains("\"file\":\"-\",\"outcome\":\"INVALID\""), output);
+        assertTrue(output.contains("\"file\":\"-\",\"outcome\":\"REJECTED\""), output);
         assertTrue(output.contains("\"code\":\"FIELD_REQUIRED\""), output);
     }
 

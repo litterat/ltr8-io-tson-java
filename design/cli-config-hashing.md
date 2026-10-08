@@ -125,14 +125,16 @@ stops the invocation before any document is read (an unreadable file during clas
 `!!id`, no data files at all) and is exit 2, while a document that read but didn't validate lands in its own
 `FileReport` at exit 1 — so a consumer tells "your invocation was wrong" from "your document was" without
 reading messages. `compile` renders a bare `ValidationReport` instead, having one schema and nothing to
-name. Every file's report is collected before anything prints, since the envelope's verdict is the AND
-across them.
+name. Every file's report is collected before anything prints, since the envelope's outcome is taken across
+them: `REJECTED` if any file is, else `UNDETERMINED` if any file is, else `ACCEPTED`.
 
-**Exit codes: 0 everything checked and nothing reported, 1 the runner can act by editing what it sent**
-(checked and rejected — bad value / unknown type / no root type-ref — or refused, §8.1's fifth outcome: a
-§8.2 name-hygiene rule or a §9.1 limit declined the document, and a relaxed policy or `--max-depth` is a flag,
-a renamed field or a smaller document theirs to send. A refusal is the one case where an `outcome` of
-`NOT_CHECKED` exits 1, the envelope answering *was it judged* and the exit code answering *what now*),
+**`outcome` answers "will this be accepted" (SPEC-FEEDBACK.md #1)**: `ACCEPTED`; `REJECTED` for an invalidity
+or a refusal under this processor's §8.2 policy or §9.1 limits, one rejection settling it whatever else went
+unjudged; `UNDETERMINED` where nothing rejected the document but something could not be judged. Which kind a
+rejection was is each diagnostic's code (`Code.verdict()`, `Code.isRefusal()`).
+
+**Exit codes: 0 accepted, 1 rejected** (bad value / unknown type / no root type-ref, or refused: a relaxed
+policy or `--max-depth` is a flag, a renamed field or a smaller document the runner's to send),
 **2 usage/classification** (no data files, an unreadable/`!!id`-less schema, a bad flag), **69
 (`EX_UNAVAILABLE`) a schema nothing would supply and a rerun would not either**, **75 (`EX_TEMPFAIL`) a
 schema that could not be reached, where a rerun might**, **78 (`EX_CONFIG`) a type the schema needs with no

@@ -73,11 +73,12 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
 
 **The three refusal codes are not verdicts either.** Each rule reads Unicode data the UCD does not
 freeze, so a refusal is [TSON-DATA] §8.1's fifth outcome beside `LIMIT_EXCEEDED`: this processor declined
-under its own policy, and one configured otherwise may accept the same document. `verdict()` is `false`, the
-CLI reports the file `NOT_CHECKED` and still exits 1, the sender holding the fix. One code per rule: the
-three want three different remedies, and the code is what a consumer routes on.
+under its own policy, and one configured otherwise may accept the same document. `verdict()` is `false`, yet
+the CLI reports the file `REJECTED` — this processor will not accept it — and exits 1, the sender holding the
+fix. One code per rule: the three want three different remedies, and the code is what a consumer routes on.
 
-`Code.isNameRefusal()` is the one statement of which three codes those are.
+`Code.isNameRefusal()` is the one statement of which three codes those are, and `Code.isRefusal()` of the four
+refusals with `LIMIT_EXCEEDED`.
 
 ## The `Diagnostic` record
 
@@ -228,7 +229,7 @@ or `TsonDataParser` directly cannot do for themselves. The facade readers call i
 | Code | Meaning                                                                                          |
 | ---- | -------------------------------------------------------------------------------------------------- |
 | `0`  | everything was checked and nothing was reported (or an explicit `--help`)                        |
-| `1`  | **the runner can act** — the validity codes, and the refusals (§8.2's three, `LIMIT_EXCEEDED`), whose outcome is `NOT_CHECKED` |
+| `1`  | **rejected** — the validity codes, and the refusals (§8.2's three, `LIMIT_EXCEEDED`); outcome `REJECTED`  |
 | `2`  | usage error — bad arguments, an unreadable file                                                  |
 | `69` | `EX_UNAVAILABLE` — a schema was not obtained and a rerun will not obtain it: `SCHEMA_NOT_PERMITTED`, `SCHEMA_NOT_FOUND`, `SCHEMA_TOO_LARGE` |
 | `75` | `EX_TEMPFAIL` — a schema was not obtained and a rerun may help: `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT` |
@@ -237,15 +238,15 @@ or `TsonDataParser` directly cannot do for themselves. The facade readers call i
 
 `1` is what the runner can act on — a verdict on the input, or a refusal: a policy they can relax, a limit
 they can raise, a document they can change; everything above `2` is the absence of a verdict, naming who
-could not give it. A refusal is no verdict, so its `outcome` is `NOT_CHECKED`, and it still exits `1`
-because an exit code answers what the caller should do now.
+could not give it. A refusal is no verdict on validity, but it is a rejection by this processor, so its
+`outcome` is `REJECTED` and it exits `1`.
 
 `TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by **who must act before anyone else's fix
 counts**, permanence breaking the tie: **70 > 78 > 69 > 75 > 1**. 70 and 78 name nobody present (a
 release of this library; an application wired to bind that type), 69 the runner editing the reference or
 the allow-list it is checked against, 75 the runner simply rerunning, and 1 the runner editing the
 document. Every non-verdict also rides in the report as its own code, with a note on stderr; the report
-on stdout is unchanged, and its `outcome` reads `NOT_CHECKED` for all of them, refusals included.
+on stdout is unchanged: its `outcome` is `UNDETERMINED` for the codes above `2`, and `REJECTED` for a refusal.
 
 70's two halves print differently: a gap prints `not implemented yet: <message>`, whose text usually
 names the workaround; a fault gets the please-report-it banner and its stack trace.

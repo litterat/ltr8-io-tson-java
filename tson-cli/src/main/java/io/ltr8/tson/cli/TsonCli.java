@@ -313,17 +313,14 @@ public final class TsonCli {
      *   <li><b>1</b> -- the runner: edit the document.</li>
      * </ol>
      *
-     * <p><b>1 means the runner can act by editing what it sent</b>: the document, checked and rejected, or
-     * the document or this run's configuration, refused. A refusal is [TSON-DATA] §8.1's fifth outcome -- a
-     * §8.2 name-hygiene rule or a §9.1 limit declined the document, and the same bytes may be accepted in
-     * full by a processor configured otherwise -- so the envelope says {@link Outcome#NOT_CHECKED}, which is
-     * the truth about the document, and these are the two places a {@code NOT_CHECKED} run exits 1.
-     * Everywhere else the two agree, because everywhere else a non-verdict means nobody present can act.
-     * Here the runner can: a relaxed policy or {@code --max-depth} is a flag, and a renamed field or a
-     * smaller document is theirs to send. The exit code answers what to do now; a consumer that needs the
-     * first question routes on {@code outcome} or on {@link Diagnostic.Code#verdict()}, both of which say so.
-     * What is deployment-specific about a refusal is carried by the diagnostic's own code and by the run's
-     * {@link CliPolicy}, the policy and data version being properties of the report (§8.2).
+     * <p><b>1 is {@link Outcome#REJECTED}</b>: the document is invalid, or this processor refused it under
+     * its [TSON-DATA] §8.2 policy or §9.1 limits, and either way the runner acts by changing what it sent or,
+     * for a refusal, this run's configuration (a relaxed policy, {@code --max-depth}). Which of the two it was
+     * is the diagnostic's code ({@link Diagnostic.Code#verdict()}, {@link Diagnostic.Code#isRefusal()}), and
+     * what is deployment-specific about a refusal is the run's {@link CliPolicy}, the policy and data version
+     * being properties of the report (§8.2). Above 2 is {@link Outcome#UNDETERMINED}. The two questions
+     * part only in a mixed run: a document rejected and also partly unjudged is {@code REJECTED}, since one
+     * rejection settles acceptance, while its exit code names whoever must act first.
      *
      * <p><b>78 rather than 70 for a bind mismatch</b>, because {@code EX_CONFIG} is "found in an
      * unconfigured or misconfigured state" and unconfigured is what this is: no class is registered for a
