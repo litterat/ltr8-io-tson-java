@@ -1,23 +1,16 @@
-package io.ltr8.tson.base.atom;
+package io.ltr8.net;
 
 import java.util.List;
 
 /**
- * A CIDR network -- what {@code cidr4} and {@code cidr6} read to, and the value {@code within} and
- * {@code excluding} are judged in.
+ * A CIDR network (RFC 4632 for IPv4, RFC 4291 §2.3 for IPv6): a prefix and how many of its leading bits are fixed.
  *
- * <p><b>A family each, because a host type is how a component names what it wants.</b> A schemaless read has
- * no schema to say which family a position holds, so it asks which built-in produces the class the component
- * declares ({@code HostAtoms}) -- and a class two families produce answers nothing. {@link CidrInet4Network}
- * and {@link CidrInet6Network} are one family each, so a component naming either is read the way an
- * {@code Inet4Address} component already is. Naming this interface instead is honestly ambiguous and is
- * refused as such: a sealed type with two members binds as a union, which wants a type annotation in the
- * document, or a bridge registered against it.
+ * <p><b>A type per family</b> -- {@link CidrInet4Network} and {@link CidrInet6Network} -- because a declared type
+ * is how a caller says which family it wants, as {@code Inet4Address} and {@code Inet6Address} do; this sealed
+ * interface is what the two share.
  *
- * <p><b>A value type, like {@link Rational}.</b> Two spellings of one network are one value: equality is over
- * the prefix octets and the prefix length, never over the text that carried them. That is what lets a schema
- * compare the networks a facet names without caring how they were written. Two networks of <em>different</em>
- * families are never equal, and now cannot be compared by accident either.
+ * <p><b>A value type.</b> Two spellings of one network are one value: equality is over the prefix octets and the
+ * prefix length, never over the text that carried them. Two networks of different families are never equal.
  *
  * <p><b>Containment needs no interval arithmetic.</b> CIDR blocks are nodes of a prefix tree, so two are
  * nested or disjoint and never partially overlapping -- which is why {@link #overlaps} is exactly "one
@@ -26,8 +19,8 @@ import java.util.List;
  * the value. That implementation is {@code CidrBits}, which both members delegate to over their own octets.
  *
  * <p><b>Host bits are a separate question</b> ({@link #hostBitsAreZero}). {@code 10.1.0.0/8} parses -- it is
- * well-formed text naming an address and a prefix -- and fails §5.5's rule that a network's every bit past the
- * prefix is zero. Keeping the two apart is what lets a caller report a malformed token and a violated
+ * well-formed text naming an address and a prefix -- and is not a network in the strict sense, whose every bit
+ * past the prefix is zero. Keeping the two apart is what lets a caller report a malformed token and a violated
  * constraint differently, which is the distinction a reader's two exception types exist for.
  */
 public sealed interface CidrNetwork permits CidrInet4Network, CidrInet6Network {
@@ -45,12 +38,11 @@ public sealed interface CidrNetwork permits CidrInet4Network, CidrInet6Network {
      * {@code text} as a network of the family {@code familyBits} names (32 or 128), or {@code null} where it
      * is not one -- a malformed address, or a prefix outside the family's range.
      *
-     * <p><b>Host bits are not judged here</b>, and deliberately: §5.5 makes nonzero host bits a rule about a
-     * value that <em>is</em> a network rather than about whether the text is one, so a caller reports it as a
-     * violated constraint and not as a malformed token. {@link #hostBitsAreZero} is the question.
+     * <p><b>Host bits are not judged here</b>, and deliberately: nonzero host bits are a rule about a value that
+     * <em>is</em> a network rather than about whether the text is one, so a caller can report it as a violated
+     * constraint rather than as malformed text. {@link #hostBitsAreZero} is the question.
      *
-     * <p>Null-returning rather than throwing so each caller names what it was reading: a reader refuses a
-     * value, a coherence check refuses a facet entry, and the two want different words.
+     * <p>Null-returning rather than throwing so each caller names what it was reading in its own words.
      */
     static CidrNetwork parse(String text, int familyBits) {
         int slash = text.indexOf('/');
@@ -106,8 +98,7 @@ public sealed interface CidrNetwork permits CidrInet4Network, CidrInet6Network {
     String text();
 
     /**
-     * §5.5's network rule: every bit past the prefix is zero, since the value denotes a block rather than an
-     * address inside one.
+     * Whether every bit past the prefix is zero, so the value denotes a block rather than an address inside one.
      */
     boolean hostBitsAreZero();
 }

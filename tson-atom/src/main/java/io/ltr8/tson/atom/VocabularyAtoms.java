@@ -19,6 +19,7 @@ import io.ltr8.tson.base.atom.Complex;
 import io.ltr8.tson.base.atom.Rational;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
+import io.ltr8.net.Iri;
 import java.net.URI;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -78,11 +79,20 @@ public final class VocabularyAtoms {
 
     private static String uriTypeRef(Object value) {
         URI uri = (URI) value;
-        boolean ascii = uri.toString().chars().allMatch(c -> c <= 0x7F);
+        return typeRef(uri.toString(), uri.isAbsolute());
+    }
+
+    private static String iriTypeRef(Object value) {
+        Iri iri = (Iri) value;
+        return typeRef(iri.text(), !iri.isRelative());
+    }
+
+    private static String typeRef(String text, boolean absolute) {
+        boolean ascii = text.chars().allMatch(c -> c <= 0x7F);
         if (ascii) {
-            return uri.isAbsolute() ? UriParser.TYPENAME : UriParser.REFERENCE_TYPENAME;
+            return absolute ? UriParser.TYPENAME : UriParser.REFERENCE_TYPENAME;
         }
-        return uri.isAbsolute() ? IriParser.TYPENAME : IriParser.REFERENCE_TYPENAME;
+        return absolute ? IriParser.TYPENAME : IriParser.REFERENCE_TYPENAME;
     }
 
     /**
@@ -100,7 +110,8 @@ public final class VocabularyAtoms {
     public static Map<Class<?>, Entry> defaults() {
         Map<Class<?>, Entry> atoms = new HashMap<>();
         atoms.put(UUID.class, new Entry(UuidParser.TYPENAME, UuidParser.UNCONSTRAINED));
-        atoms.put(URI.class, new Entry(VocabularyAtoms::uriTypeRef, IriParser.REFERENCE));
+        atoms.put(URI.class, new Entry(VocabularyAtoms::uriTypeRef, IriParser.REFERENCE_AS_JAVA_URI));
+        atoms.put(Iri.class, new Entry(VocabularyAtoms::iriTypeRef, IriParser.REFERENCE));
         atoms.put(Inet4Address.class, new Entry(Ipv4Parser.TYPENAME, Ipv4Parser.UNCONSTRAINED));
         atoms.put(Inet6Address.class, new Entry(Ipv6Parser.TYPENAME, Ipv6Parser.UNCONSTRAINED));
         atoms.put(LocalDate.class, new Entry(DateParser.TYPENAME, DateParser.UNCONSTRAINED));

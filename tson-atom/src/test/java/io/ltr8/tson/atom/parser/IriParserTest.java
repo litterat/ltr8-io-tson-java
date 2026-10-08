@@ -5,9 +5,11 @@ import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.schema.meta.IriType;
 import org.junit.jupiter.api.Test;
+import io.ltr8.net.Iri;
 import java.net.URI;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class IriParserTest {
@@ -15,13 +17,15 @@ class IriParserTest {
     @Test
     void acceptsAnIriBeyondUsAscii() {
         String text = "https://\u4F8B\u3048.jp/\u30D1\u30B9?q=\u00E9#\u00E7";
-        URI value = IriParser.UNCONSTRAINED.read(text);
+        Iri value = IriParser.UNCONSTRAINED.read(text);
         assertEquals(text, IriParser.UNCONSTRAINED.write(value));
+        assertEquals("\u4F8B\u3048.jp", value.authority().orElseThrow().host().text());
     }
 
     @Test
     void acceptsAUri() {
-        assertEquals(URI.create("urn:isbn:0451450523"), IriParser.UNCONSTRAINED.read("urn:isbn:0451450523"));
+        assertEquals(Iri.parse("urn:isbn:0451450523", Iri.Grammar.URI),
+                IriParser.UNCONSTRAINED.read("urn:isbn:0451450523"));
     }
 
     @Test
@@ -59,14 +63,17 @@ class IriParserTest {
     }
 
     /**
-     * A {@code ucschar} that {@code java.net.URI} reads as a space is still an IRI: it is held percent-encoded,
-     * so the value is read rather than refused, and two spellings of it are one value.
+     * A {@code ucschar} that {@code java.net.URI} reads as a space is still an IRI. The value is its text as
+     * written, so the percent-encoded spelling is another value; a {@code URI} component holds it percent-encoded,
+     * which is the one spelling {@code java.net.URI} can hold.
      */
     @Test
-    void aSpaceCharacterInUcscharIsHeldPercentEncoded() {
-        URI value = IriParser.UNCONSTRAINED.read("https://example.com/a\u3000b");
-        assertEquals("https://example.com/a%E3%80%80b", value.toString());
-        assertEquals(value, IriParser.UNCONSTRAINED.read("https://example.com/a%E3%80%80b"));
+    void aSpaceCharacterInUcscharIsAValueAndBindsPercentEncoded() {
+        Iri value = IriParser.UNCONSTRAINED.read("https://example.com/a\u3000b");
+        assertEquals("https://example.com/a\u3000b", value.text());
+        assertNotEquals(value, IriParser.UNCONSTRAINED.read("https://example.com/a%E3%80%80b"));
+        assertEquals(URI.create("https://example.com/a%E3%80%80b"),
+                IriParser.UNCONSTRAINED.boundTo(URI.class).orElseThrow().read("https://example.com/a\u3000b"));
     }
 
     /** An IRI's lengths count code points too, as the {@code text_type} facets it composes say. */

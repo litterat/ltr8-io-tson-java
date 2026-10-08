@@ -3,8 +3,8 @@ package io.ltr8.tson.base.source;
 
 import io.ltr8.tson.base.SchemaFetchException;
 
-import java.net.URI;
-import java.net.URISyntaxException;
+import io.ltr8.net.Iri;
+import io.ltr8.net.IriSyntaxException;
 import java.util.Locale;
 
 /**
@@ -37,37 +37,32 @@ record SchemaReference(String canonical, String host, String path) {
      * @param requireContentHashPin refuse a reference carrying no {@code ?sha256=} pin
      */
     static SchemaReference of(String reference, boolean requireContentHashPin) {
-        URI uri;
+        Iri iri;
         try {
-            uri = new URI(reference);
-        } catch (URISyntaxException e) {
-            throw notPermitted(reference, "not a URI: " + e.getMessage(), e);
+            iri = Iri.parse(reference, Iri.Grammar.IRI);
+        } catch (IriSyntaxException e) {
+            throw notPermitted(reference, "not an IRI-reference (RFC 3987): it " + e.reason(), e);
         }
-        if (!uri.isAbsolute() || uri.getHost() == null) {
+        Iri.Authority authority = iri.authority().orElse(null);
+        if (iri.isRelative() || authority == null || authority.host().text().isEmpty()) {
             throw notPermitted(reference, "not an absolute URI with a host");
         }
-        if (uri.getUserInfo() != null) {
+        if (authority.userinfo().isPresent()) {
             throw notPermitted(reference, "carries userinfo, which an identifying URI may not (§2.2.1) and "
                     + "whose host is easy to misread");
         }
-        if (uri.getPort() != -1) {
+        if (authority.port().isPresent()) {
             throw notPermitted(reference, "carries a port, which an identifying URI may not (§2.2.1); map the "
                     + "host to another location instead");
         }
-        if (uri.getFragment() != null) {
+        if (iri.fragment().isPresent()) {
             throw notPermitted(reference, "carries a fragment, which an identifying URI may not (§2.2.1)");
         }
-        if (requireContentHashPin && !hasContentHashPin(uri)) {
+        if (requireContentHashPin && !iri.query().orElse("").contains("sha256=")) {
             throw notPermitted(reference, "carries no ?sha256= content-hash pin, and this source requires one");
         }
-        String host = uri.getHost().toLowerCase(Locale.ROOT);
-        String path = uri.getPath() == null ? "" : uri.getPath();
-        return new SchemaReference(host + path, host, path);
-    }
-
-    private static boolean hasContentHashPin(URI uri) {
-        String query = uri.getQuery();
-        return query != null && query.contains("sha256=");
+        String host = authority.host().text().toLowerCase(Locale.ROOT);
+        return new SchemaReference(host + iri.path(), host, iri.path());
     }
 
     static SchemaFetchException notPermitted(String reference, String message) {

@@ -1,12 +1,11 @@
-package io.ltr8.tson.base.atom;
+package io.ltr8.net;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * An IPv6 CIDR network -- 16 prefix octets and a prefix length of 0 to 128. What {@code cidr6} reads to,
- * and what a {@code cidr6} or {@code ipv6} facet names in {@code within} and {@code excluding}.
+ * An IPv6 CIDR network -- 16 prefix octets and a prefix length of 0 to 128.
  *
  * <p>See {@link CidrNetwork} for why the two families are separate types and for the value semantics both
  * share; the arithmetic itself is {@code CidrBits}, which this delegates to over its own octets.

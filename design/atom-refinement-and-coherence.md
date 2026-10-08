@@ -115,7 +115,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
     `AtomCoherence.checkNetworks`: the facets are typed `[value]` in meta.tn and must stay so (they list
     networks, and meta declares no network instance to type them by — core.tn does, and core imports meta),
     so they arrive as text and the family that owns the rule is the only place that can judge them. That is
-    why `base.atom` carries the `CidrNetwork` pair and `InternetAddress` at all: a check in the linker or the
+    why the `CidrNetwork` pair and `InternetAddress` sit beneath `tson-schema`, in `tson-net`: a check in the linker or the
     resolver would be a second home for one family's rule, which is what `Atom.coherenceCheck` exists to
     prevent. **The pair's own emptiness is judged there too** (`checkAdmitsAValue`): an `excluding` set
     covering every network `within` permits admits nothing, which is `{ min: 10 max: 3 }` with a different

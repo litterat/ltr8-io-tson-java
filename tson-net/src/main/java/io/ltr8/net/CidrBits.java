@@ -1,4 +1,4 @@
-package io.ltr8.tson.base.atom;
+package io.ltr8.net;
 
 /**
  * The prefix arithmetic {@link CidrInet4Network} and {@link CidrInet6Network} share, over the raw octets

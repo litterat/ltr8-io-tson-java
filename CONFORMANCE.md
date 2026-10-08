@@ -65,19 +65,14 @@ bound is inert, since the family range is enforced regardless.
 `[00:00:00, 24:00:00)` and `!datetime` an instant on the UTC timeline, and second 60 is neither: `23:59:60Z` is a
 parse error, as hour 25 is ([TSON-DATA] §5.4).
 
-**One accepted, different-revision gap.** `!uri_reference` (§5.5) is the one atom here that does *not* get an
-extra shape check ahead of the JDK type it delegates to — the opposite situation from the atoms above.
-§5.5 cites RFC 3986, but `java.net.URI`'s own Javadoc states it implements RFC 2396 (as amended by RFC
-2732), an older revision of the same standard, not a looser/stricter variant of the same grammar. There's
-no simple shape to shim in front of `URI`'s constructor the way a four-group hex pattern works for UUID,
-and writing an RFC 3986 validator from scratch isn't worth it at this stage, so `java.net.URI`'s behavior
-is accepted as `!uri_reference`'s actual contract for now, beside one rule `java.net.URI` does not apply: every
-character is US-ASCII. `!uri` adds only that a scheme is present. See `UriParser`'s Javadoc.
-
-`!iri` and `!iri_reference` (RFC 3987) are judged through the URI each maps to, so they share that gap; RFC 3987
-§4's bidirectional-text rules, a SHOULD, are not checked. A handful of `ucschar` characters that `java.net.URI` reads
-as spaces (U+00A0, U+2000–U+200A, U+3000 and their kin) are held percent-encoded in the host `URI`: the IRI is
-read, not refused, and writing it back gives the encoded spelling. See `IriParser`'s Javadoc.
+**URIs and IRIs are recognised natively.** `!uri`/`!uri_reference` (§5.5) are RFC 3986's grammar and
+`!iri`/`!iri_reference` RFC 3987's, both through `tson-net`'s `io.ltr8.net.Iri`, not `java.net.URI`, which
+implements RFC 2396: `https://`, `https://?q=1` (an empty host), `a:` (an empty path) and `http://[v7.abc]/`
+(IPvFuture) are URIs, and `http://a:b/` (a port that is not digits) is not. A URI is US-ASCII; an IRI admits
+`ucschar` wherever `unreserved` stands and `iprivate` in the query. RFC 3987 §4's bidirectional-text rules, a
+SHOULD, are not checked. The value is the text as written, so a percent-encoded spelling is another value; a
+component declared `java.net.URI` binds every value RFC 2396 can hold and refuses the rest as a binding failure,
+holding the handful of `ucschar` characters it reads as spaces (U+00A0, U+2000–U+200A, U+3000) percent-encoded.
 
 **The vocabulary is the published one.** §5.6 lists the full `int8`..`int256`/`uint8`..`uint256` ladder plus
 the four bound-only refinements, and §5.5 carries `!email` beside its "Network Types" siblings, so what is

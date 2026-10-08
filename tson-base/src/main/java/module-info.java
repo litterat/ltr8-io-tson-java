@@ -60,6 +60,10 @@ module io.ltr8.tson.base {
     // which host types bind as atoms, and (in time) the rest of what a deployment states about binding.
     requires transitive io.ltr8.bind;
 
+    // Network text formats, recognised natively -- system-library standing again. CanonicalIdentity and
+    // SchemaReference split a reference with Iri, and the formats' values are host types AtomContext binds.
+    requires transitive io.ltr8.net;
+
     exports io.ltr8.tson.base;
     exports io.ltr8.tson.base.io;
 
@@ -109,8 +113,8 @@ module io.ltr8.tson.base {
     exports io.ltr8.tson.base.unicode;
 
     /**
-     * The host values the built-in atoms read to -- {@code Rational}, {@code Complex}, {@code CidrNetwork},
-     * {@code InternetAddress}. The question a consumer arrives with (<em>what do I get back from
+     * The host values the built-in atoms read to that are TSON's own -- {@code Rational}, {@code Complex}; the
+     * network ones are {@code io.ltr8.net}'s. The question a consumer arrives with (<em>what do I get back from
      * {@code !rational}?</em>) rather than part of the resolved-schema model, and pure values depending on
      * nothing, which is why they sit at the centre rather than in whichever module first needed one.
      */

@@ -1,12 +1,11 @@
-package io.ltr8.tson.base.atom;
+package io.ltr8.net;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * An IPv4 CIDR network -- 4 prefix octets and a prefix length of 0 to 32. What {@code cidr4} reads to,
- * and what a {@code cidr4} or {@code ipv4} facet names in {@code within} and {@code excluding}.
+ * An IPv4 CIDR network -- 4 prefix octets and a prefix length of 0 to 32.
  *
  * <p>See {@link CidrNetwork} for why the two families are separate types and for the value semantics both
  * share; the arithmetic itself is {@code CidrBits}, which this delegates to over its own octets.

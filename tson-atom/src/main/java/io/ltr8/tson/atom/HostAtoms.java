@@ -20,8 +20,8 @@ import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
-import io.ltr8.tson.base.atom.CidrInet4Network;
-import io.ltr8.tson.base.atom.CidrInet6Network;
+import io.ltr8.net.CidrInet4Network;
+import io.ltr8.net.CidrInet6Network;
 import io.ltr8.tson.base.atom.Complex;
 import io.ltr8.tson.base.atom.Rational;
 import io.ltr8.tson.schema.meta.IntegerSize;
@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
+import io.ltr8.net.Iri;
 import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -84,7 +85,8 @@ public final class HostAtoms {
             Map.entry(Rational.class, RationalParser.UNCONSTRAINED),
             Map.entry(Complex.class, ComplexParser.UNCONSTRAINED),
             Map.entry(UUID.class, UuidParser.UNCONSTRAINED),
-            Map.entry(URI.class, IriParser.REFERENCE),
+            Map.entry(URI.class, IriParser.REFERENCE_AS_JAVA_URI),
+            Map.entry(Iri.class, IriParser.REFERENCE),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
@@ -106,7 +108,8 @@ public final class HostAtoms {
             Map.entry(Duration.class, DurationParser.UNCONSTRAINED),
             Map.entry(Period.class, PeriodParser.UNCONSTRAINED),
             Map.entry(UUID.class, UuidParser.UNCONSTRAINED),
-            Map.entry(URI.class, IriParser.REFERENCE),
+            Map.entry(URI.class, IriParser.REFERENCE_AS_JAVA_URI),
+            Map.entry(Iri.class, IriParser.REFERENCE),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),

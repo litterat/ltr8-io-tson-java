@@ -147,7 +147,8 @@ class AtomValueReaderTest {
         Map<String, Object> result = readAgainstRealEntry("uri", metaKernel.entries().get("uri"),
                 "{ value: \"https://example.com/a/b?x=1#frag\" }");
 
-        assertEquals(java.net.URI.create("https://example.com/a/b?x=1#frag"), result.get("value"));
+        assertEquals(io.ltr8.net.Iri.parse("https://example.com/a/b?x=1#frag", io.ltr8.net.Iri.Grammar.URI),
+                result.get("value"));
     }
 
     @Test

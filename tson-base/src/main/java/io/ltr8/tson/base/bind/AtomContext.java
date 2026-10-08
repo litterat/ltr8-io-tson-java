@@ -1,11 +1,12 @@
 package io.ltr8.tson.base.bind;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.base.atom.CidrInet4Network;
-import io.ltr8.tson.base.atom.CidrInet6Network;
+import io.ltr8.net.CidrInet4Network;
+import io.ltr8.net.CidrInet6Network;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
+import io.ltr8.net.Iri;
 import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -79,6 +80,6 @@ public final class AtomContext {
     private static final List<Class<?>> HOST_TYPES = List.of(
             UUID.class, byte[].class,
             LocalDate.class, OffsetTime.class, OffsetDateTime.class, Duration.class, Period.class,
-            URI.class,
+            URI.class, Iri.class,
             Inet4Address.class, Inet6Address.class, CidrInet4Network.class, CidrInet6Network.class);
 }

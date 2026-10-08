@@ -645,7 +645,7 @@ public final class DataClassObjectReader {
      *
      * <p><b>The vocabulary comes before any Java name</b>, which is the order {@link #bindAtom} already
      * takes: a type-ref is a TSON type name, so a union whose members are built-in host types --
-     * {@code java.net.InetAddress}, {@code base.atom.CidrNetwork} -- is selected by {@code !ipv4} and
+     * {@code java.net.InetAddress}, {@code io.ltr8.net.CidrNetwork} -- is selected by {@code !ipv4} and
      * {@code !cidr4}, the names every reader of the document knows. The simple-name pass still answers
      * {@code !inet4address} behind it, and is not narrowed to exclude a member the vocabulary names:
      * {@code !circle} for a {@code Circle} is the same rule, so restricting it would be one rule for a

@@ -77,10 +77,10 @@ deployment states -- the policy, the schema access, the bind context, and the on
 vocabulary -- with every setting returning a new instance, so a configuration may be handed out and
 derived from without the holder losing what they stated. Construction is not here and cannot be: it names
 the compiler's registry, which is why `Tson.of(config)` lives with the engine.
-**`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to — `Rational`, `Complex`,
-`CidrInet4Network`/`CidrInet6Network`, `InternetAddress` — the question a consumer arrives with rather than
-part of §8's model, and
-pure values depending on nothing. **`io.ltr8.tson.base.bind`** is what a deployment binds with:
+**`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to that are TSON's own — `Rational` and
+`Complex` — the question a consumer arrives with rather than part of §8's model, and pure values depending on
+nothing. The network values (`Iri`, the `CidrNetwork` pair) are `tson-net`'s, a library usable without TSON,
+which this module requires transitively. **`io.ltr8.tson.base.bind`** is what a deployment binds with:
 `AtomContext` registers those host values, and the JDK ones beside them, with a `DataBindContext`, so a
 class binds the same under every encoding ([TSON-JSON] §5.1). **That is why this module requires
 `tson-bind`, and why doing so costs it nothing**: `tson-bind` is a general engine that binds a `DataValue`
