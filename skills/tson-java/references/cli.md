@@ -18,6 +18,7 @@ tson validate [<options>] <file|->...                validate data documents
 tson compile [<options>] <schema>                    check that a schema resolves and compiles
 tson policy [<options>]                              print the Unicode policy and limits this run would apply
 tson hash <file>                                     stamp a content hash onto a document's !!id
+tson strip [--keep-docs] <schema>                    print a schema's reading form, for a model to read
 ```
 
 **Help is two levels.** `tson --help` lists the commands; `tson <command> --help` gives that command's own
@@ -46,7 +47,7 @@ runner can act — `--max-depth`, or a smaller document.
 tson init-example .                                   # writes person.tn + person-data.tn
 tson validate person.tn person-data.tn                # OK
 tson validate --output json person.tn bad-data.tn
-printf '!person { name: "Ada" }' | tson validate person.tn -
+tson validate person.tn - < person-data.tn            # stdin; the data still names its own !!schema and type
 tson compile person.tn                                # does the schema itself resolve and compile?
 tson hash person.tn                                   # stamp ?sha256=… onto its own !!id, in place
 tson validate --schema order.tn --type order a.json b.json          # JSON inputs, bound out of band
@@ -55,6 +56,19 @@ tson validate --schema order.tn --type order a.json b.json          # JSON input
 `--schema` takes a schema file, which joins the run and binds by the `!!id` it declares — so a local draft or a
 cached copy binds wherever it sits — or the `!!id` of a schema file on the command line. A `.json` file without
 `--schema`/`--type`, or the two flags with no JSON input, is a usage error (exit `2`).
+
+## Stripping a schema for a prompt
+
+`tson strip <schema>` prints a schema's **reading form** to standard output — the same declarations in as few
+tokens as the syntax allows, for a reader that reads the schema rather than loading it, such as a language model
+given it in a prompt. The `!!id`, every `!!meta`/`!!import` pin, and every `@doc`, `@title`, `@examples` and
+`@comment` are removed; a reference to the spec's own library is shortened to its revision and name
+(`!!import:"37/core"`); each directive and declaration gets one line. Other annotations stay, and other
+references keep their URLs. `--keep-docs` keeps `@doc`, `@title` and `@examples`; `@comment`, a note for
+maintainers, still goes.
+
+The output is valid syntax but **not a loadable schema** — nothing resolves `"37/core"` — so the file is never
+rewritten. Exit codes: `0` printed, `1` not a well-formed schema document, `2` usage or an unreadable file.
 
 ## The Unicode policy, and configuring it
 
@@ -99,8 +113,9 @@ tson compile --identifier-per-segment names.tn            # OK: each _-delimited
 tson compile --identifier-scripts Latin+Cyrillic names.tn # OK: the combination is named
 ```
 
-Reach for the **unit** or a **named combination** before dropping a level — both keep the rule everywhere
-else. Four things are worth knowing before you configure one:
+Reach for the **per-segment unit** (`--identifier-per-segment`, the level judged per segment rather than over
+the whole name) or a **named combination** before dropping a level — both keep the rule everywhere else. Four
+things are worth knowing before you configure one:
 
 - **§8.2 requires a relaxation not be silent**, which is a rule about *ambient authority*: a flag in a CI
   file satisfies it where an environment variable would not. Accordingly `--output text` prints the policy on
@@ -152,9 +167,10 @@ was judged under, stated once because it is constant for the run and cannot diff
 `RESTRICTED_SCRIPT`), carries nothing extra, and leaves the file `INVALID` rather than `NOT_CHECKED`.
 
 `--output tson` is the same record through the library's own writer — the shape `tson-cli`'s own
-`diagnostics.tn` declares, which that output is validated against, and which `--output json` now matches key
-for key. A position is `line:column:byteOffset`,
-the first two 1-based, the offset counting UTF-8 bytes from 0. The top-level `errors` carries only what
+`diagnostics.tn` (`https://tson.io/2026/37/io/ltr8/cli/diagnostics.tn`) declares, which that output is validated
+against, and which `--output json` matches key for key. Its `policy` field is the spec's own `policy` type,
+imported from the bundled `policy.tn`. A position is `line:column:byteOffset`, the first two 1-based, the offset
+counting UTF-8 bytes from 0. The top-level `errors` carries only what
 stopped the run before any document was read.
 
 ## Pitfalls

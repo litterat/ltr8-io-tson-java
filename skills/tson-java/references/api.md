@@ -4,8 +4,8 @@ Module by module. Javadoc on the source is the authority where this and the code
 build` runs javadoc**, so a dangling `{@link}` fails the build.
 
 Only the packages listed here are exported. JPMS enforcement is real, not convention — `tson-compiler`'s
-`lexer`, `atom`, `base`, `reader` and `resolver`, and `tson-atom`'s `parser`, are genuinely unreachable from
-another module.
+`lexer`, `atom`, `base`, `reader`, `resolver` and `writer`, and `tson-atom`'s `parser`, are genuinely unreachable
+from another module.
 
 ---
 
@@ -39,7 +39,8 @@ public final class Tson {
 }
 ```
 
-`Tson.standard()` bootstraps meta-kernel / meta.tn / core.tn and returns an immutable instance.
+`Tson.standard()` bootstraps the four bundled schemas — meta-kernel, meta.tn, core.tn and policy.tn — and returns an
+immutable instance.
 Resolution is **always bind-anchored** (meta instances bind to `schema.meta.Top`), so `resolve` takes no
 mode; only the final compile picks one, which is why **the read mode is which registry you hold**.
 
@@ -159,10 +160,11 @@ public final class DiagnosticsCollector implements DiagnosticsReceiver {
     public List<Diagnostic> diagnostics();  public boolean isEmpty(); }
 // The root package holds Diagnostic, the receivers, SourcePosition, CanonicalIdentity, ProcessorConfig,
 // and the exceptions whose fact is the processor's rather than one encoding's: ReadException,
-// ParseException, WriteException, LimitExceededException, SchemaValidationException,
+// ParseException, WriteException, LimitExceededException, SchemaValidationException (and its
+// SchemaRefusalException, the schema-side §8.2 refusal, whose code() is which rule fired),
 // BindMismatchException, MissingBindingException, SchemaFetchException, ContentHashMismatchException.
-// The classifying half stays with each encoding (TsonDiagnostics, JsonDiagnostics); the one factory on
-// the record is Diagnostic.ofLimitExceeded.
+// The classifying half stays with each encoding (TsonDiagnostics, JsonDiagnostics); the two factories on
+// the record are Diagnostic.ofLimitExceeded and Diagnostic.ofRestrictedToken (a token-policy refusal).
 
 public record Position(int line, int column, int byteOffset)   // io.ltr8.tson.compiler --
         implements SourcePosition {}                           // any encoding's own position type
@@ -247,15 +249,18 @@ public final class ScriptPolicy {                          // the token policy, 
 
 ### The other `tson-base` packages
 
-- `io.ltr8.tson.base.atom` — the **host values** built-in atoms read to: `Rational`, `Complex`,
-  `CidrInet4Network`/`CidrInet6Network` (and their `CidrNetwork` supertype), `InternetAddress`. What you
-  hold after reading `!rational` or `!cidr4`, and what a component declares to bind one.
+- `io.ltr8.tson.base.atom` — the **host values** that are TSON's own: `Rational` and `Complex`. What you hold
+  after reading `!rational` or `!complex`, and what a component declares to bind one. The network atoms read to
+  `tson-net`'s values (`Iri`, `CidrInet4Network`/`CidrInet6Network`, below) and to the JDK's `Inet4Address`/
+  `Inet6Address`.
 - `io.ltr8.tson.base.bind` — `AtomContext`: `hostTypes()` (the list to `registerAtoms` on a builder) and
   `defaultContext()`, the context both front doors start from.
 - `io.ltr8.tson.base.io` — `ByteSource`/`ByteSink`: bytes, never characters; closing releases only what was
   acquired, and closing is not flushing.
 - `io.ltr8.tson.base.unicode` — the UCD-derived tables (`Xid`, the identifier profile, scripts,
-  confusables) the §8.2 rules read.
+  confusables) the §8.2 rules read, and the text forms a value is compared in: `Normalization` (`NONE`, `NFC`,
+  `NFKC`, `NFKC_CASEFOLD`, `ASCII_CASEFOLD`; `apply(text)`, `holds(text)`), `Nfc.of(text)` and
+  `NfkcCasefold.apply(text)`.
 - `io.ltr8.tson.base.diagnostics` — the rule classes whose prose and `expected` both encodings report.
 
 ---
@@ -349,6 +354,7 @@ public final class TsonTreeWriter {
     public TsonTreeWriter identifiedBy(String documentId);   // adds !!id
     public String toTson(TsonValue|TsonDocument value);
     public void   write(TsonValue|TsonDocument value, OutputStream|Appendable out);
+    public void   write(TsonValue value, ByteSink sink);       // tson-base's io
 }
 
 public final class TsonObjectWriter {
@@ -358,6 +364,7 @@ public final class TsonObjectWriter {
     public TsonObjectWriter identifiedBy(String documentId);
     public String toTson(Object|TsonObjectDocument<?> value);
     public void   write(Object|TsonObjectDocument<?> value, OutputStream|Appendable out);
+    public void   write(Object value, ByteSink sink);
 }
 ```
 
@@ -425,7 +432,6 @@ public final class TsonCompiledSchemaRegistry {
     public TsonCompiledMetaRegistry core();
 }
 
-@FunctionalInterface
 public interface TsonTypeReader<T> { T read(TsonReadContext ctx); }
 ```
 
@@ -451,8 +457,9 @@ everything, are fail-fast by design.
 ### Exported sub-packages
 
 - `io.ltr8.tson.compiler.ast` — the parse-preserving AST: `Document`, `DataValue`, `CoreValue` and its
-  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `VoidValue`, `EmptyBrace`,
-  `ScopedValue`), `Annotation`, `TokenForm`.
+  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `VoidValue`, `EmptyBrace`), `ScopedValue`
+  (an optional `!!schema` and a `DataValue`, at a field, map-entry or element position), `Annotation`,
+  `TokenForm`.
 - `io.ltr8.tson.compiler.ast.schema` — `SchemaDocument` and the schema-grammar nodes.
 - `io.ltr8.tson.compiler.stream` — the Tier 2 event vocabulary: `TsonEvent` (sealed) with
   `DocumentStart`/`End`, `RecordStart`/`End`, `MapStart`/`MapArrow`/`MapEnd`, `ArrayStart`/`End`,
@@ -517,8 +524,10 @@ public record TsonDocument(Optional<String> id, Optional<String> schema, TsonVal
 public record TsonSchema(String id, String meta, List<String> imports,
                          AnnotatedMap<String, TypeDefinition> entries, boolean bootstrap) {}
 
-public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins) {
+public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums,
+                               Map<String, Normalization> enumForms) {
     public String originOf(String entryName);       // which document declared it, transitively
+    public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
 }
 
 public final class TsonSchemaRegistry implements TsonSchemaLoader {
@@ -530,20 +539,31 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
 }
 
 public final class TsonBundledSchemas {
-    public static final String META_KERNEL_ID / META_ID / CORE_ID;
-    public static final String META_KERNEL_SHA256 / META_SHA256 / CORE_SHA256;
+    public static final String META_KERNEL_ID / META_ID / CORE_ID / POLICY_ID;
+    public static final String META_KERNEL_SHA256 / META_SHA256 / CORE_SHA256 / POLICY_SHA256;
     public static Optional<String> declaredSha256(String uri);
     public static String fetch(String uri);
 }
 ```
 
+`policy.tn` is the processor policy's vocabulary — `restriction_level`, `script_policy`, `identifier_policy`
+(`level`, `per_segment`, `skeleton_distinctness`, `permitting`), `limits` and `policy` — so a policy is stated in one
+shape; the CLI's `diagnostics.tn` imports it for its report's `policy` field. No document selects the policy it is
+judged under.
+
+`textEnums` and `enumForms` are what linking alone knows about the enums of the closure: which are text enums
+(string-class whatever their members spell), and the form each matches its members in.
+
 `register` rejecting a duplicate identity, plus an unmodifiable `entries()`, **is** the "locked"
 guarantee. `CanonicalIdentity` (§2.2.1's algorithm — strip scheme, strip query, nothing else) is
-`tson-base`'s, `io.ltr8.tson.base.CanonicalIdentity`.
+`tson-base`'s, `io.ltr8.tson.base.CanonicalIdentity`. It reads the reference as an RFC 3987 IRI-reference
+(through `Iri`, not `java.net.URI`), so a host or path beyond US-ASCII is held and compared as written; and an
+identity with no host must have an absolute path, so `/local/orders.tn`, `file:/local/orders.tn` and
+`file:///local/orders.tn` are one identity.
 
 The module exports two packages: `io.ltr8.tson.schema` (the above) and `io.ltr8.tson.schema.meta`, the resolved-schema
 value model — pure records, sealed interfaces and enums, §8's `TypeDefinition` et al. The host values the atoms read to
-are not here (see `tson-base`'s `atom` package, above). `Top` is sealed except for its one deliberately open branch,
+are not here (see `tson-base`'s `atom` package and `tson-net`). `Top` is sealed except for its one deliberately open branch,
 **`Data`**, which a consumer's own class implements: §4.1's fourth base kind, where an instance of a meta-schema's own
 constructor lives when the thing it describes is not a data type. A consumer registers such a class by carrying
 `@Typename` and being findable by the `metaNameBinder`; `Data.references()` is how its own type references reach the
@@ -568,9 +588,6 @@ public class DataBindContext {
 
 **Everything is fixed at `build()`** — atoms, the name binder and the profile are the builder's, and the
 built context has no mutators.
-
-```java
-```
 
 Also exports `io.ltr8.bind.mapper` and `io.ltr8.bind.bridge`. See `references/bindings.md`.
 
@@ -599,8 +616,45 @@ public final class TsonRegex {
 ```
 
 TSON pins its `regex` atom to I-Regexp, so this owns those semantics rather than delegating to
-`java.util.regex`, a laxer superset. `isDisjointFrom` is the building block for §5.4 pattern
-disjointness.
+`java.util.regex`, a laxer superset. `isDisjointFrom` answers a narrower question an author may ask; it is not
+how a choice is judged — §5.4 decides choice disjointness by class, never by proving patterns apart.
+
+---
+
+## `io.ltr8.net` (module `tson-net`)
+
+Network text formats, each recognised natively to its RFC — no TSON dependency, usable on its own. `tson-base`
+requires it transitively, so every TSON consumer can name these.
+
+```java
+public record Iri(String text, Optional<String> scheme, Optional<Authority> authority, String path,
+                  Optional<String> query, Optional<String> fragment) {
+    public enum Grammar { URI, IRI }                 // RFC 3986 URI-reference, or RFC 3987 IRI-reference
+    public static Iri parse(String text, Grammar grammar);   // or IriSyntaxException
+    public boolean isRelative();                     // no scheme
+}                                                    // equal exactly when the texts are
+
+public final class IriSyntaxException extends IllegalArgumentException {
+    public String text();  public int index();  public String reason(); }
+
+public sealed interface CidrNetwork permits CidrInet4Network, CidrInet6Network {
+    byte[] prefix();  int prefixLength();  int familyBits();
+    boolean contains(byte[] address);  boolean contains(CidrNetwork other);
+}
+public record CidrInet4Network(byte[] prefix, int prefixLength) implements CidrNetwork {
+    public static CidrInet4Network parse(String text); }       // or null; CidrInet6Network alike
+
+public final class InternetAddress {                 // functions, not a value
+    public static byte[] ipv4(String text);          // four octets, or null
+    public static byte[] ipv6(String text);          // sixteen octets, or null
+    public static String ipv4Text(byte[] octets);  public static String ipv6Text(byte[] octets);
+}
+public final class MacAddress { public static byte[] eui48(String text); }   // six octets, or null
+```
+
+`Iri` is the value the four URI atoms read to. `InternetAddress` is strict where `java.net.InetAddress` is not
+(no `0177.0.0.1`, no BSD short forms), and its octets are what `InetAddress.getByAddress` takes; `!ipv4`/`!ipv6`
+read to `Inet4Address`/`Inet6Address` built that way.
 
 ---
 

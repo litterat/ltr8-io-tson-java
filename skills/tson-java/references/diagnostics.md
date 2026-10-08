@@ -7,7 +7,7 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 
 | Code                        | Means                                                                                       |
 | --------------------------- | --------------------------------------------------------------------------------------------- |
-| `FIELD_REQUIRED`            | a required field was absent from the data                                                   |
+| `FIELD_REQUIRED`            | a required field was missing from the data                                                  |
 | `FIELD_FIXED`               | a field the schema fixes carried a different value                                           |
 | `FIELD_GROUP`               | a field group's rule broke: no option chosen, too many, or a chosen option missing a member |
 | `TYPE_MISMATCH`             | the value's shape does not match the type in scope                                           |
@@ -33,6 +33,9 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `SCHEMA_UNREACHABLE`        | the location could not be reached, or answered with something other than a document          |
 | `SCHEMA_TIMEOUT`            | the location did not answer in time                                                          |
 | `SCHEMA_TOO_LARGE`          | the location answered with more bytes than a schema document may be                          |
+
+A push at a `scoped` position whose `scope` does not hold `EXTERN` is not `SCOPE_NOT_ADMITTED` but the cell rule's
+refusal, `VALIDATION_ERROR`: that position reads scopes, and this one is not admitted there.
 
 ### The eight that are not verdicts on the document
 
@@ -71,6 +74,8 @@ reported in any of §8.1's four error categories, because each rule reads Unicod
 freeze — but the processor looked and declined, and the sender holds the fix, so `verdict()` is `true`
 and the CLI exits 1. One code per rule: the three want three different remedies, and the code is what a
 consumer routes on.
+
+`Code.isNameRefusal()` is the one statement of which three codes those are.
 
 ## The `Diagnostic` record
 
@@ -145,9 +150,10 @@ routing by code. It is called **as problems are found**, not at the end.
 Attach one with `.withDiagnostics(receiver)` on either facade reader; it returns a *new* reader and
 leaves the original fail-fast.
 
-**Mode asymmetry, deliberate, not an inconsistency:** collecting mode always keeps reading, and **bind
-mode is all-or-nothing** (a `ConstructionGuard` — a partially-filled object is worse than none) while
-**tree mode keeps everything it built** (a `TsonVoid` stands where a value failed).
+**A collecting read keeps reading and returns no value:** once anything has been reported, both facades
+return `null` — a partial tree could not say which of its parts to trust, and a partially-filled object is worse
+than none. The value is there only when `diagnostics()` is empty. Beneath the facades,
+`read(TsonReadContext)` in tree mode leaves a `TsonVoid` where a value failed.
 
 ## Exceptions
 
@@ -162,8 +168,9 @@ RuntimeException
 ├── LimitExceededException     io.ltr8.tson.base — .limit(), .position(); a §9.1 bound refused the document
 ├── TsonUnsupportedDocumentException  io.ltr8.tson.compiler — a well-formed document of a kind this parser does not implement
 ├── BindMismatchException      io.ltr8.tson.base — a schema type and its bound class disagree
-│   └── MissingBindingException   a schema type with no bound class at all
+│   └── MissingBindingException   a schema type with no class this context can build (none mapped, or unanalysable)
 ├── SchemaValidationException  io.ltr8.tson.base — the author's schema is wrong and the spec says so
+│   └── SchemaRefusalException    the schema-side §8.2 refusal; .code() is which of the three rules fired
 ├── SchemaFetchException       io.ltr8.tson.base — .uri(), .reason(); the ONLY exception a SchemaSource may throw
 ├── ContentHashMismatchException  io.ltr8.tson.base — a ?sha256= pin did not match the fetched content
 ├── AtomTypeException              io.ltr8.tson.atom (sealed) — .expected()
@@ -171,6 +178,7 @@ RuntimeException
 │   └── AtomValidationException    it parsed, then failed the atom's constraint (ATOM_CONSTRAINT_VIOLATION)
 ├── LexException                   (unexported lexer package) malformed UTF-8, non-NFC unquoted token, …
 ├── TsonRegexSyntaxException       io.ltr8.tson.regex
+├── IriSyntaxException             io.ltr8.net (an IllegalArgumentException) — .text(), .index(), .reason()
 ├── UnsupportedOperationException  a gap: this library has not implemented that yet
 └── IllegalStateException          an internal invariant broke — a bug here, not bad input
 ```

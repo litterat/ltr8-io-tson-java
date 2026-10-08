@@ -2,13 +2,14 @@
 name: tson-java
 description: Read, validate, write and bind TSON (`.tn`) documents with the `io.ltr8:tson` Java library, and run its
   `tson` command line. Use this skill whenever Java code imports `io.ltr8.tson`, `io.ltr8.tson.compiler`,
-  `io.ltr8.tson.tree`, `io.ltr8.tson.base`, `io.ltr8.tson.json` or `io.ltr8.bind`; whenever names like `Tson`, `Json`,
-  `ProcessorConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`, `ReadException`, `SchemaSource`,
-  `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the `ltr8-io-tson-java` repository;
-  and whenever someone wants to check, compile or hash `.tn` files (or validate `.json` against a TSON schema) from a
-  shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit hook, a lint step — whatever language the
-  surrounding project is written in. For authoring TSON *data* documents use the tson-data skill; for *schema* documents
-  use tson-schema. This skill is the Java implementation and its CLI, not the notation.
+  `io.ltr8.tson.tree`, `io.ltr8.tson.base`, `io.ltr8.tson.json`, `io.ltr8.bind` or `io.ltr8.net`; whenever names like
+  `Tson`, `Json`, `ProcessorConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`, `ReadException`,
+  `SchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the
+  `ltr8-io-tson-java` repository; and whenever someone wants to check, compile or hash `.tn` files (or validate
+  `.json` against a TSON schema) from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit
+  hook, a lint step — whatever language the surrounding project is written in. For authoring TSON *data* documents
+  use the tson-data skill; for *schema* documents use tson-schema. This skill is the Java implementation and its CLI,
+  not the notation.
 ---
 
 # `io.ltr8:tson` — the Java implementation
@@ -19,7 +20,7 @@ the spec, and the one the TypeScript port and the shared conformance suite are c
 (the text data format) and Class 2 (the schema layer) — passes the shared conformance suite, and carries a
 JSON encoding of the same data model ([TSON-JSON], Part 3, drafted in the repository).
 
-Eleven JPMS modules, all published together as `io.ltr8:<module>`:
+Twelve JPMS modules, all published together as `io.ltr8:<module>`:
 
 | Module           | Java module name          | What it is                                                     |
 | ---------------- | ------------------------- | -------------------------------------------------------------- |
@@ -32,6 +33,7 @@ Eleven JPMS modules, all published together as `io.ltr8:<module>`:
 | `tson-bind`      | `io.ltr8.bind`            | the generic `DataValue`↔Java-object binding engine              |
 | `tson-annotation`| `io.ltr8.annotation`      | `@Typename`/`@Field`/`@Record`/… and the `Annotations` carrier  |
 | `tson-regex`     | `io.ltr8.tson.regex`      | a standalone RFC 9485 I-Regexp engine (no TSON dependency)      |
+| `tson-net`       | `io.ltr8.net`             | network text formats to their RFCs — `Iri` (RFC 3986/3987), IP addresses, CIDR, EUI-48 (no TSON dependency) |
 | `tson-json`      | `io.ltr8.tson.json`       | the JSON encoding: `Json`, its readers and writers, `JsonValue` — no dependency on `tson-compiler` |
 | `tson-cli`       | `io.ltr8.tson.cli`        | the `tson` command (`validate`, `compile`, `policy`, `hash`, …) |
 
@@ -54,8 +56,8 @@ with no compatibility guarantee between revisions — so a schema `!!id` pinned 
 ## Workflow
 
 1. **Decide whether you need a schema at all.** Reading one document with no schema is one
-   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps
-   meta-kernel/meta.tn/core.tn and is what you need only once a *schema* is in play.
+   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the four
+   bundled schemas (meta-kernel, meta, core, policy) and is what you need only once a *schema* is in play.
 2. **Pick the reader from the matrix below** — the two questions are *what drives the interpretation*
    (the wire alone, your Java class, or a TSON schema) and *what you want out* (a `TsonValue` tree, or
    a bound Java object).
@@ -105,7 +107,7 @@ import io.ltr8.tson.base.source.*; // SchemaAccess, SchemaSource, the two fetchi
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
 
-Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn and core.tn
+Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn, core.tn and policy.tn
 
 String schema = """
         !!id:"https://example.com/2026/37/app/order-1.tn"
@@ -383,12 +385,12 @@ reported in any of §8.1's four error categories. In this implementation a refus
 `Diagnostic` carrying `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT` — **one code per
 rule, which is what a consumer routes on** — and nothing else.
 
-**What judged it is stated once, not per refusal**: `ProcessorPolicy` — `identifierPolicy` and
-`tokenPolicy` (each a level, a unit, any `permitting` relaxations), under the same names that configured
-them, plus the §9.1 limits and the Unicode data version — from `tson.processorPolicy()`, from `processorPolicy()` on the
-reader that judged, or from `tson policy` on the command line. Two deployments
-can legitimately disagree about one name, and this is the only statement of why; read it *before*
-generating and the disagreement never costs a round trip.
+**What judged it is stated once, not per refusal**: `ProcessorPolicy` — `identifierPolicy` (a level, a unit
+that is the whole name or each segment, any `permitting` relaxations) and `tokenPolicy` (a level and any
+`permitting`), under the same names that configured them, plus the §9.1 limits and the Unicode data version —
+from `tson.processorPolicy()`, from `processorPolicy()` on the reader that judged, or from `tson policy` on the
+command line. Two deployments can legitimately disagree about one name, and this is the only statement of why;
+read it *before* generating and the disagreement never costs a round trip.
 
 Two policies, defaulting opposite ways for the same reason in each case:
 
@@ -508,6 +510,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | `!type` on a schemaless read                                    | schemaless reads resolve built-ins only, and report the rest        | `.withSchema(uri)`, or `preservingUnknownTypeRefs()`        |
 | treating `TsonMissing` and `TsonVoid` as the same             | `TsonVoid` was written (`_`); `TsonMissing` is a failed lookup    | `isVoid()` / `isMissing()`, or `missingPath()`            |
 | `asInt()` to assert which host type a read produced             | it converts; `234.56E2` answers too                                 | `as(Integer.class)`                                         |
+| `as(URI.class)` on a `!uri`/`!iri` value                        | the four URI atoms read to `io.ltr8.net.Iri`; a cast finds nothing  | `as(Iri.class)`; a bound component may still declare `URI`  |
 | `SchemaAccess.of(schemas::get)`                                 | a `null` carries no `Reason`; refused as a fault                    | `SchemaSource.ofMap(schemas)`                               |
 | `SchemaAccess.httpSchemas()` with no host                       | deny by default means nothing is permitted                          | name the hosts explicitly                                   |
 | a `LIMIT_EXCEEDED` read as "invalid document"                   | this deployment's depth bound refused it; the bytes may be fine     | raise `LimitsPolicy.maxDepth` if the depth is legitimate    |
