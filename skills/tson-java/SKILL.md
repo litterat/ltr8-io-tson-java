@@ -292,9 +292,9 @@ project shipped exactly that bug.
 
 ## Fetching schemas
 
-Out of the box a `Tson` serves only the three bundled schemas: `SchemaAccess.registeredOnly()` is
-the default, so anything else must be registered first or reachable through a configured source. Two
-fetching sources ship, plus a non-fetching third:
+Out of the box a `Tson` serves only the four bundled schemas (meta-kernel, meta, core, policy):
+`SchemaAccess.registeredOnly()` is the default, so anything else must be registered first or reachable through a
+configured source. Two fetching sources ship, plus a non-fetching third:
 
 | Source              | One-call form                                | Configure                                                        |
 | ------------------- | -------------------------------------------- | ---------------------------------------------------------------- |

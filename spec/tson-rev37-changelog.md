@@ -383,7 +383,7 @@ log only — the specification text carries no open questions.
 | Ref | Question | Status |
 |---|---|---|
 | Rev 35 #25 (→ —) | Annotation cardinality as the means of per-name replacement. | Open — recorded as considered. |
-| #1 | A third artifact kind — the deployment descriptor: data, not a schema; named at the call site, never discovered; never resolvable by identity; a `.well-known` projection for discovery. | Open — [TSON-DATA] §8.2 says only what the policy is *not*. |
+| #1 | A third artifact kind — the deployment descriptor: data, not a schema; named at the call site, never discovered; never resolvable by identity; a `.well-known` projection for discovery. | **Closed** (§8.1 item 4, §8.4 item 5) — `policy.tn` declares the policy's vocabulary, and no document selects its own policy. |
 | #2 | A namespace as a value. The register's later reading fills the cell by reference rather than by containment: the unchecked reference is #6 alone; an interface is a record type reached by a projection type (`orders.create`); a route table is data whose leaves are bounded references. What stays open under that reading is the `data` kind's remaining use and the anonymous inline member. | Open — carried deliberately; step 1 waits on #6. |
 | #3 | A projection annotation (`@json_name:"…"`), the first member of §6's representation-directive category. | Open — [TSON-JSON] §6.1.1's map-typed position is the current answer. |
 | #6 | A bounded, binding parameter at a field's type (`type: <T: text>  members: set<T>`): a dependent record, a field-order requirement, a resolved form, and whether a bound may name a base kind. | **Withdrawn** (§8.2 item 13) — not the time to introduce a dependent record; `enum_type.type`'s member conformance (§7.4) and §5.2's value conformance stay rules stated in prose. |
@@ -561,6 +561,13 @@ SPEC-FEEDBACK.md's, renumbered against this revision.
    identity `https://tson.io/2026/37/m/core.tn` reduces to. **[settled]** by the spec
    author.
 
+4. **§8.2 — a policy has a vocabulary, and no document selects its own.** The policy's home was "an artifact
+   of a kind this series does not yet define". It is now a data document of the `policy` type the companion
+   artifact `policy.tn` declares — the identifier and token policies and the resource limits — which is also
+   the shape a processor states its policy in, and §8.2 adds the constraint the paragraph's own reasons
+   imply: no document may name, import or otherwise select the policy it is judged under. Fetch allow-lists
+   and host mappings stay deployment-internal. **[settled]** by the spec author.
+
 ### 8.2 Part 2
 
 1. **§2.2**, **§2.2.3**, **§7.1** — a directive value is an IRI-reference ([TSON-DATA]
@@ -663,4 +670,10 @@ SPEC-FEEDBACK.md's, renumbered against this revision.
    `iri_type` and `iri`, meta `uri_type` and `schema_identity`; core is unchanged but for
    `extern_of`'s doc.
 4. **Re-stamped**, as §6 item 3 records, and Part 2 §13.2 carries the pins.
+5. **`policy.tn` joins the companion artifacts** (§8.1 item 4): the processor policy's vocabulary at
+   `/2026/37/m/policy.tn`, pinned to meta and core, with `restriction_level`, `script_policy`,
+   `identifier_policy`, `limits` and `policy`. A script is named by its Unicode Script property value
+   alias; `limits` states nesting depth, §9.1's other limits joining as processors expose them; a policy's
+   `unicode_data_version` is optional, a report stating it and a deployment's document leaving it out.
+   Part 2 §1.5 and §13.2 list it.
 
