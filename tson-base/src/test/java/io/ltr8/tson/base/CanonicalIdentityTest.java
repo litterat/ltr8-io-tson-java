@@ -84,6 +84,21 @@ class CanonicalIdentityTest {
         assertFalse(CanonicalIdentity.sameIdentity("https://example.test/\u6CE8.tn", "https://example.test/%E6%B3%A8.tn"));
     }
 
+    /**
+     * A reference with no host names a library entry by its path (§2.2.1), which must be absolute so that it is never
+     * an identity a host and path also spell.
+     */
+    @Test
+    void aPathOnlyIdentityIsItsAbsolutePath() {
+        assertEquals("/local/orders.tn", CanonicalIdentity.canonicalize("/local/orders.tn"));
+        assertEquals("/local/orders.tn", CanonicalIdentity.canonicalize("file:/local/orders.tn"));
+        assertEquals("/local/orders.tn", CanonicalIdentity.canonicalize("file:///local/orders.tn"));
+        assertEquals("/local/orders.tn", CanonicalIdentity.canonicalize("/local/orders.tn?sha256=abc"));
+        assertThrows(SchemaValidationException.class, () -> CanonicalIdentity.canonicalize("mini.tn"));
+        assertThrows(SchemaValidationException.class, () -> CanonicalIdentity.canonicalize("/local/../orders.tn"));
+        assertThrows(SchemaValidationException.class, () -> CanonicalIdentity.canonicalize("/local/orders.tn#x"));
+    }
+
     @Test
     void rejectsMissingScheme() {
         assertThrows(SchemaValidationException.class,

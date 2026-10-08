@@ -113,8 +113,8 @@ class TemplateParamTypeTest {
     @Test
     void coresTemplatesRecordTheirTypes() {
         Map<String, List<TemplateParam>> core = parameters();
-        assertEquals(List.of(param("S", "uri")), core.get("extern_of"));
-        assertEquals(List.of(param("S", "uri"), param("T", "type_name")), core.get("extern_type"));
+        assertEquals(List.of(param("S", "schema_identity")), core.get("extern_of"));
+        assertEquals(List.of(param("S", "schema_identity"), param("T", "type_name")), core.get("extern_type"));
         assertEquals(List.of(param("T", "type_ref")), core.get("set"));
     }
 }

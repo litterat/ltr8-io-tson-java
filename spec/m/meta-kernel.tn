@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ac20ac271d6d53934e7eca4908d50aa3bfdd4545d915833dbe081d353af509c7"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f2c2b278405f4c02ae327f70df07d5778744916da613a814104af6a312fcc145"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -288,7 +288,7 @@
   @doc:"""
     Mixin record contributing the `spec` field to specification-bound atoms.
     """
-  atom_specification => { spec: uri }
+  atom_specification => { spec: iri }
 
   @doc:"""
     The base a UAX #31 Start or Continue set is drawn from: XID_Start /
@@ -373,30 +373,34 @@
   identifier => !identifier_type { continue_add: "-" }
 
   @doc:"""
-    URI constraint vocabulary. Composes with the text_type constructor to
-    inherit its record shape (length and pattern fields) plus the
-    atom_specification mixin's spec field plus uri-specific fields.
+    IRI constraint vocabulary per RFC 3987. Composes with the text_type
+    constructor to inherit its record shape (length and pattern fields) plus
+    the atom_specification mixin's spec field plus iri-specific fields.
     `schemes` lists the admitted schemes as scheme_name values, which fold case
     as RFC 3986 §3.1 compares a scheme, and a value's scheme is compared in that
-    form; a value with no scheme is outside it. `allow_relative` admits
-    a relative reference (§4.2) beside a URI (§3), so its default is a
-    URI-reference (§4.1); withdrawing it requires a scheme. `allow_fragment`
-    admits a fragment (§3.5); withdrawing it refuses one, which with
-    `allow_relative` withdrawn is an absolute-URI (§4.3).
+    form; a value with no scheme is outside it. `allow_relative` admits a
+    relative reference beside an IRI, so its default is an IRI-reference;
+    withdrawing it requires a scheme. `allow_fragment` admits a fragment;
+    withdrawing it refuses one. An IRI's characters beyond US-ASCII are RFC
+    3987's `ucschar`, and `iprivate` within the query, and an IRI is judged
+    through the URI it maps to (RFC 3987 §3.1). The kernel holds the IRI family
+    because its own `spec` citations and meta's schema identities are IRIs
+    ([TSON-DATA] §2.2.1, §3.3); meta declares `uri_type`, the US-ASCII family
+    with the same facets.
 
-    A URI is its text as written: RFC 3986 says which of its parts compare
+    An IRI is its text as written: RFC 3986 says which of its parts compare
     without case, and a form over the whole text would fold a path or a query
     that is case-sensitive.
     """
-  uri_type => text_type & atom_specification & {
-    spec?:           = "https://www.rfc-editor.org/rfc/rfc3986"
+  iri_type => text_type & atom_specification & {
+    spec?:           = "https://www.rfc-editor.org/rfc/rfc3987"
     schemes?:        scheme_set
     allow_relative?: boolean ~ true
     allow_fragment?: boolean ~ true
     normalization?:  = NONE
   }
 
-  @doc:"The schemes a uri_type admits."
+  @doc:"The schemes an iri_type or uri_type admits."
   scheme_set => !set_type { element_type: scheme_name  min_items: 1 }
 
   @doc:"""
@@ -408,11 +412,11 @@
     continue_add: "abcdefghijklmnopqrstuvwxyz0123456789+-."
     normalization: ASCII_CASEFOLD }
 
-  @doc:"A URI (RFC 3986 §3): the scheme is required."
-  uri => !uri_type { allow_relative: false }
+  @doc:"An IRI (RFC 3987 §2.2): the scheme is required."
+  iri => !iri_type { allow_relative: false }
 
   @doc:"""
-    Regex constraint vocabulary. Same shape pattern as uri_type, pinned to
+    Regex constraint vocabulary. Same shape pattern as iri_type, pinned to
     I-Regexp. A regex is its text as written: putting it into another form
     would change what it matches.
     """

@@ -296,12 +296,12 @@
 
   extern_of => !type_definition {
     source: scoped
-    body: !template { parameters: [{ name: S  type: uri }]  template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }" }
+    body: !template { parameters: [{ name: S  type: schema_identity }]  template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }" }
   }
 
   extern_type => !type_definition {
     source: scoped
-    body: !template { parameters: [{ name: S  type: uri } { name: T  type: type_name }]  template: "!scoped { scope: [EXTERN]  schemas: { S => [T] } }" }
+    body: !template { parameters: [{ name: S  type: schema_identity } { name: T  type: type_name }]  template: "!scoped { scope: [EXTERN]  schemas: { S => [T] } }" }
   }
 
   set => !type_definition {

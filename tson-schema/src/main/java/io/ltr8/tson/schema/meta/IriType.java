@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * meta.tn's {@code iri_type} constructor (§5.5's {@code iri} and {@code iri_reference} atoms): {@code
+ * The meta-kernel's {@code iri_type} constructor (§5.5's {@code iri} and {@code iri_reference} atoms): {@code
  * text_type}'s length and pattern facets, {@code atom_specification}'s {@code spec} pinned to RFC 3987, and
  * {@code uri_type}'s own {@code schemes}, {@code allow_relative} and {@code allow_fragment}. Pure constraint
  * values -- {@code tson-atom}'s {@code IriParser} holds one of these and does the reading.

@@ -18,6 +18,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
@@ -27,7 +28,6 @@ import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
-import io.ltr8.tson.schema.meta.UriType;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -288,9 +288,9 @@ public final class MetaKernelBootstrapResolver {
                 requireEmptyBody(instance);
                 yield Optional.of(TextType.UNCONSTRAINED);
             }
-            case "uri_type" -> {
+            case "iri_type" -> {
                 requireSchemeRequired(instance);
-                yield Optional.of(UriType.URI);
+                yield Optional.of(IriType.IRI);
             }
             case "regex_type" -> {
                 requireEmptyBody(instance);
@@ -332,8 +332,8 @@ public final class MetaKernelBootstrapResolver {
 
     /**
      * {@code scheme_name}'s body, checked to be exactly {@link IdentifierType#SCHEME_NAME}'s, field for field: the
-     * constant is what {@code uri_type.schemes} reads its elements through, so a kernel stating another profile
-     * would describe a scheme this implementation does not read.
+     * constant is what {@code iri_type.schemes} and {@code uri_type.schemes} read their elements through, so a
+     * kernel stating another profile would describe a scheme this implementation does not read.
      */
     private static void requireSchemeNameProfile(Instance instance) {
         Map<String, String> expected = Map.of("start", "NONE", "continue", "NONE",
@@ -353,13 +353,13 @@ public final class MetaKernelBootstrapResolver {
         }
     }
 
-    /** meta-kernel's one {@code uri_type} instance, {@code uri}, withdraws {@code allow_relative} and nothing else. */
+    /** meta-kernel's one {@code iri_type} instance, {@code iri}, withdraws {@code allow_relative} and nothing else. */
     private static void requireSchemeRequired(Instance instance) {
         if (!(instance.value().coreValue() instanceof RecordValue record) || record.fields().size() != 1
                 || !record.fields().getFirst().name().equals("allow_relative")
                 || !(record.fields().getFirst().value().value().coreValue() instanceof TokenValue token)
                 || !token.text().equals("false")) {
-            throw new IllegalStateException("expected { allow_relative: false } for !uri_type, found "
+            throw new IllegalStateException("expected { allow_relative: false } for !iri_type, found "
                     + instance.value().coreValue());
         }
     }

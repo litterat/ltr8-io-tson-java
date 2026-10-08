@@ -17,7 +17,7 @@ import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
-import io.ltr8.tson.schema.meta.UriType;
+import io.ltr8.tson.schema.meta.IriType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code build.gradle.kts}): the header directives carry straight through, the 36 declarations
  * {@code DefinitionResolver} already resolves via ordinary schema-grammar resolution are all present,
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
- * {@code integer}, {@code text}/{@code uri}/{@code regex}, and six {@code enum} instances,
+ * {@code integer}, {@code text}/{@code iri}/{@code regex}, and six {@code enum} instances,
  * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
  * resolve to the expected kind/body -- all 58 of the real fixture's declarations resolve, alongside the
  * nine entries {@link SchemaDesugarer} injects for their argument-bearing applications.
@@ -114,16 +114,16 @@ class MetaKernelBootstrapResolverTest {
     }
 
     @Test
-    void textUriRegexResolveToTheirUnconstrainedTypeBodiesWithAtomKind() {
+    void textIriRegexResolveToTheirUnconstrainedTypeBodiesWithAtomKind() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         TypeDefinition text = schema.entries().get("text");
         assertEquals(TypeKind.ATOM, text.kind());
         assertEquals(TextType.UNCONSTRAINED, text.body());
 
-        TypeDefinition uri = schema.entries().get("uri");
-        assertEquals(TypeKind.ATOM, uri.kind());
-        assertEquals(UriType.URI, uri.body());
+        TypeDefinition iri = schema.entries().get("iri");
+        assertEquals(TypeKind.ATOM, iri.kind());
+        assertEquals(IriType.IRI, iri.body());
 
         TypeDefinition regex = schema.entries().get("regex");
         assertEquals(TypeKind.ATOM, regex.kind());

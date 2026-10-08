@@ -133,21 +133,21 @@ class AtomValueReaderTest {
     }
 
     /**
-     * {@code uri_type}/{@code regex_type} are the one known exception discussed in {@link
+     * {@code iri_type}/{@code regex_type} are the one known exception discussed in {@link
      * AtomTypeReader}'s own Javadoc -- their RFC citation is a *schema-composed* default that
      * generic binding can't fill in during schema *resolution*, so {@code MetaKernelBootstrapResolver} hand-
      * picks their binding instead. That gap is upstream of this layer entirely: by the time the
-     * real {@code uri}/{@code regex} entries reach here, their constraints are already correctly
+     * real {@code iri}/{@code regex} entries reach here, their constraints are already correctly
      * filled in, so reading real *data* against them works exactly like every other family --
      * confirmed here against the real resolved entries, not a hand-built stand-in.
      */
     @Test
-    void uriUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
+    void iriUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
         TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        Map<String, Object> result = readAgainstRealEntry("uri", metaKernel.entries().get("uri"),
+        Map<String, Object> result = readAgainstRealEntry("iri", metaKernel.entries().get("iri"),
                 "{ value: \"https://example.com/a/b?x=1#frag\" }");
 
-        assertEquals(io.ltr8.net.Iri.parse("https://example.com/a/b?x=1#frag", io.ltr8.net.Iri.Grammar.URI),
+        assertEquals(io.ltr8.net.Iri.parse("https://example.com/a/b?x=1#frag", io.ltr8.net.Iri.Grammar.IRI),
                 result.get("value"));
     }
 

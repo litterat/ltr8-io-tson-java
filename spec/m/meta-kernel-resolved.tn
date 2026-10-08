@@ -78,13 +78,13 @@
   """
 !schema {
   top => !type_definition {
-    subtypes: [array atom choice data enum enum_type identifier_type integer_type map product record reference regex_type set_type sum template text_enum text_type tuple uri_type value_type void_type]
+    subtypes: [array atom choice data enum enum_type identifier_type integer_type iri_type map product record reference regex_type set_type sum template text_enum text_type tuple value_type void_type]
     body: !record { fields: [] }
   }
 
   atom => !type_definition {
     supertypes: [top]
-    subtypes: [enum enum_type identifier_type integer_type regex_type text_enum text_type uri_type value_type void_type]
+    subtypes: [enum enum_type identifier_type integer_type iri_type regex_type text_enum text_type value_type void_type]
     body: !record { supertypes: [top]  fields: [] }
   }
 
@@ -195,7 +195,7 @@
 
   text_type => !type_definition {
     supertypes: [atom top]
-    subtypes: [identifier_type regex_type uri_type]
+    subtypes: [identifier_type iri_type regex_type]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: min_length     type: non_negative_integer  optional: true }
       !record_field { name: max_length     type: non_negative_integer  optional: true }
@@ -212,9 +212,9 @@
   }
 
   atom_specification => !type_definition {
-    subtypes: [identifier_type regex_type uri_type]
+    subtypes: [identifier_type iri_type regex_type]
     body: !record { fields: [
-      !record_field { name: spec  type: uri }
+      !record_field { name: spec  type: iri }
     ] }
   }
 
@@ -237,7 +237,7 @@
       !record_field { name: pattern        type: regex    optional: true }
       !record_field { name: members        type: text_member_set  optional: true }
       !record_field { name: normalization  type: normalization  optional: true  role: DEFAULT  value: NFC }
-      !record_field { name: spec           type: uri   optional: true  role: FIXED  value: "https://www.unicode.org/reports/tr31/" }
+      !record_field { name: spec           type: iri   optional: true  role: FIXED  value: "https://www.unicode.org/reports/tr31/" }
       !record_field { name: start          type: identifier_base  optional: true  role: DEFAULT  value: XID }
       !record_field { name: continue       type: identifier_base  optional: true  role: DEFAULT  value: XID }
       !record_field { name: start_add      type: text  optional: true }
@@ -252,7 +252,7 @@
     body: !identifier_type { continue_add: "-" }
   }
 
-  uri_type => !type_definition {
+  iri_type => !type_definition {
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
       !record_field { name: min_length      type: non_negative_integer  optional: true }
@@ -261,7 +261,7 @@
       !record_field { name: pattern         type: regex    optional: true }
       !record_field { name: members         type: text_member_set  optional: true }
       !record_field { name: normalization   type: normalization  optional: true  role: FIXED  value: NONE }
-      !record_field { name: spec            type: uri      optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
+      !record_field { name: spec            type: iri      optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3987" }
       !record_field { name: schemes         type: scheme_set  optional: true }
       !record_field { name: allow_relative  type: boolean  optional: true  role: DEFAULT  value: true }
       !record_field { name: allow_fragment  type: boolean  optional: true  role: DEFAULT  value: true }
@@ -278,9 +278,9 @@
     body: !identifier_type { start: NONE  continue: NONE  start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789+-."  normalization: ASCII_CASEFOLD }
   }
 
-  uri => !type_definition {
-    source: uri_type
-    body: !uri_type { allow_relative: false }
+  iri => !type_definition {
+    source: iri_type
+    body: !iri_type { allow_relative: false }
   }
 
   regex_type => !type_definition {
@@ -292,7 +292,7 @@
       !record_field { name: pattern        type: regex  optional: true }
       !record_field { name: members        type: text_member_set  optional: true }
       !record_field { name: normalization  type: normalization  optional: true  role: FIXED  value: NONE }
-      !record_field { name: spec           type: uri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9485" }
+      !record_field { name: spec           type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9485" }
     ] }
   }
 
