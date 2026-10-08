@@ -221,7 +221,7 @@ class JsonChoiceReadTest {
     /** §8.5 admits `$schema` at a scoped position; a choice is the closed sum, so it is refused here. */
     @Test
     void aSchemaMemberIsRefusedAtAChoicePosition() {
-        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, read("shape", """
+        assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, read("shape", """
                 {"$schema": "https://example.test/other.tn", "$type": "circle", "radius": 1.0}""")
                 .refusal().code());
     }

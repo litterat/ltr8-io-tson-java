@@ -13,6 +13,7 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `TYPE_MISMATCH`             | the value's shape does not match the type in scope                                           |
 | `WRONG_ARITY`               | a tuple or template application has the wrong element/argument count                         |
 | `UNKNOWN_TYPE_REF`          | a `!type` annotation names a type the schema in scope does not declare                       |
+| `SCOPE_NOT_ADMITTED`        | a `!!schema` (`$schema`) at a position whose type is not `scoped` (§7.8, a resolver error)   |
 | `ATOM_FORM_INVALID`         | the token is not the atom's grammar — `'thirty'` where an integer goes                      |
 | `ATOM_CONSTRAINT_VIOLATION` | the token parsed, then broke a declared constraint — `150` under `max: 100`                  |
 | `UNRECOGNIZED_FIELD`        | the data carried a field the type does not declare (§7.2 — records are closed, always)       |

@@ -4,6 +4,7 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.base.unicode.Normalization;
 
 import java.util.ArrayList;
@@ -65,11 +66,12 @@ public record TextType(
         this(minLength, maxLength, length, pattern, Optional.empty());
     }
 
-    /** {@code members} put into {@link #normalization}'s form: the values a token is matched against. */
+    /**
+     * {@code members} put into {@link #normalization}'s form and compared in NFC, the floor no comparison of two
+     * text values goes below ([TSON-SCHEMA] §5.5): the values a token's own NFC is matched against.
+     */
     public Optional<List<String>> normalizedMembers() {
-        return normalization == Normalization.NONE
-                ? members
-                : members.map(set -> set.stream().map(normalization::apply).toList());
+        return members.map(set -> set.stream().map(member -> Nfc.of(normalization.apply(member))).toList());
     }
 
     /** {@code text => !text_type {}} -- the unconstrained text type. */
@@ -169,7 +171,7 @@ public record TextType(
         Map<String, String> spelledBy = new HashMap<>();
         members.ifPresent(set -> set.forEach(written -> {
             String member = normalization.apply(written);
-            String earlier = spelledBy.putIfAbsent(member, written);
+            String earlier = spelledBy.putIfAbsent(Nfc.of(member), written);
             if (earlier != null) {
                 violations.add("members '" + earlier + "' and '" + written + "' are one value under "
                         + normalization);

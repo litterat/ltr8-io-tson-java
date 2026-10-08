@@ -5,6 +5,7 @@ import java.util.Optional;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.base.unicode.Normalization;
 import io.ltr8.tson.schema.meta.EnumBody;
 import java.util.List;
@@ -55,13 +56,15 @@ public record EnumParser(EnumBody constraints, Normalization form) implements At
      * The member the token is, compared in {@link #form} -- the normalization of the enum's label type
      * ([TSON-SCHEMA] §5.5) -- so under a case-folding type {@code Content-Type} is the member written
      * {@code content-type}. The value is the token in that form. Each member is put into the form as it is
-     * compared, which allocates nothing for a member already in it.
+     * compared, and the two compare in NFC, the floor no text comparison goes below ([TSON-SCHEMA] §5.5) --
+     * neither step allocates for a member or a value already in it.
      */
     @Override
     public String read(String text) {
         String value = form.apply(text);
+        String compared = Nfc.of(value);
         for (String member : constraints.members()) {
-            if (form.apply(member).equals(value)) {
+            if (Nfc.of(form.apply(member)).equals(compared)) {
                 return value;
             }
         }
