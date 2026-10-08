@@ -13,19 +13,18 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-**Revision 37 closed seventeen of the twenty-one open against Revision 36**, and #1–#3 below are what remains: two
-of the four that revision's change log carries open, and an open remainder of its typed template parameters. The
-closed entries are gone: the spec now carries their rules — a family member is declared and a family is judged over
-its closure, the cell rule at every scoped position, `identifier` as a text family and `enum_type.type`,
-`value_type` and `void_type`, typed template parameters with their bounds and the call-site check, `ordered` on
-every container, the empty set, `tuple1<T>`, `uri` beside `uri_reference` and `iri_type`, the smaller core, meta's
-annotation vocabulary, `@doc` as CommonMark, field-group options and `+`, `normalization` on `text_type`, the leap
-second, and `optional` against `voidable`. **This file is the as-built record**, not a pointer to one: where an
-entry proposes a design this implementation has built, the entry states the design, what is running, and what is
-not, so that a reviewer editing the spec needs nothing beside it. **Where the evidence is a consumer of this
-library rather than this library** — #1 was found building the HTTP layer in `ltr8-io-tson-java-http`, and this
-register is the collection point for all of it — the entry says so and states what is running there on the same
-terms.
+**Revision 37 closed seventeen of the twenty-one open against Revision 36**, and #1 and #2 below are what remains
+of the four that revision's change log carries open. The closed entries are gone: the spec now carries their rules
+— a family member is declared and a family is judged over its closure, the cell rule at every scoped position,
+`identifier` as a text family and `enum_type.type`, `value_type` and `void_type`, typed template parameters with
+their bounds and the call-site check, `ordered` on every container, the empty set, `tuple1<T>`, `uri` beside
+`uri_reference` and `iri_type`, the smaller core, meta's annotation vocabulary, `@doc` as CommonMark, field-group
+options and `+`, `normalization` on `text_type`, the leap second, and `optional` against `voidable`. **This file is
+the as-built record**, not a pointer to one: where an entry proposes a design this implementation has built, the
+entry states the design, what is running, and what is not, so that a reviewer editing the spec needs nothing beside
+it. **Where the evidence is a consumer of this library rather than this library** — #1 was found building the HTTP
+layer in `ltr8-io-tson-java-http`, and this register is the collection point for all of it — the entry says so and
+states what is running there on the same terms.
 
 **Part 3 is not in this register.** [TSON-JSON] is an early draft this implementation exists to validate, and
 `spec/tson-part3-json.md` is edited **directly** as findings arise — so a Part 3 finding becomes a spec change
@@ -40,12 +39,12 @@ spanning both stays, and says which half is which.
 for an entry below, where there is no section to point at yet. When an entry closes, its citations become spec
 citations and the entry is deleted — nothing here is an archive.
 
-**#1–#3 are directions rather than defects.** Each is a place the series stops short of a rule on purpose: where a
-deployment's policy lives (#1), a bounded type slot at a field, which lets one field's type depend on another's
-(#2), and a bound on the constructor an argument's type was built with (#3). What verifying Revision 37's text
-against the closed entries found is in that revision's text and artifacts. **Two directions Revision 37 carried
-open are not here**: a namespace as a value and a JSON member name that is not an identifier are being reworked
-together, and will be raised against Revision 38 as entries of their own.
+**#1 and #2 are directions rather than defects.** Each is a place the series stops short of a rule on purpose:
+where a deployment's policy lives (#1), and a bounded type slot at a field, which lets one field's type depend on
+another's (#2). What verifying Revision 37's text against the closed entries found is in that revision's text and
+artifacts. **Two directions Revision 37 carried open are not here**: a namespace as a value and a JSON member name
+that is not an identifier are being reworked together, and will be raised against Revision 38 as entries of their
+own.
 
 ---
 
@@ -199,10 +198,10 @@ a type body. No alternative of `type-ref` begins with `<`, so a `<` at a field t
    but puts field names in the type namespace, where §5.10's shadowing rule does not reach.
 4. **A meta-kernel change.** `record_field` and `enum_type` change shape.
 
-**Open: what a bound may name.** `<T: text>` is a type bound. §5.2's other restriction — a value only on a field
-typed by an atom-family instance or an enum — and the HTTP layer's "any scalar" are bounds on a **base kind**,
-not on a type. If a bound may name a kind as well as a type, both become structural; if not, they stay in prose.
-#3's constructor bound is the nearest thing the series has to a kind bound, and would serve both halves.
+**Settled: a bound names a local type.** A type parameter names a local type, so its bound is one ([TSON-SCHEMA]
+§5.10), and a bound on a base kind or a constructor — §5.2's "a value only on a field typed by an atom-family
+instance or an enum", the HTTP layer's "any scalar" — would judge a schema's type by the meta's vocabulary, which
+Revision 37 declines. Both stay rules stated in prose.
 
 **Interpretation chosen:** the spec as written. No field declares a type slot; `enum_type.type` is a `type_name`
 whose bound and member conformance the linker checks as §7.4 rules, and §5.2's conformance is enforced by the
@@ -211,54 +210,3 @@ resolver as prose requires.
 **Status against Revision 37:** open, and **deferred to Revision 38** by the change log. The template bound it
 would generalise is running and recorded, but no declaration in the bundled schemas writes a typed or bounded
 parameter yet, so the shape is unproven; building the field half on it first would fix that shape twice.
-
----
-
-## 3. A bound on the constructor: `<T: !C>`, for "any text-valued atom" and "any scalar"
-
-**Section:** [TSON-SCHEMA] §5.10 (a bound names a type, and only a type; *What a parameter does not carry*),
-§5.5 (construction transfers kind and no supertypes), §3.3.1 (the structure namespace), §8.1 (`template_param`).
-
-**Kind:** proposal — an open remainder of typed template parameters, carried by the Revision 37 change log (§5).
-
-**What Revision 37 settled.** A type parameter's bound is a `type_ref` into the type-name namespace, checked by
-IS-A there, and a bound naming only a constructor is refused at the declaration: `<T: text_type> { a: T }` admits
-nothing (§5.10). §5.10 records what that leaves out — "no bound on the *constructor* an argument's type was built
-with — the spelling for 'any text-valued atom' or 'any scalar', which a nominal bound cannot say".
-
-**Why a nominal bound cannot say it.** Construction transfers kind and no supertypes (§5.5), so
-`identifier`, a kebab `!identifier_type { … }` profile, and `stock_code => !text_type {}` are IS-A nothing, and
-`<T: text>`, `<T: atom>` and `<T: identifier_type>` all refuse them. That separation is right for values -- a
-`stock_code` must not pass where a plain `text` is declared -- but a bound is a different question: what the body
-can do with T, not which nominal type T is.
-`box<stock_code>` and `box<text>` stay distinct entries, so admitting both mixes nothing.
-
-The question lives in the structure namespace -- T's definition was built by `C` or by a constructor composing
-`C` -- so it is a second field, never a second reading of `bound`:
-
-```
-template_param => {
-  name:         param_name
-  type:         type_ref
-  bound?:       type_ref   -- type-name namespace: an argument must name a type that IS-A it
-  constructor?: type_ref   -- structure namespace: an argument's definition must be built by it, or by a
-                           -- constructor composing it
-}
-```
-
-- **Spelling** `<T: !text_type>`: `!` already marks a structure-namespace head in `!C { … }`.
-- **The check** follows the argument's reference chain to its definition, takes the constructor it was built
-  with through any refinement, and asks IS-A among constructors -- one two-valued rule. `identifier_type` composes
-  `text_type`, so `identifier` and every identifier profile pass.
-- **What it buys:** `<T: !text_type>` for any text-valued atom; `<T: !atom>` for any scalar, which is what an
-  unbounded `labels => <T> set<T>` would need to keep records out of a set of labels; `<K: !atom, V> { K => V }`,
-  whose every application takes [TSON-JSON]'s object form, since that form is chosen by `K`.
-- **Both fields may be present**: a parameter can inherit one from each of two uses, and each narrows on its own
-  terms through the fixed point -- `constructor` along IS-A among constructors.
-- **A constructor is named by identity in the structure namespace**, not by bare name, and only a schema its meta
-  governs can name one. The kernel's are shared by every meta chain.
-
-**Interpretation chosen:** the spec as written — `bound` only, and a bound naming a constructor refused.
-
-**Status against Revision 37:** open; not running. Taking it is a kernel change (`template_param.constructor`)
-and one spelling in §12.1's `type-param`.

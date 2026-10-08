@@ -387,9 +387,9 @@ log only — the specification text carries no open questions.
 | #2 | A namespace as a value. The register's later reading fills the cell by reference rather than by containment: the unchecked reference is #6 alone; an interface is a record type reached by a projection type (`orders.create`); a route table is data whose leaves are bounded references. What stays open under that reading is the `data` kind's remaining use and the anonymous inline member. | Open — carried deliberately; step 1 waits on #6. |
 | #3 | A projection annotation (`@json_name:"…"`), the first member of §6's representation-directive category. | Open — [TSON-JSON] §6.1.1's map-typed position is the current answer. |
 | #6 | A bounded, binding parameter at a field's type (`type: <T: text>  members: set<T>`): a dependent record, a field-order requirement, a resolved form, and whether a bound may name a base kind. | Open — deferred to Revision 38 by the register; #7's `enum_type.type` and §5.2's value conformance stay rules rather than structure until then. |
-| #9 (remainder) | A bound on the constructor, `<T: !text_type>`, recorded as `template_param.constructor`, for "any text-valued atom" and "any scalar". | Open — not running; a nominal bound cannot say it, and §5.10 says so. |
+| #9 (remainder) | A bound on the constructor, `<T: !text_type>`, recorded as `template_param.constructor`, for "any text-valued atom" and "any scalar". | **Declined** (§8.2 item 12) — a type parameter names a local type, so its bound is local; a constructor bound judges a schema's type by meta vocabulary. |
 | #10 (Part 3) | The two MUSTs [TSON-JSON] §6.4 states for an ordered map — written in order, delivered in the order read — which no register entry spells (§7.1 item 9). | Open — written as the facet's direct consequence; the spec author's to confirm. |
-| #9 (remainder) | An edge between a core sibling and its kernel original, in place of the same-name same-body sentence, so that a recorded `type` reads the same in either namespace. | Open — the sentence is what makes the ambiguity harmless; the edge is the cleaner fix. |
+| #9 (remainder) | An edge between a core sibling and its kernel original, in place of the same-name same-body sentence, so that a recorded `type` reads the same in either namespace. | **Closed** (§8.2 item 11) — a recorded type reads where its slot is defined, which the template's form states. |
 
 Decisions taken 2026-10-07: #4 both halves, and the merge key declined; #5 the cell rule
 decides at every scoped position; #9 the narrow same-type sentence, ingest verifying a
@@ -619,6 +619,14 @@ SPEC-FEEDBACK.md's, renumbered against this revision.
     structure namespace; a record template reads them in the schema's; a bound is the schema's in every form.
     The entry's `source` says which form it is, so resolved output needs no new field. **[settled]** by the
     spec author.
+
+12. **§5.10 — the constructor bound is declined, and the rule is stated per slot.** A value conforms to where
+    it is defined: a value parameter's type is read where the slot it binds into is defined, the meta's for a
+    constructor's own slot and the schema's for a field the schema types; a type parameter names a local type,
+    so its bound is local. A constructor bound (`<T: text_type> set<T>`) would judge a schema's type by meta
+    vocabulary, the crossing item 11 removed. "Any text-valued atom" is not a type — a construction founds a
+    family of its own, and an author joins `text`'s by refining it — and "any scalar" is a style a schema
+    states with an element or key type. **[settled]** by the spec author.
 
 ### 8.3 Part 3
 
