@@ -187,11 +187,11 @@ on every text family.
   `tson-schema`, which is what lets a parser consult its constraint record directly.
 - **`RegexParser` returns `String`, and `TextType.pattern`/`UriType.pattern` are `Optional<String>`, not
   `Pattern`** — `regex` IS-A piece of text (§5.7), so its host value is `String` like every other
-  text-composing atom; the text is validated as I-Regexp via `tson-regex`'s `TsonRegex.parse` (not
+  text-composing atom; the text is validated as I-Regexp via `tson-regex`'s `IRegex.parse` (not
   `java.util.regex`, whose grammar is a superset — `regex_type`'s `spec` is fixed to RFC 9485),
   and the parsed form discarded once it's confirmed well-formed. Keeping these as plain equatable `String`
   (not a compiled matcher) is also what lets them bind generically with no `DataBridge`. **Matching** a value
-  against a `pattern` constraint (`TextParser`/`UriParser`) runs through `tson-regex`'s `TsonRegex.matches` —
+  against a `pattern` constraint (`TextParser`/`UriParser`) runs through `tson-regex`'s `IRegex.matches` —
   a Thompson-NFA, linear-time and ReDoS-safe — not `java.util.regex`.
 - **`value`, `void` and `identifier` each have a constructor**, and are read by it: `value_type` by `ValueParser`
   (in `tson-compiler`, base-type resolution to the natural host), `void_type` by `VoidReader` (the void sentinel

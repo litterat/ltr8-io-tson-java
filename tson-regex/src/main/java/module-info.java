@@ -1,3 +1,3 @@
-module io.ltr8.tson.regex {
-    exports io.ltr8.tson.regex;
+module io.ltr8.regex {
+    exports io.ltr8.regex;
 }

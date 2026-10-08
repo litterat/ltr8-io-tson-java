@@ -55,7 +55,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the *merged* result rather than the refinement body is what lets an unmentioned facet tighten vacuously; a
   stated bound is judged against the source's **effective** range, folding in a derived one like an integer's
   `size` (intersecting the refinement's own bounds first would make every widening vacuous). Unchecked by
-  design, each documented on its class: `pattern` against `pattern` (regular-language containment; `TsonRegex`
+  design, each documented on its class: `pattern` against `pattern` (regular-language containment; `IRegex`
   answers disjointness and exposes no complement to build containment from, so having the engine is not having
   the oracle — which is also why `text_type.members` takes the identity-only rule rather than the subset rule
   the numeric tiers use: one rule for a position whose other half cannot be narrowed) and **selector** facets

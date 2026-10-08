@@ -1,11 +1,11 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
 import java.util.List;
 import java.util.OptionalInt;
 
 /**
  * The abstract syntax tree of a parsed I-Regexp pattern (RFC 9485) -- a sealed hierarchy mirroring the RFC's
- * own grammar productions, produced by {@link TsonRegex#parse} and consumed by a matcher (and, in time, the
+ * own grammar productions, produced by {@link IRegex#parse} and consumed by a matcher (and, in time, the
  * choice-disjointness and constrained-decoding backends). Nodes are pure, immutable values and carry no
  * matching behaviour.
  *

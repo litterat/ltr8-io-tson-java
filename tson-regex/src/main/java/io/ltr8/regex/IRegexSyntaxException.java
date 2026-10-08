@@ -1,4 +1,4 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
 /**
  * Thrown when a string is not a valid I-Regexp (RFC 9485) -- either malformed, or using a construct outside
@@ -6,14 +6,14 @@ package io.ltr8.tson.regex;
  * subtraction, a capture/back-reference, a Unicode block, lookaround, ...). Unchecked, like the rest of the
  * read/parse stack. {@link #position()} is the code-point index into the pattern where parsing failed.
  */
-public final class TsonRegexSyntaxException extends RuntimeException {
+public final class IRegexSyntaxException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
     private final String pattern;
     private final int position;
 
-    public TsonRegexSyntaxException(String message, String pattern, int position) {
+    public IRegexSyntaxException(String message, String pattern, int position) {
         super(message + " (at position " + position + " in \"" + pattern + "\")");
         this.pattern = pattern;
         this.position = position;

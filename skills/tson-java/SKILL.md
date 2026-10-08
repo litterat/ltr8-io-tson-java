@@ -1,15 +1,14 @@
 ---
 name: tson-java
-description: Read, validate, write and bind TSON (`.tn`) documents with the `io.ltr8:tson` Java library, and run its
-  `tson` command line. Use this skill whenever Java code imports `io.ltr8.tson`, `io.ltr8.tson.compiler`,
-  `io.ltr8.tson.tree`, `io.ltr8.tson.base`, `io.ltr8.tson.json`, `io.ltr8.bind` or `io.ltr8.net`; whenever names like
-  `Tson`, `Json`, `ProcessorConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`, `ReadException`,
-  `SchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the
-  `ltr8-io-tson-java` repository; and whenever someone wants to check, compile or hash `.tn` files (or validate
-  `.json` against a TSON schema) from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit
-  hook, a lint step — whatever language the surrounding project is written in. For authoring TSON *data* documents
-  use the tson-data skill; for *schema* documents use tson-schema. This skill is the Java implementation and its CLI,
-  not the notation.
+description: Read, validate, write and bind TSON (`.tn`) documents with the `io.ltr8:tson` Java library, and run its `tson`
+  command line. Use this skill whenever Java code imports `io.ltr8.tson`, `io.ltr8.tson.compiler`, `io.ltr8.tson.tree`,
+  `io.ltr8.tson.base`, `io.ltr8.tson.json`, `io.ltr8.bind`, `io.ltr8.net` or `io.ltr8.regex`; whenever names like `Tson`,
+  `Json`, `ProcessorConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`, `ReadException`,
+  `SchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the `ltr8-io-tson-java`
+  repository; and whenever someone wants to check, compile or hash `.tn` files (or validate `.json` against a TSON schema)
+  from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit hook, a lint step — whatever language
+  the surrounding project is written in. For authoring TSON *data* documents use the tson-data skill; for *schema*
+  documents use tson-schema. This skill is the Java implementation and its CLI, not the notation.
 ---
 
 # `io.ltr8:tson` — the Java implementation
@@ -32,7 +31,7 @@ Twelve JPMS modules, all published together as `io.ltr8:<module>`:
 | `tson-schema`    | `io.ltr8.tson.schema`     | the resolved-schema value model and the registry                |
 | `tson-bind`      | `io.ltr8.bind`            | the generic `DataValue`↔Java-object binding engine              |
 | `tson-annotation`| `io.ltr8.annotation`      | `@Typename`/`@Field`/`@Record`/… and the `Annotations` carrier  |
-| `tson-regex`     | `io.ltr8.tson.regex`      | a standalone RFC 9485 I-Regexp engine (no TSON dependency)      |
+| `tson-regex`     | `io.ltr8.regex`           | a standalone RFC 9485 I-Regexp engine (no TSON dependency)      |
 | `tson-net`       | `io.ltr8.net`             | network text formats to their RFCs — `Iri` (RFC 3986/3987), IP addresses, CIDR, EUI-48 (no TSON dependency) |
 | `tson-json`      | `io.ltr8.tson.json`       | the JSON encoding: `Json`, its readers and writers, `JsonValue` — no dependency on `tson-compiler` |
 | `tson-cli`       | `io.ltr8.tson.cli`        | the `tson` command (`validate`, `compile`, `policy`, `hash`, …) |

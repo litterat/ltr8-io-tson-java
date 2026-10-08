@@ -6,7 +6,7 @@ import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.base.unicode.Normalization;
-import io.ltr8.tson.regex.TsonRegex;
+import io.ltr8.regex.IRegex;
 import io.ltr8.tson.schema.meta.UriType;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -135,7 +135,7 @@ public record UriParser(UriType constraints) implements AtomTypeParser<Iri> {
         // Pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
         // java.util.regex; already validated well-formed at schema resolution (see RegexParser).
         constraints.pattern().ifPresent(p -> {
-            if (!TsonRegex.parse(p).matches(text)) {
+            if (!IRegex.parse(p).matches(text)) {
                 throw new AtomValidationException(subject + " does not match the required pattern " + p,
                         "matching " + p);
             }

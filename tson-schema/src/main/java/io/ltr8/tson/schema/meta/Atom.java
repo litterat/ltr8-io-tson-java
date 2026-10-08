@@ -37,7 +37,7 @@ public sealed interface Atom extends Top permits ValueType, VoidType, EnumBody, 
      *
      * <p>An implementation compares facets only where narrowing is decidable. Where it is not -- a
      * {@code pattern} against another {@code pattern} (regular-language containment, which the engine this
-     * module has does not decide: {@code TsonRegex} answers disjointness, and containment needs a
+     * module has does not decide: {@code IRegex} answers disjointness, and containment needs a
      * complement it does not expose), or an ISO 8601 duration carried as unparsed text -- the
      * facet is left unchecked rather than guessed at, and each implementation names its own gaps.
      */

@@ -1,6 +1,6 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
-import io.ltr8.tson.regex.SymbolicNfa.Edge;
+import io.ltr8.regex.SymbolicNfa.Edge;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

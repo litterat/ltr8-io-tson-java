@@ -1,15 +1,15 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
-import io.ltr8.tson.regex.RegexNode.Alternation;
-import io.ltr8.tson.regex.RegexNode.AnyChar;
-import io.ltr8.tson.regex.RegexNode.CategoryEscape;
-import io.ltr8.tson.regex.RegexNode.CharClass;
-import io.ltr8.tson.regex.RegexNode.ClassRange;
-import io.ltr8.tson.regex.RegexNode.Group;
-import io.ltr8.tson.regex.RegexNode.Literal;
-import io.ltr8.tson.regex.RegexNode.Member;
-import io.ltr8.tson.regex.RegexNode.Repeat;
-import io.ltr8.tson.regex.RegexNode.Sequence;
+import io.ltr8.regex.RegexNode.Alternation;
+import io.ltr8.regex.RegexNode.AnyChar;
+import io.ltr8.regex.RegexNode.CategoryEscape;
+import io.ltr8.regex.RegexNode.CharClass;
+import io.ltr8.regex.RegexNode.ClassRange;
+import io.ltr8.regex.RegexNode.Group;
+import io.ltr8.regex.RegexNode.Literal;
+import io.ltr8.regex.RegexNode.Member;
+import io.ltr8.regex.RegexNode.Repeat;
+import io.ltr8.regex.RegexNode.Sequence;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,8 +20,8 @@ import java.util.OptionalInt;
  * Code-point addressed (surrogate pairs are single atoms), so supplementary-plane characters parse. The
  * grammar itself is the subset gate: anything the productions don't admit -- {@code \d}/{@code \w}/{@code
  * \s}, character-class subtraction, capture/back-references, lookaround, Unicode blocks, non-greedy
- * quantifiers -- is a {@link TsonRegexSyntaxException}, no separate rejection pass needed. Package-private;
- * {@link TsonRegex#parse} is the entry point.
+ * quantifiers -- is a {@link IRegexSyntaxException}, no separate rejection pass needed. Package-private;
+ * {@link IRegex#parse} is the entry point.
  */
 final class IRegexParser {
 
@@ -330,8 +330,8 @@ final class IRegexParser {
         pos++;
     }
 
-    private TsonRegexSyntaxException error(String message) {
-        return new TsonRegexSyntaxException(message, source, pos);
+    private IRegexSyntaxException error(String message) {
+        return new IRegexSyntaxException(message, source, pos);
     }
 
     private static String display(int codePoint) {

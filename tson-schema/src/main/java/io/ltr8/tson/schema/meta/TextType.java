@@ -2,7 +2,7 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
-import io.ltr8.tson.regex.TsonRegex;
+import io.ltr8.regex.IRegex;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.base.unicode.Normalization;
@@ -90,7 +90,7 @@ public record TextType(
      * where the source left it unset, or restate the source's own verbatim, and may never change it.
      *
      * <p>{@code pattern}'s reason is that the narrowing question is undecided: whether one I-Regexp accepts
-     * a subset of another's language is regular-language containment, and {@link TsonRegex} answers
+     * a subset of another's language is regular-language containment, and {@link IRegex} answers
      * disjointness rather than containment, with no complement to build one from. Having the engine is not
      * having the oracle. Refusing the change is the total rule available without it -- an undecidable
      * narrowing is not waved through -- and it is the natural place an injected containment oracle would
@@ -138,7 +138,7 @@ public record TextType(
      *
      * <p><b>{@link #pattern} emptiness is deliberately not checked, and this is a decision rather than a
      * gap.</b> A pattern matching no string would leave the type uninhabited, and the check is cheap to
-     * write -- {@link TsonRegex}'s disjointness asked of a pattern against itself decides it exactly, and
+     * write -- {@link IRegex}'s disjointness asked of a pattern against itself decides it exactly, and
      * this module has the engine. It was built and removed, because
      * <b>an empty language is not reachable by mistake in RFC 9485</b>: I-Regexp has no lookaround, no
      * anchors and no character-class subtraction, and the two errors an author actually makes -- an inverted
@@ -184,7 +184,7 @@ public record TextType(
             maxLength.filter(max -> codePoints > max).ifPresent(max -> violations.add(
                     "member '" + member + "' is " + codePoints + " characters, over max_length " + max));
             // Well-formed by the time the pattern facet itself was read, so parse cannot fail here.
-            pattern.filter(regex -> !TsonRegex.parse(regex).matches(member)).ifPresent(regex ->
+            pattern.filter(regex -> !IRegex.parse(regex).matches(member)).ifPresent(regex ->
                     violations.add("member '" + member + "' does not match pattern " + regex));
         }));
         return List.copyOf(violations);

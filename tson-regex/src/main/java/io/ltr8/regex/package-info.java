@@ -1,7 +1,7 @@
 /**
- * A native RFC 9485 (I-Regexp) engine: {@link io.ltr8.tson.regex.TsonRegex#parse} validates a pattern against
- * the RFC's grammar and builds its AST, {@link io.ltr8.tson.regex.TsonRegex#matches} runs it in guaranteed
- * linear time over a Thompson NFA, and {@link io.ltr8.tson.regex.TsonRegex#isDisjointFrom} decides whether
+ * A native RFC 9485 (I-Regexp) engine: {@link io.ltr8.regex.IRegex#parse} validates a pattern against
+ * the RFC's grammar and builds its AST, {@link io.ltr8.regex.IRegex#matches} runs it in guaranteed
+ * linear time over a Thompson NFA, and {@link io.ltr8.regex.IRegex#isDisjointFrom} decides whether
  * two patterns share any string at all.
  *
  * <h2>Conformance statement</h2>
@@ -45,7 +45,7 @@
  *
  * The Thompson-NFA simulation has no backtracking, so match time is linear in the input and no pattern is
  * adversarial -- an engine reading patterns out of untrusted schemas cannot afford otherwise.
- * {@link io.ltr8.tson.regex.TsonRegex#isDisjointFrom} decides intersection-emptiness over a symbolic product
+ * {@link io.ltr8.regex.IRegex#isDisjointFrom} decides intersection-emptiness over a symbolic product
  * NFA, exactly, because regular languages permit it: the answer is yes or no, never "unknown".
  *
  * <p><b>What that exactness is not for.</b> It does not feed [TSON-SCHEMA] §5.4's choice disjointness, which
@@ -54,4 +54,4 @@
  * variants are both string-class and therefore never disjoint, however separated their languages. The
  * decision procedure is available for a schema author's own reasoning, not for dropping a variant tag.
  */
-package io.ltr8.tson.regex;
+package io.ltr8.regex;

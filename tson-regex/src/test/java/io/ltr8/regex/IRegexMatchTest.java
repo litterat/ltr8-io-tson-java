@@ -1,4 +1,4 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -9,15 +9,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonRegex#matches}: full-match (whole-string) I-Regexp matching. Covers the combinators and
+ * {@link IRegex#matches}: full-match (whole-string) I-Regexp matching. Covers the combinators and
  * quantifiers, Unicode category and code-point handling, I-Regexp's own quirks (anchors are literals,
  * {@code .} excludes line terminators), and -- the point of a Thompson NFA -- that a pattern which hangs a
  * backtracking engine runs in linear time here.
  */
-class TsonRegexMatchTest {
+class IRegexMatchTest {
 
     private static boolean matches(String pattern, String input) {
-        return TsonRegex.parse(pattern).matches(input);
+        return IRegex.parse(pattern).matches(input);
     }
 
     @Test

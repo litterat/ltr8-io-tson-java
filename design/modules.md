@@ -82,11 +82,11 @@ module has a real `module-info.java`; module names mirror each module's root exp
   assembled by hand-written readers). The data-tree counterpart to `tson-schema`'s `schema.meta`: same
   "pure value model in its own module, engine depends on it not the reverse" shape, so JPMS keeps the tree
   from ever coupling to compiler internals. `tson-compiler` depends on it; it names no `tson-compiler` type.
-- **`tson-regex`** — **only** `io.ltr8.tson.regex`: a native RFC 9485 I-Regexp engine — `TsonRegex.parse`
-  builds a `RegexNode` AST (or `TsonRegexSyntaxException`), `TsonRegex.matches` runs a Thompson-NFA/Pike-VM
+- **`tson-regex`** — **only** `io.ltr8.regex`: a native RFC 9485 I-Regexp engine — `IRegex.parse`
+  builds a `RegexNode` AST (or `IRegexSyntaxException`), `IRegex.matches` runs a Thompson-NFA/Pike-VM
   simulation (linear-time, no backtracking → ReDoS-safe; `\p{…}` via JDK `Character.getType`), and
-  `TsonRegex.isDisjointFrom` decides whether two patterns share any string (exact — a symbolic product-NFA
-  emptiness check over a `CodePointSet` interval algebra, the building block for §5.4 pattern disjointness).
+  `IRegex.isDisjointFrom` decides whether two patterns share any string (exact — a symbolic product-NFA
+  emptiness check over a `CodePointSet` interval algebra; §5.4 decides choice disjointness by class, never by pattern).
   A true leaf — depends on **nothing**, I-Regexp being an external standard, not TSON-specific. The
   *engine* counterpart to `tson-bind` (a general dependency-free engine), not a value model like
   `tson-tree`; TSON pins its `regex` atom to I-Regexp (`regex_type`'s fixed `spec = rfc9485`), so

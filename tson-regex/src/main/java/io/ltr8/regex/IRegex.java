@@ -1,4 +1,4 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
 import java.util.Objects;
 
@@ -14,16 +14,16 @@ import java.util.Objects;
  * version, and {@code \p{...}} resolves against the running JDK's.
  *
  * <p>{@link #matches(String)} tests a whole string against the pattern in guaranteed linear time (a Thompson
- * NFA, no backtracking -- no ReDoS). The {@code Tson} prefix disambiguates from {@code java.util.regex} and
- * any domain {@code Regex}/{@code Pattern} at a call site.
+ * NFA, no backtracking -- no ReDoS). The name is the RFC's own, I-Regexp, which keeps it apart from {@code
+ * java.util.regex} and any domain {@code Regex}/{@code Pattern} at a call site.
  */
-public final class TsonRegex {
+public final class IRegex {
 
     private final String pattern;
     private final RegexNode ast;
     private NfaProgram program; // compiled lazily on first match, then reused
 
-    private TsonRegex(String pattern, RegexNode ast) {
+    private IRegex(String pattern, RegexNode ast) {
         this.pattern = pattern;
         this.ast = ast;
     }
@@ -31,11 +31,11 @@ public final class TsonRegex {
     /**
      * Parses {@code pattern} as I-Regexp, returning its AST.
      *
-     * @throws TsonRegexSyntaxException if {@code pattern} is not valid I-Regexp
+     * @throws IRegexSyntaxException if {@code pattern} is not valid I-Regexp
      */
-    public static TsonRegex parse(String pattern) {
+    public static IRegex parse(String pattern) {
         Objects.requireNonNull(pattern, "pattern");
-        return new TsonRegex(pattern, new IRegexParser(pattern).parse());
+        return new IRegex(pattern, new IRegexParser(pattern).parse());
     }
 
     /**
@@ -63,7 +63,7 @@ public final class TsonRegex {
      * string-class and keep their tags however separated their languages. This answers the narrower
      * question, for a schema author reasoning about their own patterns.
      */
-    public boolean isDisjointFrom(TsonRegex other) {
+    public boolean isDisjointFrom(IRegex other) {
         Objects.requireNonNull(other, "other");
         return RegexDisjointness.disjoint(ast, other.ast);
     }
@@ -80,6 +80,6 @@ public final class TsonRegex {
 
     @Override
     public String toString() {
-        return "TsonRegex[" + pattern + "]";
+        return "IRegex[" + pattern + "]";
     }
 }

@@ -36,5 +36,5 @@ module io.ltr8.tson.atom {
 
     requires transitive io.ltr8.tson.schema;
     requires transitive io.ltr8.tson.base;
-    requires io.ltr8.tson.regex;
+    requires io.ltr8.regex;
 }

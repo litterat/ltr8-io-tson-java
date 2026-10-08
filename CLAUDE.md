@@ -130,7 +130,7 @@ fact that must survive its entry goes in the note, the Javadoc or the test that 
 **`Tson` is a prefix, never an infix** (`TsonCompiledSchema`, never `CompiledTsonSchema`), and only on types a consumer
 names in their own code; internal machinery is bare (`Lexer`, `SchemaResolver`). `tson-base` drops it; `tson-json`
 uses `Json` on the same terms. A module that knows nothing of TSON carries no prefix and lives at `io.ltr8.<name>`
-(`tson-bind` → `io.ltr8.bind`, `tson-net` → `io.ltr8.net`), usable on its own.
+(`tson-bind` → `io.ltr8.bind`, `tson-net` → `io.ltr8.net`, `tson-regex` → `io.ltr8.regex`), usable on its own.
 
 **Exception classification is a policy.** `SchemaValidationException`: the author's schema is wrong and the spec
 says so. `UnsupportedOperationException`: this library has not implemented that yet. `IllegalStateException`: an

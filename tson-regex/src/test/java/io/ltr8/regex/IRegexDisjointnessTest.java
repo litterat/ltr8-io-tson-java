@@ -1,4 +1,4 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
 import org.junit.jupiter.api.Test;
 
@@ -6,16 +6,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonRegex#isDisjointFrom}: does any string match both patterns? Exact (regular-language
+ * {@link IRegex#isDisjointFrom}: does any string match both patterns? Exact (regular-language
  * intersection emptiness), so every case has a definite answer -- the building block for §5.4 pattern
  * disjointness over {@code regex}-constrained choice variants.
  */
-class TsonRegexDisjointnessTest {
+class IRegexDisjointnessTest {
 
     private static boolean disjoint(String a, String b) {
-        boolean result = TsonRegex.parse(a).isDisjointFrom(TsonRegex.parse(b));
+        boolean result = IRegex.parse(a).isDisjointFrom(IRegex.parse(b));
         // disjointness is symmetric -- verify both directions agree
-        assertTrue(result == TsonRegex.parse(b).isDisjointFrom(TsonRegex.parse(a)),
+        assertTrue(result == IRegex.parse(b).isDisjointFrom(IRegex.parse(a)),
                 () -> "disjoint(" + a + "," + b + ") is not symmetric");
         return result;
     }

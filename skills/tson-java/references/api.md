@@ -601,15 +601,15 @@ Also exports `io.ltr8.bind.mapper` and `io.ltr8.bind.bridge`. See `references/bi
 
 ---
 
-## `io.ltr8.tson.regex` (module `tson-regex`)
+## `io.ltr8.regex` (module `tson-regex`)
 
 A native RFC 9485 I-Regexp engine — a true leaf, no TSON dependency.
 
 ```java
-public final class TsonRegex {
-    public static TsonRegex parse(String pattern);   // or TsonRegexSyntaxException
+public final class IRegex {
+    public static IRegex parse(String pattern);    // or IRegexSyntaxException
     public boolean   matches(String input);          // Thompson-NFA / Pike-VM: linear time, ReDoS-safe
-    public boolean   isDisjointFrom(TsonRegex other);// exact — a symbolic product-NFA emptiness check
+    public boolean   isDisjointFrom(IRegex other);  // exact — a symbolic product-NFA emptiness check
     public RegexNode ast();
     public String    pattern();
 }
