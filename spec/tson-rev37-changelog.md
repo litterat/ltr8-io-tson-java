@@ -386,7 +386,7 @@ log only — the specification text carries no open questions.
 | #1 | A third artifact kind — the deployment descriptor: data, not a schema; named at the call site, never discovered; never resolvable by identity; a `.well-known` projection for discovery. | Open — [TSON-DATA] §8.2 says only what the policy is *not*. |
 | #2 | A namespace as a value. The register's later reading fills the cell by reference rather than by containment: the unchecked reference is #6 alone; an interface is a record type reached by a projection type (`orders.create`); a route table is data whose leaves are bounded references. What stays open under that reading is the `data` kind's remaining use and the anonymous inline member. | Open — carried deliberately; step 1 waits on #6. |
 | #3 | A projection annotation (`@json_name:"…"`), the first member of §6's representation-directive category. | Open — [TSON-JSON] §6.1.1's map-typed position is the current answer. |
-| #6 | A bounded, binding parameter at a field's type (`type: <T: text>  members: set<T>`): a dependent record, a field-order requirement, a resolved form, and whether a bound may name a base kind. | Open — deferred to Revision 38 by the register; #7's `enum_type.type` and §5.2's value conformance stay rules rather than structure until then. |
+| #6 | A bounded, binding parameter at a field's type (`type: <T: text>  members: set<T>`): a dependent record, a field-order requirement, a resolved form, and whether a bound may name a base kind. | **Withdrawn** (§8.2 item 13) — not the time to introduce a dependent record; `enum_type.type`'s member conformance (§7.4) and §5.2's value conformance stay rules stated in prose. |
 | #9 (remainder) | A bound on the constructor, `<T: !text_type>`, recorded as `template_param.constructor`, for "any text-valued atom" and "any scalar". | **Declined** (§8.2 item 12) — a type parameter names a local type, so its bound is local; a constructor bound judges a schema's type by meta vocabulary. |
 | #10 (Part 3) | The two MUSTs [TSON-JSON] §6.4 states for an ordered map — written in order, delivered in the order read — which no register entry spells (§7.1 item 9). | Open — written as the facet's direct consequence; the spec author's to confirm. |
 | #9 (remainder) | An edge between a core sibling and its kernel original, in place of the same-name same-body sentence, so that a recorded `type` reads the same in either namespace. | **Closed** (§8.2 item 11) — a recorded type reads where its slot is defined, which the template's form states. |
@@ -627,6 +627,15 @@ SPEC-FEEDBACK.md's, renumbered against this revision.
     vocabulary, the crossing item 11 removed. "Any text-valued atom" is not a type — a construction founds a
     family of its own, and an author joins `text`'s by refining it — and "any scalar" is a style a schema
     states with an element or key type. **[settled]** by the spec author.
+
+13. **The bounded type slot at a field is withdrawn, not deferred.** The field half of Revision 36's #6 —
+    `type: <T: text>  members: set<T>`, a field binding a type that a later field's type depends on — would
+    introduce a dependent record: a field order a streaming reader must rely on, a resolved form for the
+    binding, and a kernel change to `record_field` and `enum_type`. Now is the wrong time to introduce such a
+    feature: the template half has only just landed, no bundled schema writes a typed parameter to prove its
+    shape, and what the field half would make structural — an enum's members against its `type` (§7.4), a
+    field's value against its type (§5.2) — is already stated and enforced as prose rules. It is not carried
+    as an open question; a later revision that wants it raises it afresh. **[settled]** by the spec author.
 
 ### 8.3 Part 3
 

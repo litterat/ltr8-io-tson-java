@@ -13,9 +13,9 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-**Revision 37 closed seventeen of the twenty-one open against Revision 36**, and #1 and #2 below are what remains
-of the four that revision's change log carries open. The closed entries are gone: the spec now carries their rules
-— a family member is declared and a family is judged over its closure, the cell rule at every scoped position,
+**Revision 37 closed seventeen of the twenty-one open against Revision 36**, and #1 below is what remains of the
+four that revision's change log carries open. The closed entries are gone: the spec now carries their rules — a
+family member is declared and a family is judged over its closure, the cell rule at every scoped position,
 `identifier` as a text family and `enum_type.type`, `value_type` and `void_type`, typed template parameters with
 their bounds and the call-site check, `ordered` on every container, the empty set, `tuple1<T>`, `uri` beside
 `uri_reference` and `iri_type`, the smaller core, meta's annotation vocabulary, `@doc` as CommonMark, field-group
@@ -39,12 +39,12 @@ spanning both stays, and says which half is which.
 for an entry below, where there is no section to point at yet. When an entry closes, its citations become spec
 citations and the entry is deleted — nothing here is an archive.
 
-**#1 and #2 are directions rather than defects.** Each is a place the series stops short of a rule on purpose:
-where a deployment's policy lives (#1), and a bounded type slot at a field, which lets one field's type depend on
-another's (#2). What verifying Revision 37's text against the closed entries found is in that revision's text and
-artifacts. **Two directions Revision 37 carried open are not here**: a namespace as a value and a JSON member name
-that is not an identifier are being reworked together, and will be raised against Revision 38 as entries of their
-own.
+**#1 is a direction rather than a defect**: a place the series stops short of a rule on purpose, where a
+deployment's policy lives. The bounded type slot at a field is withdrawn rather than carried, Revision 37's change
+log recording that now is the wrong time to introduce it. What verifying Revision 37's text against the closed
+entries found is in that revision's text and artifacts. **Two directions Revision 37 carried open are not here**: a
+namespace as a value and a JSON member name that is not an identifier are being reworked together, and will be
+raised against Revision 38 as entries of their own.
 
 ---
 
@@ -115,98 +115,3 @@ to stop, and this entry is content to be answered with "not this revision."
 nowhere to live; Revision 35 gave it everywhere to be *reported* and left where it lives undefined on purpose;
 Revisions 36 and 37 carry the entry open with both constraints recorded, and §8.2's closing sentence stands as
 the placeholder it is. Adopting this entry is a new section; declining it costs nothing that is currently broken.
-
----
-
-## 2. A type slot cannot be bounded at a field, so a field cannot depend on another field's type
-
-**Section:** [TSON-SCHEMA] §5.2 (value conformance), §5.7 (facet kinds under refinement), §5.10 (*What a
-parameter does not carry*), §7.4 (`enum_type.type` and its members), §8.1 (`record_field`, the constructor type
-slots); the grammar's `type-param` and `field-type` productions.
-
-**Kind:** proposal — the field half of a mechanism whose template half Revision 37 took.
-
-**What Revision 37 settled.** A template parameter carries a type and, as a type parameter, a nominal bound:
-`<T: text>` is recorded as `template_param.bound` and checked at every application (§5.10). What is left is the
-same bound at a field. Every type slot in the kernel is a field typed `type_ref` — `array.element_type`,
-`map.key_type`, `record_field.type` — or, for an enum, `type_name`, and either names *any* type; and no field can
-refer to the type another field names. §5.10 records both as deferrals: "a type slot cannot be bounded at a
-*field* as it can at a template, so a dependency between two fields of one constructor — `record_field.value` on
-`record_field.type` (§5.2), an enum's members on its `type` (§7.4) — stays a rule stated in prose rather than
-structure."
-
-**Where it is hit.**
-
-- **`enum_type`.** `type: type_name` must name a text family, each member must be a value of it, and no two may
-  be one value under its equality — three §7.4 rules the linker checks, because the slot cannot say them.
-- **§5.2's value conformance**, which exists because `record_field.value: value` cannot point at
-  `record_field.type`.
-- **A consumer's meta layer.** `ltr8-io-tson-java-http`'s HTTP vocabulary types a path parameter with a
-  `type_ref`, and a URL segment cannot carry a record; its schema records that nothing enforces the restriction.
-
-**Suggested resolution: a bounded, binding parameter at a field's type.** §12.1's `type-param` already admits a
-written type; one more alternative at `field-type` uses it:
-
-```
-field-type  = ( "<" ws type-param ws ">" / type-ref ) ["?"]
-```
-
-At a field's type, `<T: text>` declares a type slot — a field whose value is a reference bounded as a template's
-`T` is — and binds `T` for the rest of the body:
-
-```
-enum_type => atom & {
-  type:    <T: text>
-  members: set<T>
-}
-
-record_field => {
-  type:   <T>
-  value?: T
-  …
-}
-```
-
-What this settles:
-
-- **Member conformance is structural.** `members: set<T>` checks each member against `type` as a set checks
-  any element; no prose rule states it, and the duplicate rule is the set's own uniqueness in `T`'s form.
-- **§5.2's value conformance is structural** by the same mechanism, unbounded.
-- **A type slot's value has a place.** `enum => enum_type ^ { type?: = identifier }` pins a single type-name
-  token on a type slot; every existing enum resolves unchanged.
-- **Refinement gains one facet kind.** A type slot narrows along IS-A: a refinement may restate it only with a
-  subtype of the source's value. `enum_type` does not need it, its `type` being fixed at construction (§5.7).
-- **The bound follows IS-A edges only**, as §5.10's template bound does: `date` has a text form without being
-  `text`.
-
-**Why at the field.** Placing the parameter inside the constructor, rather than wrapping the constructor in a
-template as `set => <T> !set_type { element_type: T }` does, is what lets one field refer to another: a
-template's parameters are bound by the application, before the body is read, and a template cannot be mixed into
-a type body. No alternative of `type-ref` begins with `<`, so a `<` at a field type is decided on one token.
-
-**What it costs.**
-
-1. **A dependent record, which the series has not had.** A template's `T` is bound by whoever applies it; this
-   `T` is bound by a field value in the data — `!enum_type { type: currency_code  members: [USD EUR] }` — and a
-   later field's type depends on it. §5.2 and §8.1 must say so.
-2. **Field order.** A streaming reader of a schema document read as data would meet `members` before `type` if
-   the author wrote it so, and would buffer it. Requiring the binding field to precede its uses removes the
-   buffer; §5.4 already puts a dispatch-order requirement on selectors.
-3. **A resolved form.** The sugar needs output the kernel can state: plausibly a lift (§5.3) to a synthetic
-   entry of a bounded-reference constructor carrying `bound: type_ref`, and a record-level statement of which
-   field binds which parameter. Using the field's own name as the binder (`members: set<type>`) saves the name
-   but puts field names in the type namespace, where §5.10's shadowing rule does not reach.
-4. **A meta-kernel change.** `record_field` and `enum_type` change shape.
-
-**Settled: a bound names a local type.** A type parameter names a local type, so its bound is one ([TSON-SCHEMA]
-§5.10), and a bound on a base kind or a constructor — §5.2's "a value only on a field typed by an atom-family
-instance or an enum", the HTTP layer's "any scalar" — would judge a schema's type by the meta's vocabulary, which
-Revision 37 declines. Both stay rules stated in prose.
-
-**Interpretation chosen:** the spec as written. No field declares a type slot; `enum_type.type` is a `type_name`
-whose bound and member conformance the linker checks as §7.4 rules, and §5.2's conformance is enforced by the
-resolver as prose requires.
-
-**Status against Revision 37:** open, and **deferred to Revision 38** by the change log. The template bound it
-would generalise is running and recorded, but no declaration in the bundled schemas writes a typed or bounded
-parameter yet, so the shape is unproven; building the field half on it first would fix that shape twice.
