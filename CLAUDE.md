@@ -42,14 +42,14 @@ consumer-facing `README.md`, `STATUS.md` (the implemented checklist) and `CONFOR
 A from-scratch Java implementation of TSON (Typed Schema Object Notation), built directly against the TSON spec series
 (2026 revision), and the spec's first implementation:
 
-- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/36/tson-part1-data.md
-- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/36/tson-part2-schema.md
+- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/37/tson-part1-data.md
+- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/37/tson-part2-schema.md
 - Part 3 — the JSON encoding, **drafted in this repo**: `spec/tson-part3-json.md`
 
 The spec is a working revision that changes without compatibility guarantees. When in doubt, **re-fetch the current URL**
-and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 36, not
-edited here) with **two exceptions that are live**: `spec/m/{meta-kernel,meta,core}.tn` are packaged from here at build
-time, and `spec/tson-part3-json.md` is edited in place.
+and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 37, not
+edited here) with **two exceptions that are live**: `spec/m/{meta-kernel,meta,core,policy}.tn` are packaged from here at
+build time, and `spec/tson-part3-json.md` is edited in place.
 
 **Editing a bundled schema means re-stamping.** The library verifies the packaged bytes against
 `TsonBundledSchemas`' digests on every load, so one stale constant fails `Tson.standard()` and most of the suite.
@@ -57,11 +57,10 @@ time, and `spec/tson-part3-json.md` is edited in place.
 table in `spec/` is the one pin it does not write. Keep `spec/m/*-resolved.tn` in step — `ResolvedFixtureTest` checks
 them. `design/process.md` has the procedure, and the rules for what a schema's `@doc` may say.
 
-**Branches.** `main` is the reference implementation of the *published* revision (36); published revisions are tags
-(`r2026-32`, `r2026-34`, `r2026-35`). **`r2026-37-proposal` is open**, with a corpus branch of the same name, for the
-meta-kernel changes the published spec cannot carry; it carries Revision 37 identities (`/2026/37/m/`) and version
-`0.37.0-SNAPSHOT`, and merges when the spec lands and not before. Kernel work branches off it and PRs into it; work
-that Revision 36 can carry still goes to `main`. Check the branch before quoting identities or the version.
+**Branches.** `main` is the reference implementation of the *published* revision (37): identities `/2026/37/m/`,
+version `0.37.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`), each added
+when the next revision merges. Work the published spec cannot carry goes on a proposal branch, `r2026-NN-proposal`, with
+a corpus branch of the same name; none is open. `design/process.md` has the procedure.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** No published releases, every version
 `-SNAPSHOT`. So correctness wins over stability every time: a wrong rule gets fixed, a bad name changed rather than
@@ -130,7 +129,8 @@ fact that must survive its entry goes in the note, the Javadoc or the test that 
 
 **`Tson` is a prefix, never an infix** (`TsonCompiledSchema`, never `CompiledTsonSchema`), and only on types a consumer
 names in their own code; internal machinery is bare (`Lexer`, `SchemaResolver`). `tson-base` drops it; `tson-json`
-uses `Json` on the same terms.
+uses `Json` on the same terms. A module that knows nothing of TSON carries no prefix and lives at `io.ltr8.<name>`
+(`tson-bind` → `io.ltr8.bind`, `tson-net` → `io.ltr8.net`), usable on its own.
 
 **Exception classification is a policy.** `SchemaValidationException`: the author's schema is wrong and the spec
 says so. `UnsupportedOperationException`: this library has not implemented that yet. `IllegalStateException`: an
