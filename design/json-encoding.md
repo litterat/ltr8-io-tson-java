@@ -145,8 +145,8 @@ work, and the first is the largest single obstacle to the stated goal.
    `identifier-continue`, so `user-name` and OpenAPI's `x-` extensions are declarable — which leaves
    JSON-LD's `@`-prefixed keys and digit- or underscore-initial names as what cannot be spelled. The only
    answer today is to refuse, or to type the position as a map and forgo per-field validation. A projection
-   annotation binding a wire spelling to a declared field would fit [TSON-SCHEMA] §6's licence exactly;
-   `SPEC-FEEDBACK.md` #3 states it.
+   annotation binding a wire spelling to a declared field would fit [TSON-SCHEMA] §6's licence exactly, and is
+   the proposal to be raised against Revision 38.
 2. **Records are closed and JSON Schema's are open.** `additionalProperties` defaults to *true*, so a
    converted record fails §6.1.1 on the first document carrying an extra member. There is no flattened tail
    to relax it (§7.2): open-ended data is a declared map-typed field, which the producer
