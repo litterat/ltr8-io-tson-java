@@ -111,11 +111,11 @@ class ValidateCommandTest {
         String err = captureStderr(() -> {
             String output = captureStdout(() ->
                     assertEquals(69, ValidateCommand.run(inputs(data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
-            assertTrue(output.contains("[SCHEMA_NOT_FOUND]"), output);
+            assertTrue(output.contains("[SCHEMA_NOT_PERMITTED]"), output);
             assertTrue(output.contains("not-provided"), output);
         });
 
-        assertTrue(err.contains("could not be obtained"), err);
+        assertTrue(err.contains("will not supply"), err);
     }
 
     /**

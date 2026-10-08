@@ -267,9 +267,10 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       not give one: `NOT_IMPLEMENTED` (this library), `BIND_MISMATCH` (the reading application), and
       [TSON-DATA] §8.1's fifth outcome — the five `SCHEMA_*` codes (whoever was to serve the schema), and the
       refusals, §8.2's three name-hygiene codes and `LIMIT_EXCEEDED` (this processor's own policy and §9.1
-      bound, `design/processor-policy.md`). The CLI's exit codes follow — 70, 78, and 69 or 75 by whether a
-      rerun could help, a refusal exiting 1 because the runner can act — and a mixed run ranks by who must
-      act first, permanence breaking the tie between ranks where nobody present can act: 70 > 78 > 69 > 75 > 1.
+      bound, `design/processor-policy.md`), with `SCHEMA_NOT_PERMITTED` and `SCHEMA_TOO_LARGE` refusals too
+      (`Code.isRefusal()`). The CLI's exit codes follow — 70, 78, and 69 or 75 by whether a rerun could help,
+      a name or limit refusal exiting 1 because the runner can act — and a mixed run ranks by who must act
+      first: 70 > 78 > 69 > 1 > 75, a rerun last since every other fix ends in one.
 - **What still throws even with a receiver:** an `!!import` that won't load, a `!!meta` that may not
   govern, or a reference whose target owns a different `!!id` than it was fetched under (§2.2.1's
   cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Those make the namespace itself unusable rather

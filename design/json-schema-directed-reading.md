@@ -82,7 +82,7 @@ the linked result. An application reading both encodings resolves once through `
 From there it is the TSON facades' shape: `treeReader().withSchema(uri).readAs(source, rootType)`, with
 `JsonCompiledSchemaRegistry` caching the compiled readers per canonical identity, and `Json.validate(source,
 schemaUri, rootType)` as the collecting door the CLI runs through. **Failing to reach the schema is a
-diagnostic and never a verdict**: `SCHEMA_NOT_FOUND` for an identity the loader has none for, `UNKNOWN_TYPE`
+diagnostic and never a verdict**: `SCHEMA_NOT_PERMITTED` for an identity the loader holds none of, `UNKNOWN_TYPE`
 for a root type the schema does not declare, and `Code.verdict()` separates the first from anything the
 document did.
 

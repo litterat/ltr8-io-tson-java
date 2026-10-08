@@ -87,11 +87,11 @@ class JsonSchemaBindingTest {
 
     // ── Reaching the schema, which is not a verdict on the document ──────
 
-    /** A schema nothing supplies is `SCHEMA_NOT_FOUND`, and `verdict()` is false: nobody judged the document. */
+    /** A schema this deployment holds none of is `SCHEMA_NOT_PERMITTED`, and `verdict()` is false. */
     @Test
     void aSchemaNothingSuppliesIsNotAVerdict() {
         List<Diagnostic> problems = json().validate("{}", "https://example.test/absent-1.tn", "person");
-        assertEquals(Diagnostic.Code.SCHEMA_NOT_FOUND, problems.getFirst().code());
+        assertEquals(Diagnostic.Code.SCHEMA_NOT_PERMITTED, problems.getFirst().code());
         assertFalse(problems.getFirst().code().verdict());
     }
 

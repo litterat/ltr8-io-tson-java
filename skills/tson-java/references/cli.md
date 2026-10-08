@@ -33,12 +33,12 @@ options, exit codes and description — including the policy options for the thr
 | Exit codes            | `0` accepted · `1` rejected, as invalid or refused (§8.2, §9.1) · `2` usage · `69` a schema nothing would supply · `75` a schema that could not be reached · `78` a type with no Java class here · `70` library gap or fault |
 
 **The CLI fetches nothing** — schemas come from the files you list, and one it cannot match is
-`SCHEMA_NOT_FOUND` and exit 69, not a verdict on your data. Everything above `2` is deliberately kept apart
-from `1`: `1` is a rejection the runner can act on, the rest leave acceptance undetermined, naming who could not
-judge it —
-this library (`70`), an application that would have to bind the type (`78`), whoever was to serve the schema
-(`69` permanently, `75` perhaps not). `TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by who must
-act before anyone else's fix counts and with permanence breaking the tie — `70` > `78` > `69` > `75` > `1`.
+`SCHEMA_NOT_PERMITTED` and exit 69: this run will not supply it, so its `outcome` is `REJECTED`, though nothing
+says your data is invalid. Everything above `2` is kept apart from `1`: `1` is a rejection the runner fixes in
+the document, the rest name who must act otherwise — this library (`70`), an application that would have to bind
+the type (`78`), the reference or the schema files given (`69`), or nobody, by rerunning (`75`).
+`TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by who must act first — `70` > `78` > `69` > `1` >
+`75`, a rerun last because every other fix ends in one.
 A refusal — a §8.2 name-hygiene rule or a §9.1 limit (`LIMIT_EXCEEDED`) — is a rejection and a `1` like an
 invalidity, though not a finding about validity: another deployment may accept the same document, and the runner
 can act — a relaxed policy, `--max-depth`, a renamed field or a smaller document.
@@ -153,15 +153,16 @@ way: `snake_case` keys, and a field with nothing to say left out rather than wri
 ```
 
 **`outcome` answers "will this be accepted": `ACCEPTED`, `REJECTED` or `UNDETERMINED`**, not a `valid`
-boolean. `REJECTED` is any invalidity, or any refusal under this processor's §8.2 policy or §9.1 limits — one
-rejection settles it, whatever else in the file went unjudged. `UNDETERMINED` is a file nothing rejected but
-something could not judge: a `SCHEMA_*` fetch code, `BIND_MISMATCH` or `NOT_IMPLEMENTED`. Calling that
+boolean. `REJECTED` is any invalidity, or any refusal under this processor's configuration — §8.2 policy, §9.1
+limits, or a schema it will not supply (`SCHEMA_NOT_PERMITTED`, `SCHEMA_TOO_LARGE`) — one rejection settles it,
+whatever else in the file went unjudged. `UNDETERMINED` is a file nothing rejected but something could not
+judge: `SCHEMA_NOT_FOUND`, `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT`, `BIND_MISMATCH` or `NOT_IMPLEMENTED`. Calling that
 `valid: false` would assert a rejection the run cannot make — the assertion an agent acts on the moment it
 writes `if (!valid)`. A run is `REJECTED` if any file is, else `UNDETERMINED` if any file is; a run that never
 reached a document (a usage or classification failure, exit `2`) is `UNDETERMINED` with an empty `files`.
 Which kind of rejection each problem is — the portable finding or the local refusal — is its `code`
 (`Diagnostic.Code.verdict()`, `isRefusal()`). The exit code and the outcome part only in a mixed file: a
-rejection beside an unobtained schema is `REJECTED`, while the exit code names whoever must act first (`69`).
+rejection beside an unreachable schema is `REJECTED` and exits `1`; beside a schema not supplied, `69`.
 
 `policy` sits between `outcome` and `files` on every envelope — the §8.2 configuration and §9.1 limits the run
 was judged under, stated once because it is constant for the run and cannot differ between two of its problems. A

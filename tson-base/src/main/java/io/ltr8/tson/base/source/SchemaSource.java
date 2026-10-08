@@ -84,10 +84,10 @@ public interface SchemaSource {
      * which is the second half of the same trap -- it fails only for the documents that pin, which are the
      * ones a deployment that cares about integrity writes.
      *
-     * <p><b>A miss is {@link SchemaFetchException.Reason#NOT_FOUND}</b>, where {@link #registeredOnly}'s
-     * is {@code NOT_PERMITTED}: this source has somewhere to look and looked, and the answer is that this
-     * deployment does not publish that schema. Neither is retryable, but they are different sentences to put
-     * in front of whoever sent the document.
+     * <p><b>A miss is {@link SchemaFetchException.Reason#NOT_PERMITTED}</b>, as {@link #registeredOnly}'s
+     * is: the map is this deployment's whole configuration, so a schema outside it is one this deployment will
+     * not supply, which no rerun changes and which another deployment may. {@code NOT_FOUND} is for a source
+     * that looks somewhere beyond its configuration -- an origin, a directory -- and finds nothing there.
      *
      * <p>The map is copied, so what this serves cannot change under a registry that has already read from it.
      *
@@ -121,7 +121,7 @@ public interface SchemaSource {
             }
             String document = served.get(identity);
             if (document == null) {
-                throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
+                throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,
                         "this deployment publishes no schema with that identity", null);
             }
             return document;

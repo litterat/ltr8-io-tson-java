@@ -320,14 +320,14 @@ class JsonScopedReadTest {
 
     // ── Reaching the foreign schema, which is not a verdict on the document ──────────────────────────
 
-    /** A schema nothing supplies was never read against: `SCHEMA_NOT_FOUND`, not a verdict. */
+    /** A schema this deployment holds none of was never read against: `SCHEMA_NOT_PERMITTED`, not a verdict. */
     @Test
     void aForeignSchemaNothingSuppliesIsNotAVerdict() {
         Diagnostic refusal = refusal("envelope", envelope("""
                 {"$type": "note", "body": "hi"}""", """
                 {"$schema": "https://example.test/nowhere.tn", "$type": "claim", "id": "C-1"}""", """
                 {"$type": "note", "body": "b"}"""));
-        assertEquals(Diagnostic.Code.SCHEMA_NOT_FOUND, refusal.code());
+        assertEquals(Diagnostic.Code.SCHEMA_NOT_PERMITTED, refusal.code());
         assertFalse(refusal.code().verdict());
     }
 

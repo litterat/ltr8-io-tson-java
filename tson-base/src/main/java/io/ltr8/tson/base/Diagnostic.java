@@ -324,10 +324,14 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         // A code encoding one partition strands the other. `SchemaFetchException.Reason` is the throwing
         // channel's own vocabulary and the single input to `Code.of`, so the two channels cannot disagree.
 
-        /** Policy refused it: not an allowed host, not a legal identity, or no pin where one is required. */
+        /**
+         * This deployment would not supply it: a schema it does not hold and has no source for, a host not on
+         * its allow-list, not a legal identity, or no pin where one is required. A refusal ({@link
+         * #isRefusal()}): another deployment configured otherwise may supply it.
+         */
         SCHEMA_NOT_PERMITTED,
 
-        /** The location was reached and does not have it. */
+        /** A source configured to look somewhere -- an origin, a directory -- looked, and nothing was there. */
         SCHEMA_NOT_FOUND,
 
         /** The location could not be reached, or answered with something other than a document. */
@@ -336,7 +340,10 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         /** The location did not answer in time. */
         SCHEMA_TIMEOUT,
 
-        /** The location answered with more bytes than a schema document is allowed to be. */
+        /**
+         * The location answered with more bytes than this deployment's fetch cap admits ([TSON-SCHEMA] §11.2's
+         * size limit). A refusal ({@link #isRefusal()}), the cap being this deployment's.
+         */
         SCHEMA_TOO_LARGE;
 
         /**
@@ -366,11 +373,11 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
          *
          * <p>Those that are not say so for different reasons: {@link #NOT_IMPLEMENTED} that this library could
          * not check it, {@link #BIND_MISMATCH} that the reading application is wired wrong, and the rest are
-         * [TSON-DATA] §8.1's fifth outcome. A refusal -- §8.2's three name-hygiene codes ({@link
-         * #isNameRefusal()}) and §9.1's {@link #LIMIT_EXCEEDED} -- says this processor declined under its own
-         * policy, data version and limits, and the same document may be accepted in full by the next one; the
-         * five {@code SCHEMA_*} fetch codes say no schema was obtained to check against. Nothing about the
-         * document is being asserted by any of them, which is what a caller routing on the answer needs to know.
+         * [TSON-DATA] §8.1's fifth outcome: no schema was obtained to check against (the five {@code SCHEMA_*}
+         * fetch codes), or this processor declined under its own policy, data version and limits ({@link
+         * #isRefusal()}), the same document perhaps accepted in full by the next one. Nothing about the
+         * document's validity is asserted by any of them, which is what a caller routing on the answer needs to
+         * know.
          *
          * <p>Stated here so that a consumer does not keep its own copy of the set. Two already would --
          * {@code TsonCli.exitCodeFor} and this project's HTTP surface -- and a private copy each is how two
@@ -395,13 +402,17 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         }
 
         /**
-         * Whether this code is a refusal -- {@link #isNameRefusal()}'s three or §9.1's {@link #LIMIT_EXCEEDED}:
-         * this processor declined the document under its own policy and limits. Not a {@link #verdict()}, since
-         * one configured otherwise may accept the same bytes, yet a rejection by <em>this</em> processor, which
-         * is the answer a sender asking "will it be accepted here" needs (SPEC-FEEDBACK.md #1).
+         * Whether this code is a refusal: this processor <em>would not</em>, under its own configuration --
+         * {@link #isNameRefusal()}'s three, §9.1's {@link #LIMIT_EXCEEDED}, and the two fetch codes that are
+         * this deployment's own policy, {@link #SCHEMA_NOT_PERMITTED} (what it holds and may fetch) and {@link
+         * #SCHEMA_TOO_LARGE} ([TSON-SCHEMA] §11.2's size limit). Not a {@link #verdict()}, since one configured
+         * otherwise may accept the same bytes, yet a rejection by <em>this</em> processor, which is the answer a
+         * sender asking "will it be accepted here" needs (SPEC-FEEDBACK.md #1). The other three fetch codes are
+         * what the world <em>could not</em> supply, and say nothing either way.
          */
         public boolean isRefusal() {
-            return isNameRefusal() || this == LIMIT_EXCEEDED;
+            return isNameRefusal() || this == LIMIT_EXCEEDED || this == SCHEMA_NOT_PERMITTED
+                    || this == SCHEMA_TOO_LARGE;
         }
     }
 }

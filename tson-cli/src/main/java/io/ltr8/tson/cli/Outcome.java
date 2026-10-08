@@ -9,12 +9,13 @@ import java.util.List;
  * deployment's schema and policy is asking.
  *
  * <p><b>Acceptance, not validity, is the headline.</b> A document is rejected by an invalidity every processor
- * repeats, and equally by a refusal under this deployment's own policy or limits ([TSON-DATA] §8.2, §9.1):
- * either way it will not be accepted here, and the sender holds the fix. Which of the two it was -- the
- * portable finding or the local one -- is each diagnostic's {@link Diagnostic.Code}, where {@link
- * Diagnostic.Code#verdict()} and {@link Diagnostic.Code#isRefusal()} tell them apart. What leaves a document
- * {@link #UNDETERMINED} is nothing anyone present could judge it by: a schema not obtained, a gap in this
- * library, a type with no class here (SPEC-FEEDBACK.md #1).
+ * repeats, and equally by a refusal under this deployment's own configuration -- its [TSON-DATA] §8.2 policy,
+ * its §9.1 limits, or a schema it does not hold and will not fetch ([TSON-SCHEMA] §11.2): either way it will
+ * not be accepted here, and the sender holds the fix. Which of the two it was -- the portable finding or the
+ * local one -- is each diagnostic's {@link Diagnostic.Code}, where {@link Diagnostic.Code#verdict()} and {@link
+ * Diagnostic.Code#isRefusal()} tell them apart. What leaves a document {@link #UNDETERMINED} is nothing anyone
+ * present could judge it by: a schema the world could not supply, a gap in this library, a type with no class
+ * here (SPEC-FEEDBACK.md #1).
  *
  * <p><b>An enum rather than a {@code valid} boolean</b>, since {@code if (!valid)} reads "undetermined" as
  * "rejected" -- the assertion an agent acts on. There is no falsy shortcut past a three-member enum.

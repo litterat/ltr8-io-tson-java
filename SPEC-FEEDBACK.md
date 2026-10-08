@@ -48,27 +48,37 @@ is declined, and the bounded type slot at a field is withdrawn as the wrong feat
 
 ## 1. A refusal is a rejection by this processor, not "not judged"
 
-**Section:** [TSON-DATA] §8.1 ("Not judged is a fifth outcome, not a verdict"), §8.2 ("reported as one member of
-§8.1's fifth outcome"), §9.1 ("A limit refusal is §8.1's fifth outcome … a refusal is not a verdict"), and the
-conformance bullets that cite them ([TSON-DATA] §1.5, [TSON-SCHEMA] §1.3). [TSON-JSON] §9.4 states the same outcome for
-JSON and would follow.
+**Section:** [TSON-DATA] §8.1 ("Not judged is a fifth outcome, not a verdict"; an unavailable schema as one "its
+policy or its network did not supply"), §8.2 ("reported as one member of §8.1's fifth outcome"), §9.1 ("A limit
+refusal is §8.1's fifth outcome … a refusal is not a verdict"), [TSON-SCHEMA] §10.1 and §11.2 (an unavailable
+schema; fetching's allowlists and size limits), and the conformance bullets that cite them ([TSON-DATA] §1.5,
+[TSON-SCHEMA] §1.3). [TSON-JSON] §9.4 states the same outcome for JSON and would follow.
 
 **Kind:** defect — the outcome model answers a question no consumer asks, and merges two outcomes a consumer must
 tell apart.
 
 **The problem.** §8.1 groups two things as one outcome because both leave a document "without a verdict": a
 **refusal** (this processor declined under its §8.2 policy or §9.1 limits) and an **unavailable schema** (this
-processor could not obtain what it would judge against). For the consumer the series is built for — a developer, or
-a model, checking a file or a request against a server's schema and policy — the question is *will this document be
-accepted*, and the two give opposite answers:
+processor could not obtain what it would judge against, because "its policy or its network did not supply" it).
+For the consumer the series is built for — a developer, or a model, checking a file or a request against a
+server's schema and policy — the question is *will this document be accepted*, and the two give opposite answers:
 
 - a refusal is a **certain rejection**: this processor will not accept the document, the report names the rule and
   the policy, and the sender holds the fix (rename the field, nest less, or ask for a relaxed policy);
-- an unavailable schema is **no answer**: nothing was judged, and nobody present may be able to act.
+- an unavailable schema the world could not supply is **no answer**: nothing was judged, and nobody present may be
+  able to act.
 
 Filing both under "not judged" makes the headline outcome ambiguous exactly where a client branches on it, and makes
 a refused document indistinguishable, at that level, from one nobody could check. It is also inaccurate: a refusal
 *was* judged — against the processor's policy — and the judgement was no.
+
+**And "its policy … did not supply" is a refusal too.** §8.1's unavailable schema covers a schema this processor
+*would not* obtain as well as one it *could not*. The first is a decision of this deployment's configuration, as
+deployment-specific as an identifier policy: a schema it does not hold and will not fetch (fetching is opt-in and
+off by default, §11.2), a host off its allowlist, or a document past its size limit (§11.2). The sender's fix is to
+name a schema this deployment will supply, a processor configured otherwise accepts the same document, and no rerun
+changes the answer — a refusal by every property above. Only what the world could not supply (an origin with
+nothing at the reference, a host that did not answer or timed out) leaves the document undetermined.
 
 What §8.1 is protecting is right and should stay: a refusal is not a finding about **validity**. Validity is a
 property of the bytes and the schema, the same at every processor, and a content-addressed document must mean the
@@ -79,27 +89,44 @@ same forever; rules reading Unicode data the UCD declines to freeze cannot decid
 
 - `Diagnostic.Code.verdict()` is `false` for the three name-hygiene codes and `LIMIT_EXCEEDED`, as for the five
   schema-fetch codes, `BIND_MISMATCH` and `NOT_IMPLEMENTED`: none is a finding about validity. A second predicate,
-  `Code.isRefusal()`, names the four refusals.
+  `Code.isRefusal()`, names the refusals: the three name-hygiene codes, `LIMIT_EXCEEDED`, `SCHEMA_NOT_PERMITTED` (a
+  schema this deployment does not hold and will not fetch — a closed library's miss, a host off the allowlist, an
+  illegal identity, a missing required pin) and `SCHEMA_TOO_LARGE` (past its size limit).
+- What the world could not supply is `SCHEMA_NOT_FOUND` (a source that looks beyond its configuration — an origin,
+  a directory — and found nothing), `SCHEMA_UNREACHABLE` and `SCHEMA_TIMEOUT`. A closed library's miss is
+  `SCHEMA_NOT_PERMITTED`, never `SCHEMA_NOT_FOUND`: the library is the deployment's whole configuration, so a
+  schema outside it is one this deployment will not supply.
 - The `tson` CLI's report states acceptance: `outcome` is `ACCEPTED` (nothing reported), `REJECTED` (any invalidity
-  or any refusal) or `UNDETERMINED` (nothing rejected the document, but something could not be judged — a schema not
-  obtained, a type with no binding, a construct not implemented). One rejection settles it whatever else went
-  unjudged, since what was not judged cannot make a rejected document acceptable. Exit `1` is a rejection; `69`,
-  `75`, `78` and `70` are undetermined, each naming who could not judge. Which kind a rejection was — portable or
-  local — rides on each diagnostic's code, and the report states the policy and data version once (§8.2).
+  or any refusal) or `UNDETERMINED` (nothing rejected the document, but something could not be judged — a schema the
+  world could not supply, a type with no binding, a construct not implemented). One rejection settles it whatever
+  else went unjudged, since what was not judged cannot make a rejected document acceptable. Which kind a rejection
+  was — portable or local — rides on each diagnostic's code, and the report states the policy and data version once
+  (§8.2).
+- A fetch refusal names its rule — not held or not permitted, or the size limit — but the report does not state the
+  fetch allowlist: telling an untrusted sender which hosts this processor will fetch from is reconnaissance for
+  request forgery, where a name policy's statement serves the sender and costs nothing.
 
 **Suggested resolution.** Keep the four categories and the rule that a refusal is never one of them; replace "not
 judged is a fifth outcome" with two outcomes beside them:
 
-- **Refused**: this processor declined the document under its stated policy, data version and limits. The document
-  is not accepted *here*; a refusal is not a finding about validity, MUST be distinguishable from the four
-  categories, and MUST name the rule or limit that refused — a conforming processor may legitimately not refuse.
-- **Undetermined**: this processor could not obtain what it would judge against ([TSON-SCHEMA] §10.1, §11.2) and
-  says nothing about whether the document conforms or would be accepted.
+- **Refused**: this processor declined the document under its own configuration — its §8.2 policy and data version,
+  its §9.1 limits, or (Part 2 §10.1, §11.2) a schema it does not hold and will not fetch or one past its size
+  limit. The document is not accepted *here*; a refusal is not a finding about validity, MUST be distinguishable
+  from the four categories, and MUST name the rule or limit that refused — a conforming processor may legitimately
+  not refuse.
+- **Undetermined**: the world did not supply what this processor would judge against — nothing at the reference,
+  or no answer — and the report says nothing about whether the document conforms or would be accepted.
 
 A report then answers acceptance as a summary — accepted, rejected (by a category error or a refusal), or
-undetermined — with validity still carried by the categories alone. §8.1's closing sentence becomes: "two
+undetermined — with validity still carried by the categories alone. §8.1's sentence on an unavailable schema keeps
+"its network did not supply" and moves "its policy" to the refusal, and its closing sentence becomes: "two
 conforming processors may legitimately disagree on whether they accept a document, while never disagreeing on
 validity." §8.2 and §9.1 cite "refused" in place of "the fifth outcome".
 
 **Status against Revision 37:** open. Running in this implementation as described: `Code.verdict()`,
-`Code.isRefusal()`, and the CLI's `outcome`, declared in its `diagnostics.tn`.
+`Code.isRefusal()`, the sources' and both encodings' readers reporting a closed library's miss as
+`SCHEMA_NOT_PERMITTED`, and the CLI's `outcome`, declared in its `diagnostics.tn`. The HTTP layer in
+`ltr8-io-tson-java-http` answers `SCHEMA_NOT_PERMITTED` and `SCHEMA_TOO_LARGE` with a 4xx and an unreachable or
+timed-out origin with a 5xx, so its boundary is the CLI's `REJECTED`/`UNDETERMINED` boundary but for
+`SCHEMA_NOT_FOUND`, which it also answers 400: under this reading that code is an origin's miss, the world's rather
+than the sender's.

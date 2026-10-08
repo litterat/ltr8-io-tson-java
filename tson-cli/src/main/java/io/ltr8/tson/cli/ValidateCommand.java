@@ -78,10 +78,12 @@ final class ValidateCommand {
         SchemaSource source = uri -> {
             String text = schemas.get(CanonicalIdentity.canonicalize(uri));
             if (text == null) {
-                // SchemaFetchException, not an IllegalStateException: this is a source saying it cannot
+                // SchemaFetchException, not an IllegalStateException: this is a source saying it will not
                 // supply a schema, which is the one thing the fetch contract names a type for. Anything else
                 // thrown from here would be classified as a fault in this command and rethrown as one.
-                throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
+                // NOT_PERMITTED, as SchemaSource.ofMap's miss: the files given are the run's whole
+                // configuration, and nothing is fetched beyond them.
+                throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,
                         "no schema file on the command line declares that !!id" + supplied(declaredIds), null);
             }
             return text;
@@ -240,14 +242,14 @@ final class ValidateCommand {
         try {
             identity = CanonicalIdentity.canonicalize(binding.schema());
         } catch (SchemaValidationException e) {
-            System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_NOT_FOUND,
+            System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_NOT_PERMITTED,
                     "--schema \"" + binding.schema() + "\" is neither a file nor a schema identity ("
                             + e.getMessage() + ")" + supplied(declaredIds))));
             return 2;
         }
         String text = schemas.get(identity);
         if (text == null) {
-            System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_NOT_FOUND,
+            System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_NOT_PERMITTED,
                     "--schema \"" + binding.schema() + "\": no schema file on the command line declares "
                             + "that !!id" + supplied(declaredIds))));
             return 2;

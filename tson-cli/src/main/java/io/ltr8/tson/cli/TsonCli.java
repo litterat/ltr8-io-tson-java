@@ -23,11 +23,11 @@ import java.util.Set;
  * wanted to know what {@code hash} does. A usage <em>error</em> still prints the short one-line usage plus
  * the command list, since what a caller needs there is the shape of the invocation they got wrong.
  *
- * <p>Exit codes are Unix-conventional: 0 everything checked and nothing reported (or an explicit
- * {@code --help}), 1 checked and rejected, 2 a usage error (bad arguments, a file that can't be read), and
- * four that are the absence of a verdict rather than a bad one -- 69 ({@code EX_UNAVAILABLE}) and 75
- * ({@code EX_TEMPFAIL}) for a schema not obtained, permanently or not, 78 ({@code EX_CONFIG}) for a type
- * with no Java class here, and 70 ({@code EX_SOFTWARE}) for this library failing. See {@link #exitCodeFor}
+ * <p>Exit codes are Unix-conventional: 0 accepted (or an explicit {@code --help}), 1 rejected, 2 a usage error
+ * (bad arguments, a file that can't be read), and four that are not a rejection of the document itself -- 69
+ * ({@code EX_UNAVAILABLE}) and 75 ({@code EX_TEMPFAIL}) for a schema not obtained, permanently or not, 78
+ * ({@code EX_CONFIG}) for a type with no Java class here, and 70 ({@code EX_SOFTWARE}) for this library
+ * failing. See {@link #exitCodeFor}
  * for how a mixed run ranks them -- so a script or agent shelling out gets a clean signal without parsing
  * prose, and never reads a bug, or a missing schema, as a verdict. Help requested explicitly ({@code --help}/{@code -h}/{@code help}) prints to stdout and
  * exits 0; usage shown because of a mistake (no command, a bad flag) prints to stderr and exits 2.
@@ -106,7 +106,7 @@ public final class TsonCli {
             arguments does not matter. A data file's own !!schema selects the schema and its root
             type-ref (!person) the type. A file with no !!schema gets a base-syntax and built-in-type
             check instead. Nothing is fetched over the network: a schema no file here declares is
-            reported as SCHEMA_NOT_FOUND, which is exit 69 and not a verdict on your document.
+            reported as SCHEMA_NOT_PERMITTED -- this run will not supply it -- which is exit 69.
 
             A .json file is a JSON encoding of TSON data ([TSON-JSON] §3.1: a JSON file, and .json is
             its extension -- the one place this tool reads a filename, because the axis is the encoding
@@ -308,9 +308,11 @@ public final class TsonCli {
      *       nobody-present ranks, which is what puts it above 78.</li>
      *   <li><b>78</b> -- nobody present; it needs a differently-wired application. {@code tson} has no flag
      *       that supplies a binding, which is exactly why this is not the runner's to fix.</li>
-     *   <li><b>69</b> -- the runner: edit the reference, or the allow-list it is checked against.</li>
-     *   <li><b>75</b> -- the runner, by rerunning.</li>
+     *   <li><b>69</b> -- the runner: edit the reference, or supply the schema it names.</li>
      *   <li><b>1</b> -- the runner: edit the document.</li>
+     *   <li><b>75</b> -- the runner, by rerunning. Last, because a rerun is advice only when nothing else
+     *       needs doing: every other fix ends in a rerun, which retries an unreachable schema for free, while
+     *       a bare rerun of a rejected document reaches the same rejection.</li>
      * </ol>
      *
      * <p><b>1 is {@link Outcome#REJECTED}</b>: the document is invalid, or this processor refused it under
@@ -318,9 +320,11 @@ public final class TsonCli {
      * for a refusal, this run's configuration (a relaxed policy, {@code --max-depth}). Which of the two it was
      * is the diagnostic's code ({@link Diagnostic.Code#verdict()}, {@link Diagnostic.Code#isRefusal()}), and
      * what is deployment-specific about a refusal is the run's {@link CliPolicy}, the policy and data version
-     * being properties of the report (§8.2). Above 2 is {@link Outcome#UNDETERMINED}. The two questions
-     * part only in a mixed run: a document rejected and also partly unjudged is {@code REJECTED}, since one
-     * rejection settles acceptance, while its exit code names whoever must act first.
+     * being properties of the report (§8.2). Above 2 is {@link Outcome#UNDETERMINED}, but for 69: a schema
+     * this run would not supply ({@code SCHEMA_NOT_PERMITTED}) is a refusal and its outcome {@code REJECTED},
+     * the exit code saying the fix is the reference rather than the document. The two questions part only in
+     * a mixed run: a document rejected and also partly unjudged is {@code REJECTED}, since one rejection
+     * settles acceptance, while its exit code names whoever must act first.
      *
      * <p><b>78 rather than 70 for a bind mismatch</b>, because {@code EX_CONFIG} is "found in an
      * unconfigured or misconfigured state" and unconfigured is what this is: no class is registered for a
@@ -347,16 +351,21 @@ public final class TsonCli {
             return 78;
         }
         if (codes.stream().anyMatch(PERMANENTLY_UNAVAILABLE::contains)) {
-            System.err.println("note: some of this could not be checked -- a schema could not be obtained"
-                    + " (see the SCHEMA_ entries above). Nothing here has read that schema, so nothing here"
-                    + " is saying your document, or that schema, is wrong. Rerunning will not obtain it.");
+            System.err.println("note: some of this could not be checked -- this run will not supply a schema"
+                    + " it names (see the SCHEMA_ entries above). Nothing here has read that schema; pass its"
+                    + " file, or check the !!id the reference names. Rerunning as is will not obtain it.");
             return 69;
         }
-        if (codes.stream().anyMatch(TEMPORARILY_UNAVAILABLE::contains)) {
+        boolean unreached = codes.stream().anyMatch(TEMPORARILY_UNAVAILABLE::contains);
+        if (unreached && codes.stream().allMatch(TEMPORARILY_UNAVAILABLE::contains)) {
             System.err.println("note: some of this could not be checked -- a schema could not be reached"
                     + " (see the SCHEMA_ entries above). Nothing here has read that schema. This one may"
                     + " succeed if you run it again.");
             return 75;
+        }
+        if (unreached) {
+            System.err.println("note: a schema could not be reached as well (see the SCHEMA_ entries above);"
+                    + " the rejection stands whatever a rerun reaches, so fix it first.");
         }
         return 1;
     }

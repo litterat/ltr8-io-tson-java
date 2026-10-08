@@ -46,15 +46,15 @@ class SchemaSourceTest {
     }
 
     /**
-     * A miss is {@code NOT_FOUND}, not {@code NOT_PERMITTED}: this source had somewhere to look and looked.
-     * {@link SchemaSource#registeredOnly} is the other answer, for a loader with nowhere to look at all.
+     * A miss is {@code NOT_PERMITTED}, as {@link SchemaSource#registeredOnly}'s is: the map is the deployment's
+     * whole configuration, so a schema outside it is one this deployment will not supply.
      */
     @Test
-    void ofMapReportsAMissAsNotFound() {
+    void ofMapReportsAMissAsNotPermitted() {
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
                 () -> SchemaSource.ofMap(Map.of(ID, SCHEMA)).fetch("https://elsewhere.test/other-1.tn"));
 
-        assertEquals(SchemaFetchException.Reason.NOT_FOUND, thrown.reason());
+        assertEquals(SchemaFetchException.Reason.NOT_PERMITTED, thrown.reason());
         assertEquals("https://elsewhere.test/other-1.tn", thrown.uri());
     }
 
