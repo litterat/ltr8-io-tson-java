@@ -611,6 +611,15 @@ SPEC-FEEDBACK.md's, renumbered against this revision.
     carries the template in its `supertypes` only where a declaration names it. Nothing is refused that loaded
     before. **[settled]** by the spec author.
 
+11. **§5.10 — where a parameter's type is read is decided by the template's form.** A recorded `type` was a
+    bare name read in the schema's namespace first, so a schema declaring its own `non_negative_integer` with
+    another body changed what `vec => <N> !array { … min_items: N }` admitted: `vec<0>` was refused under a
+    `min: 1` shadow, and `vec<"abc">` passed the call-site check under a text one. A template applying a meta
+    constructor other than `record` now reads its value parameters' types, written ones included, in the
+    structure namespace; a record template reads them in the schema's; a bound is the schema's in every form.
+    The entry's `source` says which form it is, so resolved output needs no new field. **[settled]** by the
+    spec author.
+
 ### 8.3 Part 3
 
 1. **§1.6 item 14** cites §8.5 and §9.4 for a `$schema` at a `declared` position, where it

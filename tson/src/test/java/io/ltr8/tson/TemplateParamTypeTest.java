@@ -117,4 +117,59 @@ class TemplateParamTypeTest {
         assertEquals(List.of(param("S", "schema_identity"), param("T", "type_name")), core.get("extern_type"));
         assertEquals(List.of(param("T", "type_ref")), core.get("set"));
     }
+
+    // ── A template over a meta constructor is the meta's ─────────────────────────────
+
+    private static List<Diagnostic> load(String declarations) {
+        return Tson.standard().validateSchema("""
+                !!id:"https://example.test/params-structure.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
+                {
+                """ + declarations + "}");
+    }
+
+    /**
+     * {@code N} stands in {@code array.min_items}, so its type is the meta's {@code non_negative_integer}, judged in
+     * the structure namespace (§5.10): a schema's own entry under that name is another type and never stands in for
+     * it, so {@code vec<0>} is a valid application however narrowly the schema defines its own.
+     */
+    @Test
+    void aConstructorTemplatesValueIsJudgedInTheStructureNamespace() {
+        assertEquals(List.of(), load("""
+                  non_negative_integer => !integer ^ { min: 1 }
+                  vec => <N> !array { element_type: text  min_items: N }
+                  v0  => vec<0>
+                """));
+        List<Diagnostic> wide = load("""
+                  non_negative_integer => !text ^ {}
+                  vec    => <N> !array { element_type: text  min_items: N }
+                  holder => { a: vec<"abc"> }
+                """);
+        assertEquals(1, wide.size(), wide::toString);
+        assertTrue(wide.getFirst().message().contains("binds 'N' to 'abc'"), wide::toString);
+    }
+
+    /** A written type on such a template narrows within the meta's vocabulary, and a schema type is not there. */
+    @Test
+    void aConstructorTemplatesWrittenTypeNamesTheMetasVocabulary() {
+        assertEquals(List.of(), load("""
+                  vec => <N: non_negative_integer> !array { element_type: text  max_items: N }
+                  v3  => vec<3>
+                """));
+        List<Diagnostic> core = load("""
+                  vec => <N: int8> !array { element_type: text  max_items: N }
+                """);
+        assertEquals(1, core.size(), core::toString);
+        assertTrue(core.getFirst().message().contains("not in the structure namespace"), core::toString);
+    }
+
+    /** A record template's fields are the schema's, and so is a written type on its parameters. */
+    @Test
+    void aRecordTemplateReadsItsParametersInTheSchema() {
+        assertEquals(List.of(), load("""
+                  note => <N: int8> { w?: integer ~ N }
+                  n3   => note<3>
+                """));
+    }
 }

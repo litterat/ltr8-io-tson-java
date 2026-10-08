@@ -122,6 +122,12 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     - **Several uses must agree**: the parameter's type is the use type that IS-A every other, and uses unordered
       by IS-A are refused at the declaration. A slot's type is looked up in the governing meta, a routed type in
       the schema's own namespace. A core copy and its kernel original (same name, same body) count as one type.
+    - **The template's form decides where its value types are read** (`ParameterTypes.readsInStructure`, §5.10).
+      A template applying a meta constructor other than `record` (`!array`, `!scoped`, `!integer_type`, …) reads
+      every value parameter's type, written ones included, in the structure namespace, and the materialiser's
+      call-site check resolves it there: a schema's own `non_negative_integer` never stands in for the meta's at
+      `min_items: N`. A record template reads its parameters in the schema's namespace; a reference template
+      takes its callee's form; a type parameter's bound is the schema's in every form.
     - **A written type narrows, read by the derived kind** (`<T: text, N: int8>`, carried on
       `SchemaMap.Declaration.parameterTypes`): on a value parameter it replaces `type` and must IS-A the derived
       one; on a type parameter it is `template_param.bound`, and must IS-A every bound the uses inherit. Bounds
