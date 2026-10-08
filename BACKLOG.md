@@ -345,29 +345,19 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   §10.2 makes a mismatch a resolver error, and the other two are §2.2.1 errors with no category of their own, which
   [TSON-DATA] §8.1 gives to the layer that detects them -- the resolver, following the reference.
 
-- [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is
-  the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one
-  table with a default each, so nothing here is a judgement call any more — what is left is eleven document
-  limits and five schema-side ones, each a component on `LimitsPolicy`, a `CliPolicy.CliLimits` field and a
-  `--flag`. Document side: **token length** (1,048,576 code points), **decoded text length** after escape
-  processing (1,048,576), **numeric literal length** (4,096 digits, annotated tokens included), **decoded
-  binary size** per `!bytes` value (16,777,216 octets), **document size** in bytes (16,777,216), **elements**
-  per array or set (1,048,576), **entries** per map (1,048,576), **fields** per record (65,536),
-  **annotations** on one value (64), **total values** in one document (16,777,216), and **foreign schemas** one
-  document's scope pushes may load (16). Schema side (§11.5, same policy and same reporting surfaces):
-  **import closure** (64), **entries** in one schema map (65,536), **reference chain** (64), **supertype
-  chain** (64), and **materialisation depth** (64) — which is where `TemplateMaterialiser.MAX_CLOSING_DEPTH`
-  goes, it being a bare constant with nowhere to live until now. What still needs deciding per limit is only
-  *where it is counted*: the ones that bound shape are per-container state the stream does not keep, where
-  depth was a counter it already had, and the two aggregates (total values, foreign schemas) need their own
-  counter since §9.1 is explicit that the total is not bounded by the parts.
-
-- [ ] **`class2/schema/` carries no vector declaring a template, and the reason it could not is gone.**
-  [TSON-SCHEMA] §8.1 now says an open entry is a `type_definition` like any other — `parameters` non-empty,
-  `body` the held application in wire form under §5.10's one-spelling rule, typed by the kernel's `schema`
-  without a second value shape — which is exactly the shape this resolver holds (`TemplateBody`/`HeldBody`).
-  The two sides no longer disagree as values, so the layer can compare a template the way it compares
-  everything else and the corpus can state what one resolves to directly rather than indirectly at `link/`.
-  `ResolvedForm.heldBodies` is the comparison to keep — §8.1 makes wire form what a held body *is* on both
-  sides, not a compromise — and what is owed is the vectors, upstream, plus the note in `CONFORMANCE.md` that
-  currently explains the absence.
+- [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is the policy value
+  and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one table with a default
+  each, so nothing here is a judgement call any more — what is left is eleven document limits and five schema-side
+  ones, each a component on `LimitsPolicy`, a field on `spec/m/policy.tn`'s `limits` (optional, defaulting to
+  §9.1's value, then a restamp), a `CliPolicy.CliLimits` field and a `--flag`. Document side: **token length**
+  (1,048,576 code points), **decoded text length** after escape processing (1,048,576), **numeric literal length**
+  (4,096 digits, annotated tokens included), **decoded binary size** per `!bytes` value (16,777,216 octets),
+  **document size** in bytes (16,777,216), **elements** per array or set (1,048,576), **entries** per map
+  (1,048,576), **fields** per record (65,536), **annotations** on one value (64), **total values** in one document
+  (16,777,216), and **foreign schemas** one document's scope pushes may load (16). Schema side (§11.5, same policy
+  and same reporting surfaces): **import closure** (64), **entries** in one schema map (65,536), **reference
+  chain** (64), **supertype chain** (64), and **materialisation depth** (64) — which is where
+  `TemplateMaterialiser.MAX_CLOSING_DEPTH` goes, it being a bare constant with nowhere to live until now. What
+  still needs deciding per limit is only *where it is counted*: the ones that bound shape are per-container state
+  the stream does not keep, where depth was a counter it already had, and the two aggregates (total values,
+  foreign schemas) need their own counter since §9.1 is explicit that the total is not bounded by the parts.
