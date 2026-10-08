@@ -7,7 +7,8 @@ history lives in git.
 
 - Java 25; no external runtime dependencies in main code.
 - `tson-compiler` depends on `tson-schema`, not the reverse; `schema.meta` names no `tson-compiler` type.
-- `tson-tree`, `tson-regex` and `tson-base` (bar `tson-bind`) are leaves; `tson-json` has no dependency on `tson-compiler`.
+- `tson-tree`, `tson-regex` and `tson-net` are leaves, and `tson-base` depends only on `tson-bind` and `tson-net`;
+  `tson-json` has no dependency on `tson-compiler`.
 - `Tson`/`Json` prefix only what a consumer names; unexported packages hold bare names.
 - No `opens` directives; an unexported package is genuinely unreachable.
 - A resolver never names a facade (`TsonObjectWriter`) — only the engine beneath it.
@@ -22,7 +23,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
 - **`tson-base`** — how a problem is stated (`Diagnostic`, the receivers, `SourcePosition`, `CanonicalIdentity`, the
   processor's exceptions), what a processor admits and spends (`policy`), where a schema comes from (`source`), the
   host atom values (`atom`), what a deployment binds with (`bind`), what a rule says when broken (`diagnostics`), byte
-  I/O (`io`) and the UCD tables (`unicode`), plus `ProcessorConfig`. A pure leaf but for `tson-bind`.
+  I/O (`io`) and the UCD tables (`unicode`), plus `ProcessorConfig`. A pure leaf but for `tson-bind` and `tson-net`.
   `design/tson-base.md` has each package and its rationale.
 - **`tson-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations, plus `Annotations`/
   `Annotation`, the wire-annotation carrier a bound class declares a component of. The carrier lives here
@@ -91,6 +92,14 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `tson-tree`; TSON pins its `regex` atom to I-Regexp (`regex_type`'s fixed `spec = rfc9485`), so
   this owns I-Regexp semantics rather than delegating to `java.util.regex` (a laxer superset).
   `tson-schema`, `tson-atom` and `tson-compiler` require it; it names no TSON type.
+- **`tson-net`** — **only** `io.ltr8.net`: native recognizers for network text formats, each to its RFC.
+  `Iri.parse` reads an RFC 3986 URI-reference or RFC 3987 IRI-reference into its components as written (or
+  throws `IriSyntaxException`), never resolving, normalising or percent-decoding. A true leaf, and the second
+  library here with no `Tson` prefix, as `io.ltr8.bind` has none: it knows nothing of TSON and is usable on its
+  own. It exists because `java.net.URI` implements RFC 2396, not the RFC §5.5 cites, and cannot hold a host
+  beyond US-ASCII, which [TSON-DATA] §2.2.1's identities admit. `tson-base` requires it transitively
+  (`CanonicalIdentity`, `SchemaReference`, and its values as host types), and `tson-atom` wraps each format in an
+  `AtomTypeParser` that adds the facets.
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the token-side atom glue
   (`atom`: `RawTokenParser`, `TokenAtomType`, `ValueParser` — the vocabulary itself is `tson-atom`'s),
   schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades

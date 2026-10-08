@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
+import io.ltr8.net.Iri;
 import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -84,7 +85,8 @@ public final class HostAtoms {
             Map.entry(Rational.class, RationalParser.UNCONSTRAINED),
             Map.entry(Complex.class, ComplexParser.UNCONSTRAINED),
             Map.entry(UUID.class, UuidParser.UNCONSTRAINED),
-            Map.entry(URI.class, IriParser.REFERENCE),
+            Map.entry(URI.class, IriParser.REFERENCE_AS_JAVA_URI),
+            Map.entry(Iri.class, IriParser.REFERENCE),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
@@ -106,7 +108,8 @@ public final class HostAtoms {
             Map.entry(Duration.class, DurationParser.UNCONSTRAINED),
             Map.entry(Period.class, PeriodParser.UNCONSTRAINED),
             Map.entry(UUID.class, UuidParser.UNCONSTRAINED),
-            Map.entry(URI.class, IriParser.REFERENCE),
+            Map.entry(URI.class, IriParser.REFERENCE_AS_JAVA_URI),
+            Map.entry(Iri.class, IriParser.REFERENCE),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),

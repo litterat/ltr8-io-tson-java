@@ -3,11 +3,14 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
 import org.junit.jupiter.api.Test;
+import io.ltr8.net.Iri;
+import io.ltr8.tson.atom.AtomType;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UriParserTest {
 
@@ -15,20 +18,50 @@ class UriParserTest {
         return text;
     }
 
+    private static Iri uri(String text) {
+        return Iri.parse(text, Iri.Grammar.URI);
+    }
+
+    /**
+     * RFC 3986's grammar, not {@code java.net.URI}'s RFC 2396 one: an empty host, an empty path and an IPvFuture
+     * literal are URIs, and a port that is not digits is not.
+     */
+    @Test
+    void theGrammarIsRfc3986s() {
+        for (String valid : List.of("https://", "https://?q=1", "a:", "http://[v7.abc]/")) {
+            assertEquals(uri(valid), UriParser.UNCONSTRAINED.read(token(valid)), valid);
+        }
+        assertThrows(AtomParseException.class, () -> UriParser.UNCONSTRAINED.read(token("http://a:b/")));
+    }
+
+    /**
+     * {@code java.net.URI} is a binding target and never the judge: a value it can hold binds, and one it cannot is
+     * refused at that component as a binding failure, its validity unchanged.
+     */
+    @Test
+    void aJavaUriComponentHoldsWhatRfc2396Can() {
+        AtomType<?> asUri = UriParser.UNCONSTRAINED.boundTo(URI.class).orElseThrow();
+        assertEquals(URI.create("https://example.com/a"), asUri.read("https://example.com/a"));
+        IllegalArgumentException refused = assertThrows(IllegalArgumentException.class, () -> asUri.read("https://"));
+        assertTrue(refused.getMessage().contains("java.net.URI cannot hold it"), refused.getMessage());
+        assertEquals(asUri, asUri.boundTo(URI.class).orElseThrow());
+        assertEquals("https://", UriParser.UNCONSTRAINED.boundTo(String.class).orElseThrow().read("https://"));
+    }
+
     @Test
     void acceptsAbsoluteUri() {
-        assertEquals(URI.create("https://example.com/a/b?x=1#frag"),
+        assertEquals(uri("https://example.com/a/b?x=1#frag"),
                 UriParser.UNCONSTRAINED.read(token("https://example.com/a/b?x=1#frag")));
     }
 
     @Test
     void uriReferenceAcceptsARelativeReference() {
-        assertEquals(URI.create("foo/bar?x=1"), UriParser.REFERENCE.read(token("foo/bar?x=1")));
+        assertEquals(uri("foo/bar?x=1"), UriParser.REFERENCE.read(token("foo/bar?x=1")));
     }
 
     @Test
     void uriReferenceAcceptsAUri() {
-        assertEquals(URI.create("urn:isbn:0451450523"), UriParser.REFERENCE.read(token("urn:isbn:0451450523")));
+        assertEquals(uri("urn:isbn:0451450523"), UriParser.REFERENCE.read(token("urn:isbn:0451450523")));
     }
 
     /** RFC 3986 §3: a URI has a scheme, so a relative reference is a valid token outside the value space. */
@@ -41,7 +74,7 @@ class UriParserTest {
 
     @Test
     void acceptsUrnScheme() {
-        assertEquals(URI.create("urn:isbn:0451450523"), UriParser.UNCONSTRAINED.read(token("urn:isbn:0451450523")));
+        assertEquals(uri("urn:isbn:0451450523"), UriParser.UNCONSTRAINED.read(token("urn:isbn:0451450523")));
     }
 
     /** RFC 3986 §2: a URI is US-ASCII; the same text beyond it is an IRI, and {@code !uri} refuses it. */
@@ -50,7 +83,7 @@ class UriParserTest {
         AtomParseException refused = assertThrows(AtomParseException.class,
                 () -> UriParser.REFERENCE.read(token("https://example.com/caf\u00E9")));
         assertEquals("a URI", refused.expected());
-        assertEquals(URI.create("https://example.com/caf%C3%A9"),
+        assertEquals(uri("https://example.com/caf%C3%A9"),
                 UriParser.REFERENCE.read(token("https://example.com/caf%C3%A9")));
     }
 
@@ -64,7 +97,7 @@ class UriParserTest {
     void minLengthRejectsShorterUri() {
         UriParser type = new UriParser(Optional.of(20), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), true, true);
-        assertEquals(URI.create("https://example.com/"), type.read(token("https://example.com/")));
+        assertEquals(uri("https://example.com/"), type.read(token("https://example.com/")));
         assertThrows(AtomValidationException.class, () -> type.read(token("urn:x")));
     }
 
@@ -72,7 +105,7 @@ class UriParserTest {
     void maxLengthRejectsLongerUri() {
         UriParser type = new UriParser(Optional.empty(), Optional.of(6), Optional.empty(),
                 Optional.empty(), Optional.empty(), true, true);
-        assertEquals(URI.create("urn:x"), type.read(token("urn:x")));
+        assertEquals(uri("urn:x"), type.read(token("urn:x")));
         assertThrows(AtomValidationException.class, () -> type.read(token("https://example.com/")));
     }
 
@@ -80,7 +113,7 @@ class UriParserTest {
     void patternRejectsNonMatchingUri() {
         UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of("https://.*"), Optional.empty(), true, true);
-        assertEquals(URI.create("https://example.com/"), type.read(token("https://example.com/")));
+        assertEquals(uri("https://example.com/"), type.read(token("https://example.com/")));
         assertThrows(AtomValidationException.class, () -> type.read(token("http://example.com/")));
     }
 
@@ -88,7 +121,7 @@ class UriParserTest {
     void schemeConstraintRejectsMismatchedScheme() {
         UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.of(List.of("https")), true, true);
-        assertEquals(URI.create("https://example.com/"), type.read(token("https://example.com/")));
+        assertEquals(uri("https://example.com/"), type.read(token("https://example.com/")));
         assertThrows(AtomValidationException.class, () -> type.read(token("http://example.com/")));
     }
 
@@ -104,8 +137,8 @@ class UriParserTest {
     void schemesAdmitAnyMemberWhateverItsCase() {
         UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(List.of("http", "https")), false, true);
-        assertEquals(URI.create("HTTPS://example.com/"), type.read(token("HTTPS://example.com/")));
-        assertEquals(URI.create("http://example.com/"), type.read(token("http://example.com/")));
+        assertEquals(uri("HTTPS://example.com/"), type.read(token("HTTPS://example.com/")));
+        assertEquals(uri("http://example.com/"), type.read(token("http://example.com/")));
         AtomValidationException ftp = assertThrows(AtomValidationException.class,
                 () -> type.read(token("ftp://example.com/")));
         assertEquals("scheme one of (http, https)", ftp.expected());
@@ -116,7 +149,7 @@ class UriParserTest {
     void allowFragmentWithdrawnRefusesAFragment() {
         UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), false, false);
-        assertEquals(URI.create("https://example.com/a?x=1"), type.read(token("https://example.com/a?x=1")));
+        assertEquals(uri("https://example.com/a?x=1"), type.read(token("https://example.com/a?x=1")));
         AtomValidationException fragment = assertThrows(AtomValidationException.class,
                 () -> type.read(token("https://example.com/a#top")));
         assertEquals("no fragment", fragment.expected());
@@ -136,7 +169,7 @@ class UriParserTest {
         UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.of(19),
                 Optional.empty(), Optional.empty(), true, true);
 
-        assertEquals(URI.create("https://example.com"), type.read(token("https://example.com")));
+        assertEquals(uri("https://example.com"), type.read(token("https://example.com")));
         assertThrows(AtomValidationException.class, () -> type.read(token("https://example.com/a")));
     }
 

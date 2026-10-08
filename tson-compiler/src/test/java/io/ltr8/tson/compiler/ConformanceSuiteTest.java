@@ -1,4 +1,6 @@
 package io.ltr8.tson.compiler;
+
+import io.ltr8.net.Iri;
 import io.ltr8.tson.base.io.ByteSource;
 
 import io.ltr8.tson.base.ParseException;
@@ -42,7 +44,6 @@ import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -665,9 +666,11 @@ class ConformanceSuiteTest {
                 assertEquals(Long.parseLong(((TokenValue) payload).text()), actual.toTotalMonths(),
                         "period months");
             }
+            // A URI or IRI is its text as written ([TSON-DATA] §2.2.1 compares identities so), so the oracle is
+            // the text: java.net.URI implements RFC 2396 and cannot hold every reference RFC 3986 admits.
             case "uri", "uri_reference", "iri", "iri_reference" -> {
-                URI actual = (URI) atomType.boundTo(URI.class).orElseThrow().read(token);
-                assertEquals(URI.create(((TokenValue) payload).text()), actual, "vocabulary value");
+                Iri actual = (Iri) atomType.boundTo(Iri.class).orElseThrow().read(token);
+                assertEquals(((TokenValue) payload).text(), actual.text(), "vocabulary value");
             }
             case "ipv4" -> {
                 Inet4Address actual = (Inet4Address) atomType.boundTo(Inet4Address.class).orElseThrow().read(token);

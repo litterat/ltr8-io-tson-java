@@ -60,6 +60,10 @@ module io.ltr8.tson.base {
     // which host types bind as atoms, and (in time) the rest of what a deployment states about binding.
     requires transitive io.ltr8.bind;
 
+    // Network text formats, recognised natively -- system-library standing again. CanonicalIdentity and
+    // SchemaReference split a reference with Iri, and the formats' values are host types AtomContext binds.
+    requires transitive io.ltr8.net;
+
     exports io.ltr8.tson.base;
     exports io.ltr8.tson.base.io;
 

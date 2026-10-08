@@ -89,6 +89,7 @@ Schema documents: **parse → desugar → resolve → link → register → comp
 | `tson-atom` | The built-in atom vocabulary, over `String`, shared by both encodings |
 | `tson-tree` | `TsonValue` data tree model; depends on nothing |
 | `tson-regex` | RFC 9485 I-Regexp engine; depends on nothing |
+| `tson-net` | Network text formats (`io.ltr8.net`: URIs and IRIs), each to its RFC; depends on nothing |
 | `tson-compiler` | The engine: lexer, grammars, resolver, linker, compiler, readers, writers, facades |
 | `tson` | The front door: `Tson` |
 | `tson-json` | The JSON encoding, a separate stack with no dependency on `tson-compiler` |

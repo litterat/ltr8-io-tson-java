@@ -226,10 +226,14 @@ on every text family.
   network must be a subnet of a permitted one and must not overlap an excluded one — the difference being
   that a block partly inside an exclusion is partly excluded, which for a value denoting a whole block is a
   rejection.
-- **`uri`/`uri_reference` (`uri_type`, RFC 3986) and `iri`/`iri_reference` (`iri_type`, RFC 3987) share
-  `java.net.URI`.** Each `_reference` admits a relative reference and its sibling withdraws `allow_relative`; a
-  URI is US-ASCII, and an IRI is judged through the URI it maps to (`IriParser`). Every one of them is an
-  IRI-reference, so `HostAtoms` answers the class with `iri_reference`, the widest — one class over two
+- **`uri`/`uri_reference` (`uri_type`, RFC 3986) and `iri`/`iri_reference` (`iri_type`, RFC 3987) share one
+  recognizer, `tson-net`'s `Iri`**, under its URI or IRI grammar, and read to the `Iri` itself: the text as
+  written, split into its components. `java.net.URI` (RFC 2396) is a binding target, never the judge —
+  `JavaUriAtom` holds a value as a `URI` or refuses it as a binding failure (`IllegalArgumentException`, so
+  `AtomRefusal` files it `TYPE_MISMATCH`), and answers `boundTo` itself because `HostAtoms` hands it out as
+  `URI`'s entry. Each `_reference` admits a relative reference and its sibling withdraws `allow_relative`; a
+  URI is US-ASCII. Every one of them is an IRI-reference, so `HostAtoms` answers `URI` and `Iri` with
+  `iri_reference`, the widest — one class over two
   families answers here, where the CIDR pair's does not, because one family's value space contains the
   other's. `VocabularyAtoms` names the
   atom per value — `iri` once a character is beyond US-ASCII, `_reference` where there is no scheme — so a

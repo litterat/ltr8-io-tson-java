@@ -1,7 +1,7 @@
 package io.ltr8.tson.base;
 
-import java.net.URI;
-import java.net.URISyntaxException;
+import io.ltr8.net.Iri;
+import io.ltr8.net.IriSyntaxException;
 import java.util.Locale;
 
 /**
@@ -24,6 +24,10 @@ import java.util.Locale;
  * identities exactly the way the library does -- which is this class. The half of §2.2.1 that reads
  * the {@code ?sha256=} pin this one strips lives in {@code TsonContentHash}.
  *
+ * <p><b>The reference is read as an IRI-reference</b> (§2.2.1, §3.3), by {@link Iri}'s own RFC 3987 grammar rather
+ * than {@code java.net.URI}'s RFC 2396 one, so a host or path beyond US-ASCII is held as written and compared as
+ * written, and a percent-encoded spelling of the same characters is another identity.
+ *
  * <p>The methods return and compare plain {@code String}s rather than instances of this type: a
  * canonical identity is a map key throughout the registries, and wrapping it would buy type-safety
  * only if every identity-carrying signature were converted at once.
@@ -44,48 +48,50 @@ public final class CanonicalIdentity {
      * @throws SchemaValidationException if {@code uriString} isn't a valid canonical-identity candidate
      */
     public static String canonicalize(String uriString) {
-        URI uri;
+        Iri iri;
         try {
-            uri = new URI(uriString);
-        } catch (URISyntaxException e) {
-            throw new SchemaValidationException("'" + uriString + "' is not a valid URI: " + e.getReason());
+            iri = Iri.parse(uriString, Iri.Grammar.IRI);
+        } catch (IriSyntaxException e) {
+            throw new SchemaValidationException(
+                    "'" + uriString + "' is not a valid IRI-reference (RFC 3987): it " + e.reason());
         }
 
-        if (uri.getScheme() == null) {
+        if (iri.scheme().isEmpty()) {
             throw new SchemaValidationException("'" + uriString + "' has no scheme");
         }
-        if (uri.getHost() == null) {
+        Iri.Authority authority = iri.authority().orElse(null);
+        if (authority == null || authority.host().text().isEmpty()) {
             throw new SchemaValidationException("'" + uriString + "' has no host");
         }
-        if (uri.getUserInfo() != null) {
+        if (authority.userinfo().isPresent()) {
             throw new SchemaValidationException(
                     "'" + uriString + "' carries userinfo, not permitted in an identifying URI");
         }
-        if (uri.getPort() != -1) {
+        if (authority.port().isPresent()) {
             throw new SchemaValidationException(
                     "'" + uriString + "' carries a port, not permitted in an identifying URI");
         }
-        if (uri.getRawFragment() != null) {
+        if (iri.fragment().isPresent()) {
             throw new SchemaValidationException(
                     "'" + uriString + "' carries a fragment, not permitted in an identifying URI");
         }
 
-        String host = uri.getHost();
+        String host = authority.host().text();
         if (!host.equals(host.toLowerCase(Locale.ROOT))) {
             throw new SchemaValidationException("'" + uriString + "' has a non-lowercase host '" + host + "'");
         }
 
-        String rawPath = uri.getRawPath() == null ? "" : uri.getRawPath();
-        for (String segment : rawPath.split("/", -1)) {
+        String path = iri.path();
+        for (String segment : path.split("/", -1)) {
             if (segment.equals(".") || segment.equals("..")) {
                 throw new SchemaValidationException("'" + uriString + "' contains a dot-segment in its path");
             }
         }
 
         requireNoPercentEncodedUnreservedCharacters(uriString, host);
-        requireNoPercentEncodedUnreservedCharacters(uriString, rawPath);
+        requireNoPercentEncodedUnreservedCharacters(uriString, path);
 
-        return host + rawPath;
+        return host + path;
     }
 
     /**
