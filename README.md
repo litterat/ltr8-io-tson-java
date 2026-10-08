@@ -6,7 +6,7 @@ one hash verifies the whole chain. The finishing touch, TSON's data format is a 
 actually enjoy writing — JSON-like in shape, and not a superset of it.
 
 > **Status: pure design, no users.** This is the first implementation of TSON, built against a working-draft
-> spec (Revision 36 of the 2026 series), and it is the first real test of whether that spec resolves to one
+> spec (Revision 37 of the 2026 series), and it is the first real test of whether that spec resolves to one
 > behaviour — which is the point of it existing. Nothing is released: there is no Maven Central artifact, no
 > remote repository is configured, and every version carries `-SNAPSHOT`.
 >
@@ -53,7 +53,7 @@ Try it (the data names its own schema and type, so no --type is needed):
 ```
 
 Here's the `person.tn` schema created. It shows a few of the basic schema features,
-including records, record groups, enums and some in-built types. The `2026/36` in the
+including records, record groups, enums and some in-built types. The `2026/37` in the
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
@@ -507,7 +507,7 @@ unchanged, and a writer that was not asked for a header still writes a bare valu
 ## Status
 
 This is the **first implementation** of TSON, built against a working-draft spec (Part 1 data format
-and Part 2 schema layer, Revision 36 of the 2026 series). Part 1 and most of Part 2 — schema grammar,
+and Part 2 schema layer, Revision 37 of the 2026 series). Part 1 and most of Part 2 — schema grammar,
 resolution, linking/registration, and a compiled schema-validating reader — are implemented; some Part 2
 constructs are still out of scope.
 
