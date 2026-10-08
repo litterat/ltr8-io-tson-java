@@ -357,7 +357,7 @@ class TsonCliTest {
 
         assertTrue(out.contains("identifier policy: MODERATELY_RESTRICTIVE per segment"), out);
         // The token list brought its own level: Unrestricted scans nothing, so the list would have been inert.
-        assertTrue(out.contains("token policy:      SINGLE_SCRIPT permitting [GREEK+LATIN]"), out);
+        assertTrue(out.contains("token policy:      SINGLE_SCRIPT permitting [Greek+Latin]"), out);
     }
 
     /**
@@ -421,7 +421,10 @@ class TsonCliTest {
         assertTrue(raised.contains("max depth 300"), raised);
     }
 
-    /** The run says {@code NOT_CHECKED} where the exit code says 1 -- the one place the two diverge. */
+    /**
+     * The run says {@code NOT_CHECKED} where the exit code says 1 -- a refusal, [TSON-DATA] §8.1's fifth
+     * outcome, being where the two diverge.
+     */
     @Test
     void aLimitRefusalIsNotCheckedInTheEnvelopeThoughItExitsOne(@TempDir Path dir) throws IOException {
         Path data = writeFile(dir, "deep.tson", "[".repeat(200) + "1" + "]".repeat(200));
@@ -432,6 +435,23 @@ class TsonCliTest {
         assertTrue(json.contains("\"outcome\":\"NOT_CHECKED\""), json);
         assertTrue(json.contains("\"code\":\"LIMIT_EXCEEDED\""), json);
         assertTrue(json.contains("\"max_depth\":64"), json);
+    }
+
+    /**
+     * A §8.2 name-hygiene refusal is §8.1's fifth outcome too: the envelope says {@code NOT_CHECKED}, since
+     * another deployment may accept the same document, and the exit code still says 1, the sender holding
+     * the fix.
+     */
+    @Test
+    void aNameRefusalIsNotCheckedInTheEnvelopeThoughItExitsOne(@TempDir Path dir) throws IOException {
+        String mixed = "p" + new String(Character.toChars(0x0430)) + "y";
+        Path data = writeFile(dir, "mixed.tson", "@" + mixed + ":1 2");
+
+        String json = captureStdout(() -> assertEquals(1, TsonCli.run(new String[] {
+                "validate", "--output", "json", data.toString()})));
+
+        assertTrue(json.contains("\"outcome\":\"NOT_CHECKED\""), json);
+        assertTrue(json.contains("\"code\":\"RESTRICTED_SCRIPT\""), json);
     }
 
     /** A bound below one admits no document at all, so it is a usage error rather than a silent clamp. */

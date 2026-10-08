@@ -34,19 +34,20 @@
     run cannot make, and an agent reading `if (!valid)` acts on that assertion.
 
     NOT_CHECKED is exactly the set of diagnostic codes that are not a verdict (Diagnostic.Code.verdict):
-    the five SCHEMA_ codes, BIND_MISMATCH, NOT_IMPLEMENTED and LIMIT_EXCEEDED. A name-hygiene refusal is INVALID --
-    the processor looked and declined, and the sender holds the fix.
+    [TSON-DATA] §8.1's fifth outcome -- the three name-hygiene refusals, LIMIT_EXCEEDED and the five
+    SCHEMA_ codes -- with BIND_MISMATCH and NOT_IMPLEMENTED. A refusal says this processor declined, and
+    the same document may be accepted in full by one configured otherwise.
     """
   outcome => !enum [ VALID INVALID NOT_CHECKED ]
   @doc:"""
     One problem, located at up to two ends: the value in the data (path, data_position) and the rule
-    in the schema (schema_id, schema_pointer, schema_position). Either end may be absent -- a problem
+    in the schema (schema_id, schema_pointer, schema_position). Either end may be missing -- a problem
     found in a schema has no data, and a schemaless read has no schema.
 
-    Absence is written as absence: every field that may have nothing to say is optional here and
-    renders as null in --output json. That includes both RFC 6901 pointers, and the distinction they
-    draw is load-bearing: a present "" is the root, which a document-level schema problem genuinely
-    carries, while null means this diagnostic has no such end at all.
+    Nothing to say is written as nothing: every field that may have nothing to say is optional here and
+    is left out, in --output json as in --output tson. That includes both RFC 6901 pointers, and the
+    distinction they draw is load-bearing: a present "" is the root, which a document-level schema
+    problem genuinely carries, while a missing pointer means this diagnostic has no such end at all.
 
     A position is "line:column:byte_offset", all three 1-based except byte_offset, which counts
     UTF-8 bytes from 0 ([TSON-DATA] §8.1).

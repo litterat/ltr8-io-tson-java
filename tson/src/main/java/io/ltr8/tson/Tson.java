@@ -28,11 +28,12 @@ import java.util.Optional;
  * mechanical surface (lexer, both grammars, resolution, linking-adjacent validation, compilation,
  * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
  * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
- * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #of(ProcessorConfig)}, which
- * bootstraps meta-kernel/meta.tn/core.tn into a fresh, governed environment:
+ * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #of(ProcessorConfig)}, or
+ * {@link #standard()} for the defaults, which bootstraps the four bundled schemas (meta-kernel, meta, core,
+ * policy) into a fresh, governed environment:
  *
  * <pre>{@code
- * Tson tson = Tson.builder().build();
+ * Tson tson = Tson.standard();
  * tson.resolve(schemaText);                      // registers the schema by its own !!id
  * TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
  * }</pre>

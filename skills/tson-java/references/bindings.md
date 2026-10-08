@@ -13,10 +13,10 @@ hand — so **the target class must be `public`**, since the library reaches it 
 | ------------------------------------------- | ------------------------------------------------------------------ |
 | a `record`                                  | a `record` — named fields, bound by component name                |
 | a hand-written immutable class with `@Record` on its canonical constructor | the same                          |
-| a `record` carrying `@Tuple`                | a `tuple` — positional, by constructor-argument order             |
+| a `record` carrying `@Tuple`                | a `tuple` — positional, by constructor-argument order, named or inline |
 | `List<E>`, `Set<E>`, any `Collection<E>`   | an array (`set<T>` included)                                      |
 | `Map<K, V>`                                 | a map                                                             |
-| `SequencedMap<K, V>`                        | a map, keeping the order the document wrote its entries in        |
+| `SequencedMap<K, V>`, `AnnotatedMap<K, V>`  | a map, keeping the order the document wrote its entries in        |
 | a plain `enum`                              | an enum                                                           |
 | a sealed interface, or one with `@Union`    | a choice                                                          |
 | the built-in atom vocabulary                | the `java.base` types in the table below                          |
@@ -28,9 +28,16 @@ it has one and its no-argument constructor otherwise (`TreeSet`, `LinkedList`, `
 
 A bare `Map` is built as a `HashMap`, which does not keep entry order. An ordered map
 (`!map { … ordered: true }`) under a schema needs a component that does — `SequencedMap` (built as a
-`LinkedHashMap`), or a concrete class that is a `SequencedMap` but not a `SortedMap`, which sorts by key
-instead — or the bind-mode compile refuses it with a `BindMismatchException`. An unordered map binds to
-either.
+`LinkedHashMap`), `AnnotatedMap`, or a concrete class that is a `SequencedMap` but not a `SortedMap`, which sorts
+by key instead — or the bind-mode compile refuses it with a `BindMismatchException`, at whatever depth the map
+sits. A map that is not ordered binds to either.
+
+**The component's declared class is the bind target at every depth.** Under a schema, each type compiles to its
+natural reading (an `int32` to `Integer`, an array to a `List`), and a component that declares something more
+specific is met when the reader is built: `List<Long>` under `int32` elements holds `Long`s, and `long[]`,
+`List<int[]>` and `Map<String, SequencedMap<String, Long>>` each receive what they declare. A tuple position binds
+the same way, so a tuple written inline at a field binds to the component's `@Tuple` record, nested ones included.
+Most atom families also bind to `String` or `CharSequence`, as the spelling they validated.
 
 A cyclic type graph resolves: `getDescriptor` hands a re-entrant call a deferred supplier and each
 holder keeps it in a final `Memoized`, so laziness is confined to the cyclic edge and every other
@@ -49,24 +56,34 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `uint16`, `int32`                               | `Integer`                                       |
 | `uint32`, `int64`                               | `Long`                                          |
 | `uint64`, `int128`/`uint128`, `int256`/`uint256`| `BigInteger`                                    |
-| `integer`, and a bound on it (`!integer ^ { min: 0 }`) | `BigInteger`              |
+| `integer`, and a declared bound on it (`count => !integer ^ { min: 0 }`) | `BigInteger` |
 | `number`                                        | `BigDecimal`                                    |
 | `float32` / `float64`                           | `Float` / `Double`                              |
 | `rational`                                      | `io.ltr8.tson.base.atom.Rational`               |
 | `complex`                                       | `io.ltr8.tson.base.atom.Complex`                |
-| `text`, `mac`, `email`, `regex`, an enum member | `String`                                        |
+| `text`, `identifier`, `mac`, `email`, `regex`, an enum member | `String`                         |
 | `uuid`                                          | `UUID`                                          |
 | `date` / `time` / `datetime`                    | `LocalDate` / `OffsetTime` / `OffsetDateTime`   |
 | `duration` / `period`                           | `java.time.Duration` / `java.time.Period`       |
-| `uri` / `uri_reference` / `iri` / `iri_reference` | `URI`                                         |
+| `uri` / `uri_reference` / `iri` / `iri_reference` | `io.ltr8.net.Iri`                             |
 | `ipv4` / `ipv6`                                 | `Inet4Address` / `Inet6Address`                 |
-| `cidr4` / `cidr6`                               | `io.ltr8.tson.base.atom.CidrInet4Network` / `CidrInet6Network` |
+| `cidr4` / `cidr6`                               | `io.ltr8.net.CidrInet4Network` / `CidrInet6Network` |
 | `bytes` (and any `!bytes_type { encoding: … }` instance) | `byte[]`                               |
 | an untyped token (§4 base resolution)           | `Boolean`, `BigInteger`, `BigDecimal`, `String` |
 | `_` (the only no-value spelling)                | a `TsonVoid` node / `null`                    |
 
 An integer's host type is the **narrowest** that holds its declared range, so `int8` never hands back a
 `BigInteger` for a value that fits a `Byte`.
+
+**A text value is its text in the type's form.** A text family with a `normalization` reads to the normalized
+string — under `NFKC_CASEFOLD`, `Content-Type` arrives as `content-type` — and that is what a bound `String`
+holds.
+
+**The four URI atoms read to `Iri`**, `tson-net`'s RFC 3986/3987 value, so a tree read answers
+`as(Iri.class)` and not `as(URI.class)`. A component may declare `Iri`, `java.net.URI` or `String`. `URI` reads
+by RFC 2396 and cannot hold every reference these atoms admit (an IRI's non-ASCII host, `https://`), so a value
+it cannot hold is refused at a `URI` component; declare `Iri` to take every one. A component typed `Iri` or `URI`
+with no schema reads as `iri_reference`, the widest of the four.
 
 **`bytes` is one type with a spelling.** core.tn's `bytes` is base64 (RFC 4648 §4); another alphabet is
 another type, declared as its own instance — `hexdigest => !bytes_type { encoding: HEX }`, with `BASE64`,
@@ -139,13 +156,29 @@ Checked at **bind-mode compile** — startup, not first read — raising `BindMi
 
 Any non-FIXED field with no component, or a component no field fills, is refused. **Optional fields are
 not exempt** — those are precisely the ones that work in development and fail on the first caller who
-sends them. A FIXED field is exempt, the schema settling its value.
+sends them. A FIXED field is exempt, the schema settling its value. The same compile also refuses:
+
+- an atom field whose component binds structurally, or whose atom family cannot produce the component's class;
+- a primitive component for a field that can deliver no value — a voidable one, or an optional one with no
+  default;
+- at any depth below a component: a void element meeting a primitive array, an ordered map meeting a class that
+  does not keep insertion order, and a tuple class with the wrong arity or a primitive at a voidable position.
 
 - `@Unbound` on a component marks it as the class's own — a source position kept for diagnostics, a
   cache, anything derived — so binding leaves it alone instead of reporting a mismatch. Without it, a
   component no schema field fills reaches the constructor as `null` however careful the class is.
-- `MissingBindingException` (a subclass) covers a schema type with **no** class at all, and is
-  deferred to the first read of that type — a schema legitimately declares types a consumer never binds.
+- `MissingBindingException` (a subclass) covers a schema type with no class this context can **build** —
+  none is mapped to its name, or the class that is cannot be analysed (an interface that is no union, a
+  collection with no constructor to build it) — and is deferred to the first read of that type, since a schema
+  legitimately declares types a consumer never binds. Beneath it, `DataBindContext.getDescriptor(String)` raises
+  `UnboundNameException` for a name the binder maps to no class, and a plain `DataBindException` for a class it
+  cannot analyse.
+
+**A bound class refusing a value is a diagnostic, not an exception.** A constructor's own check, a bridge, or a
+collection's `put` throwing for what a read hands it — a compact constructor rejecting a value, a
+`ConcurrentHashMap` meeting a void one — is reported through the receiver like any other problem. Under a schema
+it is `BIND_MISMATCH`, the binding disagreeing with a schema that admits the value (no verdict on the document);
+with no schema the class is the contract, and it is `TYPE_MISMATCH`.
 
 **A bound class guards its own optional lists.** An omitted optional field arrives as `null` and the binder
 does not normalise it to an empty list. A *required* one never reaches the constructor at all — the read
@@ -154,9 +187,8 @@ guarding against something that cannot happen, and defaulting one is masking a v
 caught.
 
 The place this bites is `Data.references()`, whose default returns `List.of()`: an implementation that
-returns an optional component instead, unguarded, hands the linker a `null` it iterates — and the resulting
-`NullPointerException` comes out of `Tson.resolve` looking like a fault in the library rather than a bug in
-the calling class. Return `list == null ? List.of() : list`.
+returns an optional component instead, unguarded, hands the linker a `null`, which `Tson.resolve` refuses with a
+`BindMismatchException` naming the class. Return `list == null ? List.of() : list`.
 
 ## Binding profiles
 
@@ -213,6 +245,13 @@ public record Person(Annotations annotations, String name) {}
 
 That component is not bound from an authored field of the same name and takes no part in field
 matching. `Annotation` is one `@name` / `@name:value`; an empty `value` is the valueless form.
+
+`Annotations` serves the value a whole record was bound from. **Every other position opts in through its own
+type**: `Annotated<T>` (`value()`, `annotations()`) at a scalar field, an array element or a tuple position —
+`record Person(Annotated<String> name, List<Annotated<Order>> orders)` — nesting as deep as it is written, and
+`AnnotatedMap<K, V>` for a map's keys, an ordinary `Map` whose `getAnnotations(key)` answers beside `get`. An
+`Annotated` box equals and hashes as its value, since annotations are metadata. A position typed `String` still
+binds to a plain `String`.
 
 `Annotation.value` is `Object` because its Java form depends on how the document was read: where the
 name resolves to a type in the governing schema it is that type's own bound object, and where it

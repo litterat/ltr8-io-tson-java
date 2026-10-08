@@ -60,9 +60,9 @@ class RefusedNameDrawsNoVerdictTest {
         // §8.2's own requirement and the half that must not change -- the shape `checkRefusedVector` asserts
         // of the conformance corpus: something was refused, and nothing was reported as invalid.
         //
-        // A refusal *is* a verdict (`Code.verdict()` is true): the processor looked and declined, and the
-        // sender holds the fix. That is exactly why a second, contradictory instruction beside it is worse
-        // than a redundant one -- both tell the sender what to do, and they disagree.
+        // A refusal is not a verdict (`Code.verdict()` is false), but it still tells the sender what to do.
+        // That is exactly why a second, contradictory instruction beside it is worse than a redundant one --
+        // both tell the sender what to do, and they disagree.
         DiagnosticsCollector collected = new DiagnosticsCollector();
         new TsonObjectReader().withDiagnostics(collected).read("{ " + HOMOGLYPH + ": \"x\" }", Account.class);
         assertEquals(1, collected.diagnostics().size(), collected.diagnostics()::toString);

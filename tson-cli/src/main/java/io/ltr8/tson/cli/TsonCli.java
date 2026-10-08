@@ -313,21 +313,17 @@ public final class TsonCli {
      *   <li><b>1</b> -- the runner: edit the document.</li>
      * </ol>
      *
-     * <p><b>1 means checked and rejected</b>, not "invalid". A [TSON-DATA] §8.2 name-hygiene refusal is one,
-     * though §8.2 calls it a fifth outcome that must not be reported in any of §8.1's four categories: that
-     * rule is about which layer detected it, and this code answers what the caller should do now. A refusal
-     * was checked and declined and the sender holds the fix, which is what 1 means. What is genuinely
-     * portable-sensitive about a refusal -- that another deployment may accept the same document -- is
-     * carried by the diagnostic's own code and by the run's own {@link CliPolicy}, which is the shape §8.2
-     * now asks for: the policy and the data version are properties of the report, not of the refusal.
-     *
-     * <p><b>A [TSON-DATA] §9.1 limit refusal is also 1, and it is the one place an {@link
-     * Outcome#NOT_CHECKED} run exits 1.</b> Everywhere else the two agree, because everywhere else a
-     * non-verdict means nobody present can act. Here the runner can: {@code --max-depth} is a flag, and a
-     * smaller document is theirs to send. The envelope still says {@code NOT_CHECKED}, which is the truth
-     * about the document -- it was not read -- and the exit code still answers what to do now, which is the
-     * question it has always answered. A consumer that needs the first question routes on {@code outcome} or
-     * on {@link Diagnostic.Code#verdict()}, both of which say so.
+     * <p><b>1 means the runner can act by editing what it sent</b>: the document, checked and rejected, or
+     * the document or this run's configuration, refused. A refusal is [TSON-DATA] §8.1's fifth outcome -- a
+     * §8.2 name-hygiene rule or a §9.1 limit declined the document, and the same bytes may be accepted in
+     * full by a processor configured otherwise -- so the envelope says {@link Outcome#NOT_CHECKED}, which is
+     * the truth about the document, and these are the two places a {@code NOT_CHECKED} run exits 1.
+     * Everywhere else the two agree, because everywhere else a non-verdict means nobody present can act.
+     * Here the runner can: a relaxed policy or {@code --max-depth} is a flag, and a renamed field or a
+     * smaller document is theirs to send. The exit code answers what to do now; a consumer that needs the
+     * first question routes on {@code outcome} or on {@link Diagnostic.Code#verdict()}, both of which say so.
+     * What is deployment-specific about a refusal is carried by the diagnostic's own code and by the run's
+     * {@link CliPolicy}, the policy and data version being properties of the report (§8.2).
      *
      * <p><b>78 rather than 70 for a bind mismatch</b>, because {@code EX_CONFIG} is "found in an
      * unconfigured or misconfigured state" and unconfigured is what this is: no class is registered for a

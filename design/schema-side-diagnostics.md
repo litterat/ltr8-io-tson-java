@@ -263,11 +263,12 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       either every fault reads as a bad schema or every source that spells a miss that way crashes the read.
       A source failing any other way is that source malfunctioning, and surfaces as the exception it threw:
       `Tson.validate` promises a bad *document* never throws, and a bad *source* is not a document.
-    - **Eight codes are not a verdict on the document** (`Code.verdict()`), and they differ in *who* could
-      not give one: `NOT_IMPLEMENTED` (this library), `BIND_MISMATCH` (the reading application), the five
-      `SCHEMA_*` codes (whoever was to serve the schema), and `LIMIT_EXCEEDED` (this reader's own §9.1 bound,
-      `design/processor-policy.md`). The CLI's exit codes follow — 70, 78, and 69 or 75
-      by whether a rerun could help, a limit refusal exiting 1 because the runner can act — and a mixed run ranks by who must
+    - **Eleven codes are not a verdict on the document** (`Code.verdict()`), and they differ in *who* could
+      not give one: `NOT_IMPLEMENTED` (this library), `BIND_MISMATCH` (the reading application), and
+      [TSON-DATA] §8.1's fifth outcome — the five `SCHEMA_*` codes (whoever was to serve the schema), and the
+      refusals, §8.2's three name-hygiene codes and `LIMIT_EXCEEDED` (this processor's own policy and §9.1
+      bound, `design/processor-policy.md`). The CLI's exit codes follow — 70, 78, and 69 or 75 by whether a
+      rerun could help, a refusal exiting 1 because the runner can act — and a mixed run ranks by who must
       act first, permanence breaking the tie between ranks where nobody present can act: 70 > 78 > 69 > 75 > 1.
 - **What still throws even with a receiver:** an `!!import` that won't load, a `!!meta` that may not
   govern, or a reference whose target owns a different `!!id` than it was fetched under (§2.2.1's

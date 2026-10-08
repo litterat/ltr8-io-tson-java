@@ -7,7 +7,7 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 
 | Code                        | Means                                                                                       |
 | --------------------------- | --------------------------------------------------------------------------------------------- |
-| `FIELD_REQUIRED`            | a required field was absent from the data                                                   |
+| `FIELD_REQUIRED`            | a required field was missing from the data                                                  |
 | `FIELD_FIXED`               | a field the schema fixes carried a different value                                           |
 | `FIELD_GROUP`               | a field group's rule broke: no option chosen, too many, or a chosen option missing a member |
 | `TYPE_MISMATCH`             | the value's shape does not match the type in scope                                           |
@@ -34,11 +34,15 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `SCHEMA_TIMEOUT`            | the location did not answer in time                                                          |
 | `SCHEMA_TOO_LARGE`          | the location answered with more bytes than a schema document may be                          |
 
-### The eight that are not verdicts on the document
+A push at a `scoped` position whose `scope` does not hold `EXTERN` is not `SCOPE_NOT_ADMITTED` but the cell rule's
+refusal, `VALIDATION_ERROR`: that position reads scopes, and this one is not admitted there.
+
+### The eleven that are not verdicts on the document
 
 `Code.verdict()` is the one statement of the set, so a consumer does not keep a private copy that can
-drift: it is `false` for `NOT_IMPLEMENTED`, `BIND_MISMATCH`, `LIMIT_EXCEEDED` and the five `SCHEMA_*` fetch
-codes, and `true` for everything else. Each of the eight says the document was not judged, and they differ in *who*
+drift: it is `false` for `NOT_IMPLEMENTED`, `BIND_MISMATCH`, the three §8.2 refusal codes, `LIMIT_EXCEEDED` and
+the five `SCHEMA_*` fetch codes, and `true` for everything else. Each of the eleven says the document was not
+judged, and they differ in *who*
 could not judge it — which is exactly what a caller picking an HTTP status or an exit code is asking.
 
 - **`NOT_IMPLEMENTED`** is a gap in this library. It rides in the report located at the value it could
@@ -55,7 +59,8 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
 - **`LIMIT_EXCEEDED`** is this deployment declining: the document nested deeper than `LimitsPolicy.maxDepth`
   (64 by default). The bytes may be valid and read in full by a processor configured for more, which is why
   the bound is stated once per run (`ProcessorPolicy.limits()`, the `policy` field of every CLI envelope)
-  rather than copied into the diagnostic. It is the one non-verdict where the reader holds the fix.
+  rather than copied into the diagnostic. It and the three refusal codes below are the non-verdicts where
+  the reader holds the fix.
 - **The five `SCHEMA_*` fetch codes** are everyone else: no configured `SchemaSource` would supply
   the schema the document names. Nothing is wrong with the document, and nothing may be wrong with the
   schema either — it was never obtained, so it was never read. **`SCHEMA_ERROR` vs the five** is the
@@ -66,11 +71,13 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
   `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` that the reference was fine and the world did not answer — only
   those last two are worth a retry.
 
-**The three refusal codes are verdicts**, though not validity ones. §8.2 says a refusal MUST NOT be
-reported in any of §8.1's four error categories, because each rule reads Unicode data the UCD does not
-freeze — but the processor looked and declined, and the sender holds the fix, so `verdict()` is `true`
-and the CLI exits 1. One code per rule: the three want three different remedies, and the code is what a
-consumer routes on.
+**The three refusal codes are not verdicts either.** Each rule reads Unicode data the UCD does not
+freeze, so a refusal is [TSON-DATA] §8.1's fifth outcome beside `LIMIT_EXCEEDED`: this processor declined
+under its own policy, and one configured otherwise may accept the same document. `verdict()` is `false`, the
+CLI reports the file `NOT_CHECKED` and still exits 1, the sender holding the fix. One code per rule: the
+three want three different remedies, and the code is what a consumer routes on.
+
+`Code.isNameRefusal()` is the one statement of which three codes those are.
 
 ## The `Diagnostic` record
 
@@ -145,9 +152,10 @@ routing by code. It is called **as problems are found**, not at the end.
 Attach one with `.withDiagnostics(receiver)` on either facade reader; it returns a *new* reader and
 leaves the original fail-fast.
 
-**Mode asymmetry, deliberate, not an inconsistency:** collecting mode always keeps reading, and **bind
-mode is all-or-nothing** (a `ConstructionGuard` — a partially-filled object is worse than none) while
-**tree mode keeps everything it built** (a `TsonVoid` stands where a value failed).
+**A collecting read keeps reading and returns no value:** once anything has been reported, both facades
+return `null` — a partial tree could not say which of its parts to trust, and a partially-filled object is worse
+than none. The value is there only when `diagnostics()` is empty. Beneath the facades,
+`read(TsonReadContext)` in tree mode leaves a `TsonVoid` where a value failed.
 
 ## Exceptions
 
@@ -162,8 +170,9 @@ RuntimeException
 ├── LimitExceededException     io.ltr8.tson.base — .limit(), .position(); a §9.1 bound refused the document
 ├── TsonUnsupportedDocumentException  io.ltr8.tson.compiler — a well-formed document of a kind this parser does not implement
 ├── BindMismatchException      io.ltr8.tson.base — a schema type and its bound class disagree
-│   └── MissingBindingException   a schema type with no bound class at all
+│   └── MissingBindingException   a schema type with no class this context can build (none mapped, or unanalysable)
 ├── SchemaValidationException  io.ltr8.tson.base — the author's schema is wrong and the spec says so
+│   └── SchemaRefusalException    the schema-side §8.2 refusal; .code() is which of the three rules fired
 ├── SchemaFetchException       io.ltr8.tson.base — .uri(), .reason(); the ONLY exception a SchemaSource may throw
 ├── ContentHashMismatchException  io.ltr8.tson.base — a ?sha256= pin did not match the fetched content
 ├── AtomTypeException              io.ltr8.tson.atom (sealed) — .expected()
@@ -171,6 +180,7 @@ RuntimeException
 │   └── AtomValidationException    it parsed, then failed the atom's constraint (ATOM_CONSTRAINT_VIOLATION)
 ├── LexException                   (unexported lexer package) malformed UTF-8, non-NFC unquoted token, …
 ├── TsonRegexSyntaxException       io.ltr8.tson.regex
+├── IriSyntaxException             io.ltr8.net (an IllegalArgumentException) — .text(), .index(), .reason()
 ├── UnsupportedOperationException  a gap: this library has not implemented that yet
 └── IllegalStateException          an internal invariant broke — a bug here, not bad input
 ```
@@ -218,25 +228,24 @@ or `TsonDataParser` directly cannot do for themselves. The facade readers call i
 | Code | Meaning                                                                                          |
 | ---- | -------------------------------------------------------------------------------------------------- |
 | `0`  | everything was checked and nothing was reported (or an explicit `--help`)                        |
-| `1`  | **checked and rejected** — the validity codes and a §8.2 refusal; also `LIMIT_EXCEEDED`, whose outcome is `NOT_CHECKED` |
+| `1`  | **the runner can act** — the validity codes, and the refusals (§8.2's three, `LIMIT_EXCEEDED`), whose outcome is `NOT_CHECKED` |
 | `2`  | usage error — bad arguments, an unreadable file                                                  |
 | `69` | `EX_UNAVAILABLE` — a schema was not obtained and a rerun will not obtain it: `SCHEMA_NOT_PERMITTED`, `SCHEMA_NOT_FOUND`, `SCHEMA_TOO_LARGE` |
 | `75` | `EX_TEMPFAIL` — a schema was not obtained and a rerun may help: `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT` |
 | `78` | `EX_CONFIG` — a type the schema needs has no Java class in this tool: `BIND_MISMATCH`             |
 | `70` | `EX_SOFTWARE` — a library gap (`NOT_IMPLEMENTED`) or an uncaught fault; **no verdict reached**    |
 
-`1` is what the runner can act on — a verdict on the input, or a §9.1 limit they can raise or a document they
-can shrink; everything above `2` is the absence of a verdict, naming who could not give it.
-A §8.2 name-hygiene refusal is a `1` and not a fifth code: §8.2's "not in any of the four categories" is
-about which layer detected it, where an exit code answers what the caller should do now — and a refusal
-was checked and declined, with the sender holding the fix.
+`1` is what the runner can act on — a verdict on the input, or a refusal: a policy they can relax, a limit
+they can raise, a document they can change; everything above `2` is the absence of a verdict, naming who
+could not give it. A refusal is no verdict, so its `outcome` is `NOT_CHECKED`, and it still exits `1`
+because an exit code answers what the caller should do now.
 
 `TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by **who must act before anyone else's fix
 counts**, permanence breaking the tie: **70 > 78 > 69 > 75 > 1**. 70 and 78 name nobody present (a
 release of this library; an application wired to bind that type), 69 the runner editing the reference or
 the allow-list it is checked against, 75 the runner simply rerunning, and 1 the runner editing the
 document. Every non-verdict also rides in the report as its own code, with a note on stderr; the report
-on stdout is unchanged, and its `outcome` reads `NOT_CHECKED` for all of them — and for `LIMIT_EXCEEDED`.
+on stdout is unchanged, and its `outcome` reads `NOT_CHECKED` for all of them, refusals included.
 
 70's two halves print differently: a gap prints `not implemented yet: <message>`, whose text usually
 names the workaround; a fault gets the please-report-it banner and its stack trace.

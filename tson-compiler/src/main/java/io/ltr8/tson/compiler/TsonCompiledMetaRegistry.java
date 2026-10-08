@@ -48,7 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * bundled schemas (meta-kernel, meta, core, policy) already loaded -- fetched straight from {@link
  * TsonBundledSchemas}, so it works whatever the configured source. The plain constructors leave the
  * registry empty, for a caller that populates it itself. Any schema governed by (or importing) the
- * bundled three then reuses what's already in {@link #get} rather than recompiling its chain.
+ * bundled schemas then reuses what's already in {@link #get} rather than recompiling its chain.
  *
  * <p><b>Keyed by canonical identity</b> ({@link CanonicalIdentity#canonicalize}, scheme and query
  * stripped), matching the paired {@link TsonSchemaRegistry}. So two differently-spelled-but-equivalent

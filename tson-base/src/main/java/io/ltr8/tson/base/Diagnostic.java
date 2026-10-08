@@ -81,10 +81,10 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * read ([TSON-DATA] §9.1) --
      * {@code TsonDiagnostics.ofBaseSyntaxError} 's sibling, and deliberately not a case inside it.
      *
-     * <p><b>The one factory that lives on this record, because it is the one that classifies nothing.</b>
-     * Its nine siblings each switch on an exception type an encoding declares, so they belong to that
-     * encoding ({@code TsonDiagnostics}); this one takes an already-classified refusal and reshapes it, and
-     * a limit refusal is one fact across every encoding ([TSON-JSON] §10.1). It follows its input.
+     * <p><b>On this record, with {@link #ofRestrictedToken}, because neither classifies anything.</b> Its
+     * nine siblings each switch on an exception type an encoding declares, so they belong to that encoding
+     * ({@code TsonDiagnostics}); this one takes an already-classified refusal and reshapes it, and a limit
+     * refusal is one fact across every encoding ([TSON-JSON] §10.1). It follows its input.
      *
      * <p><b>The two are separated at the type, because they are separated in what they claim.</b> A
      * base-syntax failure is a verdict every processor reaching the same bytes repeats; this one is a
@@ -104,12 +104,12 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     }
 
     /**
+     * A token whose scripts the read's {@code ScriptPolicy} does not permit ([TSON-DATA] §8.2's
+     * "Values", UTS #39 §5.2).
+     *
      * <p><b>Here rather than on an encoding, for {@code ofLimitExceeded}'s reason:</b> it classifies
      * nothing. A policy has already decided the token is refused; this only shapes that into a diagnostic,
      * and §8.2's rule is the processor's rather than any one encoding's -- both streams report through it.
-     *
-     * A token whose scripts the read's {@code ScriptPolicy} does not permit ([TSON-DATA] §8.2's
-     * "Values", UTS #39 §5.2).
      *
      * <p><b>Always {@link Diagnostic.Code#RESTRICTED_SCRIPT}.</b> A token is not a name, so it has no identifier profile
      * and no scope to be distinct within; §8.2's restricted-script rule is the only one of the three a value
@@ -364,15 +364,13 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
          * Whether this code is a verdict on the document -- <b>the document was checked, and this is what
          * checking found</b>.
          *
-         * <p>The four that are not say so for four different reasons: {@link #NOT_IMPLEMENTED} that this
-         * library could not check it, {@link #BIND_MISMATCH} that the reading application is wired wrong,
-         * {@link #LIMIT_EXCEEDED} that this deployment declined to spend the resources, and the five {@code
-         * SCHEMA_*} fetch codes that no schema was obtained to check against. Nothing about the document is
-         * being asserted by any of them, which is what a caller routing on the answer needs to know.
-         *
-         * <p><b>A §8.2 name-hygiene refusal is a verdict</b>, though not a validity one: the processor
-         * looked and declined, and the sender holds the fix. What it is not is an {@link #SCHEMA_ERROR}-style
-         * claim about conformance, which is what the code beside it carries.
+         * <p>Those that are not say so for different reasons: {@link #NOT_IMPLEMENTED} that this library could
+         * not check it, {@link #BIND_MISMATCH} that the reading application is wired wrong, and the rest are
+         * [TSON-DATA] §8.1's fifth outcome. A refusal -- §8.2's three name-hygiene codes ({@link
+         * #isNameRefusal()}) and §9.1's {@link #LIMIT_EXCEEDED} -- says this processor declined under its own
+         * policy, data version and limits, and the same document may be accepted in full by the next one; the
+         * five {@code SCHEMA_*} fetch codes say no schema was obtained to check against. Nothing about the
+         * document is being asserted by any of them, which is what a caller routing on the answer needs to know.
          *
          * <p>Stated here so that a consumer does not keep its own copy of the set. Two already would --
          * {@code TsonCli.exitCodeFor} and this project's HTTP surface -- and a private copy each is how two
@@ -380,8 +378,9 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
          */
         public boolean verdict() {
             return switch (this) {
-                case NOT_IMPLEMENTED, BIND_MISMATCH, LIMIT_EXCEEDED, SCHEMA_NOT_PERMITTED, SCHEMA_NOT_FOUND,
-                        SCHEMA_UNREACHABLE, SCHEMA_TIMEOUT, SCHEMA_TOO_LARGE -> false;
+                case NOT_IMPLEMENTED, BIND_MISMATCH, CONFUSABLE_NAMES, RESTRICTED_CHARACTER, RESTRICTED_SCRIPT,
+                        LIMIT_EXCEEDED, SCHEMA_NOT_PERMITTED, SCHEMA_NOT_FOUND, SCHEMA_UNREACHABLE, SCHEMA_TIMEOUT,
+                        SCHEMA_TOO_LARGE -> false;
                 default -> true;
             };
         }

@@ -10,7 +10,8 @@ Diagnostics, policies, schema sources, host atom values, byte I/O, UCD tables, `
 - No `Tson` prefix in this module (`ReadException`, `ParseException`).
 - `Diagnostic` components are locations. A new component must be a fact not recoverable from document plus schema and not
   one a consumer routes on — what a consumer routes on is the `Code`.
-- Each encoding owns the classifier over its own exceptions; only `Diagnostic.ofLimitExceeded` lives on the record.
+- Each encoding owns the classifier over its own exceptions; only `Diagnostic.ofLimitExceeded` and `ofRestrictedToken`,
+  which classify nothing, live on the record.
 - `base.diagnostics` prose is the schema's vernacular (fields, *absent*); the encoding's spelling rides in `actual`.
 - `ByteSource`/`ByteSink`: bytes never characters; close releases only what was acquired; closing is not flushing.
 - `IdentifierProfile.validate`/`hygiene` report and never throw. `IdentifierPolicy.judge` is the one place the per-name
