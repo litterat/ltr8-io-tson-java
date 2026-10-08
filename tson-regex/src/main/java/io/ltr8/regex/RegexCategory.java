@@ -1,4 +1,4 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
 /**
  * The Unicode general categories permitted in an I-Regexp {@code \p{...}}/{@code \P{...}} escape -- exactly

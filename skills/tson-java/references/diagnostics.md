@@ -180,7 +180,7 @@ RuntimeException
 │   ├── AtomParseException         the token is not this atom's grammar (ATOM_FORM_INVALID)
 │   └── AtomValidationException    it parsed, then failed the atom's constraint (ATOM_CONSTRAINT_VIOLATION)
 ├── LexException                   (unexported lexer package) malformed UTF-8, non-NFC unquoted token, …
-├── TsonRegexSyntaxException       io.ltr8.tson.regex
+├── IRegexSyntaxException         io.ltr8.regex
 ├── IriSyntaxException             io.ltr8.net (an IllegalArgumentException) — .text(), .index(), .reason()
 ├── UnsupportedOperationException  a gap: this library has not implemented that yet
 └── IllegalStateException          an internal invariant broke — a bug here, not bad input

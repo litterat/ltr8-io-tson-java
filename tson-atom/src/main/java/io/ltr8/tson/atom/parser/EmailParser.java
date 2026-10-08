@@ -2,10 +2,10 @@ package io.ltr8.tson.atom.parser;
 
 import java.util.Optional;
 
+import io.ltr8.regex.IRegex;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.schema.meta.EmailType;
 import java.util.regex.Pattern;
 
@@ -75,7 +75,7 @@ public record EmailParser(EmailType constraints) implements AtomTypeParser<Strin
         // I-Regexp (RFC 9485) via tson-regex -- linear-time and ReDoS-safe, not java.util.regex; already
         // validated well-formed when the schema resolved (see RegexParser).
         constraints.pattern().ifPresent(p -> {
-            if (!TsonRegex.parse(p).matches(text)) {
+            if (!IRegex.parse(p).matches(text)) {
                 throw new AtomValidationException(subject + " does not match the required pattern " + p,
                         "matching " + p);
             }

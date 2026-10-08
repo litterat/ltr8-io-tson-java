@@ -1,15 +1,15 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
-import io.ltr8.tson.regex.RegexNode.Alternation;
-import io.ltr8.tson.regex.RegexNode.AnyChar;
-import io.ltr8.tson.regex.RegexNode.CategoryEscape;
-import io.ltr8.tson.regex.RegexNode.CharClass;
-import io.ltr8.tson.regex.RegexNode.ClassRange;
-import io.ltr8.tson.regex.RegexNode.Group;
-import io.ltr8.tson.regex.RegexNode.Literal;
-import io.ltr8.tson.regex.RegexNode.Member;
-import io.ltr8.tson.regex.RegexNode.Repeat;
-import io.ltr8.tson.regex.RegexNode.Sequence;
+import io.ltr8.regex.RegexNode.Alternation;
+import io.ltr8.regex.RegexNode.AnyChar;
+import io.ltr8.regex.RegexNode.CategoryEscape;
+import io.ltr8.regex.RegexNode.CharClass;
+import io.ltr8.regex.RegexNode.ClassRange;
+import io.ltr8.regex.RegexNode.Group;
+import io.ltr8.regex.RegexNode.Literal;
+import io.ltr8.regex.RegexNode.Member;
+import io.ltr8.regex.RegexNode.Repeat;
+import io.ltr8.regex.RegexNode.Sequence;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,7 +25,7 @@ import java.util.function.IntPredicate;
  *
  * <p>Matching is <b>full-match</b> (the whole input must be consumed reaching an accepting state), per RFC
  * 9485 §3's XSD semantics. Code-point addressed throughout. Package-private; reached via {@link
- * TsonRegex#matches}.
+ * IRegex#matches}.
  */
 final class NfaProgram {
 
@@ -136,7 +136,7 @@ final class NfaProgram {
 
         int emit(Inst inst) {
             if (prog.size() >= MAX_INSTRUCTIONS) {
-                throw new TsonRegexSyntaxException("pattern expands to too many states to compile", source, 0);
+                throw new IRegexSyntaxException("pattern expands to too many states to compile", source, 0);
             }
             prog.add(inst);
             return prog.size() - 1;

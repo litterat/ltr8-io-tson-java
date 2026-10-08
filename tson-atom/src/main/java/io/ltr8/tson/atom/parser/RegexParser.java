@@ -2,11 +2,11 @@ package io.ltr8.tson.atom.parser;
 
 import java.util.Optional;
 
+import io.ltr8.regex.IRegex;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
-import io.ltr8.tson.regex.TsonRegex;
-import io.ltr8.tson.regex.TsonRegexSyntaxException;
+import io.ltr8.regex.IRegexSyntaxException;
 import io.ltr8.tson.schema.meta.RegexType;
 
 /**
@@ -26,7 +26,7 @@ import io.ltr8.tson.schema.meta.RegexType;
  *
  * <p><b>Validation goes through {@code tson-regex}, not {@code java.util.regex}.</b> {@code regex_type}'s
  * {@code spec} is pinned to RFC 9485 (I-Regexp), so the text is validated against the
- * I-Regexp subset via {@link TsonRegex#parse} -- which rejects the non-interoperable constructs the JVM's
+ * I-Regexp subset via {@link IRegex#parse} -- which rejects the non-interoperable constructs the JVM's
  * engine would silently accept ({@code \d}/{@code \w}/{@code \s}, subtraction, back-references, lookaround,
  * Unicode blocks). The parsed form is discarded once validation passes; matching a value against a {@code
  * pattern} is a separate capability built on {@code tson-regex}'s AST (see {@code BACKLOG.md}).
@@ -40,8 +40,8 @@ public record RegexParser(RegexType constraints) implements AtomTypeParser<Strin
     public String read(String text) {
         String pattern = new TextParser(constraints.textConstraints()).read(text);
         try {
-            TsonRegex.parse(pattern);
-        } catch (TsonRegexSyntaxException e) {
+            IRegex.parse(pattern);
+        } catch (IRegexSyntaxException e) {
             throw new AtomParseException("'" + text + "' is not a valid I-Regexp (RFC 9485): " + e.getMessage(),
                     "an I-Regexp pattern");
         }

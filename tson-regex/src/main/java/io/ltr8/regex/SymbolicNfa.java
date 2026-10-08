@@ -1,15 +1,15 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
-import io.ltr8.tson.regex.RegexNode.Alternation;
-import io.ltr8.tson.regex.RegexNode.AnyChar;
-import io.ltr8.tson.regex.RegexNode.CategoryEscape;
-import io.ltr8.tson.regex.RegexNode.CharClass;
-import io.ltr8.tson.regex.RegexNode.ClassRange;
-import io.ltr8.tson.regex.RegexNode.Group;
-import io.ltr8.tson.regex.RegexNode.Literal;
-import io.ltr8.tson.regex.RegexNode.Member;
-import io.ltr8.tson.regex.RegexNode.Repeat;
-import io.ltr8.tson.regex.RegexNode.Sequence;
+import io.ltr8.regex.RegexNode.Alternation;
+import io.ltr8.regex.RegexNode.AnyChar;
+import io.ltr8.regex.RegexNode.CategoryEscape;
+import io.ltr8.regex.RegexNode.CharClass;
+import io.ltr8.regex.RegexNode.ClassRange;
+import io.ltr8.regex.RegexNode.Group;
+import io.ltr8.regex.RegexNode.Literal;
+import io.ltr8.regex.RegexNode.Member;
+import io.ltr8.regex.RegexNode.Repeat;
+import io.ltr8.regex.RegexNode.Sequence;
 
 import java.util.ArrayList;
 import java.util.List;

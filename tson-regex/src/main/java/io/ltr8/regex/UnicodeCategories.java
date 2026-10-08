@@ -1,4 +1,4 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
 /**
  * Tests a code point's membership in an I-Regexp {@link RegexCategory}, leaning on the JDK's own Unicode

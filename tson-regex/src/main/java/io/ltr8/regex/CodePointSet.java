@@ -1,4 +1,4 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
 import java.util.ArrayList;
 import java.util.Comparator;

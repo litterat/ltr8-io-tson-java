@@ -1,13 +1,13 @@
-package io.ltr8.tson.regex;
+package io.ltr8.regex;
 
-import io.ltr8.tson.regex.RegexNode.Alternation;
-import io.ltr8.tson.regex.RegexNode.AnyChar;
-import io.ltr8.tson.regex.RegexNode.CategoryEscape;
-import io.ltr8.tson.regex.RegexNode.CharClass;
-import io.ltr8.tson.regex.RegexNode.ClassRange;
-import io.ltr8.tson.regex.RegexNode.Literal;
-import io.ltr8.tson.regex.RegexNode.Repeat;
-import io.ltr8.tson.regex.RegexNode.Sequence;
+import io.ltr8.regex.RegexNode.Alternation;
+import io.ltr8.regex.RegexNode.AnyChar;
+import io.ltr8.regex.RegexNode.CategoryEscape;
+import io.ltr8.regex.RegexNode.CharClass;
+import io.ltr8.regex.RegexNode.ClassRange;
+import io.ltr8.regex.RegexNode.Literal;
+import io.ltr8.regex.RegexNode.Repeat;
+import io.ltr8.regex.RegexNode.Sequence;
 import org.junit.jupiter.api.Test;
 
 import java.util.OptionalInt;
@@ -19,12 +19,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonRegex}: parsing and subset-validating I-Regexp (RFC 9485). Proves the interoperable subset is
+ * {@link IRegex}: parsing and subset-validating I-Regexp (RFC 9485). Proves the interoperable subset is
  * accepted, that constructs outside it (the whole point of the pin) are rejected, and that a few AST shapes
  * and I-Regexp's own semantic quirks (anchors are literals, {@code .} excludes line terminators) come out
  * right.
  */
-class TsonRegexTest {
+class IRegexTest {
 
     @Test
     void acceptsInteroperablePatterns() {
@@ -46,7 +46,7 @@ class TsonRegexTest {
             "😀+",          // a supplementary-plane code point (emoji) is a single atom
         };
         for (String pattern : valid) {
-            TsonRegex.parse(pattern); // must not throw
+            IRegex.parse(pattern); // must not throw
         }
     }
 
@@ -66,7 +66,7 @@ class TsonRegexTest {
             "a{", "(", "a)", "[a", "\\", "\\p{L",  // malformed
         };
         for (String pattern : invalid) {
-            assertThrows(TsonRegexSyntaxException.class, () -> TsonRegex.parse(pattern),
+            assertThrows(IRegexSyntaxException.class, () -> IRegex.parse(pattern),
                     () -> "expected '" + pattern + "' to be rejected");
         }
     }
@@ -74,34 +74,34 @@ class TsonRegexTest {
     @Test
     void anchorsAreLiteralsNotAssertions() {
         // I-Regexp has no anchors: ^ and $ are ordinary literal characters.
-        assertEquals(new Literal('^'), TsonRegex.parse("^").ast());
-        assertEquals(new Literal('$'), TsonRegex.parse("$").ast());
+        assertEquals(new Literal('^'), IRegex.parse("^").ast());
+        assertEquals(new Literal('$'), IRegex.parse("$").ast());
     }
 
     @Test
     void buildsTheExpectedAst() {
-        assertEquals(new Repeat(new Literal('a'), 2, OptionalInt.of(4)), TsonRegex.parse("a{2,4}").ast());
+        assertEquals(new Repeat(new Literal('a'), 2, OptionalInt.of(4)), IRegex.parse("a{2,4}").ast());
 
-        RegexNode alt = TsonRegex.parse("ab|cd").ast();
+        RegexNode alt = IRegex.parse("ab|cd").ast();
         Alternation alternation = assertInstanceOf(Alternation.class, alt);
         assertEquals(2, alternation.alternatives().size());
         assertInstanceOf(Sequence.class, alternation.alternatives().get(0));
 
-        CharClass cls = assertInstanceOf(CharClass.class, TsonRegex.parse("[^a-z0]").ast());
+        CharClass cls = assertInstanceOf(CharClass.class, IRegex.parse("[^a-z0]").ast());
         assertTrue(cls.negated());
         assertEquals(new ClassRange('a', 'z'), cls.members().get(0));
         assertEquals(new Literal('0'), cls.members().get(1));
 
-        CategoryEscape cat = assertInstanceOf(CategoryEscape.class, TsonRegex.parse("\\P{Nd}").ast());
+        CategoryEscape cat = assertInstanceOf(CategoryEscape.class, IRegex.parse("\\P{Nd}").ast());
         assertEquals(RegexCategory.Nd, cat.category());
         assertTrue(cat.complement());
 
-        assertInstanceOf(AnyChar.class, TsonRegex.parse(".").ast());
+        assertInstanceOf(AnyChar.class, IRegex.parse(".").ast());
     }
 
     @Test
     void reportsThePositionOfAFailure() {
-        TsonRegexSyntaxException e = assertThrows(TsonRegexSyntaxException.class, () -> TsonRegex.parse("ab\\d"));
+        IRegexSyntaxException e = assertThrows(IRegexSyntaxException.class, () -> IRegex.parse("ab\\d"));
         assertEquals(3, e.position());          // the 'd' after the backslash
         assertFalse(e.getMessage().isBlank());
     }
