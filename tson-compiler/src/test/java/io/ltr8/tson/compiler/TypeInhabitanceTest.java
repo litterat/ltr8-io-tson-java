@@ -108,7 +108,7 @@ class TypeInhabitanceTest {
     }
 
     /**
-     * An option is chosen whole (SPEC-FEEDBACK.md #18): it needs every member its group does not mark, so one
+     * An option is chosen whole ([TSON-SCHEMA] §5.11): it needs every member its group does not mark, so one
      * recurring unmarked member blocks it, while a recurring marked one can be left out.
      */
     @Test

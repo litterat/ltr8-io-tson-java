@@ -63,7 +63,7 @@ bound is inert, since the family range is enforced regardless.
 
 **A leap second is refused.** RFC 3339's grammar admits `time-second` `60`, but `!time` is the time of day on
 `[00:00:00, 24:00:00)` and `!datetime` an instant on the UTC timeline, and second 60 is neither: `23:59:60Z` is a
-parse error. Part 1 names the grammar and the interval without reconciling them (SPEC-FEEDBACK.md #20).
+parse error, as hour 25 is ([TSON-DATA] §5.4).
 
 **One accepted, different-revision gap.** `!uri_reference` (§5.5) is the one atom here that does *not* get an
 extra shape check ahead of the JDK type it delegates to — the opposite situation from the atoms above.

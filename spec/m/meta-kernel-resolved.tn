@@ -10,7 +10,8 @@
   - `type_definition.supertypes` and `subtypes` are complete and
     lexically sorted; a resolver's native ordering is
     implementation-defined, so comparison tools canonicalise both
-    lists, and set-typed fields, before comparing (Part 2 Section 8).
+    lists before comparing. Set-typed fields are compared as
+    written, in source declaration order (Part 2 Sections 7.5, 8).
   - `record.supertypes` inside bodies preserves source order (it
     records what was written).
   - `subtypes` lists entries of this map only; inverse edges from
@@ -27,22 +28,23 @@
   - Type-reference positions (`record_field.type`,
     `tuple_element.element_type`, `type_definition.source`, choice
     variant elements, and binding-record type slots) hold type_ref
-    values; `name` is type_ref's only REQUIRED field, so a bare name
+    values; `name` is type_ref's only required field, so a bare name
     token is the positional form (Part 2 Section 5.6, general over
     schema-backed data) and a braced record appears only when
     `arguments` is present — which, in output, is only where an
     application is still open: template bodies and `source`
     provenance (Part 2 Section 8.1).
   - The container constructors carry no parameters: their type
-    slots are plain REQUIRED `type_ref`-typed fields, filled by the
+    slots are plain required `type_ref`-typed fields, filled by the
     construction (or by a sugar form's desugaring) like any other
     required field. Within a template body `value` also carries a
     parameter, unlabelled: a token there is a parameter exactly when
     its text resolves into the enclosing entry's `parameters`
     (Part 2 Section 5.10's shadowing rule), and a closed entry has
-    none for one to resolve into. A parametric `= P` fixes nothing
-    and stays a required FREE field until materialisation makes the
-    value concrete; `~ P` yields a DEFAULT (Part 2 Section 5.7).
+    none for one to resolve into. A parametric `= P` or `~ P` fixes
+    nothing until materialisation makes the value concrete, when the
+    field takes the role its literal spelling has, FIXED or DEFAULT;
+    its `optional` is the name's mark as written (Part 2 Section 5.7).
   - `arguments` elements are type_argument records: `{ name: ... }`
     is a reference — including, in template bodies, parameter
     references of either kind, read against `parameters` — and

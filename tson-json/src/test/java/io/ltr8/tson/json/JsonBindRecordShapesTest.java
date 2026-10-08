@@ -165,7 +165,7 @@ class JsonBindRecordShapesTest {
     }
 
     /**
-     * An at-least-one group admits several of its fields at once (SPEC-FEEDBACK.md #18), so a record of it is
+     * An at-least-one group admits several of its fields at once ([TSON-SCHEMA] §5.11), so a record of it is
      * not one alternative of a sealed union, and binding one there is named as the wiring's mistake.
      */
     @Test

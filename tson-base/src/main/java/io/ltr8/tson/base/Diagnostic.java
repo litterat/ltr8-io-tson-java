@@ -244,7 +244,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         FIELD_FIXED,
 
         /**
-         * A field group's presence rule broken ([TSON-SCHEMA] §5.11, SPEC-FEEDBACK.md #18): no option chosen
+         * A field group's presence rule broken ([TSON-SCHEMA] §5.11): no option chosen
          * where the group needs one, more chosen than it admits, or a chosen option missing a member its group
          * does not mark optional. One code for everything a group decides, so a consumer repairs the group as
          * one thing rather than as separate field and type problems; a field outside any group keeps

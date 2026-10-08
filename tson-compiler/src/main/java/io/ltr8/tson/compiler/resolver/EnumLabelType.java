@@ -53,7 +53,7 @@ public final class EnumLabelType {
 
     /**
      * The form {@code enumeration} matches its members in: its label type's {@code normalization}
-     * (SPEC-FEEDBACK.md #19). {@code NONE} for a body that is not an enum, a type that resolves to nothing, or one
+     * ([TSON-SCHEMA] §5.5). {@code NONE} for a body that is not an enum, a type that resolves to nothing, or one
      * that is not a text family -- each refused or reported on its own.
      */
     public static Normalization form(TypeDefinition enumeration, Function<String, TypeDefinition> local,

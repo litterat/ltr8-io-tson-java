@@ -43,7 +43,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
 
     /**
      * The value {@code text} decodes to -- the text put into the type's {@code normalization} form
-     * (SPEC-FEEDBACK.md #19) -- once every facet has judged that value.
+     * ([TSON-SCHEMA] §5.5) -- once every facet has judged that value.
      */
     @Override
     public String read(String text) {

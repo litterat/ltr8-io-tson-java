@@ -185,7 +185,7 @@ are kept in step deliberately.
   `RecordField`. A **parametric** `= P` is FREE with the parameter in `value` (§5.7's "Open modifiers") until
   materialisation closes it to FIXED, keeping the name's mark, so the parameter branch sits ahead of the
   literal pin.
-- **A field group is options of members** (`GroupDef`, the kernel's `field_group`; SPEC-FEEDBACK.md #18). An
+- **A field group is options of members** (`GroupDef`, the kernel's `field_group`; §5.11). An
   option is chosen when any member is present, a chosen option holds every member `field_group.optional_members`
   does not name, and `field_group.optional` decides whether no option may be chosen. `GroupDef.fieldGroup` is the
   one lowering, used by a fresh body and by a held one alike: `+` becomes the non-optional group of one option

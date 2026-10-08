@@ -118,7 +118,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   optional within its option — and refuses a modifier outright, its presence being the group's (§5.11).
   `|` separates a group's options and the members of one option are separated as record entries are; `)+`
   marks the at-least-one group, `+` binding to the `)` as `?` does. `checkGroupShape` refuses every group that
-  restates plain fields or another group, so each presence rule has one spelling (SPEC-FEEDBACK.md #18).
+  restates plain fields or another group, so each presence rule has one spelling ([TSON-SCHEMA] §5.11).
   - A map key stays `type-name ["<" type-args ">"]` and nothing else — not a paren type, not a bracket form
     — which is what holds the brace dispatch below to its lookahead budget; a composite key earns a named
     declaration and the explicit `!map { key_type: … }` form.

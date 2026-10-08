@@ -50,7 +50,7 @@ import java.util.Set;
  * members, which is also what a schema assembled by hand gets.
  *
  * <p><b>{@code enumForms} is the third</b>, for the same reason: each enum whose label type's {@code normalization}
- * is not {@code NONE} (SPEC-FEEDBACK.md #19), with that form, which its readers match members in -- the kernel's
+ * is not {@code NONE} ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's
  * {@code identifier} is NFC, a schema's own case-folding identifier {@code NFKC_CASEFOLD}. An enum not listed
  * matches its members as written.
  */

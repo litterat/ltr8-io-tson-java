@@ -62,8 +62,8 @@ diagnostics parameterised over a "candidate noun" so one class serves a choice *
 **Two boundary calls are finer than "the schema's nouns":**
 
 - **"The void sentinel" is the schema's noun and stays in the prose**; only the *spelling* is the format's.
-  [TSON-DATA] §2.9 names the concept (as the absent sentinel until SPEC-FEEDBACK.md #21 lands), and a message
-  that will not say it loses the word the spec uses for the thing it is refusing.
+  [TSON-DATA] §2.9 names the concept, and a message that will not say it loses the word the spec uses for the thing
+  it is refusing.
 - **A message about a value renders the value, not the wire form.** A set duplicate reads `'a'` and not
   `'"a"'`. That is harder on the JSON side than it sounds, because tree mode discards the host value by
   design — so `Nodes.rendered` answers from the node instead, which is the same question the TSON reader's

@@ -146,7 +146,7 @@ class ResolvedFixtureTest {
     }
 
     /**
-     * <b>And every entry's key carries the same annotations</b> -- {@code @ordered}, {@code @bounded}, {@code
+     * <b>And every entry's key carries the same annotations</b> -- {@code @ordering}, {@code @bounded}, {@code
      * @exact}, {@code @numeric} and the rest, {@code @doc} aside. They sit on the schema-map key, where binding
      * the fixture drops them, so this is the one assertion that reaches them; through the bound document both
      * sides would carry none and agree for the wrong reason, which is how a fixture drifts unnoticed.
@@ -165,7 +165,7 @@ class ResolvedFixtureTest {
         }
         // Non-vacuous: core marks its atoms, so an empty-equals-empty pass is not available here either.
         assertTrue(ResolvedForm.fixtureKeyAnnotations(Files.readString(specDirectory().resolve("core-resolved.tn")))
-                .get("int32").contains("@ordered:TOTAL"), "core-resolved.tn marks int32 @ordered:TOTAL");
+                .get("int32").contains("@ordering:TOTAL"), "core-resolved.tn marks int32 @ordering:TOTAL");
     }
 
     /**

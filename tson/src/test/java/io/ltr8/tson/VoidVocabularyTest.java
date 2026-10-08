@@ -13,10 +13,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The kernel's two kinds of nothing (SPEC-FEEDBACK.md #21): {@code voidable} where the void sentinel may stand in a
- * slot -- a container's element, a map's value, a tuple position -- and {@code optional} where a slot may be
- * missing, a field group as a whole among them. Each is written the same way as a construction and as the sugar it
- * lowers from, and the retired {@code state} is refused rather than read under another meaning.
+ * The kernel's two kinds of nothing ([TSON-DATA] §2.9, [TSON-SCHEMA] §7.6): {@code voidable} where the void
+ * sentinel may stand in a slot -- a container's element, a map's value, a tuple position -- and {@code optional}
+ * where a slot may be missing, a field group as a whole among them. Each is written the same way as a construction
+ * and as the sugar it lowers from, and the retired {@code state} is refused rather than read under another meaning.
  */
 class VoidVocabularyTest {
 

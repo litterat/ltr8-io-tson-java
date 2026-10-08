@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code text_type}'s {@code normalization} end to end (SPEC-FEEDBACK.md #19): a value is its token's text put
+ * {@code text_type}'s {@code normalization} end to end ([TSON-SCHEMA] §5.5): a value is its token's text put
  * into the form, and everything downstream judges the value -- the facets, a pin, map-key identity, the output.
  * {@code NFKC_CASEFOLD} makes the names of a case-insensitive naming system one value however they are cased.
  */

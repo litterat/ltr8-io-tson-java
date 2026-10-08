@@ -1384,7 +1384,7 @@ final class DefinitionResolver {
      * things in one declaration, and the author meant one of them. Rule 4 is checked first: a body-introduced
      * field <em>is</em> in the merged set, so the weaker "no such field" answer would be the wrong diagnosis.
      *
-     * <p>Groups (§5.11, SPEC-FEEDBACK.md #18): a removed member leaves its option, and an emptied option leaves
+     * <p>Groups (§5.11): a removed member leaves its option, and an emptied option leaves
      * the group. A group left with one option that no schema could write is dissolved into the plain fields it
      * equals ({@link #dissolveInto}), and removing every member drops the group with them.
      */
@@ -1432,7 +1432,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * Whether a group reduced to one option is still one a schema could write (SPEC-FEEDBACK.md #18): not
+     * Whether a group reduced to one option is still one a schema could write ([TSON-SCHEMA] §5.11): not
      * optional with at least two members, every one marked -- the {@code +} group -- or optional with at least
      * two members, one unmarked. Any other one option is plain fields.
      */
@@ -1928,7 +1928,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * A restated member's name {@code ?} (§5.11, SPEC-FEEDBACK.md #18) speaks for its option, not the record:
+     * A restated member's name {@code ?} (§5.11) speaks for its option, not the record:
      * it keeps the member optional once its option is chosen, and leaving it off makes the member required
      * there -- the name's {@code ?} is never inherited, at a member as at any field. It may be dropped and
      * never added, since adding one loosens the option. A {@code +} group, the one group of a single REQUIRED

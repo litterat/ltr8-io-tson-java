@@ -31,7 +31,7 @@ public enum TokenType {
     /** {@code ..} — the range token (§7.2.4). Reserved; no role in data values. */
     RANGE,
 
-    // Special tokens (§7.2.5, with SPEC-FEEDBACK.md #18 adding `+`). Fifteen characters, all Pattern_Syntax.
+    // Special tokens (§7.2.5). Fifteen characters, all Pattern_Syntax.
     // Only BANG (type prefix) and AT (annotation prefix) have a role in
     // data values; the rest are reserved by the schema grammar and are
     // parse errors wherever a data value is expected.

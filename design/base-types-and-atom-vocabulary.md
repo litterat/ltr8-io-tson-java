@@ -151,25 +151,28 @@ the whole value space so the other facets hold vacuously where it is present.
 It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recovers a boolean from an unquoted
 `true`, so a writer annotating every one with `!boolean` would be restating what the token already says.
 
-**A text family's value is its text in the type's `normalization` form** (`base.unicode.Normalization`;
-SPEC-FEEDBACK.md #19). `text_type` carries the facet and every family composing it inherits it — `NONE` by default,
-`NFC` on `identifier_type`, fixed to `NONE` on `regex_type`, since folding a pattern changes what it matches, and
-on `uri_type`, `iri_type` and `email_type`, since a URI's path and query and a mailbox's local part compare with
-case and a form over the whole text would change what the value names. Each parser puts the text into the form
-first and judges the result: the lengths, `pattern`, the members (normalised the same way,
-`TextType.normalizedMembers`), an identifier's profile, a URI's or an address's grammar. The three lengths are one
-helper, `TextParser.checkLengths`, which the URI and email parsers call too, and they count code points, as
-`text_type` says and `TextType.coherenceCheck` does. Since every comparison downstream — map keys, set elements,
-pins, look-alike scopes, hygiene — already runs on the parser's value, none of them needed a change of its own
-beyond reading the value rather than the token. A refusal names the token as written and then the value it was
-judged as — `'PUT' (read as 'put' under NFKC_CASEFOLD) is not a member of this type` — through
-`TextParser.subject`, threaded into every facet's message: the written spelling is the text a reader or a repair
-loop has to find, and the value is what the facet compared. `NFKC_CASEFOLD` is `NfkcCasefold`, derived from the
-JDK's normalizer and case mappings with three exceptions and checked against `DerivedNormalizationProps.txt` over
-every code point. `ASCII_CASEFOLD` lowercases A..Z and touches nothing else — no NFC either — so a profile of ASCII
-letters under it refuses the full-width and Kelvin-sign spellings `NFKC_CASEFOLD` would fold into the profile. It
-is the form of the case-insensitive ASCII naming systems (field names, schemes, DNS names), and `scheme_name` uses
-it; `NFKC_CASEFOLD` is for names compared without case across Unicode.
+**A text family's value is its text in the type's `normalization` form** (`base.unicode.Normalization`; [TSON-SCHEMA]
+§5.5). `text_type` carries the facet and every family composing it inherits it — `NONE` by default, `NFC` on
+`identifier_type`, fixed to `NONE` on `regex_type`, since folding a pattern changes what it matches, and on
+`uri_type`, `iri_type` and `email_type`, since a URI's path and query and a mailbox's local part compare with case and
+a form over the whole text would change what the value names. Each parser puts the text into the form first and judges
+the result: the lengths, `pattern`, the members (normalised the same way, `TextType.normalizedMembers`), an
+identifier's profile, a URI's or an address's grammar. The three lengths are one helper, `TextParser.checkLengths`,
+which the URI and email parsers call too, and they count code points, as `text_type` says and
+`TextType.coherenceCheck` does. Since every comparison downstream — map keys, set elements, pins, look-alike scopes,
+hygiene — already runs on the parser's value, none of them needed a change of its own beyond reading the value rather
+than the token. A refusal names the token as written and then the value it was judged as — `'PUT' (read as 'put' under
+NFKC_CASEFOLD) is not a member of this type` — through `TextParser.subject`, threaded into every facet's message: the
+written spelling is the text a reader or a repair loop has to find, and the value is what the facet compared.
+`NFKC_CASEFOLD` is `NfkcCasefold`, derived from the JDK's normalizer and case mappings with three exceptions and
+checked against `DerivedNormalizationProps.txt` over every code point. `ASCII_CASEFOLD` lowercases A..Z and touches
+nothing else — no NFC either — so a profile of ASCII letters under it refuses the full-width and Kelvin-sign spellings
+`NFKC_CASEFOLD` would fold into the profile. It is the form of the case-insensitive ASCII naming systems (field names,
+schemes, DNS names), and `scheme_name` uses it; `NFKC_CASEFOLD` is for names compared without case across Unicode.
+**No comparison goes below NFC** ([TSON-SCHEMA] §5.5), whatever the form: `ValueIdentity` compares map keys, set
+elements, FIXED values and pins in NFC of the value, so under `NONE` or `ASCII_CASEFOLD` a composed and a decomposed
+`É` are one key and one member while each value keeps its spelling. The `members` checks in `TextParser` and
+`EnumParser` still compare the form exactly (`BACKLOG.md`).
 
 **`text_type` has no facet for the text's format, deliberately.** A facet narrows a value space (§5.7), and a
 format such as CommonMark narrows nothing — every string is valid CommonMark — so it would fail §6's own test for
@@ -299,9 +302,9 @@ on every text family.
   `DurationType` built in Java cannot carry one either. Longer spans are `period`, finer or wider quantities
   are `number` in the unit the schema names. [TSON-SCHEMA] §5.5 and §5.4 here state both ends.
 - **A leap second is refused.** RFC 3339's grammar admits second 60, but `time` is the time of day on
-  `[00:00:00, 24:00:00)` and `datetime` an instant on the UTC timeline, so `23:59:60Z` is neither, as core's docs
-  say (SPEC-FEEDBACK.md #20). `java.time` refuses it as well, so `TimeParser` and `DateTimeParser` report it as a
-  parse error with no check of their own.
+  `[00:00:00, 24:00:00)` and `datetime` an instant on the UTC timeline, so `23:59:60Z` is neither, as [TSON-DATA]
+  §5.4 says. `java.time` refuses it as well, so `TimeParser` and `DateTimeParser` report it as a parse error with no
+  check of their own.
 - The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.
 - **The atom vocabulary is complete** — `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` all have parsers, the
   CIDR pair reusing the two address grammars and validating §5.5's family-range and host-bits-zero rules on top. All

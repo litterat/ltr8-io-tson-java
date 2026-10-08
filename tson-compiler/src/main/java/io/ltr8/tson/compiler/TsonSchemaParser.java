@@ -618,7 +618,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * {@code group-def} (§5.11, SPEC-FEEDBACK.md #18): {@code |} separates options, and the members of one option
+     * {@code group-def} (§5.11): {@code |} separates options, and the members of one option
      * are separated as a record body's entries are. The grammar refuses a group that restates what plain fields
      * or another group already state, so each presence rule has one spelling ({@link #checkGroupShape}).
      */
@@ -677,7 +677,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * The shapes a group may take (§5.11, SPEC-FEEDBACK.md #18), each refused with the spelling it restates:
+     * The shapes a group may take (§5.11), each refused with the spelling it restates:
      * <ul>
      *   <li>the only member of an option takes no {@code ?}, being present exactly when its option is chosen;
      *   <li>{@code +} takes options of one field each, at least two of them;

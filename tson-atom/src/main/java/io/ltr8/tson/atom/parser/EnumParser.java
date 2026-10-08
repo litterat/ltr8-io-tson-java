@@ -53,7 +53,7 @@ public record EnumParser(EnumBody constraints, Normalization form) implements At
 
     /**
      * The member the token is, compared in {@link #form} -- the normalization of the enum's label type
-     * (SPEC-FEEDBACK.md #19) -- so under a case-folding type {@code Content-Type} is the member written
+     * ([TSON-SCHEMA] §5.5) -- so under a case-folding type {@code Content-Type} is the member written
      * {@code content-type}. The value is the token in that form. Each member is put into the form as it is
      * compared, which allocates nothing for a member already in it.
      */

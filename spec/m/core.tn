@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/37/m/core.tn?sha256=0315cb4d799b769009438bcaa9d4e4fbf6d6c88090bd1c0d844ad267a9635ed9"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=001ce80d5273e3a13999f6f1d91b6a2f73a62c5f32ab7bcbdd182fd24ae4a572"
+!!id:"https://tson.io/2026/37/m/core.tn?sha256=63df3c784893d4784ff33b4743db2081dbbc9008c65424ff62f640bce7a9ee71"
+!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=64b5dd6a2c00d54c5370b52a82e94b27abad603805e5380f167de5b658269ab3"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 37 draft).
@@ -22,7 +22,7 @@
   Hash pins here are real digests over the bytes of this copy; see
   meta-kernel.tn's note.
 
-  Annotation types (`@ordered`, `@bounded`, `@exact`, `@numeric`, `@disjoint`,
+  Annotation types (`@ordering`, `@bounded`, `@exact`, `@numeric`, `@disjoint`,
   `@deprecated`, `@title`, `@comment`, `@examples`, `@read_only`,
   `@write_only`) live in meta.tn — annotations resolve one hop against the
   governing target's namespace ([TSON-SCHEMA] §3.3.3, §6), so for this schema
@@ -68,7 +68,7 @@
     admits decimal, hex, octal and binary spellings ([TSON-DATA] §7.6), all one
     value.
     """
-  @ordered:TOTAL @bounded:false @exact:true @numeric
+  @ordering:TOTAL @bounded:false @exact:true @numeric
   integer => !integer_type {}
 
   @doc:"""
@@ -82,7 +82,7 @@
     needing `.inf`/`.nan` is not a `number` — those belong to the approximate
     tier.
     """
-  @ordered:TOTAL @bounded:false @exact:true @numeric
+  @ordering:TOTAL @bounded:false @exact:true @numeric
   number => !decimal_type {}
 
   @doc:"""
@@ -93,7 +93,7 @@
     (TSON text preserves the token as written, and quotes it, since it contains
     `/`).
     """
-  @ordered:TOTAL @bounded:false @exact:true @numeric
+  @ordering:TOTAL @bounded:false @exact:true @numeric
   rational => !rational_type {}
 
   @doc:"""
@@ -107,96 +107,96 @@
     `complex` carries no `@exact` marker. Spellings are the text class's concern
     (TSON text accepts a+bi and a+bj); component representation is host-defined.
     """
-  @ordered:NONE @bounded:false @numeric
+  @ordering:NONE @bounded:false @numeric
   complex => !complex_type {}
 
   @doc:"Signed 8-bit integer (-128 to 127)."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   int8 => !integer ^ { size: { bits: 8  signed: true } }
 
   @doc:"Signed 16-bit integer."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   int16 => !integer ^ { size: { bits: 16  signed: true } }
 
   @doc:"Signed 32-bit integer."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   int32 => !integer ^ { size: { bits: 32  signed: true } }
 
   @doc:"Signed 64-bit integer."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   int64 => !integer ^ { size: { bits: 64  signed: true } }
 
   @doc:"Signed 128-bit integer."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   int128 => !integer ^ { size: { bits: 128  signed: true } }
 
   @doc:"Signed 256-bit integer."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   int256 => !integer ^ { size: { bits: 256  signed: true } }
 
   @doc:"Unsigned 8-bit integer (0 to 255)."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   uint8 => !integer ^ { size: { bits: 8  signed: false } }
 
   @doc:"Unsigned 16-bit integer."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   uint16 => !integer ^ { size: { bits: 16  signed: false } }
 
   @doc:"Unsigned 32-bit integer."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   uint32 => !integer ^ { size: { bits: 32  signed: false } }
 
   @doc:"Unsigned 64-bit integer."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   uint64 => !integer ^ { size: { bits: 64  signed: false } }
 
   @doc:"Unsigned 128-bit integer."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   uint128 => !integer ^ { size: { bits: 128  signed: false } }
 
   @doc:"Unsigned 256-bit integer."
-  @ordered:TOTAL @bounded:true @exact:true @numeric
+  @ordering:TOTAL @bounded:true @exact:true @numeric
   uint256 => !integer ^ { size: { bits: 256  signed: false } }
 
   @doc:"""
     IEEE 754 binary32. Value set is the binary32 grid plus signed zeros,
     subnormals, both infinities, and quiet NaN.
     """
-  @ordered:PARTIAL @bounded:false @exact:false @numeric
+  @ordering:PARTIAL @bounded:false @exact:false @numeric
   float32 => !float_type { format: BINARY32 }
 
   @doc:"""
     IEEE 754 binary64. Value set is the binary64 grid plus signed zeros,
     subnormals, both infinities, and quiet NaN.
     """
-  @ordered:PARTIAL @bounded:false @exact:false @numeric
+  @ordering:PARTIAL @bounded:false @exact:false @numeric
   float64 => !float_type { format: BINARY64 }
 
   @doc:"Unicode code point sequence. The universal text type."
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   text => !text_type {}
 
   @doc:"Interoperable regular expression pattern per RFC 9485 (I-Regexp)."
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   regex => !regex_type {}
 
   @doc:"A URI-reference (RFC 3986 §4.1): a URI or a relative reference."
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   uri_reference => !uri_type {}
 
   @doc:"A URI (RFC 3986 §3): the scheme is required."
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   uri => !uri_reference ^ { allow_relative: false }
 
   @doc:"""
     An IRI-reference (RFC 3987 §2.2): an IRI or a relative reference, its
     characters drawn from RFC 3987's grammar, beyond US-ASCII included.
     """
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   iri_reference => !iri_type {}
 
   @doc:"An IRI (RFC 3987 §2.2): the scheme is required."
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   iri => !iri_reference ^ { allow_relative: false }
 
   @doc:"""
@@ -208,11 +208,11 @@
     (`hexdigest => !bytes_type { encoding: HEX  length: 4 }`) — never as a
     refinement of this one. An encoding whose values are octets writes them raw.
     """
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   bytes => !bytes_type {}
 
   @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
-  @ordered:TOTAL @bounded:true
+  @ordering:TOTAL @bounded:true
   date => !date_type {}
 
   @doc:"""
@@ -226,7 +226,7 @@
     it. A leap second, `23:59:60`, which RFC 3339's grammar admits, lies outside
     the interval and is refused.
     """
-  @ordered:TOTAL @bounded:true
+  @ordering:TOTAL @bounded:true
   time => !time_type {}
 
   @doc:"""
@@ -242,7 +242,7 @@
     second 60, which RFC 3339's grammar admits, is not an instant on that
     timeline and is refused.
     """
-  @ordered:TOTAL @bounded:true
+  @ordering:TOTAL @bounded:true
   datetime => !datetime_type {}
 
   @doc:"""
@@ -252,29 +252,29 @@
     minute is `PT1M`. A day is exactly 86400 s and a week 7 days, so `PT90M`,
     `PT1H30M` and `P0DT5400S` are one value.
     """
-  @ordered:TOTAL @bounded:true
+  @ordering:TOTAL @bounded:true
   duration => !duration_type {}
 
   @doc:"""
     Calendar span — a signed integer number of months. `P1Y` and `P12M` are one
     value. A span that is genuinely both is a record with a field of each.
     """
-  @ordered:TOTAL @bounded:false
+  @ordering:TOTAL @bounded:false
   period => !period_type {}
 
   @doc:"128-bit identifier per RFC 9562."
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   uuid => !uuid_type {}
 
   @doc:"Email address per RFC 5322."
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   email => !email_type {}
 
   @doc:"""
     IPv4 address, dotted-quad per the RFC 3986 IPv4address production. Totally
     ordered by numeric address value over a finite 32-bit space.
     """
-  @ordered:TOTAL @bounded:true
+  @ordering:TOTAL @bounded:true
   ipv4 => !ipv4_type {}
 
   @doc:"""
@@ -283,7 +283,7 @@
     ordered by numeric address value over a finite 128-bit space. (TSON text:
     contains colons, so quote it.)
     """
-  @ordered:TOTAL @bounded:true
+  @ordering:TOTAL @bounded:true
   ipv6 => !ipv6_type {}
 
   @doc:"""
@@ -293,7 +293,7 @@
     disjoint, and disjoint networks are incomparable. (TSON text: contains `/`,
     so quote it.)
     """
-  @ordered:PARTIAL @bounded:false
+  @ordering:PARTIAL @bounded:false
   cidr4 => !cidr4_type {}
 
   @doc:"""
@@ -301,7 +301,7 @@
     ordering is by containment, as for cidr4. (TSON text: contains colons and
     `/`, so quote it.)
     """
-  @ordered:PARTIAL @bounded:false
+  @ordering:PARTIAL @bounded:false
   cidr6 => !cidr6_type {}
 
   @doc:"""
@@ -310,7 +310,7 @@
     meaningful. (TSON text: the colon form must be quoted; the hyphen form may
     go unquoted.)
     """
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   mac => !mac_type {}
 
   @doc:"""
@@ -319,7 +319,7 @@
     a !type-ref) and that name resolves in the governing namespace
     ([TSON-SCHEMA] §2.2.3), exactly as it does anywhere else.
     """
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   declared => !scoped { scope: [LOCAL] }
 
   @doc:"""
@@ -329,7 +329,7 @@
     push). Any foreign schema is admitted; `extern_of` and `extern_type` narrow
     to one schema, or to one type in one schema, without declaring anything.
     """
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   extern => !scoped { scope: [EXTERN] }
 
   @doc:"""
@@ -338,7 +338,7 @@
     against the type it names. A value naming no type at all is a validation
     error here as at every scoped position.
     """
-  @ordered:NONE @bounded:false
+  @ordering:NONE @bounded:false
   dynamic => !scoped { scope: [LOCAL EXTERN] }
 
   @doc:"""

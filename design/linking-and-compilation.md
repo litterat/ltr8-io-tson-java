@@ -276,7 +276,7 @@ rules for an enum whose `type` is not an identifier family; the collision relati
   `TsonLinkedSchema.textEnums` before deriving `disjoint`. Each enum is judged in the schema that declares it, and an
   import's list is merged with its entries, as `entryOrigins` is.
 - **So is the form, for the same reason.** An enum matches its members in its label type's `normalization`
-  (SPEC-FEEDBACK.md #19), and the linker records each one whose form is not `NONE` in `TsonLinkedSchema.enumForms`
+  ([TSON-SCHEMA] §5.5), and the linker records each one whose form is not `NONE` in `TsonLinkedSchema.enumForms`
   (`EnumLabels.labelForm`), merged through imports the same way. Every site that builds an enum parser passes it to
   `AtomParsers.forType(body, form)`; the linker's own default and pin checks ask `labelForm` or the map directly.
   Where `type` resolves is `resolver.EnumLabelType`'s, shared with materialisation, which checks a template's value

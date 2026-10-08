@@ -2000,7 +2000,7 @@ class DefinitionResolverTest {
         assertRefused(BOUNDS + "  pinned => bounds ^ { min: integer ~ 0 }", "takes no default");
     }
 
-    // ── Options of several fields (SPEC-FEEDBACK.md #18) ──────────────────
+    // ── Options of several fields ([TSON-SCHEMA] §5.11) ──────────────────
 
     private static final String FRAGMENT =
             "fragment => { ( include: text | name?: text  type?: text ) }";

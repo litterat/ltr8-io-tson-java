@@ -294,7 +294,7 @@
     ] }
   }
 
-  ordered => @annotation !type_definition {
+  ordering => @annotation !type_definition {
     source: enum
     body: !enum { members: [NONE PARTIAL TOTAL] }
   }

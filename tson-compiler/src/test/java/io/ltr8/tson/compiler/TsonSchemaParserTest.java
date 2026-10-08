@@ -483,7 +483,7 @@ class TsonSchemaParserTest {
 
     /**
      * {@code |} separates options and the members of one option are separated as record entries are; a
-     * member's name {@code ?} makes it optional within its option (SPEC-FEEDBACK.md #18).
+     * member's name {@code ?} makes it optional within its option ([TSON-SCHEMA] §5.11).
      */
     @Test
     void aGroupOptionHoldsSeveralMembers() {

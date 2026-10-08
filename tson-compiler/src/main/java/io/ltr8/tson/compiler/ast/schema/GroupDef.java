@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * {@code group-def = *annotation "(" ws group-option *(ws "|" ws group-option) ws ")" ["?" / "+"]} (Part 2
- * §12.1, §5.11, SPEC-FEEDBACK.md #18) -- a field group: a presence rule over the fields its options hold. An
+ * §12.1, §5.11) -- a field group: a presence rule over the fields its options hold. An
  * option is chosen when any of its members is present, and a chosen option holds every member whose name is
  * not marked {@code ?}. A bare group admits exactly one chosen option, {@code ?} at most one, and {@code +}
  * at least one of its members, each option then being one field.
