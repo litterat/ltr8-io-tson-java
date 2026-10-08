@@ -365,11 +365,12 @@ The **schema end is the path taken through *your* schema**: an `age: int32` fiel
 bound reports `/person/age`, not `/int32` in core.tn, because a pointer into a library file you did not
 write is not where you go to fix it.
 
-`Diagnostic.Code` is a **closed enum** — switch on it exhaustively. Eight of its members are not verdicts
+`Diagnostic.Code` is a **closed enum** — switch on it exhaustively. Eleven of its members are not verdicts
 on the document, and `Code.verdict()` is the one place that says so rather than each consumer keeping its
 own copy of the set: `NOT_IMPLEMENTED` (a library gap), `BIND_MISMATCH` (your class and the schema
-disagree), `LIMIT_EXCEEDED` (this deployment's §9.1 bound, not the document), and the five `SCHEMA_*` fetch
-codes (nothing was checked — the schema was never obtained).
+disagree), the refusals — `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT` (§8.2) and
+`LIMIT_EXCEEDED` (§9.1), this deployment declining rather than the document failing — and the five `SCHEMA_*`
+fetch codes (nothing was checked — the schema was never obtained).
 Those five are `SCHEMA_NOT_PERMITTED`, `SCHEMA_NOT_FOUND`, `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT` and
 `SCHEMA_TOO_LARGE`, one per `SchemaFetchException.Reason` and mapped by `Code.of(reason)` — a code
 rather than a reason field beside one code, because which one it is is a *routing* question and the code
@@ -439,12 +440,12 @@ a data document's own `!!schema` plus its root type-ref select what it is checke
 is JSON data — the one place the tool reads an extension — and, naming neither its schema nor its type,
 takes `--schema <file|uri> --type <name>` together; they bind every JSON input in the run. A schema file given
 to `--schema` joins the run and binds by the `!!id` it declares, wherever it sits. Nothing is fetched
-over the network. Exit codes: `0` checked and nothing reported · `1` checked and rejected, or refused by a
-§9.1 limit · `2` usage · `69` a schema not obtained and a rerun will not help · `75` a schema not reached,
+over the network. Exit codes: `0` checked and nothing reported · `1` checked and rejected, or refused (§8.2
+name hygiene, a §9.1 limit) · `2` usage · `69` a schema not obtained and a rerun will not help · `75` a schema not reached,
 where a rerun may · `78` a type with no Java class in this tool · `70` a library gap or fault — a mixed run
 lifting to the most permanent (`70` > `78` > `69` > `75` > `1`). The report envelope's `outcome` answers the
-other question, `VALID`, `INVALID` or `NOT_CHECKED`: a `LIMIT_EXCEEDED` run is `NOT_CHECKED` yet exits `1`,
-because the runner holds the fix (`--max-depth`, or a smaller document).
+other question, `VALID`, `INVALID` or `NOT_CHECKED`: a refused run is `NOT_CHECKED` yet exits `1`, because the
+runner holds the fix (a relaxed policy, `--max-depth`, or a changed document).
 
 `tson --help` lists the commands; `tson <command> --help` carries that command's own options, including
 the policy flags (§8.2's name hygiene and §9.1's `--max-depth`) for the three that judge a document.

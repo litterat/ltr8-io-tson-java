@@ -275,22 +275,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **A text `members` check compares in the type's form exactly, below [TSON-SCHEMA] §5.5's NFC floor.**
-  `ValueIdentity` compares map keys, set elements, FIXED values and pins in NFC, but `TextParser`'s
-  `normalizedMembers` check and `EnumParser`'s member match compare `form.apply(...)` strings as they are, so
-  under `NONE` or `ASCII_CASEFOLD` a decomposed `e\u0301` is not the member `"\u00e9"`. Both match in NFC of
-  the value in its form, as do the two checks that refuse members which are one value (`TextType`'s coherence
-  check and `EnumLabels`); `TextNormalizationTest.anAsciiFoldDoesNotComposeADecomposedSpelling` asserts the old
-  rule and flips. A Class 2 vector for each.
-
-- [ ] **A scope push at a position that is not scoped is reported in the validation category**, where
-  [TSON-SCHEMA] §7.8 makes it a resolver error (the cell rule's refusal, at a `scoped` position without
-  `EXTERN`, is the validation error). TSON text reports it as `VALIDATION_ERROR` (`ScopePush.refuse`) and JSON
-  as `UNRECOGNIZED_FIELD` (`Tags.refuseScope`, whose Javadoc already says resolver error); both map to
-  validation in `Class2ConformanceSuiteTest.categoryOf`. Needs a resolver-category code at both sites, and a
-  corpus vector for each encoding — a `!!schema` on a record field and on a container of a scoped type
-  (`[declared]` itself, not its element) — since none catches it today.
-
 - [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
   `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
   `NOT_IMPLEMENTED` diagnostic carries. `resolveTypeRef`'s, for a sugar form that reaches resolution unlifted, offers two

@@ -101,7 +101,8 @@ differ on purpose.
 scope to be distinct within.
 
 **`Code.verdict()` answers the other question a consumer asks** — whether the code is a verdict on the document at
-all, which the five fetch codes, `NOT_IMPLEMENTED`, `BIND_MISMATCH` and `LIMIT_EXCEEDED` are not.
+all, which `NOT_IMPLEMENTED`, `BIND_MISMATCH` and [TSON-DATA] §8.1's fifth outcome are not: the five fetch codes,
+and the refusals (§8.2's three name-hygiene codes and `LIMIT_EXCEEDED`).
 
 ## When a fact earns a component
 

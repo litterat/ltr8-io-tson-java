@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -193,8 +194,8 @@ class PolicyRefusalTest {
 
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, refusal.code());
         assertEquals(Diagnostic.Code.DUPLICATE_FIELD, verdict.code());
-        assertTrue(refusal.code().verdict() && verdict.code().verdict(),
-                "a refusal was checked and declined -- the sender still holds the fix");
+        assertFalse(refusal.code().verdict(), "a refusal is §8.1's fifth outcome, not a verdict");
+        assertTrue(verdict.code().verdict());
     }
 
     /**

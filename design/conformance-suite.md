@@ -44,7 +44,7 @@ one of `valid`/`error`/`schema-document`/`refused` is present and the payload ca
 
 **`refused` is §8.1's fifth outcome and is not a verdict on the document or the schema.** §8.2's name-hygiene
 rules refuse without making a document invalid — each reads data the UCD does not freeze, so none of
-them may decide validity — and §8.2 says the refusal MUST NOT be reported in any of the four categories.
+them may decide validity — and §8.1 puts a refusal outside the four categories (`Code.verdict()` false).
 `checkRefusedVector` therefore asserts both halves: that something was refused, and that *nothing* was
 reported as invalid, `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT` being the three codes that mean
 policy, one per rule. A vector

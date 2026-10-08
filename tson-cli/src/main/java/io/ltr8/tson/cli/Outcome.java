@@ -24,10 +24,13 @@ public enum Outcome {
     /** Checked, and nothing was reported. */
     VALID,
 
-    /** Checked and rejected -- including a [TSON-DATA] §8.2 refusal, where the sender still holds the fix. */
+    /** Checked and rejected. */
     INVALID,
 
-    /** No verdict: something was reported that says the document could not be judged at all. */
+    /**
+     * No verdict: something was reported that says the document was not judged -- [TSON-DATA] §8.1's fifth
+     * outcome (a §8.2 or §9.1 refusal, a schema not obtained), or a gap or a binding this tool lacks.
+     */
     NOT_CHECKED;
 
     /**

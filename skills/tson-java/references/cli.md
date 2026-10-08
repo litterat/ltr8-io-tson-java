@@ -30,17 +30,17 @@ options, exit codes and description — including the policy options for the thr
 | Schema selection      | a `.tn` data document's own: its `!!schema` names the schema, its root type-ref (`!person`) the type. JSON names neither, so `--schema <file|uri> --type <name>`, given together, bind every JSON input in the run |
 | `-`                   | reads one data document from stdin, at most once, always data (a file really named `-` is `./-`); JSON when `--schema`/`--type` are given |
 | `--output`            | `text` (default), `json`, `tson`                                                                    |
-| Exit codes            | `0` checked, nothing reported · `1` checked and rejected, or a §9.1 limit refusal · `2` usage · `69` a schema nothing would supply · `75` a schema that could not be reached · `78` a type with no Java class here · `70` library gap or fault |
+| Exit codes            | `0` checked, nothing reported · `1` checked and rejected, or refused (§8.2, §9.1) · `2` usage · `69` a schema nothing would supply · `75` a schema that could not be reached · `78` a type with no Java class here · `70` library gap or fault |
 
 **The CLI fetches nothing** — schemas come from the files you list, and one it cannot match is
 `SCHEMA_NOT_FOUND` and exit 69, not a verdict on your data. Everything above `2` is deliberately kept apart
-from `1`: `1` is a verdict on the document, the rest are the *absence* of one, naming who could not give it —
+from `1`: `1` is what the runner can act on, the rest are the *absence* of a verdict, naming who could not give it —
 this library (`70`), an application that would have to bind the type (`78`), whoever was to serve the schema
 (`69` permanently, `75` perhaps not). `TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by who must
 act before anyone else's fix counts and with permanence breaking the tie — `70` > `78` > `69` > `75` > `1`.
-A §8.2 name-hygiene refusal is a `1`: the processor looked and declined, and the sender holds the fix. So is a
-§9.1 limit refusal (`LIMIT_EXCEEDED`), though its `outcome` is `NOT_CHECKED`: the document was not read, and the
-runner can act — `--max-depth`, or a smaller document.
+A refusal — a §8.2 name-hygiene rule or a §9.1 limit (`LIMIT_EXCEEDED`) — is a `1`, though its `outcome` is
+`NOT_CHECKED`: [TSON-DATA] §8.1's fifth outcome, not a verdict, since another deployment may accept the same
+document, and the runner can act — a relaxed policy, `--max-depth`, a renamed field or a smaller document.
 `validate` collects every problem in a file in one pass.
 
 ```bash
@@ -156,15 +156,17 @@ and one bit cannot carry both: a document whose schema was never obtained, or wh
 in this tool, was never read, and calling it `valid: false` asserts a verdict the run cannot make — the
 assertion an agent acts on the moment it writes `if (!valid)`. `NOT_CHECKED` is exactly the set of codes that
 are not a verdict (`Diagnostic.Code.verdict()`): the five `SCHEMA_*` fetch codes, `BIND_MISMATCH`,
-`NOT_IMPLEMENTED` and `LIMIT_EXCEEDED`. One of them in a file makes that file `NOT_CHECKED`, and one such file
-makes the run `NOT_CHECKED` — a run being no better than its parts. Its exit code is then one of `69`, `75`,
-`78`, `70`, or `1` for a limit refusal alone, the one non-verdict the runner can fix. A run that never reached a document at
-all (a usage or classification failure, exit `2`) is `NOT_CHECKED` with an empty `files` too.
+`NOT_IMPLEMENTED`, the three §8.2 refusal codes and `LIMIT_EXCEEDED`. One of them in a file makes that file
+`NOT_CHECKED`, and one such file makes the run `NOT_CHECKED` — a run being no better than its parts. Its exit
+code is then one of `69`, `75`, `78`, `70`, or `1` for refusals alone, the non-verdicts the runner can fix. A run
+that never reached a document at all (a usage or classification failure, exit `2`) is `NOT_CHECKED` with an empty
+`files` too.
 
 `policy` sits between `outcome` and `files` on every envelope — the §8.2 configuration and §9.1 limits the run
 was judged under, stated once because it is constant for the run and cannot differ between two of its problems. A
 §8.2 refusal is an ordinary diagnostic told apart by its `code` (`CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`,
-`RESTRICTED_SCRIPT`), carries nothing extra, and leaves the file `INVALID` rather than `NOT_CHECKED`.
+`RESTRICTED_SCRIPT`), carries nothing extra, and like `LIMIT_EXCEEDED` leaves the file `NOT_CHECKED` rather than
+`INVALID` — another deployment may accept it — while the run exits `1`.
 
 `--output tson` is the same record through the library's own writer — the shape `tson-cli`'s own
 `diagnostics.tn` (`https://tson.io/2026/37/io/ltr8/cli/diagnostics.tn`) declares, which that output is validated

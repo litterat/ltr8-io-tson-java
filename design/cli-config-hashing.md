@@ -128,11 +128,11 @@ reading messages. `compile` renders a bare `ValidationReport` instead, having on
 name. Every file's report is collected before anything prints, since the envelope's verdict is the AND
 across them.
 
-**Exit codes: 0 everything checked and nothing reported, 1 checked and rejected** (bad value / unknown type
-/ no root type-ref, a §8.2 refusal — the processor looked and declined, and the sender holds the fix — and a
-§9.1 limit refusal, on the narrower ground that the runner can act: `--max-depth` is a flag and a smaller
-document is theirs to send. That last is the one case where an `outcome` of `NOT_CHECKED` exits 1, the
-envelope answering *was it read* and the exit code answering *what now*),
+**Exit codes: 0 everything checked and nothing reported, 1 the runner can act by editing what it sent**
+(checked and rejected — bad value / unknown type / no root type-ref — or refused, §8.1's fifth outcome: a
+§8.2 name-hygiene rule or a §9.1 limit declined the document, and a relaxed policy or `--max-depth` is a flag,
+a renamed field or a smaller document theirs to send. A refusal is the one case where an `outcome` of
+`NOT_CHECKED` exits 1, the envelope answering *was it judged* and the exit code answering *what now*),
 **2 usage/classification** (no data files, an unreadable/`!!id`-less schema, a bad flag), **69
 (`EX_UNAVAILABLE`) a schema nothing would supply and a rerun would not either**, **75 (`EX_TEMPFAIL`) a
 schema that could not be reached, where a rerun might**, **78 (`EX_CONFIG`) a type the schema needs with no
@@ -182,10 +182,11 @@ discriminator that could contradict it.
 
 **What §8.2 requires a refusal to name rides on the envelope instead**, as `policy` — a `CliPolicy` on both
 `validation_run` and `validation_report`, carrying `identifier_policy` (a level, a `per_segment` unit, a
-`skeleton_distinctness` switch, and any `permitting` relaxations) and `token_policy` (a level and its `permitting`)
-and the `unicode_data_version` the rules were computed against — **plus `limits`, §9.1's bounds on the same terms**,
-currently a `max_depth` and nothing else. It is inside `policy` rather than beside it because the envelope's one
-question is "what judged this run", and a limit refusal answers it as much as a name refusal does; it also inherits
+`skeleton_distinctness` switch, and any `permitting` relaxations, each script by its UAX #24 alias, `Latin`) and
+`token_policy` (a level and its `permitting`) and the `unicode_data_version` the rules were computed against —
+**plus `limits`, §9.1's bounds on the same terms**, currently a `max_depth` and nothing else. It is inside `policy`
+rather than beside it because the envelope's one question is "what judged this run", and a limit refusal answers it
+as much as a name refusal does; it also inherits
 `CliPolicy.isDefault()`, so a run that raised the depth states it even when nothing was refused. The two surfaces keep
 `ProcessorConfig`'s own names all the way to the wire, so what a deployment set and what its reports say are one
 vocabulary. It is there rather than on each diagnostic because it is a fact about the *processor*: constant for the

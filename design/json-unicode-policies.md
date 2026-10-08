@@ -115,11 +115,11 @@ Every member name a record position carries is judged, declared or not: §8.2's 
 document wrote, and the undeclared case is the one that matters, a look-alike of a declared name arriving
 where the class will not keep it.
 
-**A refusal is a verdict but not an invalidity.** §8.2 says it MUST NOT be reported in any of §8.1's four
-categories and §9.4 carries those categories here unchanged, so what keeps it apart is the *code* —
+**A refusal is neither a verdict nor an invalidity.** It is §8.1's fifth outcome, outside the four
+categories, and §9.4 carries those categories here unchanged, so what keeps it apart is the *code* —
 `RESTRICTED_CHARACTER` and `RESTRICTED_SCRIPT`, one per rule, because the two want different fixes.
-`Code.verdict()` stays `true`: the processor looked and declined, and the sender holds the fix, which is
-the question a consumer routes on.
+`Code.verdict()` is `false`: this processor declined, and one configured otherwise may accept the same
+document.
 
 **The third rule reaches JSON where the schema says the set is names.** Names that read
 alike is a property of a *set*, which `tson-compiler` asks of a record's field names in its schemaless tree

@@ -7,6 +7,7 @@ import io.ltr8.tson.base.policy.ScriptPolicy;
 
 import java.lang.Character.UnicodeScript;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -105,7 +106,26 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
 
         /** One admitted combination, script names sorted so two deployments' reports compare as text. */
         private static List<String> names(Set<UnicodeScript> scripts) {
-            return scripts.stream().map(Enum::name).sorted().toList();
+            return scripts.stream().map(CliScriptPolicy::alias).sorted().toList();
+        }
+
+        /**
+         * A script's UAX #24 property value alias, the name {@code policy.tn} states a script by: {@code
+         * Latin}, {@code Old_Italic}. The JDK's constant is the alias upper-cased, so each segment is
+         * title-cased back; {@code SignWriting} is the one alias with a capital inside a segment.
+         */
+        static String alias(UnicodeScript script) {
+            if (script == UnicodeScript.SIGNWRITING) {
+                return "SignWriting";
+            }
+            StringBuilder alias = new StringBuilder();
+            for (String segment : script.name().split("_")) {
+                if (!alias.isEmpty()) {
+                    alias.append('_');
+                }
+                alias.append(segment.charAt(0)).append(segment.substring(1).toLowerCase(Locale.ROOT));
+            }
+            return alias.toString();
         }
     }
 }

@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -90,17 +91,17 @@ class JsonIdentifierPolicyTest {
         }
 
         @Test
-        void a_refusal_is_a_verdict_but_not_an_invalidity() {
-            // §8.2 says a refusal MUST NOT be reported in any of §8.1's four categories, and §9.4 carries
-            // those categories into this encoding unchanged -- so the *code* is what keeps it apart, one
-            // per rule. It stays a verdict: the processor looked and declined, and the sender holds the
-            // fix, which is the question a consumer routes on.
+        void a_refusal_is_neither_a_verdict_nor_an_invalidity() {
+            // §8.1 puts a refusal outside its four categories, and §9.4 carries those categories into this
+            // encoding unchanged -- so the *code* is what keeps it apart, one per rule. It is not a verdict
+            // (§8.1's fifth outcome): this processor declined, and another configured otherwise may accept
+            // the same document.
             DiagnosticsCollector problems = new DiagnosticsCollector();
             READER.withDiagnostics(problems).read(MIXED_SCRIPT, Person.class);
             Diagnostic refusal = problems.diagnostics().stream()
                     .filter(d -> HYGIENE.contains(d.code())).findFirst().orElseThrow();
             assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, refusal.code());
-            assertTrue(refusal.code().verdict(), refusal.toString());
+            assertFalse(refusal.code().verdict(), refusal.toString());
             assertEquals("'n\u0430me'", refusal.actual());
         }
 

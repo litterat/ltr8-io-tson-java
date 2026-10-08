@@ -245,9 +245,23 @@ class OutputFormatTest {
                 .read(TestDocuments.document(rendered));
 
         assertEquals(original, reread);
-        assertEquals(List.of(List.of("CYRILLIC", "LATIN")), relaxed.identifierPolicy().permitting());
+        assertEquals(List.of(List.of("Cyrillic", "Latin")), relaxed.identifierPolicy().permitting());
         assertTrue(relaxed.identifierPolicy().perSegment());
         assertFalse(relaxed.identifierPolicy().skeletonDistinctness());
+    }
+
+    /**
+     * A script is written as its UAX #24 property value alias, the name {@code policy.tn} states it by --
+     * never the JDK's upper-cased constant -- and every alias is one {@code --identifier-permit} accepts back.
+     */
+    @Test
+    void aScriptIsWrittenAsItsUnicodeAlias() {
+        assertEquals("Latin", CliPolicy.CliScriptPolicy.alias(UnicodeScript.LATIN));
+        assertEquals("Old_Italic", CliPolicy.CliScriptPolicy.alias(UnicodeScript.OLD_ITALIC));
+        assertEquals("SignWriting", CliPolicy.CliScriptPolicy.alias(UnicodeScript.SIGNWRITING));
+        for (UnicodeScript script : UnicodeScript.values()) {
+            assertEquals(script, UnicodeScript.forName(CliPolicy.CliScriptPolicy.alias(script)), script::name);
+        }
     }
 
     /**
@@ -261,7 +275,7 @@ class OutputFormatTest {
                 Diagnostic.Code.CONFUSABLE_NAMES, "reads alike", Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty());
 
-        String rendered = OutputFormat.JSON.render(new ValidationReport(Outcome.INVALID, POLICY, List.of(refused)));
+        String rendered = OutputFormat.JSON.render(new ValidationReport(Outcome.NOT_CHECKED, POLICY, List.of(refused)));
 
         assertEquals(1, count(rendered, ProcessorPolicy.dataVersion()), rendered);
         assertTrue(rendered.contains("\"policy\":" + POLICY_JSON), rendered);
