@@ -57,7 +57,7 @@ lets a schema change land across several commits with the integrity checks left 
 **The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
 `@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`
 does it: every entry must read back into `schema.meta`, have a counterpart here and resolve identically,
-and every schema-map key must carry the same annotations (`@ordered`, `@bounded`, `@exact`, `@numeric`,
+and every schema-map key must carry the same annotations (`@ordering`, `@bounded`, `@exact`, `@numeric`,
 `@synthetic`). `@doc` is not compared: a fixture keeps only its header note for the reader and leaves entry
 docs out, since it exists to be compared and a summary of a source doc only drifts from it. **Key annotations
 are compared from the parsed text**, never through the bound document, which drops them, so both sides would
@@ -106,9 +106,9 @@ merging a divergence early costs `main` the one signal it exists to give. The bu
 revision's own identities from the start, so a content change lands on artifacts named for the revision
 proposing it rather than being re-identified at the end.
 
-**The open proposal is `r2026-37-proposal`**, with its corpus twin. What takes work off `main` is the set of
-meta-kernel changes in `SPEC-FEEDBACK.md` #6–#9 — bounded type slots, `identifier` as a text family, `unit`'s
-retirement, and a recorded type per template parameter — none of which Revision 36 can carry. It carries the
+**The open proposal is `r2026-37-proposal`**, with its corpus twin. What takes work off `main` is Revision 37's
+meta-kernel changes — `identifier` as a text family, `unit`'s retirement, a recorded type per template parameter,
+field-group options, `optional` and `voidable` — none of which Revision 36 can carry. It carries the
 Revision 37 identities and version `0.37.0-SNAPSHOT` from its first commit. Kernel work lands through PR branches
 off it; work Revision 36 can carry still lands on `main`, which the proposal merges in to keep up. While it is
 open, `Closes #N` in a PR into it does not close the issue (GitHub fires it only on the default branch), so each

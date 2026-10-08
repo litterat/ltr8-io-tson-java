@@ -28,7 +28,7 @@ public record MapDiagnostics(String typeName) {
      * [TSON-DATA] §2.9: a key must not be void. The one void rule that holds at every position, there being no
      * facet that admits a void key and no reading under which one would mean anything.
      *
-     * <p>"The void sentinel" is the series' noun for the concept (§2.9, SPEC-FEEDBACK.md #21) and so belongs in
+     * <p>"The void sentinel" is the series' noun for the concept ([TSON-DATA] §2.9) and so belongs in
      * the prose; what stays out is the <em>spelling</em>, which is each encoding's and rides in {@code actual}.
      */
     public Refusal voidKey(String spelling) {

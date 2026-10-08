@@ -55,7 +55,7 @@ import java.util.Optional;
  * system's names as in the series' own.
  *
  * <p><b>The profile judges a value, which is already in its {@link Normalization} form.</b> An
- * {@code identifier_type} atom puts the text it reads into the form first (SPEC-FEEDBACK.md #19), and a name the
+ * {@code identifier_type} atom puts the text it reads into the form first ([TSON-SCHEMA] §5.5), and a name the
  * series reads arrives NFC -- an unquoted token by the lexer's rule, a quoted one normalised before it is matched
  * ([TSON-DATA] §7.2.1). So {@link #check} refuses text not in the form rather than normalising it: the form holds
  * for every caller with a value, the stored name equals the compared name, and duplicate detection is string

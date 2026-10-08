@@ -142,7 +142,7 @@ final class TypeInhabitance {
     }
 
     /**
-     * Whether some document can choose this option (SPEC-FEEDBACK.md #18): it states every member the group does
+     * Whether some document can choose this option ([TSON-SCHEMA] §5.11): it states every member the group does
      * not mark {@code ?}, and at least one member, so an option whose members are all marked needs one of them.
      */
     private static boolean choosable(List<String> option, FieldGroup group, RecordBody record,

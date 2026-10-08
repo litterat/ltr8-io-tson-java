@@ -832,7 +832,7 @@ class CrossEncodingParityTest {
                 {"value": 1, "min": 0, "max": 9}""");
     }
 
-    // ── Field groups whose options hold several fields (SPEC-FEEDBACK.md #18) ──
+    // ── Field groups whose options hold several fields ([TSON-SCHEMA] §5.11) ──
 
     /** Documents both encodings admit: each option chosen alone, its marked members left out or not. */
     @Test
@@ -904,7 +904,7 @@ class CrossEncodingParityTest {
         assertEquals(List.of(), json(rootType, jsonBody), "JSON refused " + jsonBody);
     }
 
-    // ── A text family's normalization (SPEC-FEEDBACK.md #19) ──
+    // ── A text family's normalization ([TSON-SCHEMA] §5.5) ──
 
     /** The value is the text in the type's form, so a member, a pin and a key each match it however it is cased. */
     @Test

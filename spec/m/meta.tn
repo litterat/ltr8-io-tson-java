@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=001ce80d5273e3a13999f6f1d91b6a2f73a62c5f32ab7bcbdd182fd24ae4a572"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=cfbc5c47c825a30bb9762a06bc98724bde640a8038d4d5f85376bb7f761cfb47"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=cfbc5c47c825a30bb9762a06bc98724bde640a8038d4d5f85376bb7f761cfb47"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=64b5dd6a2c00d54c5370b52a82e94b27abad603805e5380f167de5b658269ab3"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ac20ac271d6d53934e7eca4908d50aa3bfdd4545d915833dbe081d353af509c7"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ac20ac271d6d53934e7eca4908d50aa3bfdd4545d915833dbe081d353af509c7"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 
@@ -38,7 +38,7 @@
      (`uuid_type`, `iri_type`), network (`ipv4_type`, `ipv6_type`,
      `cidr4_type`, `cidr6_type`, `mac_type`), and text (`email_type`).
 
-  Plus annotation types — the classifying markers `ordered`, `bounded`, `exact`,
+  Plus annotation types — the classifying markers `ordering`, `bounded`, `exact`,
   `numeric`; the checked assertion `disjoint`; and the documentary `deprecated`,
   `title`, `comment`, `examples`, `read_only`, `write_only`. Annotation types
   must reside in the governing target's namespace ([TSON-SCHEMA] §6); placing
@@ -179,7 +179,7 @@
     the two infinities, and the canonical quiet NaN ([TSON-DATA] §5.6);
     `allow_nan`, `allow_infinity`, `allow_subnormal`, and `allow_negative_zero`
     default to true (`~ true` — the format's full set) and may be narrowed to
-    false to exclude those representation artifacts. The bounds are OPTIONAL
+    false to exclude those representation artifacts. The bounds are optional
     domain restrictions validated against the value as written, before
     rounding; they do not bound the special values. Not a narrowing of the
     exact tier: infinities and NaN are not exact numbers.
@@ -273,7 +273,7 @@
     selects the type of both parts from the closed `complex_component`
     vocabulary; it defaults to `NUMBER` (a DEFAULT, §5.2), so a bare complex has
     exact components — a defaulted selector. Complex has no useful total order
-    (`@ordered:NONE`), so the order-based facets of the other numeric tiers do
+    (`@ordering:NONE`), so the order-based facets of the other numeric tiers do
     not apply here. Exactness is inherited from `component` rather than fixed:
     `INTEGER`/`NUMBER`/`RATIONAL` components give an exact complex,
     `FLOAT32`/`FLOAT64` an approximate one, so `complex` carries no `@exact`
@@ -472,8 +472,12 @@
     spec?: = "https://www.rfc-editor.org/rfc/rfc9542"
   }
 
-  @doc:"Ordering classification (ISO/IEC 11404 / XSD fundamental facet)."
-  ordered => @annotation !enum [NONE PARTIAL TOTAL]
+  @doc:"""
+    Ordering classification (ISO/IEC 11404 / XSD fundamental facet): whether
+    the value space has an order relation. Not a container's `ordered` facet,
+    which says whether element order is part of a value.
+    """
+  ordering => @annotation !enum [NONE PARTIAL TOTAL]
 
   @doc:"""
     Boundedness classification (ISO/IEC 11404 / XSD fundamental facet): true

@@ -4,9 +4,10 @@ import java.text.Normalizer;
 
 /**
  * The meta-kernel's {@code normalization}: the form a text family puts its decoded value into
- * (SPEC-FEEDBACK.md #19). A token is unquoted and unescaped, then put into this form, and the result is the value
+ * ([TSON-SCHEMA] §5.5). A token is unquoted and unescaped, then put into this form, and the result is the value
  * -- the one every facet judges and every identity compares, as {@code 0x10} decodes to 16. A written value is
- * never refused for not being in the form.
+ * never refused for not being in the form. No comparison goes below NFC: two values are one when, each in its
+ * form, they are NFC-equal, so {@link #NONE} and {@link #NFC} share one equality and differ in the value.
  */
 public enum Normalization {
     /** The value is the text as written. */
@@ -24,8 +25,8 @@ public enum Normalization {
      * The text as written with U+0041..005A mapped to U+0061..007A and nothing else: the comparison the
      * case-insensitive ASCII naming systems state -- RFC 9110 field names, RFC 3986 §3.1 schemes, RFC 4343 DNS
      * names. A compatibility character is left as it is, so a profile of ASCII letters still refuses a full-width
-     * or Kelvin-sign spelling that {@link #NFKC_CASEFOLD} would fold into it. No Unicode normalization runs: a
-     * composed and a decomposed {@code É} stay two values, as under {@link #NONE}.
+     * or Kelvin-sign spelling that {@link #NFKC_CASEFOLD} would fold into it. No Unicode normalization runs
+     * on the value, which still compares in NFC, as every text value does.
      */
     ASCII_CASEFOLD;
 

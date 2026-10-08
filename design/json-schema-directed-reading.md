@@ -388,8 +388,8 @@ separates them is two constraint values, `scope` and `schemas`, and not a shape.
 `$type`'s). `$schema` leading is EXTERN, `$type` alone is LOCAL, and anything else -- a bare scalar, an array, an
 object leading with none of them, a wrapper with no `$type` -- names no type: a validation error in every mode.
 A cell the instance's `scope` does not hold refuses the value as a validation error, which is also how a
-`$schema` at a `declared` position is refused (`SPEC-FEEDBACK.md` #5: §7.8 states two categories for it, and both
-encodings take the cell rule's).
+`$schema` at a `declared` position is refused: [TSON-SCHEMA] §7.8's cell rule decides at every scoped position, in
+both encodings.
 
 **LOCAL is wired at compile.** Every name the governing namespace holds is resolved to a `Route` when the scoped
 entry compiles, so a LOCAL read is one map lookup and a route, exactly as a tagged record position's is -- inline

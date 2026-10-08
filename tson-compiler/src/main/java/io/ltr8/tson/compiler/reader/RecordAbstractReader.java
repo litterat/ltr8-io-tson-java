@@ -328,7 +328,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private static final String VOID = "_";
 
     /**
-     * Field-group presence check (§5.11, SPEC-FEEDBACK.md #18). The group's members flatten into ordinary
+     * Field-group presence check (§5.11). The group's members flatten into ordinary
      * optional fields, so this is the only place a group is enforced at read time. "Present" means the member's
      * field name appeared in the data ({@code seen}); a voidable member written as the void sentinel {@code _}
      * counts as appearing, which is what chooses its option. Per group: an option is chosen when any member

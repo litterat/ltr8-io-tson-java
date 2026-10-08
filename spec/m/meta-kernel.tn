@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=cfbc5c47c825a30bb9762a06bc98724bde640a8038d4d5f85376bb7f761cfb47"
+!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ac20ac271d6d53934e7eca4908d50aa3bfdd4545d915833dbe081d353af509c7"
 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
@@ -75,7 +75,7 @@
     One parameter of an open entry: its name, and the type an argument for it is
     read as — the declared type of the slot it stands in, in the vocabulary of
     the constructor the held body applies. It is derived from the body and never
-    written: a type slot gives `type_ref`; a scalar slot of the applied
+    required of the author: a type slot gives `type_ref`; a scalar slot of the applied
     constructor gives that slot's declared type (`min_items: N` gives
     `non_negative_integer`); a routed default or fixed value gives the field's
     own declared type (`w?: int32 ~ N` gives `int32`); and a parameter passed to
@@ -102,7 +102,7 @@
     Held body — the body of an entry that declares type parameters
     ([TSON-SCHEMA] §5.10). `template` is the constructor application as written,
     unread until materialisation substitutes the parameters away, and
-    `parameters` are the names it binds.
+    `parameters` lists what it binds, each a `template_param`.
 
     The text is how a held body is written in resolved output; a processor holds
     the parsed form, which this vocabulary cannot represent. A held body is not
@@ -159,7 +159,7 @@
   @doc:"""
     Void primitive. The instance of void_type, an atom constructor with no
     constraint vocabulary whose parsing contract admits only the void sentinel
-    `_`. The host value is absent. void is the target type for bare annotations
+    `_`. It binds no host value. void is the target type for bare annotations
     (`@T` with no value); the resolver fills the implicit `_` and validates
     against this contract. See [TSON-SCHEMA] §6.
 
@@ -440,7 +440,7 @@
     the held body as parsed; in resolved output it sits inside the
     `template.template` text.
 
-    `name` is the only REQUIRED field, so the positional form ([TSON-SCHEMA]
+    `name` is the only required field, so the positional form ([TSON-SCHEMA]
     §5.6, general over schema-backed data) applies at every type_ref-typed
     position: a bare name token fills `name` directly, and a braced record is
     the explicit form, canonical only when `arguments` is present.
@@ -479,8 +479,8 @@
     replaces a parameter-naming member with the bound argument as parameters
     close ([TSON-SCHEMA] §8.1). A parameter here describes the held body as
     parsed; in resolved output it sits inside the `template.template` text. The
-    group is REQUIRED: exactly one member is present. There is no positional
-    form.
+    group is not optional: exactly one member is present. There is no
+    positional form.
     """
   type_argument => {
     ( name: type_ref | value: value )
@@ -572,9 +572,12 @@
     describes the held body as parsed; in resolved output it sits inside the
     `template.template` text.
 
-    Under [TSON-SCHEMA] §5.7's fixation, a parametric `= P` is a required FREE
-    field with the parameter in `value`, and becomes optional and FIXED when
-    substitution makes the value concrete.
+    A parametric modifier takes the name mark its literal spelling takes
+    ([TSON-SCHEMA] §5.7): `w?: T ~ P` is an optional DEFAULT field and
+    `w?: T = P` an optional FIXED one, `w: T = P` is a FIXED field that is not
+    optional, and `w: T ~ P` is refused. The parameter stands in `value` until
+    substitution makes it concrete; `optional` is the name's mark as written,
+    and closing changes neither it nor `role`.
 
     Which fields a member-dispatched family dispatches on is the enclosing
     record's own statement, `record.discriminators`, and no field says it of
@@ -669,7 +672,7 @@
   @doc:"""
     A sequence of elements of one type. The container constructors carry no
     parameters: a type slot (array's element_type, map's key_type and
-    value_type) is an ordinary REQUIRED field typed type_ref, filled by the
+    value_type) is an ordinary required field typed type_ref, filled by the
     construction or by a sugar form's desugaring like any other required field,
     and a closed application carries the bound reference as the field's value
     (!array { element_type: person }), its binding record being ordinary data

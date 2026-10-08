@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  *
  * <p><b>A leap second is refused.</b> RFC 3339's grammar admits {@code time-second} {@code 60}, but core's
  * {@code time} is the time of day on {@code [00:00:00, 24:00:00)}, and {@code 23:59:60} lies outside it
- * (SPEC-FEEDBACK.md #20). {@link OffsetTime#parse} refuses it as well, so the refusal is a parse error.
+ * ([TSON-DATA] §5.4). {@link OffsetTime#parse} refuses it as well, so the refusal is a parse error.
  *
  * <p>{@code precision} constrains the value, not the spelling (§5.5), through {@link FractionalSeconds}:
  * {@code 12:00:00.500} is admitted under {@code precision: 1}, being the half-second.

@@ -117,7 +117,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
                 "at most one option of (" + options + ")", chosen + " chosen");
     }
 
-    /** The at-least-one group ({@code +}, SPEC-FEEDBACK.md #18) with none of its members present. */
+    /** The at-least-one group ({@code +}, [TSON-SCHEMA] §5.11) with none of its members present. */
     public Refusal groupRequiresAtLeastOne(String members) {
         return new Refusal(Diagnostic.Code.FIELD_GROUP,
                 "at least one of (%s) must be present for '%s'".formatted(members, typeName),
@@ -125,7 +125,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     }
 
     /**
-     * A chosen option missing a member its group does not mark {@code ?} (§5.11, SPEC-FEEDBACK.md #18): the
+     * A chosen option missing a member its group does not mark {@code ?} (§5.11): the
      * member present chose the option, and the option needs the one that is missing.
      */
     public Refusal optionNeeds(String chosenBy, String option, String missing) {

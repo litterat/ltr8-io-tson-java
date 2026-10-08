@@ -31,7 +31,7 @@ import java.util.stream.Stream;
  * included -- one rule, checked in one place ({@link #coherenceCheck}), which is why this module depends on
  * {@code tson-regex}.
  *
- * <p><b>{@code normalization} is the form the decoded value is put into</b> (SPEC-FEEDBACK.md #19): a value is
+ * <p><b>{@code normalization} is the form the decoded value is put into</b> ([TSON-SCHEMA] §5.5): a value is
  * the text as written put into that form, and every other facet -- lengths, {@code pattern}, {@code members}
  * -- judges the value, never the spelling. A member is a value too, so it is put into the form before it is
  * judged.

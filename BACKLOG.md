@@ -46,6 +46,12 @@ own prose (which had gone stale on it):
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
+- [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
+  so no path reads a resolved `type_definition` map and verifies it. §8.1's ingest verifies rather than
+  recomputes what an author may have written into a derived fact: a recorded `template_param.type` or `bound`
+  must be IS-A the type the held body derives, since a written narrowing lives nowhere else; it also re-runs the
+  family checks (no member minted at a use site) over the ingested map and its closure, and the §5.11 group
+  declaration rules over every `field_group`. `ParameterTypes` already derives the type to check against.
 
 ## Checked annotations
 
@@ -220,7 +226,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
-  — the fixtures carry `@synthetic` on the keys the resolver minted and `@ordered`/`@bounded`/`@exact` on core's,
+  — the fixtures carry `@synthetic` on the keys the resolver minted and `@ordering`/`@bounded`/`@exact` on core's,
   and the bound side renders none of them, so the entries would compare equal for the wrong reason;
   `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
   test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
@@ -256,6 +262,22 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   only consumer-facing prose; `design/` is internal.
 
 ## Miscellaneous
+
+- [ ] **A text `members` check compares in the type's form exactly, below [TSON-SCHEMA] §5.5's NFC floor.**
+  `ValueIdentity` compares map keys, set elements, FIXED values and pins in NFC, but `TextParser`'s
+  `normalizedMembers` check and `EnumParser`'s member match compare `form.apply(...)` strings as they are, so
+  under `NONE` or `ASCII_CASEFOLD` a decomposed `e\u0301` is not the member `"\u00e9"`. Both match in NFC of
+  the value in its form, as do the two checks that refuse members which are one value (`TextType`'s coherence
+  check and `EnumLabels`); `TextNormalizationTest.anAsciiFoldDoesNotComposeADecomposedSpelling` asserts the old
+  rule and flips. A Class 2 vector for each.
+
+- [ ] **A scope push at a position that is not scoped is reported in the validation category**, where
+  [TSON-SCHEMA] §7.8 makes it a resolver error (the cell rule's refusal, at a `scoped` position without
+  `EXTERN`, is the validation error). TSON text reports it as `VALIDATION_ERROR` (`ScopePush.refuse`) and JSON
+  as `UNRECOGNIZED_FIELD` (`Tags.refuseScope`, whose Javadoc already says resolver error); both map to
+  validation in `Class2ConformanceSuiteTest.categoryOf`. Needs a resolver-category code at both sites, and a
+  corpus vector for each encoding — a `!!schema` on a record field and on a container of a scoped type
+  (`[declared]` itself, not its element) — since none catches it today.
 
 - [ ] **`!uri` is `java.net.URI`'s RFC 2396 grammar, not [TSON-DATA] §5.5's RFC 3986** (`main` and
   `r2026-37-proposal`). `UriParser` delegates the whole grammar to `java.net.URI`, which refuses valid URIs —

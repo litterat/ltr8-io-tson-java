@@ -16,7 +16,7 @@ import java.util.Optional;
  * Other instances name an outside system's positions under that system's own profile.
  *
  * <p><b>The text is put into the {@code normalization} form, then the profile judges it, then the text
- * facets.</b> The value is the normalised text (SPEC-FEEDBACK.md #19), so the profile asks whether the
+ * facets.</b> The value is the normalised text ([TSON-SCHEMA] §5.5), so the profile asks whether the
  * <em>value</em> is a name: under {@code NFKC_CASEFOLD}, a profile of lowercase letters admits
  * {@code Content-Type}. A name the profile refuses is a grammar violation whatever its facets say, so a
  * refinement's {@code pattern} or {@code members} is only ever asked of a well-formed name; the facets are

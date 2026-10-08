@@ -64,7 +64,7 @@ final class EnumLabels {
 
     /**
      * The form {@code enumeration} matches its members in: its label type's {@code normalization}
-     * (SPEC-FEEDBACK.md #19), followed into the governing meta where the enum's constructor pinned the type.
+     * ([TSON-SCHEMA] §5.5), followed into the governing meta where the enum's constructor pinned the type.
      * {@code NONE} for a body that is not an enum, a type that resolves to nothing, or one that is not a text
      * family -- each refused or reported on its own.
      */

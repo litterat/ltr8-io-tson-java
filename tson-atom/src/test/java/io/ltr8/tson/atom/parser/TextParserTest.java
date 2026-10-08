@@ -64,7 +64,7 @@ class TextParserTest {
         assertEquals("hello", TextParser.UNCONSTRAINED.write(TextParser.UNCONSTRAINED.read(token("hello"))));
     }
 
-    /** The value is the text in the type's form, and the facets judge that value (SPEC-FEEDBACK.md #19). */
+    /** The value is the text in the type's form, and the facets judge that value ([TSON-SCHEMA] §5.5). */
     @Test
     void theValueIsTheTextInTheTypesNormalizationForm() {
         TextParser charset = new TextParser(new TextType(Optional.empty(), Optional.empty(), Optional.empty(),

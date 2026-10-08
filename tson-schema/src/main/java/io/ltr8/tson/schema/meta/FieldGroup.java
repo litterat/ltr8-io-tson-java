@@ -31,7 +31,7 @@ public record FieldGroup(List<List<String>> members, @Field("optional_members") 
 
     /**
      * Whether this is the at-least-one group: one option the group may not leave out, which the grammar writes
-     * only as {@code +} over its members (SPEC-FEEDBACK.md #18).
+     * only as {@code +} over its members ([TSON-SCHEMA] §5.11).
      */
     public boolean atLeastOne() {
         return members.size() == 1 && !optional;
