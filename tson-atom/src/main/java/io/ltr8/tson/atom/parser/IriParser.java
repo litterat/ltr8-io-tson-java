@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta.tn's {@code iri_type} constructor (§5.5's {@code iri} and {@code
+ * Parses and validates against the meta-kernel's {@code iri_type} constructor (§5.5's {@code iri} and {@code
  * iri_reference} atoms), RFC 3987.
  *
  * <p><b>The grammar is RFC 3987's own, through {@link Iri}</b>: every character beyond US-ASCII is a {@code

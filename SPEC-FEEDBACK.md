@@ -45,10 +45,9 @@ where a deployment's policy lives (#1), whether a namespace should be a value (#
 a JSON member name that is not an identifier (#3), a bounded type slot at a field, which lets one field's type
 depend on another's (#4), a bound on the constructor an argument's type was built with (#5), and an edge between
 a core sibling and its kernel original, which resolved output needs and the same-body rule cannot give it (#6).
-**#7 and #8 were raised against Revision 37 itself**, in verifying its text against the closed entries: §5.2
-exempts a use-site application of a template family base, which mints exactly the unnameable member §5.2's rule
-removes (#7); and `uri` types the keys of `scoped.schemas`, where an identity may be an IRI-reference or
-path-only (#8). The rest of what that verification found is in Revision 37's text and artifacts.
+**#7 was raised against Revision 37 itself**, in verifying its text against the closed entries: §5.2 exempts a
+use-site application of a template family base, which mints exactly the unnameable member §5.2's rule removes. The
+rest of what that verification found is in Revision 37's text and artifacts.
 ---
 
 ## 1. §8.2's policy has no artifact, and the two obvious homes are both wrong
@@ -586,38 +585,5 @@ first is total and simpler, and refuses a schema that never dispatches on `box`.
 
 **Interpretation chosen:** the text — the exemption holds, the schema loads, and dispatch at the base reports
 the minted name.
-
-**Status against Revision 37:** open.
-
----
-
-## 8. `uri` types the keys of `scoped.schemas`, where an identity may be an IRI-reference or path-only
-
-**Section:** [TSON-SCHEMA] §5.5 (*A URI is RFC 3986's URI*), [TSON-DATA] §2.2.1 (identity), §3.3 (a directive
-argument is an IRI-reference); meta's `scoped`.
-
-**Kind:** defect — two statements about identity that Revision 37's URI and IRI changes left out of step.
-
-**The text.** §5.5: withdrawing `allow_fragment` beside `allow_relative` "leaves the absolute-URI (§4.3), the form
-[TSON-DATA] §2.2.1 demands of an identity", and "the kernel's `uri` is `!uri_type { allow_relative: false }`,
-which types `atom_specification.spec` and the keys of `scoped.schemas` by the value space identity already
-requires of them". [TSON-DATA] §2.2.1 demands no such form. It admits "a reference with no authority component
-(a local `file:`-style or path-only reference)", whose canonical identity is the path alone; it reads the argument
-"as an IRI-reference (§3.3), so a host or path may carry characters beyond US-ASCII as themselves"; and it forbids
-a fragment, which the kernel's `uri` admits (`allow_fragment` keeps its default).
-
-**What follows.** `scoped.schemas => {uri => [type_name; 1..]?; 1..}` (meta) cannot hold every identity a
-document may name in `!!schema`: a path-only identity has no scheme, and one with characters beyond US-ASCII is
-outside the URI grammar — a resolver error under `!uri` (§5.5). A schema can therefore admit, at an `extern_of`
-position, only the schemas whose identities happen to be absolute and ASCII, and an identity carrying a fragment
-types as a `uri` though no identity may carry one.
-
-**Suggested resolution:** type identity positions by what §2.2.1 states — an `iri_reference` with fragments
-withdrawn, or a kernel `identity` atom stating §2.2.1's form (no fragment, no userinfo, no port, lowercase host,
-no dot-segments) — and correct §5.5's two sentences to say that `uri` is the absolute form and not identity's.
-The alternative, restricting §2.2.1 to absolute ASCII URIs, undoes the directive-argument reading (§3.3).
-
-**Interpretation chosen:** the kernel as written. The keys are read as `uri`, so a path-only or non-ASCII
-identity is refused as a key, and a fragment is admitted there.
 
 **Status against Revision 37:** open.

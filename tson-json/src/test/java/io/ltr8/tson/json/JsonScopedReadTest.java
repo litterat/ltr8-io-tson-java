@@ -68,6 +68,29 @@ class JsonScopedReadTest {
             }
             """;
 
+    private static final String WIDE = "https://\u4F8B\u3048.test/\u6CE8\u6587.tn";
+    private static final String LIBRARY = "/local/json-scope-orders.tn";
+    private static final String IDENTITY_HOST = "https://example.test/json-scope-identity-host.tn";
+
+    private static String orders(String id) {
+        return "!!id:\"" + id + "\"\n" + """
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
+                {
+                  order => { n: int32 }
+                }
+                """;
+    }
+
+    private static final String IDENTITY_HOST_SCHEMA = """
+            !!id:"https://example.test/json-scope-identity-host.tn"
+            !!meta:"https://tson.io/2026/37/m/meta.tn"
+            !!import:"https://tson.io/2026/37/m/core.tn"
+            {
+              routed => { wide: extern_of<"%s">  library: extern_of<"%s"> }
+            }
+            """.formatted(WIDE, LIBRARY);
+
     private static final Tson TSON = registered();
 
     private static Tson registered() {
@@ -75,6 +98,9 @@ class JsonScopedReadTest {
         tson.resolve(CLAIM_SCHEMA);
         tson.resolve(REPORT_SCHEMA);
         tson.resolve(HOST_SCHEMA);
+        tson.resolve(orders(WIDE));
+        tson.resolve(orders(LIBRARY));
+        tson.resolve(IDENTITY_HOST_SCHEMA);
         return tson;
     }
 
@@ -394,5 +420,18 @@ class JsonScopedReadTest {
         assertNull(read);
         assertEquals(1, problems.size(), problems::toString);
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code());
+    }
+
+    /**
+     * {@code $schema} names a schema by any identity a document may carry ([TSON-DATA] §2.2.1): a host and path
+     * beyond US-ASCII, or a path-only reference naming a library entry -- as the text encoding reads them.
+     */
+    @Test
+    void externOfNamesASchemaByAnyIdentityADocumentMayCarry() {
+        String json = """
+                {"wide": {"$schema": "%s", "$type": "order", "n": 1},
+                 "library": {"$schema": "%s", "$type": "order", "n": 2}}""".formatted(WIDE, LIBRARY);
+
+        assertEquals(List.of(), JSON.validate(json, IDENTITY_HOST, "routed"));
     }
 }

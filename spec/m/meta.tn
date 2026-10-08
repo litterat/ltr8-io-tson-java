@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=64b5dd6a2c00d54c5370b52a82e94b27abad603805e5380f167de5b658269ab3"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ac20ac271d6d53934e7eca4908d50aa3bfdd4545d915833dbe081d353af509c7"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=ac20ac271d6d53934e7eca4908d50aa3bfdd4545d915833dbe081d353af509c7"
+!!id:"https://tson.io/2026/37/m/meta.tn?sha256=568b589bdb162f5390ca46f6a941339d7b92ecb236bf233f8ed992b359b47a90"
+!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f2c2b278405f4c02ae327f70df07d5778744916da613a814104af6a312fcc145"
+!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f2c2b278405f4c02ae327f70df07d5778744916da613a814104af6a312fcc145"
 @doc:"""
   TSON meta-schema (2026 Revision 37 draft).
 
@@ -23,7 +23,7 @@
      selecting its text spelling), whose instance in core is `bytes`; and
      `scoped` (with the `scope_kind` enum), whose instances in core are
      `declared`, `extern` and `dynamic` and whose applications are `extern_of`
-     and `extern_type`. Fixed-size arrays have no constructor of their own:
+     and `extern_type`, with `schema_identity` typing the schemas it names. Fixed-size arrays have no constructor of their own:
      `[T; N]` is the spelling.
 
   2. The `set` template — the `set<T>` spelling of the kernel's `set_type`
@@ -35,7 +35,7 @@
      `ieee_format` enum; `decimal_type` for the exact tier; `rational_type`;
      `complex_type`, with the `complex_component` enum), temporal (`date_type`,
      `time_type`, `datetime_type`, `duration_type`, `period_type`), identifier
-     (`uuid_type`, `iri_type`), network (`ipv4_type`, `ipv6_type`,
+     (`uuid_type`, `uri_type`), network (`ipv4_type`, `ipv6_type`,
      `cidr4_type`, `cidr6_type`, `mac_type`), and text (`email_type`).
 
   Plus annotation types — the classifying markers `ordering`, `bounded`, `exact`,
@@ -153,8 +153,15 @@
     """
   scoped => sum & {
     scope:    scope_set
-    schemas?: {uri => [type_name; 1..]?; 1..}
+    schemas?: {schema_identity => [type_name; 1..]?; 1..}
   }
+
+  @doc:"""
+    A schema's identity as a reference names it ([TSON-DATA] §2.2.1): an
+    IRI-reference, so a host or path may carry characters beyond US-ASCII and
+    a path-only reference names a library entry, and never a fragment.
+    """
+  schema_identity => !iri_type { allow_fragment: false }
 
   @doc:"""
     IEEE 754-2019 interchange formats, both radices. Selects the representable
@@ -384,16 +391,17 @@
   }
 
   @doc:"""
-    IRI constraint vocabulary per RFC 3987. Instances are `iri` and
-    `iri_reference` in core. The facets are uri_type's: `schemes` lists the
-    admitted schemes as scheme_name values, which fold case; `allow_relative`
-    admits a relative reference beside an IRI, so its default is an
-    IRI-reference; `allow_fragment` admits a fragment. An IRI's characters
-    beyond US-ASCII are RFC 3987's `ucschar`, and `iprivate` within the query.
-    An IRI is its text as written, as a URI is.
+    URI constraint vocabulary per RFC 3986. Instances are `uri` and
+    `uri_reference` in core. The facets are the kernel's iri_type's, over RFC
+    3986's grammar: `schemes` lists the admitted schemes as scheme_name values,
+    which fold case; `allow_relative` admits a relative reference (§4.2) beside
+    a URI (§3), so its default is a URI-reference (§4.1); `allow_fragment`
+    admits a fragment (§3.5), and withdrawing it beside `allow_relative` leaves
+    an absolute-URI (§4.3). A URI is US-ASCII (§2), and its text as written, as
+    an IRI is.
     """
-  iri_type => text_type & atom_specification & {
-    spec?:           = "https://www.rfc-editor.org/rfc/rfc3987"
+  uri_type => text_type & atom_specification & {
+    spec?:           = "https://www.rfc-editor.org/rfc/rfc3986"
     schemes?:        scheme_set
     allow_relative?: boolean ~ true
     allow_fragment?: boolean ~ true

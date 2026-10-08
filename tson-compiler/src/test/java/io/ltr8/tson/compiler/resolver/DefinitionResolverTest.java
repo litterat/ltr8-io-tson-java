@@ -21,7 +21,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.UriType;
+import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -1132,28 +1132,28 @@ class DefinitionResolverTest {
      * Asserting against a hand-written constant cannot catch that; this resolves real declarations.
      */
     @Test
-    void resolvesRegexAndUriInstancesWithEveryComposedFieldBound() {
+    void resolvesRegexAndIriInstancesWithEveryComposedFieldBound() {
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
                 { plain_regex   => !regex_type {}
                   bounded_regex => !regex_type { max_length: 40 }
-                  plain_uri     => !uri_type {}
-                  schemed_uri   => !uri_type { allow_relative: false }
-                  https_uri     => !uri_type {
+                  plain_uri     => !iri_type {}
+                  schemed_uri   => !iri_type { allow_relative: false }
+                  https_uri     => !iri_type {
                     schemes: [https] allow_fragment: false length: 19 } }""").parseSchemaDocument().body();
         DefinitionResolver resolver = definitionResolverFor(metaKernelCompiled(), EMPTY_NAMESPACE);
 
         assertEquals(RegexType.UNCONSTRAINED, resolver.resolve(schemaMap.declarations().get("plain_regex")).body());
-        assertEquals(UriType.REFERENCE, resolver.resolve(schemaMap.declarations().get("plain_uri")).body());
-        assertEquals(UriType.URI, resolver.resolve(schemaMap.declarations().get("schemed_uri")).body());
+        assertEquals(IriType.REFERENCE, resolver.resolve(schemaMap.declarations().get("plain_uri")).body());
+        assertEquals(IriType.IRI, resolver.resolve(schemaMap.declarations().get("schemed_uri")).body());
 
         RegexType bounded = (RegexType) resolver.resolve(schemaMap.declarations().get("bounded_regex")).body();
         assertEquals("https://www.rfc-editor.org/rfc/rfc9485", bounded.spec());
         assertEquals(Optional.of(40), bounded.maxLength());
 
-        // length is the facet UriType declared no component for at all, so it had nowhere to bind.
-        UriType https = (UriType) resolver.resolve(schemaMap.declarations().get("https_uri")).body();
-        assertEquals("https://www.rfc-editor.org/rfc/rfc3986", https.spec());
+        // length is the facet IriType declared no component for at all, so it had nowhere to bind.
+        IriType https = (IriType) resolver.resolve(schemaMap.declarations().get("https_uri")).body();
+        assertEquals("https://www.rfc-editor.org/rfc/rfc3987", https.spec());
         assertEquals(Optional.of(List.of("https")), https.schemes());
         assertFalse(https.allowFragment());
         assertEquals(Optional.of(19), https.length());
@@ -1329,20 +1329,20 @@ class DefinitionResolverTest {
      * may not grant it back, which would admit the relative references its source refuses.
      */
     @Test
-    void uriRefinementMayWithdrawRelativeReferencesButNotRestoreThem() {
+    void iriRefinementMayWithdrawRelativeReferencesButNotRestoreThem() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
                 {
-                  reference => !uri_type {}
+                  reference => !iri_type {}
                   schemed   => !reference ^ { allow_relative: false }
-                  relaxed   => !uri ^ { allow_relative: true }
+                  relaxed   => !iri ^ { allow_relative: true }
                 }""").parseSchemaDocument().body();
         chainNamespace.put("reference", instanceResolver.resolve(schemaMap.declarations().get("reference")));
 
-        assertEquals(UriType.URI, instanceResolver.resolve(schemaMap.declarations().get("schemed")).body());
+        assertEquals(IriType.IRI, instanceResolver.resolve(schemaMap.declarations().get("schemed")).body());
         SchemaValidationException relaxed = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("relaxed")));
         assertTrue(relaxed.getMessage().contains("allow_relative re-enables what the source forbids"),
@@ -1354,23 +1354,23 @@ class DefinitionResolverTest {
      * compares a scheme; {@code allow_fragment} is a permission, withdrawn and never granted back.
      */
     @Test
-    void uriRefinementNarrowsSchemesAndMayWithdrawFragmentsButNotRestoreThem() {
+    void iriRefinementNarrowsSchemesAndMayWithdrawFragmentsButNotRestoreThem() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
                 {
-                  web      => !uri ^ { schemes: [http https] }
+                  web      => !iri ^ { schemes: [http https] }
                   secure   => !web ^ { schemes: [HTTPS] }
                   ftp      => !web ^ { schemes: [https ftp] }
-                  whole    => !uri ^ { allow_fragment: false }
+                  whole    => !iri ^ { allow_fragment: false }
                   pointing => !whole ^ { allow_fragment: true }
                 }""").parseSchemaDocument().body();
         chainNamespace.put("web", instanceResolver.resolve(schemaMap.declarations().get("web")));
         chainNamespace.put("whole", instanceResolver.resolve(schemaMap.declarations().get("whole")));
 
-        UriType secure = (UriType) instanceResolver.resolve(schemaMap.declarations().get("secure")).body();
+        IriType secure = (IriType) instanceResolver.resolve(schemaMap.declarations().get("secure")).body();
         // A scheme is a scheme_name, whose value is folded: `HTTPS` narrows to the source's `https`.
         assertEquals(Optional.of(List.of("https")), secure.schemes());
         SchemaValidationException ftp = assertThrows(SchemaValidationException.class,

@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code uri_type} constructor (§5.5's {@code uri} and {@code uri_reference} atoms):
+ * meta.tn's {@code uri_type} constructor (§5.5's {@code uri} and {@code uri_reference} atoms):
  * {@code text_type}'s length and pattern facets, {@code atom_specification}'s {@code spec} pinned to RFC
  * 3986, and its own {@code schemes}, {@code allow_relative} and {@code allow_fragment} fields. Pure constraint values, no
  * parsing/validation behavior -- {@code tson-atom}'s {@code UriParser} holds one of these and does the

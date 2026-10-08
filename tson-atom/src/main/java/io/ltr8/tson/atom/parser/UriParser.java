@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta-kernel's {@code uri_type} constructor (§5.5's {@code uri} and
+ * Parses and validates against meta.tn's {@code uri_type} constructor (§5.5's {@code uri} and
  * {@code uri_reference} atoms). Holds a {@link UriType} -- the pure constraint values -- rather than
  * declaring those fields itself.
  *

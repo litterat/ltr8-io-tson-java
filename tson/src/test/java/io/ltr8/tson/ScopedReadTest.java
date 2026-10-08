@@ -36,6 +36,9 @@ class ScopedReadTest {
     private static final String HOST = "https://example.test/scope-host.tn";
     private static final String CLAIM = "https://example.test/scope-claim.tn";
     private static final String REPORT = "https://example.test/scope-report.tn";
+    private static final String WIDE = "https://\u4F8B\u3048.test/\u6CE8\u6587.tn";
+    private static final String LIBRARY = "/local/scope-orders.tn";
+    private static final String IDENTITY_HOST = "https://example.test/scope-identity-host.tn";
 
     private static final Map<String, String> SCHEMAS = Map.of(
             HOST, """
@@ -69,7 +72,30 @@ class ScopedReadTest {
                     {
                       report => { study: text }
                     }
-                    """);
+                    """,
+            WIDE, "!!id:\"" + WIDE + "\"\n" + """
+                    !!meta:"https://tson.io/2026/37/m/meta.tn"
+                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    {
+                      order => { n: int32 }
+                    }
+                    """,
+            LIBRARY, """
+                    !!id:"/local/scope-orders.tn"
+                    !!meta:"https://tson.io/2026/37/m/meta.tn"
+                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    {
+                      order => { n: int32 }
+                    }
+                    """,
+            IDENTITY_HOST, """
+                    !!id:"https://example.test/scope-identity-host.tn"
+                    !!meta:"https://tson.io/2026/37/m/meta.tn"
+                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    {
+                      routed => { wide: extern_of<"%s">  library: extern_of<"%s"> }
+                    }
+                    """.formatted(WIDE, LIBRARY));
 
     private static final SchemaSource SOURCE = uri -> {
         for (Map.Entry<String, String> document : SCHEMAS.entrySet()) {
@@ -245,6 +271,35 @@ class ScopedReadTest {
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code());
         assertEquals(Optional.of("/one"), problems.getFirst().path());
         assertEquals(Optional.of("/two"), problems.get(1).path());
+    }
+
+    /**
+     * A schema is named by its identity, which [TSON-DATA] §2.2.1 reads as an IRI-reference: a host or path beyond
+     * US-ASCII, or a path-only reference naming a library entry, is an identity a document may carry, so meta's
+     * {@code schema_identity} admits both as a key of {@code scoped.schemas} and {@code extern_of<S>} names them.
+     */
+    @Test
+    void externOfNamesASchemaByAnyIdentityADocumentMayCarry() {
+        String data = "!!schema:\"" + IDENTITY_HOST + "\"\n!routed { wide: !!schema:\"" + WIDE + "\" !order { n: 1 }"
+                + "  library: !!schema:\"" + LIBRARY + "\" !order { n: 2 } }";
+
+        assertEquals(List.of(), tson().validate(data));
+    }
+
+    /** No identity carries a fragment (§2.2.1), so {@code schema_identity} refuses one as a key at load. */
+    @Test
+    void externOfRefusesAFragmentNoIdentityCarries() {
+        List<Diagnostic> problems = tson().validateSchema("""
+                !!id:"https://example.test/scope-fragment.tn"
+                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!import:"https://tson.io/2026/37/m/core.tn"
+                {
+                  routed => { one: extern_of<"https://example.test/scope-claim.tn#part"> }
+                }
+                """);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("schema_identity"), problems::toString);
     }
 
     /** {@code extern_type<S, T>} names one type in one schema, and the schema's other types are not it. */

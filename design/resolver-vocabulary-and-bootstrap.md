@@ -54,7 +54,7 @@ a held body.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the
   materialisation note (`design/template-materialisation.md`).
 - **Every walk over a held body descends into a map slot.** meta.tn's
-  `scoped.schemas` is `{uri => [type_name; 1..]?; 1..}`, so core's `extern_of => <S> !scoped { scope:
+  `scoped.schemas` is `{schema_identity => [type_name; 1..]?; 1..}`, so core's `extern_of => <S> !scoped { scope:
   [EXTERN]  schemas: { S => _ } }` and `extern_type => <S, T> ... { S => [T] }` put a parameter inside a
   map — one in a key, one inside the array its value names. Each of the three walks fails differently if it
   skips one: `substitute` leaves the parameter name standing where the argument belongs; `ParameterTypes`

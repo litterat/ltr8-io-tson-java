@@ -429,7 +429,7 @@ joins the built-in vocabulary (§3.1 item 13).
    **The hash chain is re-stamped over the shipped bytes.** Because meta pins the kernel
    and core pins meta, the edit moved all three, in that order, with the pinned
    references in `meta.tn` and `core.tn` and the three rows of Part 2 §13.2. §8.4's edits
-   moved them again: kernel `ac20ac27…`, meta `64b5dd6a…`, core `63df3c78…`.
+   moved them again: kernel `f2c2b278…`, meta `568b589b…`, core `4845f0c1…`.
 4. **Not verified**, carried as a note: #9's ingest check of a recorded parameter type is
    stated in §8.1 and is not running in the implementation, which re-resolves from source;
    and #10's `ordered` facet is consulted by bind mode, which binds an ordered map to an
@@ -556,6 +556,10 @@ SPEC-FEEDBACK.md's, renumbered against this revision.
 2. **§7.2.1** — two string values differing only in composition stay distinct as written
    and compare in NFC wherever they are compared ([TSON-SCHEMA] §5.5); the example's
    "decomposed" spelling is written `"cafe\u0301"`, where both spellings were precomposed.
+3. **§2.2.1** — an identity without a host has an absolute path, so that path-only and
+   hosted identities are disjoint: a relative `tson.io/2026/37/m/core.tn` would be the
+   identity `https://tson.io/2026/37/m/core.tn` reduces to. **[settled]** by the spec
+   author.
 
 ### 8.2 Part 2
 
@@ -589,6 +593,16 @@ SPEC-FEEDBACK.md's, renumbered against this revision.
    Unicode versions, and no identifier or token policy relaxes it. **[settled]** by the
    spec author.
 
+9. **§5.5, §5.8, §7.8, §9 — `iri_type` is the kernel's and identities are
+   `schema_identity`.** `scoped.schemas` was typed by the kernel's `uri`, which requires a
+   scheme and US-ASCII and admits a fragment, so a schema whose identity is an IRI or
+   path-only could not be named at a scoped position, and a fragment could. Meta's
+   `schema_identity => !iri_type { allow_fragment: false }` now types the keys; since meta
+   cannot construct an instance of a constructor it declares (§3.3.1), the IRI family
+   moves to the kernel, where its `iri` types `atom_specification.spec`, and `uri_type`
+   moves to meta. `extern_of` and `extern_type` record `S: schema_identity`. **[settled]**
+   by the spec author.
+
 ### 8.3 Part 3
 
 1. **§1.6 item 14** cites §8.5 and §9.4 for a `$schema` at a `declared` position, where it
@@ -611,5 +625,8 @@ SPEC-FEEDBACK.md's, renumbered against this revision.
    value, where it said "the host value is absent". `meta.tn`: the float bounds are
    "optional", where a Revision 35 state name stood. `meta-kernel-resolved.tn`: "plain
    required `type_ref`-typed fields", the one "REQUIRED" §6 item 2 missed.
-3. **Re-stamped**, as §6 item 3 records, and Part 2 §13.2 carries the pins.
+3. **`iri_type` and `uri_type` change places** (§8.2 item 9): the kernel declares
+   `iri_type` and `iri`, meta `uri_type` and `schema_identity`; core is unchanged but for
+   `extern_of`'s doc.
+4. **Re-stamped**, as §6 item 3 records, and Part 2 §13.2 carries the pins.
 

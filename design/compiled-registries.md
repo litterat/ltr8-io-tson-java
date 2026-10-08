@@ -122,7 +122,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   below that): the critical section is a map lookup, and a JVM absorbs an uncontended monitor well. It is
   lock-free because a monitor on the read path is a ceiling that arrives with the core count rather than a
   cost that shows up in a profile, and because the section can only grow.
-- **A read canonicalizes its schema URI once.** `CanonicalIdentity.canonicalize` is a `new URI(...)`
+- **A read canonicalizes its schema URI once.** `CanonicalIdentity.canonicalize` is an `Iri`
   parse, and three places want its result for one document — the compiled-schema cache's key, the resolution
   cache's key, and the schema registry's own lookup. The identity is computed at the top and passed
   down (`resolveLinked(uri, identity, receiver)`, `TsonSchemaRegistry.getByCanonicalIdentity`), with the

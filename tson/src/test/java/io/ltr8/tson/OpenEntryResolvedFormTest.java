@@ -145,7 +145,7 @@ class OpenEntryResolvedFormTest {
                   extern_of => !type_definition {
                     source: scoped
                     body: !template {
-                      parameters: [ { name: S  type: uri } ]
+                      parameters: [ { name: S  type: schema_identity } ]
                       template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }"
                     }
                   }
@@ -163,7 +163,7 @@ class OpenEntryResolvedFormTest {
         Map<String, TypeDefinition> read = ResolvedForm.readResolved(tson, resolved);
 
         TemplateBody externOf = assertInstanceOf(TemplateBody.class, read.get("extern_of").body());
-        assertEquals(List.of(new TemplateParam("S", TypeRef.of("uri"))), externOf.parameters());
+        assertEquals(List.of(new TemplateParam("S", TypeRef.of("schema_identity"))), externOf.parameters());
         assertEquals("!scoped { scope: [EXTERN]  schemas: { S => _ } }", externOf.template(),
                 "the application as written -- no URI named 'S' anywhere");
 
@@ -283,7 +283,7 @@ class OpenEntryResolvedFormTest {
                   listed      => <T> atom & { members: [T] }
                   listed_text => listed<text>
                   payload     => <T> data & { value: T }
-                  payload_uri => payload<uri>
+                  payload_iri => payload<iri>
                 }
                 """);
         List<String> ids = List.of(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID,
