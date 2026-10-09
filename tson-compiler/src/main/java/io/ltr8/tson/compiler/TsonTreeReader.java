@@ -152,10 +152,11 @@ public final class TsonTreeReader {
      * leaving this one unchanged, sharing its compiled-schema registry.
      *
      * <p>A schemaless read has nothing to resolve {@code !person} against, so by default it is {@code
-     * UNKNOWN_TYPE_REF} -- a reader policy, §7.1 asking only that an unresolved annotation be treated as
-     * informational. This is the opt-out for a caller who wants the wire
-     * back as authored: reading the structure of a document whose {@code !!schema} defines those names but is
-     * deliberately out of scope, or round-tripping a tree through {@link TsonTreeWriter}. Built-in type-refs
+     * UNKNOWN_TYPE_REF}: §5's vocabulary is a schemaless document's only source of type names
+     * (SPEC-FEEDBACK.md #3). This is the opt-out for a caller who wants the wire back as authored, which is a
+     * reading of the structure and not a verdict on the document: reading the structure of a document whose
+     * {@code !!schema} defines those names but is deliberately out of scope, or round-tripping a tree through
+     * {@link TsonTreeWriter}. Built-in type-refs
      * are still checked -- {@code !uuid nope} is a problem either way. Affects the schemaless path only; a
      * schema-aware read resolves type-refs against its compiled schema.
      */

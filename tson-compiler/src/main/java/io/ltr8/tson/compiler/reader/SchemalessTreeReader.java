@@ -77,9 +77,9 @@ public final class SchemalessTreeReader {
     }
 
     /**
-     * A reader that keeps a type-ref naming no built-in type on the node without reporting it -- §5.1's
-     * uninterpreted marker, carried all the way to the tree. For reading the wire form of a document whose
-     * own {@code !!schema} defines those names but is deliberately not in scope.
+     * A reader that keeps a type-ref naming no built-in type on the node without reporting it, carried all
+     * the way to the tree. For reading the wire form of a document whose own {@code !!schema} defines those
+     * names but is deliberately not in scope -- a reading of its structure, not a verdict on it.
      */
     public static SchemalessTreeReader preserving() {
         return new SchemalessTreeReader(true);

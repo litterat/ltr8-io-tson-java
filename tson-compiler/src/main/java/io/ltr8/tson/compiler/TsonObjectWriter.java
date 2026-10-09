@@ -151,6 +151,11 @@ public final class TsonObjectWriter {
      * first place, the same reason a schemaless reader has no way to reject an out-of-range value
      * without the annotation.
      *
+     * <p>A union member is the other type-ref this writes ({@code !circle} for a sealed {@code Shape}'s
+     * {@code Circle}): a name the classes define rather than the vocabulary, so the text reads back
+     * schemalessly through a {@code TsonObjectReader} given {@code withHostTypes()}, and is otherwise the
+     * {@code UNKNOWN_TYPE_REF} any schemaless processor reports for it.
+     *
      * <p>A record whose bound class declares an {@code Annotations} component gets its wire annotations
      * (§3.1) written back ahead of the value. An annotation's own value round-trips in whatever form the
      * read produced -- a bound object writes like any other value, and one kept structurally (its name

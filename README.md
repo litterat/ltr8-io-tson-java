@@ -191,10 +191,12 @@ UTF-8 here rather than through an `OutputStreamWriter`, so an unpaired surrogate
 silently written as `?`.
 
 A schemaless read still holds a `!type-ref` to account, since it is the only contract on offer: a built-in
-name (`!uuid`, `!int32`, `!date`) must sit on a scalar and satisfy that type, and any other name must name
-the class you are binding to — one that names neither is reported, so a typo like `!Uuid` doesn't quietly
-disable the check you asked for. Add `preservingUnknownTypeRefs()` when you *want* names carried through
-uninterpreted: reading the raw wire of a document whose schema you're deliberately ignoring, or
+name (`!uuid`, `!int32`, `!date`) must sit on a scalar and satisfy that type, and any other name is
+reported, exactly as `tson validate` reports it — so a typo like `!Uuid` doesn't quietly disable the check
+you asked for. Add `withHostTypes()` to an object reader to make the classes you bind into the schema for
+tags: `!order` then links to an `Order`, and `!circle` chooses that member of a sealed `Shape`, which a
+schemaless bind into a sealed hierarchy needs. Add `preservingUnknownTypeRefs()` when you *want* names carried
+through uninterpreted: reading the raw wire of a document whose schema you're deliberately ignoring, or
 round-tripping a tree back out through `tson.treeWriter()`.
 
 **These two readers are the whole document-reading surface.** They own the `!!schema` decision, the
@@ -216,9 +218,9 @@ binds to the wire, or your Java class, alone (Jackson-style). That's what the ex
 
 ### 1. Bind to a Java class — `TsonObjectReader`
 
-Schemaless (Class 1). Records, `Map<K, V>`, `List<E>`, tuples, plain enums, sealed-interface unions,
-and the whole built-in vocabulary (`!uuid`/`!ipv4`/`!date`/`!uint8`/…) all bind with no custom code —
-your Java class is the shape the data is checked against, no schema document involved:
+Schemaless (Class 1). Records, `Map<K, V>`, `List<E>`, tuples, plain enums, sealed-interface unions (tagged,
+under `withHostTypes()`), and the whole built-in vocabulary (`!uuid`/`!ipv4`/`!date`/`!uint8`/…) all bind with no
+custom code — your Java class is the shape the data is checked against, no schema document involved:
 
 ```java
 import io.ltr8.tson.compiler.TsonObjectReader;

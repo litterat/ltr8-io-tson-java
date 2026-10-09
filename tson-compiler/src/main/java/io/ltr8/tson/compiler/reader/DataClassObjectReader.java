@@ -63,12 +63,16 @@ import java.util.Set;
  *
  * <p><b>A type-ref must link to something</b>, by {@link TypeRefCheck}'s rules, wherever it is written --
  * not just at an atom leaf. A name {@link BuiltinTypeVocabulary} resolves (§5) is a built-in atom, so it
- * must sit on a token; any other name must name the target being bound, and one that names neither is a
- * binding error rather than a marker to ignore. That is not a contradiction of §5.1's "preserve an
- * unrecognized annotation as an uninterpreted marker": that rule is about passive preservation during
- * parsing, not about what an application actively binding to a caller-declared Java type should do with a
- * marker it can't interpret. {@link #preserving} is the opt-in passthrough for a caller who wants the
- * other reading.
+ * must sit on a token; any other name is {@code UNKNOWN_TYPE_REF}, a resolver error, exactly as {@code tson
+ * validate} reports it: a schemaless document has no source of type names but §5's vocabulary
+ * (SPEC-FEEDBACK.md #3), and a verdict that changed with the class a caller binds into would not be one.
+ *
+ * <p><b>{@link #withHostTypes} makes the target classes a schema for tags</b>: a name that names the class
+ * being bound links to it, and a union's member is chosen by the tag naming it. That is what a schemaless
+ * bind into a sealed hierarchy needs, and it is the caller's statement that their classes stand in for the
+ * schema the document does not bind -- explicit on the reader, because with it on the reader accepts what
+ * the vocabulary alone would refuse. {@link #preservingUnknownTypeRefs} is the other control: it keeps a tag
+ * nothing resolves rather than reporting it. Built-in names are checked under both.
  *
  * <p>The two positions differ in how a name gets to "names the target". A <b>container</b> accepts the
  * target's {@link io.ltr8.annotation.Typename} or, failing that, its simple class name case-insensitively --
@@ -76,8 +80,9 @@ import java.util.Set;
  * union's members already get. An <b>atom</b> accepts a declared {@code @Typename} only: its vocabulary is
  * closed, so the loose match would let a UUID-targeted {@code !Uuid} through on the strength of the class
  * being called {@code UUID}, disabling the check §5.1's case-sensitivity exists for. This is why {@code
- * !tags [ "a" ]} bound to a {@code List<String>} is reported -- neither {@code List} nor {@code ArrayList}
- * answers to {@code tags} -- and {@link #preserving} is the way to ask for it anyway.
+ * !tags [ "a" ]} bound to a {@code List<String>} is reported even with host types -- neither {@code List} nor
+ * {@code ArrayList} answers to {@code tags} -- and {@link #preservingUnknownTypeRefs} is the way to ask for
+ * it anyway.
  *
  * <p>With no type-ref, binding falls through to plain untyped resolution: {@link BaseTypeResolver} (which
  * of boolean/number/string) then {@link AtomBinder} (that shape into whatever concrete Java type the
@@ -93,33 +98,49 @@ public final class DataClassObjectReader {
 
     private final DataBindContext context;
 
-    /** Whether a type-ref that links to nothing is ignored rather than reported -- see {@link #preserving}. */
+    /**
+     * Whether a type-ref that links to nothing is ignored rather than reported -- see {@link
+     * #preservingUnknownTypeRefs}.
+     */
     private final boolean preserveUnknownTypeRefs;
+
+    /** Whether a type-ref may name a target class or a union member -- see {@link #withHostTypes}. */
+    private final boolean hostTypes;
 
     /** Whether a field the target class does not declare is discarded rather than reported -- see {@link #ignoringUnknownFields}. */
     private final boolean ignoreUnknownFields;
 
     public DataClassObjectReader(DataBindContext context) {
-        this(context, false, false);
+        this(context, false, false, false);
     }
 
     public DataClassObjectReader() {
         this(AtomContext.defaultContext());
     }
 
-    private DataClassObjectReader(DataBindContext context, boolean preserveUnknownTypeRefs,
+    private DataClassObjectReader(DataBindContext context, boolean preserveUnknownTypeRefs, boolean hostTypes,
                                   boolean ignoreUnknownFields) {
         this.context = context;
         this.preserveUnknownTypeRefs = preserveUnknownTypeRefs;
+        this.hostTypes = hostTypes;
         this.ignoreUnknownFields = ignoreUnknownFields;
     }
 
     /**
-     * A reader that ignores a type-ref linking to nothing instead of reporting it -- §5.1's uninterpreted
-     * marker, for a caller who wants forward-compatible passthrough. Built-in names are still checked.
+     * This reader, ignoring a type-ref that links to nothing instead of reporting it -- for a caller reading a
+     * document's structure while setting its tags aside. Built-in names are still checked.
      */
-    public static DataClassObjectReader preserving(DataBindContext context) {
-        return new DataClassObjectReader(context, true, false);
+    public DataClassObjectReader preservingUnknownTypeRefs() {
+        return new DataClassObjectReader(context, true, hostTypes, ignoreUnknownFields);
+    }
+
+    /**
+     * This reader, resolving a type-ref against the classes being bound: a tag that names the target class
+     * links to it, and a union's member is the one its tag names. See the class Javadoc for why this is the
+     * caller's choice and not the default.
+     */
+    public DataClassObjectReader withHostTypes() {
+        return new DataClassObjectReader(context, preserveUnknownTypeRefs, true, ignoreUnknownFields);
     }
 
     /**
@@ -130,7 +151,7 @@ public final class DataClassObjectReader {
      * it to, and has decided that the parts they cannot see do not change the parts they can.
      */
     public DataClassObjectReader ignoringUnknownFields() {
-        return new DataClassObjectReader(context, preserveUnknownTypeRefs, true);
+        return new DataClassObjectReader(context, preserveUnknownTypeRefs, hostTypes, true);
     }
 
     // ── Entry points ─────────────────────────────────────────────────────
@@ -233,8 +254,8 @@ public final class DataClassObjectReader {
         String name = typeRef.get();
         if (BuiltinTypeVocabulary.lookup(name).isPresent()) {
             TypeRefCheck.notScalar(ctx, name, ctx.peek());
-        } else if (!preserveUnknownTypeRefs && !TypeRefCheck.names(target.typeClass(), name)) {
-            TypeRefCheck.unknown(ctx, name, target.typeClass());
+        } else if (!(hostTypes && TypeRefCheck.names(target.typeClass(), name)) && !preserveUnknownTypeRefs) {
+            TypeRefCheck.unknown(ctx, name, target.typeClass(), hostTypes, TypeRefCheck.names(target.typeClass(), name));
         }
     }
 
@@ -263,8 +284,9 @@ public final class DataClassObjectReader {
             }
             // Not a built-in: only a name the target class declares outright gets through -- see the class
             // Javadoc on why an atom position takes `declares` rather than `names`.
-            if (!preserveUnknownTypeRefs && !TypeRefCheck.declares(dataClass.typeClass(), typeRef.get())) {
-                TypeRefCheck.unknown(ctx, typeRef.get(), dataClass.typeClass());
+            boolean declared = TypeRefCheck.declares(dataClass.typeClass(), typeRef.get());
+            if (!(hostTypes && declared) && !preserveUnknownTypeRefs) {
+                TypeRefCheck.unknown(ctx, typeRef.get(), dataClass.typeClass(), hostTypes, declared);
                 return null;
             }
         }
@@ -657,6 +679,11 @@ public final class DataClassObjectReader {
             TsonEvent e = ctx.peek();
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "union type " + dataClass.typeClass()
                     + " requires a type annotation (!typeName) to disambiguate members", "a !typeName", TypeRefCheck.describe(e));
+            EventSkip.coreValue(ctx);
+            return null;
+        }
+        if (!hostTypes && BuiltinTypeVocabulary.lookup(typeRef.get()).isEmpty()) {
+            TypeRefCheck.unknownUnionMember(ctx, typeRef.get(), dataClass.typeClass());
             EventSkip.coreValue(ctx);
             return null;
         }

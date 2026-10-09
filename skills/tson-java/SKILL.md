@@ -509,7 +509,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | catching `ParseException` around a facade read              | a facade routes base syntax through the receiver                    | catch `ReadException`, or read `.diagnostic()`          |
 | expecting a collecting read to throw on a syntax error          | it collects; an empty list is the only "valid"                      | check `problems.diagnostics().isEmpty()`                    |
 | matching diagnostic `message` text                              | messages are not API                                                | switch on `Diagnostic.Code`                                 |
-| `!type` on a schemaless read                                    | schemaless reads resolve built-ins only, and report the rest        | `.withSchema(uri)`, or `preservingUnknownTypeRefs()`        |
+| `!type` on a schemaless read                                    | schemaless reads resolve built-ins only, and report the rest        | `.withSchema(uri)`, `withHostTypes()`, or `preserving…()`   |
 | treating `TsonMissing` and `TsonVoid` as the same             | `TsonVoid` was written (`_`); `TsonMissing` is a failed lookup    | `isVoid()` / `isMissing()`, or `missingPath()`            |
 | `asInt()` to assert which host type a read produced             | it converts; `234.56E2` answers too                                 | `as(Integer.class)`                                         |
 | `as(URI.class)` on a `!uri`/`!iri` value                        | the four URI atoms read to `io.ltr8.net.Iri`; a cast finds nothing  | `as(Iri.class)`; a bound component may still declare `URI`  |

@@ -45,7 +45,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TsonObjectWriterTest {
 
-    private final TsonObjectReader reader = new TsonObjectReader();
+    // Host types on: a union member written as `!circle` is read back by the tag naming its class.
+    private final TsonObjectReader reader = new TsonObjectReader().withHostTypes();
     private final TsonObjectWriter writer = new TsonObjectWriter();
 
     @Test
