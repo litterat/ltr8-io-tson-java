@@ -65,7 +65,7 @@ sit at the schema layer because that is the only layer able to name request and 
 - **Resolved output is ordinary.** §8.1's `body` carries an instance of whichever constructor built the
   entry, and a meta-schema's own constructor is not a special case: a DATA entry writes as
   `body: !operation { ... }`, formally indistinguishable from `!record { ... }`. What makes that work is a
-  general `tson-bind` rule (`DataClassUnion`) — a non-sealed union branch stands for its own implementations,
+  general `ltr8-bind` rule (`DataClassUnion`) — a non-sealed union branch stands for its own implementations,
   which exact-class membership would never match.
 - **A meta-schema keeps a constructor this library cannot build a reader for**, its factory standing in as
   an `ErrorReader` carrying the real cause (`TsonCompiledMetaSchema`'s `unbuildable`). Dropping it would lose

@@ -19,8 +19,8 @@ dependencies {
     // ([TSON-JSON] §3.4's out-of-band binding). One CLI over both encodings is the point:
     // the report, the exit codes and the policy field are the run's, not an encoding's.
     implementation(project(":tson-json"))
-    implementation(project(":tson-bind"))
-    implementation(project(":tson-annotation"))
+    implementation(project(":ltr8-bind"))
+    implementation(project(":ltr8-annotation"))
 
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")

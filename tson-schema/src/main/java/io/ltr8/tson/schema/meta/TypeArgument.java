@@ -17,7 +17,7 @@ import io.ltr8.annotation.Field;
  * <p>It also used to be the only shape that <em>worked</em>. {@link TypeRef} and {@code TypeArgument} are
  * mutually recursive ({@code TypeRef.arguments: List<TypeArgument>}, and a reference argument wraps a
  * {@code TypeRef} right back) -- {@code box<box<text>>}, an ordinary nested application -- and
- * {@code tson-bind} resolved every component's descriptor eagerly with no cycle detection, so a plain record
+ * {@code ltr8-bind} resolved every component's descriptor eagerly with no cycle detection, so a plain record
  * here recursed until the stack went. {@code DataBindContext} carries a cycle guard now, so that constraint
  * is gone and this shape stands on its own merits.
  *

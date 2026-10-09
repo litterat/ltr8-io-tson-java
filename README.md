@@ -809,7 +809,7 @@ dependencies {
 ```
 
 `io.ltr8:tson` is the front door and pulls in the rest; depend on a single module directly
-(`io.ltr8:tson-regex`, say) if that is all you want. **The jars carry real `module-info.class`es**, so a
+(`io.ltr8:ltr8-regex`, say) if that is all you want. **The jars carry real `module-info.class`es**, so a
 consumer works either way — plain classpath, or a `module-info.java` of its own:
 
 ```java

@@ -23,7 +23,7 @@ import java.util.Optional;
  *
  * <p>The canonical (compact) constructor carries an explicit {@code @Record} -- required as soon
  * as a record has more than one public constructor (the convenience {@link
- * #IntegerType(IntegerSize)} one below is the second): {@code tson-bind}'s {@code
+ * #IntegerType(IntegerSize)} one below is the second): {@code ltr8-bind}'s {@code
  * DefaultRecordBinder.getConstructor} only auto-picks a bare class's sole constructor when exactly
  * one exists, and throws {@code CodeAnalysisException} ("Could not find constructor") otherwise
  * unless one is explicitly marked.

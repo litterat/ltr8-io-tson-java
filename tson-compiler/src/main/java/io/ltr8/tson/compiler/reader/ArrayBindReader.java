@@ -22,7 +22,7 @@ import java.util.List;
 
 /**
  * Object-binding mode's own {@code array} reader -- reads an array-shaped value into a real, bound
- * Java array/collection via {@code descriptor}, a {@code tson-bind} {@link DataClassArray} already
+ * Java array/collection via {@code descriptor}, a {@code ltr8-bind} {@link DataClassArray} already
  * resolved for this array's own target Java type (resolving one is this class's caller's job, not
  * this class's -- same division of responsibility as {@link RecordBindReader}'s own {@code
  * DataClassRecord}).

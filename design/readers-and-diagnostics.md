@@ -186,7 +186,7 @@ is small and parsed once.)
   point of claiming it.
 - **A bound component's own bridge is applied where the field is wired, not where the value is read**
   (`ElementBridging.wrap`, from `RecordBindReader`'s field loop and from the array and map readers). A
-  schema-driven read is exactly the path that does not go through `tson-bind`'s binder, which is what
+  schema-driven read is exactly the path that does not go through `ltr8-bind`'s binder, which is what
   applies a bridge as it collects a record's constructor arguments — `RecordBindReader` fills its own
   argument array from the compiled field readers, and a collection appends elements through an access
   bridge that converts nothing. So both wrap, and a consumer's `registerAtom(Money.class, bridge)` or
@@ -266,7 +266,7 @@ is small and parsed once.)
   only until a collecting receiver is handed the same document, at which point the value it declined is still
   pending and the enclosing frame's next pull sees it. At the document boundary that pull is
   `requireDocumentEnd`, whose belt-and-braces `IllegalStateException` then fires on ordinary caller input —
-  which is how `DataClassObjectReader`'s unbindable-target report (a target class `tson-bind` cannot produce
+  which is how `DataClassObjectReader`'s unbindable-target report (a target class `ltr8-bind` cannot produce
   a descriptor for) reached a caller as an internal-invariant exception with the diagnostics they asked for
   lost inside it. Where the skip goes is a per-caller question, not `descriptorFor`'s: `read` has taken
   nothing and skips a whole `dataValue`, while `bindUnion` has already consumed the framing to find the

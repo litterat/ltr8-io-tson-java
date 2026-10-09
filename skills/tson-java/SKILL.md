@@ -29,10 +29,10 @@ Twelve JPMS modules, all published together as `io.ltr8:<module>`:
 | `tson-atom`      | `io.ltr8.tson.atom`       | the built-in atom vocabulary: which tokens each atom accepts, what Java value results |
 | `tson-tree`      | `io.ltr8.tson.tree`       | `TsonValue` and its node types — the read output of tree mode   |
 | `tson-schema`    | `io.ltr8.tson.schema`     | the resolved-schema value model and the registry                |
-| `tson-bind`      | `io.ltr8.bind`            | the generic `DataValue`↔Java-object binding engine              |
-| `tson-annotation`| `io.ltr8.annotation`      | `@Typename`/`@Field`/`@Record`/… and the `Annotations` carrier  |
-| `tson-regex`     | `io.ltr8.regex`           | a standalone RFC 9485 I-Regexp engine (no TSON dependency)      |
-| `tson-net`       | `io.ltr8.net`             | network text formats to their RFCs — `Iri` (RFC 3986/3987), IP addresses, CIDR, EUI-48 (no TSON dependency) |
+| `ltr8-bind`      | `io.ltr8.bind`            | the generic `DataValue`↔Java-object binding engine              |
+| `ltr8-annotation`| `io.ltr8.annotation`      | `@Typename`/`@Field`/`@Record`/… and the `Annotations` carrier  |
+| `ltr8-regex`     | `io.ltr8.regex`           | a standalone RFC 9485 I-Regexp engine (no TSON dependency)      |
+| `ltr8-net`       | `io.ltr8.net`             | network text formats to their RFCs — `Iri` (RFC 3986/3987), IP addresses, CIDR, EUI-48 (no TSON dependency) |
 | `tson-json`      | `io.ltr8.tson.json`       | the JSON encoding: `Json`, its readers and writers, `JsonValue` — no dependency on `tson-compiler` |
 | `tson-cli`       | `io.ltr8.tson.cli`        | the `tson` command (`validate`, `compile`, `policy`, `hash`, …) |
 

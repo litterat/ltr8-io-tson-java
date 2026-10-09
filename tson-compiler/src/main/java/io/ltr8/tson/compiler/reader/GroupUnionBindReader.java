@@ -31,7 +31,7 @@ import java.util.Map;
  *
  * <p><b>Why a Java union rather than a record with two {@code Optional}s</b>, which is the more literal
  * translation: {@link io.ltr8.tson.schema.meta.TypeArgument} holds a {@code type_ref} whose {@code arguments}
- * hold {@code type_argument}s right back, and {@code tson-bind}'s record resolution has no cycle detection.
+ * hold {@code type_argument}s right back, and {@code ltr8-bind}'s record resolution has no cycle detection.
  * The union defers member resolution and breaks the loop -- see that type's own Javadoc. This reader is what
  * makes the shape chosen for the <em>write</em> side readable on the way back in.
  *

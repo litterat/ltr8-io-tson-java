@@ -132,7 +132,7 @@ public final class HostAtoms {
      * is concerned, so a hole in one half of a pair is invisible until a caller happens to declare the
      * other. {@code HostAtomsTest} pins the pairing rather than the table. {@link Number} itself is
      * deliberately absent -- it is abstract and names no family, so there is nothing to answer with, and
-     * {@code tson-bind} refuses such a component a layer earlier in any case.
+     * {@code ltr8-bind} refuses such a component a layer earlier in any case.
      *
      * <p><b>It is an interpretation, and this is the one worth committing to.</b> Nothing says a Java
      * {@code int} means {@code int32} rather than an {@code integer} bounded to 32 bits; the two admit the

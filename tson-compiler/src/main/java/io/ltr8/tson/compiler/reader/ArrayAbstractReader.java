@@ -27,7 +27,7 @@ import java.util.function.Consumer;
  * tolerating (or rejecting) a void element per {@code voidable}, and rejecting a duplicate
  * *decoded* element when {@code unique_items} says to -- handing each decoded element to a {@link
  * Consumer} rather than assembling a result itself, since how a decoded element gets stored (a plain
- * {@code List.add}, or a {@code tson-bind} {@code DataClassArray}'s own {@code put()} {@link
+ * {@code List.add}, or a {@code ltr8-bind} {@code DataClassArray}'s own {@code put()} {@link
  * java.lang.invoke.MethodHandle}) differs completely between the two subclasses. Array elements have
  * no default/fixed-value concept at all ({@code voidable} is the element's one fact, where a record field
  * carries a role and a value), so there's nothing here

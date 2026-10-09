@@ -22,15 +22,15 @@ import java.util.Objects;
  *
  * <p>This is deliberately a minimal value type, not a full arithmetic library (no {@code plus}/
  * {@code times}/reduction methods). <b>{@code TsonObjectReader} cannot bind directly to this class
- * at all</b> -- it's itself a Java record, so {@code tson-bind}'s record
+ * at all</b> -- it's itself a Java record, so {@code ltr8-bind}'s record
  * auto-detection claims it ahead of anything atom/vocabulary-related, and a {@code !rational}
  * value's token content (not a record) fails to satisfy a record target. The supported way to bind
  * {@code !rational} to a Java field, including to this class's own shape if that's genuinely what's
  * wanted, is a {@code DataBridge<Rational, TheirType>} registered via {@code
- * DataBindContext.registerAtom(TheirType.class, bridge)} ({@code tson-bind}) -- the natural fit for
+ * DataBindContext.registerAtom(TheirType.class, bridge)} ({@code ltr8-bind}) -- the natural fit for
  * an application that already has a richer rational type (e.g. Apache Commons Math's {@code
  * BigFraction}), and currently the *only* fit, full stop. This class stays in {@code tson-schema},
- * which has no dependency on {@code tson-bind} at all -- see {@code RationalType}'s Javadoc.
+ * which has no dependency on {@code ltr8-bind} at all -- see {@code RationalType}'s Javadoc.
  */
 public record Rational(BigInteger numerator, BigInteger denominator) implements Comparable<Rational> {
 

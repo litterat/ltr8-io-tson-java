@@ -42,10 +42,10 @@ import java.util.Set;
 
 /**
  * Binds a TSON document to a Java object -- schemaless (Class 1) binding driven by the target Java
- * class's own {@code tson-bind} {@link DataClass} descriptor, which is in effect the schema the data
+ * class's own {@code ltr8-bind} {@link DataClass} descriptor, which is in effect the schema the data
  * must satisfy. The reflective, class-driven counterpart to the schema-driven {@link TsonTypeReader}
  * (which validates against a resolved TSON schema instead), and the read-side inverse of {@link
- * TsonObjectWriter}. {@code tson-bind}, what this is built on, has no dependency on {@code
+ * TsonObjectWriter}. {@code ltr8-bind}, what this is built on, has no dependency on {@code
  * tson-compiler}/{@code tson-schema} at all, so depending on it directly here is clean -- which is
  * also what lets schema resolution (constructor application, atom refinement, §5.5) use this binding
  * layer directly, in the same module, without a cycle.
@@ -57,7 +57,7 @@ import java.util.Set;
  * reported through {@code ctx} using the same model the compiled readers use: the context's own {@link
  * DiagnosticsReceiver} decides each problem's fate -- the fail-fast one throws
  * {@link ReadException} at the first, a collecting one accumulates every independent problem and reads
- * on. A {@code tson-bind} {@link DataBindException} thrown while narrowing a value or
+ * on. A {@code ltr8-bind} {@link DataBindException} thrown while narrowing a value or
  * invoking a constructor is caught and re-reported through {@code ctx} too, so a caller sees one
  * uniform error model regardless of which layer noticed the problem.
  *
@@ -179,7 +179,7 @@ public final class DataClassObjectReader {
     }
 
     /**
-     * Resolves {@code targetClass}'s own descriptor; a class {@code tson-bind} cannot analyse (two
+     * Resolves {@code targetClass}'s own descriptor; a class {@code ltr8-bind} cannot analyse (two
      * {@code Annotations} components, say) is reported, not passed over silently. Consumes nothing on
      * failure -- each caller knows how much of the value's framing it has already taken, so the skip is
      * theirs to make.
@@ -777,7 +777,7 @@ public final class DataClassObjectReader {
      * <p><b>What a non-sealed union's member list does not contain.</b> A union built over an open
      * permitted type cannot know its implementations at analysis time, so members are registered as they
      * are met -- and every route that registers one is holding an instance or a class already: the object
-     * writer, {@code tson-bind}'s mappers, and the analysis of the member itself. A read holds a name, so
+     * writer, {@code ltr8-bind}'s mappers, and the analysis of the member itself. A read holds a name, so
      * before this the list only ever grew as a side effect of something else in the process, and the same
      * document bound or failed depending on whether anything had written that member first.
      *

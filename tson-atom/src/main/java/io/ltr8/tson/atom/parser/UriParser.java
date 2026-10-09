@@ -132,7 +132,7 @@ public record UriParser(UriType constraints) implements AtomTypeParser<Iri> {
         }
         TextParser.checkLengths(text, subject, constraints.length(), constraints.minLength(),
                 constraints.maxLength());
-        // Pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
+        // Pattern is I-Regexp (RFC 9485), matched via ltr8-regex (linear-time, ReDoS-safe), not
         // java.util.regex; already validated well-formed at schema resolution (see RegexParser).
         constraints.pattern().ifPresent(p -> {
             if (!IRegex.parse(p).matches(text)) {

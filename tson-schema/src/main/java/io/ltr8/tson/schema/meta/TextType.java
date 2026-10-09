@@ -30,7 +30,7 @@ import java.util.stream.Stream;
  * <p><b>{@code members} is the sparse case</b>, as {@link IntegerType#members} is for integers: the strings
  * admitted, written out. Every member must satisfy the other facets on the same body, {@code pattern}
  * included -- one rule, checked in one place ({@link #coherenceCheck}), which is why this module depends on
- * {@code tson-regex}.
+ * {@code ltr8-regex}.
  *
  * <p><b>{@code normalization} is the form the decoded value is put into</b> ([TSON-SCHEMA] §5.5): a value is
  * the text as written put into that form, and every other facet -- lengths, {@code pattern}, {@code members}

@@ -31,7 +31,7 @@ public record TimeType(Optional<OffsetTime> min, @Field("exclusive_min") Optiona
                      Optional<BigInteger> precision) implements Atom {
 
     /**
-     * Carries {@code @Record} because a second constructor exists below, and {@code tson-bind}'s own
+     * Carries {@code @Record} because a second constructor exists below, and {@code ltr8-bind}'s own
      * constructor selection fails outright without it (see {@link IntegerSize}).
      */
     @Record

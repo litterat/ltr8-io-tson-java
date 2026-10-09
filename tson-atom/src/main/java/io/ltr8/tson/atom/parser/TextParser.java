@@ -64,7 +64,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
      */
     void validate(String text, String subject) {
         checkLengths(text, subject, constraints.length(), constraints.minLength(), constraints.maxLength());
-        // The pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
+        // The pattern is I-Regexp (RFC 9485), matched via ltr8-regex (linear-time, ReDoS-safe), not
         // java.util.regex; it was already validated well-formed when the schema resolved (see RegexParser).
         constraints.pattern().ifPresent(p -> {
             if (!IRegex.parse(p).matches(text)) {

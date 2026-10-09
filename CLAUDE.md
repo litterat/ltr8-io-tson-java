@@ -84,13 +84,13 @@ Schema documents: **parse → desugar → resolve → link → register → comp
 | Module | Holds |
 |---|---|
 | `tson-base` | Shared by every encoding: `Diagnostic`, policies, schema sources, host atom values, byte I/O |
-| `tson-annotation` | Binding annotations and the `Annotations` carrier |
-| `tson-bind` | Generic `DataValue`↔object binding engine; knows nothing of schemas |
+| `ltr8-annotation` | Binding annotations and the `Annotations` carrier |
+| `ltr8-bind` | Generic `DataValue`↔object binding engine; knows nothing of schemas |
 | `tson-schema` | `schema.meta` resolved-schema value model, registry, `TsonBundledSchemas` |
 | `tson-atom` | The built-in atom vocabulary, over `String`, and §7.7's name grammar, shared by both encodings |
 | `tson-tree` | `TsonValue` data tree model; depends on nothing |
-| `tson-regex` | RFC 9485 I-Regexp engine; depends on nothing |
-| `tson-net` | Network text formats (`io.ltr8.net`: URIs/IRIs, IP addresses, CIDR, EUI-48), each to its RFC; depends on nothing |
+| `ltr8-regex` | RFC 9485 I-Regexp engine; depends on nothing |
+| `ltr8-net` | Network text formats (`io.ltr8.net`: URIs/IRIs, IP addresses, CIDR, EUI-48), each to its RFC; depends on nothing |
 | `ltr8-unicode` | Unicode properties and algorithms (`io.ltr8.unicode`: XID, normalization, UAX #31 profiles, UTS #39); depends on nothing |
 | `tson-compiler` | The engine: lexer, grammars, resolver, linker, compiler, readers, writers, facades |
 | `tson` | The front door: `Tson` |
@@ -132,9 +132,8 @@ fact that must survive its entry goes in the note, the Javadoc or the test that 
 
 **`Tson` is a prefix, never an infix** (`TsonCompiledSchema`, never `CompiledTsonSchema`), and only on types a consumer
 names in their own code; internal machinery is bare (`Lexer`, `SchemaResolver`). `tson-base` drops it; `tson-json`
-uses `Json` on the same terms. A module that knows nothing of TSON carries no prefix and lives at `io.ltr8.<name>`
-(`tson-bind` → `io.ltr8.bind`, `tson-net` → `io.ltr8.net`, `tson-regex` → `io.ltr8.regex`, `ltr8-unicode` →
-`io.ltr8.unicode`), usable on its own.
+uses `Json` on the same terms. A module that knows nothing of TSON is named `ltr8-<name>`, carries no prefix and lives
+at `io.ltr8.<name>` (`ltr8-bind`, `ltr8-net`, `ltr8-regex`, `ltr8-unicode`), usable on its own.
 
 **Exception classification is a policy.** `SchemaValidationException`: the author's schema is wrong and the spec
 says so. `UnsupportedOperationException`: this library has not implemented that yet. `IllegalStateException`: an

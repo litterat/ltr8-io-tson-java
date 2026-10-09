@@ -14,7 +14,7 @@ import io.ltr8.tson.schema.meta.Cidr6Type;
  * Parses and validates against meta.tn's {@code cidr6_type} constructor (§5.5's {@code cidr6} atom, RFC
  * 4632): an IPv6 address, {@code /}, and a prefix length of 0-128.
  *
- * <p><b>Host type is {@link CidrInet6Network}</b>, a value type in {@code io.ltr8.net} ({@code tson-net}).
+ * <p><b>Host type is {@link CidrInet6Network}</b>, a value type in {@code io.ltr8.net} ({@code ltr8-net}).
  * The grammar and the family-range and host-bits rules live on it, so a network is a value here rather than
  * the text that carried it -- which is what lets {@code within} and {@code excluding} be judged by the family
  * that declares them rather than by a check bolted onto the resolver.

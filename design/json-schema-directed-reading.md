@@ -107,7 +107,7 @@ is the only name a document has for one.
 
 **The class is `ReservedMembers`, not the spec's own noun, and the divergence is deliberate.** In this
 codebase `Annotation` means an `@name` annotation and nothing else — two dozen types say so, from the
-`tson-annotation` module through `Annotations`, `TsonAnnotation` and the `AnnotationStart`/`AnnotationEnd`
+`ltr8-annotation` module through `Annotations`, `TsonAnnotation` and the `AnnotationStart`/`AnnotationEnd`
 events — and those have **no JSON carrier at all**: §4.3 declines one for v1 and makes encoding a value that
 carries them an encode error. A type named for §3.3 would be the single place the word meant something else,
 so it is named for the §3.2 namespace it reads and cites §3.3 throughout. The spec's noun is right for the

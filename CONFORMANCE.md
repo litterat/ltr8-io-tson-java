@@ -66,7 +66,7 @@ bound is inert, since the family range is enforced regardless.
 parse error, as hour 25 is ([TSON-DATA] §5.4).
 
 **URIs and IRIs are recognised natively.** `!uri`/`!uri_reference` (§5.5) are RFC 3986's grammar and
-`!iri`/`!iri_reference` RFC 3987's, both through `tson-net`'s `io.ltr8.net.Iri`, not `java.net.URI`, which
+`!iri`/`!iri_reference` RFC 3987's, both through `ltr8-net`'s `io.ltr8.net.Iri`, not `java.net.URI`, which
 implements RFC 2396: `https://`, `https://?q=1` (an empty host), `a:` (an empty path) and `http://[v7.abc]/`
 (IPvFuture) are URIs, and `http://a:b/` (a port that is not digits) is not. A URI is US-ASCII; an IRI admits
 `ucschar` wherever `unreserved` stands and `iprivate` in the query. RFC 3987 §4's bidirectional-text rules, a
@@ -86,7 +86,7 @@ the RFC admits them. Accepting them would admit spaces, brackets and parentheses
 treat as a token — and §5.5 scopes the pin to exactly that core, so this is the contract rather than a
 narrowing of it. Pinned by `EmailParserTest`.
 
-**`RegexParser` is a real RFC 9485 (I-Regexp) validator, not `java.util.regex`.** The `tson-regex` module
+**`RegexParser` is a real RFC 9485 (I-Regexp) validator, not `java.util.regex`.** The `ltr8-regex` module
 parses I-Regexp to its own AST and matches with a Thompson-NFA/Pike-VM — linear-time, so ReDoS-safe — which
 means this implementation defines I-Regexp behaviour rather than inheriting the JVM's Perl-derived superset.
 `TextParser`/`UriParser` match their `pattern` constraint through the same engine. [TSON-SCHEMA] §9 makes

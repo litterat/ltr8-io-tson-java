@@ -39,7 +39,7 @@
  * which encoding carried the document.
  *
  * <p><b>The two engines it rests on are system libraries, not layers above it.</b> {@code java.net.http}
- * and {@code io.ltr8.bind} are both general and both know nothing of TSON -- {@code tson-bind} binds a
+ * and {@code io.ltr8.bind} are both general and both know nothing of TSON -- {@code ltr8-bind} binds a
  * {@code DataValue} to a Java object and has never heard of a schema. Depending on them is the same kind of
  * thing as depending on the JDK, which is why it does not make this module a layer in the stack: nothing
  * here knows what a TSON document or a JSON one looks like, and that is the property that matters.
@@ -55,7 +55,7 @@ module io.ltr8.tson.base {
     requires transitive java.net.http;
 
     // A dependency-free binding engine that knows nothing about TSON -- system-library standing, like
-    // java.net.http above and tson-regex elsewhere. What this module adds is the TSON-side configuration:
+    // java.net.http above and ltr8-regex elsewhere. What this module adds is the TSON-side configuration:
     // which host types bind as atoms, and (in time) the rest of what a deployment states about binding.
     requires transitive io.ltr8.bind;
 

@@ -72,7 +72,7 @@ public record EmailParser(EmailType constraints) implements AtomTypeParser<Strin
     private void validate(String text, String subject) {
         TextParser.checkLengths(text, subject, constraints.length(), constraints.minLength(),
                 constraints.maxLength());
-        // I-Regexp (RFC 9485) via tson-regex -- linear-time and ReDoS-safe, not java.util.regex; already
+        // I-Regexp (RFC 9485) via ltr8-regex -- linear-time and ReDoS-safe, not java.util.regex; already
         // validated well-formed when the schema resolved (see RegexParser).
         constraints.pattern().ifPresent(p -> {
             if (!IRegex.parse(p).matches(text)) {

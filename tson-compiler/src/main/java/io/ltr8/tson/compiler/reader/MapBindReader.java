@@ -22,7 +22,7 @@ import java.util.Map;
 
 /**
  * Object-binding mode's own {@code map} reader -- reads a map-shaped value into a real, bound Java
- * map via {@code descriptor}, a {@code tson-bind} {@link DataClassMap} already resolved for this
+ * map via {@code descriptor}, a {@code ltr8-bind} {@link DataClassMap} already resolved for this
  * map's own target Java type (same division of responsibility as {@link RecordBindReader}'s {@code
  * DataClassRecord}/{@link ArrayBindReader}'s {@code DataClassArray}).
  *
@@ -30,7 +30,7 @@ import java.util.Map;
  * to allocate the target with a known capacity, then {@code descriptor.put().invoke(mapData, key,
  * value)} per decoded entry -- no iterator needed, unlike {@link DataClassMap}'s own *reading* side,
  * since writing a map only ever needs {@code put}. Unlike {@link ArrayBindReader}, there's no fixed-
- * size-target concern here at all -- every map {@code tson-bind} constructs is growable, so this always
+ * size-target concern here at all -- every map {@code ltr8-bind} constructs is growable, so this always
  * constructs empty ({@code invoke(0)}) and appends incrementally, one entry at a time, with no
  * buffer-then-allocate step. As with {@link
  * ArrayBindReader}, there's no narrowing at this level either -- each key and value's own binding

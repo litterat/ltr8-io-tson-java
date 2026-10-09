@@ -24,7 +24,7 @@ public record DateType(Optional<LocalDate> min, @Field("exclusive_min") Optional
 
     /**
      * Carries {@code @Record} because the inclusive-bounds convenience constructor below is a second
-     * public one, and {@code tson-bind}'s constructor selection fails outright without it (see {@link
+     * public one, and {@code ltr8-bind}'s constructor selection fails outright without it (see {@link
      * IntegerSize}). Mutual exclusion within each side is this constructor's, as for {@link IntegerType}:
      * the field group ([TSON-SCHEMA] §5.11) makes it unrepresentable in the schema and this makes it
      * unconstructable here.

@@ -33,7 +33,7 @@ import java.util.Optional;
  * same source parsed twice) would not compare equal. {@code toString()} stays generated -- {@code position}
  * carries no reference back to this type or its own schema, so there is no cycle risk in printing it. The
  * compact constructor carries {@code @Record} because the convenience constructors beside it would
- * otherwise leave {@code tson-bind}'s constructor selection ambiguous (see {@link IntegerSize}).
+ * otherwise leave {@code ltr8-bind}'s constructor selection ambiguous (see {@link IntegerSize}).
  */
 public record TypeDefinition(Optional<TypeRef> source, @Unbound TypeKind kind,
                               List<String> supertypes, List<String> subtypes,

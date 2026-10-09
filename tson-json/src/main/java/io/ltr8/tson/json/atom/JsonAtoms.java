@@ -42,7 +42,7 @@ import java.util.Optional;
  *
  * <p><b>A bridged atom binds its serial type, then crosses.</b> {@code DataClassAtom.dataClass()} is the
  * type on the wire and {@code typeClass()} the one the class wants, so a bridged component is read as the
- * type its bridge declares and handed to {@code toObject}. That is how {@code tson-bind}'s own bridges --
+ * type its bridge declares and handed to {@code toObject}. That is how {@code ltr8-bind}'s own bridges --
  * an enum's, a {@code Pattern}'s -- are covered without naming one of them.
  *
  * <p><b>A string-content family is read by its own parser</b> (§5.1): the string's content is handed to the
@@ -62,7 +62,7 @@ import java.util.Optional;
  * and the atom's own {@code expected} reaches the diagnostic ({@code >= -128 and <= 127} rather than the
  * target's Java name).
  *
- * <p><b>There is no enum rule here, and that is not an omission.</b> {@code tson-bind} binds every plain
+ * <p><b>There is no enum rule here, and that is not an omission.</b> {@code ltr8-bind} binds every plain
  * Java enum through {@code EnumStringBridge}, so an enum component arrives as a {@code String} atom whose
  * bridge does the lookup -- a rule matching constants by name in this class would never be reached, and a
  * rule that is never reached still has to be read by everyone who comes after it.
@@ -101,7 +101,7 @@ public final class JsonAtoms {
      * <p>The three targets answered by kind alone come first: they are the encoding's own rather than any
      * family's, {@code text} accepting every JSON string (§5.6) and {@code boolean} being the general enum
      * rule applied (§5.2). {@code Object} is here for the {@code value} position of §5.7, which has no
-     * bind-path representation yet -- {@code tson-bind} refuses an {@code Object} component outright.
+     * bind-path representation yet -- {@code ltr8-bind} refuses an {@code Object} component outright.
      */
     private static Object bindTo(JsonReadContext ctx, JsonEvent leaf, Class<?> target) {
         if (target == boolean.class || target == Boolean.class) {

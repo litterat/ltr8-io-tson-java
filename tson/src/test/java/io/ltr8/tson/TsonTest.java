@@ -146,7 +146,10 @@ class TsonTest {
         assertEquals(new Point(1, 2), point);
     }
 
-    /** Public, not local/package-private -- {@code tson-bind}'s own reflective binding only ever finds *public* constructors (see {@code CliDiagnostic}'s own Javadoc in {@code tson-cli} for the identical gotcha). */
+    /**
+     * Public, not local or package-private: {@code ltr8-bind}'s reflective binding finds only <em>public</em>
+     * constructors, as {@code tson-cli}'s {@code CliDiagnostic} also notes.
+     */
     public record Point(int x, int y) {
     }
 }

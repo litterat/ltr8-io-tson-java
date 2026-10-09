@@ -194,7 +194,7 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
     - **The check is raised at bind-mode compile — startup, not first read — except for a type with no class to
       build.** That is the `MissingBindingException` subclass, deferred to the first read of that type, since a
       schema legitimately declares types a consumer never binds. It covers two causes the message tells apart:
-      a name the binder resolves to no class (`tson-bind`'s `UnboundNameException`), and a class it does resolve
+      a name the binder resolves to no class (`ltr8-bind`'s `UnboundNameException`), and a class it does resolve
       to that cannot be analysed — the kernel's `data` kind is mapped to a marker interface nothing builds.
     - **There is no wholesale opt-out**, and that is deliberate: accepting fewer fields without saying *which* is the
       defect §7.2 refuses on the wire, and a class that means to read one version of a schema while another is current
@@ -208,7 +208,7 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       reader that reported would return `null` for exactly the documents it exists to accept — and a
       diagnostic the guard is told to ignore is a severity axis under another name, and [TSON-DATA] §8.1
       states there is no such axis: a conforming processor has one severity.
-    - **An unbindable target class is `BIND_MISMATCH`, not `SCHEMA_ERROR`.** A class `tson-bind` cannot analyse
+    - **An unbindable target class is `BIND_MISMATCH`, not `SCHEMA_ERROR`.** A class `ltr8-bind` cannot analyse
       is a misconfiguration in the reading application and says nothing about the document — the distinction
       `Code.verdict()` exists to carry, and the same line `BindMismatchException` draws at compile time.
       Reporting it as `SCHEMA_ERROR` would tell a caller routing on the answer that the document is wrong when

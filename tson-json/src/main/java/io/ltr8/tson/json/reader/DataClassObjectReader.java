@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Binds one JSON value at one {@link DataClass}, driven by the target class's own {@code tson-bind}
+ * Binds one JSON value at one {@link DataClass}, driven by the target class's own {@code ltr8-bind}
  * descriptor -- the engine {@code JsonObjectReader} is a facade over.
  *
  * <p><b>Named for what drives it and what it produces</b>, which is the pair every reader in this family

@@ -45,7 +45,7 @@ class JsonObjectReaderTest {
 
     private static final JsonObjectReader READER = JsonObjectReader.standard();
 
-    // A primitive component is required (tson-bind makes it so); an object component is not, unless the
+    // A primitive component is required (ltr8-bind makes it so); an object component is not, unless the
     // class says so with @Field(required = true). Both states are exercised below.
     public record Person(String name, int age) {
     }
@@ -366,7 +366,7 @@ class JsonObjectReaderTest {
         void a_string_reads_an_enum_by_its_constant_name() {
             assertEquals(new Painted(Colour.GREEN, true), READER.read("{\"colour\": \"GREEN\", \"filled\": true}",
                     Painted.class));
-            // The lookup is EnumStringBridge's, not this reader's: tson-bind binds every plain Java enum
+            // The lookup is EnumStringBridge's, not this reader's: ltr8-bind binds every plain Java enum
             // through it, so an enum component arrives as a bridged String atom.
             assertTrue(refused("{\"colour\": \"BLUE\", \"filled\": true}", Painted.class).message()
                     .contains("'BLUE' is not a Colour"));

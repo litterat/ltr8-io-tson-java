@@ -6,13 +6,13 @@ import io.ltr8.tson.base.SourcePosition;
 
 /**
  * Bridge for {@link SourcePosition}, converting to/from a compact {@code "line:column:byteOffset"}
- * string -- same reasoning as {@code tson-bind}'s own {@code PatternStringBridge}: {@code
- * SourcePosition} is an interface with no {@code sealed}/{@code @Union} signal {@code tson-bind}
+ * string -- same reasoning as {@code ltr8-bind}'s own {@code PatternStringBridge}: {@code
+ * SourcePosition} is an interface with no {@code sealed}/{@code @Union} signal {@code ltr8-bind}
  * could auto-detect (and couldn't be given one even if this project wanted to -- {@code
  * schema.meta.TypeDefinition}'s own {@code position} field is typed {@code SourcePosition}
  * specifically so {@code tson-schema} never has to name {@link Position}, its own real
  * implementation, at all), so a caller registers this explicitly. Lives here, not {@code
- * tson-bind.bridge}, since -- unlike {@code Pattern}/{@code EnumStringBridge}'s own targets -- both
+ * ltr8-bind.bridge}, since -- unlike {@code Pattern}/{@code EnumStringBridge}'s own targets -- both
  * {@code SourcePosition} and {@link Position} are this project's own types, not generic reusable
  * ones.
  *

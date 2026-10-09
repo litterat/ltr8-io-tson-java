@@ -39,7 +39,7 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
 ```
 
 `ProcessorConfig.withDataBindContext` says which Java classes the schema's types bind to. **The vocabulary
-for building a context is `tson-bind`'s, not `ProcessorConfig`'s** — `DataNameBinder.ofMap(map)` over
+for building a context is `ltr8-bind`'s, not `ProcessorConfig`'s** — `DataNameBinder.ofMap(map)` over
 `DataBindContext.builder().registerAtoms(AtomContext.hostTypes())`, with `orElse` composing a caller's
 names over the kernel's own — so the front door has no binding or profile setters restating it.
 **Strictness is configuration and not a reader derivation**, which is a fact about when
@@ -70,7 +70,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
     `@Atom` on a constructor or static factory, or a plain enum's own `name()` crossing — and falls back to
     a bare `DataClassAtom` only for a class that declares none. The bare form asserts "one scalar" and
     supplies nothing that makes it one, so it is right exactly for a class the *encoding* already knows: the
-    JDK scalars, and the vocabulary's host types (`UUID`, `LocalDate`, `Inet4Address`, …). `tson-bind` cannot
+    JDK scalars, and the vocabulary's host types (`UUID`, `LocalDate`, `Inet4Address`, …). `ltr8-bind` cannot
     check which those are, knowing nothing of any encoding, so a class that is neither is accepted here and
     refused by the reader or writer that meets it. **The order is the point**: writing the bare form
     unconditionally would settle the class in the descriptor cache, short-circuiting analysis permanently, so

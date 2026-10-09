@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  * <p>Has exactly one legitimate host representation ({@link UUID} itself), so like {@link
  * RationalParser}/{@link ComplexParser} its {@link #boundTo} offers that and the text it was written
  * as. Unlike {@code Rational}/{@code Complex}, {@code
- * UUID} isn't a Java record, so it doesn't collide with {@code tson-bind}'s record auto-detection --
+ * UUID} isn't a Java record, so it doesn't collide with {@code ltr8-bind}'s record auto-detection --
  * but it also isn't {@code @Atom}-annotatable (it's a JDK class), so {@code DataBindContext} now
  * pre-registers it as a bridge-less atom directly, the same way it already does for {@code
  * java.util.Date}, rather than requiring every caller to register it themselves.

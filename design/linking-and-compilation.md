@@ -30,7 +30,7 @@ Resolution handles one declaration at a time (references carried as unverified s
 consulted). `TsonSchemaLinker`/`TsonSchemaRegistry` add the second stage. **They sit in different modules on
 purpose:** the linker is a pipeline stage and lives in `tson-compiler` alongside parse/desugar/resolve/compile,
 so every phase that will grow schema-side diagnostics is in one module with `Diagnostic`, and it can reach
-`tson-regex` directly (what §5.4 pattern disjointness needs, with no injected-oracle seam); the registry is
+`ltr8-regex` directly (what §5.4 pattern disjointness needs, with no injected-oracle seam); the registry is
 storage over the `schema.meta` value model and stays in `tson-schema`, the leaf everything else depends on.
 
 - **`CanonicalIdentity.canonicalize(String)`** (`tson-base`) implements §2.2.1's canonical-identity algorithm — **not**

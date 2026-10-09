@@ -13,7 +13,7 @@ import java.util.List;
  * from output the same way; {@code groups} similarly for a record with no field groups. In
  * practice, bound through plain {@code TsonObjectWriter.toTson} rather than a hand-written writer (see
  * {@code TypeDefinition}'s own Javadoc), both currently render as {@code []} rather than being
- * omitted when empty -- {@code tson-bind} doesn't support {@code Optional<List<T>>} record
+ * omitted when empty -- {@code ltr8-bind} doesn't support {@code Optional<List<T>>} record
  * components yet (only a bare, always-present {@code List} does), so there's no wrapper available
  * to opt into the omit-when-absent behavior non-list optional fields already get for free.
  *

@@ -7,8 +7,8 @@ history lives in git.
 
 - Java 25; no external runtime dependencies in main code.
 - `tson-compiler` depends on `tson-schema`, not the reverse; `schema.meta` names no `tson-compiler` type.
-- `tson-tree`, `tson-regex`, `tson-net` and `ltr8-unicode` are leaves, and `tson-base` depends only on `tson-bind`,
-  `tson-net` and `ltr8-unicode`;
+- `tson-tree`, `ltr8-regex`, `ltr8-net` and `ltr8-unicode` are leaves, and `tson-base` depends only on `ltr8-bind`,
+  `ltr8-net` and `ltr8-unicode`;
   `tson-json` has no dependency on `tson-compiler`.
 - `Tson`/`Json` prefix only what a consumer names; unexported packages hold bare names.
 - No `opens` directives; an unexported package is genuinely unreachable.
@@ -25,14 +25,14 @@ module has a real `module-info.java`; module names mirror each module's root exp
   processor's exceptions), what a processor admits and spends (`policy`), where a schema comes from (`source`), the
   host atom values (`atom`), what a deployment binds with (`bind`), what a rule says when broken (`diagnostics`), byte
   I/O (`io`), plus `ProcessorConfig`. A pure leaf but for
-  `tson-bind`, `tson-net` and `ltr8-unicode`.
+  `ltr8-bind`, `ltr8-net` and `ltr8-unicode`.
   `design/tson-base.md` has each package and its rationale.
-- **`tson-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations, plus `Annotations`/
+- **`ltr8-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations, plus `Annotations`/
   `Annotation`, the wire-annotation carrier a bound class declares a component of. The carrier lives here
-  rather than with the engine because it is the one module `tson-bind` (which analyses classes),
+  rather than with the engine because it is the one module `ltr8-bind` (which analyses classes),
   `tson-schema` (whose `schema.meta` model is itself a bind target) and consumer code all see.
-- **`tson-bind`** — the generic `DataValue`↔Java-object binding engine (`DataBindContext`, `DataClass`
-  descriptors, `DataNameBinder`, bridges). Depends only on `tson-annotation`, whose annotations and carrier
+- **`ltr8-bind`** — the generic `DataValue`↔Java-object binding engine (`DataBindContext`, `DataClass`
+  descriptors, `DataNameBinder`, bridges). Depends only on `ltr8-annotation`, whose annotations and carrier
   types it reads off a class under analysis. A context may name a **binding profile**
   (`DataBindContext.Builder.profile`), selecting among a class's `@Profile` constructors so one class binds
   several shapes — one context per schema version, descriptors still cached per context. The name is opaque
@@ -45,18 +45,18 @@ module has a real `module-info.java`; module names mirror each module's root exp
 - **`tson-schema`** — `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
   records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
   deliberately open branch, `Data`, which a consumer's own class implements — see below). **The host value
-  types are not here**: `Rational` and `Complex` are `base.atom`'s and the `CidrNetwork` pair `tson-net`'s, because
+  types are not here**: `Rational` and `Complex` are `base.atom`'s and the `CidrNetwork` pair `ltr8-net`'s, because
   *what do I get back from `!rational`?* is a question about the type system rather than about §8's model,
   and they depend on nothing. `schema.meta` reads them structurally — `RationalType`'s
   `min`/`max`/`multiple_of` are `Rational` values — a pull from above rather than a reason to live above. Plus the schema
   registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`) and
   `TsonBundledSchemas`. **The linker is not here** — it is an engine, not a value model, so
   `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the pipeline; what stays is storage
-  and the identity algorithm lookups compare by. Depends on `tson-annotation`, `tson-base` (`requires
-  transitive`) and `tson-regex` — the last so that `text_type`'s member-against-pattern coherence sits on the
+  and the identity algorithm lookups compare by. Depends on `ltr8-annotation`, `tson-base` (`requires
+  transitive`) and `ltr8-regex` — the last so that `text_type`'s member-against-pattern coherence sits on the
   family with the length checks it shares a rule with, rather than being split across modules by which engine
   each half needs. The engine is an internal library like any other; the boundary worth keeping is the one
-  that stops a value model depending on the *pipeline*, and `tson-regex` is a leaf.
+  that stops a value model depending on the *pipeline*, and `ltr8-regex` is a leaf.
   **`tson-compiler` depends on `tson-schema`, not the reverse** — the opposite of what the names suggest, deliberately
   so the compiler's resolver can hold and consult `schema.meta` types directly. `schema.meta` names no `tson-compiler`
   type; where it needs
@@ -73,7 +73,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   exceptions a refusal arrives as; `io.ltr8.tson.atom.number` is §4's number production and
   the narrowing over it, exported because base type resolution stays with the text encoding and reads it;
   `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on the same terms as `tson-compiler`'s
-  own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its constraint record), `tson-base` and `tson-regex`.
+  own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its constraint record), `tson-base` and `ltr8-regex`.
   **What deliberately stayed behind is everything that depends on *how* a token was written**: `AtomType` takes a `String`,
   and the two atoms needing the lexical form — the kernel's `value`, whose §4.4 rule is that a quoted token is a string, and
   `Token`, which records the spelling §8's resolved form carries — stay in `tson-compiler` with `TokenValue` and
@@ -81,21 +81,21 @@ module has a real `module-info.java`; module names mirror each module's root exp
   forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
 - **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonValue` and its
   pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
-  true leaf: depends on **nothing** (not even `tson-annotation` — the nodes aren't bind targets, they're
+  true leaf: depends on **nothing** (not even `ltr8-annotation` — the nodes aren't bind targets, they're
   assembled by hand-written readers). The data-tree counterpart to `tson-schema`'s `schema.meta`: same
   "pure value model in its own module, engine depends on it not the reverse" shape, so JPMS keeps the tree
   from ever coupling to compiler internals. `tson-compiler` depends on it; it names no `tson-compiler` type.
-- **`tson-regex`** — **only** `io.ltr8.regex`: a native RFC 9485 I-Regexp engine — `IRegex.parse`
+- **`ltr8-regex`** — **only** `io.ltr8.regex`: a native RFC 9485 I-Regexp engine — `IRegex.parse`
   builds a `RegexNode` AST (or `IRegexSyntaxException`), `IRegex.matches` runs a Thompson-NFA/Pike-VM
   simulation (linear-time, no backtracking → ReDoS-safe; `\p{…}` via JDK `Character.getType`), and
   `IRegex.isDisjointFrom` decides whether two patterns share any string (exact — a symbolic product-NFA
   emptiness check over a `CodePointSet` interval algebra; §5.4 decides choice disjointness by class, never by pattern).
   A true leaf — depends on **nothing**, I-Regexp being an external standard, not TSON-specific. The
-  *engine* counterpart to `tson-bind` (a general dependency-free engine), not a value model like
+  *engine* counterpart to `ltr8-bind` (a general dependency-free engine), not a value model like
   `tson-tree`; TSON pins its `regex` atom to I-Regexp (`regex_type`'s fixed `spec = rfc9485`), so
   this owns I-Regexp semantics rather than delegating to `java.util.regex` (a laxer superset).
   `tson-schema`, `tson-atom` and `tson-compiler` require it; it names no TSON type.
-- **`tson-net`** — **only** `io.ltr8.net`: native recognizers for network text formats, each to its RFC.
+- **`ltr8-net`** — **only** `io.ltr8.net`: native recognizers for network text formats, each to its RFC.
   `Iri.parse` reads an RFC 3986 URI-reference or RFC 3987 IRI-reference into its components as written (or
   throws `IriSyntaxException`), never resolving, normalising or percent-decoding. A true leaf, and the second
   library here with no `Tson` prefix, as `io.ltr8.bind` has none: it knows nothing of TSON and is usable on its
@@ -129,7 +129,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   one module. Root package `io.ltr8.tson.compiler`; exports the packages with real cross-module callers
   and keeps `reader`/`atom`/`base`/`lexer` internal.
 - **`tson`** — the front door, and **one class**: `Tson`, over `tson-compiler`, the way Retrofit sits on
-  OkHttp. Declares `tson-compiler`/`tson-schema`/`tson-bind`/`tson-tree` as `api` so a caller sees the real
+  OkHttp. Declares `tson-compiler`/`tson-schema`/`ltr8-bind`/`tson-tree` as `api` so a caller sees the real
   classes underneath. **`ProcessorConfig` is not here** — a configuration is a value stating what a deployment
   chose, so it sits in `tson-base` with the values it holds and is shared by every encoding; what cannot
   follow it is construction, which names the compiler's own registry. Hence `Tson.of(config)`, and

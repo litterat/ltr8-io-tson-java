@@ -16,7 +16,7 @@ dependencies {
 
     // TSON pins its `regex` atom to I-Regexp (RFC 9485), so RegexParser validates through the native
     // engine rather than through java.util.regex, which is a laxer superset.
-    implementation(project(":tson-regex"))
+    implementation(project(":ltr8-regex"))
 
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")

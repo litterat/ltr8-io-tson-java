@@ -749,7 +749,7 @@ class TsonObjectReaderTest {
 
     // ── A target class this context cannot bind ──────────────────────────
 
-    /** An interface has no constructor to bind through, so {@code tson-bind} cannot produce a descriptor for it. */
+    /** An interface has no constructor to bind through, so {@code ltr8-bind} cannot produce a descriptor for it. */
     interface Unbindable {
     }
 
@@ -918,7 +918,7 @@ class TsonObjectReaderTest {
     @Test
     void builtinUuidAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
         // Unlike Rational/Complex, UUID isn't a Java record, so it doesn't collide with
-        // tson-bind's record auto-detection -- but it also can't self-declare @Atom (it's a JDK
+        // ltr8-bind's record auto-detection -- but it also can't self-declare @Atom (it's a JDK
         // class), so TsonObjectReader's default DataBindContext pre-registers it (see
         // AtomContext.defaultContext()) rather than requiring every caller to do so themselves.
         UuidHolder h = mapper.read("{ value: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09 }", UuidHolder.class);
@@ -1368,7 +1368,7 @@ class TsonObjectReaderTest {
     /**
      * <b>A member of an open union is found by name, not only once something else has registered it.</b>
      * Such a union starts with an empty member list and grows through {@code DataClassUnion.addMemberType},
-     * which every route reaching it holds a class or an instance for -- the writer, {@code tson-bind}'s
+     * which every route reaching it holds a class or an instance for -- the writer, {@code ltr8-bind}'s
      * mappers, and the analysis of the member itself. A read holds a name, so the list used to grow only as
      * a side effect: writing a {@code Hexagon} made the next read of {@code !hexagon} work and a process
      * that only ever read never got there. The same document, bound or refused by what else had happened

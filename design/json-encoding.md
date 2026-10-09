@@ -72,7 +72,7 @@ so *which* families a reader can bind is a property of the type system and not o
 them. A consumer whose class has a `UUID` component must not have to discover that one front door treats it
 as a scalar and the other takes it apart.
 
-What the registration buys is that `tson-bind` treats each host type as a **scalar** — `CidrInet4Network` is a
+What the registration buys is that `ltr8-bind` treats each host type as a **scalar** — `CidrInet4Network` is a
 Java record and would otherwise bind as `{ prefix: … prefixLength: … }`, refusing the scalar `cidr4`/`cidr6`
 actually carry. None of these registrations carries a bridge, so the string-to-host-value conversion is not
 the registration's: it is the **family's**, and `HostAtoms.forStringContentHostType` is how a reader with no

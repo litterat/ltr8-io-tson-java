@@ -10,13 +10,13 @@ dependencies {
     // present for any downstream compilation that transitively requires io.ltr8.tson.schema (tson-compiler,
     // tson) -- Gradle's own implementation/api split controls compile-classpath *type* visibility, which
     // is a separate concern from the module graph's own presence requirement.
-    api(project(":tson-annotation"))
+    api(project(":ltr8-annotation"))
 
     // `text_type.members` must answer to a `pattern` on the same body, which is a regex match. The engine
     // is an internal library like any other and the check belongs beside the length checks that share its
     // method, so the constraint model carries the dependency rather than splitting one coherence rule
-    // across two modules. `implementation`: no public schema.meta signature names a tson-regex type.
-    implementation(project(":tson-regex"))
+    // across two modules. `implementation`: no public schema.meta signature names a ltr8-regex type.
+    implementation(project(":ltr8-regex"))
 
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")

@@ -13,7 +13,7 @@ import java.util.Optional;
  * {@code access_pattern}/{@code size_type} are fixed ({@code NAMED}/{@code VARIABLE}) and never
  * appear in output. Also backs the kernel's own {@code schema} type ({@code map<type_name,
  * type_definition>}). {@code @Field} renames each component to the kernel's own snake_case wire
- * name -- {@code tson-bind} otherwise writes the bare Java component name verbatim (camelCase).
+ * name -- {@code ltr8-bind} otherwise writes the bare Java component name verbatim (camelCase).
  *
  * <p>{@code voidable} governs the <b>value</b> and only the value, spelled {@code {K => V?}} -- a key can
  * never be void ([TSON-DATA] §2.9), so there is nothing else for the name to be ambiguous between. It is the

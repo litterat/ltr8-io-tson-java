@@ -22,7 +22,7 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 
 /**
  * Object-binding mode's own {@code tuple} reader -- reads a tuple's own array-shaped value into a
- * real, bound Java object via {@code descriptor}, a {@code tson-bind} {@link DataClassTuple} already
+ * real, bound Java object via {@code descriptor}, a {@code ltr8-bind} {@link DataClassTuple} already
  * resolved for this tuple's own target Java type (same division of responsibility as {@link
  * RecordBindReader}'s {@code DataClassRecord}).
  *
