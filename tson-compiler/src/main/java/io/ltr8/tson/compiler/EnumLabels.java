@@ -130,7 +130,7 @@ final class EnumLabels {
      * a refinement records its instance's constructor as its own {@code source}, so this answers for
      * {@code !identifier ^ { ... }} as for {@code identifier}.
      */
-    private static boolean isFamily(TypeDefinition instance, String family, Function<String, TypeDefinition> lookup) {
+    static boolean isFamily(TypeDefinition instance, String family, Function<String, TypeDefinition> lookup) {
         if (instance == null || instance.kind() != TypeKind.ATOM || instance.supertypes().contains("top")
                 || instance.source().isEmpty()) {
             return false;

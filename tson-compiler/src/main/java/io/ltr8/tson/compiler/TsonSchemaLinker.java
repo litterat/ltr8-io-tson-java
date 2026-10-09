@@ -260,7 +260,8 @@ public final class TsonSchemaLinker {
             // An enum whose members its own type refused has had its verdict: judging those members as names
             // too would report the one mistake twice.
             List<String> names = switch (body) {
-                case RecordBody record -> record.fields().stream().map(RecordField::name).toList();
+                case RecordBody record when !refusedEnums.contains(name) ->
+                        record.fields().stream().map(RecordField::name).toList();
                 case EnumBody enumBody when !refusedEnums.contains(name) -> List.copyOf(enumBody.members());
                 default -> List.of();
             };
@@ -270,9 +271,12 @@ public final class TsonSchemaLinker {
             // domain carries, and there is nothing to spoof where nothing is looked up by name. The collision
             // relation stays -- two members that render alike is the hazard either way, and it is a property of
             // the set (§7.4).
-            boolean perNameRules = !(body instanceof EnumBody)
-                    || EnumLabels.membersAreNames(definition, merged, structure);
-            checkScope(receiver, schema, name, definition, names, noun, identifiers, perNameRules);
+            boolean perNameRules = body instanceof EnumBody ? EnumLabels.membersAreNames(definition, merged, structure)
+                    : !(body instanceof RecordBody) || FieldNames.namesAreIdentifiers(definition, merged, structure);
+            IdentifierProfile profile = body instanceof RecordBody
+                    ? FieldNames.profile(definition, merged, structure).orElse(IdentifierGrammar.PROFILE)
+                    : IdentifierGrammar.PROFILE;
+            checkScope(receiver, schema, name, definition, names, noun, identifiers, perNameRules, profile);
             if (body instanceof RecordBody record) {
                 checkFieldValues(receiver, schema, name, definition, record, merged, identifiers);
             }
@@ -302,6 +306,14 @@ public final class TsonSchemaLinker {
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
                                    IdentifierPolicy identifiers, boolean perNameRules) {
+        checkScope(receiver, schema, entry, definition, names, noun, identifiers, perNameRules,
+                IdentifierGrammar.PROFILE);
+    }
+
+    /** The same, judging each name under {@code profile} -- a record's field name type's, for its field names. */
+    private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
+                                   TypeDefinition definition, List<String> names, String noun,
+                                   IdentifierPolicy identifiers, boolean perNameRules, IdentifierProfile profile) {
         if (identifiers.appliesSkeletonDistinctness()) {
             ConfusableNames.firstCollision(names).ifPresent(collision -> refuse(receiver, schema, entry,
                     definition, Diagnostic.Code.CONFUSABLE_NAMES,
@@ -312,7 +324,7 @@ public final class TsonSchemaLinker {
         }
         String singular = noun.substring(0, noun.length() - 1);
         names.forEach(member -> perName(receiver, schema, entry, definition, member,
-                "'" + entry + "' has a " + singular + " where ", identifiers));
+                "'" + entry + "' has a " + singular + " where ", identifiers, profile));
     }
 
     /**
@@ -658,6 +670,7 @@ public final class TsonSchemaLinker {
         // Before the name checks: a member that is not a value of its enum's type is the more basic verdict,
         // and the per-name rules would otherwise report it as a restricted character.
         Set<String> refusedEnums = checkEnumTypes(schema, merged, localNames, structureNamespace::get, receiver);
+        refusedEnums.addAll(checkFieldNameTypes(schema, merged, localNames, structureNamespace::get, receiver));
         checkNames(receiver, schema, merged, structureNamespace::get, refusedEnums, identifiers);
 
         Set<String> blamedOnce = new LinkedHashSet<>();
@@ -743,6 +756,23 @@ public final class TsonSchemaLinker {
                                               DiagnosticsReceiver receiver) {
         Set<String> refused = new LinkedHashSet<>();
         for (EnumLabels.Violation violation : EnumLabels.check(merged, localNames, structure)) {
+            report(receiver, schema, violation.entry(), merged.get(violation.entry()), violation.message());
+            refused.add(violation.entry());
+        }
+        return refused;
+    }
+
+    /**
+     * What each record's {@code field_name_type} obliges ({@link FieldNames}, SPEC-FEEDBACK.md #10): a text
+     * family, of which every field name the record states is a value, no two of its fields one. Refused at schema
+     * load, against the record that states it; the names of the records refused are returned, so the name checks
+     * do not judge the same names a second time.
+     */
+    private static Set<String> checkFieldNameTypes(TsonSchema schema, Map<String, TypeDefinition> merged,
+                                                   Set<String> localNames, Function<String, TypeDefinition> structure,
+                                                   DiagnosticsReceiver receiver) {
+        Set<String> refused = new LinkedHashSet<>();
+        for (EnumLabels.Violation violation : FieldNames.check(merged, localNames, structure)) {
             report(receiver, schema, violation.entry(), merged.get(violation.entry()), violation.message());
             refused.add(violation.entry());
         }

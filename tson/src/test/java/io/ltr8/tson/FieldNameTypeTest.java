@@ -32,6 +32,56 @@ class FieldNameTypeTest {
         assertEquals(List.of(), Tson.standard().validate("{ \"order-id\": 1  \"true\": 2 }"));
     }
 
+    private static final String HEADER = """
+            !!id:"https://example.test/%s.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
+            """;
+
+    private static String schema(String id, String body) {
+        return HEADER.formatted(id) + "{\n" + body + "\n}\n";
+    }
+
+    /** A record states its field names' family; a JSON-LD translation's admits a leading @ or $. */
+    static final String JSON_LD = schema("json-ld", """
+              json_name => !identifier_type { start_add: "@$" }
+              node => !record {
+                field_name_type: json_name
+                fields: [
+                  { name: "@id"  type: text }
+                  { name: "$ref"  type: text  optional: true }
+                  { name: label  type: text }
+                ]
+              }
+            """);
+
+    @Test
+    void aRecordMayStateARelaxedFieldNameType() {
+        Tson tson = Tson.standard();
+        tson.resolve(JSON_LD);
+    }
+
+    @Test
+    void aTextFieldNameTypeAdmitsAnyText() {
+        Tson.standard().resolve(schema("texts", """
+              row => !record { field_name_type: text  fields: [ { name: "first name"  type: text } ] }
+            """));
+    }
+
+    /** The default does not change under a schema either: an identifier, refused at schema load. */
+    @Test
+    void aNameOutsideTheRecordsTypeIsRefusedAtSchemaLoad() {
+        var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
+                () -> Tson.standard().resolve(schema("default", """
+                      node => !record { fields: [ { name: "@id"  type: text } ] }
+                    """)));
+        assertTrue(thrown.getMessage().contains("field_name_type 'field_name'"), thrown.getMessage());
+        org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
+                () -> Tson.standard().resolve(schema("number", """
+                      node => !record { field_name_type: int32  fields: [ { name: "1"  type: text } ] }
+                    """)));
+    }
+
     @Test
     void annotationNamesStayIdentifiersByTheGrammar() {
         assertEquals(1, Tson.standard().validate("{ a: @\"x y\" 1 }").size());
