@@ -1,6 +1,10 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.tson.atom;
 
+import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.unicode.IdentifierProfile.Base;
+import io.ltr8.unicode.Normalization;
 import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,22 +16,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>The profile <b>reports</b> a violation rather than throwing one -- what a violation becomes is the
  * caller's, a parse error from the lexer and a diagnostic from the linker -- so the assertions here are over
- * {@link IdentifierProfile#validate}'s own answer.
+ * {@link IdentifierGrammar#validate}'s own answer.
  *
  * <p><b>No literal invisible character appears in this source</b>; each is built from its code point.
  */
-class IdentifierProfileTest {
+class IdentifierGrammarTest {
 
     /** {@code text} itself when the profile admits it, so an assertion reads as an equality. */
     private static String read(String text) {
-        assertTrue(IdentifierProfile.validate(text).isEmpty(),
-                () -> "should accept: " + text + " -- " + IdentifierProfile.validate(text).orElse(""));
+        assertTrue(IdentifierGrammar.validate(text).isEmpty(),
+                () -> "should accept: " + text + " -- " + IdentifierGrammar.validate(text).orElse(""));
         return text;
     }
 
     private static String rejects(String text) {
-        return IdentifierProfile.validate(text)
+        return IdentifierGrammar.validate(text)
                 .orElseGet(() -> fail("should reject: " + text));
+    }
+
+    /** The kernel's {@code identifier} declares §7.7's sets, and the grammar is built from it, not restated. */
+    @Test
+    void theProfileIsTheKernelIdentifiers() {
+        assertEquals(IdentifierProfile.of(Base.XID, Base.XID, "", "-", "", "", Normalization.NFC),
+                IdentifierGrammar.PROFILE);
     }
 
     @Test
@@ -73,7 +84,7 @@ class IdentifierProfileTest {
      * Obsolete and technical characters, which XID admits and the General Security Profile does not -- and
      * which are <b>refused, not rejected</b>. [TSON-DATA] §8.2 makes {@code Identifier_Status} a policy
      * rule whose failure MUST NOT be reported in any of §8.1's four categories, so the grammar accepts
-     * such a name (it is a well-formed identifier) and {@link IdentifierProfile#hygiene} is what declines it.
+     * such a name (it is a well-formed identifier) and {@link IdentifierGrammar#hygiene} is what declines it.
      *
      * <p>Nothing here applies the policy. Every position that reads a name applies the grammar and only the
      * grammar; §8.2's name-hygiene rules run once per layer over the scopes §8.2 and [TSON-SCHEMA] §11.4 define --
@@ -84,9 +95,9 @@ class IdentifierProfileTest {
         for (int cp : new int[] {0x07E8, 0xA610, 0x1B6B}) {
             String text = "ab" + new String(Character.toChars(cp)) + "c";
             String label = "U+%04X".formatted(cp);
-            assertTrue(IdentifierProfile.validate(text).isEmpty(),
+            assertTrue(IdentifierGrammar.validate(text).isEmpty(),
                     () -> label + " is a well-formed identifier");
-            assertTrue(IdentifierProfile.hygiene(text).orElseThrow(() -> new AssertionError(label))
+            assertTrue(IdentifierGrammar.hygiene(text).orElseThrow(() -> new AssertionError(label))
                     .contains("Identifier_Status=Restricted"), () -> label);
             // And read() -- the atom-parser path -- is the grammar too, so a restricted name reaches the
             // scope walk that refuses it rather than dying here as a malformed one.
@@ -99,7 +110,7 @@ class IdentifierProfileTest {
     void aJoinerOutsideItsContextIsAGrammarFailureNotARefusal() {
         String text = "ab" + new String(Character.toChars(0x200C)) + "cd";
         assertTrue(rejects(text).contains("join control outside the contexts"));
-        assertTrue(IdentifierProfile.hygiene(text).isEmpty(),
+        assertTrue(IdentifierGrammar.hygiene(text).isEmpty(),
                 "the restricted-character rule does not judge a joiner");
     }
 

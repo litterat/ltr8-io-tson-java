@@ -1,4 +1,4 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.unicode;
 
 import org.junit.jupiter.api.Test;
 

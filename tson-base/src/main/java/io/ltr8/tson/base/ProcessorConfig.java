@@ -7,6 +7,7 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.unicode.RestrictionLevel;
 import java.util.Objects;
 
 /**
@@ -229,7 +230,7 @@ public final class ProcessorConfig {
      * compared at all. The per-string rule is what remains, which is the same reason it is right for a
      * browser judging a domain name.
      *
-     * <p>{@link ScriptPolicy.Level#MINIMALLY_RESTRICTIVE} and {@link ScriptPolicy.Level#UNRESTRICTED}
+     * <p>{@link RestrictionLevel#MINIMALLY_RESTRICTIVE} and {@link RestrictionLevel#UNRESTRICTED}
      * collapse here: §5.2 says so directly, a token that is not a name having no identifier profile to drop.
      *
      * <p>A level over the whole token, never per segment: {@code _} and {@code -} are word separators by

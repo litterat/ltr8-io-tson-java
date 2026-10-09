@@ -14,6 +14,9 @@ dependencies {
     // Native recognizers for network text formats, a leaf like tson-regex. `api`: their values are host types
     // this module's AtomContext binds, so a consumer naming one in a class needs the module readable.
     api(project(":tson-net"))
+    // Unicode properties and algorithms, a leaf like tson-net. `api`: the engines above read the tables directly
+    // (NFC, NFKC_Casefold, XID), so a module that requires this one reads them without naming a second module.
+    api(project(":ltr8-unicode"))
 
     // The bottom of the stack: what every encoding and every phase reports through, and the position type
     // a report points at. A true pure leaf -- depends on nothing, and nothing here knows what a TSON

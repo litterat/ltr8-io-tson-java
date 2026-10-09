@@ -5,7 +5,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.unicode.RestrictionLevel;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
@@ -44,7 +44,7 @@ final class DiagnosticsSchema {
         case "limits" -> CliPolicy.CliLimits.class;
         case "diagnostic_code" -> Diagnostic.Code.class;
         case "outcome" -> Outcome.class;
-        case "restriction_level" -> ScriptPolicy.Level.class;
+        case "restriction_level" -> RestrictionLevel.class;
         default -> SchemaMetaNameBinder.INSTANCE.resolve(name);
     };
 

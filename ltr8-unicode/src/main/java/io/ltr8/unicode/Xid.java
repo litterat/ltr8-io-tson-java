@@ -1,12 +1,10 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.unicode;
 
 import java.util.Arrays;
 
 /**
- * UAX #31's {@code XID_Start} and {@code XID_Continue}, exactly, over the running JDK's character data.
- * Shared by the two layers that need them: {@code Lexer}'s unquoted-token profile ([TSON-DATA] §7.1) and the
- * identifier profile the meta-kernel's {@code identifier} type carries. Neither is XID alone -- each adds
- * and removes its own characters -- so what is shared is the property, not either profile.
+ * UAX #31's {@code XID_Start} and {@code XID_Continue}, exactly, over the running JDK's character data. A
+ * profile built on them adds and removes its own characters; what is here is the property, not any profile.
  *
  * <p><b>The JDK's own identifier predicates are not these properties</b>, which is the reason this class
  * exists rather than a pair of one-line calls. {@link Character#isUnicodeIdentifierStart}/{@code Part} are
@@ -25,8 +23,8 @@ public final class Xid {
     }
 
     /**
-     * The Unicode version whose properties this implements -- [TSON-DATA] §7.1 asks an implementation to
-     * document it. It is the version the running JDK's character data carries, since {@link #NOT_XID_START}
+     * The Unicode version whose properties this package implements, for a caller that must document the version
+     * it judges against. It is the version the running JDK's character data carries, since {@link #NOT_XID_START}
      * and {@link #NOT_XID_CONTINUE} are derived against that data; a JDK whose Unicode version moves needs
      * both tables re-derived (see their Javadoc for how).
      */
@@ -45,9 +43,8 @@ public final class Xid {
      * {@code XID_Continue}, exactly -- <b>including U+200C and U+200D</b>, which are members of the property
      * (Unicode 16.0 {@code DerivedCoreProperties.txt}) because UAX #31 folded them into the default when it
      * removed requirement R1a. Whether a given profile then admits them is that profile's decision, not this
-     * one's: [TSON-DATA] §7.1 admits them in the unquoted-token profile on exactly those terms and relocates
-     * the safety rule to the name layer, where §7.7 applies UTS #39's contextual rule -- so neither profile
-     * subtracts a joiner, and this predicate is the property and nothing more.
+     * one's -- UTS #39's contextual rule ({@link JoiningControls}) is the usual way to admit them safely -- so
+     * this predicate is the property and nothing more.
      */
     public static boolean isContinue(int cp) {
         return (Character.isUnicodeIdentifierPart(cp) && !Character.isIdentifierIgnorable(cp)

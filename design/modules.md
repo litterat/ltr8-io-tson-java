@@ -7,7 +7,8 @@ history lives in git.
 
 - Java 25; no external runtime dependencies in main code.
 - `tson-compiler` depends on `tson-schema`, not the reverse; `schema.meta` names no `tson-compiler` type.
-- `tson-tree`, `tson-regex` and `tson-net` are leaves, and `tson-base` depends only on `tson-bind` and `tson-net`;
+- `tson-tree`, `tson-regex`, `tson-net` and `ltr8-unicode` are leaves, and `tson-base` depends only on `tson-bind`,
+  `tson-net` and `ltr8-unicode`;
   `tson-json` has no dependency on `tson-compiler`.
 - `Tson`/`Json` prefix only what a consumer names; unexported packages hold bare names.
 - No `opens` directives; an unexported package is genuinely unreachable.
@@ -23,7 +24,8 @@ module has a real `module-info.java`; module names mirror each module's root exp
 - **`tson-base`** — how a problem is stated (`Diagnostic`, the receivers, `SourcePosition`, `CanonicalIdentity`, the
   processor's exceptions), what a processor admits and spends (`policy`), where a schema comes from (`source`), the
   host atom values (`atom`), what a deployment binds with (`bind`), what a rule says when broken (`diagnostics`), byte
-  I/O (`io`) and the UCD tables (`unicode`), plus `ProcessorConfig`. A pure leaf but for `tson-bind` and `tson-net`.
+  I/O (`io`), plus `ProcessorConfig`. A pure leaf but for
+  `tson-bind`, `tson-net` and `ltr8-unicode`.
   `design/tson-base.md` has each package and its rationale.
 - **`tson-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations, plus `Annotations`/
   `Annotation`, the wire-annotation carrier a bound class declares a component of. The carrier lives here
@@ -67,7 +69,8 @@ module has a real `module-info.java`; module names mirror each module's root exp
   which families a reader binds, and what they read to, is a property of the type system and not of the encoding that carried
   them. Three packages, split by who touches them: `io.ltr8.tson.atom` is what a caller names — `AtomType`, the two indices
   over it (`BuiltinTypeVocabulary` by name, `HostAtoms` by host class), `AtomParsers` from a resolved body, `VocabularyAtoms`
-  for the write direction, and the exceptions a refusal arrives as; `io.ltr8.tson.atom.number` is §4's number production and
+  for the write direction, `IdentifierGrammar` (§7.7's name grammar, built from the kernel's `identifier`), and the
+  exceptions a refusal arrives as; `io.ltr8.tson.atom.number` is §4's number production and
   the narrowing over it, exported because base type resolution stays with the text encoding and reads it;
   `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on the same terms as `tson-compiler`'s
   own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its constraint record), `tson-base` and `tson-regex`.
@@ -103,6 +106,19 @@ module has a real `module-info.java`; module names mirror each module's root exp
   leading zeros, short forms and bare integers. `tson-base` requires it transitively (`CanonicalIdentity`,
   `SchemaReference`, and its values as host types), `tson-schema`'s coherence checks judge facet entries with it,
   and `tson-atom` wraps each format in an `AtomTypeParser` that adds the facets.
+- **`ltr8-unicode`** — **only** `io.ltr8.unicode`: Unicode Character Database properties and the algorithms over
+  them, each to its Unicode standard. The tables: `Xid` (UAX #31's `XID_Start`/`XID_Continue`, exact, and
+  `UNICODE_VERSION`, the one version every table is checked against), `Nfc` (UAX #15, allocation-free on text
+  already in NFC), `NfkcCasefold`, `IdentifierStatus` and `Confusables` (`skeleton`). The algorithms over them:
+  `Normalization` (the text forms), `IdentifierProfile` (a UAX #31 R1 profile), `JoiningControls` (UTS #39's
+  limited contexts for ZWNJ and ZWJ), `ConfusableNames` (skeleton distinctness over a set) and `RestrictionLevel`
+  (UTS #39 §5.2's levels). A true leaf that knows nothing of TSON, named for the publisher rather than the format.
+  The boundary is **mechanism versus choice**: what the Unicode standards define lives here, and what a format
+  chooses — its own profile, the policy it applies and the words of a refusal — stays with the format
+  (`tson-atom`'s `IdentifierGrammar`, `tson-base`'s `ScriptPolicy` and `IdentifierPolicy`). One version for every
+  table is the reason it is one module: a JDK whose Unicode version moves re-derives them together. `tson-base` requires it
+  transitively, so the engines above read `Nfc`, `Normalization` and `IdentifierProfile` without naming a second
+  module, and a consumer naming a level names `RestrictionLevel`, since the levels are Unicode's.
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the token-side atom glue
   (`atom`: `RawTokenParser`, `TokenAtomType`, `ValueParser` — the vocabulary itself is `tson-atom`'s),
   schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades

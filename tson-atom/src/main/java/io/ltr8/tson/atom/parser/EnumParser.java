@@ -5,8 +5,8 @@ import java.util.Optional;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
-import io.ltr8.tson.base.unicode.Nfc;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Nfc;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.meta.EnumBody;
 import java.util.List;
 

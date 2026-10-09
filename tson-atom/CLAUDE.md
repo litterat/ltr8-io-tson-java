@@ -8,4 +8,6 @@ Which tokens each family accepts and what host value results, over a `String`, s
 - Each family is a constraint record in `schema.meta` plus a same-named `*Parser` in the unexported `atom.parser`.
 - Pattern facets are `String`, matched through `tson-regex` (I-Regexp) — never `java.util.regex`.
 - `AtomParsers` is the one answer to "which parser reads this body"; the compiled readers and the linker both ask it.
+- `IdentifierGrammar.PROFILE` is built from `IdentifierType.IDENTIFIER`, never restated; `validate`/`hygiene` report
+  and never throw.
 - `expected` on a refusal is the constraint that failed, from `AtomTypeException`'s six shapes — never the type's name.

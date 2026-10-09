@@ -1,4 +1,4 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.unicode;
 
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +32,7 @@ class ConfusablesTest {
                 () -> "expected distinct: " + a + " / " + b);
     }
 
-    /** The mixed-script homograph §9.4 opens with: Cyrillic а (U+0430) against Latin a. */
+    /** The classic mixed-script homograph: Cyrillic а (U+0430) against Latin a. */
     @Test
     void aCyrillicHomographIsConfusableWithItsLatinSpelling() {
         confusable("admin", cp(0x0430) + "dmin");

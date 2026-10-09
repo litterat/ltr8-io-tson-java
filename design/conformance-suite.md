@@ -61,7 +61,7 @@ mechanisms 2 and 3 are per-name and reach every identifier position anyway (§8.
 **The grammar runs where a name is read; the policy runs once per layer, over scopes.** That split is
 §8.2's own — §7.7 is validity, stable across Unicode versions, and a failure is a parse error; §8.2's three
 name-hygiene rules are policy over *named scopes*, read unstable data, and a failure is a refusal. So
-`IdentifierProfile.validate` is the grammar and `IdentifierProfile.hygiene` the restricted-character rule;
+`IdentifierGrammar.validate` is the grammar and `IdentifierGrammar.hygiene` the restricted-character rule;
 **both report a violation and neither throws**, so what a failure becomes is the caller's — a parse error
 where the grammar is read, a refusal where the policy is applied — and **no position that reads a name
 applies a policy**. The joiners belong to the grammar despite

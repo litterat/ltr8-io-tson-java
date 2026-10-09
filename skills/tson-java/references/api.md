@@ -257,10 +257,10 @@ public final class ScriptPolicy {                          // the token policy, 
   `defaultContext()`, the context both front doors start from.
 - `io.ltr8.tson.base.io` — `ByteSource`/`ByteSink`: bytes, never characters; closing releases only what was
   acquired, and closing is not flushing.
-- `io.ltr8.tson.base.unicode` — the UCD-derived tables (`Xid`, the identifier profile, scripts,
-  confusables) the §8.2 rules read, and the text forms a value is compared in: `Normalization` (`NONE`, `NFC`,
-  `NFKC`, `NFKC_CASEFOLD`, `ASCII_CASEFOLD`; `apply(text)`, `holds(text)`), `Nfc.of(text)` and
-  `NfkcCasefold.apply(text)`.
+- `io.ltr8.unicode` (module `ltr8-unicode`) — the Unicode mechanisms beneath it, TSON-free: `RestrictionLevel`
+  (the levels a `ScriptPolicy` states), `Normalization` (`NONE`, `NFC`, `NFKC`, `NFKC_CASEFOLD`, `ASCII_CASEFOLD`;
+  `apply(text)`, `holds(text)`), `IdentifierProfile`, `ConfusableNames`, `Xid`, `Nfc.of(text)`,
+  `NfkcCasefold.apply(text)`, `IdentifierStatus`, `Confusables.skeleton(text)`, `JoiningControls`.
 - `io.ltr8.tson.base.diagnostics` — the rule classes whose prose and `expected` both encodings report.
 
 ---
@@ -278,6 +278,9 @@ public final class VocabularyAtoms {                // the atom host classes, an
 public sealed abstract class AtomTypeException extends RuntimeException
         permits AtomParseException, AtomValidationException { public String expected(); }
 ```
+
+`IdentifierGrammar` is §7.7's name grammar: `PROFILE` (the kernel `identifier`'s `IdentifierProfile`),
+`validate(text)` and §8.2's `hygiene(text)`, each the violation or empty.
 
 `AtomParseException` is a token outside the atom's grammar (`ATOM_FORM_INVALID`); `AtomValidationException`
 a token that parsed and broke a declared constraint (`ATOM_CONSTRAINT_VIOLATION`). `expected()` is the

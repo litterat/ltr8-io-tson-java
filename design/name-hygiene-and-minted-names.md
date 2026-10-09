@@ -7,7 +7,7 @@ history lives in git.
 **Invariants**
 
 - All three §8.2 rules run in one walk over scopes (`checkNames`), never at the positions where a name is read.
-- What stays at the reading positions is §7.7's grammar (`IdentifierProfile.validate`); `IdentifierProfile.hygiene`
+- What stays at the reading positions is §7.7's grammar (`IdentifierGrammar.validate`); `IdentifierGrammar.hygiene`
   returns a verdict rather than throwing.
 - A template's parameters are a checked scope although §11.4 declines to list them; a choice's variants are not.
 - A `data` body and an annotation value are judged at the payload read (`SchemaResolver.payloadNames`), not in the
@@ -137,8 +137,8 @@ still what a value is matched against and two members that render identically is
 (`EnumLabels`), never the shape of the members: inferring "these look like names, so police them" would switch a
 spoofing check on and off by accident. A scope list
 can be reviewed; three call sites cannot. What stays at the reading positions is §7.7's grammar
-(`IdentifierProfile.validate`), which is validity, is stable across Unicode versions, and really is a parse
-error; `IdentifierProfile.hygiene` returns the restricted-character rule's verdict rather than throwing,
+(`IdentifierGrammar.validate`), which is validity, is stable across Unicode versions, and really is a parse
+error; `IdentifierGrammar.hygiene` returns the restricted-character rule's verdict rather than throwing,
 because a refusal is not
 one.
 

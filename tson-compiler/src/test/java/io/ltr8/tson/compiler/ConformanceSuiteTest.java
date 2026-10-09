@@ -13,7 +13,7 @@ import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
-import io.ltr8.tson.base.unicode.Xid;
+import io.ltr8.unicode.Xid;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.atom.number.BaseValue;
 import io.ltr8.tson.atom.number.NumberForm;

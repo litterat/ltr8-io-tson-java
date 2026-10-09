@@ -1,4 +1,4 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.unicode;
 
 import java.text.Normalizer;
 import java.util.HashMap;
@@ -6,22 +6,19 @@ import java.util.Map;
 
 /**
  * UTS #39 §4's {@code skeleton()} -- the mapping that decides whether two strings are confusable. Two names
- * are confusable exactly when their skeletons are equal, which is the relation [TSON-DATA] §8.2 turns into
- * a rule over the named scopes the series already defines: no two names in one scope may read alike.
+ * are confusable exactly when their skeletons are equal.
  *
- * <p><b>It is a relation, not a property</b>, and that is why it is the rule this implementation
- * adopts rather than a restriction level. A skeleton says nothing about one name: it fires only when two
- * names <em>in the same scope</em> collide, so it cannot reject `id_пользователя` or any other lone name an
- * author legitimately wrote. The per-name alternative (UTS #39 §5.2's restriction levels) rejects ordinary
- * mixed-script names and still misses whole-script confusables like {@code aec}/{@code аес}; #3 carries the
- * measurement.
+ * <p><b>It is a relation, not a property.</b> A skeleton says nothing about one name: it decides only whether
+ * two collide, so it cannot reject {@code id_пользователя} or any other lone name an author legitimately wrote.
+ * UTS #39 §5.2's restriction levels are the per-name alternative; they reject ordinary mixed-script names and
+ * still miss whole-script confusables like {@code aec}/{@code аес}.
  *
  * <p><b>The algorithm</b> (§4): NFD the input, replace each code point by its confusable mapping, NFD again.
  * The table is {@code confusables.txt} for Unicode {@link Xid#UNICODE_VERSION}, 6,355 mappings, carried here
  * as text and parsed once -- {@code src>t1 t2,...} in hex, split across constants only because a single
  * class-file string may not exceed 65,535 bytes.
  *
- * <p>Being a *table* rather than a derived property, this is the one part of the identifier work that costs
+ * <p>Being a <em>table</em> rather than a derived property, this is the one part of identifier security that costs
  * an implementation real data. A host with Unicode property escapes gets {@code XID_Start}, {@code Script}
  * and {@code General_Category} free and still ships this.
  */

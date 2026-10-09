@@ -1,6 +1,6 @@
 package io.ltr8.tson.schema;
 
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 
 import java.util.Map;
 import java.util.Objects;

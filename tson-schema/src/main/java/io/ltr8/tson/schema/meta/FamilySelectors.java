@@ -1,6 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
-import io.ltr8.tson.base.unicode.Nfc;
+import io.ltr8.unicode.Nfc;
 
 import java.util.ArrayList;
 import java.util.List;

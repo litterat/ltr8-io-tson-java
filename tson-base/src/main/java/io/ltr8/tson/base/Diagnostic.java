@@ -211,7 +211,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * would only be a fact the code already fixes, free to disagree with it.
      *
      * <p><b>{@code RESTRICTED_SCRIPT} is a script the policy does not admit, which is wider than a mix.</b>
-     * A script <em>combination</em> is the usual finding, and at {@code ScriptPolicy.Level.ASCII_ONLY}
+     * A script <em>combination</em> is the usual finding, and at {@code RestrictionLevel.ASCII_ONLY}
      * a single-script name is refused with nothing mixed at all -- so the code names what the policy would
      * not admit rather than what the text did, and pairs with {@code RESTRICTED_CHARACTER} as the two halves
      * of one identifier policy. It is also the one of the three a <em>value</em> can carry ({@code

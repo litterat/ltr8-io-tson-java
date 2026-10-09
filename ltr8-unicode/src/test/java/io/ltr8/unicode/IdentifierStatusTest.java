@@ -1,4 +1,4 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.unicode;
 
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +31,7 @@ class IdentifierStatusTest {
         assertFalse(IdentifierStatus.isAllowed('Z' + 1), "the code point above a range end is outside");
     }
 
-    /** The joiners are Restricted here, which is what lets the profile drop §7.1's hand-picked exclusion. */
+    /** The joiners are Restricted here, which is what lets a profile admit them only through the contextual rule. */
     @Test
     void theJoinersAreRestricted() {
         assertFalse(IdentifierStatus.isAllowed(0x200C));

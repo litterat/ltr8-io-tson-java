@@ -7,7 +7,8 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -16,8 +17,8 @@ import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
-import io.ltr8.tson.base.unicode.ConfusableNames;
+import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.unicode.ConfusableNames;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
@@ -353,7 +354,7 @@ public final class TsonSchemaLinker {
     private static void perName(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                 TypeDefinition definition, String name, String prefix,
                                 IdentifierPolicy identifiers) {
-        perName(receiver, schema, entry, definition, name, prefix, identifiers, IdentifierProfile.NAME);
+        perName(receiver, schema, entry, definition, name, prefix, identifiers, IdentifierGrammar.PROFILE);
     }
 
     /** The same under {@code profile}, whose added characters are its own and meet no restricted-character rule. */

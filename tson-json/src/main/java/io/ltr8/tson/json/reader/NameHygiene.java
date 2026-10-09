@@ -2,7 +2,8 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
+import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.json.JsonReadContext;
 
 import java.util.List;
@@ -39,7 +40,7 @@ final class NameHygiene {
      * passes, which is every name of an ordinary document, where a capturing lambda allocates per name.
      */
     static boolean refuses(JsonReadContext ctx, String name) {
-        return judge(ctx, name, IdentifierProfile.NAME, true);
+        return judge(ctx, name, IdentifierGrammar.PROFILE, true);
     }
 
     /**

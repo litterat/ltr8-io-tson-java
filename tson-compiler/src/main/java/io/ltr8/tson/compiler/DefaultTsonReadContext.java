@@ -2,7 +2,8 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
+import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import java.util.ArrayDeque;
@@ -173,7 +174,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * {@link ParseException}, which can only say "invalid" -- the one thing this is not -- and the one
      * receiver it holds is its token surface's, present only when it was built with a policy. Every context
      * has a receiver. So the grammar stays there, where a failure really is a parse error
-     * ({@code IdentifierProfile.validate}), and the policy is applied here.
+     * ({@code IdentifierGrammar.validate}), and the policy is applied here.
      *
      * <p><b>Only on a freshly pulled event.</b> {@link TsonReadContext#lookingAhead} rewinds what it
      * consumed and a reader replays it, so checking every event would report a refused name once per
@@ -194,7 +195,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
             default -> null;
         };
         if (name != null) {
-            judgeName(name, IdentifierProfile.NAME);
+            judgeName(name, IdentifierGrammar.PROFILE);
         }
     }
 
