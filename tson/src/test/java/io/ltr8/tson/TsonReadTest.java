@@ -236,7 +236,7 @@ class TsonReadTest {
     @Test
     void readWithoutSchemaBindsEvenWhenTheSchemaIsUnavailable() {
         // read() would SCHEMA_ERROR (the source can't provide this URI); readWithoutSchema binds the class anyway.
-        Point value = tsonWithPointBinding().objectReader().readWithoutSchema("""
+        Point value = tsonWithPointBinding().objectReader().withHostTypes().readWithoutSchema("""
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }""", Point.class);
 
@@ -247,7 +247,8 @@ class TsonReadTest {
     void aStandaloneObjectReaderIgnoresADeclaredSchema() {
         // Built without a schema environment -> schemaless: any !!schema is ignored, binds to the class
         // (the Jackson-style "target class is the contract" case), even a !!schema the reader couldn't resolve.
-        Point value = new TsonObjectReader(tsonWithPointBinding().dataBindContext()).read("""
+        // The class is the schema for the root's !point only because the reader is told so.
+        Point value = new TsonObjectReader(tsonWithPointBinding().dataBindContext()).withHostTypes().read("""
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 4 }""", Point.class);
 

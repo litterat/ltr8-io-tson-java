@@ -194,3 +194,99 @@ Each meta constructor's "Instance is `ipv4` in core" becomes "in net".
 core without the five, `TsonBundledSchemas.NET_ID` loaded by `Tson.standard()`, the schemaless `!hostname`
 (`BuiltinTypeVocabulary.HOSTNAME`, checked equal to net.tn's resolved body), and corpus vectors for both the
 schemaless and the schema-governed reads.
+
+---
+
+## 3. A type annotation outside the built-in vocabulary is a resolver error, not a marker
+
+**Section:** [TSON-DATA] §1.5 ("MUST preserve annotations, type annotations outside the vocabulary, and `schema`
+directives it does not act on"), §3.2 ("A processor MUST preserve type annotations it does not resolve as
+uninterpreted markers attached to their values and MUST NOT reject a document because a type annotation is
+unresolved"), §5.1 ("Type annotations whose names are not in the vocabulary are preserved as uninterpreted markers"),
+§5.6 ("such a name is an uninterpreted marker here"), §8.1 (the resolver errors at the data-format layer);
+[TSON-SCHEMA] §7.1 ("any other type annotation is preserved unresolved — applications SHOULD treat unresolved type
+annotations as informational").
+
+**Kind:** design — the one open-world rule left in a series that is closed everywhere else.
+
+**The problem.** Everywhere else a name can be checked, a name that does not resolve is an error:
+
+- a field the record does not declare;
+- a `!name` under a schema, which is "an unresolved-type error" ([TSON-SCHEMA] §7.2);
+- an `@name` under a governing target ([TSON-SCHEMA] §6).
+
+The schemaless type annotation is the exception. Its vocabulary is closed — §5's table, which §1.5 requires be
+"implemented as a unit, so two conforming processors never disagree on whether a built-in name is meaningful" — yet a
+name outside it is accepted silently. So `!uiid 550e…`, `!datetme "…"` and `!Date 2026-01-01` pass a check that
+reports nothing and validates nothing. This is the failure the series exists to prevent. For the consumer it is built
+for — model output checked before use — the document is accepted, and the typo surfaces only when a schema-bound
+consumer rejects it, or never.
+
+The reasons for the marker rule do not survive the rest of the design:
+
+- **Forward compatibility.** The vocabulary does not grow. §5 is frozen with TSON version 1, and §1.2's principle 6
+  rules out a later version — "There is no TSON 1.1 or TSON 2. New types are added through the type system" — so a
+  new type arrives through a schema, never as a built-in name. There is no future name a current processor must
+  tolerate.
+- **Gradual adoption** ([TSON-GUIDE] §1.4). The path from "annotate the values that matter" to "bind a schema and pin
+  it by hash" runs through the built-in annotations, which resolve in both modes and mean the same thing under the
+  core library. It does not need `!order { … }` written before `order.tn` exists: an author with no schema leaves the
+  tag off or binds one.
+- **A stable verdict.** The vocabulary is a property of the revision, not of the deployment, as §1.5's own wording
+  guarantees. `!nonesuch` names no type at every conforming processor, so rejecting it is a portable finding about
+  the document: a category error, never a refusal (#1). Accept or reject stays the whole model, with no informational
+  tier for a "SHOULD treat as informational" to land in.
+- **The removed sign bounds** (§5.6). The marker rule is what let `positive_integer` leave the vocabulary without
+  breaking schemaless documents that used it. There are no deployed documents to protect, and a rejection naming the
+  alternative (`!integer`, or a bound the schema declares) guides the author better than silent acceptance.
+
+**What stays is the `@` annotation.** §3.1's "preserved, ordered metadata with no further interpretation" is right
+for a schemaless document, which has no namespace to validate one against. [TSON-SCHEMA] §6's sentence giving "the
+preserved-uninterpreted treatment" to schemaless processing cites §3.1 and concerns `@` annotations only, so it
+stands. This entry is about `!name`, whose vocabulary is closed.
+
+**Interpretation chosen.** Rejection, ahead of the spec. A schemaless type annotation outside §5's vocabulary is
+`UNKNOWN_TYPE_REF`, a resolver error: the document is invalid, and the diagnostic carries the annotation's position.
+Both implementations word it the same way: "unknown type '!nonesuch' -- not a built-in type, and no schema is in
+scope to define it".
+
+**A host-typed read is no exception.** A host-typed read (§4.1) binds a schemaless document into a declared host
+type, so a tag could be read as naming that type (`!order` read into an `Order`). It is not: the verdict on a
+document is a property of its bytes, and one that changed with the class a caller binds into would let a bind accept
+what `tson validate` rejects — two answers to "will this be accepted" for one document. So a schemaless bind reports
+`!order` as `UNKNOWN_TYPE_REF` too.
+
+**Host types as a schema is the caller's explicit choice.** Treating the bound classes as the definitions of a
+document's tags is useful, and a schemaless bind into a sealed hierarchy needs it, since a tag naming the member
+(`!circle` into a sealed `Shape`) is the only way to choose one. It is a schema in all but form, so the Java
+reference makes it one the caller states: `TsonObjectReader.withHostTypes()` makes a tag naming the bound class link
+to it and a tag naming a union member choose it, and without it such a tag is reported with a message naming the
+control. That is the same move as binding a schema the document does not name — the caller supplies the definitions —
+and it sits outside the spec's verdict, as reading a document wider than its class does. The spec needs no hook for
+it.
+
+**Suggested resolution.**
+
+- §3.2: replace the last sentence with "A type annotation whose name is not in the built-in vocabulary (§5), in a
+  document with no schema in scope, is a resolver error (§8.1): schemaless processing has no other source of type
+  names, and a document that names its own types binds the schema that declares them."
+- §1.5: "MUST preserve annotations, type annotations outside the vocabulary, and `schema` directives it does not act
+  on (§3)" becomes "MUST preserve annotations and `schema` directives it does not act on, and MUST report a type
+  annotation outside the vocabulary as a resolver error (§3)".
+- §5.1: "Type annotations whose names are not in the vocabulary are preserved as uninterpreted markers (§3.2)"
+  becomes "A type annotation whose name is not in the vocabulary is a resolver error (§3.2)."
+- §5.6: "such a name is an uninterpreted marker here (§5.1)" becomes "such a name is a resolver error here (§5.1)".
+- §8.1, among the resolver errors at the data-format layer: add "a type annotation outside the built-in vocabulary in
+  a document with no `!!schema` (§3.2)".
+- [TSON-SCHEMA] §7.1: "and any other type annotation is preserved unresolved — applications SHOULD treat unresolved
+  type annotations as informational" becomes "and any other type annotation is a resolver error ([TSON-DATA] §3.2)".
+- No change to §3.1, [TSON-SCHEMA] §6 or [TSON-GUIDE] §1.4.
+
+**Status against Revision 37:** open; running on `r2026-38-proposal`. Both implementations already reject:
+
+- the Java reference reports `UNKNOWN_TYPE_REF`, and the CLI exits 1, for a schemaless `!foo`, `!positive_integer` or
+  `!order`; its object reader does the same into an `Order` unless the caller asks for `withHostTypes()`;
+- the TypeScript port (0.37.0) rejects the same names;
+- tson.io's live validator shows it in its "no schema (Class 1)" scenario.
+
+Corpus vectors in `class1/reader` pin the rejection for `!foo`, `!positive_integer`, `!Uuid` and `!order`.

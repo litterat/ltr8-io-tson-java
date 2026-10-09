@@ -318,6 +318,7 @@ public final class TsonObjectReader {
     public TsonObjectReader(TsonCompiledSchemaRegistry bind, DataBindContext context);
     // the same derivations and policy accessors, plus:
     public TsonObjectReader ignoringUnknownFields();          // schemaless only: drop, don't report
+    public TsonObjectReader withHostTypes();                  // schemaless only: tags name the bound classes
     public <T> T                    read(source, Class<T> targetClass);
     public <T> TsonObjectDocument<T> readDocument(source, Class<T> targetClass);
     public <T> T                    readWithoutSchema(source, Class<T> targetClass);

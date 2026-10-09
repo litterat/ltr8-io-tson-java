@@ -55,8 +55,9 @@ import java.util.Optional;
  * is inspectable and a bound object is application data whose existence implies the document was good.
  *
  * <p>A schemaless bind also holds a wire type-ref to account: a built-in name must sit on a token and
- * satisfy its atom, and any other name must name the target being bound. {@link #preservingUnknownTypeRefs}
- * is the passthrough opt-out.
+ * satisfy its atom, and any other name is {@code UNKNOWN_TYPE_REF}, as {@code tson validate} reports it.
+ * {@link #withHostTypes} lets a name the bound classes answer to link to them, and {@link
+ * #preservingUnknownTypeRefs} keeps one nothing resolves.
  */
 public final class TsonObjectReader {
 
@@ -216,16 +217,33 @@ public final class TsonObjectReader {
      * This reader, ignoring a type-ref that links to nothing instead of reporting it -- a new reader, leaving
      * this one unchanged, sharing its compiled-schema registry.
      *
-     * <p>A schemaless bind reports a type-ref naming neither a built-in type nor the target being bound,
-     * rather than treating it as a marker to skip past -- §7.1's "informational" is the floor, not a ceiling.
-     * {@link #preservingUnknownTypeRefs} is the forward-compatible passthrough: a document tagged with
-     * names this reader knows
-     * nothing about still binds on the strength of the target class alone. Built-in names are still checked,
-     * so {@code !uuid nope} remains a problem. Affects the schemaless path only.
+     * <p>A schemaless bind reports a type-ref naming no built-in type: §5's vocabulary is a schemaless
+     * document's only source of type names (SPEC-FEEDBACK.md #3). This keeps such a tag instead, so a
+     * document tagged with names this reader knows nothing about still binds on the strength of the target
+     * class alone -- a reading of its structure that sets its tags aside, and so not a verdict on it. Built-in
+     * names are still checked, so {@code !uuid nope} remains a problem. Affects the schemaless path only.
      */
     public TsonObjectReader preservingUnknownTypeRefs() {
-        return new TsonObjectReader(dataBindContext, DataClassObjectReader.preserving(dataBindContext),
+        return new TsonObjectReader(dataBindContext, schemaless.preservingUnknownTypeRefs(),
                 bind, receiver, schemaUri, policy);
+    }
+
+    /**
+     * This reader, resolving a type-ref against the classes being bound -- a new reader, leaving this one
+     * unchanged, sharing its compiled-schema registry.
+     *
+     * <p><b>The bound classes become the schema for tags.</b> A tag naming the target class links to it
+     * ({@code !order} into an {@code Order}, by its {@code @Typename} or else its simple name), and a union's
+     * member is the one its tag names ({@code !circle} into a sealed {@code Shape}) -- which is what a
+     * schemaless bind into a sealed hierarchy needs to choose a member at all. Without it, a schemaless bind
+     * judges a document exactly as {@code tson validate} does, and such a tag is {@code UNKNOWN_TYPE_REF}: a
+     * schemaless document has no source of type names but §5's vocabulary (SPEC-FEEDBACK.md #3). With it,
+     * the reader accepts what the vocabulary alone refuses, which is why it is the caller's explicit choice
+     * and never the default. Built-in names are still checked. Affects the schemaless path only; under a
+     * schema, the schema names the types.
+     */
+    public TsonObjectReader withHostTypes() {
+        return new TsonObjectReader(dataBindContext, schemaless.withHostTypes(), bind, receiver, schemaUri, policy);
     }
 
     /**

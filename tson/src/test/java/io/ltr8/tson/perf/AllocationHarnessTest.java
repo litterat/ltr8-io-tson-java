@@ -117,8 +117,9 @@ class AllocationHarnessTest {
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
         reader = tson.objectReader();
-        // The same bind context, so what separates this from `reader` is the schema and nothing else.
-        schemalessReader = new TsonObjectReader(tson.dataBindContext());
+        // The same bind context, so what separates this from `reader` is the schema and nothing else -- the
+        // classes stand in for it, which is what lets the root's `!order` link to Order.
+        schemalessReader = new TsonObjectReader(tson.dataBindContext()).withHostTypes();
 
         // Everything a first read builds -- the compiled schema, the reader graph, the bind descriptors --
         // is startup state under this design, so it is built here rather than measured as a read's cost.

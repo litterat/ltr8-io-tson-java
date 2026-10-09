@@ -18,18 +18,18 @@ import io.ltr8.tson.compiler.stream.VoidEvent;
  * <ol>
  *   <li>{@code X} <b>is</b> a built-in ([TSON-DATA] §5) -- the core-value must be a token ({@link
  *       #notScalar}), and the token must satisfy the atom ({@link #violation}).</li>
- *   <li>{@code X} is not a built-in but <b>names the target</b> the read is binding into ({@link #names})
- *       -- accepted. Object-binding only; a tree read has no target to name.</li>
+ *   <li>{@code X} is not a built-in but <b>names the target</b> the read is binding into ({@link #names}),
+ *       on a reader the caller gave host types ({@code withHostTypes()}) -- accepted. Object-binding only; a
+ *       tree read has no target to name.</li>
  *   <li>Otherwise the name links to nothing and is {@link #unknown}.</li>
  * </ol>
  *
- * <p><b>Rule 3 is a reader policy, not a parsing one.</b> §5.1 requires the Class 1 <i>parsing</i> step to
- * preserve an unrecognized type annotation as an uninterpreted marker, and it does -- {@code TsonDataStream}
- * and {@code TsonDataParser} keep every name they see. What a reader actively type-checking a value does with
- * a marker it cannot link to anything is the layer above, where a typo like {@code !Uuid} (case-sensitive per
- * §5.1, so not {@code !uuid}) silently disabling the validation its author intended is the worse failure. Both
- * schemaless readers therefore report by default and offer preservation as an opt-in; §7.1's
- * "informational" is the floor this sits above.
+ * <p><b>Rule 3 is a resolver error</b> ({@code UNKNOWN_TYPE_REF}): a schemaless document has no source of
+ * type names but §5's vocabulary, so a name outside it names no type, at every processor (SPEC-FEEDBACK.md
+ * #3). A typo like {@code !Uuid} (case-sensitive per §5.1, so not {@code !uuid}) would otherwise disable the
+ * validation its author intended and report nothing. {@code TsonDataStream} and {@code TsonDataParser} keep
+ * every name they see, which is what lets the readers report one at its position; both schemaless readers
+ * report by default, and {@code preservingUnknownTypeRefs()} is the caller's opt-out.
  */
 final class TypeRefCheck {
 
@@ -43,11 +43,37 @@ final class TypeRefCheck {
                 "a built-in type name", "!" + name);
     }
 
-    /** {@link #unknown} where a target class was in hand, so the diagnostic can say what the name failed to match. */
-    static void unknown(TsonReadContext ctx, String name, Class<?> target) {
+    /**
+     * {@link #unknown} where a target class was in hand. With host types on, the name failed to name it, and
+     * the diagnostic says what would have; with them off, a name that <em>would</em> have named it says how to
+     * ask for that, since the tag is then a type the caller's own classes define.
+     */
+    static void unknown(TsonReadContext ctx, String name, Class<?> target, boolean hostTypes, boolean wouldName) {
+        if (hostTypes) {
+            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
+                    "unknown type '!" + name + "' -- not a built-in type, and it does not name " + target.getName(),
+                    "a built-in type name or '!" + preferredName(target) + "'", "!" + name);
+        } else if (wouldName) {
+            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
+                    "unknown type '!" + name + "' -- not a built-in type, and no schema is in scope to define it; it"
+                            + " names " + target.getName() + ", which a schemaless bind links a tag to only"
+                            + " withHostTypes()",
+                    "a built-in type name", "!" + name);
+        } else {
+            unknown(ctx, name);
+        }
+    }
+
+    /**
+     * A tag choosing a union member that is not a built-in name, on a reader without host types: only the
+     * member classes could define it, and they are the schema here only when the caller says so.
+     */
+    static void unknownUnionMember(TsonReadContext ctx, String name, Class<?> union) {
         ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
-                "unknown type '!" + name + "' -- not a built-in type, and it does not name " + target.getName(),
-                "a built-in type name or '!" + preferredName(target) + "'", "!" + name);
+                "unknown type '!" + name + "' -- not a built-in type, and no schema is in scope to define it; a"
+                        + " schemaless bind chooses a member of " + union.getName() + " by a tag naming it only"
+                        + " withHostTypes()",
+                "a built-in type name", "!" + name);
     }
 
     /** A built-in type-ref on a value that isn't a token -- every built-in atom is scalar. */
