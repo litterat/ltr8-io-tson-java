@@ -758,18 +758,16 @@ class TsonDataParserTest {
     }
 
     /**
-     * A quoted field name still parses -- the production has two spellings and always did. What it is not is an
-     * escape hatch from the profile: a field name is an identifier however it was written (§2.5, §7.7), so
-     * quoting carries a name the unquoted form would misread and never a key that is not a name.
+     * A quoted field name parses whatever its text: what a field name may be is its record's to say
+     * (SPEC-FEEDBACK.md #10), so the grammar admits any single-line token in name position and a reader judges it
+     * ({@code SchemalessTreeReaderTest} has the schemaless refusal).
      */
     @Test
-    void aSingleLineQuotedFieldNameIsStillMatchedAgainstTheProfile() {
+    void aSingleLineQuotedFieldNameParsesWhateverItsText() {
         RecordValue record = assertInstanceOf(RecordValue.class, root("{\"order-id\": 1}").coreValue());
         assertEquals("order-id", record.fields().get(0).name());
-
-        ParseException thrown = assertThrows(ParseException.class, () -> root("{\"first name\": 1}"));
-        assertTrue(thrown.getMessage().contains("invalid field name"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("belongs in a map"), thrown.getMessage());
+        RecordValue spaced = assertInstanceOf(RecordValue.class, root("{\"first name\": 1}").coreValue());
+        assertEquals("first name", spaced.fields().get(0).name());
     }
 
     @Test

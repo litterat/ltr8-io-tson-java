@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.atom.IdentifierGrammar;
@@ -191,12 +192,30 @@ final class DefaultTsonReadContext implements TsonReadContext {
         String name = switch (event) {
             case io.ltr8.tson.compiler.stream.TypeRef typeRef -> typeRef.name();
             case io.ltr8.tson.compiler.stream.AnnotationStart annotation -> annotation.name();
-            case io.ltr8.tson.compiler.stream.FieldName field -> field.name();
+            case io.ltr8.tson.compiler.stream.FieldName field -> requireFieldName(field.name()) ? field.name() : null;
             default -> null;
         };
         if (name != null) {
             judgeName(name, IdentifierGrammar.PROFILE);
         }
+    }
+
+    /**
+     * [TSON-DATA] §2.5: a record's field name is read by its record's field name type, an identifier unless the
+     * record says otherwise (SPEC-FEEDBACK.md #10). The grammar admits any single-line token in name position, so
+     * the match is here, where a failure is reported as a resolver error -- a name the type's contract rejects,
+     * as an atom's token would be -- and the name is then judged by no hygiene rule, being no name of the type.
+     */
+    private boolean requireFieldName(String name) {
+        Optional<String> violation = IdentifierGrammar.validate(name);
+        if (violation.isEmpty()) {
+            return true;
+        }
+        report(Diagnostic.Code.ATOM_FORM_INVALID, "'" + name + "' is not a field name -- " + violation.get()
+                        + ". A record's field names are identifiers unless its type says otherwise; a key that is "
+                        + "not a name belongs in a map, written '{ key => value }'", "an identifier",
+                "'" + name + "'");
+        return false;
     }
 
     /**
