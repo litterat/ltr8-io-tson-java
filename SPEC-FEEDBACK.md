@@ -133,48 +133,25 @@ there and `REJECTED` here, as the CLI exits 70 or 78. It too keeps the fetch all
 
 ---
 
-## 2. The network types are a library of their own, `net.tn`, with a host name beside them
+## 2. The network types are a library of their own, `net.tn`
 
 **Section:** [TSON-SCHEMA] §9 ("Core holds only what a schema cannot do without"), §2.2.3 (a local declaration may
 not reuse a name the import closure binds), §13.2 and the companion-artifact count in §1; [TSON-DATA] §5.5's table
 and §5.6's rule that the schemaless vocabulary leaves with core (`positive_integer`).
 
-**Kind:** proposal — a gap (no host name type), and a cost §9 states but does not apply to the network families.
+**Kind:** proposal — a cost §9 states but does not apply to the network families, and a home for a host name (#5).
 
-**The problem.** Two, and one answer to both.
-
-- **There is no host name.** Core has `ipv4` and `ipv6` but nothing for a DNS host name, so a host — a listener's,
-  a schema identity's (§2.2.1 keys identities by host) — is `text`, or a pattern each schema writes for itself and
-  gets slightly wrong: RFC 1123's labels admit `192.0.2.1`, and a fold chosen as `NFKC_CASEFOLD` admits a fullwidth
-  spelling an ASCII type should refuse.
-- **Every name core declares is one no importing schema may declare** (§9's own reasoning, from §2.2.3). That is
-  the right price for what nearly every schema needs, and a poor one for `ipv4`, `ipv6`, `cidr4`, `cidr6` and `mac`:
-  most schemas never use them, and `mac` and `hostname` are plausible names for a schema's own types. Adding
-  `hostname` to core would make the cost worse, and break every schema that already declares one.
+**The problem.** Every name core declares is one no importing schema may declare (§9's own reasoning, from §2.2.3).
+That is the right price for what nearly every schema needs, and a poor one for `ipv4`, `ipv6`, `cidr4`, `cidr6` and
+`mac`: most schemas never use them, and `mac` is a plausible name for a schema's own type. The series also lacks a
+host name type (#5), which has the same cost — `hostname` is a name schemas already declare for themselves — so
+adding it to core would make the cost worse and break every schema that does.
 
 **Interpretation chosen.** A fifth companion artifact, `net.tn` (`https://tson.io/2026/38/m/net.tn`), governed by
 meta and importing nothing:
 
 - **It holds the five network families**, moved from core unchanged — the same empty instances of meta's
-  constructors, which stay in meta — **and `hostname`**:
-
-  ```
-  hostname => !text_type {
-    pattern: "([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.])*[a-z]([a-z0-9-]{0,61}[a-z0-9])?"
-    max_length: 253
-    normalization: ASCII_CASEFOLD
-  }
-  ```
-
-  An RFC 1123 §2.1 host name: letter-digit-hyphen labels of 1–63 characters, no hyphen at a label's edge, the last
-  label starting with a letter (RFC 1123's own disambiguation, so a dotted-quad is never a host name and
-  `( hostname | ipv4 )` has no value in both), at most 253 characters, no trailing dot. The fold is `ASCII_CASEFOLD`,
-  the member §5.5 names for DNS names: the value is folded before `pattern` judges it, so `NFKC_CASEFOLD` would turn
-  a fullwidth or compatibility spelling into ASCII and admit it. U-labels are out; an internationalized name is
-  written as its A-labels, and an IDN host type (UTS #46 mapping, not expressible as a pattern) is a separate
-  question.
-- **`hostname` needs no constructor of its own**: it is regular and has nothing to configure, so it is an instance
-  of `text_type`, and a malformed host is a validation error, as any pattern-constrained text is.
+  constructors, which stay in meta — **and `hostname`**, whose definition is #5's question.
 - **Core no longer declares the network names.** A schema importing core alone may declare `mac` or `hostname`; one
   that wants the network types imports `net.tn` as well.
 - **The schemaless vocabulary keeps every name, by library.** `!ipv4`, `!cidr4`, `!mac` and the rest stay
@@ -183,12 +160,11 @@ meta and importing nothing:
   library named.
 
 **Suggested resolution.** Publish `net.tn` as a companion artifact (§1's count and §13.2's table gain it) holding
-the five network families and `hostname` as above; remove the five from core and from §9's list of what core
-declares, adding a sentence that a library outside core is what a family most schemas never use belongs in. In
-[TSON-DATA] §5.5, add the `!hostname` row (RFC 1123 §2.1 host name, ASCII, compared without case; host value text)
-and say which library each row's name comes from; restate §5.6's rule as "a schemaless name denotes the type its
-library declares under that name, so a document moving under a schema that imports the library keeps its meaning".
-Each meta constructor's "Instance is `ipv4` in core" becomes "in net".
+the five network families and `hostname`; remove the five from core and from §9's list of what core declares,
+adding a sentence that a library outside core is where a family most schemas never use belongs. In [TSON-DATA]
+§5.5, say which library each row's name comes from and add the `!hostname` row #5 defines; restate §5.6's rule as
+"a schemaless name denotes the type its library declares under that name, so a document moving under a schema that
+imports the library keeps its meaning". Each meta constructor's "Instance is `ipv4` in core" becomes "in net".
 
 **Status against Revision 37:** open; running on `r2026-38-proposal`. `spec/m/net.tn` and its resolved fixture,
 core without the five, `TsonBundledSchemas.NET_ID` loaded by `Tson.standard()`, the schemaless `!hostname`
@@ -290,3 +266,201 @@ it.
 - tson.io's live validator shows it in its "no schema (Class 1)" scenario.
 
 Corpus vectors in `class1/reader` pin the rejection for `!foo`, `!positive_integer`, `!Uuid` and `!order`.
+
+---
+
+## 4. An identity is an IRI whose host is a `host` value: validity, NFC, and its URI spelling as the same identity
+
+**Section:** [TSON-DATA] §2.2.1 (canonical identity: "lowercase host plus path"; "The argument is read as an
+IRI-reference (§3.3), so a host or path may carry characters beyond US-ASCII as themselves; identity compares them as
+written, and a percent-encoded spelling of the same characters is a different identity"), §3.3, §5.5; [TSON-SCHEMA]
+§10.1, §11.2 (fetching and its allowlists); [TSON-JSON] §3.5 (the `TSON-Schema` header field); #5, #6.
+
+**Kind:** underspecification, with a consequence that is a defect. Raised by the HTTP layer in
+`ltr8-io-tson-java-http` (its `UPSTREAM.md` #3), whose fetch allowlist meets it, and confirmed here.
+
+**The problem.** Since Revision 37 an identity is an IRI-reference, so a host may be written in U-labels
+(`bücher.example`, `ตัวอย่าง.ไทย`) and a path in characters beyond US-ASCII. That is right — an identity should be
+writable in its publisher's language — but §2.2.1's rules were written for US-ASCII, and four things follow:
+
+- **"Lowercase host" has no meaning beyond US-ASCII.** The input rule requires a lowercase host without saying by
+  which case mapping, at which Unicode version.
+- **Two encodings of one character are two identities.** `é` precomposed and `e` followed by U+0301 COMBINING ACUTE
+  ACCENT read alike and compare unequal, in a host or a path, and nothing requires either.
+- **One DNS host has two identities.** `bücher.example` and its A-label form `xn--bcher-kva.example` name one host,
+  and a fetch reaches it by either; §2.2.1 makes them two documents, and nothing says a publisher must pick one.
+- **It cannot be named over HTTP.** An RFC 9651 String, which [TSON-JSON] §3.5's `TSON-Schema` field is, holds
+  printable US-ASCII only, so a reference beyond US-ASCII goes in the field as its URI spelling —
+  `xn--bcher-kva.example`, `%C3%A9`. §3.5 requires the field and `!!schema` to agree by canonical identity, which
+  compares as written, so the two never agree: a non-ASCII identity can be named in a document and in no header.
+
+Restricting an identity to US-ASCII would close all four, at the price of the international names the IRI form
+exists to admit. The resolution below keeps them, and it does so by defining the host once, as a type the series
+already needs, rather than with rules of §2.2.1's own.
+
+**Interpretation chosen.** A guess, recorded as one. `CanonicalIdentity` parses the reference as an RFC 3987
+IRI-reference and requires `host.equals(host.toLowerCase(Locale.ROOT))` — Java's Unicode case mapping, a choice the
+spec does not make — and checks nothing else beyond US-ASCII: no NFC, no IDNA validity, no relation to the URI
+spelling. So `BÜCHER.example` is refused, while the precomposed and decomposed spellings of `bücher.example`, and
+`xn--bcher-kva.example`, are three identities. An IPv6 host compares as written, so `[::1]` and `[0:0:0:0:0:0:0:1]`
+are two.
+
+**Suggested resolution.** The identity is the IRI, split as §2.2.1 already splits it, into a host and a path. The
+host is defined by the vocabulary and the path by §2.2.1. Its URI spelling is accepted as the same identity, because
+some carriers hold only US-ASCII, but it is never the identity: diagnostics, registries and every result name the
+IRI, whichever spelling was written.
+
+- **The host is a `host` value (#6).** RFC 3987's `ihost` is `IP-literal / IPv4address / ireg-name`. An identity
+  takes the DNS profile of it, which is what `host` is: an `ireg-name` MUST be a `hostname` (#5), an `IPv4address`
+  an `ipv4` and an `IP-literal` an `ipv6` (§5.5), so IPvFuture and zone identifiers are refused. RFC 3987 admits
+  more (`_`, sub-delimiters, percent-encoding, any `ucschar`) because a registered name need not be DNS; an
+  identity's is, since it is what a fetch looks up.
+- **The host compares as a value**, so canonical identity's host is that value's canonical text: a name in its
+  U-labels, an IPv4 address as its dotted-quad, an IPv6 address in RFC 5952 text. Validity, NFC and case are
+  `hostname`'s rules and are not restated here. Three consequences, each the type's rule applied: `Example.COM`
+  and `example.com` are one identity, so §2.2.1's "lowercase host" input rule is withdrawn for the host;
+  `xn--bcher-kva.example` and `bücher.example` are one; and `[::1]` and `[0:0:0:0:0:0:0:1]` are one.
+- **The path is NFC.** Characters beyond US-ASCII in the path MUST be in Normalization Form C, as RFC 3987 §5.3.2.2
+  recommends; a path that is not is an error, not a candidate for normalization. A path needs no type of its own: an
+  identity's path is not a file path or a route, and nothing but §2.2.1 would use one. The rest of §2.2.1's path
+  rules stand.
+- **The URI spelling of the path is read back** (RFC 3987 §3.2): each percent-encoded UTF-8 sequence of a character
+  beyond US-ASCII to that character, so `https://xn--bcher-kva.example/sch%C3%A9mas/x.tn` and
+  `https://bücher.example/schémas/x.tn` are one identity, and its canonical form is the second. The URI spelling
+  stays one spelling per identity: a percent-encoding that is not the UTF-8 of an IRI character beyond US-ASCII
+  (`%FF`, an encoded bidi control) has no IRI form and is an error; the encoded character must be NFC as the
+  path's are; and lowercase hex is an error. A percent-encoded ASCII character keeps today's rule: an unreserved
+  one is an error, and a reserved one (`%2F`) is part of the identity as written.
+- **Nothing unstable decides it.** NFC is covered by Unicode's normalization stability policy, as the identifier
+  grammar's use of it already relies on (§7.7), and `hostname`'s validity is IDNA2008's, which #5 shows stable in
+  the way a content-addressed name needs.
+
+How a processor spells an identity on a wire that needs US-ASCII — a fetch's request, an HTTP field — is its own
+business, and the spec needs to say only that the URI spelling is accepted as the same identity. [TSON-JSON] §3.5
+then needs a sentence: a reference beyond US-ASCII is carried in its URI spelling (RFC 3987 §3.1, the host by
+ToASCII). A processor that reports a fetch it made in that spelling should name both — the identity, and the URI it
+requested — since the first says which schema and the second is what DNS and a proxy saw.
+
+**Status against Revision 37:** open; not built. The `toLowerCase` check above runs; the host as a `host` value, the
+NFC requirement and the reading of the URI spelling do not. The HTTP layer's `deployment.tn` types `schema_hosts` as
+`[hostname]`, so it allow-lists ASCII hosts only, pinned by
+`UpstreamGapsTest.anIdentityWithANonAsciiHostCannotBeAllowListed`.
+
+---
+
+## 5. `hostname` is a domain name in either label form, not an ASCII pattern
+
+**Section:** Revision 38's `net.tn` (#2); [TSON-DATA] §5.5's `!hostname` row as #2 proposes it; [TSON-SCHEMA] §5.5
+(text normalization), §9; #4.
+
+**Kind:** proposal — `hostname` as running is ASCII only, narrower than the identities it is needed to name.
+
+**The problem.** `hostname` as #2 built it is an instance of `text_type`:
+
+```
+hostname => !text_type {
+  pattern: "([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.])*[a-z]([a-z0-9-]{0,61}[a-z0-9])?"
+  max_length: 253
+  normalization: ASCII_CASEFOLD
+}
+```
+
+An RFC 1123 §2.1 host name: letter-digit-hyphen labels of 1–63 characters, no hyphen at a label's edge, the last
+label starting with a letter (so a dotted-quad is never a host name and `( hostname | ipv4 )` has no value in both),
+at most 253 characters, no trailing dot, compared without ASCII case. An international name is accepted only as its
+A-labels, and as text, so its U-label spelling is a different value where it is accepted at all. That is narrower
+than the series: identities admit U-labels (#4), so an allowlist typed `[hostname]` cannot name an identity's host
+as the identity writes it, and an operator who types `bücher.example` into a configuration is refused. No
+`text_type` can fix it: U-label validity is RFC 5892's property, which no pattern here states, and the equivalence
+of a U-label and its A-label is Punycode, which no normalization reaches.
+
+**Proposed (not built).** `hostname` becomes an atom, an instance of a new meta constructor:
+
+```
+hostname_type => atom & atom_specification & {
+  spec?:      = "https://www.rfc-editor.org/rfc/rfc5890"
+  allow_idn?: boolean ~ true
+}
+```
+
+- **Lexical space:** labels that are LDH labels, A-labels or U-labels (RFC 5890), in any mix, ASCII letters in
+  either case; each label at most 63 octets and the name at most 253 in its A-label form; no trailing dot; the last
+  label not beginning with a digit, keeping `( hostname | ipv4 )` without a value in both. A U-label is RFC 5890
+  §2.3.2.1's: NFC, every code point PVALID or meeting its contextual rule under RFC 5892, the name meeting RFC
+  5893's bidi rule. An uppercase character beyond ASCII is therefore outside the lexical space, as IDNA2008 has it,
+  rather than mapped. A percent-encoded spelling (`b%C3%BCcher.example`) is URI syntax and not a host name, as
+  `[::1]` is not an address (#6), and is refused.
+- **Value:** the domain name. `Example.COM` and `example.com` are one value, and so are `xn--bcher-kva.example` and
+  `bücher.example`. Its two forms are views of the one value, each recoverable from the other: the U-label form for
+  display and an IRI, the A-label form for DNS, a URI and HTTP; ToASCII and ToUnicode between them are Punycode
+  (RFC 3492) over a valid label and need no table. A writer emits the U-label form, which is the form #4 takes for
+  an identity's host, so an allowlist entry and an identity's host compare by name in either spelling.
+- **`allow_idn`:** false admits only names with no internationalized label, in either spelling, so
+  `xn--bcher-kva.example` is refused as `bücher.example` is: a property of the name, for a system that cannot carry
+  one, and not a restriction on how a name is written. There is no facet choosing a spelling, since the value is the
+  name, and none restricting scripts: script data is what [TSON-DATA] §8.2 keeps out of validity, and a homograph
+  defence for host names would be the policy's, not the type's.
+- **Stable enough to name a content-addressed document.** Nothing is mapped, so UTS #46's tables never enter.
+  RFC 5892's property is computed per Unicode version, but it is built so that a code point once PVALID stays so: a
+  newly assigned character can become valid, and a valid name never becomes invalid. That is what lets #4 make an
+  identity's host a `hostname`, and what keeps this out of [TSON-DATA] §8.3's unstable data.
+- **Host value:** a host-name type of its own (the Java reference would put it in `io.ltr8.net`, beside its address
+  types), parsed from either spelling and exposing both forms. It is also `host`'s name member (#6), so one
+  definition serves this atom, `host` and an identity's host (#4).
+
+**Suggested resolution.** Meta gains `hostname_type` as above, and `net.tn` declares `hostname => !hostname_type {}`.
+The [TSON-DATA] §5.5 row reads: "`!hostname` — a domain name (RFC 5890): LDH labels, A-labels or U-labels; equal by
+name; host value a host name".
+
+**Status against Revision 37:** open; proposal, not built. What runs on `r2026-38-proposal` is the `text_type` above
+(#2).
+
+---
+
+## 6. `host`: a host name or an IP address, one string-class atom
+
+**Section:** Revision 38's `net.tn` (#2); [TSON-DATA] §5.5 (`!ipv4`, `!ipv6`, and `!hostname` as #5 proposes it);
+[TSON-SCHEMA] §5.4 (choice disjointness); RFC 3987 `ihost`; #4.
+
+**Kind:** proposal — a gap, raised by the HTTP layer in `ltr8-io-tson-java-http` (its `UPSTREAM.md` #3) and needed
+by #4.
+
+**The problem.** A host as a deployment writes one is a name *or* an address: a listener binds `localhost`,
+`127.0.0.1` or `::1`, and an allowlist names hosts of all three kinds. There is no type for it.
+`( hostname | ipv4 | ipv6 )` resolves, but §5.4 makes all three string-class, so the choice is not disjoint and
+every value needs a tag — `host: !ipv4 "127.0.0.1"` in a file an operator writes by hand. The HTTP layer's
+`listener.host` therefore stays `text`; at the choice, an untagged value is refused with *"'host' is a choice -- a
+value at this position requires an explicit type annotation"*. The three value sets do not meet — a host name's
+last label does not begin with a digit (#5), and only an IPv6 address has a colon — but §5.4 deliberately does not
+prove disjointness from patterns, and that rule should stay. The answer is one type, not a choice.
+
+#4 needs the same type: an identity's host is RFC 3987's `ihost` profiled to DNS, which is exactly a host name, an
+IPv4 address or an IPv6 address.
+
+**Proposed (not built).** `host` in `net.tn`, an instance of a new meta constructor:
+
+```
+host_type => atom & atom_specification & {
+  spec?: = "https://www.rfc-editor.org/rfc/rfc3987"
+}
+```
+
+- **Lexical space:** the union of `hostname`'s (#5), `ipv4`'s and `ipv6`'s, which do not overlap. One string-class
+  atom, so `listener.host: host` takes `localhost`, `"127.0.0.1"` and `"::1"` untagged.
+- **No brackets.** RFC 3987 brackets an IPv6 address in a host (`[::1]`) so that a URI can find the port after it;
+  a value has no port to separate, and the address is the value. `[::1]` is URI syntax and refused, as a
+  percent-encoded host name is (#5). Inside an identity the host is written with the brackets the IRI grammar
+  requires, and its value is the address within them (#4).
+- **Value:** a host name or an address, never both, with each member's equality: a name by name (#5), an address
+  numerically, so `::1` and `0:0:0:0:0:0:0:1` are one value. A name never equals an address. Its canonical text is
+  the member's: U-labels, a dotted-quad, RFC 5952 text — the form #4 takes for an identity's host, so an allowlist
+  typed `[host]` matches identity hosts by the type's own equality.
+- **No facets yet.** A position that wants only names, or only addresses, uses `hostname`, `ipv4` or `ipv6`.
+- **Host value:** a host name or an address (the Java reference would type it in `io.ltr8.net`, beside the host-name
+  type #5 adds and its address types).
+
+**Suggested resolution.** Meta gains `host_type`, and `net.tn` declares `host => !host_type {}`. [TSON-DATA] §5.5
+gains a row: "`!host` — a host name, IPv4 address or IPv6 address (RFC 3987 `ihost`, DNS names only, no brackets);
+equal by its member's equality; host value a host name or an address".
+
+**Status against Revision 37:** open; proposal, not built. The HTTP layer's `listener.host` is `text`.
