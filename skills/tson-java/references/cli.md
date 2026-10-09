@@ -64,11 +64,11 @@ cached copy binds wherever it sits — or the `!!id` of a schema file on the com
 tokens as the syntax allows, for a reader that reads the schema rather than loading it, such as a language model
 given it in a prompt. The `!!id`, every `!!meta`/`!!import` pin, and every `@doc`, `@title`, `@examples` and
 `@comment` are removed; a reference to the spec's own library is shortened to its revision and name
-(`!!import:"37/core"`); each directive and declaration gets one line. Other annotations stay, and other
+(`!!import:"38/core"`); each directive and declaration gets one line. Other annotations stay, and other
 references keep their URLs. `--keep-docs` keeps `@doc`, `@title` and `@examples`; `@comment`, a note for
 maintainers, still goes.
 
-The output is valid syntax but **not a loadable schema** — nothing resolves `"37/core"` — so the file is never
+The output is valid syntax but **not a loadable schema** — nothing resolves `"38/core"` — so the file is never
 rewritten. Exit codes: `0` printed, `1` not a well-formed schema document, `2` usage or an unreadable file.
 
 ## The Unicode policy, and configuring it
@@ -171,7 +171,7 @@ was judged under, stated once because it is constant for the run and cannot diff
 deployment, which the `policy` beside it explains.
 
 `--output tson` is the same record through the library's own writer — the shape `tson-cli`'s own
-`diagnostics.tn` (`https://tson.io/2026/37/io/ltr8/cli/diagnostics.tn`) declares, which that output is validated
+`diagnostics.tn` (`https://tson.io/2026/38/io/ltr8/cli/diagnostics.tn`) declares, which that output is validated
 against, and which `--output json` matches key for key. Its `policy` field is the spec's own `policy` type,
 imported from the bundled `policy.tn`. A position is `line:column:byteOffset`, the first two 1-based, the offset
 counting UTF-8 bytes from 0. The top-level `errors` carries only what

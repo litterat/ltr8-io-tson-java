@@ -19,8 +19,8 @@ class TsonSchemaStripperTest {
     void dropsTheIdPinsAndProseAndShortensTheSpecLibrary() {
         String schema = """
                 !!id:"https://example.test/thing-1.tn%s"
-                !!meta:"https://tson.io/2026/37/m/meta.tn%s"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn%s"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 !!import:"https://example.test/shapes-1.tn%s"
                 @doc:\"""
                   Things.
@@ -44,8 +44,8 @@ class TsonSchemaStripperTest {
                 """.formatted(PIN, PIN, PIN);
 
         assertEquals("""
-                !!meta:"37/meta"
-                !!import:"37/core"
+                !!meta:"38/meta"
+                !!import:"38/core"
                 !!import:"https://example.test/shapes-1.tn"
                 {
                 thing => int32
@@ -58,7 +58,7 @@ class TsonSchemaStripperTest {
     @Test
     void keepingDocsDropsOnlyTheComments() {
         String schema = """
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 @doc:"Shapes."
                 {
                   @doc:"A point." @title:"Point" @comment:"Kept in step with shapes-1."
@@ -67,7 +67,7 @@ class TsonSchemaStripperTest {
                 """;
 
         assertEquals("""
-                !!meta:"37/meta"
+                !!meta:"38/meta"
                 @doc:"Shapes." {
                 @doc:"A point." @title:"Point" point => { @examples:[1.0 2.5] x: float64 }
                 }
@@ -78,11 +78,11 @@ class TsonSchemaStripperTest {
     @Test
     void keepsAdjacencyAsWritten() {
         String schema = """
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 {   pair    =>   {   a?:text~"x"     b:  array<int32>  }   }
                 """;
 
-        assertEquals("!!meta:\"37/meta\"\n{\npair => { a?:text~\"x\" b: array<int32> }\n}\n",
+        assertEquals("!!meta:\"38/meta\"\n{\npair => { a?:text~\"x\" b: array<int32> }\n}\n",
                 TsonSchemaStripper.strip(schema));
     }
 
@@ -90,7 +90,7 @@ class TsonSchemaStripperTest {
     @Test
     void rewritesAMultiLineTokenSingleLine() {
         String schema = """
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 {
                   @title:\"""
                     Two "quoted"
@@ -100,7 +100,7 @@ class TsonSchemaStripperTest {
                 }
                 """;
 
-        assertEquals("!!meta:\"37/meta\"\n{\n@title:\"Two \\\"quoted\\\"\\nlines\" thing => int32\n}\n",
+        assertEquals("!!meta:\"38/meta\"\n{\n@title:\"Two \\\"quoted\\\"\\nlines\" thing => int32\n}\n",
                 TsonSchemaStripper.stripKeepingDocs(schema));
     }
 
@@ -108,18 +108,18 @@ class TsonSchemaStripperTest {
     @Test
     void shortensOnlyTheSpecLibrary() {
         String schema = """
-                !!meta:"http://tson.io/2026/37/m/meta.tn%s"
-                !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/37/x/core.tn"
-                !!import:"https://example.test/2026/37/m/core.tn"
+                !!meta:"http://tson.io/2026/38/m/meta.tn%s"
+                !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/38/x/core.tn"
+                !!import:"https://example.test/2026/38/m/core.tn"
                 { thing => int32 }
                 """.formatted(PIN);
 
         assertEquals("""
-                !!meta:"37/meta"
-                !!import:"37/meta-kernel"
-                !!import:"https://tson.io/2026/37/x/core.tn"
-                !!import:"https://example.test/2026/37/m/core.tn"
+                !!meta:"38/meta"
+                !!import:"38/meta-kernel"
+                !!import:"https://tson.io/2026/38/x/core.tn"
+                !!import:"https://example.test/2026/38/m/core.tn"
                 {
                 thing => int32
                 }
@@ -147,13 +147,13 @@ class TsonSchemaStripperTest {
     @Test
     void startsEachDeclarationOnItsOwnLine() {
         String schema = """
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 { @doc:"Paired." @title:"Pair" pair => <A, B> { first: A second: B } @deprecated old => int32
                   @doc:"Last." last => { @examples:{ a => 1 } m?: int32 } }
                 """;
 
         assertEquals("""
-                !!meta:"37/meta"
+                !!meta:"38/meta"
                 {
                 pair => <A, B> { first: A second: B }
                 @deprecated old => int32
@@ -170,7 +170,7 @@ class TsonSchemaStripperTest {
     @Test
     void refusesAMalformedSchema() {
         assertThrows(ParseException.class, () -> TsonSchemaStripper.strip("""
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 { thing => }
                 """));
     }

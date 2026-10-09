@@ -43,8 +43,8 @@ class AtomTargetAdmissionTest {
     private static Tson tson(String decls, Class<?> bound) {
         String schema = """
                 !!id:"https://example.test/a-1.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }

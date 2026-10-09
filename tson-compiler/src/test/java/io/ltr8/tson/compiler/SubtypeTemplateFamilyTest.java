@@ -38,8 +38,8 @@ class SubtypeTemplateFamilyTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/subtype-template.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }

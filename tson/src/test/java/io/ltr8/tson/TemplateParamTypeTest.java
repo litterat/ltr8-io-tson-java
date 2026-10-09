@@ -25,8 +25,8 @@ class TemplateParamTypeTest {
     private static final String ID = "https://example.test/params-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/params-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               percent  => !integer ^ { min: 0  max: 100 }
               vector   => <T, N> !array { element_type: T  min_items: N  max_items: N }
@@ -99,8 +99,8 @@ class TemplateParamTypeTest {
     void usesThatDisagreeAreRefused() {
         List<Diagnostic> refused = Tson.standard().validateSchema("""
                 !!id:"https://example.test/clash-1.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   clash => <N> { a?: text ~ N  b?: int32 ~ N }
                 }
@@ -123,8 +123,8 @@ class TemplateParamTypeTest {
     private static List<Diagnostic> load(String declarations) {
         return Tson.standard().validateSchema("""
                 !!id:"https://example.test/params-structure.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 """ + declarations + "}");
     }

@@ -53,13 +53,13 @@ Try it (the data names its own schema and type, so no --type is needed):
 ```
 
 Here's the `person.tn` schema created. It shows a few of the basic schema features,
-including records, record groups, enums and some in-built types. The `2026/37` in the
+including records, record groups, enums and some in-built types. The `2026/38` in the
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/37/getting-started/person.tn?sha256=2ec23a8cbde914abf674d8ca8b0a7261c999ba3db954c3a8ee8b2c200a98494e"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=568b589bdb162f5390ca46f6a941339d7b92ecb236bf233f8ed992b359b47a90"
-!!import:"https://tson.io/2026/37/m/core.tn?sha256=4845f0c17bd0753f70cfe34ed3a537445e6a5b551b3b68541696ffe9e50d5065"
+!!id:"https://example.com/2026/38/getting-started/person.tn?sha256=5166ed268bdd3533fcc9a9febf925288c6d913a6f891df0765f8b83a2670d11e"
+!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=4eba4e370cac599ddbc9b84027a1c2be8b2e9369c0ed5135227629ee6d7ee55b"
+!!import:"https://tson.io/2026/38/m/core.tn?sha256=dfcc0124f4d3abe529ebfe898e175a8cc5d03d197dc6c8e7647497e197faf153"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]
@@ -96,7 +96,7 @@ And here's a corresponding `person-data.tn` *data* document. It's *self-describi
 `!!schema` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
-!!schema:"https://example.com/2026/37/getting-started/person.tn"
+!!schema:"https://example.com/2026/38/getting-started/person.tn"
 !person {
   id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
   name: "Ada Lovelace"
@@ -355,9 +355,9 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.standard();
 
 String schema = """
-        !!id:"https://example.com/2026/37/app/server-1.tn"
-        !!meta:"https://tson.io/2026/37/m/meta.tn"
-        !!import:"https://tson.io/2026/37/m/core.tn"
+        !!id:"https://example.com/2026/38/app/server-1.tn"
+        !!meta:"https://tson.io/2026/38/m/meta.tn"
+        !!import:"https://tson.io/2026/38/m/core.tn"
         {
             server => { hostname: text  port: int32 }
         }""";
@@ -365,7 +365,7 @@ String schema = """
 tson.resolve(schema);
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/37/app/server-1.tn")
+        .withSchema("https://example.com/2026/38/app/server-1.tn")
         .readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
 
 value.get("hostname").asString();          // Optional[web-01] — validated against the schema
@@ -397,11 +397,11 @@ Tson tson = Tson.of(ProcessorConfig.defaults()
         // Schemas you already hold, keyed by identity. Not `schemas::get` -- a source says "I cannot
         // supply that" by throwing, where a map returns null, for whichever identity the document names.
         .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(   // the `server` schema from §4
-                Map.of("https://example.com/2026/37/app/server-1.tn", schema)))));
+                Map.of("https://example.com/2026/38/app/server-1.tn", schema)))));
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
 TsonValue server = tson.treeReader().read("""
-        !!schema:"https://example.com/2026/37/app/server-1.tn"
+        !!schema:"https://example.com/2026/38/app/server-1.tn"
         !server { hostname: "web-01"  port: 8080 }""");        // validated as it builds the tree
 
 // No !!schema? The same reader reads schemalessly, straight off the wire.
@@ -661,7 +661,7 @@ pinned reference and a plain one still resolve to the same schema).
 **`tson strip`** prints a schema's reading form to standard output — the same declarations in as few tokens
 as the syntax allows, for a language model to read in a prompt. It drops the `!!id`, every header pin and the
 documentary annotations (`@doc`, `@title`, `@examples` and `@comment`), shortens the spec's own library to its
-revision and name (`!!import:"37/core"`), and puts each directive and each declaration on one line with its
+revision and name (`!!import:"38/core"`), and puts each directive and each declaration on one line with its
 whitespace collapsed; other annotations and other references stay. `--keep-docs` keeps `@doc`, `@title` and
 `@examples`, for a model that should read the documentation too; `@comment`, a note for maintainers, still goes.
 The output is valid syntax but not loadable, so the file is never rewritten.
@@ -688,9 +688,9 @@ nothing to reopen, so piped input is always treated as data.
 For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
-!!id:"https://example.com/2026/37/app/person-1.tn"
-!!meta:"https://tson.io/2026/37/m/meta.tn"
-!!import:"https://tson.io/2026/37/m/core.tn"
+!!id:"https://example.com/2026/38/app/person-1.tn"
+!!meta:"https://tson.io/2026/38/m/meta.tn"
+!!import:"https://tson.io/2026/38/m/core.tn"
 {
     person => { name: text  age: int32 }
 }
@@ -705,7 +705,7 @@ $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person
   "skeleton_distinctness":true,"permitting":[]},"token_policy":{"level":"UNRESTRICTED","permitting":[]},
   "unicode_data_version":"16.0"},
   "files":[{"file":"bad.tn","outcome":"REJECTED","errors":[{"path":"/name",
-  "schema_pointer":"/person/name","schema_id":"example.com/2026/37/app/person-1.tn",
+  "schema_pointer":"/person/name","schema_id":"example.com/2026/38/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(missing)","data_position":"2:9:63",
   "schema_position":"5:5:145"}]}],"errors":[]}

@@ -1,8 +1,8 @@
-!!id:"https://tson.io/2026/37/m/policy.tn?sha256=f2159051c9b7397203272dd5a92c229c1ca0829546032f323db39f4c3eaddca3"
-!!meta:"https://tson.io/2026/37/m/meta.tn?sha256=568b589bdb162f5390ca46f6a941339d7b92ecb236bf233f8ed992b359b47a90"
-!!import:"https://tson.io/2026/37/m/core.tn?sha256=4845f0c17bd0753f70cfe34ed3a537445e6a5b551b3b68541696ffe9e50d5065"
+!!id:"https://tson.io/2026/38/m/policy.tn?sha256=fbf7f16a199ded6effc0f9220ad3d64210473fba5d976399171c67eb230e970d"
+!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=4eba4e370cac599ddbc9b84027a1c2be8b2e9369c0ed5135227629ee6d7ee55b"
+!!import:"https://tson.io/2026/38/m/core.tn?sha256=dfcc0124f4d3abe529ebfe898e175a8cc5d03d197dc6c8e7647497e197faf153"
 @doc:"""
-  TSON processor policy — what a processor admits and spends (2026 Revision 37
+  TSON processor policy — what a processor admits and spends (2026 Revision 38
   draft).
 
   A processor's policy is a property of the deployment, never of a schema

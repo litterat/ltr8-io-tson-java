@@ -24,8 +24,8 @@ class TemplateParamBoundTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/bounds-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             """;
 
     private static final String SCHEMA = HEADER + """

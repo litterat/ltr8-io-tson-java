@@ -46,8 +46,8 @@ class AtomBoundClassUnderSchemaTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/invoice-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               money => text
               invoice => { total: money }
@@ -188,8 +188,8 @@ class AtomBoundClassUnderSchemaTest {
      */
     private static final String VALUE_SCHEMA = """
             !!id:"https://example.test/holder-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
             {
               holder => { slot: value }
             }

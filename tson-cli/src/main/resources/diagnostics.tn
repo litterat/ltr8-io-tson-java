@@ -1,10 +1,10 @@
-!!id:"https://tson.io/2026/37/io/ltr8/cli/diagnostics.tn"
-!!meta:"https://tson.io/2026/37/m/meta.tn"
-!!import:"https://tson.io/2026/37/m/core.tn"
-!!import:"https://tson.io/2026/37/m/policy.tn"
+!!id:"https://tson.io/2026/38/io/ltr8/cli/diagnostics.tn"
+!!meta:"https://tson.io/2026/38/m/meta.tn"
+!!import:"https://tson.io/2026/38/m/core.tn"
+!!import:"https://tson.io/2026/38/m/policy.tn"
 @doc:"""
   The tson CLI's report: what a run found, and the policy it judged under. A
-  project-owned schema (CLAUDE.md's "Project-owned schema !!id"): /2026/37 is
+  project-owned schema (CLAUDE.md's "Project-owned schema !!id"): /2026/38 is
   the spec revision it is written against, io/ltr8 the publisher, cli this
   module's schema group.
 

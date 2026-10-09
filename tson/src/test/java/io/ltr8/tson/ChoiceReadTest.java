@@ -32,8 +32,8 @@ class ChoiceReadTest {
     private static TsonTypeReader<?> personReader(String contact) {
         String schema = """
                 !!id:"https://example.test/choice-read.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   contact => %s
                   person => {

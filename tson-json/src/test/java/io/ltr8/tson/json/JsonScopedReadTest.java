@@ -35,8 +35,8 @@ class JsonScopedReadTest {
 
     private static final String HOST_SCHEMA = """
             !!id:"https://example.test/json-scope-host.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               note      => { body: text }
               memo      => { body: text  urgent: boolean }
@@ -50,8 +50,8 @@ class JsonScopedReadTest {
 
     private static final String CLAIM_SCHEMA = """
             !!id:"https://example.test/json-scope-claim.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               claim  => { id: text  amount: int32 }
               remark => { text: text }
@@ -61,8 +61,8 @@ class JsonScopedReadTest {
 
     private static final String REPORT_SCHEMA = """
             !!id:"https://example.test/json-scope-report.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               report => { study: text }
             }
@@ -74,8 +74,8 @@ class JsonScopedReadTest {
 
     private static String orders(String id) {
         return "!!id:\"" + id + "\"\n" + """
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   order => { n: int32 }
                 }
@@ -84,8 +84,8 @@ class JsonScopedReadTest {
 
     private static final String IDENTITY_HOST_SCHEMA = """
             !!id:"https://example.test/json-scope-identity-host.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               routed => { wide: extern_of<"%s">  library: extern_of<"%s"> }
             }

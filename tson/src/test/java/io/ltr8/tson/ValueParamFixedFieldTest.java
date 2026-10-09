@@ -36,8 +36,8 @@ class ValueParamFixedFieldTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/value-param.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               order    => { id: text }
               literal  => { status?: int32 = 201  body: order }
@@ -152,8 +152,8 @@ class ValueParamFixedFieldTest {
     void everyTemplateShapeFixesARoutedValueTheSameWay() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   order    => { id: text }
                   base     => { status: int32  body: order }
@@ -189,8 +189,8 @@ class ValueParamFixedFieldTest {
     void everyTemplateShapeResolvesAgainstTheSingleValueChannel() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   order    => { id: text }
                   base     => { status: int32  body: order }
