@@ -57,6 +57,14 @@ public record Iri(String text, Optional<String> scheme, Optional<Authority> auth
         return scheme.isEmpty();
     }
 
+    /**
+     * Whether {@code codePoint} is RFC 3987 §2.2's {@code ucschar}: a character beyond US-ASCII an IRI may hold as
+     * itself outside its query.
+     */
+    public static boolean isUcschar(int codePoint) {
+        return IriGrammar.isUcschar(codePoint);
+    }
+
     /** The text as written. */
     @Override
     public String toString() {

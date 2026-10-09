@@ -7,8 +7,8 @@ history lives in git.
 **Invariants**
 
 - The linker lives in `tson-compiler` and the registry in `tson-schema`, on purpose; the linker materializes nothing.
-- `CanonicalIdentity.canonicalize` (`tson-base`) is exactly two reductions (strip scheme, strip query); anything else not
-  already canonical is rejected.
+- `CanonicalIdentity.canonicalize` (`tson-base`) reads a *reference* in any spelling of its identity; `validate` judges
+  a document's own `!!id`, which must already be written canonically. Neither rewrites an identity into validity.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds.
 - A reference to a DATA-kinded entry is refused at every position a type-ref occupies.
@@ -33,13 +33,16 @@ so every phase that will grow schema-side diagnostics is in one module with `Dia
 `ltr8-regex` directly (what §5.4 pattern disjointness needs, with no injected-oracle seam); the registry is
 storage over the `schema.meta` value model and stays in `tson-schema`, the leaf everything else depends on.
 
-- **`CanonicalIdentity.canonicalize(String)`** (`tson-base`) implements §2.2.1's canonical-identity algorithm — **not**
-  general URI normalization. Exactly two reductions (strip scheme + `://`, strip query); everything else must
-  already be canonical (lowercase host, no port, no dot-segments, no fragment, no percent-encoding of
-  unreserved chars) or it's rejected. `http://` and `https://` resolve to the same identity; a `?sha256=`
-  query is dropped, not validated. Two companions: `validate` runs the same checks and discards the result
-  (so a caller checking a candidate `!!id` up front reads as such), and `sameIdentity(a, b)` canonicalizes
-  both and compares — the recurring question, since a pin or a scheme never distinguishes two references.
+- **`CanonicalIdentity.canonicalize(String)`** (`tson-base`) implements §2.2.1's canonical identity over the IRI
+  (SPEC-FEEDBACK.md #4) — **not** general URI normalization. Scheme and query are stripped (`http://` and `https://`
+  are one identity, a `?sha256=` pin is dropped, not validated); the host is read as an `ltr8-net` `Host` value
+  (lowercase U-labels, a dotted-quad, RFC 5952 in brackets — so `Example.COM`, A-labels and an uncompressed IPv6
+  address name the identity their canonical form does); the path is read back from its URI spelling (percent-encoded
+  UTF-8 of a character beyond US-ASCII decoded, hex case ignored, reserved encodings kept in uppercase hex) and must
+  be NFC. A port, userinfo, fragment, dot-segment, encoded unreserved character, or encoding with no IRI form is
+  rejected. Three companions: `validate(id)` judges a document's own name, which must be written in that canonical
+  form — `SchemaResolver` applies it to `!!id` and `canonicalize` to each `!!import`; `toUri` gives a reference's URI
+  spelling (A-labels, percent-encoded UTF-8) for a fetch; and `sameIdentity(a, b)` canonicalizes both and compares.
   **Public API, not internal machinery**: `TsonSchemaLoader.load` takes a canonical identity as its
   argument, so anything implementing that seam or a `SchemaSource` has to derive them the same way. It
   is the identity half of §2.2.1; `TsonContentHash` is the `?sha256=` half this one strips. It sits in

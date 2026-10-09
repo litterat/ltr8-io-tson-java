@@ -77,10 +77,11 @@ vocabulary -- with every setting returning a new instance, so a configuration ma
 derived from without the holder losing what they stated. Construction is not here and cannot be: it names
 the compiler's registry, which is why `Tson.of(config)` lives with the engine.
 **`CanonicalIdentity` reads a reference as an IRI-reference** through `ltr8-net`'s `Iri`, so a host or path beyond
-US-ASCII is an identity, compared as written. An identity with no host — path-only or `file:`-style — is its
-path, which must be absolute ([TSON-DATA] §2.2.1), so it can never equal a host-and-path identity: a relative
-`tson.io/…` would be `https://tson.io/…`'s. `SchemaReference`, the fetching sources' check, still requires a host:
-a library entry is never fetched.
+US-ASCII is an identity; its host is a `Host` value and its path read back from its URI spelling, so every spelling of
+one identity is one string (`design/linking-and-compilation.md`). An identity with no host — path-only or
+`file:`-style — is its path, which must be absolute ([TSON-DATA] §2.2.1), so it can never equal a host-and-path
+identity: a relative `tson.io/…` would be `https://tson.io/…`'s. `SchemaReference`, the fetching sources' check, still
+requires a host: a library entry is never fetched.
 
 **`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to that are TSON's own — `Rational` and
 `Complex` — the question a consumer arrives with rather than part of §8's model, and pure values depending on

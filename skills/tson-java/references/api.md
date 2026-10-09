@@ -559,11 +559,12 @@ judged under.
 (string-class whatever their members spell), and the form each matches its members in.
 
 `register` rejecting a duplicate identity, plus an unmodifiable `entries()`, **is** the "locked"
-guarantee. `CanonicalIdentity` (§2.2.1's algorithm — strip scheme, strip query, nothing else) is
-`tson-base`'s, `io.ltr8.tson.base.CanonicalIdentity`. It reads the reference as an RFC 3987 IRI-reference
-(through `Iri`, not `java.net.URI`), so a host or path beyond US-ASCII is held and compared as written; and an
-identity with no host must have an absolute path, so `/local/orders.tn`, `file:/local/orders.tn` and
-`file:///local/orders.tn` are one identity.
+guarantee. `CanonicalIdentity` (§2.2.1's algorithm) is `tson-base`'s, `io.ltr8.tson.base.CanonicalIdentity`:
+`canonicalize(reference)` reads a reference in any spelling of its identity -- scheme and query stripped, the host a
+`Host` value (so `Example.COM`, `xn--bcher-kva.example` and `bücher.example` spellings meet), the path read back from
+its URI spelling and NFC; `validate(id)` requires a document's own `!!id` to be written in that canonical form;
+`toUri(reference)` is the URI spelling for a fetch. An identity with no host must have an absolute path, so
+`/local/orders.tn`, `file:/local/orders.tn` and `file:///local/orders.tn` are one identity.
 
 The module exports two packages: `io.ltr8.tson.schema` (the above) and `io.ltr8.tson.schema.meta`, the resolved-schema
 value model — pure records, sealed interfaces and enums, §8's `TypeDefinition` et al. The host values the atoms read to
