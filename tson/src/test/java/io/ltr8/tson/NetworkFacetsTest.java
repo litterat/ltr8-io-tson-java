@@ -33,6 +33,7 @@ class NetworkFacetsTest {
             !!id:"%s"
             !!meta:"https://tson.io/2026/38/m/meta.tn"
             !!import:"https://tson.io/2026/38/m/core.tn"
+            !!import:"https://tson.io/2026/38/m/net.tn"
             {
               private_v4 => !ipv4 ^ { within: ["10.0.0.0/8" "192.168.0.0/16"]  excluding: ["10.1.0.0/16"] }
               subnet     => !cidr4 ^ { within: ["10.0.0.0/8"]  excluding: ["10.1.0.0/16"] }
@@ -121,6 +122,7 @@ class NetworkFacetsTest {
                         !!id:"https://example.test/bad-network.tn"
                         !!meta:"https://tson.io/2026/38/m/meta.tn"
                         !!import:"https://tson.io/2026/38/m/core.tn"
+                        !!import:"https://tson.io/2026/38/m/net.tn"
                         { oops => !ipv4 ^ { within: ["10.0.0.0" "not-a-network"] } }
                         """));
 
@@ -140,6 +142,7 @@ class NetworkFacetsTest {
                         !!id:"https://example.test/empty-network-pair.tn"
                         !!meta:"https://tson.io/2026/38/m/meta.tn"
                         !!import:"https://tson.io/2026/38/m/core.tn"
+                        !!import:"https://tson.io/2026/38/m/net.tn"
                         { oops => !ipv4 ^ { within: ["10.0.0.0/8"]  excluding: ["10.0.0.0/9" "10.128.0.0/9"] } }
                         """));
 
@@ -158,6 +161,7 @@ class NetworkFacetsTest {
                         !!id:"https://example.test/empty-network-bound.tn"
                         !!meta:"https://tson.io/2026/38/m/meta.tn"
                         !!import:"https://tson.io/2026/38/m/core.tn"
+                        !!import:"https://tson.io/2026/38/m/net.tn"
                         { oops => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]
                                              max_prefix: 24 } }
                         """));
@@ -173,6 +177,7 @@ class NetworkFacetsTest {
                 !!id:"https://example.test/inhabited-network-bound.tn"
                 !!meta:"https://tson.io/2026/38/m/meta.tn"
                 !!import:"https://tson.io/2026/38/m/core.tn"
+                !!import:"https://tson.io/2026/38/m/net.tn"
                 { ok => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]  max_prefix: 25 }
                   holder => { n?: ok? } }
                 """);

@@ -62,6 +62,7 @@ class CoreSchemaImportTest {
 
         loader.loadMeta(TsonBundledSchemas.META_ID);
         loader.resolveLinked(TsonBundledSchemas.CORE_ID); // core.tn is a non-meta import: resolved, not compiled here
+        loader.resolveLinked(TsonBundledSchemas.NET_ID); // and so is net.tn
 
         return new Loaded(schemaRegistry, registry);
     }
@@ -74,11 +75,11 @@ class CoreSchemaImportTest {
         assertTrue(registered.isPresent(), "expected core.tn to be registered");
 
         TsonSchema core = registered.get().schema();
-        assertEquals(48, core.entries().size(), "expected every core.tn declaration to resolve");
+        assertEquals(43, core.entries().size(), "expected every core.tn declaration to resolve");
 
         // A representative spread of core.tn's own real declarations -- atom refinements
-        // (int32/positive_integer) and constructor applications (hex, float32, cidr4, ipv4, complex,
-        // unknown) -- all genuinely present in the validated, registered namespace. core.tn declares
+        // (int32/positive_integer) and constructor applications (hex, float32, email, complex, unknown) --
+        // all genuinely present in the validated, registered namespace. core.tn declares
         // no !!import of its own (only !!meta:"...meta.tn"), so unlike MetaSchemaImportTest's own
         // assertions, meta.tn's/meta-kernel's own vocabulary (e.g. "atom", "binary") is never merged
         // into this schema's own entries() -- it's only reachable one hop via !!meta, and only for a
@@ -89,12 +90,7 @@ class CoreSchemaImportTest {
         assertTrue(core.entries().containsKey("bytes"));
         assertTrue(core.entries().containsKey("float32"));
         assertTrue(core.entries().containsKey("float64"));
-        assertTrue(core.entries().containsKey("cidr4"));
-        assertTrue(core.entries().containsKey("cidr6"));
         assertTrue(core.entries().containsKey("email"));
-        assertTrue(core.entries().containsKey("mac"));
-        assertTrue(core.entries().containsKey("ipv4"));
-        assertTrue(core.entries().containsKey("ipv6"));
         assertTrue(core.entries().containsKey("complex"));
         assertTrue(core.entries().containsKey("declared"));
         assertTrue(core.entries().containsKey("extern"));
@@ -103,9 +99,21 @@ class CoreSchemaImportTest {
         assertTrue(core.entries().containsKey("extern_type"));
     }
 
+    /** The network families are net.tn's, beside its host name, and core claims none of their names. */
+    @Test
+    void theNetworkFamiliesAreNetTnsAndNotCores() {
+        TsonSchemaRegistry schemaRegistry = loadMetaKernelMetaAndCore().schemaRegistry();
+        TsonSchema net = schemaRegistry.get(TsonBundledSchemas.NET_ID).orElseThrow().schema();
+        TsonSchema core = schemaRegistry.get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
+
+        Set<String> network = Set.of("ipv4", "ipv6", "cidr4", "cidr6", "mac", "hostname");
+        assertEquals(network, net.entries().keySet());
+        assertTrue(network.stream().noneMatch(core.entries()::containsKey), "core declares a network name");
+    }
+
     /**
      * {@link TsonCompiledMetaRegistry#register} (reached via {@code loader.load}, inside {@link
-     * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn's own 48 entries as a side
+     * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn's own 43 entries as a side
      * effect of registering it -- but {@link TsonSchemaCompiler}'s own per-entry build-failure
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to
      * an {@code ErrorReader} instead (see that class's own Javadoc), only throwing once someone
@@ -139,20 +147,38 @@ class CoreSchemaImportTest {
         assertEquals(Set.of(), errored, () -> "an entry with no compiled reader: " + errored);
     }
 
+    /** As above, for net.tn. */
+    @Test
+    void noNetEntryCompilesToAnErrorReader() {
+        Loaded loaded = loadMetaKernelMetaAndCore();
+        TsonSchema net = loaded.schemaRegistry().get(TsonBundledSchemas.NET_ID).orElseThrow().schema();
+        TsonCompiledSchema compiledNet =
+                TsonCompiledSchemaRegistry.tree(loaded.registry()).get(TsonBundledSchemas.NET_ID);
+
+        Set<String> errored = new TreeSet<>();
+        for (String name : net.entries().keySet()) {
+            if (compiledNet.get(name).getClass().getSimpleName().equals("ErrorReader")) {
+                errored.add(name);
+            }
+        }
+
+        assertEquals(Set.of(), errored, () -> "an entry with no compiled reader: " + errored);
+    }
+
     /**
      * The compiled-reader half of the entry above: {@code cidr4}/{@code cidr6} don't merely stop being
-     * {@code ErrorReader}s, they read real values against core.tn's own declarations -- the schema-driven
+     * {@code ErrorReader}s, they read real values against net.tn's own declarations -- the schema-driven
      * path, next to {@code TsonObjectReaderTest}'s coverage of the schemaless one.
      */
     @Test
-    void theCidrEntriesReadRealValuesAgainstCoreTnsOwnDeclarations() {
+    void theCidrEntriesReadRealValuesAgainstNetTnsOwnDeclarations() {
         Loaded loaded = loadMetaKernelMetaAndCore();
-        TsonCompiledSchema compiledCore =
-                TsonCompiledSchemaRegistry.tree(loaded.registry()).get(TsonBundledSchemas.CORE_ID);
+        TsonCompiledSchema compiledNet =
+                TsonCompiledSchemaRegistry.tree(loaded.registry()).get(TsonBundledSchemas.NET_ID);
 
         assertEquals(CidrNetwork.parse("10.0.0.0/8", 32),
-                Dom.of((TsonValue) compiledCore.get("cidr4").read(TestDocuments.document("\"10.0.0.0/8\""))));
+                Dom.of((TsonValue) compiledNet.get("cidr4").read(TestDocuments.document("\"10.0.0.0/8\""))));
         assertEquals(CidrNetwork.parse("2001:db8::/32", 128),
-                Dom.of((TsonValue) compiledCore.get("cidr6").read(TestDocuments.document("\"2001:db8::/32\""))));
+                Dom.of((TsonValue) compiledNet.get("cidr6").read(TestDocuments.document("\"2001:db8::/32\""))));
     }
 }

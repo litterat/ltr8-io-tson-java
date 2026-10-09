@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Re-stamp the four bundled schemas' content-hash pins, bottom-up, plus every copy of them this
-# repo carries. Run it after any edit to spec/m/{meta-kernel,meta,core}.tn: a digest is over the
+# Re-stamp the five bundled schemas' content-hash pins, bottom-up, plus every copy of them this
+# repo carries. Run it after any edit to spec/m/{meta-kernel,meta,core,net,policy}.tn: a digest is over the
 # document's own bytes, so an edit to meta.tn invalidates meta.tn's own !!id pin, core.tn's !!meta
 # pin, core.tn's own !!id pin (its bytes now differ), TsonBundledSchemas' held constants, and the
 # getting-started example's pins in README.md and InitCommand.java.
@@ -115,6 +115,7 @@ example_digest() {
 KERNEL_ID=$(identity spec/m/meta-kernel.tn)
 META_ID=$(identity spec/m/meta.tn)
 CORE_ID=$(identity spec/m/core.tn)
+NET_ID=$(identity spec/m/net.tn)
 POLICY_ID=$(identity spec/m/policy.tn)
 
 KERNEL=$(digest spec/m/meta-kernel.tn)
@@ -128,6 +129,10 @@ restamp spec/m/core.tn "$META_ID" "$META"
 CORE=$(digest spec/m/core.tn)
 restamp spec/m/core.tn "$CORE_ID" "$CORE"
 
+restamp spec/m/net.tn "$META_ID" "$META"
+NET=$(digest spec/m/net.tn)
+restamp spec/m/net.tn "$NET_ID" "$NET"
+
 restamp spec/m/policy.tn "$META_ID" "$META"
 restamp spec/m/policy.tn "$CORE_ID" "$CORE"
 POLICY=$(digest spec/m/policy.tn)
@@ -137,6 +142,7 @@ BUNDLED=tson-schema/src/main/java/io/ltr8/tson/schema/TsonBundledSchemas.java
 restamp_constant "$BUNDLED" META_KERNEL_SHA256 "$KERNEL"
 restamp_constant "$BUNDLED" META_SHA256 "$META"
 restamp_constant "$BUNDLED" CORE_SHA256 "$CORE"
+restamp_constant "$BUNDLED" NET_SHA256 "$NET"
 restamp_constant "$BUNDLED" POLICY_SHA256 "$POLICY"
 
 # The example pins meta.tn and core.tn, so its own digest is over bytes this pass has just changed:

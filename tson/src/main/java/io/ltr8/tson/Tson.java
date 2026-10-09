@@ -29,8 +29,8 @@ import java.util.Optional;
  * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
  * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
  * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #of(ProcessorConfig)}, or
- * {@link #standard()} for the defaults, which bootstraps the four bundled schemas (meta-kernel, meta, core,
- * policy) into a fresh, governed environment:
+ * {@link #standard()} for the defaults, which bootstraps the five bundled schemas (meta-kernel, meta, core,
+ * net, policy) into a fresh, governed environment:
  *
  * <pre>{@code
  * Tson tson = Tson.standard();

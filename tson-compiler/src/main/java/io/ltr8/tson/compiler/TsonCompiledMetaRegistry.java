@@ -44,8 +44,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Content hashes are recorded and verified per identity along the way ([TSON-DATA] §2.2.1, [TSON-SCHEMA]
  * §10.2).
  *
- * <p><b>{@link #withStandardLibrary} is the ordinary entry point</b>: it builds a registry with the four
- * bundled schemas (meta-kernel, meta, core, policy) already loaded -- fetched straight from {@link
+ * <p><b>{@link #withStandardLibrary} is the ordinary entry point</b>: it builds a registry with the five
+ * bundled schemas (meta-kernel, meta, core, net, policy) already loaded -- fetched straight from {@link
  * TsonBundledSchemas}, so it works whatever the configured source. The plain constructors leave the
  * registry empty, for a caller that populates it itself. Any schema governed by (or importing) the
  * bundled schemas then reuses what's already in {@link #get} rather than recompiling its chain.
@@ -190,7 +190,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     }
 
     /**
-     * A registry with this library's four bundled schemas -- meta-kernel, meta, core, policy -- already loaded,
+     * A registry with this library's five bundled schemas -- meta-kernel, meta, core, net, policy -- already loaded,
      * plus {@code source} for any other, non-bundled URIs a caller later resolves. This is the ordinary
      * way to get a working registry; the plain constructors leave it empty (for a caller that populates
      * it itself, e.g. a test bootstrapping in isolation).
@@ -215,7 +215,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     }
 
     /**
-     * Loads this library's four bundled schema documents into this registry in dependency order, so any
+     * Loads this library's five bundled schema documents into this registry in dependency order, so any
      * schema governed by (or importing) them resolves. Each is fetched straight from {@link
      * TsonBundledSchemas} (never the configured {@code source}) and registered; its own {@code
      * !!meta}/{@code !!import} targets are cache hits by the time they're needed (meta-kernel's own is
@@ -226,6 +226,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         registerBundled(TsonBundledSchemas.META_KERNEL_ID);
         registerBundled(TsonBundledSchemas.META_ID);
         registerBundled(TsonBundledSchemas.CORE_ID);
+        registerBundled(TsonBundledSchemas.NET_ID);
         registerBundled(TsonBundledSchemas.POLICY_ID);
     }
 

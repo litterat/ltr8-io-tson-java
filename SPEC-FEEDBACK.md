@@ -130,3 +130,67 @@ validity." §8.2 and §9.1 cite "refused" in place of "the fifth outcome".
 `ltr8-io-tson-java-http` answers who acts, as the CLI's exit code does: its status follows the exit code, and parts
 from `outcome` exactly where the exit code does — a rejection beside a gap or a binding mismatch is a 500 or 501
 there and `REJECTED` here, as the CLI exits 70 or 78. It too keeps the fetch allowlist out of every response.
+
+---
+
+## 2. The network types are a library of their own, `net.tn`, with a host name beside them
+
+**Section:** [TSON-SCHEMA] §9 ("Core holds only what a schema cannot do without"), §2.2.3 (a local declaration may
+not reuse a name the import closure binds), §13.2 and the companion-artifact count in §1; [TSON-DATA] §5.5's table
+and §5.6's rule that the schemaless vocabulary leaves with core (`positive_integer`).
+
+**Kind:** proposal — a gap (no host name type), and a cost §9 states but does not apply to the network families.
+
+**The problem.** Two, and one answer to both.
+
+- **There is no host name.** Core has `ipv4` and `ipv6` but nothing for a DNS host name, so a host — a listener's,
+  a schema identity's (§2.2.1 keys identities by host) — is `text`, or a pattern each schema writes for itself and
+  gets slightly wrong: RFC 1123's labels admit `192.0.2.1`, and a fold chosen as `NFKC_CASEFOLD` admits a fullwidth
+  spelling an ASCII type should refuse.
+- **Every name core declares is one no importing schema may declare** (§9's own reasoning, from §2.2.3). That is
+  the right price for what nearly every schema needs, and a poor one for `ipv4`, `ipv6`, `cidr4`, `cidr6` and `mac`:
+  most schemas never use them, and `mac` and `hostname` are plausible names for a schema's own types. Adding
+  `hostname` to core would make the cost worse, and break every schema that already declares one.
+
+**Interpretation chosen.** A fifth companion artifact, `net.tn` (`https://tson.io/2026/38/m/net.tn`), governed by
+meta and importing nothing:
+
+- **It holds the five network families**, moved from core unchanged — the same empty instances of meta's
+  constructors, which stay in meta — **and `hostname`**:
+
+  ```
+  hostname => !text_type {
+    pattern: "([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.])*[a-z]([a-z0-9-]{0,61}[a-z0-9])?"
+    max_length: 253
+    normalization: ASCII_CASEFOLD
+  }
+  ```
+
+  An RFC 1123 §2.1 host name: letter-digit-hyphen labels of 1–63 characters, no hyphen at a label's edge, the last
+  label starting with a letter (RFC 1123's own disambiguation, so a dotted-quad is never a host name and
+  `( hostname | ipv4 )` has no value in both), at most 253 characters, no trailing dot. The fold is `ASCII_CASEFOLD`,
+  the member §5.5 names for DNS names: the value is folded before `pattern` judges it, so `NFKC_CASEFOLD` would turn
+  a fullwidth or compatibility spelling into ASCII and admit it. U-labels are out; an internationalized name is
+  written as its A-labels, and an IDN host type (UTS #46 mapping, not expressible as a pattern) is a separate
+  question.
+- **`hostname` needs no constructor of its own**: it is regular and has nothing to configure, so it is an instance
+  of `text_type`, and a malformed host is a validation error, as any pattern-constrained text is.
+- **Core no longer declares the network names.** A schema importing core alone may declare `mac` or `hostname`; one
+  that wants the network types imports `net.tn` as well.
+- **The schemaless vocabulary keeps every name, by library.** `!ipv4`, `!cidr4`, `!mac` and the rest stay
+  schemaless annotations, and `!hostname` joins them, each denoting the type its library declares — so a document
+  keeps its meaning when it moves under a schema that imports that library, which is §5.6's guarantee with the
+  library named.
+
+**Suggested resolution.** Publish `net.tn` as a companion artifact (§1's count and §13.2's table gain it) holding
+the five network families and `hostname` as above; remove the five from core and from §9's list of what core
+declares, adding a sentence that a library outside core is what a family most schemas never use belongs in. In
+[TSON-DATA] §5.5, add the `!hostname` row (RFC 1123 §2.1 host name, ASCII, compared without case; host value text)
+and say which library each row's name comes from; restate §5.6's rule as "a schemaless name denotes the type its
+library declares under that name, so a document moving under a schema that imports the library keeps its meaning".
+Each meta constructor's "Instance is `ipv4` in core" becomes "in net".
+
+**Status against Revision 37:** open; running on `r2026-38-proposal`. `spec/m/net.tn` and its resolved fixture,
+core without the five, `TsonBundledSchemas.NET_ID` loaded by `Tson.standard()`, the schemaless `!hostname`
+(`BuiltinTypeVocabulary.HOSTNAME`, checked equal to net.tn's resolved body), and corpus vectors for both the
+schemaless and the schema-governed reads.

@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/38/m/core.tn?sha256=dfcc0124f4d3abe529ebfe898e175a8cc5d03d197dc6c8e7647497e197faf153"
-!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=4eba4e370cac599ddbc9b84027a1c2be8b2e9369c0ed5135227629ee6d7ee55b"
+!!id:"https://tson.io/2026/38/m/core.tn?sha256=2acabf70c8dfd119be47a1e5d5d9394c7be473a85b42fc9b27aeded1b7cee65f"
+!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=f4bc634c2e40ec9002f997f47fe0055e84a47c4cdd4b0463024f79539e23dfc3"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 38 draft).
@@ -42,12 +42,9 @@
                           is the informative source behind it)
     RFC 9562              UUID format
     RFC 4648              Base encodings (text spellings of `bytes`)
-    RFC 3986              URI syntax (incl. IPv4address grammar)
+    RFC 3986              URI syntax
     RFC 3987              Internationalized Resource Identifiers (IRIs)
     RFC 9485              I-Regexp, the interoperable regular expression
-    RFC 4291              IPv6 addressing architecture
-    RFC 4632              Classless Inter-domain Routing (CIDR)
-    RFC 9542              IEEE 802 parameters (EUI-48 format)
     RFC 5322              Email address format
   """
 {
@@ -269,49 +266,6 @@
   @doc:"Email address per RFC 5322."
   @ordering:NONE @bounded:false
   email => !email_type {}
-
-  @doc:"""
-    IPv4 address, dotted-quad per the RFC 3986 IPv4address production. Totally
-    ordered by numeric address value over a finite 32-bit space.
-    """
-  @ordering:TOTAL @bounded:true
-  ipv4 => !ipv4_type {}
-
-  @doc:"""
-    IPv6 address, RFC 4291 §2.2 text representation. Zone identifiers (RFC 4007,
-    `fe80::1%eth0`) are host-local and excluded from the contract. Totally
-    ordered by numeric address value over a finite 128-bit space. (TSON text:
-    contains colons, so quote it.)
-    """
-  @ordering:TOTAL @bounded:true
-  ipv6 => !ipv6_type {}
-
-  @doc:"""
-    IPv4 network, address `/` prefix length 0-32 (RFC 4632). PARTIAL ordering is
-    by containment: a network precedes another when its address range is a
-    strict subset; CIDR blocks never partially overlap, so any two are nested or
-    disjoint, and disjoint networks are incomparable. (TSON text: contains `/`,
-    so quote it.)
-    """
-  @ordering:PARTIAL @bounded:false
-  cidr4 => !cidr4_type {}
-
-  @doc:"""
-    IPv6 network, address `/` prefix length 0-128 (RFC 4291 §2.3). PARTIAL
-    ordering is by containment, as for cidr4. (TSON text: contains colons and
-    `/`, so quote it.)
-    """
-  @ordering:PARTIAL @bounded:false
-  cidr6 => !cidr6_type {}
-
-  @doc:"""
-    MAC address, EUI-48: six hex octets, colon- or hyphen-separated (RFC 9542).
-    An opaque hardware identifier — like uuid, ordering is not semantically
-    meaningful. (TSON text: the colon form must be quoted; the hyphen form may
-    go unquoted.)
-    """
-  @ordering:NONE @bounded:false
-  mac => !mac_type {}
 
   @doc:"""
     A type this schema declares or imports, chosen by the value. The narrowest

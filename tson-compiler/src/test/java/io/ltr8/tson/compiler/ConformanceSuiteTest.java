@@ -696,12 +696,12 @@ class ConformanceSuiteTest {
                 assertEquals(CidrNetwork.parse(((TokenValue) payload).text(), familyBits), actual,
                         "vocabulary value");
             }
-            case "text", "mac", "email" -> {
-                // The atoms whose host value is the authored text itself, so the oracle is a plain string
-                // compare with no parse in between. Deliberately not folded into the numeric default arm
-                // below. `text` is text by definition (§5.5, "the host value is the token's text"), `mac`
-                // keeps its text because Java has no type to map onto (see MacParser), and `email` because
-                // the address shape is the contract.
+            case "text", "mac", "email", "hostname" -> {
+                // The atoms whose host value is text, so the oracle is a plain string compare with no parse
+                // in between. Deliberately not folded into the numeric default arm below. `text` is text by
+                // definition (§5.5, "the host value is the token's text"), `mac` keeps its text because Java
+                // has no type to map onto (see MacParser), `email` because the address shape is the contract,
+                // and `hostname` is a text type whose value is the name folded, which the vector states.
                 String actual = (String) atomType.boundTo(String.class).orElseThrow().read(token);
                 assertEquals(((TokenValue) payload).text(), actual, "vocabulary value");
             }

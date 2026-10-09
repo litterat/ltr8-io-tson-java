@@ -1,0 +1,46 @@
+!!id:"https://tson.io/2026/38/m/net-resolved.tn"
+!!schema:"https://tson.io/2026/38/m/meta.tn"
+@doc:"""
+  Resolver-output fixture for net.tn (2026 Revision 38 draft).
+  Parse the source schema, run the resolver, canonicalise, compare.
+  Conventions as in meta-kernel-resolved.tn, and the header note in
+  core-resolved.tn applies here unchanged: net.tn imports nothing, and
+  every `source` and body names a meta- or kernel-level constructor.
+  """
+!schema {
+  @ordering:TOTAL @bounded:true
+  ipv4 => !type_definition {
+    source: ipv4_type
+    body: !ipv4_type {}
+  }
+
+  @ordering:TOTAL @bounded:true
+  ipv6 => !type_definition {
+    source: ipv6_type
+    body: !ipv6_type {}
+  }
+
+  @ordering:PARTIAL @bounded:false
+  cidr4 => !type_definition {
+    source: cidr4_type
+    body: !cidr4_type {}
+  }
+
+  @ordering:PARTIAL @bounded:false
+  cidr6 => !type_definition {
+    source: cidr6_type
+    body: !cidr6_type {}
+  }
+
+  @ordering:NONE @bounded:false
+  mac => !type_definition {
+    source: mac_type
+    body: !mac_type {}
+  }
+
+  @ordering:NONE @bounded:false
+  hostname => !type_definition {
+    source: text_type
+    body: !text_type { max_length: 253  pattern: "([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.])*[a-z]([a-z0-9-]{0,61}[a-z0-9])?"  normalization: ASCII_CASEFOLD }
+  }
+}

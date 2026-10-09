@@ -38,14 +38,15 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 public final class Sidecar {
 
     /**
-     * The spec's own three, whose real identities carry the revision -- resolved off {@link
+     * The spec's own four, whose real identities carry the revision -- resolved off {@link
      * TsonBundledSchemas}'s constants, so a revision bump touches that one class rather than every vector
      * that mentions core.tn.
      */
     private static final Map<String, String> BUNDLED_SHORT_NAMES = Map.of(
             "meta-kernel.tn", TsonBundledSchemas.META_KERNEL_ID,
             "meta.tn", TsonBundledSchemas.META_ID,
-            "core.tn", TsonBundledSchemas.CORE_ID);
+            "core.tn", TsonBundledSchemas.CORE_ID,
+            "net.tn", TsonBundledSchemas.NET_ID);
 
     /** Where the corpus publishes its own schemas -- the sidecar schemas, and the link layer's fixtures. */
     private static final String SUITE_SCHEMAS = "https://tson.io/test-suite/schemas/";
@@ -137,10 +138,10 @@ public final class Sidecar {
     }
 
     /**
-     * The real, current identity a sidecar's short name stands for: one of the spec's own three, or a
+     * The real, current identity a sidecar's short name stands for: one of the spec's own four, or a
      * schema the corpus publishes itself, named by its path under {@code schemas/}.
      *
-     * <p><b>A rule, not a table.</b> The three bundled names have to be listed because their identities
+     * <p><b>A rule, not a table.</b> The four bundled names have to be listed because their identities
      * carry the spec revision and nothing in the name says so. Everything else is derived, which is what
      * lets the corpus grow a fixture without every runner in every language editing a constant to keep up
      * -- and a table that has to be edited per fixture is the same drift {@code RUNNER.md} exists to stop,
