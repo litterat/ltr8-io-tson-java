@@ -674,3 +674,39 @@ three kinds compose with it; the resolved fixtures carry the entry and the longe
 the bundled schemas are restamped. The Java value model mirrors it: `schema.meta.Type` is a sealed interface between
 `Top` and `Atom`/`Product`/`Sum`, so a body is a type exactly when it is an `instanceof Type`. No check reads `type`
 yet, so no verdict changes: the corpus passes unchanged.
+
+---
+
+## 10. A record's field names have a type: `record.field_name_type` (experimental)
+
+**Section:** [TSON-DATA] §2.5 ("A field name is an identifier at every layer"), §7.2.1, §7.7, §8.2; [TSON-SCHEMA]
+§5.2 (`record`), §7.4 (`enum_type.type`), §7.7, §12.1; [TSON-JSON] §3 (the reserved member namespace).
+
+**Kind:** proposal, experimental — on the branch `experiment/field-name-type`, not `r2026-38-proposal`.
+
+**The problem.** A field name is an identifier at every layer, so `{ "@id": x }` and `{ "$ref": x }` are parse
+errors, and §2.5's remedy is a map: "a key that is not a name belongs in a map". That serves TSON's own data. It
+fails a schema translated from JSON-LD, OpenAPI or JSON Schema, whose objects are records — a fixed set of declared
+members — with names such as `@context`, `@id` or `$ref`. A map loses the record's declared shape, and renaming the
+member loses the round trip.
+
+**The idea.** Copy `enum_type.type`, which already says which family an enum's members belong to. A record gains
+`field_name_type?: type_name ~ field_name`, the family its field names belong to. The default is the series' own
+`field_name`, an identifier, so nothing changes unless a record says so. A record translated from JSON names a
+relaxed type, defined by the translation and not by the series, such as
+`json_name => !identifier_type { start_add: "@$" }`, or plain `text`.
+
+**Decided so far:**
+
+- **The default does not change.** A schemaless record's field names are identifiers. A field-name position admits
+  any single-line token, and the identifier match moves from the parser to the record, so a schemaless
+  `{ "first name": 1 }` is a resolver error rather than a parse error. That is the one verdict that moves.
+- **Part 3's reserved member names move.** Its reserved namespace rests on no declared name beginning with `$`,
+  which a relaxed `field_name_type` breaks.
+- **No shipped `json_name`, for now.** A relaxed type is likely the translation's own and differs between sources;
+  whether the series should ship one waits on the implementation.
+
+**Open:** the default for a JSON member name that is not an identifier; how the brace form states a record's
+`field_name_type`; whether a subtype or refinement may change it; the hygiene policy for names of a text type.
+
+**Status against Revision 37:** open; experimental, in progress on `experiment/field-name-type`.
