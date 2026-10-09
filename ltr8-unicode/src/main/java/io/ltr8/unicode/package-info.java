@@ -17,6 +17,8 @@
  *   <li>{@link io.ltr8.unicode.ConfusableNames} -- skeleton distinctness over a set of names.</li>
  *   <li>{@link io.ltr8.unicode.JoiningControls} -- UTS #39's limited contexts for ZWNJ and ZWJ.</li>
  *   <li>{@link io.ltr8.unicode.RestrictionLevel} -- UTS #39's restriction levels over one run of text.</li>
+ *   <li>{@link io.ltr8.unicode.IdnaProperty} -- RFC 5892's IDNA2008 derived property and contextual rules.</li>
+ *   <li>{@link io.ltr8.unicode.BidiRule} -- RFC 5893's Bidi rule for the labels of a domain name.</li>
  * </ul>
  *
  * <p><b>One Unicode version for every table.</b> Each table here is checked against the Unicode Character Database

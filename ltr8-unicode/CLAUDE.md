@@ -2,7 +2,8 @@
 
 Unicode Character Database properties and the algorithms over them, each to its Unicode standard: identifier
 properties and profiles (UAX #31), normalization forms (UAX #15, NFKC_Casefold) and UTS #39's security mechanisms —
-identifier status, confusable skeletons over a set, joining-control contexts and restriction levels. Depends on
+identifier status, confusable skeletons over a set, joining-control contexts and restriction levels — and IDNA2008's
+derived property (RFC 5892) and Bidi rule (RFC 5893). Depends on
 nothing and knows nothing of TSON, so it carries no `Tson` prefix and is usable on its own. What a format chooses
 — its own profile, the policy it applies, the words of a refusal — belongs to the module that defines the format
 (`tson-atom`'s `IdentifierGrammar`, `tson-base`'s `ScriptPolicy` and `IdentifierPolicy`, for TSON's).

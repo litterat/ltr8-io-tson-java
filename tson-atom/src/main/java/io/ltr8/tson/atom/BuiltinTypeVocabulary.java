@@ -12,6 +12,8 @@ import io.ltr8.tson.atom.parser.DurationParser;
 import io.ltr8.tson.atom.parser.EmailParser;
 import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
+import io.ltr8.tson.atom.parser.HostParser;
+import io.ltr8.tson.atom.parser.HostnameParser;
 import io.ltr8.tson.atom.parser.Ipv4Parser;
 import io.ltr8.tson.atom.parser.Ipv6Parser;
 import io.ltr8.tson.atom.parser.MacParser;
@@ -57,9 +59,9 @@ import java.util.Optional;
  * ipv6_type} ({@code ipv6}, §5.5) -- a hand-rolled RFC 4291 §2.2 compiler for the same reason, see
  * {@link Ipv6Parser}'s Javadoc. And with {@code cidr4_type}/{@code cidr6_type} ({@code cidr4}/{@code cidr6},
  * §5.5), which reuse those two address grammars for the address half of a network. And with {@code mac_type}
- * ({@code mac}, §5.5, EUI-48 per RFC 9542). Those five are net.tn's, as is {@code hostname}: not a family of
- * its own but net.tn's {@code text_type} instance, an RFC 1123 host name under {@code ASCII_CASEFOLD}, so its
- * entry here is a {@link TextParser} over {@link #HOSTNAME} -- the facets net.tn writes.
+ * ({@code mac}, §5.5, EUI-48 per RFC 9542). And with {@code hostname_type} ({@code hostname}, a domain name in
+ * either label form, see {@link HostnameParser}) and {@code host_type} ({@code host}, a host name or an IP
+ * address, see {@link HostParser}). Those seven are net.tn's.
  *
  * <p>And with {@code email_type} ({@code email}, §5.5's own row beside {@code uuid}/{@code ipv4}/{@code mac},
  * with the shape core.tn gives it) -- the RFC 5322 pin is scoped there to the {@code dot-atom "@" dot-atom}
@@ -71,11 +73,6 @@ import java.util.Optional;
 public final class BuiltinTypeVocabulary {
 
     private static final int[] INTEGER_WIDTHS = {8, 16, 32, 64, 128, 256};
-
-    /** net.tn's {@code hostname}: its {@code text_type} body, facet for facet. */
-    public static final TextType HOSTNAME = new TextType(Optional.empty(), Optional.of(253), Optional.empty(),
-            Optional.of("([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.])*[a-z]([a-z0-9-]{0,61}[a-z0-9])?"),
-            Optional.empty(), Normalization.ASCII_CASEFOLD);
 
     private static final Map<String, AtomType<?>> TYPES = buildVocabulary();
 
@@ -123,7 +120,8 @@ public final class BuiltinTypeVocabulary {
         types.put(Ipv6Parser.TYPENAME, Ipv6Parser.UNCONSTRAINED);
         types.put(Cidr4Parser.TYPENAME, Cidr4Parser.UNCONSTRAINED);
         types.put(Cidr6Parser.TYPENAME, Cidr6Parser.UNCONSTRAINED);
-        types.put("hostname", new TextParser(HOSTNAME));
+        types.put(HostnameParser.TYPENAME, HostnameParser.UNCONSTRAINED);
+        types.put(HostParser.TYPENAME, HostParser.UNCONSTRAINED);
 
         return Map.copyOf(types);
     }

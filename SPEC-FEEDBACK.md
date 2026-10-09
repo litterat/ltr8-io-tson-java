@@ -167,9 +167,8 @@ adding a sentence that a library outside core is where a family most schemas nev
 imports the library keeps its meaning". Each meta constructor's "Instance is `ipv4` in core" becomes "in net".
 
 **Status against Revision 37:** open; running on `r2026-38-proposal`. `spec/m/net.tn` and its resolved fixture,
-core without the five, `TsonBundledSchemas.NET_ID` loaded by `Tson.standard()`, the schemaless `!hostname`
-(`BuiltinTypeVocabulary.HOSTNAME`, checked equal to net.tn's resolved body), and corpus vectors for both the
-schemaless and the schema-governed reads.
+core without the five, `TsonBundledSchemas.NET_ID` loaded by `Tson.standard()`, the schemaless `!hostname` and
+`!host` (#5, #6), and corpus vectors for both the schemaless and the schema-governed reads.
 
 ---
 
@@ -371,9 +370,9 @@ types `schema_hosts` as `[hostname]`, so it allow-lists ASCII hosts only, pinned
 **Section:** Revision 38's `net.tn` (#2); [TSON-DATA] §5.5's `!hostname` row as #2 proposes it, §8.2; [TSON-SCHEMA]
 §5.5 (text normalization), §9; #4, #6.
 
-**Kind:** proposal — `hostname` as running is ASCII only, narrower than the identities it is needed to name.
+**Kind:** proposal — a host name type as wide as the identities it is needed to name.
 
-**The problem.** `hostname` as #2 built it is an instance of `text_type`:
+**The problem.** No `text_type` can state a host name beyond ASCII. The nearest one is RFC 1123's:
 
 ```
 hostname => !text_type {
@@ -392,7 +391,7 @@ as the identity writes it, and an operator who types `bücher.example` into a co
 `text_type` can fix it: U-label validity is RFC 5892's property, which no pattern here states, and the equivalence
 of a U-label and its A-label is Punycode, which no normalization reaches.
 
-**Proposed (not built).** `hostname` becomes an atom, an instance of a new meta constructor, defined by [TSON-DATA]
+**Proposed, and running.** `hostname` is an atom, an instance of a new meta constructor, defined by [TSON-DATA]
 §5.5's row and instanced in `net.tn`:
 
 ```
@@ -434,7 +433,7 @@ hostname_type => atom & atom_specification & {
   newly assigned character can become valid, and a valid name never becomes invalid — the same monotone growth
   [TSON-DATA] §7.1 states for identifiers. That is what lets #4 make an identity's host a `hostname`.
 - **Binding:** a `String` component binds the canonical text, so a host's list of names stays `List<String>`. A
-  host-name type of its own is an addition, not a requirement (the Java reference would put it in `io.ltr8.net`,
+  host-name type of its own is an addition, not a requirement (the Java reference's is `io.ltr8.net.HostName`,
   beside its address types), parsed from either spelling and exposing both forms. It is also `host`'s name member
   (#6), so one definition serves this atom, `host` and an identity's host (#4).
 
@@ -443,8 +442,12 @@ The [TSON-DATA] §5.5 row reads: "`!hostname` — a domain name (RFC 5890): LDH 
 uppercase beyond ASCII, no trailing dot; equal by name; host value a host name, canonical text its lowercase
 U-labels".
 
-**Status against Revision 37:** open; proposal, not built. What runs on `r2026-38-proposal` is the `text_type` above
-(#2).
+**Status against Revision 37:** open; running on `r2026-38-proposal`. Meta's `hostname_type` and net.tn's
+`hostname => !hostname_type {}`, read by `tson-atom`'s `HostnameParser` through `io.ltr8.net.HostName`. Its
+validity is `ltr8-unicode`'s `IdnaProperty`, RFC 5892's derived property computed by the RFC's rules at Unicode 16.0
+and checked against IANA's last published table (Unicode 12.0) for every code point that version assigns, with no
+difference, and `BidiRule`, RFC 5893's. Corpus vectors in `class1/vocabulary` (both label forms, a Thai name, and
+each boundary) and `class2/validate` (`allow_idn`).
 
 ---
 
@@ -468,7 +471,7 @@ prove disjointness from patterns, and that rule should stay. The answer is one t
 #4 needs the same type: an identity's host is RFC 3987's `ihost` profiled to DNS, which is exactly a host name, an
 IPv4 address or an IPv6 address.
 
-**Proposed (not built).** `host`, defined by a [TSON-DATA] §5.5 row and instanced in `net.tn` from a new meta
+**Proposed, and running.** `host`, defined by a [TSON-DATA] §5.5 row and instanced in `net.tn` from a new meta
 constructor:
 
 ```
@@ -496,15 +499,18 @@ host_type => atom & atom_specification & {
   likely first facet is `allow_zone`: zone identifiers (`fe80::1%eth0`, RFC 6874) are refused, which is right for an
   identity and for most hosts, but a listener binding a link-local address needs one.
 - **Binding:** a `String` component binds the canonical text, as #5's does. A host value of its own — a host name or
-  an address — is an addition, not a requirement (the Java reference would type it in `io.ltr8.net`, beside the
-  host-name type #5 adds and its address types).
+  an address — is an addition, not a requirement (the Java reference's is `io.ltr8.net.Host`, a `HostName` or a
+  `Host.Address`).
 
 **Suggested resolution.** Meta gains `host_type`, and `net.tn` declares `host => !host_type {}`. [TSON-DATA] §5.5
 gains a row: "`!host` — a host name, IPv4 address or IPv6 address (RFC 3987 `ihost`, DNS names only, IPv6 with or
 without brackets, no zone identifier); equal by its member's equality, the two address families distinct; host
 value a host name or an address, canonical text the member's, unbracketed".
 
-**Status against Revision 37:** open; proposal, not built. The HTTP layer's `listener.host` is `text`.
+**Status against Revision 37:** open; running on `r2026-38-proposal`. Meta's `host_type` and net.tn's
+`host => !host_type {}`, read by `tson-atom`'s `HostParser` through `io.ltr8.net.Host`, with corpus vectors in
+`class1/vocabulary` (each member, both IPv6 spellings, the zone refusal) and `class2/validate` (untagged at a field).
+The HTTP layer's `listener.host` is `text` until it adopts the type.
 
 ---
 

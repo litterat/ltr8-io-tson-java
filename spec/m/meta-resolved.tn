@@ -299,6 +299,21 @@
     ] }
   }
 
+  hostname_type => !type_definition {
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec       type: iri      optional: true  role: FIXED    value: "https://www.rfc-editor.org/rfc/rfc5890" }
+      !record_field { name: allow_idn  type: boolean  optional: true  role: DEFAULT  value: true }
+    ] }
+  }
+
+  host_type => !type_definition {
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec  type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3987" }
+    ] }
+  }
+
   ordering => @annotation !type_definition {
     source: enum
     body: !enum { members: [NONE PARTIAL TOTAL] }

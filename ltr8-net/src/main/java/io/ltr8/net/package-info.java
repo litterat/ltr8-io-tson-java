@@ -7,6 +7,10 @@
  *   <li>{@link io.ltr8.net.CidrNetwork} -- CIDR networks, one type per family, with containment and the host-bits
  *       rule.</li>
  *   <li>{@link io.ltr8.net.MacAddress} -- RFC 9542's EUI-48 text form.</li>
+ *   <li>{@link io.ltr8.net.HostName} -- a domain name in either label form, judged by IDNA2008, over
+ *       {@link io.ltr8.net.Punycode}.</li>
+ *   <li>{@link io.ltr8.net.Host} -- a host name or an IPv4 or IPv6 address, RFC 3987's {@code ihost} with a DNS
+ *       name.</li>
  * </ul>
  *
  * <p>Every one exists because the JDK's answer is a different grammar: {@code java.net.URI} implements RFC 2396

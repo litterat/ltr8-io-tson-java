@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom;
 
+import io.ltr8.net.Host;
+import io.ltr8.net.HostName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -155,46 +157,56 @@ class BuiltinTypeVocabularyTest {
                 () -> int8.read("128"));
     }
 
-    /** net.tn's {@code hostname}: RFC 1123 labels, read folded to lowercase. */
+    /** net.tn's {@code hostname}: a domain name, read to its canonical text -- lowercase, U-labels. */
     @ParameterizedTest
-    @ValueSource(strings = {"localhost", "example.com", "a.b-c.example", "xn--bcher-kva.example", "1host.example"})
-    void hostnameAdmitsRfc1123Names(String name) {
-        assertEquals(name, hostname().read(name));
+    @ValueSource(strings = {"localhost", "example.com", "a.b-c.example", "1host.example", "b\u00FCcher.example"})
+    void hostnameAdmitsNames(String name) {
+        assertEquals(name, hostname().read(name).unicode());
     }
 
     @org.junit.jupiter.api.Test
-    void hostnameIsReadFolded() {
-        assertEquals("example.com", hostname().read("Example.COM"));
+    void hostnameIsReadFoldedAndInItsULabels() {
+        assertEquals("example.com", hostname().read("Example.COM").unicode());
+        assertEquals("b\u00FCcher.example", hostname().read("xn--bcher-kva.example").unicode());
     }
 
     /**
-     * A leading or trailing hyphen, an empty label, a trailing dot, a label past 63, a dotted-quad, a
-     * non-letter-digit-hyphen character, and a fullwidth spelling that only a Unicode fold would bring to ASCII.
+     * A leading or trailing hyphen, an empty label, a trailing dot, a dotted-quad, a non-letter-digit-hyphen
+     * character, a fullwidth spelling, and uppercase beyond ASCII: each outside the family's grammar.
      */
     @ParameterizedTest
     @ValueSource(strings = {
             "-example.com", "example-.com", "a..b", "example.com.", "192.0.2.1", "under_score.example",
-            "\uFF45xample.com",
+            "\uFF45xample.com", "B\u00DCCHER.example",
     })
-    void hostnameRefusesWhatRfc1123Does(String name) {
-        org.junit.jupiter.api.Assertions.assertThrows(AtomValidationException.class, () -> hostname().read(name));
+    void hostnameRefusesWhatIsNotAName(String name) {
+        org.junit.jupiter.api.Assertions.assertThrows(AtomParseException.class, () -> hostname().read(name));
     }
 
     @org.junit.jupiter.api.Test
     void hostnameLabelsAndTotalAreBounded() {
         String label63 = "a".repeat(63);
-        assertEquals(label63 + ".example", hostname().read(label63 + ".example"));
-        org.junit.jupiter.api.Assertions.assertThrows(AtomValidationException.class,
+        assertEquals(label63 + ".example", hostname().read(label63 + ".example").unicode());
+        org.junit.jupiter.api.Assertions.assertThrows(AtomParseException.class,
                 () -> hostname().read("a".repeat(64) + ".example"));
         String name253 = String.join(".", label63, label63, label63, "a".repeat(61));
         assertEquals(253, name253.length());
-        assertEquals(name253, hostname().read(name253));
-        org.junit.jupiter.api.Assertions.assertThrows(AtomValidationException.class,
+        assertEquals(name253, hostname().read(name253).unicode());
+        org.junit.jupiter.api.Assertions.assertThrows(AtomParseException.class,
                 () -> hostname().read(name253 + "a"));
     }
 
+    @org.junit.jupiter.api.Test
+    void hostReadsANameOrAnAddress() {
+        @SuppressWarnings("unchecked")
+        AtomType<Host> host = (AtomType<Host>) BuiltinTypeVocabulary.lookup("host").orElseThrow();
+        assertEquals("localhost", host.read("localhost").text());
+        assertEquals("::1", host.read("[::1]").text());
+        org.junit.jupiter.api.Assertions.assertThrows(AtomParseException.class, () -> host.read("fe80::1%eth0"));
+    }
+
     @SuppressWarnings("unchecked")
-    private static AtomType<String> hostname() {
-        return (AtomType<String>) BuiltinTypeVocabulary.lookup("hostname").orElseThrow();
+    private static AtomType<HostName> hostname() {
+        return (AtomType<HostName>) BuiltinTypeVocabulary.lookup("hostname").orElseThrow();
     }
 }

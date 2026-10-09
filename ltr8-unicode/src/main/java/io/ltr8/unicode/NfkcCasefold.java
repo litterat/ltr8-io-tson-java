@@ -64,7 +64,8 @@ public final class NfkcCasefold {
         }
     }
 
-    private static String fold(String s) {
+    /** {@code CaseFolding.txt}'s full fold (statuses C and F) of {@code s}; see the class comment. */
+    static String fold(String s) {
         StringBuilder out = new StringBuilder(s.length());
         s.codePoints().forEach(cp -> {
             if (cp == 0x0131 || (cp >= 0x13A0 && cp <= 0x13F5)) {

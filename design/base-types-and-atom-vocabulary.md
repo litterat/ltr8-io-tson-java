@@ -133,10 +133,12 @@ name→`AtomType` table (§5).
 
 **Each name denotes the type its library declares under it** — core.tn's, or net.tn's for the five network families
 and `hostname` — so a document keeps its meaning when it moves under a schema importing that library
-(SPEC-FEEDBACK.md #2). `hostname` is the one entry that is not a family: net.tn declares it as a `text_type` instance
-(an RFC 1123 pattern, `max_length: 253`, `ASCII_CASEFOLD`), so its entry is a `TextParser` over
-`BuiltinTypeVocabulary.HOSTNAME`, a hand copy of those facets that `NetSchemaTest` checks equal to net.tn's resolved
-body.
+(SPEC-FEEDBACK.md #2). net.tn's `hostname` and `host` are families of their own (#5, #6): `HostnameParser` reads a
+domain name in either label form to an `io.ltr8.net.HostName`, and `HostParser` a host name or an address to an
+`io.ltr8.net.Host`. Both are string-class, their grammar is `io.ltr8.net`'s, and a `String` target receives the
+canonical text — lowercase U-labels, a dotted-quad, unbracketed RFC 5952 — so a list of names declared
+`List<String>` compares by name. A token outside the grammar is a parse failure; `allow_idn: false` refusing an
+internationalized name is a constraint violation, the name being one.
 
 **`boolean` is in that table** ([TSON-DATA] §5.5): the tokens `true` and `false`, case-sensitive, over
 meta-kernel's `!enum [true false]`. A typed position does not consult the form, so `!boolean "true"` and

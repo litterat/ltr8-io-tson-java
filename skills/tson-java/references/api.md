@@ -654,6 +654,18 @@ public final class InternetAddress {                 // functions, not a value
     public static String ipv4Text(byte[] octets);  public static String ipv6Text(byte[] octets);
 }
 public final class MacAddress { public static byte[] eui48(String text); }   // six octets, or null
+
+public sealed interface Host permits HostName, Host.Address {   // what !host reads to
+    String text();                                   // canonical: U-labels, dotted-quad, RFC 5952 unbracketed
+    static Host parse(String text);                  // a name, IPv4, or IPv6 bare or in brackets; or HostSyntaxException
+    record Address(InetAddress address) implements Host { }   // equal by family and octets
+}
+public final class HostName implements Host {        // what !hostname reads to; IDNA2008, nothing mapped
+    public static HostName parse(String text);       // either label form, ASCII case folded; or HostSyntaxException
+    public String unicode();  public String ascii();  public boolean isIdn();   // equal by name
+}
+public final class HostSyntaxException extends IllegalArgumentException { public String text(); public String reason(); }
+public final class Punycode { public static String encode(String s); public static String decode(String s); }  // or null
 ```
 
 `Iri` is the value the four URI atoms read to. `InternetAddress` is strict where `java.net.InetAddress` is not
