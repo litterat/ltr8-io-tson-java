@@ -168,7 +168,8 @@ imports the library keeps its meaning". Each meta constructor's "Instance is `ip
 
 **Status against Revision 37:** open; running on `r2026-38-proposal`. `spec/m/net.tn` and its resolved fixture,
 core without the five, `TsonBundledSchemas.NET_ID` loaded by `Tson.standard()`, the schemaless `!hostname` and
-`!host` (#5, #6), and corpus vectors for both the schemaless and the schema-governed reads.
+`!host` (#5, #6), the schemaless `!media_type` (#8), and corpus vectors for both the schemaless and the
+schema-governed reads.
 
 ---
 
@@ -545,3 +546,79 @@ earlier version may refuse a name a later one accepts, and its report names the 
 relies on the same property for an identity's host.
 
 **Status against Revision 37:** open; wording only.
+
+---
+
+## 8. `media_type`: a media type and its parameters, one atom in `net.tn`
+
+**Section:** Revision 38's `net.tn` (#2); [TSON-DATA] §5.5 (a `!media_type` row); [TSON-SCHEMA] §9; RFC 6838
+(media type names), RFC 6839 (structured suffixes), RFC 9110 §8.3.1 (parameters).
+
+**Kind:** proposal — a gap. Raised by the HTTP layer in `ltr8-io-tson-java-http`, whose `acceptingJson` admits
+`application/json` and any `+json` type.
+
+**The problem.** A media type labels the format of content, wherever the content is: inline, as
+`{ data: bytes  type: media_type }`, or linked, as `{ href: iri  type: media_type }`. That pair is how data names
+external content without the processor fetching it, which is the line `!!include` was refused on. A type describes
+the content and never follows the reference; a consumer fetches under its own policy. The label is everywhere: in
+`Content-Type`, in JSON Schema's `contentMediaType`, in CloudEvents' `datacontenttype` and in ActivityPub's
+`mediaType`. Written as `text`, it has the wrong equality. The type, subtype and parameter names compare without
+case, a quoted parameter value equals its token form, and parameter order carries no meaning. A parameter value,
+though, keeps its case — except `charset`'s. No fold over the whole text states that.
+
+**Proposed, and running.** `media_type` in `net.tn`, an instance of a new meta constructor:
+
+```
+media_type_type => atom & atom_specification & {
+  spec?:             = "https://www.rfc-editor.org/rfc/rfc6838"
+  allow_parameters?: boolean ~ false
+  types?:            [text]
+  suffixes?:         [text]
+}
+```
+
+- **Grammar:**
+  - The type and subtype are RFC 6838 §4.2's `restricted-name`: at most 127 characters, the first a letter or
+    digit, the rest letters, digits and `! # $ & - ^ _ . +`.
+  - Parameters follow RFC 9110 §8.3.1: `;` with optional whitespace around it, a token name, `=`, and a token or
+    quoted-string value.
+  - Nothing beyond US-ASCII is admitted.
+  - A media range (`*/*`, `text/*`) is a pattern over media types, `Accept`'s syntax, and is outside the grammar.
+- **Value:** the type, the subtype and a map of parameters.
+  - The type, subtype and parameter names are compared without ASCII case.
+  - Parameters are a map, so order carries no meaning and a repeated name is refused.
+  - A quoted value equals its token form.
+  - A parameter value keeps its case, except `charset`'s, which folds (RFC 9110 §8.3.2). The list is closed and
+    holds `charset` alone. "Unless its own registration says otherwise" would leave every processor to hold the
+    registry, and two at different registry states would disagree.
+- **Canonical text:** lowercase type, subtype and parameter names, and the `charset` value folded. Parameters are
+  sorted by name, each value in token form where it is one and quoted-string otherwise, joined by `;` with no
+  whitespace: `text/html;charset=utf-8`.
+- **Facets**, permissions in `uri_type`'s manner, withdrawn and never granted back:
+  - `allow_parameters`, false by default, so `media_type` is a media type proper, not a `Content-Type` value; a
+    position that takes parameters declares its own instance, `!media_type_type { allow_parameters: true }`.
+  - `types`, the top-level types admitted.
+  - `suffixes`, RFC 6839's structured suffixes: a suffix `s` admits a subtype ending `+s`, and the subtype `s`
+    itself, so `suffixes: [json]` admits `application/json` and `application/ld+json`.
+
+  A value outside a facet is a constraint violation. A token outside the grammar is a parse failure.
+- **Host value:** `io.ltr8.net.MediaType`. A `String` component binds the canonical text, as `hostname`'s does.
+- **Where it lives:** `net.tn`, not core. An opt-in library is what keeps the name from colliding with a schema's
+  own `media_type` — an OpenAPI conversion's Media Type Object is the likely one. None of the 497 conversions in
+  `ltr8-io-tson-benchmarks` declares a type named `media_type`, `mime_type` or `content_type`; the concept
+  appears there only as fields typed `text` (`content-type?: text`, `Content-Type?: text ~ "application/json"`).
+  The name is RFC 6838's term; "MIME type" is the legacy one.
+
+**Not proposed: `uri_template`.** An RFC 6570 template is not a value that names or describes anything but a small
+program producing URIs. Validating one checks syntax alone, its equality is textual, and its meaning is in the
+expansion, which belongs to an HTTP library. It is the line media ranges are refused on: a pattern over values is
+not a value. A schema that needs one declares a pattern-constrained `text`.
+
+**Suggested resolution.** Meta gains `media_type_type` as above, and `net.tn` declares
+`media_type => !media_type_type {}`. [TSON-DATA] §5.5 gains a row: "`!media_type` — a media type (RFC 6838),
+without parameters; type, subtype and parameter names compared without case, a `charset` value too; host value a
+media type, canonical text lowercase with parameters sorted".
+
+**Status against Revision 37:** open; running on `r2026-38-proposal`. Meta's `media_type_type` and net.tn's
+`media_type`, read by `tson-atom`'s `MediaTypeParser` through `io.ltr8.net.MediaType`, with corpus vectors in
+`class1/vocabulary` (forms, equality, refusals) and `class2/validate` (each facet).

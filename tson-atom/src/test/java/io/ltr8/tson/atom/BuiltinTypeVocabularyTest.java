@@ -93,6 +93,7 @@ class BuiltinTypeVocabularyTest {
     void hostnameAndHostAreRegistered() {
         assertTrue(BuiltinTypeVocabulary.lookup("hostname").isPresent());
         assertTrue(BuiltinTypeVocabulary.lookup("host").isPresent());
+        assertTrue(BuiltinTypeVocabulary.lookup("media_type").isPresent());
     }
 
     /**

@@ -314,6 +314,16 @@
     ] }
   }
 
+  media_type_type => !type_definition {
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec              type: iri      optional: true  role: FIXED    value: "https://www.rfc-editor.org/rfc/rfc6838" }
+      !record_field { name: allow_parameters  type: boolean  optional: true  role: DEFAULT  value: false }
+      !record_field { name: types             type: array_text_xxhash  optional: true }
+      !record_field { name: suffixes          type: array_text_xxhash  optional: true }
+    ] }
+  }
+
   ordering => @annotation !type_definition {
     source: enum
     body: !enum { members: [NONE PARTIAL TOTAL] }
@@ -372,6 +382,11 @@
   @synthetic array_value_xxhash => !type_definition {
     source: array
     body: !array { element_type: value }
+  }
+
+  @synthetic array_text_xxhash => !type_definition {
+    source: array
+    body: !array { element_type: text }
   }
 
   @synthetic array_type_name_1_xxhash => !type_definition {

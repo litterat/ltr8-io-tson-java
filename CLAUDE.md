@@ -90,7 +90,7 @@ Schema documents: **parse → desugar → resolve → link → register → comp
 | `tson-atom` | The built-in atom vocabulary, over `String`, and §7.7's name grammar, shared by both encodings |
 | `tson-tree` | `TsonValue` data tree model; depends on nothing |
 | `ltr8-regex` | RFC 9485 I-Regexp engine; depends on nothing |
-| `ltr8-net` | Network text formats (`io.ltr8.net`: URIs/IRIs, IP addresses, CIDR, EUI-48, IDNA2008 host names), each to its RFC; depends on `ltr8-unicode` |
+| `ltr8-net` | Network text formats (`io.ltr8.net`: URIs/IRIs, IP addresses, CIDR, EUI-48, IDNA2008 host names, media types), each to its RFC; depends on `ltr8-unicode` |
 | `ltr8-unicode` | Unicode properties and algorithms (`io.ltr8.unicode`: XID, normalization, UAX #31 profiles, UTS #39); depends on nothing |
 | `tson-compiler` | The engine: lexer, grammars, resolver, linker, compiler, readers, writers, facades |
 | `tson` | The front door: `Tson` |

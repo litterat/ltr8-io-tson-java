@@ -8,6 +8,7 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import io.ltr8.net.Host;
 import io.ltr8.net.HostName;
+import io.ltr8.net.MediaType;
 import io.ltr8.net.Iri;
 import java.net.URI;
 import java.time.Duration;
@@ -84,5 +85,5 @@ public final class AtomContext {
             LocalDate.class, OffsetTime.class, OffsetDateTime.class, Duration.class, Period.class,
             URI.class, Iri.class,
             Inet4Address.class, Inet6Address.class, CidrInet4Network.class, CidrInet6Network.class,
-            HostName.class, Host.class, Host.Address.class);
+            HostName.class, Host.class, Host.Address.class, MediaType.class);
 }

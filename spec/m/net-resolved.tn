@@ -49,4 +49,10 @@
     source: host_type
     body: !host_type {}
   }
+
+  @ordering:NONE @bounded:false
+  media_type => !type_definition {
+    source: media_type_type
+    body: !media_type_type {}
+  }
 }

@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/38/m/net.tn?sha256=60c6071567304fa8b233983523509a7e69e63fce1729563e875cba3d016dabd7"
-!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=d0316a128e3b15259639109734ec2d344de1862a1c09f6bc043e56e4b986c398"
+!!id:"https://tson.io/2026/38/m/net.tn?sha256=86d2b5cfbaf39fed4724698704174dc62da5a07075f27d8130ea309a8b11edbb"
+!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=0440a1d349af8291c83755f43cf0b6d9ad226e15d248bd2736517e3631d2b07a"
 @doc:"""
   TSON Network Type Library — addresses, networks and host names
   (2026 Revision 38 draft).
@@ -22,6 +22,8 @@
     RFC 4632              Classless Inter-domain Routing (CIDR)
     RFC 5890-5893         IDNA2008: definitions, protocol, code points, Bidi
     RFC 5952              IPv6 address text representation
+    RFC 6838, RFC 6839    Media type specifications, structured suffixes
+    RFC 9110 §8.3.1       Media type parameters
     RFC 9542              IEEE 802 parameters (EUI-48 format)
   """
 {
@@ -83,4 +85,11 @@
     """
   @ordering:NONE @bounded:false
   host => !host_type {}
+
+  @doc:"""
+    A media type without parameters: `text/html`, `application/ld+json`. See
+    `media_type_type` in meta.
+    """
+  @ordering:NONE @bounded:false
+  media_type => !media_type_type {}
 }

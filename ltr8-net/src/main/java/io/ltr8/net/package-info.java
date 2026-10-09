@@ -11,6 +11,7 @@
  *       {@link io.ltr8.net.Punycode}.</li>
  *   <li>{@link io.ltr8.net.Host} -- a host name or an IPv4 or IPv6 address, RFC 3987's {@code ihost} with a DNS
  *       name.</li>
+ *   <li>{@link io.ltr8.net.MediaType} -- an RFC 6838 media type with RFC 9110 parameters.</li>
  * </ul>
  *
  * <p>Every one exists because the JDK's answer is a different grammar: {@code java.net.URI} implements RFC 2396
