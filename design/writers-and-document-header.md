@@ -16,6 +16,8 @@ keeps the rest of the document. Current form only; history lives in git.
   writer only the schema, and the root type-ref is not part of `TsonDocumentHeader`.
 - `TsonDataEmitter.typeRef` refuses a second type-ref on one value — a writer cannot emit a document that
   will not read back.
+- `TsonDataEmitter.field` writes a name that is no identifier as a quoted string: a relaxed `field_name_type`
+  (SPEC-FEEDBACK.md #10) admits `"@id"`, which written bare would not lex back.
 - `TsonDocumentPeek` performs no second header scan and rewinds nothing; a continuing reader whose lexical
   policy (token policy, limits) disagrees with the peek's is refused.
 - A peek is total: a malformed header yields nothing rather than throwing, never a schema the document does

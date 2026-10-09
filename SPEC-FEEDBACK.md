@@ -725,6 +725,9 @@ relaxed type, defined by the translation and not by the series, such as
   reads it. The spec says nothing about when a name is judged relative to dispatch; this is the reading that
   reports a name once and by the right rule. A family's members compose its base, so they share its type, and the
   question would only bite a choice whose variants differ in theirs.
+- **A name binds and writes as the record states it.** A host component binds a relaxed name through the name it
+  states (`@Field("@id")`), as it binds any other, and a writer quotes a name that is no identifier, so the
+  document reads back.
 
 **Open:** the default for a JSON member name that is not an identifier; how the brace form states a fresh
 record's `field_name_type`; a template's field name type.

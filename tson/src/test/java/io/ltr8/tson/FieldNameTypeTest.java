@@ -120,6 +120,48 @@ class FieldNameTypeTest {
         assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, only(problems).code());
     }
 
+    /** A JSON-LD node bound to a Java record, whose components name the members they hold. */
+    public record Node(@io.ltr8.annotation.Field("@id") String id,
+                       @io.ltr8.annotation.Field("$ref") String ref, String label) {
+    }
+
+    /** A name that is no identifier binds by the name the component states, as any other does. */
+    private static Tson boundJsonLd() {
+        io.ltr8.tson.base.source.SchemaSource source = uri -> JSON_LD;
+        io.ltr8.bind.DataBindContext context = io.ltr8.bind.DataBindContext.builder()
+                .nameBinder(io.ltr8.bind.DataNameBinder.ofMap(java.util.Map.of("node", Node.class))
+                        .orElse(io.ltr8.tson.compiler.config.SchemaMetaNameBinder.INSTANCE))
+                .build();
+        Tson tson = Tson.of(io.ltr8.tson.base.ProcessorConfig.defaults()
+                .withSchemaAccess(io.ltr8.tson.base.source.SchemaAccess.of(source))
+                .withDataBindContext(context));
+        tson.resolve(JSON_LD);
+        return tson;
+    }
+
+    @Test
+    void aRelaxedNameBindsThroughTheComponentThatStatesIt() {
+        Tson tson = boundJsonLd();
+        Node read = tson.objectReader().read("""
+                !!schema:"https://example.test/json-ld.tn"
+                !node { "@id": "urn:x"  "$ref": "#/a"  label: "x" }""", Node.class);
+        assertEquals(new Node("urn:x", "#/a", "x"), read);
+        assertEquals(new Node("urn:x", null, "x"), tson.objectReader().read("""
+                !!schema:"https://example.test/json-ld.tn"
+                !node { "@id": "urn:x"  label: "x" }""", Node.class));
+    }
+
+    /** Written, a name that is no identifier is quoted, so the document reads back to the same value. */
+    @Test
+    void aRelaxedNameIsWrittenQuoted() {
+        Tson tson = boundJsonLd();
+        String written = tson.objectWriter().describing("https://example.test/json-ld.tn", "node")
+                .toTson(new Node("urn:x", "#/a", "x"));
+        assertTrue(written.contains("\"@id\": \"urn:x\""), written);
+        assertTrue(written.contains("label: \"x\""), written);
+        assertEquals(new Node("urn:x", "#/a", "x"), tson.objectReader().read(written, Node.class));
+    }
+
     @Test
     void aTextFieldNameTypeAdmitsAnyText() {
         String texts = schema("texts", """

@@ -6,6 +6,7 @@ import io.ltr8.tson.base.io.Utf8Sink;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.atom.IdentifierGrammar;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -119,10 +120,18 @@ public final class TsonDataEmitter {
         return close('}');
     }
 
-    /** {@code name:} -- inserts the inter-element separator itself; the value follows directly. */
+    /**
+     * {@code name:} -- inserts the inter-element separator itself; the value follows directly. A name that is no
+     * identifier, which a record whose {@code field_name_type} is relaxed may have (SPEC-FEEDBACK.md #10), is
+     * written as a quoted string, the single-line token a field-name position admits.
+     */
     public TsonDataEmitter field(String name) {
         beforeElement();
-        emit(name);
+        if (IdentifierGrammar.validate(name).isEmpty()) {
+            emit(name);
+        } else {
+            emitQuoted(name);
+        }
         emit(':');
         emit(' ');
         return this;
@@ -313,6 +322,11 @@ public final class TsonDataEmitter {
      */
     public TsonDataEmitter quotedString(String text) {
         startCoreValue();
+        emitQuoted(text);
+        return this;
+    }
+
+    private void emitQuoted(String text) {
         emit('"');
         int length = text.length();
         for (int i = 0; i < length; i++) {
@@ -335,7 +349,6 @@ public final class TsonDataEmitter {
             }
         }
         emit('"');
-        return this;
     }
 
     /**
