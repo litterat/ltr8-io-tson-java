@@ -68,6 +68,8 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `uri` / `uri_reference` / `iri` / `iri_reference` | `io.ltr8.net.Iri`                             |
 | `ipv4` / `ipv6`                                 | `Inet4Address` / `Inet6Address`                 |
 | `cidr4` / `cidr6`                               | `io.ltr8.net.CidrInet4Network` / `CidrInet6Network` |
+| `hostname`                                      | `io.ltr8.net.HostName`, or `String` (lowercase U-labels) |
+| `host`                                          | `io.ltr8.net.Host`, or `String` (the member's canonical text) |
 | `bytes` (and any `!bytes_type { encoding: … }` instance) | `byte[]`                               |
 | an untyped token (§4 base resolution)           | `Boolean`, `BigInteger`, `BigDecimal`, `String` |
 | `_` (the only no-value spelling)                | a `TsonVoid` node / `null`                    |

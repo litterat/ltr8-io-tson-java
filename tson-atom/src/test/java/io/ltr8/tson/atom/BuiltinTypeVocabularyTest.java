@@ -88,6 +88,13 @@ class BuiltinTypeVocabularyTest {
         assertTrue(BuiltinTypeVocabulary.lookup("cidr6").isPresent());
     }
 
+    /** net.tn's two host types are schemaless annotations too ([TSON-DATA] §5.5), each its library's type. */
+    @org.junit.jupiter.api.Test
+    void hostnameAndHostAreRegistered() {
+        assertTrue(BuiltinTypeVocabulary.lookup("hostname").isPresent());
+        assertTrue(BuiltinTypeVocabulary.lookup("host").isPresent());
+    }
+
     /**
      * {@code binary} is not a name the vocabulary ever answers to: §5.3 spells out that "there is no generic
      * {@code !binary} annotation", only its four encodings.

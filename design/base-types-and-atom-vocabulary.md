@@ -331,12 +331,12 @@ on every text family.
   §5.4 says. `java.time` refuses it as well, so `TimeParser` and `DateTimeParser` report it as a parse error with no
   check of their own.
 - The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.
-- **The atom vocabulary is complete** — `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` all have parsers, the
-  CIDR pair reusing the two address grammars and validating §5.5's family-range and host-bits-zero rules on top. All
-  four network families apply `within`/`excluding` and judge the pair for emptiness at schema load — exactly,
+- **The atom vocabulary is complete** — `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email`/`hostname`/`host` all have
+  parsers, the CIDR pair reusing the two address grammars and validating §5.5's family-range and host-bits-zero rules on
+  top. All four network families apply `within`/`excluding` and judge the pair for emptiness at schema load — exactly,
   prefix-tree cover being counting rather than searching, with a network family's prefix bounds folded in, both halves
   stated by §5.5. The address grammars (`InternetAddress`, `MacAddress`) and the network values live in `ltr8-net`, a
   leaf beneath `tson-schema`, so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries
   without the linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its
-  siblings**, and its format check is the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted
-  local parts, domain literals or comments.
+  siblings**, and its format check is the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted local
+  parts, domain literals or comments.
