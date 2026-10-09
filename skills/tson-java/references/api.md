@@ -39,8 +39,8 @@ public final class Tson {
 }
 ```
 
-`Tson.standard()` bootstraps the four bundled schemas — meta-kernel, meta.tn, core.tn and policy.tn — and returns an
-immutable instance.
+`Tson.standard()` bootstraps the five bundled schemas — meta-kernel, meta.tn, core.tn, net.tn and policy.tn — and returns
+an immutable instance.
 Resolution is **always bind-anchored** (meta instances bind to `schema.meta.Top`), so `resolve` takes no
 mode; only the final compile picks one, which is why **the read mode is which registry you hold**.
 

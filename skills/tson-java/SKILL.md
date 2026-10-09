@@ -55,8 +55,8 @@ with no compatibility guarantee between revisions — so a schema `!!id` pinned 
 ## Workflow
 
 1. **Decide whether you need a schema at all.** Reading one document with no schema is one
-   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the four
-   bundled schemas (meta-kernel, meta, core, policy) and is what you need only once a *schema* is in play.
+   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the five
+   bundled schemas (meta-kernel, meta, core, net, policy) and is what you need only once a *schema* is in play.
 2. **Pick the reader from the matrix below** — the two questions are *what drives the interpretation*
    (the wire alone, your Java class, or a TSON schema) and *what you want out* (a `TsonValue` tree, or
    a bound Java object).
@@ -106,7 +106,7 @@ import io.ltr8.tson.base.source.*; // SchemaAccess, SchemaSource, the two fetchi
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
 
-Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn, core.tn and policy.tn
+Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn, core.tn, net.tn and policy.tn
 
 String schema = """
         !!id:"https://example.com/2026/38/app/order-1.tn"
@@ -293,7 +293,7 @@ project shipped exactly that bug.
 
 ## Fetching schemas
 
-Out of the box a `Tson` serves only the four bundled schemas (meta-kernel, meta, core, policy):
+Out of the box a `Tson` serves only the five bundled schemas (meta-kernel, meta, core, net, policy):
 `SchemaAccess.registeredOnly()` is the default, so anything else must be registered first or reachable through a
 configured source. Two fetching sources ship, plus a non-fetching third:
 

@@ -129,6 +129,13 @@ value), `write(T)`, and `boundTo(Class<?>)` — the family reading into a caller
 reader is built rather than carried into every read. `BuiltinTypeVocabulary` is the fixed, closed
 name→`AtomType` table (§5).
 
+**Each name denotes the type its library declares under it** — core.tn's, or net.tn's for the five network families
+and `hostname` — so a document keeps its meaning when it moves under a schema importing that library
+(SPEC-FEEDBACK.md #2). `hostname` is the one entry that is not a family: net.tn declares it as a `text_type` instance
+(an RFC 1123 pattern, `max_length: 253`, `ASCII_CASEFOLD`), so its entry is a `TextParser` over
+`BuiltinTypeVocabulary.HOSTNAME`, a hand copy of those facets that `NetSchemaTest` checks equal to net.tn's resolved
+body.
+
 **`boolean` is in that table** ([TSON-DATA] §5.5): the tokens `true` and `false`, case-sensitive, over
 meta-kernel's `!enum [true false]`. A typed position does not consult the form, so `!boolean "true"` and
 `!boolean true` are one value — §4.2's special status for the two tokens is a base-resolution rule a typed

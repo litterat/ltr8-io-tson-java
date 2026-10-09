@@ -246,36 +246,6 @@
     body: !email_type {}
   }
 
-  @ordering:TOTAL @bounded:true
-  ipv4 => !type_definition {
-    source: ipv4_type
-    body: !ipv4_type {}
-  }
-
-  @ordering:TOTAL @bounded:true
-  ipv6 => !type_definition {
-    source: ipv6_type
-    body: !ipv6_type {}
-  }
-
-  @ordering:PARTIAL @bounded:false
-  cidr4 => !type_definition {
-    source: cidr4_type
-    body: !cidr4_type {}
-  }
-
-  @ordering:PARTIAL @bounded:false
-  cidr6 => !type_definition {
-    source: cidr6_type
-    body: !cidr6_type {}
-  }
-
-  @ordering:NONE @bounded:false
-  mac => !type_definition {
-    source: mac_type
-    body: !mac_type {}
-  }
-
   @ordering:NONE @bounded:false
   declared => !type_definition {
     source: scoped

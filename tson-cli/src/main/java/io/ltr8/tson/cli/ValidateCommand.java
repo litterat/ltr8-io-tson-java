@@ -297,6 +297,7 @@ final class ValidateCommand {
         return id.equals(TsonBundledSchemas.META_KERNEL_ID)
                 || id.equals(TsonBundledSchemas.META_ID)
                 || id.equals(TsonBundledSchemas.CORE_ID)
+                || id.equals(TsonBundledSchemas.NET_ID)
                 || id.equals(TsonBundledSchemas.POLICY_ID);
     }
 

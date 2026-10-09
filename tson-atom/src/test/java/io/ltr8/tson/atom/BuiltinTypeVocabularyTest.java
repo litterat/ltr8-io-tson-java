@@ -154,4 +154,47 @@ class BuiltinTypeVocabularyTest {
         org.junit.jupiter.api.Assertions.assertThrows(AtomValidationException.class,
                 () -> int8.read("128"));
     }
+
+    /** net.tn's {@code hostname}: RFC 1123 labels, read folded to lowercase. */
+    @ParameterizedTest
+    @ValueSource(strings = {"localhost", "example.com", "a.b-c.example", "xn--bcher-kva.example", "1host.example"})
+    void hostnameAdmitsRfc1123Names(String name) {
+        assertEquals(name, hostname().read(name));
+    }
+
+    @org.junit.jupiter.api.Test
+    void hostnameIsReadFolded() {
+        assertEquals("example.com", hostname().read("Example.COM"));
+    }
+
+    /**
+     * A leading or trailing hyphen, an empty label, a trailing dot, a label past 63, a dotted-quad, a
+     * non-letter-digit-hyphen character, and a fullwidth spelling that only a Unicode fold would bring to ASCII.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "-example.com", "example-.com", "a..b", "example.com.", "192.0.2.1", "under_score.example",
+            "\uFF45xample.com",
+    })
+    void hostnameRefusesWhatRfc1123Does(String name) {
+        org.junit.jupiter.api.Assertions.assertThrows(AtomValidationException.class, () -> hostname().read(name));
+    }
+
+    @org.junit.jupiter.api.Test
+    void hostnameLabelsAndTotalAreBounded() {
+        String label63 = "a".repeat(63);
+        assertEquals(label63 + ".example", hostname().read(label63 + ".example"));
+        org.junit.jupiter.api.Assertions.assertThrows(AtomValidationException.class,
+                () -> hostname().read("a".repeat(64) + ".example"));
+        String name253 = String.join(".", label63, label63, label63, "a".repeat(61));
+        assertEquals(253, name253.length());
+        assertEquals(name253, hostname().read(name253));
+        org.junit.jupiter.api.Assertions.assertThrows(AtomValidationException.class,
+                () -> hostname().read(name253 + "a"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static AtomType<String> hostname() {
+        return (AtomType<String>) BuiltinTypeVocabulary.lookup("hostname").orElseThrow();
+    }
 }

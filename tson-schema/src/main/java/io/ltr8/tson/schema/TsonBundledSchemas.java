@@ -9,12 +9,13 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * The real, published identities of the four schema documents this library bundles and pre-loads --
+ * The real, published identities of the five schema documents this library bundles and pre-loads --
  * meta-kernel (the self-referencing bootstrap layer, spec §9's "meta layer"), meta (the canonical
  * meta-schema, the other half of the "meta layer"), core (the core type library, governed by meta but
- * not itself part of the meta layer -- spec §9 is explicit that only two schemas make up that layer), and
- * policy (the processor policy's vocabulary, [TSON-DATA] §8.2, §9.1) -- plus {@link #fetch}, their raw
- * source text, straight off this module's own classpath.
+ * not itself part of the meta layer -- spec §9 is explicit that only two schemas make up that layer), net
+ * (the network type library: addresses, networks and host names, governed by meta like core), and policy
+ * (the processor policy's vocabulary, [TSON-DATA] §8.2, §9.1) -- plus {@link #fetch}, their raw source
+ * text, straight off this module's own classpath.
  *
  * <p>Both the identities and their source text live here, in {@code tson-schema}: "what these documents
  * are" (identity) and "where their content lives" (fetch) sit in the one module every consumer of them
@@ -43,6 +44,9 @@ public final class TsonBundledSchemas {
     /** core's own real, published identity -- see {@code spec/m/core.tn}'s own {@code !!id}. */
     public static final String CORE_ID = "https://tson.io/2026/38/m/core.tn";
 
+    /** net's own real, published identity -- see {@code spec/m/net.tn}'s own {@code !!id}. */
+    public static final String NET_ID = "https://tson.io/2026/38/m/net.tn";
+
     /** policy's own real, published identity -- see {@code spec/m/policy.tn}'s own {@code !!id}. */
     public static final String POLICY_ID = "https://tson.io/2026/38/m/policy.tn";
 
@@ -55,27 +59,35 @@ public final class TsonBundledSchemas {
     public static final String META_KERNEL_SHA256 = "45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0";
 
     /** meta's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String META_SHA256 = "4eba4e370cac599ddbc9b84027a1c2be8b2e9369c0ed5135227629ee6d7ee55b";
+    public static final String META_SHA256 = "f4bc634c2e40ec9002f997f47fe0055e84a47c4cdd4b0463024f79539e23dfc3";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "dfcc0124f4d3abe529ebfe898e175a8cc5d03d197dc6c8e7647497e197faf153";
+    public static final String CORE_SHA256 = "2acabf70c8dfd119be47a1e5d5d9394c7be473a85b42fc9b27aeded1b7cee65f";
+
+    /**
+     * net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code
+     * !!id}. See {@link #META_KERNEL_SHA256}.
+     */
+    public static final String NET_SHA256 = "7fb72c7e6b6407a6b48068146afa8d86e977e568bdea11057aad7866a8edcbb4";
 
     /**
      * policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s {@code
      * !!id}. See {@link #META_KERNEL_SHA256}.
      */
-    public static final String POLICY_SHA256 = "fbf7f16a199ded6effc0f9220ad3d64210473fba5d976399171c67eb230e970d";
+    public static final String POLICY_SHA256 = "9f62efe212f66a6c0a40354604c92627b73c6ea4091b4bab7bbbc54c22e7e6f3";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",
             META_ID, "/meta.tn",
             CORE_ID, "/core.tn",
+            NET_ID, "/net.tn",
             POLICY_ID, "/policy.tn");
 
     private static final Map<String, String> DIGESTS = Map.of(
             CanonicalIdentity.canonicalize(META_KERNEL_ID), META_KERNEL_SHA256,
             CanonicalIdentity.canonicalize(META_ID), META_SHA256,
             CanonicalIdentity.canonicalize(CORE_ID), CORE_SHA256,
+            CanonicalIdentity.canonicalize(NET_ID), NET_SHA256,
             CanonicalIdentity.canonicalize(POLICY_ID), POLICY_SHA256);
 
     private TsonBundledSchemas() {
@@ -91,19 +103,20 @@ public final class TsonBundledSchemas {
     }
 
     /**
-     * Returns one of the four bundled schemas' own raw source text, straight off this module's own
+     * Returns one of the five bundled schemas' own raw source text, straight off this module's own
      * classpath -- the resources {@code tson-schema/build.gradle.kts}'s {@code processResources} task
      * copies in from the repo's own {@code spec/m/}.
      *
      * @throws IllegalStateException if {@code uri} isn't one of {@link #META_KERNEL_ID}/{@link
-     *                                #META_ID}/{@link #CORE_ID}/{@link #POLICY_ID}
+     *                                #META_ID}/{@link #CORE_ID}/{@link #NET_ID}/{@link
+     *                                #POLICY_ID}
      */
     public static String fetch(String uri) {
         String resource = RESOURCES.get(uri);
         if (resource == null) {
             throw new IllegalStateException(
                     "'" + uri + "' is not one of this library's own bundled schemas "
-                            + "(meta-kernel, meta, core, policy)");
+                            + "(meta-kernel, meta, core, net, policy)");
         }
         try (InputStream in = TsonBundledSchemas.class.getResourceAsStream(resource)) {
             if (in == null) {

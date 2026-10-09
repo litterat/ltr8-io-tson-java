@@ -83,6 +83,7 @@ class ResolvedFixtureTest {
     private static List<Comparison> all() throws Exception {
         return List.of(
                 compare("core.tn", "core-resolved.tn", TsonBundledSchemas.CORE_ID),
+                compare("net.tn", "net-resolved.tn", TsonBundledSchemas.NET_ID),
                 compare("meta.tn", "meta-resolved.tn", TsonBundledSchemas.META_ID),
                 compare("meta-kernel.tn", "meta-kernel-resolved.tn", TsonBundledSchemas.META_KERNEL_ID));
     }
@@ -156,7 +157,8 @@ class ResolvedFixtureTest {
         Map<String, String> fixtures = Map.of(
                 "meta-kernel-resolved.tn", TsonBundledSchemas.META_KERNEL_ID,
                 "meta-resolved.tn", TsonBundledSchemas.META_ID,
-                "core-resolved.tn", TsonBundledSchemas.CORE_ID);
+                "core-resolved.tn", TsonBundledSchemas.CORE_ID,
+                "net-resolved.tn", TsonBundledSchemas.NET_ID);
         for (Map.Entry<String, String> fixture : fixtures.entrySet()) {
             Map<String, List<String>> written = ResolvedForm.fixtureKeyAnnotations(
                     Files.readString(specDirectory().resolve(fixture.getKey())));
@@ -172,8 +174,8 @@ class ResolvedFixtureTest {
      * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
      * {@code @synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
      * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark nine keys
-     * in meta-kernel and three in meta.tn; core.tn writes no inline form and has none, which is as much a
-     * statement as the other two.
+     * in meta-kernel and three in meta.tn; core.tn and net.tn write no inline form and have none, which is as
+     * much a statement as the other two.
      *
      * <p>This is the one assertion here that does not go through the bound document -- see {@link
      * ResolvedForm#markedSynthetics}.
@@ -191,5 +193,7 @@ class ResolvedFixtureTest {
                 ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.META_ID), "meta.tn");
         assertEquals(fixtureSynthetics("core-resolved.tn"),
                 ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.CORE_ID), "core.tn");
+        assertEquals(fixtureSynthetics("net-resolved.tn"),
+                ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.NET_ID), "net.tn");
     }
 }

@@ -1099,7 +1099,7 @@ class DefinitionResolverTest {
     }
 
     @Test
-    void resolvesCidrEmailAndMacInstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
+    void resolvesCidrEmailAndMacInstancesFromTheRealTypeLibraryFixtures() throws IOException {
         // cidr4 => !cidr4_type {}, cidr6 => !cidr6_type {}, email => !email_type {}, mac => !mac_type
         // {} -- all four constructors are record-only additions (Cidr4Type/Cidr6Type/EmailType/
         // MacType), no tson-compiler vocab compiler, added specifically so these real declarations
@@ -1107,14 +1107,15 @@ class DefinitionResolverTest {
         // (and friends) since Atom had no member for any of them at all. Each one's own `spec`
         // field is filled in by the compiled RecordBindReader from the schema's REQUIRED_FIXED
         // default, the same mechanism float32/float64 above rely on.
-        SchemaMap schemaMap = schemaMapFromCoreFixture();
+        SchemaMap core = schemaMapFromFixture("core.tn");
+        SchemaMap net = schemaMapFromFixture("net.tn");
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
-        TypeDefinition cidr4 = instanceResolver.resolve(schemaMap.declarations().get("cidr4"));
-        TypeDefinition cidr6 = instanceResolver.resolve(schemaMap.declarations().get("cidr6"));
-        TypeDefinition email = instanceResolver.resolve(schemaMap.declarations().get("email"));
-        TypeDefinition mac = instanceResolver.resolve(schemaMap.declarations().get("mac"));
+        TypeDefinition cidr4 = instanceResolver.resolve(net.declarations().get("cidr4"));
+        TypeDefinition cidr6 = instanceResolver.resolve(net.declarations().get("cidr6"));
+        TypeDefinition email = instanceResolver.resolve(core.declarations().get("email"));
+        TypeDefinition mac = instanceResolver.resolve(net.declarations().get("mac"));
 
         assertEquals(Cidr4Type.UNCONSTRAINED, cidr4.body());
         assertEquals(Cidr6Type.UNCONSTRAINED, cidr6.body());
@@ -1160,10 +1161,10 @@ class DefinitionResolverTest {
     }
 
     @Test
-    void resolvesIpv4AndIpv6InstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
+    void resolvesIpv4AndIpv6InstancesFromTheRealNetTypeLibraryFixture() throws IOException {
         // ipv4 => !ipv4_type {}, ipv6 => !ipv6_type {} -- Ipv4Type/Ipv6Type, same treatment as
         // Cidr4Type/Cidr6Type above (record-only, no vocab compiler, flat String spec).
-        SchemaMap schemaMap = schemaMapFromCoreFixture();
+        SchemaMap schemaMap = schemaMapFromFixture("net.tn");
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
@@ -1644,7 +1645,11 @@ class DefinitionResolverTest {
     }
 
     private SchemaMap schemaMapFromCoreFixture() throws IOException {
-        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/core.tn").normalize());
+        return schemaMapFromFixture("core.tn");
+    }
+
+    private SchemaMap schemaMapFromFixture(String name) throws IOException {
+        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/" + name).normalize());
         return new TsonSchemaParser(source).parseSchemaDocument().body();
     }
 

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta.tn?sha256=4eba4e370cac599ddbc9b84027a1c2be8b2e9369c0ed5135227629ee6d7ee55b"
+!!id:"https://tson.io/2026/38/m/meta.tn?sha256=f4bc634c2e40ec9002f997f47fe0055e84a47c4cdd4b0463024f79539e23dfc3"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0"
 !!import:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0"
 @doc:"""
@@ -56,7 +56,7 @@
 
   Constructors that bind to a governing specification compose with the kernel's
   atom_specification mixin and pin the spec field with `=`. Their instances in
-  core are empty, `float_type` aside, whose instances select a `format`.
+  core and net are empty, `float_type` aside, whose instances select a `format`.
 
   Constraint fields whose values are of an atom meta declares the constructor of
   but not the instance — a bound of the constrained atom's own family, or a
@@ -419,7 +419,7 @@
   }
 
   @doc:"""
-    IPv4 address constraint vocabulary. Instance is `ipv4` in core. The spec pin
+    IPv4 address constraint vocabulary. Instance is `ipv4` in net. The spec pin
     cites RFC 3986 for its `IPv4address` production — the normative dotted-quad
     grammar ([TSON-DATA] §5.5). `within` and `excluding` list IPv4 networks in
     CIDR text (quoted — the form contains `/`): the address must lie inside at
@@ -433,7 +433,7 @@
   }
 
   @doc:"""
-    IPv6 address constraint vocabulary. Instance is `ipv6` in core. `within` and
+    IPv6 address constraint vocabulary. Instance is `ipv6` in net. `within` and
     `excluding` list IPv6 networks in CIDR text (quoted): the address must lie
     inside at least one `within` network when the field is present, and inside
     no `excluding` network.
@@ -445,7 +445,7 @@
   }
 
   @doc:"""
-    IPv4 network constraint vocabulary. Instance is `cidr4` in core.
+    IPv4 network constraint vocabulary. Instance is `cidr4` in net.
     `min_prefix`/`max_prefix` narrow the prefix length within the family range
     0-32; bounds outside that range are invalid at the schema level. `within`
     lists IPv4 networks in CIDR text (quoted): the value must be a subnet of at
@@ -461,7 +461,7 @@
   }
 
   @doc:"""
-    IPv6 network constraint vocabulary. Instance is `cidr6` in core.
+    IPv6 network constraint vocabulary. Instance is `cidr6` in net.
     `min_prefix`/`max_prefix` narrow the prefix length within the family range
     0-128. `within` and `excluding` list IPv6 networks in CIDR text (quoted),
     with the semantics of `cidr4_type`: subnet-of for `within`, non-overlap for
@@ -475,7 +475,7 @@
     excluding?:  [value]
   }
 
-  @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac` in core."
+  @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac` in net."
   mac_type => atom & atom_specification & {
     spec?: = "https://www.rfc-editor.org/rfc/rfc9542"
   }

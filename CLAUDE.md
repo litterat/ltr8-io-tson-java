@@ -48,7 +48,7 @@ A from-scratch Java implementation of TSON (Typed Schema Object Notation), built
 
 The spec is a working revision that changes without compatibility guarantees. When in doubt, **re-fetch the current URL**
 and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 37, not
-edited here) with **two exceptions that are live**: `spec/m/{meta-kernel,meta,core,policy}.tn` are packaged from here at
+edited here) with **two exceptions that are live**: `spec/m/{meta-kernel,meta,core,net,policy}.tn` are packaged from here at
 build time, and `spec/tson-part3-json.md` is edited in place.
 
 **Editing a bundled schema means re-stamping.** The library verifies the packaged bytes against
