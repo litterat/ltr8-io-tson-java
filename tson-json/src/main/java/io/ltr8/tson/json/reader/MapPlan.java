@@ -3,7 +3,7 @@ package io.ltr8.tson.json.reader;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.base.diagnostics.MapDiagnostics;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
+import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;

@@ -8,13 +8,13 @@ import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.ParseException;
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.atom.AtomParseException;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.lexer.Lexer;
-import io.ltr8.tson.base.unicode.Nfc;
+import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
 import io.ltr8.tson.compiler.stream.VoidEvent;
@@ -575,7 +575,7 @@ public final class TsonDataStream implements TsonEventSource {
      * not read would put an allocation per name into a document's steady-state cost.
      */
     private void requireIdentifier(Token name, String role) {
-        Optional<String> violation = IdentifierProfile.validate(name.text());
+        Optional<String> violation = IdentifierGrammar.validate(name.text());
         if (violation.isPresent()) {
             throw new ParseException("invalid " + role + " -- " + violation.get(), name.start());
         }
@@ -742,7 +742,7 @@ public final class TsonDataStream implements TsonEventSource {
      * stricter of the two, which is the asymmetry this rule exists to remove.
      */
     private void requireFieldName(Token name) {
-        Optional<String> violation = IdentifierProfile.validate(Nfc.of(name.text()));
+        Optional<String> violation = IdentifierGrammar.validate(Nfc.of(name.text()));
         if (violation.isPresent()) {
             throw new ParseException("invalid field name -- " + violation.get()
                     + ". A record's fields are names a schema can declare; a key that is not a name belongs in "

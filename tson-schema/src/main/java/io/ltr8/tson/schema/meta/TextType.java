@@ -4,8 +4,8 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.regex.IRegex;
 import io.ltr8.annotation.Typename;
-import io.ltr8.tson.base.unicode.Nfc;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Nfc;
+import io.ltr8.unicode.Normalization;
 
 import java.util.ArrayList;
 import java.util.HashMap;

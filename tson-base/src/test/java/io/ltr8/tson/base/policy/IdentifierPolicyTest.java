@@ -1,9 +1,9 @@
 package io.ltr8.tson.base.policy;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
-import io.ltr8.tson.base.unicode.IdentifierProfile.Base;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.unicode.IdentifierProfile.Base;
+import io.ltr8.unicode.Normalization;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -22,6 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * alike, so a literal would be unreviewable.
  */
 class IdentifierPolicyTest {
+
+    /** [TSON-DATA] §7.7's profile, as the meta-kernel's {@code identifier} declares it. */
+    private static final IdentifierProfile NAME =
+            IdentifierProfile.of(Base.XID, Base.XID, "", "-", "", "", Normalization.NFC);
 
     private static final String CYR_A = new String(Character.toChars(0x0430));   // а
     private static final String CYR_P = new String(Character.toChars(0x043F));   // п
@@ -52,14 +56,14 @@ class IdentifierPolicyTest {
     /** The first relaxation: the unit, not the level. It keeps every rejection that matters. */
     @Test
     void perSegmentKeepsTheHomographsAndAdmitsTheCompounds() {
-        assertTrue(accepts(PER_SEGMENT, "id_" + CYR_P, IdentifierProfile.NAME));
-        assertTrue(accepts(PER_SEGMENT, "alpha-" + GREEK_ALPHA, IdentifierProfile.NAME));
-        assertTrue(accepts(PER_SEGMENT, HAN + HAN + "id", IdentifierProfile.NAME));
+        assertTrue(accepts(PER_SEGMENT, "id_" + CYR_P, NAME));
+        assertTrue(accepts(PER_SEGMENT, "alpha-" + GREEK_ALPHA, NAME));
+        assertTrue(accepts(PER_SEGMENT, HAN + HAN + "id", NAME));
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT), codes(PER_SEGMENT, CYR_A + "dmin",
-                IdentifierProfile.NAME));
+                NAME));
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT), codes(PER_SEGMENT, "id_" + CYR_A + "dmin",
-                IdentifierProfile.NAME));
-        assertFalse(accepts(IdentifierPolicy.defaults(), "id_" + CYR_P, IdentifierProfile.NAME));
+                NAME));
+        assertFalse(accepts(IdentifierPolicy.defaults(), "id_" + CYR_P, NAME));
     }
 
     /**
@@ -71,28 +75,28 @@ class IdentifierPolicyTest {
     void segmentsAreDividedByTheProfilesOwnSeparators() {
         assertTrue(accepts(PER_SEGMENT, "id$" + CYR_P, JS));
         assertTrue(accepts(PER_SEGMENT, "com." + CYR_P, DOTTED));
-        assertFalse(accepts(PER_SEGMENT, "id$" + CYR_P, IdentifierProfile.NAME));
-        assertFalse(accepts(PER_SEGMENT, "com." + CYR_P, IdentifierProfile.NAME));
+        assertFalse(accepts(PER_SEGMENT, "id$" + CYR_P, NAME));
+        assertFalse(accepts(PER_SEGMENT, "com." + CYR_P, NAME));
         assertFalse(accepts(PER_SEGMENT, "id$" + CYR_A + "dmin", JS), "a homograph inside one word still is one");
 
         assertTrue(JS.separates('$'));
         assertTrue(JS.separates('_'));
         assertFalse(JS.separates('-'));
-        assertTrue(IdentifierProfile.NAME.separates('-'));
-        assertFalse(IdentifierProfile.NAME.separates('.'));
+        assertTrue(NAME.separates('-'));
+        assertFalse(NAME.separates('.'));
     }
 
     /** Both rules are judged, and each one failed is reported: two rules, two fixes. */
     @Test
     void aNameFailingBothRulesIsReportedUnderBoth() {
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_CHARACTER, Diagnostic.Code.RESTRICTED_SCRIPT),
-                codes(IdentifierPolicy.defaults(), "a" + RESTRICTED + CYR_A, IdentifierProfile.NAME));
+                codes(IdentifierPolicy.defaults(), "a" + RESTRICTED + CYR_A, NAME));
     }
 
     /** A passing name allocates no list: the empty answer is the one constant. */
     @Test
     void aPassingNameIsTheEmptyList() {
-        assertSame(List.of(), IdentifierPolicy.defaults().judge("admin", IdentifierProfile.NAME));
+        assertSame(List.of(), IdentifierPolicy.defaults().judge("admin", NAME));
     }
 
     /** Level 6 alone drops the restricted-character rule; level 5 keeps it, as §8.2 says. */
@@ -100,9 +104,9 @@ class IdentifierPolicyTest {
     void onlyUnrestrictedDropsTheRestrictedCharacterRule() {
         String name = "a" + RESTRICTED + "b";
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_CHARACTER),
-                codes(IdentifierPolicy.of(ScriptPolicy.scriptsUnchecked()), name, IdentifierProfile.NAME));
+                codes(IdentifierPolicy.of(ScriptPolicy.scriptsUnchecked()), name, NAME));
         assertEquals(List.of(), codes(IdentifierPolicy.of(ScriptPolicy.unrestricted()), name,
-                IdentifierProfile.NAME));
+                NAME));
     }
 
     /** Skeleton distinctness is on by default, off only when stated, and untouched by the level. */
@@ -112,7 +116,7 @@ class IdentifierPolicyTest {
         assertTrue(IdentifierPolicy.of(ScriptPolicy.unrestricted()).appliesSkeletonDistinctness());
         assertFalse(IdentifierPolicy.defaults().withSkeletonDistinctness(false).appliesSkeletonDistinctness());
         assertFalse(IdentifierPolicy.none().appliesSkeletonDistinctness());
-        assertEquals(List.of(), codes(IdentifierPolicy.none(), "a" + RESTRICTED + CYR_A, IdentifierProfile.NAME));
+        assertEquals(List.of(), codes(IdentifierPolicy.none(), "a" + RESTRICTED + CYR_A, NAME));
     }
 
     @Test

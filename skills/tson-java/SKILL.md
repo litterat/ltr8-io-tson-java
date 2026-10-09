@@ -2,13 +2,13 @@
 name: tson-java
 description: Read, validate, write and bind TSON (`.tn`) documents with the `io.ltr8:tson` Java library, and run its `tson`
   command line. Use this skill whenever Java code imports `io.ltr8.tson`, `io.ltr8.tson.compiler`, `io.ltr8.tson.tree`,
-  `io.ltr8.tson.base`, `io.ltr8.tson.json`, `io.ltr8.bind`, `io.ltr8.net` or `io.ltr8.regex`; whenever names like `Tson`,
-  `Json`, `ProcessorConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`, `ReadException`,
-  `SchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the `ltr8-io-tson-java`
-  repository; and whenever someone wants to check, compile or hash `.tn` files (or validate `.json` against a TSON schema)
-  from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit hook, a lint step — whatever language
-  the surrounding project is written in. For authoring TSON *data* documents use the tson-data skill; for *schema*
-  documents use tson-schema. This skill is the Java implementation and its CLI, not the notation.
+  `io.ltr8.tson.base`, `io.ltr8.tson.json`, `io.ltr8.bind`, `io.ltr8.net`, `io.ltr8.regex` or `io.ltr8.unicode`; whenever
+  names like `Tson`, `Json`, `ProcessorConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`,
+  `ReadException`, `SchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the
+  `ltr8-io-tson-java` repository; and whenever someone wants to check, compile or hash `.tn` files (or validate `.json`
+  against a TSON schema) from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit hook, a lint step
+  — whatever language the surrounding project is written in. For authoring TSON *data* documents use the tson-data skill; for
+  *schema* documents use tson-schema. This skill is the Java implementation and its CLI, not the notation.
 ---
 
 # `io.ltr8:tson` — the Java implementation

@@ -1,7 +1,6 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.unicode;
 
-import io.ltr8.tson.base.unicode.IdentifierProfile.Base;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.IdentifierProfile.Base;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -13,12 +12,15 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * {@link IdentifierProfile}'s parameters -- UAX #31's R1 shape, {@code Start Continue* (Medial Continue+)*}, with
- * each set a base adjusted by additions and exclusions, and a required normalization form. {@link
- * IdentifierProfileTest} covers {@link IdentifierProfile#NAME} itself.
+ * each set a base adjusted by additions and exclusions, and a required normalization form.
  *
  * <p><b>No literal invisible or compatibility character appears in this source</b>; each is an escape.
  */
-class IdentifierProfileParametersTest {
+class IdentifierProfileTest {
+
+    /** {@code XID_Start}, {@code XID_Continue ∪ { - }}, NFC: a dash that continues, rather than joins. */
+    private static final IdentifierProfile DASH_CONTINUES =
+            IdentifierProfile.of(Base.XID, Base.XID, "", "-", "", "", Normalization.NFC);
 
     private static void admits(IdentifierProfile profile, String... texts) {
         for (String text : texts) {
@@ -36,9 +38,9 @@ class IdentifierProfileParametersTest {
     }
 
     @Test
-    void nameIsTheKernelProfileHoweverTheSetsAreSpelled() {
-        assertEquals(IdentifierProfile.NAME, profile(Base.XID, Base.XID, "", "--", "", "", Normalization.NFC));
-        assertNotEquals(IdentifierProfile.NAME, profile(Base.XID, Base.XID, "", "", "-", "", Normalization.NFC));
+    void aProfileIsItsSetsHoweverTheyAreSpelled() {
+        assertEquals(DASH_CONTINUES, profile(Base.XID, Base.XID, "", "--", "", "", Normalization.NFC));
+        assertNotEquals(DASH_CONTINUES, profile(Base.XID, Base.XID, "", "", "-", "", Normalization.NFC));
     }
 
     /** JavaScript's IdentifierName: {@code ID_Start ∪ {$ _}}, {@code ID_Continue ∪ {$}}. */
@@ -78,24 +80,24 @@ class IdentifierProfileParametersTest {
         assertTrue(refuses(kebab, "-a").contains("cannot start"));
     }
 
-    /** The kernel's `-` is Continue, not Medial, so the kernel admits what kebab refuses. */
+    /** A `-` added to Continue rather than Medial admits what kebab refuses. */
     @Test
-    void theKernelDashIsContinueNotMedial() {
-        admits(IdentifierProfile.NAME, "a-", "a--b");
+    void aContinueDashMayTrailAndDouble() {
+        admits(DASH_CONTINUES, "a-", "a--b");
     }
 
     @Test
     void theNormalizationFormIsRequiredNotApplied() {
         String decomposed = "café";
         String fullWidthA = "ａbc";
-        assertTrue(refuses(IdentifierProfile.NAME, decomposed).contains("NFC"));
+        assertTrue(refuses(DASH_CONTINUES, decomposed).contains("NFC"));
         admits(profile(Base.XID, Base.XID, "", "", "", "", Normalization.NONE), decomposed);
         IdentifierProfile nfkc = profile(Base.ID, Base.ID, "", "", "", "", Normalization.NFKC);
         assertTrue(refuses(nfkc, fullWidthA).contains("NFKC"));
         admits(profile(Base.ID, Base.ID, "", "", "", "", Normalization.NFC), fullWidthA);
     }
 
-    /** An invisible joiner is refused under every profile, not only the kernel's. */
+    /** An invisible joiner is refused under every profile. */
     @Test
     void theJoinerRuleHoldsUnderEveryProfile() {
         String zwnj = "ab‌c";

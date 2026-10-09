@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;

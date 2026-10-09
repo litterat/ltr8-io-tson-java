@@ -1,4 +1,4 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.unicode;
 
 import java.lang.Character.UnicodeScript;
 import java.util.Arrays;
@@ -15,11 +15,9 @@ import java.util.Arrays;
  * scripts use both to control conjunct formation. §3.1.1.1 is what tells the two apart, mechanically: a
  * joiner is admitted exactly where it has a shaping effect, and refused where it is invisible.
  *
- * <p>That is the whole argument for the contextual rule rather than an exclusion, and [TSON-DATA] §7.7
- * rule 2 requires all three conditions for it. An exclusion is not neutral -- it makes a class of correct
- * words unspellable as names -- and quoting is no remedy, because the token profile governs unquoted tokens
- * only, so a quoted spelling is precisely the route by which {@code "ad<ZWNJ>min"} would reach a Latin name.
- * It forbids the safe case and permits the attack.
+ * <p>That is the whole argument for the contextual rule rather than an exclusion. An exclusion is not
+ * neutral -- it makes a class of correct words unspellable as names -- and admitting the joiners everywhere
+ * permits the attack.
  *
  * <p><b>The three contexts</b>, transcribed from §3.1.1.1's own regular expressions:
  *
@@ -30,9 +28,8 @@ import java.util.Arrays;
  * </ul>
  *
  * <p><b>Both of §3.1.1.1's global conditions apply to the matched sequence, not to the identifier.</b> The
- * script restriction is checked here, over each matched span. Normalization is not: {@code IdentifierProfile}
- * rejects an identifier that is not NFC before consulting this class at all, so every sequence reaching here
- * is already NFC and a second check could not fail.
+ * script restriction is checked here, over each matched span. Normalization is not: {@link #permitted} requires
+ * NFC text, so the caller checks it once over the whole identifier and a second check here could not fail.
  *
  * <p><b>All four properties are carried here</b> ({@code Joining_Type}, {@code Canonical_Combining_Class},
  * {@code Indic_Syllabic_Category=Vowel_Dependent}, and the {@code General_Category} default rule for
@@ -42,8 +39,7 @@ import java.util.Arrays;
  * disagrees with it, rather than the whole property.
  *
  * <p><b>A1 and the two conjunct rules are implemented together or not at all.</b> A1 alone admits Persian and
- * refuses Malayalam, which is the shape of failure this project rejects the restriction level for elsewhere:
- * a rule that is correct for the script its author happens to read.
+ * refuses Malayalam: a rule that is correct for the script its author happens to read.
  */
 public final class JoiningControls {
 

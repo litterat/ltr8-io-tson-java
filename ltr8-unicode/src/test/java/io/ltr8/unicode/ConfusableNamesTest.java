@@ -1,4 +1,4 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.unicode;
 
 import org.junit.jupiter.api.Test;
 
@@ -9,7 +9,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * [TSON-DATA] §8.2's skeleton distinctness over one scope. A small scope is compared pairwise and a large one
+ * Skeleton distinctness over one scope. A small scope is compared pairwise and a large one
  * through a {@link ConfusableNames.Scope}, so every rule here is asserted at both sizes: the two must answer
  * alike.
  *

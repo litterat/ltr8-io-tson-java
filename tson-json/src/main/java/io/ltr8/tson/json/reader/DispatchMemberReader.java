@@ -7,7 +7,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.base.diagnostics.Refusal;
-import io.ltr8.tson.base.unicode.Nfc;
+import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;

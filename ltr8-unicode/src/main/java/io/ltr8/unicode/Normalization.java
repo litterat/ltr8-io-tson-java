@@ -1,18 +1,17 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.unicode;
 
 import java.text.Normalizer;
 
 /**
- * The meta-kernel's {@code normalization}: the form a text family puts its decoded value into
- * ([TSON-SCHEMA] §5.5). A token is unquoted and unescaped, then put into this form, and the result is the value
- * -- the one every facet judges and every identity compares, as {@code 0x10} decodes to 16. A written value is
- * never refused for not being in the form. No comparison goes below NFC: two values are one when, each in its
- * form, they are NFC-equal, so {@link #NONE} and {@link #NFC} share one equality and differ in the value.
+ * A text form a string is put into before it is judged or compared: Unicode's normalization forms (UAX #15), the
+ * {@code NFKC_Casefold} mapping, ASCII case folding, or none. {@link #apply} puts text into the form and
+ * {@link #holds} tests whether it already is; both return the input itself when it is, so the common case
+ * allocates nothing.
  */
 public enum Normalization {
     /** The value is the text as written. */
     NONE,
-    /** NFC, the series' own form ([TSON-DATA] §2.5, §2.6). */
+    /** NFC: canonical composition, so a precomposed and a decomposed spelling are one text. */
     NFC,
     /** NFKC: compatibility variants fold to their ordinary forms -- {@code ﬁ} to {@code fi}, full-width to ASCII. */
     NFKC,

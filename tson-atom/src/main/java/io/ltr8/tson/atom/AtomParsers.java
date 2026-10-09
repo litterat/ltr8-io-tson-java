@@ -24,7 +24,7 @@ import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;

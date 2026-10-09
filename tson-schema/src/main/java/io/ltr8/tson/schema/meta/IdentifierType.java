@@ -3,9 +3,9 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
-import io.ltr8.tson.base.unicode.IdentifierProfile.Base;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.unicode.IdentifierProfile.Base;
+import io.ltr8.unicode.Normalization;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +29,8 @@ import java.util.Optional;
  * {@link UriType}'s are. {@code continue} is a Java keyword, so its component is {@link #continueBase}.
  *
  * <p>{@code identifier => !identifier_type { continue_add: "-" }} is a constructor-application instance (§5.5)
- * whose resolved body is exactly {@link #IDENTIFIER}, and whose profile is {@link IdentifierProfile#NAME}.
+ * whose resolved body is exactly {@link #IDENTIFIER}, and whose profile is [TSON-DATA] §7.7's: {@code tson-atom}'s
+ * {@code IdentifierGrammar} builds the series' name grammar from it.
  */
 @Typename(name = "identifier_type")
 public record IdentifierType(

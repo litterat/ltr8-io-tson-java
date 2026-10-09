@@ -1,7 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.tson.base.atom.Rational;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

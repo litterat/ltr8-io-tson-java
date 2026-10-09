@@ -18,6 +18,8 @@ Design notes for what a token means: §4 base type resolution for untyped tokens
 - Every atom is told apart by its body's constructor, never by its declared name — `value`, `void` and
   `identifier` included, each with a constructor of its own. `boolean` is the one name-keyed read, and only for
   its host value.
+- `IdentifierGrammar` is §7.7's grammar and nothing else: `PROFILE` is `IdentifierType.IDENTIFIER.profile()`, never
+  restated, and `validate`/`hygiene` report a violation and never throw.
 - Facet comparisons are on the value denoted, never the token: `members` uses §4.3 identity (`compareTo`), and no facet
   counts written digits.
 
@@ -158,8 +160,10 @@ the whole value space so the other facets hold vacuously where it is present.
 It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recovers a boolean from an unquoted
 `true`, so a writer annotating every one with `!boolean` would be restating what the token already says.
 
-**A text family's value is its text in the type's `normalization` form** (`base.unicode.Normalization`; [TSON-SCHEMA]
-§5.5). `text_type` carries the facet and every family composing it inherits it — `NONE` by default, `NFC` on
+**A text family's value is its text in the type's `normalization` form** (`Normalization`, `ltr8-unicode`'s, which
+`schema.meta` binds the meta-kernel's enum to directly; [TSON-SCHEMA] §5.5). No comparison goes below NFC: two values
+are one when, each in its form, they are NFC-equal, so `NONE` and `NFC` share one equality and differ in the value.
+`text_type` carries the facet and every family composing it inherits it — `NONE` by default, `NFC` on
 `identifier_type`, fixed to `NONE` on `regex_type`, since folding a pattern changes what it matches, and on
 `uri_type`, `iri_type` and `email_type`, since a URI's path and query and a mailbox's local part compare with case and
 a form over the whole text would change what the value names. Each parser puts the text into the form first and judges
@@ -209,18 +213,27 @@ on every text family.
 - **`identifier_type` is a UAX #31 profile**: `start`/`continue` bases (`XID`, `ID`, `NONE`), `start_add`,
   `continue_add`, `medial` and `exclude` code-point sets, with `text_type`'s `normalization` defaulting to `NFC`.
   `IdentifierType.profile()` builds the `IdentifierProfile`; the parser builds it once, so a read builds nothing. The
-  kernel's `identifier` is `!identifier_type { continue_add: "-" }`, whose profile is `IdentifierProfile.NAME` —
-  which the lexer, schema parser, resolver and linker hold statically, since the kernel's own names are read before
-  the kernel exists. `MetaKernelBootstrapResolver` refuses a kernel `identifier` stating any other body, so the two
-  cannot drift. The kernel's second instance, `scheme_name` (`IdentifierType.SCHEME_NAME`), is told apart by its
-  entry name and checked the same way. **The profile facets never move under refinement**
-  (`IdentifierType.constraintsCheck`): a refinement restates them or leaves them, and narrows only the text facets.
-  Set-once would not do — setting `start_add` where the source left it unset widens the profile. `coherenceCheck`
-  holds each member to the type's profile as well as to the facets, since a member the profile refuses is one no
-  value can reach, and refuses a profile with an empty Start set or a medial that is also Start or Continue. Core
-  declares no `identifier`; a schema wanting one writes the kernel's line. Core's `void` is `!void_type {}` too, so
-  the linker's refusal of a `void` variant and the inhabitance check ask the body (`ReferenceChain.resolvesToVoid`),
-  not the name.
+  kernel's `identifier` is `!identifier_type { continue_add: "-" }` (`IdentifierType.IDENTIFIER`), and
+  `IdentifierGrammar.PROFILE` is built from it — §7.7's grammar, which both encodings' readers, the schema parser, the
+  resolver and the linker hold statically, since the kernel's own names are read before the kernel exists.
+  `MetaKernelBootstrapResolver` refuses a kernel `identifier` stating any other body, so the constant and the
+  declaration cannot drift, and the grammar is not restated anywhere. The kernel's second instance, `scheme_name`
+  (`IdentifierType.SCHEME_NAME`), is told apart by its entry name and checked the same way. **The profile facets never
+  move under refinement** (`IdentifierType.constraintsCheck`): a refinement restates them or leaves them, and narrows
+  only the text facets. Set-once would not do — setting `start_add` where the source left it unset widens the profile.
+  `coherenceCheck` holds each member to the type's profile as well as to the facets, since a member the profile refuses
+  is one no value can reach, and refuses a profile with an empty Start set or a medial that is also Start or Continue.
+  Core declares no `identifier`; a schema wanting one writes the kernel's line. Core's `void` is `!void_type {}` too, so
+  the linker's refusal of a `void` variant and the inhabitance check ask the body (`ReferenceChain.resolvesToVoid`), not
+  the name.
+- **`IdentifierGrammar` is the series' name grammar, beside the atom it is the profile of.** `validate` is [TSON-DATA]
+  §7.7 and `hygiene` §8.2's restricted-character rule, both over `PROFILE`, and both **report** a violation rather than
+  throwing one — what lets one check serve a caller that owes a parse error and one that owes a diagnostic: the
+  identical violation is a `ParseException` from the lexer and a refusal from the linker. It is not a parser: it
+  answers *is this a legal name* over text a caller already holds, and refuses text not in NFC, where
+  `IdentifierParser.IDENTIFIER` reads a value and puts it into NFC first. It lives here rather than in `tson-base`
+  because its one definition is `tson-schema`'s `IdentifierType.IDENTIFIER`, and `tson-atom` is the module under both
+  encodings that can see it.
 - **The network family reuses one grammar per address form, never a second copy.** Both grammars are `tson-net`'s
   `io.ltr8.net.InternetAddress`, which `Iri` reads its IP literals through too: its IPv6 half parses RFC 4291 §2.2's
   embedded IPv4 tail through the same strict `dec-octet` pattern `Ipv4Parser` reads, and `Cidr4Parser`/`Cidr6Parser`

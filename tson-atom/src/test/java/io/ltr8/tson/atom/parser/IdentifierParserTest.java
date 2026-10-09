@@ -2,8 +2,9 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.base.unicode.IdentifierProfile.Base;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.unicode.IdentifierProfile.Base;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.TextType;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ class IdentifierParserTest {
     /** The profile's own message travels, so the position adds a verdict and not a second explanation. */
     @Test
     void theRefusalCarriesTheProfilesOwnMessage() {
-        assertEquals(io.ltr8.tson.base.unicode.IdentifierProfile.validate("2fast").orElseThrow(),
+        assertEquals(IdentifierGrammar.validate("2fast").orElseThrow(),
                 assertThrows(AtomParseException.class, () -> IdentifierParser.IDENTIFIER.read("2fast")).getMessage());
     }
 

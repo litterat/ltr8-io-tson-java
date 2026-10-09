@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
@@ -36,8 +37,6 @@ import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.lexer.TokenType;
-import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1015,7 +1014,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     private void requireIdentifierName(Token t) {
         // isPresent/get rather than ifPresent: the lambda would capture `t`, which allocates once per
         // name on a path every document runs through. Optional.empty() is a singleton, so this is free.
-        Optional<String> violation = IdentifierProfile.validate(t.text());
+        Optional<String> violation = IdentifierGrammar.validate(t.text());
         if (violation.isPresent()) {
             throw new ParseException("'" + t.text() + "' is not a valid type name -- " + violation.get(),
                     t.start());

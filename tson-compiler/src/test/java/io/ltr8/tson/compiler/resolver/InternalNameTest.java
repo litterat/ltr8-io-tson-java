@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.base.unicode.IdentifierProfile;
+import io.ltr8.tson.atom.IdentifierGrammar;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,7 +23,7 @@ class InternalNameTest {
             derived.append('_').append(InternalName.part(segment));
         }
         derived.append("_1f8d998a");
-        assertTrue(IdentifierProfile.validate(derived.toString()).isEmpty(), derived::toString);
+        assertTrue(IdentifierGrammar.validate(derived.toString()).isEmpty(), derived::toString);
     }
 
     /**

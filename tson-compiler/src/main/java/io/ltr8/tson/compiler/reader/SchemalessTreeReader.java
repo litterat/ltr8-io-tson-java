@@ -8,7 +8,7 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.atom.ValueParser;
-import io.ltr8.tson.base.unicode.ConfusableNames;
+import io.ltr8.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonValue;

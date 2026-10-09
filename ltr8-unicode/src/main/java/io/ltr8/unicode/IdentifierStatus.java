@@ -1,4 +1,4 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.unicode;
 
 import java.util.Arrays;
 
@@ -12,12 +12,9 @@ import java.util.Arrays;
  * unlike a restriction level, this is per-character with no cross-script judgement in it, so it does not
  * reject a mixed-script name such as {@code id_}<i>пользователя</i>.
  *
- * <p>It is <b>[TSON-DATA] §8.2's restricted-character rule</b>, and it covers the joining controls without a special case:
- * both are Restricted here, so a profile built on this needs no hand-picked rule for them, and what admits
- * them where they do shaping work is §7.7 rule 2's contextual carve-out rather than the status.
- *
- * <p>This is the <b>name</b> profile's rule, not the token profile's: an unquoted <em>value</em> in a
- * historic script stays legal, because a value's content is its own.
+ * <p>It covers the joining controls without a special case: both are Restricted here, so a profile built on
+ * this needs no hand-picked rule for them, and what admits them where they do shaping work is UTS #39
+ * §3.1.1.1's contextual rule ({@link JoiningControls}) rather than the status.
  */
 public final class IdentifierStatus {
 

@@ -19,7 +19,7 @@ only; history lives in git.
   `ofBaseSyntaxError`; the CLI still exits 1.
 - Its wire shape is the spec's: `spec/m/policy.tn` (a bundled companion artifact, `TsonBundledSchemas.POLICY_ID`)
   declares `policy` and its parts, and the CLI's `diagnostics.tn` imports it rather than restating it.
-  `PolicySchemaTest` holds `restriction_level` to `ScriptPolicy.Level`. No document selects the policy it is judged
+  `PolicySchemaTest` holds `restriction_level` to `RestrictionLevel`. No document selects the policy it is judged
   under ([TSON-DATA] §8.2), so nothing here reads a policy out of a document.
 
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,

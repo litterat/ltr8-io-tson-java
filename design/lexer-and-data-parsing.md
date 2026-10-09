@@ -91,8 +91,8 @@ fixed rather than kept.
   .isUnicodeIdentifierStart/Part` is `ID_Start`/`ID_Continue`, and the `Part` half is additionally unioned
   with everything `Character.isIdentifierIgnorable` covers — all of `Cf` plus the non-whitespace C0/C1
   controls. Standing it in unmodified would put a BOM, a soft hyphen, a raw control and every bidi override
-  (U+202A–U+202E, U+2066–U+2069, U+061C) inside identifiers, with every ASCII test still passing. `Xid` (`tson-base`'s
-  `base.unicode`, which `Lexer` asks) subtracts the ignorable set and two literal `ID_ \ XID_` tables (24 code points
+  (U+202A–U+202E, U+2066–U+2069, U+061C) inside identifiers, with every ASCII test still passing. `Xid` (`ltr8-unicode`'s,
+  which `Lexer` asks) subtracts the ignorable set and two literal `ID_ \ XID_` tables (24 code points
   for start, 20 for continue — the characters XID drops for not being NFKC-closed), which is **exact** against Unicode
   16.0: zero over-, zero under-acceptance on both predicates across all 1,112,064 non-surrogate code points.
   `Xid.UNICODE_VERSION` declares the version, as §7.1 asks.

@@ -27,6 +27,15 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 
 ## Name hygiene on the read path ([TSON-DATA] §8.2)
 
+**The look-alike rule is decidable because the series names its scopes.** `ConfusableNames` (`ltr8-unicode`) is
+UTS #39's skeleton relation over a set the caller supplies; a relation answers nothing about one name, which is why
+a general-purpose language can only "consider it". TSON supplies the sets: the fields of one record, the members of
+one enum, the variants of one choice, the declared names of one schema, the merged namespace at an `!!import`, and
+the keys of one identifier-keyed map ([TSON-SCHEMA] §11.4, met one at a time through a `ConfusableNames.Scope` and
+reported at the second name's own position, as §8.2's detection rule asks). Each is closed, and known when the check
+runs. A relation has no false positives on a lone name — `id_пользователя` collides with nothing — which is why it
+is the rule and a per-name restriction level is an option.
+
 **The token policy is the stream's, not the context's.** Both `TsonDataStream` and `JsonStream` apply it as
 an event leaves them; neither read context takes one, and `TsonReadContext.of` has no parameter for
 it. The reason is that a context **rewinds** — an event consumed during
@@ -157,7 +166,7 @@ name two things — and neither is a set of `text`. **An element that fails to r
 
 **The restricted-character rule is gated on the level, as the restricted-script rule is.** §8.2's
 Unrestricted "drops the
-profile too", taking that rule with it, so `appliesIdentifierProfile()` guards the `IdentifierProfile.hygiene`
+profile too", taking that rule with it, so `appliesIdentifierProfile()` guards the `IdentifierGrammar.hygiene`
 call at both walks — the read context's and the linker's. Every other level keeps the profile, the
 restricted-script rule gating itself inside `violation()`.
 

@@ -1,7 +1,7 @@
 package io.ltr8.tson.base.diagnostics;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.unicode.ConfusableNames;
+import io.ltr8.unicode.ConfusableNames;
 
 import java.math.BigInteger;
 

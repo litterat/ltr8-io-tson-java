@@ -1,5 +1,7 @@
 package io.ltr8.tson.base.policy;
 
+import io.ltr8.unicode.RestrictionLevel;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -44,7 +46,7 @@ class ProcessorPolicyTest {
         void a_default_policy_names_the_two_surfaces_defaults() {
             ProcessorPolicy defaults = ProcessorPolicy.defaults();
             assertEquals(IdentifierPolicy.defaults(), defaults.identifierPolicy());
-            assertEquals(ScriptPolicy.Level.UNRESTRICTED, defaults.tokenPolicy().level());
+            assertEquals(RestrictionLevel.UNRESTRICTED, defaults.tokenPolicy().level());
             assertEquals(LimitsPolicy.defaults(), defaults.limits());
         }
     }

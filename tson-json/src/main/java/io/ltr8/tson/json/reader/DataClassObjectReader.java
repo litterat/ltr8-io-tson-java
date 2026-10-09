@@ -2,6 +2,7 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
@@ -19,7 +20,6 @@ import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
@@ -339,7 +339,7 @@ public final class DataClassObjectReader {
     private void checkNameHygiene(JsonReadContext ctx, String name) {
         // Looped rather than `forEach`-ed: judging is allocation-free when a name passes, which is every name of
         // an ordinary document, where a capturing lambda allocates per member name whatever it is handed.
-        List<IdentifierPolicy.Violation> violations = identifierPolicy.judge(name, IdentifierProfile.NAME);
+        List<IdentifierPolicy.Violation> violations = identifierPolicy.judge(name, IdentifierGrammar.PROFILE);
         if (violations.isEmpty()) {
             return;
         }

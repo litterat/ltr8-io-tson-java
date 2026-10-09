@@ -1,4 +1,4 @@
-package io.ltr8.tson.base.unicode;
+package io.ltr8.tson.atom;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,13 +23,13 @@ class JoiningControlsTest {
 
     /** {@code identifier} itself where §7.7 admits it -- so an assertion reads as an equality. */
     private static String parse(String identifier) {
-        assertTrue(IdentifierProfile.validate(identifier).isEmpty(),
-                () -> "should accept: " + IdentifierProfile.validate(identifier).orElse(""));
+        assertTrue(IdentifierGrammar.validate(identifier).isEmpty(),
+                () -> "should accept: " + IdentifierGrammar.validate(identifier).orElse(""));
         return identifier;
     }
 
     private static String refused(String identifier) {
-        return IdentifierProfile.validate(identifier)
+        return IdentifierGrammar.validate(identifier)
                 .orElseGet(() -> fail("should refuse: " + identifier));
     }
 

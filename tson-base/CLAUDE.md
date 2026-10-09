@@ -1,7 +1,7 @@
 # tson-base — what every encoding shares
 
-Diagnostics, policies, schema sources, host atom values, byte I/O, UCD tables, `ProcessorConfig`. Read
-`design/tson-base.md`; for the `Diagnostic` record and the rule classes, `design/diagnostic-model.md` and
+Diagnostics, policies, schema sources, host atom values, byte I/O, `ProcessorConfig`. Read `design/tson-base.md`;
+for the `Diagnostic` record and the rule classes, `design/diagnostic-model.md` and
 `design/diagnostic-rules-and-messages.md`; for policies, `design/processor-policy.md`.
 
 - Nothing here knows what a TSON or a JSON document looks like. If a change needs to, it belongs in an encoding.
@@ -14,5 +14,5 @@ Diagnostics, policies, schema sources, host atom values, byte I/O, UCD tables, `
   which classify nothing, live on the record.
 - `base.diagnostics` prose is the schema's vernacular (fields, *absent*); the encoding's spelling rides in `actual`.
 - `ByteSource`/`ByteSink`: bytes never characters; close releases only what was acquired; closing is not flushing.
-- `IdentifierProfile.validate`/`hygiene` report and never throw. `IdentifierPolicy.judge` is the one place the per-name
+- `IdentifierPolicy.judge` is the one place the per-name
   rules are applied; the token policy is a bare `ScriptPolicy`, which has no unit.

@@ -14,14 +14,13 @@ the Unicode tables — package by package, with why each thing is here. Current 
   `Diagnostic.ofLimitExceeded` stays on the record.
 - `ByteSource`/`ByteSink` carry bytes, never characters; closing releases what was acquired and nothing handed in,
   and closing is not flushing.
-- `IdentifierProfile.validate`/`hygiene` report a violation and never throw.
 
 Related: `design/modules.md`, `design/readers-and-diagnostics.md`, `design/json-encoding.md`.
 
 ## The packages
 
-**`tson-base`** — eight packages (the root, `io`, `diagnostics`, `policy`, `source`, `unicode`, `atom`, `bind`), and
-**the root names none of the other seven** apart from `ProcessorConfig`, which composes them: every other
+**`tson-base`** — seven packages (the root, `io`, `diagnostics`, `policy`, `source`, `atom`, `bind`), and
+**the root names none of the other six** apart from `ProcessorConfig`, which composes them: every other
 dependency runs inward, so a subpackage reads on its own and the vocabulary at the centre stays free of the machinery
 around it. `io.ltr8.tson.base` is how a problem is stated — `Diagnostic` (the record and its closed `Code`
 enum), the three diagnostics receivers, `SourcePosition`, `CanonicalIdentity` (§2.2.1's algorithm, how a
@@ -125,21 +124,8 @@ distinction is load-bearing: bytes sit in a block until pushed, so a document ne
 never written, and a sink cannot tell a caller who finished from one who abandoned the write. Every writer
 flushes explicitly. What stays smaller is the *target* set, not the contract: `Appendable` is a genuinely
 different target rather than one spelled twice, so `toTson`'s char path is untouched.
-**`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
-`IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc`, `NfkcCasefold` — and the
-UTS #39 rules over them, read by two engines and knowing nothing about either format. The two policies are
-in `policy` rather than beside the tables they read, because the line between the two Unicode packages is
-**who touches them**: a consumer names `policy` to configure a processor and never names `unicode`; the
-engines read `unicode` and never name `policy`.
-**`IdentifierProfile` is here too**, beside the tables it reads: a UAX #31 R1 profile (`of`, `check`), with
-[TSON-DATA] §7.7's as `NAME` (`validate`), and §8.2's restricted-character rule (`hygiene`), all **reporting** a
-violation rather than throwing one. Its `Base` enum is the meta-kernel's `identifier_base`, and the top-level
-`Normalization` is `normalization`, which every `schema.meta` text family binds directly rather than mirroring; it
-applies its form (`apply`) as well as testing for it (`holds`), the parsers putting a value into the form and the
-profile then requiring it.
-That is what lets one check serve a caller that owes a parse error and one that owes a diagnostic — the
-identical violation is a `ParseException` from the lexer and a refusal from the linker — where a signature
-that threw forced the lexer's answer on everyone. It is not a parser: nothing here turns a token into a
-host value, and the `identifier_type` atom is a wrapper over `check` living with the rest of the vocabulary
-(`atom.parser.IdentifierParser`). It leaves `tson-compiler`'s `lexer` package exactly `Lexer`, `LexException`, `Token` and
-`TokenType`.
+**The Unicode mechanisms the policies configure are `ltr8-unicode`'s** — the restriction levels, skeleton
+distinctness, the identifier profiles and normalization forms — and what `policy` holds is the choice a deployment
+makes with them; the line is mechanism versus choice (`design/modules.md`). A consumer names `policy` to configure a
+processor, with `RestrictionLevel` for its level. The series' own name grammar is `tson-atom`'s `IdentifierGrammar`
+(`design/base-types-and-atom-vocabulary.md`).

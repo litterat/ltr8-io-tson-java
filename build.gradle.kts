@@ -21,6 +21,7 @@ val moduleDescriptions = mapOf(
     "tson-annotation" to "TSON binding annotations and the wire-annotation carrier a bound class declares",
     "tson-regex" to "A native RFC 9485 I-Regexp engine: parse, match, and decide whether two patterns are disjoint",
     "tson-net" to "Native network text formats: URIs and IRIs, IPv4 and IPv6 addresses, CIDR networks, EUI-48",
+    "ltr8-unicode" to "Unicode properties and algorithms: XID, normalization, UAX #31 profiles, UTS #39 security mechanisms",
     "tson-cli" to "The tson command-line application",
     "tson-json" to "The JSON encoding of TSON: an RFC 8259 stack of its own, aligned with JEP 540's JSON API"
 )
