@@ -61,11 +61,71 @@ class FieldNameTypeTest {
         tson.resolve(JSON_LD);
     }
 
+    private static List<Diagnostic> read(String schemaText, String id, String body) {
+        Tson tson = Tson.standard();
+        tson.resolve(schemaText);
+        return tson.validate("!!schema:\"https://example.test/" + id + ".tn\"\n" + body);
+    }
+
+    /** A document's field names are judged by the record that reads them, not by the identifier default. */
+    @Test
+    void aDocumentsFieldNamesAreReadByTheirRecordsType() {
+        assertEquals(List.of(), read(JSON_LD, "json-ld", "!node { \"@id\": \"a\"  label: \"b\" }"));
+        assertEquals(List.of(), read(JSON_LD, "json-ld", "!node { \"@id\": \"a\"  \"$ref\": \"r\"  label: \"b\" }"));
+    }
+
+    /** A name of the type the record does not declare is unrecognised, as any other is; one outside it is refused. */
+    @Test
+    void aNameOutsideTheRecordsTypeIsRefusedAndOneInsideItIsLookedUp() {
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, only(read(JSON_LD, "json-ld",
+                "!node { \"@id\": \"a\"  \"@type\": \"t\"  label: \"b\" }")).code());
+        Diagnostic refused = only(read(JSON_LD, "json-ld", "!node { \"@id\": \"a\"  \"a b\": 1  label: \"b\" }"));
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, refused.code());
+        assertTrue(refused.expected().contains("json_name"), refused.expected());
+    }
+
+    /** The rule is the reading record's: a record nested in a relaxed one keeps its own identifier names. */
+    @Test
+    void aNestedRecordJudgesItsOwnNames() {
+        String nested = schema("nested", """
+                  json_name => !identifier_type { start_add: "@$" }
+                  plain => { a: text }
+                  holder => !record { field_name_type: json_name  fields: [
+                    { name: "@id"  type: text }  { name: inner  type: plain } ] }
+                """);
+        assertEquals(List.of(), read(nested, "nested", "!holder { \"@id\": \"x\"  inner: { a: \"y\" } }"));
+        List<Diagnostic> problems = read(nested, "nested", "!holder { \"@id\": \"x\"  inner: { \"@a\": \"y\" } }");
+        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID, Diagnostic.Code.FIELD_REQUIRED),
+                problems.stream().map(Diagnostic::code).toList(), problems.toString());
+    }
+
+    /**
+     * A family's discriminator scan looks ahead across the member's names before any member reads them; a name is
+     * judged when the member that reads it does, by that member's type, and once.
+     */
+    @Test
+    void aDiscriminatorScanLeavesTheNamesItCrossesToTheMember() {
+        String family = schema("family", """
+                  json_name => !identifier_type { start_add: "@$" }
+                  node => !record { field_name_type: json_name  fields: [ { name: "@id"  type: text } ] }
+                  pet => abstract node & { "@type": text =?  name: text }
+                  dog => pet & { "@type"?: = "dog"  breed: text }
+                  cat => pet & { "@type"?: = "cat"  indoor: boolean }
+                  holder => { p: pet }
+                """);
+        assertEquals(List.of(), read(family, "family",
+                "!holder { p: { \"@id\": \"x\"  \"@type\": \"dog\"  name: \"Rex\"  breed: \"corgi\" } }"));
+        List<Diagnostic> problems = read(family, "family",
+                "!holder { p: { \"@id\": \"x\"  \"a b\": 1  \"@type\": \"dog\"  name: \"Rex\"  breed: \"c\" } }");
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, only(problems).code());
+    }
+
     @Test
     void aTextFieldNameTypeAdmitsAnyText() {
-        Tson.standard().resolve(schema("texts", """
+        String texts = schema("texts", """
               row => !record { field_name_type: text  fields: [ { name: "first name"  type: text } ] }
-            """));
+            """);
+        assertEquals(List.of(), read(texts, "texts", "!row { \"first name\": \"Ada\" }"));
     }
 
     /** The default does not change under a schema either: an identifier, refused at schema load. */

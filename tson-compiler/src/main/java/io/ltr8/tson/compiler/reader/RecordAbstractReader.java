@@ -8,6 +8,8 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -129,6 +131,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final FixedCheck[] fixedCheck;
     final int positionalFieldIndex;
     final SchemaLocation schemaLocation;
+
+    /**
+     * What this record's field names are judged by as they are read ({@link TsonReadContext#nextFieldName}):
+     * its field name type, or {@code null} for the kernel's {@code field_name}, which a read applies untold.
+     */
+    private final TsonReadContext.FieldNameRule fieldNames;
     /**
      * This type's declared field names in <em>schema</em> order, rendered once for the closure diagnostic
      * ({@link #readFields}) -- both its message and its machine-readable {@code expected}. Schema order, not
@@ -141,8 +149,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final RecordDiagnostics rules;
 
     RecordAbstractReader(String name, String displayName, RecordBody body, FieldReaders readers,
-                          SchemaLocation schemaLocation) {
+                          SchemaLocation schemaLocation, TsonReadContext.FieldNameRule fieldNames) {
         this.name = name;
+        this.fieldNames = fieldNames;
         this.displayName = displayName;
         this.schemaLocation = schemaLocation;
         this.fields = buildFields(body, readers);
@@ -246,6 +255,20 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
+     * The rule entry {@code name}'s field names are judged by, from what linking recorded of its field name
+     * type, or {@code null} where it has the kernel's default.
+     */
+    static TsonReadContext.FieldNameRule fieldNameRule(String name, RecordBody body, ValueReaderContext context) {
+        return context.linked().fieldNameType(name).map(type -> new TsonReadContext.FieldNameRule(
+                body.fieldNameType(),
+                AtomParsers.forType(type.body()).orElseThrow(() -> new IllegalStateException("'" + name
+                        + "': field_name_type '" + body.fieldNameType() + "' reached a reader with no reader of "
+                        + "its own; the linker admits only a text family")),
+                type.body() instanceof IdentifierType identifiers ? Optional.of(identifiers.profile())
+                        : Optional.empty())).orElse(null);
+    }
+
+    /**
      * Loops {@code FieldName} events forward until {@code RecordEnd} (the cursor assumed already
      * positioned right after {@code RecordStart} -- see {@link #expectRecordShape}), decoding each
      * recognized, non-fixed field's own value and handing it to {@code sink} -- see this class's own
@@ -264,11 +287,11 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             // reporting it unrecognised would be claiming to have looked it up, which this processor
             // declined to do. Without this a homoglyph draws both the refusal and "unknown field 'x' -- the
             // type declares (x)", which tells a sender to add a field that is already there when the fix is
-            // one character. The refusal is reported by `ctx.next()` itself (name hygiene runs as the event
+            // one character. The refusal is reported by `ctx.nextFieldName` itself (name hygiene runs as the event
             // is pulled), so the delta across that one pull is exactly "this name was refused" -- nothing
             // else reports during it.
             int reportedBeforeName = ctx.reported();
-            FieldName fieldName = (FieldName) ctx.next();
+            FieldName fieldName = ctx.nextFieldName(fieldNames);
             boolean nameRefused = ctx.reported() > reportedBeforeName;
 
             Integer schemaIndex = fieldIndex.get(fieldName.name());

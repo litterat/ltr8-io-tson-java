@@ -6,7 +6,10 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 **Invariants**
 
 - The token policy is the stream's, not the context's: a context rewinds, a stream produces each token exactly once.
-- The per-name rules run in `DefaultTsonReadContext`, only on a freshly pulled event — never on a replayed one.
+- The per-name rules run in `DefaultTsonReadContext`, only on a freshly pulled event — never on a replayed one. A
+  field name a lookahead pulls is the one deferral: it is judged when a reader reads it, under that reader's rule.
+- A record reader pulls its own names through `nextFieldName(rule)`, its field name type; every other pull of a
+  field name — schemaless readers, `EventSkip` — judges it as an identifier.
 - A refused name draws no verdict beside its refusal: both record readers checkpoint `ctx.reported()` across the pull
   and skip their `UNRECOGNIZED_FIELD`.
 - Both surfaces are allocation-free when nothing is refused: `IdentifierPolicy.judge` answers a passing name with the
@@ -81,6 +84,15 @@ failure really is a parse error.
 `AnnotationCapture` builds a probe context over events already seen — so checking every event would report
 one name once per lookahead that crossed it. `NameHygieneTest` counts every shape an annotation takes,
 because that is the failure that would survive every other test.
+
+**A field name is judged by the record that reads it** (SPEC-FEEDBACK.md #10). The grammar admits any single-line
+token in name position, and the match against the record's `field_name_type` is here: a name the type refuses is
+`ATOM_FORM_INVALID` and meets no hygiene rule; one it admits meets the per-name rules under the type's profile, or
+none where the type is no identifier family. The rule is the reading record's, passed on the one pull
+(`TsonReadContext.nextFieldName`), so a record nested in a relaxed one keeps identifier names. A lookahead —
+`RecordMemberDispatchReader`'s discriminator scan — crosses a member's names before the member is chosen, so a field
+name pulled while one is running is held in the cursor's `unjudged` set and judged when a reader outside any
+lookahead reads it. The set is allocated only when a lookahead crosses a field name.
 
 **Not in `TsonDataStream`**, which is where the *token* surface's policy runs and gets exactly-once
 for free by sitting upstream of the rewind. The two surfaces sit on opposite sides of the rewind because they

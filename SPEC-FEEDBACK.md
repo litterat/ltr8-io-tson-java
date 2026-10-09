@@ -715,6 +715,16 @@ relaxed type, defined by the translation and not by the series, such as
 - **Hygiene follows the type.** A record's names meet §8.2's per-name rules under its type's own profile, whose
   added characters are its own (`json_name`'s `@` and `$`), and none where the type is a text family that is no
   identifier family; the collision relation runs either way.
+- **A document's field names are judged by the record that reads them.** A name its record's type refuses is a
+  resolver error, `ATOM_FORM_INVALID`, and draws no "unrecognised field" beside it; a name of the type the record
+  does not declare is unrecognised, as any other. A record nested in a relaxed one judges its own names, so the
+  relaxation does not leak into a value it holds. A name read where no record governs it — a schemaless record, the
+  value of an unrecognised field — is judged as an identifier.
+- **A lookahead does not judge a field name.** A sealed family's discriminator scan crosses a member's names before
+  the member is chosen, and only the member knows its type, so a name the scan crosses is judged when the member
+  reads it. The spec says nothing about when a name is judged relative to dispatch; this is the reading that
+  reports a name once and by the right rule. A family's members compose its base, so they share its type, and the
+  question would only bite a choice whose variants differ in theirs.
 
 **Open:** the default for a JSON member name that is not an identifier; how the brace form states a fresh
 record's `field_name_type`; a template's field name type.

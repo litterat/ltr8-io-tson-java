@@ -55,6 +55,20 @@ final class FieldNames {
                 .map(body -> ((io.ltr8.tson.schema.meta.IdentifierType) body).profile());
     }
 
+    /**
+     * The definition {@code record}'s field names are read by, where its field name type is not the kernel's
+     * default -- what {@link io.ltr8.tson.schema.TsonLinkedSchema#fieldNameTypes} carries to its readers. Empty
+     * for the default, which every reader applies without being told, and for a type that resolves to nothing.
+     */
+    static Optional<TypeDefinition> readBy(TypeDefinition record, Map<String, TypeDefinition> merged,
+                                           Function<String, TypeDefinition> structure) {
+        if (record == null || !(record.body() instanceof RecordBody body)
+                || body.fieldNameType().equals(RecordBody.FIELD_NAME)) {
+            return Optional.empty();
+        }
+        return FieldNameType.of(record, merged::get, structure).map(EnumLabelType.Resolved::definition);
+    }
+
     /** Every violation among the records in {@code localNames}, in their order. */
     static List<EnumLabels.Violation> check(Map<String, TypeDefinition> merged, Set<String> localNames,
                                             Function<String, TypeDefinition> structure) {

@@ -12,7 +12,8 @@ history lives in git.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds.
 - A reference to a DATA-kinded entry is refused at every position a type-ref occupies.
-- `entryOrigins`, `textEnums` and `enumForms` are on `TsonLinkedSchema`, never on `TsonSchema` or `TypeDefinition`.
+- `entryOrigins`, `textEnums`, `enumForms` and `fieldNameTypes` are on `TsonLinkedSchema`, never on `TsonSchema` or
+  `TypeDefinition`.
 - An enum's discrimination class is read from `TsonLinkedSchema.textEnums`, never re-derived by a reader.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
@@ -284,3 +285,13 @@ rules for an enum whose `type` is not an identifier family; the collision relati
   `AtomParsers.forType(body, form)`; the linker's own default and pin checks ask `labelForm` or the map directly.
   Where `type` resolves is `resolver.EnumLabelType`'s, shared with materialisation, which checks a template's value
   argument of an enum type before linking has recorded anything.
+- **A record's `field_name_type` is the same contract over its field names** (SPEC-FEEDBACK.md #10, experimental).
+  `FieldNames` is `EnumLabels`' peer: the type must be a text family, every name the record states — in `fields`,
+  `discriminators` and its groups — must be a value of it, and no two fields may be one value under its equality.
+  The default, `field_name`, resolves in the structure namespace (`resolver.FieldNameType`); where no kernel is in
+  scope to resolve it, the identifier grammar it stands for applies. A refused record's names are not judged again by
+  the per-name rules, and those rules run under the type's own profile, or not at all for a type that is no
+  identifier family. A composition takes its supertypes' type and refuses two that disagree; a refinement keeps its
+  source's. Each record with a type other than the default is recorded in `TsonLinkedSchema.fieldNameTypes`, with
+  the definition it resolves to, merged through imports like `enumForms`, because its readers judge a document's
+  names by it and cannot resolve it themselves.

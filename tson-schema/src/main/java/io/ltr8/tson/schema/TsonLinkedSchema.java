@@ -1,9 +1,11 @@
 package io.ltr8.tson.schema;
 
+import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.unicode.Normalization;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -53,15 +55,27 @@ import java.util.Set;
  * is not {@code NONE} ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's
  * {@code identifier} is NFC, a schema's own case-folding identifier {@code NFKC_CASEFOLD}. An enum not listed
  * matches its members as written.
+ *
+ * <p><b>{@code fieldNameTypes} is the fourth</b>, for the same reason again: each record whose {@code
+ * field_name_type} is not the kernel's {@code field_name} (SPEC-FEEDBACK.md #10), with the definition that type
+ * resolves to, by which its readers judge the field names a document writes. A record not listed has
+ * identifiers for field names.
  */
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums,
-                               Map<String, Normalization> enumForms) {
+                               Map<String, Normalization> enumForms, Map<String, TypeDefinition> fieldNameTypes) {
 
     public TsonLinkedSchema {
         Objects.requireNonNull(schema, "schema");
         entryOrigins = Map.copyOf(entryOrigins);
         textEnums = Set.copyOf(textEnums);
         enumForms = Map.copyOf(enumForms);
+        fieldNameTypes = Map.copyOf(fieldNameTypes);
+    }
+
+    /** A schema whose records all have identifiers for field names. */
+    public TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums,
+                            Map<String, Normalization> enumForms) {
+        this(schema, entryOrigins, textEnums, enumForms, Map.of());
     }
 
     /** A schema whose enums all match their members as written. */
@@ -85,6 +99,11 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     /** The form enum {@code entryName} matches its members in -- {@code NONE} for one {@link #enumForms} omits. */
     public Normalization enumForm(String entryName) {
         return enumForms.getOrDefault(entryName, Normalization.NONE);
+    }
+
+    /** What record {@code entryName}'s field names are judged by -- empty for one {@link #fieldNameTypes} omits. */
+    public Optional<TypeDefinition> fieldNameType(String entryName) {
+        return Optional.ofNullable(fieldNameTypes.get(entryName));
     }
 
     /**

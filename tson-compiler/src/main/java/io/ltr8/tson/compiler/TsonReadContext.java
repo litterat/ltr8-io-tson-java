@@ -4,6 +4,7 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 
@@ -170,6 +171,29 @@ public interface TsonReadContext {
      * caller can leave the value out rather than admit a name the processor declined.
      */
     boolean refusesName(String name, IdentifierProfile profile);
+
+    /**
+     * Pulls the next event, a record's field name, judged by {@code rule} -- the field name type of the record
+     * that is reading it (SPEC-FEEDBACK.md #10), where {@link #next()} judges a field name as an identifier. A
+     * name its type refuses is reported as {@code ATOM_FORM_INVALID}; one it admits then meets §8.2's per-name
+     * rules under the type's profile, or none where the type is no identifier family. Either way the name is
+     * reported once, as {@link #next()} reports one: a field name a lookahead pulls is judged when it is read.
+     */
+    FieldName nextFieldName(FieldNameRule rule);
+
+    /**
+     * What a record's field names are judged by: its field name type, by name for messages, the reader of its
+     * texts, and the identifier profile §8.2's per-name rules apply under, where the type is an identifier
+     * family.
+     */
+    record FieldNameRule(String typeName, io.ltr8.tson.atom.AtomType<?> type, Optional<IdentifierProfile> profile) {
+
+        public FieldNameRule {
+            Objects.requireNonNull(typeName, "typeName");
+            Objects.requireNonNull(type, "type");
+            Objects.requireNonNull(profile, "profile");
+        }
+    }
 
     /**
      * The identifier policy this read judges names under -- what a reader enumerating a scope asks before it
