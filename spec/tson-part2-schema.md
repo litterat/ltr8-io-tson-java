@@ -1969,11 +1969,11 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/37/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/37/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/37/tson-guide |
-| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/38/m/meta-kernel.tn?sha256=45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0 |
-| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/38/m/meta.tn?sha256=0440a1d349af8291c83755f43cf0b6d9ad226e15d248bd2736517e3631d2b07a |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/38/m/core.tn?sha256=8e2f7be38b91688934330cd744254e4ea16953f5620c830314c3d28744af30ff |
-| net.tn | TSON Network Type Library (companion artifact) | https://tson.io/2026/38/m/net.tn?sha256=86d2b5cfbaf39fed4724698704174dc62da5a07075f27d8130ea309a8b11edbb |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/38/m/policy.tn?sha256=bf1cd805b232acfb033f48c1da0f3d095f501063a56e6aeacbba015a0214a5d2 |
+| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/38/m/meta-kernel.tn?sha256=ba1f621a8d0cbcd69cae968440fcf0cdcaee04d926f6d2ab187b0f3e57605246 |
+| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/38/m/meta.tn?sha256=2ec79cbf59eb18fe7f6b8d3fee1c4f8023d90b7eae2fb78ca6e86f76f048e4dc |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/38/m/core.tn?sha256=9a840dfef0df78405d29b83029f384197f8158342131a384329cec59e3bac8ed |
+| net.tn | TSON Network Type Library (companion artifact) | https://tson.io/2026/38/m/net.tn?sha256=839e6e88ae2b2c32cd1e84bbf9e3dc6c242ccdd39da4b4e4214705e5535755a6 |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/38/m/policy.tn?sha256=851082bfaa9f2b5c842edfcd999cef597680f827cb326c726114ef4858561435 |
 
 ### 13.3 Informative References
 

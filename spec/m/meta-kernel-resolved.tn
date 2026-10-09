@@ -78,29 +78,35 @@
   """
 !schema {
   top => !type_definition {
-    subtypes: [array atom choice data enum enum_type identifier_type integer_type iri_type map product record reference regex_type set_type sum template text_enum text_type tuple value_type void_type]
+    subtypes: [array atom choice data enum enum_type identifier_type integer_type iri_type map product record reference regex_type set_type sum template text_enum text_type tuple type value_type void_type]
     body: !record { fields: [] }
   }
 
-  atom => !type_definition {
+  type => !type_definition {
     supertypes: [top]
-    subtypes: [enum enum_type identifier_type integer_type iri_type regex_type text_enum text_type value_type void_type]
+    subtypes: [array atom choice enum enum_type identifier_type integer_type iri_type map product record regex_type set_type sum text_enum text_type tuple value_type void_type]
     body: !record { supertypes: [top]  fields: [] }
   }
 
+  atom => !type_definition {
+    supertypes: [top type]
+    subtypes: [enum enum_type identifier_type integer_type iri_type regex_type text_enum text_type value_type void_type]
+    body: !record { supertypes: [type]  fields: [] }
+  }
+
   product => !type_definition {
-    supertypes: [top]
+    supertypes: [top type]
     subtypes: [array map record set_type tuple]
-    body: !record { supertypes: [top]  fields: [
+    body: !record { supertypes: [type]  fields: [
       !record_field { name: access_pattern  type: product_access_type }
       !record_field { name: size_type       type: product_size_type }
     ] }
   }
 
   sum => !type_definition {
-    supertypes: [top]
+    supertypes: [top type]
     subtypes: [choice]
-    body: !record { supertypes: [top]  fields: [] }
+    body: !record { supertypes: [type]  fields: [] }
   }
 
   data => !type_definition {
@@ -134,7 +140,7 @@
   }
 
   value_type => !type_definition {
-    supertypes: [atom top]
+    supertypes: [atom top type]
     body: !record { supertypes: [atom]  fields: [] }
   }
 
@@ -144,7 +150,7 @@
   }
 
   void_type => !type_definition {
-    supertypes: [atom top]
+    supertypes: [atom top type]
     body: !record { supertypes: [atom]  fields: [] }
   }
 
@@ -166,7 +172,7 @@
   }
 
   integer_type => !type_definition {
-    supertypes: [atom top]
+    supertypes: [atom top type]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: size           type: integer_size  optional: true }
       !record_field { name: min            type: integer  optional: true }
@@ -194,7 +200,7 @@
   }
 
   text_type => !type_definition {
-    supertypes: [atom top]
+    supertypes: [atom top type]
     subtypes: [identifier_type iri_type regex_type]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: min_length     type: non_negative_integer  optional: true }
@@ -229,7 +235,7 @@
   }
 
   identifier_type => !type_definition {
-    supertypes: [atom atom_specification text_type top]
+    supertypes: [atom atom_specification text_type top type]
     body: !record { supertypes: [text_type atom_specification]  fields: [
       !record_field { name: min_length     type: non_negative_integer  optional: true }
       !record_field { name: max_length     type: non_negative_integer  optional: true }
@@ -253,7 +259,7 @@
   }
 
   iri_type => !type_definition {
-    supertypes: [atom atom_specification text_type top]
+    supertypes: [atom atom_specification text_type top type]
     body: !record { supertypes: [text_type atom_specification]  fields: [
       !record_field { name: min_length      type: non_negative_integer  optional: true }
       !record_field { name: max_length      type: non_negative_integer  optional: true }
@@ -284,7 +290,7 @@
   }
 
   regex_type => !type_definition {
-    supertypes: [atom atom_specification text_type top]
+    supertypes: [atom atom_specification text_type top type]
     body: !record { supertypes: [text_type atom_specification]  fields: [
       !record_field { name: min_length     type: non_negative_integer  optional: true }
       !record_field { name: max_length     type: non_negative_integer  optional: true }
@@ -395,7 +401,7 @@
   }
 
   record => !type_definition {
-    supertypes: [product top]
+    supertypes: [product top type]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: NAMED }
       !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: FIXED }
@@ -408,7 +414,7 @@
   }
 
   array => !type_definition {
-    supertypes: [product top]
+    supertypes: [product top type]
     subtypes: [set_type]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: INDEX }
@@ -424,7 +430,7 @@
 
   set_type => !type_definition {
     source: array
-    supertypes: [array product top]
+    supertypes: [array product top type]
     body: !record { fields: [
       !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: INDEX }
       !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
@@ -437,7 +443,7 @@
     ] }
   }
   map => !type_definition {
-    supertypes: [product top]
+    supertypes: [product top type]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: NAMED }
       !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
@@ -451,7 +457,7 @@
   }
 
   tuple => !type_definition {
-    supertypes: [product top]
+    supertypes: [product top type]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: INDEX }
       !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: FIXED }
@@ -476,7 +482,7 @@
   }
 
   enum_type => !type_definition {
-    supertypes: [atom top]
+    supertypes: [atom top type]
     subtypes: [enum text_enum]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: type     type: type_name }
@@ -486,7 +492,7 @@
 
   enum => !type_definition {
     source: enum_type
-    supertypes: [atom enum_type top]
+    supertypes: [atom enum_type top type]
     body: !record { fields: [
       !record_field { name: type     type: type_name  optional: true  role: FIXED  value: identifier }
       !record_field { name: members  type: enum_set }
@@ -495,7 +501,7 @@
 
   text_enum => !type_definition {
     source: enum_type
-    supertypes: [atom enum_type top]
+    supertypes: [atom enum_type top type]
     body: !record { fields: [
       !record_field { name: type     type: type_name  optional: true  role: FIXED  value: text }
       !record_field { name: members  type: enum_set }
@@ -503,7 +509,7 @@
   }
 
   choice => !type_definition {
-    supertypes: [sum top]
+    supertypes: [sum top type]
     body: !record { supertypes: [sum]  fields: [
       !record_field { name: variants  type: array_type_ref_xxhash }
       !record_field { name: disjoint  type: boolean  optional: true }
