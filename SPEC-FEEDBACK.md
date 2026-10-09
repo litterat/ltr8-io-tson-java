@@ -671,4 +671,6 @@ excludes `top` and `type`. §13.2's table names `type` among the kernel's entrie
 
 **Status against Revision 37:** open; running on `r2026-38-proposal`. `meta-kernel.tn` declares `type`, and the
 three kinds compose with it; the resolved fixtures carry the entry and the longer chains (`ResolvedFixtureTest`), and
-the bundled schemas are restamped. No check reads `type` yet, so no verdict changes: the corpus passes unchanged.
+the bundled schemas are restamped. The Java value model mirrors it: `schema.meta.Type` is a sealed interface between
+`Top` and `Atom`/`Product`/`Sum`, so a body is a type exactly when it is an `instanceof Type`. No check reads `type`
+yet, so no verdict changes: the corpus passes unchanged.

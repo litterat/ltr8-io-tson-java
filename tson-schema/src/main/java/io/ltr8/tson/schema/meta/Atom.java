@@ -3,14 +3,14 @@ package io.ltr8.tson.schema.meta;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code atom => top & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
+ * The meta-kernel's {@code atom => type & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
  * Top} variant IS-A this. {@link ValueType} and {@link VoidType} back {@code value} and {@code void}, the
  * two atoms with no constraint vocabulary; {@link EnumBody} backs {@code boolean} and the kernel's other
  * internal enumerations; the remaining variants are the atom constraint-vocabulary families, one
  * per {@code *_type} constructor. {@link Scoped} is the sibling SUM-kind case -- see {@link Sum}, not
  * here.
  */
-public sealed interface Atom extends Top permits ValueType, VoidType, EnumBody, IntegerType, TextType, IdentifierType,
+public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody, IntegerType, TextType, IdentifierType,
         UriType, IriType, RegexType,
         DecimalType, FloatType, RationalType, UuidType, BytesType, DateType, TimeType, DateTimeType, DurationType,
         PeriodType,

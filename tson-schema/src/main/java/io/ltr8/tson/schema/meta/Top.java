@@ -1,16 +1,16 @@
 package io.ltr8.tson.schema.meta;
 
 /**
- * The meta-kernel's structural root, {@code top => {}} (Part 2 §4.1) -- every type in the schema
+ * The meta-kernel's structural root, {@code top => {}} (Part 2 §4.1) -- every body in the schema
  * IS-A this, and it is {@link TypeDefinition#body}'s own declared type. A marker interface, not a
  * class (Java records can't extend a class, only implement interfaces), added purely to replicate
- * the kernel's own composition chain as real Java subtyping: {@code atom => top & {}}, {@code
- * product => top & { ... }}, and {@code sum => top & {}} become {@link Atom}/{@link Product}/
- * {@link Sum} each {@code extends Top}, and {@code reference => top & { target: type_name } }
- * (which composes with {@code top} directly, not through one of the three base kinds) becomes
- * {@link Reference} implementing this interface directly. Lets a consumer test kind ancestry with
- * an ordinary {@code instanceof Product}/{@code instanceof Atom} rather than switching on {@link
- * TypeKind} by hand, and also lets {@code ltr8-bind}'s generic writer/reader dispatch on this same
+ * the kernel's own composition chain as real Java subtyping: {@code type => top & {}} becomes
+ * {@link Type}, and {@code atom => type & {}}, {@code product => type & { ... }} and
+ * {@code sum => type & {}} become {@link Atom}/{@link Product}/{@link Sum} each {@code extends Type};
+ * {@code reference => top & { target: type_name } } (which composes with {@code top} directly, not
+ * through {@code type}) becomes {@link Reference} implementing this interface directly. Lets a consumer
+ * test kind ancestry with an ordinary {@code instanceof Type}/{@code instanceof Product} rather than
+ * switching on {@link TypeKind} by hand, and also lets {@code ltr8-bind}'s generic writer/reader dispatch on this same
  * sealed hierarchy directly for {@code !record}/{@code !array}/etc. type-refs -- {@code
  * DefaultUnionBinder} recurses through a multi-level sealed hierarchy like this one (a permitted
  * subclass that's itself sealed is flattened, not left as an unusable "member"), which is what
@@ -23,5 +23,5 @@ package io.ltr8.tson.schema.meta;
  * its implementations are consumer classes this library has never seen -- where a held body is an ordinary
  * record here, carrying the application as text.
  */
-public sealed interface Top permits Atom, Product, Sum, Reference, Data, TemplateBody {
+public sealed interface Top permits Type, Reference, Data, TemplateBody {
 }
