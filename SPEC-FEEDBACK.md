@@ -300,12 +300,10 @@ Restricting an identity to US-ASCII would close all four, at the price of the in
 exists to admit. The resolution below keeps them, and it does so by defining the host once, as a type the series
 already needs, rather than with rules of §2.2.1's own.
 
-**Interpretation chosen.** A guess, recorded as one. `CanonicalIdentity` parses the reference as an RFC 3987
-IRI-reference and requires `host.equals(host.toLowerCase(Locale.ROOT))` — Java's Unicode case mapping, a choice the
-spec does not make — and checks nothing else beyond US-ASCII: no NFC, no IDNA validity, no relation to the URI
-spelling. So `BÜCHER.example` is refused, while the precomposed and decomposed spellings of `bücher.example`, and
-`xn--bcher-kva.example`, are three identities. An IPv6 host compares as written, so `[::1]` and `[0:0:0:0:0:0:0:1]`
-are two. In the HTTP layer, `TsonSchemaHeader.format` writes a reference as it stands, so a non-ASCII identity
+**Interpretation chosen.** The resolution below, ahead of the spec. An identity that breaks a rule is a resolver
+error, as a `!!id` that is no identity already is here; an IP literal with a zone (`[fe80::1%25eth0]`) is not an
+IRI-reference at all (RFC 3986 has no zone; RFC 6874 adds one), so its directive fails to parse first. In the HTTP
+layer, `TsonSchemaHeader.format` writes a reference as it stands, so a non-ASCII identity
 yields an invalid field value, and `TsonSchemaCatalog` matches an `!!id`'s path, read through `java.net.URI`,
 against the request path, so whether a percent-encoded request reaches a non-ASCII path is the JDK's decoding and
 no rule's.
@@ -358,10 +356,14 @@ business. [TSON-JSON] §3.5 then needs a sentence: a reference beyond US-ASCII i
 3987 §3.1, the host by ToASCII). A processor that reports a fetch it made in that spelling should name both — the
 identity, and the URI it requested — since the first says which schema and the second is what DNS and a proxy saw.
 
-**Status against Revision 37:** open; not built. The `toLowerCase` check above runs; the host as a `host` value,
-the NFC requirement, the canonical `!!id` and the reading of a reference do not. The HTTP layer's `deployment.tn`
-types `schema_hosts` as `[hostname]`, so it allow-lists ASCII hosts only, pinned by
-`UpstreamGapsTest.anIdentityWithANonAsciiHostCannotBeAllowListed`.
+**Status against Revision 37:** open; running on `r2026-38-proposal`. `CanonicalIdentity.canonicalize` reads a
+reference as above (the host through `io.ltr8.net.Host`, #6), `CanonicalIdentity.validate` holds a schema's `!!id` to
+the canonical form and names it in the refusal, and `CanonicalIdentity.toUri` gives the URI spelling. The fetching
+sources key their hosts by the identity's host form, so a host is allowed by name in either label form, fetch an
+origin by the URI spelling, and name both spellings when a fetch beyond US-ASCII fails. Corpus vectors in a new
+`class1/identity` layer (RUNNER.md rule 3e) cover both directives: each canonical form, each spelling a reference may
+use, and each refusal. The HTTP layer's `deployment.tn` types `schema_hosts` as `[hostname]`, which #5 now makes
+international, pinned until it adopts it by `UpstreamGapsTest.anIdentityWithANonAsciiHostCannotBeAllowListed`.
 
 ---
 

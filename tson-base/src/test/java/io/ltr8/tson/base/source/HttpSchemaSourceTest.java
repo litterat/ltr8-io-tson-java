@@ -165,6 +165,41 @@ class HttpSchemaSourceTest {
         }
     }
 
+    /** {@code bücher.example}. */
+    private static final String BUCHER = "b\u00FCcher.example";
+
+    /** A host is allowed by name ([TSON-DATA] §2.2.1's host is a host value), so either label form permits it. */
+    @Test
+    void aHostIsAllowedByNameInEitherSpelling() {
+        serve("/x.tn", 200, SCHEMA.formatted("https://" + BUCHER + "/x.tn"));
+        try (HttpSchemaSource source = HttpSchemaSource.builder().mapHost("xn--bcher-kva.example", base)
+                .timeout(Duration.ofSeconds(2)).build()) {
+            assertTrue(source.fetch("https://" + BUCHER + "/x.tn").contains("order =>"));
+        }
+        try (HttpSchemaSource source = HttpSchemaSource.builder().mapHost(BUCHER, base)
+                .timeout(Duration.ofSeconds(2)).build()) {
+            assertTrue(source.fetch("https://XN--BCHER-KVA.example/x.tn").contains("order =>"));
+        }
+    }
+
+    /** A path beyond US-ASCII travels as its URI spelling, and a failure names both spellings. */
+    @Test
+    void aPathBeyondAsciiIsRequestedInItsUriSpelling() {
+        java.util.List<String> paths = new java.util.concurrent.CopyOnWriteArrayList<>();
+        server.createContext("/", exchange -> {
+            paths.add(exchange.getRequestURI().getRawPath());
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+        });
+        try (HttpSchemaSource source = allowingThisServer().build()) {
+            SchemaFetchException missing = refusal(source, reference("/sch\u00E9mas/x.tn"));
+            assertEquals(Reason.NOT_FOUND, missing.reason());
+            assertTrue(missing.getMessage().contains("requested as " + base + "/sch%C3%A9mas/x.tn"),
+                    missing.getMessage());
+        }
+        assertEquals(java.util.List.of("/sch%C3%A9mas/x.tn"), paths);
+    }
+
     @Test
     void reportsAMissingSchemaAsNotFound() {
         serve("/gone.tn", 404, "nope");

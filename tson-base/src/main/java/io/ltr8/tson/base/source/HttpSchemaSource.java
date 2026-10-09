@@ -185,11 +185,14 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
                     ? "no host is allowed by this source"
                     : "host '" + identity.host() + "' is not one of " + hosts.keySet());
         }
-        return new Target(identity.canonical(), base.resolve(identity.path()));
+        return new Target(identity.canonical(), base.resolve(identity.uriPath()));
     }
 
     /** Opens {@code location}, enforcing the time and size caps, and decodes the body as UTF-8. */
     private String get(String reference, URI location) {
+        // A reference beyond US-ASCII travels as its URI spelling; a failure names both, the identity saying which
+        // schema and the location what DNS and a proxy saw.
+        String requested = reference.chars().allMatch(c -> c < 0x80) ? "" : " (requested as " + location + ")";
         HttpRequest request = HttpRequest.newBuilder(location)
                 .GET()
                 .timeout(timeout)
@@ -206,15 +209,15 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
                             + "), and a redirect leaves the allow-list");
                     case 4 -> throw new SchemaFetchException(reference,
                             SchemaFetchException.Reason.NOT_FOUND,
-                            "the host answered " + response.statusCode(), null);
-                    default -> throw transport(reference, "the host answered " + response.statusCode());
+                            "the host answered " + response.statusCode() + requested, null);
+                    default -> throw transport(reference, "the host answered " + response.statusCode() + requested);
                 };
             }
         } catch (HttpTimeoutException e) {
             throw new SchemaFetchException(reference, SchemaFetchException.Reason.TIMEOUT,
-                    "the host did not answer within " + timeout, e);
+                    "the host did not answer within " + timeout + requested, e);
         } catch (IOException e) {
-            throw transport(reference, "the host could not be reached: " + e, e);
+            throw transport(reference, "the host could not be reached" + requested + ": " + e, e);
         } catch (InterruptedException e) {
             // The flag belongs to whoever is unwinding this thread, not to this method.
             Thread.currentThread().interrupt();
@@ -257,11 +260,13 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
 
         /**
          * Permits schemas identified by {@code host}, fetched over {@code https} from that same host. The host
-         * is matched exactly: allowing {@code schemas.example.com} permits nothing on a subdomain and nothing
-         * on a host that merely ends the same way.
+         * is matched by name, in either spelling -- {@code allowHost("xn--bcher-kva.example")} permits an identity
+         * written {@code bücher.example} -- and exactly: allowing {@code schemas.example.com} permits nothing on a
+         * subdomain and nothing on a host that merely ends the same way. A look-alike host, such as one spelled
+         * with a Cyrillic {@code а}, is another name and is refused unless it is allowed itself.
          */
         public Builder allowHost(String host) {
-            return mapHost(host, "https://" + host);
+            return mapHost(host, "https://" + SchemaReference.asciiHost(host));
         }
 
         /**
@@ -293,7 +298,7 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
             if (!"https".equals(scheme) && !"http".equals(scheme)) {
                 throw new IllegalArgumentException("'" + base + "' is not an http or https URI");
             }
-            hosts.put(host.toLowerCase(Locale.ROOT), parsed);
+            hosts.put(SchemaReference.hostKey(host), parsed);
             return this;
         }
 

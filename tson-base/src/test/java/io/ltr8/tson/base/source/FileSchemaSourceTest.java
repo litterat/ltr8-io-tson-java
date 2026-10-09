@@ -73,9 +73,8 @@ class FileSchemaSourceTest {
     }
 
     /**
-     * <b>The control this class exists for.</b> A {@code ..} that climbs out of the mapped directory is
-     * refused, and refused on the <em>real</em> path -- so the check does not depend on the reference
-     * looking suspicious.
+     * <b>A {@code ..} names no identity</b> ([TSON-DATA] §2.2.1 forbids a dot-segment), so it is refused before
+     * any path is opened; the containment check after {@link Path#toRealPath} is what a symlink meets (below).
      */
     @Test
     void aPathMayNotEscapeItsDirectory(@TempDir Path dir) throws IOException {
@@ -85,7 +84,7 @@ class FileSchemaSourceTest {
 
         SchemaFetchException refused = refusal(serving(served), reference("/../secret.tn"));
         assertEquals(Reason.NOT_PERMITTED, refused.reason());
-        assertTrue(refused.getMessage().contains("outside"), refused.getMessage());
+        assertTrue(refused.getMessage().contains("dot-segment"), refused.getMessage());
     }
 
     /**

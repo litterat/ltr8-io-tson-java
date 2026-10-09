@@ -100,11 +100,13 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   ways of naming a source are learnt once and the exclusion rules among them are stated once — a second copy
   at the front door would be a second surface to keep in step.
   - **Identity is not location, and that is what makes two sources one design** ([TSON-DATA] §2.2.1). A
-    reference's identity is its lowercase host plus path — the scheme "a transport hint, not part of the
-    name", no port, no userinfo, no fragment — so `https://schemas.example.com/order-1.tn` may legitimately
+    reference's identity is its host plus path (`CanonicalIdentity`) — the scheme "a transport hint, not part of
+    the name", no port, no userinfo, no fragment — so `https://schemas.example.com/order-1.tn` may legitimately
     be served from a directory, and moving a schema between the two renames nothing. `SchemaReference`
     holds those rules once, for both: two sources enforcing them separately is two places for one to drift
-    lenient, and this is a security check.
+    lenient, and this is a security check. A source's host keys are put into the identity's host form, so a host
+    is allowed by name in either label form; a directory is read by the identity's path and an origin by its URI
+    spelling, and a failed fetch of a reference beyond US-ASCII names the URI it requested as well.
   - **The reference is attacker-controlled**, since a document names its own schema and in a server that
     string came out of a request body. Both deny by default and match a host exactly (a suffix test for
     `.example.com` also matches `evil-example.com`). Beyond that they guard different primitives: the HTTP

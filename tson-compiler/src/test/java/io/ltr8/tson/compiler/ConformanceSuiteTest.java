@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.net.Iri;
 import io.ltr8.tson.base.io.ByteSource;
 
@@ -126,6 +128,46 @@ class ConformanceSuiteTest {
     @TestFactory
     Stream<DynamicTest> vocabularyVectors() {
         return Vectors.in("class1", "vocabulary", ConformanceSuiteTest::checkVocabularyVector);
+    }
+
+    @TestFactory
+    Stream<DynamicTest> identityVectors() {
+        return Vectors.in("class1", "identity", ConformanceSuiteTest::checkIdentityVector);
+    }
+
+    // ── Identity-layer vectors (RUNNER.md rule 3e) ───────────────────────
+
+    /**
+     * [TSON-DATA] §2.2.1 over the subject's first directive: an {@code !!id} is a document's own name and must be
+     * written canonically ({@link CanonicalIdentity#validate}); a {@code !!schema} is a reference, read in any
+     * spelling ({@link CanonicalIdentity#canonicalize}). Nothing is fetched or resolved.
+     */
+    private static void checkIdentityVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
+        TsonDocumentHeader header = TsonDocumentPeek.of(new ByteArrayInputStream(subjectBytes(subject, sidecar)))
+                .header();
+        boolean ownName = header.id().isPresent();
+        String argument = ownName ? header.id().get()
+                : header.schema().orElseThrow(() -> new AssertionError("an identity subject carries !!id or !!schema"));
+        switch (outcomeOf(sidecar)) {
+            case "valid" -> {
+                if (ownName) {
+                    CanonicalIdentity.validate(argument);
+                }
+                assertEquals(fieldText(outcomePayload(sidecar), "identity"),
+                        CanonicalIdentity.canonicalize(argument), "canonical identity");
+            }
+            case "error" -> {
+                assertEquals("resolver", fieldText(outcomePayload(sidecar), "category"), "an identity error's category");
+                assertThrows(SchemaValidationException.class, () -> {
+                    if (ownName) {
+                        CanonicalIdentity.validate(argument);
+                    } else {
+                        CanonicalIdentity.canonicalize(argument);
+                    }
+                });
+            }
+            default -> fail("unknown identity-layer outcome: " + outcomeOf(sidecar));
+        }
     }
 
     // ── Lexer-layer vectors ──────────────────────────────────────────────

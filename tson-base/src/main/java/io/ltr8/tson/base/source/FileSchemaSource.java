@@ -232,7 +232,7 @@ public final class FileSchemaSource implements SchemaSource {
             if (directory == null || !Files.isDirectory(directory)) {
                 throw new IllegalArgumentException("'" + directory + "' is not an existing directory");
             }
-            hosts.put(host.toLowerCase(Locale.ROOT), directory);
+            hosts.put(SchemaReference.hostKey(host), directory);
             return this;
         }
 

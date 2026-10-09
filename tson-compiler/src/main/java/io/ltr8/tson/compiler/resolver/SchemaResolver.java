@@ -202,7 +202,7 @@ public final class SchemaResolver {
                 "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
         CanonicalIdentity.validate(id);
         for (String importUri : document.imports()) {
-            CanonicalIdentity.validate(importUri);
+            CanonicalIdentity.canonicalize(importUri);
         }
 
         TsonCompiledMetaSchema metaParser = loader.loadMeta(document.meta());
