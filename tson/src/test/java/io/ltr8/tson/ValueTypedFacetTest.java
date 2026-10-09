@@ -31,8 +31,8 @@ class ValueTypedFacetTest {
     private static String schemaDeclaring(String declarations) {
         return """
                 !!id:"https://example.test/facet-%d.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 { %s }
                 """.formatted(NEXT.incrementAndGet(), declarations);
     }

@@ -66,7 +66,7 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
   never change so the pin stays valid).
 - **`tson strip [--keep-docs] <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read, never
   to load: the `!!id`, header pins and the documentary annotations go — `@doc`, `@title`, `@examples` and `@comment` — the
-  spec library's `!!meta`/`!!import` shorten to `"37/core"`, and each directive and declaration gets one line.
+  spec library's `!!meta`/`!!import` shorten to `"38/core"`, and each directive and declaration gets one line.
   `--keep-docs` (`stripKeepingDocs`) keeps the three written for the schema's readers and still drops `@comment`, which is
   for its maintainers. It never re-pins and never rewrites the file — the output claims no identity, because its bytes are
   not the published document's. **Whitespace collapses to one space and is never removed**, so tokens that touched still

@@ -27,8 +27,8 @@ source of truth — with **two** standing exceptions. The three `.tn` schemas ar
 time**, so they are the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in
 place**: see "Part 3 is drafted here" below.
 
-On `main` the bundled schemas carry **Revision 37 identities** (`https://tson.io/2026/37/m/*.tn`); a proposal branch
-carries the next revision's. `spec/` holds
+On `main` the bundled schemas carry **Revision 37 identities** (`https://tson.io/2026/37/m/*.tn`); on
+`r2026-38-proposal` they carry Revision 38's (`/2026/38/m/`). `spec/` holds
 **Revision 37** of Parts 1 and 2, the published cache, not edited here except for §13.2's four artifact rows,
 so the table names the bytes beside it and stays checkable; its Part 1 and Guide rows stay at the revision
 those documents actually are. **§13.2 is a fourth pin to move** whenever the artifacts change.
@@ -106,12 +106,10 @@ merging a divergence early costs `main` the one signal it exists to give. The bu
 revision's own identities from the start, so a content change lands on artifacts named for the revision
 proposing it rather than being re-identified at the end.
 
-**No proposal branch is open.** Revision 37's — the meta-kernel changes Revision 36 could not carry — merged to
-`main` when the spec landed. The next opens as `r2026-38-proposal` with its corpus twin, carrying the Revision 38
-identities and the next version from its first commit. Kernel work lands through PR branches off it; work the
-published revision can carry still lands on `main`, which the proposal merges in to keep up. While one is open,
-`Closes #N` in a PR into it does not close the issue (GitHub fires it only on the default branch), so each is closed
-by hand.
+**The open proposal is `r2026-38-proposal`**, with its corpus twin. It carries the Revision 38 identities and version
+`0.38.0-SNAPSHOT` from its first commit. Proposal work lands through PR branches off it; work Revision 37 can carry
+still lands on `main`, which the proposal merges in to keep up. While it is open, `Closes #N` in a PR into it does not
+close the issue (GitHub fires it only on the default branch), so each is closed by hand.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** The spec is a working
 revision, this is its first implementation, and the artifact has no published releases and no remote
@@ -227,7 +225,7 @@ keeps it apart; the exception's class is what picks the code.
 `DefinitionResolver`'s Javadoc lists the exact current boundary.
 
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
-`https://tson.io/2026/37/io/ltr8/<group>/<name>.tn` — `/2026/37` is the spec revision, `io/ltr8` the publisher,
+`https://tson.io/2026/38/io/ltr8/<group>/<name>.tn` — `/2026/38` is the spec revision, `io/ltr8` the publisher,
 `<group>` the subsystem (`cli`), `<name>` the schema. Between releases — while the build version carries
 `-SNAPSHOT`, so nothing has published the identity — the schema is edited in place. §10's immutability rule
 binds a *published* identity: once a release ships carrying the schema, the document under that `!!id` is fixed.

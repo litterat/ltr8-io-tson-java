@@ -42,8 +42,8 @@ class IdentifierValueHygieneTest {
     private static final String ID = "https://example.test/names-2.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/names-2.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               identifier => !identifier_type { continue_add: "-" }
               js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
@@ -184,8 +184,8 @@ class IdentifierValueHygieneTest {
     private static String schemaWith(String declaration) {
         return """
                 !!id:"https://example.test/names-3.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   identifier => !identifier_type { continue_add: "-" }
                   js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }

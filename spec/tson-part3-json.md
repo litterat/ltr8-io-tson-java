@@ -140,8 +140,8 @@ A schema exercising a sealed record family, defaults, optional fields, and a non
 
 ```
 !!id:"https://example.com/pets.tn"
-!!meta:"https://tson.io/2026/37/m/meta.tn"
-!!import:"https://tson.io/2026/37/m/core.tn"
+!!meta:"https://tson.io/2026/38/m/meta.tn"
+!!import:"https://tson.io/2026/38/m/core.tn"
 {
   pet => abstract { pet_type: text =?  name: text  nickname?: text? }
   cat => pet & { pet_type: = cat  hunting_skill?: text ~ lazy }

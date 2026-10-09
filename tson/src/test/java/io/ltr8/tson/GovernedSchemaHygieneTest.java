@@ -37,22 +37,22 @@ class GovernedSchemaHygieneTest {
     /** {@code аdmin}, its first letter U+0430: a mixed-script name. */
     private static final String MIXED = "аdmin";
 
-    private static final String META_ID = "https://example.test/2026/37/iface-meta-1.tn";
+    private static final String META_ID = "https://example.test/2026/38/iface-meta-1.tn";
     private static final String META = """
-            !!id:"https://example.test/2026/37/iface-meta-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/37/m/meta.tn"
+            !!id:"https://example.test/2026/38/iface-meta-1.tn"
+            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/38/m/meta.tn"
             {
               method_name => identifier
               iface       => data & { methods: {method_name => text} }
               routes      => @annotation {method_name => text}
             }""";
 
-    private static final String DATA_ID = "https://example.test/2026/37/iface-data-1.tn";
+    private static final String DATA_ID = "https://example.test/2026/38/iface-data-1.tn";
     private static final String DATA_SCHEMA = """
-            !!id:"https://example.test/2026/37/iface-data-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!id:"https://example.test/2026/38/iface-data-1.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               identifier  => !identifier_type { continue_add: "-" }
               method_name => identifier
@@ -86,7 +86,7 @@ class GovernedSchemaHygieneTest {
 
     private static String governed(String annotation, String methods) {
         return """
-                !!id:"https://example.test/2026/37/orders-1.tn"
+                !!id:"https://example.test/2026/38/orders-1.tn"
                 !!meta:"%s"
                 {
                   orders => %s!iface { methods: { %s } }

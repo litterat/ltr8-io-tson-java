@@ -37,8 +37,8 @@ class SkeletonDistinctnessPolicyTest {
     private static final String ID = "https://example.test/skeletons-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/skeletons-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               identifier => !identifier_type { continue_add: "-" }
               handlers => { identifier => text }
@@ -85,8 +85,8 @@ class SkeletonDistinctnessPolicyTest {
                 "pass => text  " + CYRILLIC_PASS + " => text")) {
             String schema = """
                     !!id:"https://example.test/skeletons-2.tn"
-                    !!meta:"https://tson.io/2026/37/m/meta.tn"
-                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    !!meta:"https://tson.io/2026/38/m/meta.tn"
+                    !!import:"https://tson.io/2026/38/m/core.tn"
                     { %s }
                     """.formatted(declarations);
             assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES),

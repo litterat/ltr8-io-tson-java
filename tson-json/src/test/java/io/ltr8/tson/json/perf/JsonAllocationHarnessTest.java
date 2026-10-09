@@ -73,8 +73,8 @@ class JsonAllocationHarnessTest {
     /** The order's shape as a schema, for the schema-directed read: every record here is concrete. */
     private static final String SCHEMA = """
             !!id:"https://example.test/orders.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               line  => { sku: text  quantity: int32  price: float64 }
               order => { id: uuid  customer: text  placed: datetime  lines: [line]  note: text }

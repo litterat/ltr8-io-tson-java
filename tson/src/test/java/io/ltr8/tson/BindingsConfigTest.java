@@ -31,8 +31,8 @@ class BindingsConfigTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/orders.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               order => { sku: text  quantity: int32  when: datetime }
             }
@@ -56,8 +56,8 @@ class BindingsConfigTest {
     /** The same schema without the field the profiled constructor omits. */
     private static final String SHORT_SCHEMA = """
             !!id:"https://example.test/orders.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               order => { sku: text  quantity: int32 }
             }

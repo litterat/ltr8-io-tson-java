@@ -29,7 +29,7 @@ class PolicySchemaTest {
     @Test
     void aDeploymentsPolicyDocumentValidates() {
         assertEquals(List.of(), Tson.standard().validate("""
-                !!schema:"https://tson.io/2026/37/m/policy.tn"
+                !!schema:"https://tson.io/2026/38/m/policy.tn"
                 !policy {
                   identifier_policy: { level: HIGHLY_RESTRICTIVE  per_segment: false
                                        skeleton_distinctness: true  permitting: [] }

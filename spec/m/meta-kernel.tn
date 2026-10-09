@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f2c2b278405f4c02ae327f70df07d5778744916da613a814104af6a312fcc145"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0"
+!!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
-  TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 37 draft).
+  TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
 
   The `!!meta` directive names this file itself. The circularity is closed by
   pre-loading rather than by resolution: implementations ship the kernel's

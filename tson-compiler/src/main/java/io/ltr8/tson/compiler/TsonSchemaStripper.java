@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  *   <li><b>A header reference's {@code ?sha256=} pin</b> goes. A pin is verification metadata ([TSON-DATA]
  *       §2.2.1), and the query of an identifying URI holds nothing else.</li>
  *   <li><b>A header reference to the spec's own library</b> -- meta-kernel, meta and core at any revision -- is
- *       shortened to its revision and name ({@code "37/meta"}). Any other reference keeps its URL, which is
+ *       shortened to its revision and name ({@code "38/meta"}). Any other reference keeps its URL, which is
  *       the only thing that tells a reader which schema it names.</li>
  *   <li><b>The documentary annotations</b> go, wherever they are written: {@code @doc}, {@code @title} and
  *       {@code @examples}, which are for the schema's readers, and {@code @comment}, which is for its
