@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
@@ -37,7 +38,14 @@ import java.util.List;
  */
 @Typename(name = "record")
 public record RecordBody(List<TypeRef> supertypes, List<RecordField> fields, List<FieldGroup> groups,
-                          RecordExtensionType extension, List<String> discriminators) implements Product {
+                          RecordExtensionType extension, List<String> discriminators,
+                          @Field("field_name_type") String fieldNameType) implements Product {
+
+    /**
+     * {@code record.field_name_type}'s default: the kernel's {@code field_name}, an identifier
+     * (SPEC-FEEDBACK.md #10). A record that states another names the family its field names belong to.
+     */
+    public static final String FIELD_NAME = "field_name";
 
     /**
      * <b>Absent and empty are the same list</b> for the three the kernel makes optional ({@code supertypes:
@@ -55,19 +63,20 @@ public record RecordBody(List<TypeRef> supertypes, List<RecordField> fields, Lis
         fields = List.copyOf(fields);
         groups = groups == null ? List.of() : List.copyOf(groups);
         discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
+        fieldNameType = fieldNameType == null ? FIELD_NAME : fieldNameType;
     }
 
     /**
-     * The same body with {@code discriminators} unstated -- every construction that has no family to
-     * dispatch, which while the per-field mark is still the live carrier is all of them.
+     * The same body with {@code discriminators} unstated and the default field name type -- every construction
+     * that has no family to dispatch, which while the per-field mark is still the live carrier is all of them.
      */
     public RecordBody(List<TypeRef> supertypes, List<RecordField> fields, List<FieldGroup> groups,
                        RecordExtensionType extension) {
-        this(supertypes, fields, groups, extension, List.of());
+        this(supertypes, fields, groups, extension, List.of(), FIELD_NAME);
     }
 
     /** A fresh record body: no supertypes, no field groups, just plain fields, extensible. */
     public static RecordBody of(List<RecordField> fields) {
-        return new RecordBody(List.of(), fields, List.of(), RecordExtensionType.OPEN, List.of());
+        return new RecordBody(List.of(), fields, List.of(), RecordExtensionType.OPEN, List.of(), FIELD_NAME);
     }
 }

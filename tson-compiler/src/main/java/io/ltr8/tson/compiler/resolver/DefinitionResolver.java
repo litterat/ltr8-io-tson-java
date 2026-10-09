@@ -355,7 +355,8 @@ final class DefinitionResolver {
         }
         return new TypeDefinition(resolved.source(), resolved.kind(), resolved.supertypes(),
                 resolved.subtypes(), new RecordBody(record.supertypes(), record.fields(), record.groups(),
-                        extension.get(), record.discriminators()), resolved.position(), resolved.annotations());
+                        extension.get(), record.discriminators(), record.fieldNameType()), resolved.position(),
+                resolved.annotations());
     }
 
     /**
@@ -1339,7 +1340,8 @@ final class DefinitionResolver {
         }
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(directSupertypes, fields, groups, RecordExtensionType.OPEN,
-                construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()));
+                construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()),
+                RecordBody.FIELD_NAME);
         // §5.9: subtraction breaks IS-A. The contract index (type_definition.supertypes) is emptied while the
         // body keeps `directSupertypes` as authorial lineage (record.supertypes) -- the distinction §7.2's
         // subsumption rule reads, so a subtracted type does not stand where its source is expected. `kind` is
@@ -1623,7 +1625,7 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN,
-                markedNames(refined.body().entries()));
+                markedNames(refined.body().entries()), RecordBody.FIELD_NAME);
         return new TypeDefinition(source, kind, transitiveSupertypes,
                 List.of(), body);
     }
@@ -1810,7 +1812,8 @@ final class DefinitionResolver {
         for (RecordEntry entry : entries) {
             resolveEntry(null, entry, fields, groups, seenFieldNames, Map.of(), parameters);
         }
-        return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN, markedNames(entries));
+        return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN, markedNames(entries),
+                RecordBody.FIELD_NAME);
     }
 
     /**

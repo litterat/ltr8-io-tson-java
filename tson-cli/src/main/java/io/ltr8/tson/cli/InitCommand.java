@@ -22,9 +22,9 @@ import java.nio.file.Path;
 final class InitCommand {
 
     private static final String SCHEMA = """
-            !!id:"https://example.com/2026/38/getting-started/person.tn?sha256=93b53b61e722fd4932b78382f83268c2ad80948853768cec96b78630cc5e0394"
-            !!meta:"https://tson.io/2026/38/m/meta.tn?sha256=2ec79cbf59eb18fe7f6b8d3fee1c4f8023d90b7eae2fb78ca6e86f76f048e4dc"
-            !!import:"https://tson.io/2026/38/m/core.tn?sha256=9a840dfef0df78405d29b83029f384197f8158342131a384329cec59e3bac8ed"
+            !!id:"https://example.com/2026/38/getting-started/person.tn?sha256=bb98a992d5d40e1aef0bbb528368e5bce547624049ad015ad4596d6f95f4e960"
+            !!meta:"https://tson.io/2026/38/m/meta.tn?sha256=6561c8305e7c604382079802ea62f5d074c045e99d315ce926b5cf76ae0f90af"
+            !!import:"https://tson.io/2026/38/m/core.tn?sha256=4d2d1cbde525a3e8d9d1dcbb58951909829152d6b019901552629b80de6533e1"
             @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
             {
               role => !enum [admin member guest]

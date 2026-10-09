@@ -854,7 +854,7 @@ final class TemplateMaterialiser {
                 .map(field -> field.role() == FieldRole.FREE && field.value().isPresent()
                         ? field.withFacts(field.optional(), false, FieldRole.FIXED)
                         : field)
-                .toList(), record.groups(), closedExtension(record));
+                .toList(), record.groups(), closedExtension(record), java.util.List.of(), record.fieldNameType());
     }
 
     /**

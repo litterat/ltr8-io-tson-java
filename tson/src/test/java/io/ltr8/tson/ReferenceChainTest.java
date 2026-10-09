@@ -44,11 +44,11 @@ class ReferenceChainTest {
                 .resolveLinked(TsonBundledSchemas.META_KERNEL_ID).schema().entries().get(name);
     }
 
-    /** The kernel's own case: {@code record_field.name} is declared {@code field_name} and stays it. */
+    /** The kernel's own case: {@code template_param.name} is declared {@code param_name} and stays it. */
     @Test
     void aKernelReferenceAtAFieldTypeNamesWhatWasWritten() {
-        TypeRef name = fieldType(kernelEntry("record_field"), "name");
-        assertEquals("field_name", name.name());
+        TypeRef name = fieldType(kernelEntry("template_param"), "name");
+        assertEquals("param_name", name.name());
         assertTrue(name.annotations().isEmpty(), "nothing is attached to record where it points");
 
         assertEquals("type_name", fieldType(kernelEntry("type_ref"), "name").name());
