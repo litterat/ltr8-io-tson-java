@@ -430,21 +430,6 @@ final class DefinitionResolver {
     }
 
     /**
-     * Checks a name the author wrote against the kernel's {@code identifier} contract (§7.1's name profile).
-     * The resolver builds {@code record_field.name} and its kin directly rather than round-tripping the
-     * resolved model through the compiled meta reader, so the type these positions carry -- {@code
-     * field_name}, an alias of {@code identifier} -- would otherwise constrain only the positions that *are*
-     * read back as data, which is constructor applications and materialisation. Calling it here is what
-     * makes one contract reach every naming position rather than the subset the model happens to round-trip.
-     */
-    private static void requireIdentifier(String name, String role) {
-        Optional<String> violation = IdentifierGrammar.validate(name);
-        if (violation.isPresent()) {
-            throw new SchemaValidationException("invalid " + role + " -- " + violation.get());
-        }
-    }
-
-    /**
      * §3.3.3's one hop missed: {@code annotationName} is not an entry of the governing meta-schema's own
      * namespace. Worded from the two ways an author gets here -- a name they declared in this very schema (or
      * imported into it), which is the near miss the rule actually catches, and a name that is simply nowhere.
@@ -1205,6 +1190,10 @@ final class DefinitionResolver {
     private TypeDefinition resolveComposition(String name, ConstructionDef construction,
                                                List<String> parameters) {
         List<io.ltr8.tson.schema.meta.TypeRef> directSupertypes = new ArrayList<>();
+        // SPEC-FEEDBACK.md #10: a composition inherits its record supertypes' field_name_type, whose names it
+        // absorbs; supertypes that disagree compose names of two families, which no one type judges.
+        String fieldNameType = null;
+        String fieldNameTypeFrom = null;
         List<String> transitiveSupertypes = new ArrayList<>();
         Set<String> seenTransitive = new HashSet<>();
         List<RecordField> fields = new ArrayList<>();
@@ -1327,6 +1316,14 @@ final class DefinitionResolver {
             }
 
             absorb(name, supertypeBody, fields, groups, seenFieldNames, inheritedFieldIndex);
+            if (fieldNameType == null) {
+                fieldNameType = supertypeBody.fieldNameType();
+                fieldNameTypeFrom = supertypeName;
+            } else if (!fieldNameType.equals(supertypeBody.fieldNameType())) {
+                throw new SchemaValidationException("'" + name + "': supertypes '" + fieldNameTypeFrom + "' and '"
+                        + supertypeName + "' state different field name types, '" + fieldNameType + "' and '"
+                        + supertypeBody.fieldNameType() + "' -- a record's field names are of one family");
+            }
         }
 
         if (construction.body().isPresent()) {
@@ -1341,7 +1338,7 @@ final class DefinitionResolver {
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(directSupertypes, fields, groups, RecordExtensionType.OPEN,
                 construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()),
-                RecordBody.FIELD_NAME);
+                fieldNameType == null ? RecordBody.FIELD_NAME : fieldNameType);
         // §5.9: subtraction breaks IS-A. The contract index (type_definition.supertypes) is emptied while the
         // body keeps `directSupertypes` as authorial lineage (record.supertypes) -- the distinction §7.2's
         // subsumption rule reads, so a subtracted type does not stand where its source is expected. `kind` is
@@ -1625,7 +1622,7 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN,
-                markedNames(refined.body().entries()), RecordBody.FIELD_NAME);
+                markedNames(refined.body().entries()), sourceBody.fieldNameType());
         return new TypeDefinition(source, kind, transitiveSupertypes,
                 List.of(), body);
     }
@@ -2104,7 +2101,6 @@ final class DefinitionResolver {
      */
     private RecordField resolveFieldEntry(FieldDef field, List<String> parameters,
                                            Optional<RecordField> inherited) {
-        requireIdentifier(field.name(), "field name");
         io.ltr8.tson.schema.meta.TypeRef type;
         if (field.type().isPresent()) {
             type = resolveTypeRef(field.type().get().typeRef());

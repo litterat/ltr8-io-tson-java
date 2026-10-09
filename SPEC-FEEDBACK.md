@@ -705,8 +705,18 @@ relaxed type, defined by the translation and not by the series, such as
   which a relaxed `field_name_type` breaks.
 - **No shipped `json_name`, for now.** A relaxed type is likely the translation's own and differs between sources;
   whether the series should ship one waits on the implementation.
+- **A schema's field names are judged at load, by the record's type.** The schema grammar admits any single-line
+  token as a declared field name too, and the linker holds every record to its `field_name_type`: the type names a
+  text family, every name in `fields`, `discriminators` and the groups is a value of it, and no two fields are one
+  value. A brace-form `{ "first name": text }` is therefore a resolver error rather than a parse error.
+- **Inheritance keeps one family.** A composition takes its record supertypes' `field_name_type`, whose names it
+  absorbs, and supertypes stating two different ones are a resolver error; a refinement keeps its source's. So the
+  brace form can restate an inherited relaxed name (`tightened => node ^ { "$ref": text }`).
+- **Hygiene follows the type.** A record's names meet §8.2's per-name rules under its type's own profile, whose
+  added characters are its own (`json_name`'s `@` and `$`), and none where the type is a text family that is no
+  identifier family; the collision relation runs either way.
 
-**Open:** the default for a JSON member name that is not an identifier; how the brace form states a record's
-`field_name_type`; whether a subtype or refinement may change it; the hygiene policy for names of a text type.
+**Open:** the default for a JSON member name that is not an identifier; how the brace form states a fresh
+record's `field_name_type`; a template's field name type.
 
 **Status against Revision 37:** open; experimental, in progress on `experiment/field-name-type`.

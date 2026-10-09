@@ -82,6 +82,34 @@ class FieldNameTypeTest {
                     """)));
     }
 
+    /** A composition absorbs its supertypes' names, so it takes their field_name_type; a refinement keeps its own. */
+    @Test
+    void aCompositionAndARefinementInheritTheFieldNameType() {
+        var schema = Tson.standard().resolve(schema("inherit", """
+              json_name => !identifier_type { start_add: "@$" }
+              node => !record { field_name_type: json_name  fields: [
+                { name: "@id"  type: text }  { name: "$ref"  type: text  optional: true } ] }
+              labelled => node & { label: text }
+              tightened => node ^ { "$ref": text }
+            """));
+        assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) schema.schema().entries().get("labelled").body())
+                .fieldNameType());
+        assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) schema.schema().entries().get("tightened").body())
+                .fieldNameType());
+    }
+
+    @Test
+    void supertypesOfTwoFieldNameTypesDoNotCompose() {
+        var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
+                () -> Tson.standard().resolve(schema("disagree", """
+                      json_name => !identifier_type { start_add: "@$" }
+                      node => !record { field_name_type: json_name  fields: [ { name: "@id"  type: text } ] }
+                      plain => { label: text }
+                      both => node & plain & {}
+                    """)));
+        assertTrue(thrown.getMessage().contains("different field name types"), thrown.getMessage());
+    }
+
     @Test
     void annotationNamesStayIdentifiersByTheGrammar() {
         assertEquals(1, Tson.standard().validate("{ a: @\"x y\" 1 }").size());

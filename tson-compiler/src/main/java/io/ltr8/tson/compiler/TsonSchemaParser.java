@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
@@ -1013,17 +1012,12 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * A field name a schema declares: the shared {@code field-name} production, then the identifier match
-     * ([TSON-SCHEMA] §12.1), a failure being a parse error. The data grammar leaves the match to the record;
-     * a declared name is still an identifier.
+     * A field name a schema declares: the shared {@code field-name} production, any single-line token. What the
+     * name may be is its record's field name type (SPEC-FEEDBACK.md #10), which the linker judges every declared
+     * name by once the record and the type it inherits are resolved.
      */
     private Token expectDeclaredFieldName(String construct) {
-        Token name = expectFieldNameToken(construct);
-        Optional<String> violation = IdentifierGrammar.validate(Nfc.of(name.text()));
-        if (violation.isPresent()) {
-            throw new ParseException("invalid field name -- " + violation.get(), name.start());
-        }
-        return name;
+        return expectFieldNameToken(construct);
     }
 
     private void requireIdentifierName(Token t) {
