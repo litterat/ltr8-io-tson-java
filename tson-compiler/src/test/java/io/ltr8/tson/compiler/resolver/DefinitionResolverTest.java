@@ -329,6 +329,7 @@ class DefinitionResolverTest {
     void resolvesAtomProductSumAndReferenceByComposingWithTop() throws IOException, DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
 
         TypeDefinition atom = resolver.resolve(schemaMap.declarations().get("atom"));
         resolved.put("atom", atom);
@@ -340,28 +341,28 @@ class DefinitionResolverTest {
         resolved.put("reference", reference);
 
         // §4.1: atom/product/sum are each kind PRODUCT -- their own transitive chain is just
-        // [top], which contains none of the three literal base-kind names, so the structural
-        // default applies even to the base kinds' own entries.
+        // [type, top], which contains none of the three literal base-kind names, so the structural
+        // default applies even to the base kinds' own entries. They compose with `type`; reference with top.
         assertEquals(TypeKind.PRODUCT, atom.kind());
         assertEquals(TypeKind.PRODUCT, product.kind());
         assertEquals(TypeKind.PRODUCT, sum.kind());
         assertEquals(TypeKind.PRODUCT, reference.kind());
-        assertEquals(List.of("top"), atom.supertypes());
-        assertEquals(List.of("top"), product.supertypes());
-        assertEquals(List.of("top"), sum.supertypes());
+        assertEquals(List.of("type", "top"), atom.supertypes());
+        assertEquals(List.of("type", "top"), product.supertypes());
+        assertEquals(List.of("type", "top"), sum.supertypes());
         assertEquals(List.of("top"), reference.supertypes());
 
-        // atom, sum: empty trailing body, no fields inherited from top (which has none) -- just the composition itself.
-        assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [] groups: [] "
+        // atom, sum: empty trailing body, no fields inherited from type (which has none) -- just the composition itself.
+        assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
+                + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: [] groups: [] "
                 + "extension: \"OPEN\" discriminators: [] } }", write(atom));
-        assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [] groups: [] "
+        assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
+                + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: [] groups: [] "
                 + "extension: \"OPEN\" discriminators: [] } }", write(sum));
 
-        // product: two brand-new fields added by the trailing body (top contributes none).
-        assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
+        // product: two brand-new fields added by the trailing body (type contributes none).
+        assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
+                + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: [ "
                 + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
                 + "optional: false voidable: false role: \"FREE\" "
                 + "} "
@@ -384,6 +385,7 @@ class DefinitionResolverTest {
     void resolvesIntegerTypeWithFieldGroupsAndOptionalFields() throws IOException, DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
 
         TypeDefinition integerType = resolver.resolve(schemaMap.declarations().get("integer_type"));
@@ -392,9 +394,9 @@ class DefinitionResolverTest {
         // because "atom" (the literal base-kind name) is in integer_type's own transitive chain.
         assertTrue(integerType.supertypes().contains("top"), "a constructor: IS-A top");
         assertEquals(TypeKind.ATOM, integerType.kind());
-        assertEquals(List.of("atom", "top"), integerType.supertypes());
+        assertEquals(List.of("atom", "type", "top"), integerType.supertypes());
 
-        assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
+        assertEquals("{ supertypes: [ \"atom\" \"type\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
                         + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
@@ -761,6 +763,7 @@ class DefinitionResolverTest {
     void resolvesArrayFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
 
@@ -769,9 +772,9 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.PRODUCT, array.kind());
         assertEquals(List.of(), array.parameters(), "the container constructors carry no parameters");
         assertTrue(array.supertypes().contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("product", "top"), array.supertypes());
+        assertEquals(List.of("product", "type", "top"), array.supertypes());
         assertEquals("{ "
-                        + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
+                        + "supertypes: [ \"product\" \"type\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
@@ -799,6 +802,7 @@ class DefinitionResolverTest {
     void resolvesMapFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
 
@@ -807,9 +811,9 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.PRODUCT, map.kind());
         assertEquals(List.of(), map.parameters(), "the container constructors carry no parameters");
         assertTrue(map.supertypes().contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("product", "top"), map.supertypes());
+        assertEquals(List.of("product", "type", "top"), map.supertypes());
         assertEquals("{ "
-                        + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
+                        + "supertypes: [ \"product\" \"type\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: NAMED } "
@@ -920,10 +924,10 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.PRODUCT, set.kind());
         assertEquals(List.of(), set.parameters(), "the container constructors carry no parameters");
         assertTrue(set.supertypes().contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("array", "product", "top"), set.supertypes());
+        assertEquals(List.of("array", "product", "type", "top"), set.supertypes());
         assertEquals("{ source: { name: \"array\" arguments: [] } "
                         + ""
-                        + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
+                        + "supertypes: [ \"array\" \"product\" \"type\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
@@ -977,6 +981,7 @@ class DefinitionResolverTest {
     void resolvesEnumTypeAndEnumFromTheRealMetaKernelFixture() throws IOException, DataBindException {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         TypeDefinition enumType = resolver.resolve(schemaMap.declarations().get("enum_type"));
         resolved.put("enum_type", enumType);
@@ -984,7 +989,7 @@ class DefinitionResolverTest {
 
         // enum_type => atom & { type: type_name  members: enum_set }: the constructor, `type` required.
         assertEquals(TypeKind.ATOM, enumType.kind());
-        assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
+        assertEquals("{ supertypes: [ \"atom\" \"type\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
                         + "{ name: \"type\" type: { name: \"type_name\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
@@ -995,9 +1000,9 @@ class DefinitionResolverTest {
         // enum => enum_type ^ { type?: = identifier }: a constructor tightening, `type` pinned and injected, so
         // `members` is the one unmarked field and `!enum [A B]` stays the positional form.
         assertEquals(TypeKind.ATOM, enumDef.kind());
-        assertEquals(List.of("enum_type", "atom", "top"), enumDef.supertypes());
+        assertEquals(List.of("enum_type", "atom", "type", "top"), enumDef.supertypes());
         assertEquals("{ source: { name: \"enum_type\" arguments: [] } "
-                        + "supertypes: [ \"enum_type\" \"atom\" \"top\" ] subtypes: [] "
+                        + "supertypes: [ \"enum_type\" \"atom\" \"type\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"type\" type: { name: \"type_name\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: identifier } "
@@ -1017,6 +1022,7 @@ class DefinitionResolverTest {
         // handles that for the whole file -- see its class Javadoc).
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("enum_type", resolver.resolve(schemaMap.declarations().get("enum_type")));
         resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
@@ -1051,6 +1057,7 @@ class DefinitionResolverTest {
     void booleanInstanceResolvesCorrectlyViaTheCompiledReader() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("enum_type", resolver.resolve(schemaMap.declarations().get("enum_type")));
         resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
@@ -1726,6 +1733,7 @@ class DefinitionResolverTest {
     private void resolveUpToArray() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
         resolved.put("array", resolver.resolve(schemaMap.declarations().get("array")));

@@ -622,3 +622,53 @@ media type, canonical text lowercase with parameters sorted".
 **Status against Revision 37:** open; running on `r2026-38-proposal`. Meta's `media_type_type` and net.tn's
 `media_type`, read by `tson-atom`'s `MediaTypeParser` through `io.ltr8.net.MediaType`, with corpus vectors in
 `class1/vocabulary` (forms, equality, refusals) and `class2/validate` (each facet).
+
+---
+
+## 9. The `type` kind: `atom`, `product` and `sum` IS-A `type`, and `data` does not
+
+**Section:** [TSON-SCHEMA] §4.1 (the base kinds, each "composing with `top` via `top & {}`"), §8.1 (kind
+determination, "the base kind … excluding `top`"; kind derivation), §13.2's `meta-kernel.tn` row.
+
+**Kind:** proposal — the kernel can say "a type" only by exclusion.
+
+**The problem.** §4.1 divides the kernel's kinds in two. `atom`, `product` and `sum` describe the shape of a data
+value; `data` describes something that is not one, and "naming one where a type is expected is a resolver error".
+"A type" is therefore defined only as "not `data`", and nothing in the kernel names it. A slot that must refer to a
+type — a field's `type`, a choice's variants, an element type, a `reference`'s `target` — has nothing to say so with,
+and every such constraint lives in a resolver's code. Once data is not the only non-type kind (a scope, a namespace
+of names), "not `data`" is not even the right test.
+
+**Proposed, and running.** A kernel entry for the shared kind, which the three base kinds of data values compose
+with:
+
+```
+type    => top & {}
+atom    => type & {}
+product => type & { access_pattern: product_access_type  size_type: product_size_type }
+sum     => type & {}
+data    => top & {}
+```
+
+- **An entry is a type exactly when it IS-A `type`.** `data` IS-A `top` alone, and so do `reference` and
+  `template`, which compose with `top` directly, as now.
+- **`type` is not a base kind.** §8.1's kind determination reads `atom`, `product`, `sum` or `data` off the chain,
+  "excluding `top`", and should say "excluding `top` and `type`". Kind derivation's branch (3) already names only
+  `atom`, `sum` and `data`. No entry's kind changes. An entry composing with `type` alone is PRODUCT by the
+  structural default, exactly as one composing with `top` alone is.
+- **IS-A `top` is still the constructor predicate** (§3.3.1, §4.2), since `type` IS-A `top`.
+- **What moves is complete supertype lists.** Every constructor under `atom`, `product` or `sum` gains `type` in
+  its resolved `supertypes` (`integer_type`'s is `[atom top type]`), and `top`'s subtypes gain `type`. A schema's
+  own declared supertypes are untouched.
+
+This is the kernel half of typed references. A later rule can say "this slot names a type" as IS-A `type`, rather
+than as one more exclusion in a resolver.
+
+**Suggested resolution.** In §4.1: "The kernel defines `top` as the structural root, `type => top & {}` as the kind
+of the kinds that describe data values, and four base kinds: `atom`, `product` and `sum`, each composing with `type`,
+and `data`, composing with `top`. An entry describes a type exactly when it IS-A `type`." In §8.1, kind determination
+excludes `top` and `type`. §13.2's table names `type` among the kernel's entries.
+
+**Status against Revision 37:** open; running on `r2026-38-proposal`. `meta-kernel.tn` declares `type`, and the
+three kinds compose with it; the resolved fixtures carry the entry and the longer chains (`ResolvedFixtureTest`), and
+the bundled schemas are restamped. No check reads `type` yet, so no verdict changes: the corpus passes unchanged.

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=ba1f621a8d0cbcd69cae968440fcf0cdcaee04d926f6d2ab187b0f3e57605246"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -16,32 +16,38 @@
 {
   @doc:"""
     The structural root. Every constructor transitively IS-A `atom`, `product`,
-    `sum` or `data`, each of which IS-A `top`, except `reference` and
-    `template`, which compose with `top` directly. Construction transfers kind,
-    not IS-A, so instances and fresh records sit under the kinds without
-    supertypes. The first three describe the shape of a data value; `data`
-    describes something that is not one.
+    `sum` or `data`, except `reference` and `template`, which compose with
+    `top` directly. `atom`, `product` and `sum` IS-A `type`, which IS-A `top`;
+    `data` IS-A `top` alone. Construction transfers kind, not IS-A, so
+    instances and fresh records sit under the kinds without supertypes.
     """
   top       => {}
+
+  @doc:"""
+    The kind of kinds that describe the shape of a data value: `atom`,
+    `product` and `sum` IS-A `type`, and nothing else does. An entry whose
+    body IS-A `type` is a type; one whose body IS-A `data` is not.
+    """
+  type      => top & {}
 
   @doc:"""
     The kind of a scalar: a value written as one token, which its atom family
     reads into a value.
     """
-  atom      => top & {}
+  atom      => type & {}
 
   @doc:"""
     The kind of a compound value of parts: a record, an array, a map or a tuple.
     `access_pattern` says whether a part is reached by position or by name, and
     `size_type` whether the number of parts is fixed by the type.
     """
-  product   => top & {
+  product   => type & {
     access_pattern: product_access_type
     size_type:      product_size_type
   }
 
   @doc:"The kind of a value that is one of several types: a choice or a scope."
-  sum       => top & {}
+  sum       => type & {}
 
   @doc:"""
     The body of an entry that describes something other than an atom, product,

@@ -21,12 +21,15 @@ Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `d
 
 ## `Data`: an entry that is not a type (`schema.meta.Data`, §4.1's `data` base kind)
 
-§2.2.2 calls the meta layer the format's sanctioned extension point, and a meta-schema may declare
-constructors of its own. The question that needs an answer is where an *instance* of such a constructor
-lands when the thing it describes is not a data type — `schema => {type_name => type_definition}` makes
-every schema-map entry a type definition. `data => top & {}` is the fourth base kind that lets one say
-otherwise, and `TypeKind.DATA` is what it resolves to. The motivating case is an HTTP operation, which must
-sit at the schema layer because that is the only layer able to name request and response types *by name*.
+§2.2.2 calls the meta layer the format's sanctioned extension point, and a meta-schema may declare constructors of its
+own. The question that needs an answer is where an *instance* of such a constructor lands when the thing it describes
+is not a data type — `schema => {type_name => type_definition}` makes every schema-map entry a type definition. `data
+=> top & {}` is the fourth base kind that lets one say otherwise, and `TypeKind.DATA` is what it resolves to. The
+kernel names the other side: `type => top & {}`, which `atom`, `product` and `sum` compose with (SPEC-FEEDBACK.md #9),
+so an entry is a type exactly when it IS-A `type`, and `data` IS-A `top` alone. `type` is not a base kind — kind
+derivation reads `atom`, `sum` and `data` off the chain and skips `type` as it skips `top` — so adding it moved every
+type's complete supertype list and no kind. The motivating case is an HTTP operation, which must sit at the schema
+layer because that is the only layer able to name request and response types *by name*.
 
 - **`Data` is the one open branch of `Top`.** Every other branch is sealed all the way down: each leaf
   mirrors one kernel constructor, so a body's kind is decidable by inspection and each switch over them is
