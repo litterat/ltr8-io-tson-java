@@ -7,9 +7,9 @@ history lives in git.
 
 - Java 25; no external runtime dependencies in main code.
 - `tson-compiler` depends on `tson-schema`, not the reverse; `schema.meta` names no `tson-compiler` type.
-- `tson-tree`, `ltr8-regex`, `ltr8-net` and `ltr8-unicode` are leaves, and `tson-base` depends only on `ltr8-bind`,
-  `ltr8-net` and `ltr8-unicode`;
-  `tson-json` has no dependency on `tson-compiler`.
+- `tson-tree`, `ltr8-regex` and `ltr8-unicode` are leaves, `ltr8-net` depends only on `ltr8-unicode`, and
+  `tson-base` depends only on `ltr8-bind`, `ltr8-net` and `ltr8-unicode`; `tson-json` has no dependency on
+  `tson-compiler`.
 - `Tson`/`Json` prefix only what a consumer names; unexported packages hold bare names.
 - No `opens` directives; an unexported package is genuinely unreachable.
 - A resolver never names a facade (`TsonObjectWriter`) — only the engine beneath it.
@@ -95,30 +95,33 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `tson-tree`; TSON pins its `regex` atom to I-Regexp (`regex_type`'s fixed `spec = rfc9485`), so
   this owns I-Regexp semantics rather than delegating to `java.util.regex` (a laxer superset).
   `tson-schema`, `tson-atom` and `tson-compiler` require it; it names no TSON type.
-- **`ltr8-net`** — **only** `io.ltr8.net`: native recognizers for network text formats, each to its RFC.
-  `Iri.parse` reads an RFC 3986 URI-reference or RFC 3987 IRI-reference into its components as written (or
-  throws `IriSyntaxException`), never resolving, normalising or percent-decoding. A true leaf, and the second
-  library here with no `Tson` prefix, as `io.ltr8.bind` has none: it knows nothing of TSON and is usable on its
-  own. Beside `Iri`: `InternetAddress` (RFC 3986's IPv4 and RFC 4291's IPv6 text forms, to octets and back, which
-  `Iri`'s IP literals read through), the `CidrNetwork` pair (RFC 4632 / RFC 4291 §2.3 prefixes, with containment
-  and the host-bits rule) and `MacAddress` (RFC 9542's EUI-48). Each exists because the JDK's answer is another
-  grammar: `java.net.URI` implements RFC 2396 and cannot hold a host beyond US-ASCII, and `InetAddress` admits
-  leading zeros, short forms and bare integers. `tson-base` requires it transitively (`CanonicalIdentity`,
-  `SchemaReference`, and its values as host types), `tson-schema`'s coherence checks judge facet entries with it,
-  and `tson-atom` wraps each format in an `AtomTypeParser` that adds the facets.
-- **`ltr8-unicode`** — **only** `io.ltr8.unicode`: Unicode Character Database properties and the algorithms over
-  them, each to its Unicode standard. The tables: `Xid` (UAX #31's `XID_Start`/`XID_Continue`, exact, and
-  `UNICODE_VERSION`, the one version every table is checked against), `Nfc` (UAX #15, allocation-free on text
-  already in NFC), `NfkcCasefold`, `IdentifierStatus` and `Confusables` (`skeleton`). The algorithms over them:
-  `Normalization` (the text forms), `IdentifierProfile` (a UAX #31 R1 profile), `JoiningControls` (UTS #39's
-  limited contexts for ZWNJ and ZWJ), `ConfusableNames` (skeleton distinctness over a set) and `RestrictionLevel`
-  (UTS #39 §5.2's levels). A true leaf that knows nothing of TSON, named for the publisher rather than the format.
-  The boundary is **mechanism versus choice**: what the Unicode standards define lives here, and what a format
-  chooses — its own profile, the policy it applies and the words of a refusal — stays with the format
-  (`tson-atom`'s `IdentifierGrammar`, `tson-base`'s `ScriptPolicy` and `IdentifierPolicy`). One version for every
-  table is the reason it is one module: a JDK whose Unicode version moves re-derives them together. `tson-base` requires it
-  transitively, so the engines above read `Nfc`, `Normalization` and `IdentifierProfile` without naming a second
-  module, and a consumer naming a level names `RestrictionLevel`, since the levels are Unicode's.
+- **`ltr8-net`** — **only** `io.ltr8.net`: native recognizers for network text formats, each to its RFC. `Iri.parse`
+  reads an RFC 3986 URI-reference or RFC 3987 IRI-reference into its components as written (or throws
+  `IriSyntaxException`), never resolving, normalising or percent-decoding. A library with no `Tson` prefix, as
+  `io.ltr8.bind` has none: it knows nothing of TSON and is usable on its own. Beside `Iri`: `InternetAddress` (RFC
+  3986's IPv4 and RFC 4291's IPv6 text forms, to octets and back, which `Iri`'s IP literals read through), the
+  `CidrNetwork` pair (RFC 4632 / RFC 4291 §2.3 prefixes, with containment and the host-bits rule), `MacAddress` (RFC
+  9542's EUI-48), `HostName` (a domain name in either label form, IDNA2008, over `Punycode`) and `Host` (a `HostName`
+  or a `Host.Address`). Each exists because the JDK's answer is another grammar: `java.net.URI` implements RFC 2396
+  and cannot hold a host beyond US-ASCII, `InetAddress` admits leading zeros, short forms and bare integers, and
+  `java.net.IDN` is IDNA2003. Its one dependency is `ltr8-unicode`, for IDNA2008's derived property and the Bidi rule,
+  which belong with the Unicode tables at their one version. `tson-base` requires it transitively
+  (`CanonicalIdentity`, `SchemaReference`, and its values as host types), `tson-schema`'s coherence checks judge facet
+  entries with it, and `tson-atom` wraps each format in an `AtomTypeParser` that adds the facets.
+- **`ltr8-unicode`** — **only** `io.ltr8.unicode`: Unicode Character Database properties and the algorithms over them,
+  each to its Unicode standard. The tables: `Xid` (UAX #31's `XID_Start`/`XID_Continue`, exact, and `UNICODE_VERSION`,
+  the one version every table is checked against), `Nfc` (UAX #15, allocation-free on text already in NFC),
+  `NfkcCasefold`, `IdentifierStatus`, `Confusables` (`skeleton`) and `IdnaProperty` (RFC 5892's derived property,
+  computed by the RFC's rules and checked against IANA's last table). The algorithms over them: `Normalization` (the
+  text forms), `IdentifierProfile` (a UAX #31 R1 profile), `JoiningControls` (UTS #39's limited contexts for ZWNJ and
+  ZWJ), `ConfusableNames` (skeleton distinctness over a set), `RestrictionLevel` (UTS #39 §5.2's levels) and
+  `BidiRule` (RFC 5893). A true leaf that knows nothing of TSON, named for the publisher rather than the format. The
+  boundary is **mechanism versus choice**: what the Unicode standards define lives here, and what a format chooses —
+  its own profile, the policy it applies and the words of a refusal — stays with the format (`tson-atom`'s
+  `IdentifierGrammar`, `tson-base`'s `ScriptPolicy` and `IdentifierPolicy`). One version for every table is the reason
+  it is one module: a JDK whose Unicode version moves re-derives them together. `tson-base` requires it transitively,
+  so the engines above read `Nfc`, `Normalization` and `IdentifierProfile` without naming a second module, and a
+  consumer naming a level names `RestrictionLevel`, since the levels are Unicode's.
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the token-side atom glue
   (`atom`: `RawTokenParser`, `TokenAtomType`, `ValueParser` — the vocabulary itself is `tson-atom`'s),
   schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades

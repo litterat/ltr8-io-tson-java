@@ -17,6 +17,8 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.HostType;
+import io.ltr8.tson.schema.meta.HostnameType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
@@ -101,6 +103,8 @@ public enum DiscriminationClass {
             case BytesType ignored -> Optional.of(STRING);
             case EmailType ignored -> Optional.of(STRING);
             case Ipv4Type ignored -> Optional.of(STRING);
+            case HostnameType ignored -> Optional.of(STRING);
+            case HostType ignored -> Optional.of(STRING);
             case Ipv6Type ignored -> Optional.of(STRING);
             case Cidr4Type ignored -> Optional.of(STRING);
             case Cidr6Type ignored -> Optional.of(STRING);

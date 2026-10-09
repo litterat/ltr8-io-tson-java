@@ -106,7 +106,7 @@ class CoreSchemaImportTest {
         TsonSchema net = schemaRegistry.get(TsonBundledSchemas.NET_ID).orElseThrow().schema();
         TsonSchema core = schemaRegistry.get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
-        Set<String> network = Set.of("ipv4", "ipv6", "cidr4", "cidr6", "mac", "hostname");
+        Set<String> network = Set.of("ipv4", "ipv6", "cidr4", "cidr6", "mac", "hostname", "host");
         assertEquals(network, net.entries().keySet());
         assertTrue(network.stream().noneMatch(core.entries()::containsKey), "core declares a network name");
     }

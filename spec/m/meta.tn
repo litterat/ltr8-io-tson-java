@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta.tn?sha256=f4bc634c2e40ec9002f997f47fe0055e84a47c4cdd4b0463024f79539e23dfc3"
+!!id:"https://tson.io/2026/38/m/meta.tn?sha256=d0316a128e3b15259639109734ec2d344de1862a1c09f6bc043e56e4b986c398"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0"
 !!import:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0"
 @doc:"""
@@ -36,7 +36,8 @@
      `complex_type`, with the `complex_component` enum), temporal (`date_type`,
      `time_type`, `datetime_type`, `duration_type`, `period_type`), identifier
      (`uuid_type`, `uri_type`), network (`ipv4_type`, `ipv6_type`,
-     `cidr4_type`, `cidr6_type`, `mac_type`), and text (`email_type`).
+     `cidr4_type`, `cidr6_type`, `mac_type`, `hostname_type`, `host_type`), and
+     text (`email_type`).
 
   Plus annotation types — the classifying markers `ordering`, `bounded`, `exact`,
   `numeric`; the checked assertion `disjoint`; and the documentary `deprecated`,
@@ -478,6 +479,40 @@
   @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac` in net."
   mac_type => atom & atom_specification & {
     spec?: = "https://www.rfc-editor.org/rfc/rfc9542"
+  }
+
+  @doc:"""
+    Host name constraint vocabulary. Instance is `hostname` in net. A domain
+    name as a host names it: labels of ASCII letters, digits and hyphens
+    (RFC 1123 §2.1), or internationalized labels judged by IDNA2008 (RFC 5890
+    to RFC 5893), written as U-labels or as their A-labels, in any mix. `A`-`Z`
+    read as `a`-`z`; nothing else is mapped, so uppercase beyond ASCII, a
+    U-label not in NFC and percent-encoding are not host names. A label is at
+    most 63 octets and the name at most 253, counted in the A-label form; no
+    label is empty, none begins or ends with `-`, and there is no trailing `.`.
+    The last label does not begin with a digit, so a dotted-quad is never a
+    host name. The value is the name: every spelling of one name is one value,
+    and its canonical text has each internationalized label as its U-label.
+    `allow_idn` false admits only names with no internationalized label, in
+    either spelling.
+    """
+  hostname_type => atom & atom_specification & {
+    spec?:      = "https://www.rfc-editor.org/rfc/rfc5890"
+    allow_idn?: boolean ~ true
+  }
+
+  @doc:"""
+    Host constraint vocabulary. Instance is `host` in net. RFC 3987's `ihost`
+    with a DNS name: a host name as `hostname_type` has it, an IPv4 address in
+    dotted-quad, or an IPv6 address, written with or without the brackets a
+    URI puts around one. No zone identifier. The value is the name or the
+    address, never both; a name compares by name, an address by its octets,
+    and an IPv4 address never equals an IPv6 one, IPv4-mapped included. The
+    canonical text is the member's: the name's U-labels, the dotted-quad, or
+    RFC 5952 text without brackets.
+    """
+  host_type => atom & atom_specification & {
+    spec?: = "https://www.rfc-editor.org/rfc/rfc3987"
   }
 
   @doc:"""

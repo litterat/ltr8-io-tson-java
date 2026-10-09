@@ -39,6 +39,8 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.HostType;
+import io.ltr8.tson.schema.meta.HostnameType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
@@ -1280,6 +1282,10 @@ public final class TsonSchemaLinker {
             case Ipv4Type ignored -> {
             }
             case Ipv6Type ignored -> {
+            }
+            case HostnameType ignored -> {
+            }
+            case HostType ignored -> {
             }
             case ComplexType ignored -> {
             }

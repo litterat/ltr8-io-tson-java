@@ -193,7 +193,7 @@ public final class JoiningControls {
      * {@code Joining_Type=Transparent}. {@code ArabicShaping.txt}'s default rule with its exceptions applied:
      * an explicit value in the file always wins over the {@code General_Category} default.
      */
-    private static boolean isTransparent(int cp) {
+    static boolean isTransparent(int cp) {
         if (inRanges(TRANSPARENT_ADDED, cp)) {
             return true;
         }
@@ -203,6 +203,21 @@ public final class JoiningControls {
         int type = Character.getType(cp);
         return type == Character.NON_SPACING_MARK || type == Character.ENCLOSING_MARK
                 || type == Character.FORMAT;
+    }
+
+    /** {@code Joining_Type} Dual_Joining or Left_Joining. */
+    static boolean isLeftJoining(int cp) {
+        return inRanges(LEFT_JOINING, cp);
+    }
+
+    /** {@code Joining_Type} Dual_Joining or Right_Joining. */
+    static boolean isRightJoining(int cp) {
+        return inRanges(RIGHT_JOINING, cp);
+    }
+
+    /** {@code Canonical_Combining_Class=9}, Virama. */
+    static boolean isVirama(int cp) {
+        return inRanges(VIRAMA, cp);
     }
 
     /** Flattened inclusive ranges, ascending -- see {@link IdentifierStatus#isAllowed} for the bisection. */

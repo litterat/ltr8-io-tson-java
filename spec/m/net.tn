@@ -1,13 +1,12 @@
-!!id:"https://tson.io/2026/38/m/net.tn?sha256=7fb72c7e6b6407a6b48068146afa8d86e977e568bdea11057aad7866a8edcbb4"
-!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=f4bc634c2e40ec9002f997f47fe0055e84a47c4cdd4b0463024f79539e23dfc3"
+!!id:"https://tson.io/2026/38/m/net.tn?sha256=60c6071567304fa8b233983523509a7e69e63fce1729563e875cba3d016dabd7"
+!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=d0316a128e3b15259639109734ec2d344de1862a1c09f6bc043e56e4b986c398"
 @doc:"""
   TSON Network Type Library — addresses, networks and host names
   (2026 Revision 38 draft).
 
   A library a schema imports when it wants these names, and only then: every
   name a schema imports is one it may not declare ([TSON-SCHEMA] §2.2.3). The
-  address and network types are empty instances of meta's constructors, as
-  core's atoms are; `hostname` is an instance of the kernel's `text_type`.
+  types are empty instances of meta's constructors, as core's atoms are.
   The schemaless annotations of the same names ([TSON-DATA] §5.5) denote these
   types.
 
@@ -16,9 +15,13 @@
 
   References:
     RFC 1123              Host name syntax (§2.1)
+    RFC 3492              Punycode
     RFC 3986              IPv4address grammar
+    RFC 3987              Internationalized Resource Identifiers (ihost)
     RFC 4291              IPv6 addressing architecture
     RFC 4632              Classless Inter-domain Routing (CIDR)
+    RFC 5890-5893         IDNA2008: definitions, protocol, code points, Bidi
+    RFC 5952              IPv6 address text representation
     RFC 9542              IEEE 802 parameters (EUI-48 format)
   """
 {
@@ -66,18 +69,18 @@
   mac => !mac_type {}
 
   @doc:"""
-    Internet host name (RFC 1123 §2.1): labels of ASCII letters, digits and
-    hyphens joined by `.`, each 1-63 characters and neither starting nor ending
-    with a hyphen, the last starting with a letter, at most 253 characters in
-    all. The value is the name with `A`-`Z` folded to `a`-`z`
-    (`ASCII_CASEFOLD`), so `Example.COM` and `example.com` are one value. No
-    trailing `.`, and no U-labels: an internationalized name is written as its
-    A-labels (`xn--`). A dotted-quad is not a host name; it is an `ipv4`.
+    Internet host name, in either label form: `Example.COM` and `example.com`
+    are one value, and so are `xn--bcher-kva.example` and `bücher.example`,
+    whose canonical text is the second. See `hostname_type` in meta.
     """
   @ordering:NONE @bounded:false
-  hostname => !text_type {
-    pattern: "([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.])*[a-z]([a-z0-9-]{0,61}[a-z0-9])?"
-    max_length: 253
-    normalization: ASCII_CASEFOLD
-  }
+  hostname => !hostname_type {}
+
+  @doc:"""
+    A host: a `hostname`, an IPv4 address or an IPv6 address, one string-class
+    type, so `localhost`, `"127.0.0.1"`, `"::1"` and `"[::1]"` need no tag. See
+    `host_type` in meta.
+    """
+  @ordering:NONE @bounded:false
+  host => !host_type {}
 }
