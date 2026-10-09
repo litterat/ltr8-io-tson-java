@@ -702,9 +702,19 @@ relaxed type, defined by the translation and not by the series, such as
   any single-line token, and the identifier match moves from the parser to the record, so a schemaless
   `{ "first name": 1 }` is a resolver error rather than a parse error. That is the one verdict that moves.
 - **Part 3's reserved member names move.** Its reserved namespace rests on no declared name beginning with `$`,
-  which a relaxed `field_name_type` breaks.
-- **No shipped `json_name`, for now.** A relaxed type is likely the translation's own and differs between sources;
-  whether the series should ship one waits on the implementation.
+  which a relaxed `field_name_type` breaks: JSON Schema's and OpenAPI's own members are `$ref`, `$id`, `$defs` and
+  `$schema`, so a translated record names exactly the members Part 3 claims. *Proposed, not yet built:*
+  `!schema`, `!type` and `!value`, with one total rule on the schema side — no record's field name begins with
+  `!`, under any `field_name_type`. `!` is TSON text's own type-annotation sigil, so `"!type": "dog"` reads as
+  `!dog` does; neither `$` (JSON Schema's) nor `@` (JSON-LD's: `@type`, `@value`) is free, and no ecosystem in
+  view claims `!`. The rule keeps the reservation sound by construction where a character test no longer can,
+  since a `text` field name type admits every character. As built, the JSON reader matches a member by its
+  declared name and judges no matched name, so `"@id"` reads under a `json_name` record; a `$`-initial declared
+  name cannot be read from JSON until the move lands, being refused as an unknown reserved member.
+- **No shipped `json_name`.** A relaxed type is the translation's own and differs between sources, and the
+  implementation needed nothing from the series to support one: `!identifier_type { start_add: "@$" }` is a
+  complete definition, read, bound and written like any record's names, and `text` serves a source with arbitrary
+  member names.
 - **A schema's field names are judged at load, by the record's type.** The schema grammar admits any single-line
   token as a declared field name too, and the linker holds every record to its `field_name_type`: the type names a
   text family, every name in `fields`, `discriminators` and the groups is a value of it, and no two fields are one
