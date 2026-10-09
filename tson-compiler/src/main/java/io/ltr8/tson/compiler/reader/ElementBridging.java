@@ -9,7 +9,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
  * Turns a reader into one that hands back its target's <em>object</em> form, applying that
  * {@link DataClass}'s own bridge where it has one.
  *
- * <p><b>Every schema-driven position needs this, not only a collection's elements.</b> {@code tson-bind}
+ * <p><b>Every schema-driven position needs this, not only a collection's elements.</b> {@code ltr8-bind}
  * applies a bridge as it collects a record's constructor arguments, and a schema-driven read is precisely
  * the path that does not go through it: {@link RecordBindReader} fills its own argument array from the
  * compiled field readers, and a collection appends its elements one at a time through the collection's own

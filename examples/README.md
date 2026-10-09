@@ -27,7 +27,7 @@ java --module-path tson/build/modules --add-modules io.ltr8.tson examples/Docume
 
 - `--module-path tson/build/modules` puts the five `tson` module jars on the module path.
 - `--add-modules io.ltr8.tson` resolves the front-door module (and, transitively, `tson-compiler`,
-  `tson-schema`, `tson-bind`, `tson-annotation`), making them readable from the program's own code.
+  `tson-schema`, `ltr8-bind`, `ltr8-annotation`), making them readable from the program's own code.
 - Inside each file, `import module io.ltr8.tson;` imports the front door and its transitive modules in
   one line; `IO.println` and `java.base` types (`UUID`, `LocalDate`, …) come for free from a compact
   source file's implicit `java.base` import.

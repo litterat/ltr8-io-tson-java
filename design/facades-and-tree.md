@@ -237,7 +237,7 @@ admit UTS #39's own `Toys-Я-Us`.
       rest on a property of the reading application rather than of the document.
 - **`DataClassObjectReader` streams events** (like the compiled readers), walking the descriptor in
   parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
-  `ReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /
+  `ReadException`; collecting accumulates), and a `ltr8-bind` `DataBindException` while narrowing /
   applying a bridge / invoking a constructor is caught and re-reported through `ctx`, so a caller sees one
   uniform error model regardless of which layer noticed. **No positional form and no schema-composed
   defaults** — both are schema-layer concepts a class-driven bind has no equivalent for (a record must be

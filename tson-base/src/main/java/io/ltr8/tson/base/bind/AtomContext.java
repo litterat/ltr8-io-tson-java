@@ -26,7 +26,7 @@ import java.util.UUID;
  * {@link io.ltr8.tson.base.atom the host values themselves}, because a consumer whose class has a
  * {@code UUID} component must not have to discover that one front door binds it and the other does not.
  *
- * <p>Every type here is registered as an <b>atom</b> rather than left to {@code tson-bind}'s structural
+ * <p>Every type here is registered as an <b>atom</b> rather than left to {@code ltr8-bind}'s structural
  * auto-detection. Most are opaque scalars the engine has no way to take apart; a CIDR network is a Java
  * record, so auto-detection would make a {@code { prefix: ... prefixLength: ... }} of it and refuse the
  * scalar {@code cidr4}/{@code cidr6} actually carry.
@@ -36,7 +36,7 @@ import java.util.UUID;
  * schema record and need registering, as the other temporal host types do.
  *
  * <p><b>Registering a class is not the same as converting to it.</b> What this buys is that
- * {@code tson-bind} treats each as a scalar; the string-to-host-value conversion is the position's own atom
+ * {@code ltr8-bind} treats each as a scalar; the string-to-host-value conversion is the position's own atom
  * parser's, under a schema. With no schema neither encoding converts one, which is a shared gap rather than
  * an asymmetry -- {@code BACKLOG.md}'s "Binding" section carries it.
  *

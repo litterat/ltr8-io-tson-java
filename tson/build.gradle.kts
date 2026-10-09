@@ -22,7 +22,7 @@ dependencies {
     api(project(":tson-schema"))
     // Reachable through tson-compiler, declared here because JPMS resolution needs it present.
     api(project(":tson-atom"))
-    api(project(":tson-bind"))
+    api(project(":ltr8-bind"))
     api(project(":tson-tree"))
 
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
@@ -31,7 +31,7 @@ dependencies {
 }
 
 // Gather this module's runtime jars -- itself plus its transitive dependencies (tson-compiler,
-// tson-schema, tson-bind, tson-annotation) -- into a single directory, so the single-file programs
+// tson-schema, ltr8-bind, ltr8-annotation) -- into a single directory, so the single-file programs
 // in examples/ can run straight off the module path with no build tool:
 //   ./gradlew :tson:modules
 //   java --module-path tson/build/modules --add-modules io.ltr8.tson examples/ObjectBinding.java

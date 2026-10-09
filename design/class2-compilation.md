@@ -126,7 +126,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   never redirect its binding. The index is built once per compile beside `namesMeaning`, for that one's
   reason — a property of the schema, not of the entry being looked up. **A class that is mapped and fails
   analysis stops the search at once** and says so — `'sets' binds Sets, which cannot be analysed: …`, each
-  cause along the chain — rather than reading as a name nothing binds; only `tson-bind`'s
+  cause along the chain — rather than reading as a name nothing binds; only `ltr8-bind`'s
   `UnboundNameException` moves on to the next candidate, and a search that finds nothing reports the first,
   the author-written name. That is what makes an erased component
   (`no valid data conversion for class java.lang.Object`) visible from an ordinary read.

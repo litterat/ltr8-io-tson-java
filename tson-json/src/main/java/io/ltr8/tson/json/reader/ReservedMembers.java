@@ -17,7 +17,7 @@ import java.util.Set;
  *
  * <p><b>The spec calls the construct an "annotation object" (§3.3) and this class does not</b>, because in
  * this codebase {@code Annotation} means an {@code @name} annotation and nothing else -- two dozen types say
- * so, from the {@code tson-annotation} module through {@code Annotations}, {@code TsonAnnotation} and the
+ * so, from the {@code ltr8-annotation} module through {@code Annotations}, {@code TsonAnnotation} and the
  * {@code AnnotationStart}/{@code AnnotationEnd} events. Those have no JSON carrier at all: §4.3 declines one
  * for v1 and makes encoding a value that carries them an encode error. A class named for §3.3 would be the
  * one place the word meant something else, so it is named for the namespace it reads and cites §3.3

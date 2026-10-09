@@ -14,7 +14,7 @@ Design notes for what a token means: §4 base type resolution for untyped tokens
 - `NumberGrammar` identifies and extracts a `NumberForm`; it does not convert to a host numeric type — binding does.
 - Three indices, three questions, and no fourth: `BuiltinTypeVocabulary` (name), `AtomParsers` (resolved body),
   `HostAtoms` (host class); a second body→parser table is what drifts.
-- Pattern facets are `String`, validated and matched through `tson-regex` (I-Regexp), never `java.util.regex`.
+- Pattern facets are `String`, validated and matched through `ltr8-regex` (I-Regexp), never `java.util.regex`.
 - Every atom is told apart by its body's constructor, never by its declared name — `value`, `void` and
   `identifier` included, each with a constructor of its own. `boolean` is the one name-keyed read, and only for
   its host value.
@@ -90,7 +90,7 @@ schema is the oracle rather than a literal in a test.
   than a performance one. A grammar stated as a `java.util.regex` pattern with named groups is stated in a
   dialect no other language shares — an unspecified host dependency in the artifact other implementations
   copy, and TSON pins I-Regexp for a schema's `pattern` facets while saying nothing about how a number is
-  recognized. (This repo's own `tson-regex` is not the substitute: I-Regexp deliberately has no named
+  recognized. (This repo's own `ltr8-regex` is not the substitute: I-Regexp deliberately has no named
   groups, so it cannot extract what `NumberForm` carries.) The scanner is single-pass, with explicit
   `mark`/`reset` at the two places the grammar is genuinely optional — a float's fraction and its exponent —
   because a regex backtracks there and the two must agree. It is also a fifth of a read's allocation
@@ -198,11 +198,11 @@ on every text family.
   `tson-schema`, which is what lets a parser consult its constraint record directly.
 - **`RegexParser` returns `String`, and `TextType.pattern`/`UriType.pattern` are `Optional<String>`, not
   `Pattern`** — `regex` IS-A piece of text (§5.7), so its host value is `String` like every other
-  text-composing atom; the text is validated as I-Regexp via `tson-regex`'s `IRegex.parse` (not
+  text-composing atom; the text is validated as I-Regexp via `ltr8-regex`'s `IRegex.parse` (not
   `java.util.regex`, whose grammar is a superset — `regex_type`'s `spec` is fixed to RFC 9485),
   and the parsed form discarded once it's confirmed well-formed. Keeping these as plain equatable `String`
   (not a compiled matcher) is also what lets them bind generically with no `DataBridge`. **Matching** a value
-  against a `pattern` constraint (`TextParser`/`UriParser`) runs through `tson-regex`'s `IRegex.matches` —
+  against a `pattern` constraint (`TextParser`/`UriParser`) runs through `ltr8-regex`'s `IRegex.matches` —
   a Thompson-NFA, linear-time and ReDoS-safe — not `java.util.regex`.
 - **`value`, `void` and `identifier` each have a constructor**, and are read by it: `value_type` by `ValueParser`
   (in `tson-compiler`, base-type resolution to the natural host), `void_type` by `VoidReader` (the void sentinel
@@ -234,7 +234,7 @@ on every text family.
   `IdentifierParser.IDENTIFIER` reads a value and puts it into NFC first. It lives here rather than in `tson-base`
   because its one definition is `tson-schema`'s `IdentifierType.IDENTIFIER`, and `tson-atom` is the module under both
   encodings that can see it.
-- **The network family reuses one grammar per address form, never a second copy.** Both grammars are `tson-net`'s
+- **The network family reuses one grammar per address form, never a second copy.** Both grammars are `ltr8-net`'s
   `io.ltr8.net.InternetAddress`, which `Iri` reads its IP literals through too: its IPv6 half parses RFC 4291 §2.2's
   embedded IPv4 tail through the same strict `dec-octet` pattern `Ipv4Parser` reads, and `Cidr4Parser`/`Cidr6Parser`
   parse the address half of a network through those two — so the leniency gap `Ipv4Parser`'s Javadoc documents is
@@ -246,7 +246,7 @@ on every text family.
   difference being that a block partly inside an exclusion is partly excluded, which for a value denoting a whole
   block is a rejection.
 - **`uri`/`uri_reference` (`uri_type`, RFC 3986) and `iri`/`iri_reference` (`iri_type`, RFC 3987) share one
-  recognizer, `tson-net`'s `Iri`**, under its URI or IRI grammar, and read to the `Iri` itself: the text as
+  recognizer, `ltr8-net`'s `Iri`**, under its URI or IRI grammar, and read to the `Iri` itself: the text as
   written, split into its components. `java.net.URI` (RFC 2396) is a binding target, never the judge —
   `JavaUriAtom` holds a value as a `URI` or refuses it as a binding failure (`IllegalArgumentException`, so
   `AtomRefusal` files it `TYPE_MISMATCH`), and answers `boundTo` itself because `HostAtoms` hands it out as
@@ -276,7 +276,7 @@ on every text family.
   naming the supertype binds as a union, which is what it honestly is. `mac` and `email` keep `String` for
   the reason the CIDR pair does not: nothing about their text decomposes into a value a schema
   compares. Both networks are Java records registered as **atoms** (`AtomContext.hostTypes()`), or
-  tson-bind's record auto-detection would expect `{ prefix: … prefixLength: … }` on the wire where one token
+  ltr8-bind's record auto-detection would expect `{ prefix: … prefixLength: … }` on the wire where one token
   stands.
 - **The exact tiers' sparse `members` set is a facet, and its identity is [TSON-DATA] §4.3's.** `integer`
   and `number` carry a member set (§5.6) for a value set that is neither a contiguous range nor an
@@ -333,7 +333,7 @@ on every text family.
   CIDR pair reusing the two address grammars and validating §5.5's family-range and host-bits-zero rules on top. All
   four network families apply `within`/`excluding` and judge the pair for emptiness at schema load — exactly,
   prefix-tree cover being counting rather than searching, with a network family's prefix bounds folded in, both halves
-  stated by §5.5. The address grammars (`InternetAddress`, `MacAddress`) and the network values live in `tson-net`, a
+  stated by §5.5. The address grammars (`InternetAddress`, `MacAddress`) and the network values live in `ltr8-net`, a
   leaf beneath `tson-schema`, so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries
   without the linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its
   siblings**, and its format check is the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted

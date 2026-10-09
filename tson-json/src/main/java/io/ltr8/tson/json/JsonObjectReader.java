@@ -23,7 +23,7 @@ import java.util.function.Function;
 
 /**
  * Reads a JSON document straight into a Java object, driven by the target class's own
- * {@code tson-bind} descriptor.
+ * {@code ltr8-bind} descriptor.
  *
  * <p><b>The class is the schema.</b> [TSON-JSON] §4.1 reads every JSON value at a typed position and
  * never by inspecting the value twice; here the type comes from a {@code DataClass} rather than from a

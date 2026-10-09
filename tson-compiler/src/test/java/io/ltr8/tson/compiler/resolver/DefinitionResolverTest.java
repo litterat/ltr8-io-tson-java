@@ -73,7 +73,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Writes resolved values through plain {@code TsonObjectWriter.toTson} -- no hand-written
  * schema-model writer at all -- deliberately, to validate the {@code io.ltr8.tson.schema.meta}
  * model is built from ordinary, idiomatic Java (records, sealed interfaces, enums, {@code
- * Optional}) that {@code tson-bind}'s generic introspection already knows how to bind, rather than
+ * Optional}) that {@code ltr8-bind}'s generic introspection already knows how to bind, rather than
  * a shape that happens to work only because a bespoke writer papered over it.
  *
  * <p>What this confirms works with zero extra code: {@code Top}'s sealed-interface variants

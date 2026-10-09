@@ -76,7 +76,7 @@ deployment states -- the policy, the schema access, the bind context, and the on
 vocabulary -- with every setting returning a new instance, so a configuration may be handed out and
 derived from without the holder losing what they stated. Construction is not here and cannot be: it names
 the compiler's registry, which is why `Tson.of(config)` lives with the engine.
-**`CanonicalIdentity` reads a reference as an IRI-reference** through `tson-net`'s `Iri`, so a host or path beyond
+**`CanonicalIdentity` reads a reference as an IRI-reference** through `ltr8-net`'s `Iri`, so a host or path beyond
 US-ASCII is an identity, compared as written. An identity with no host — path-only or `file:`-style — is its
 path, which must be absolute ([TSON-DATA] §2.2.1), so it can never equal a host-and-path identity: a relative
 `tson.io/…` would be `https://tson.io/…`'s. `SchemaReference`, the fetching sources' check, still requires a host:
@@ -84,11 +84,11 @@ a library entry is never fetched.
 
 **`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to that are TSON's own — `Rational` and
 `Complex` — the question a consumer arrives with rather than part of §8's model, and pure values depending on
-nothing. The network values (`Iri`, the `CidrNetwork` pair) are `tson-net`'s, a library usable without TSON,
+nothing. The network values (`Iri`, the `CidrNetwork` pair) are `ltr8-net`'s, a library usable without TSON,
 which this module requires transitively. **`io.ltr8.tson.base.bind`** is what a deployment binds with:
 `AtomContext` registers those host values, and the JDK ones beside them, with a `DataBindContext`, so a
 class binds the same under every encoding ([TSON-JSON] §5.1). **That is why this module requires
-`tson-bind`, and why doing so costs it nothing**: `tson-bind` is a general engine that binds a `DataValue`
+`ltr8-bind`, and why doing so costs it nothing**: `ltr8-bind` is a general engine that binds a `DataValue`
 to a Java object and has never heard of a schema — system-library standing, like the `java.net.http` this
 module already rests on. The property that matters holds: nothing here knows what a TSON document or
 a JSON one looks like.

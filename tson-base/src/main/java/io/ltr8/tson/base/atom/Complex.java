@@ -21,7 +21,7 @@ import java.math.BigDecimal;
  * the same way a bare {@code !number} is, not normalized across instances.
  *
  * <p>As with {@code Rational}, {@code TsonObjectReader} cannot bind directly to this class -- it's itself
- * a Java record, so {@code tson-bind}'s record auto-detection claims it ahead of the vocabulary
+ * a Java record, so {@code ltr8-bind}'s record auto-detection claims it ahead of the vocabulary
  * path. A {@code DataBridge<Complex, TheirType>} registered via {@code
  * DataBindContext.registerAtom(TheirType.class, bridge)} is the supported (and currently only) way
  * to bind {@code !complex} to a Java field -- the natural fit for an application that already has a

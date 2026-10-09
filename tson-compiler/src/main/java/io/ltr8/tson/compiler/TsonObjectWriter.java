@@ -14,7 +14,7 @@ import java.util.Optional;
 
 /**
  * The write-side counterpart to {@link TsonObjectReader} -- given a Java object and its {@link
- * DataClass} descriptor from {@code tson-bind}, writes it as TSON text. See {@link
+ * DataClass} descriptor from {@code ltr8-bind}, writes it as TSON text. See {@link
  * TsonObjectReader}'s own Javadoc for the read/write split and why this pair lives in {@code
  * tson-compiler}.
  */

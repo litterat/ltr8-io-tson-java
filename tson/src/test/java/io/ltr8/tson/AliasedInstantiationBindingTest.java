@@ -133,7 +133,7 @@ class AliasedInstantiationBindingTest {
 
     /**
      * <b>The reason a class could not be bound is the cause, not a lost sentence.</b> An erased component is
-     * refused by {@code tson-bind} ("no valid data conversion for class java.lang.Object"), and a report that
+     * refused by {@code ltr8-bind} ("no valid data conversion for class java.lang.Object"), and a report that
      * appends the text but drops the cause leaves the caller with a name and no account of what about the
      * class was wrong.
      */

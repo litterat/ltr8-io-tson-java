@@ -336,7 +336,7 @@ class AllocationHarnessTest {
      * schemaless record costs what a schema-driven one does, though it reaches its slots by name where the
      * other was told them.
      *
-     * <p>{@code DataClassRecordFieldIndexTest} in {@code tson-bind} pins that the index is built once, and
+     * <p>{@code DataClassRecordFieldIndexTest} in {@code ltr8-bind} pins that the index is built once, and
      * {@code TsonObjectReaderTest} the repeat that still needs remembering; this reports what a record costs
      * and catches a regression by a multiple rather than by a fraction.
      */

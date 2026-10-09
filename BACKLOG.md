@@ -171,7 +171,7 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   were two to find it from): everything above the event level is encoding-neutral, and today it exists twice,
   guarded by `CrossEncodingParityTest` rather than by being one thing. `tson-base` is the wrong home — it is already
   the shared bottom of everything and is at risk of becoming a miscellany — so this is a module of its own, below
-  `tson-json` and the TSON reader and above `tson-schema`, `tson-atom` and `tson-bind`. The JSON shape (a plan, one
+  `tson-json` and the TSON reader and above `tson-schema`, `tson-atom` and `ltr8-bind`. The JSON shape (a plan, one
   loop per encoding, a builder per mode) is what shares; `tson-compiler`'s base class with hooks shares only by
   making both stacks extend it. In order of value:
   - **The bind plan** — field-to-component matching, the FIXED exemption, `@Unbound`, the atom checks and

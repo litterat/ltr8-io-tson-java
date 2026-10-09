@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and whose bridge crosses to the consumer's own class, so what a reader owes at such a position is the
  * wire value put through that bridge.
  *
- * <p>The schemaless readers get this from {@code tson-bind}, which collects a record's constructor
+ * <p>The schemaless readers get this from {@code ltr8-bind}, which collects a record's constructor
  * arguments through their bridges. A schema-driven read builds its own arguments from the compiled field
  * readers, so it applies the bridge itself, in the same field-wiring step that rebinds a {@code value} slot
  * and a container -- {@code RecordBindReader} over {@code ElementBridging}, the wrapper an array's and a

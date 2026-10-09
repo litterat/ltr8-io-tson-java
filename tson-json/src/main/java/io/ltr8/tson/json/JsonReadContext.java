@@ -34,7 +34,7 @@ import java.util.function.Function;
  * nearly all of them -- and a schema-directed read steps both pointers for every field of every record.
  *
  * <p><b>The schema end is present only when a schema is.</b> A schemaless read -- a tree, or a class's own
- * {@code tson-bind} descriptor playing the schema's part ([TSON-JSON] §4.1) -- has no document to point
+ * {@code ltr8-bind} descriptor playing the schema's part ([TSON-JSON] §4.1) -- has no document to point
  * into, so {@link #schemaLocation()} is empty and the three schema components of every {@link Diagnostic}
  * it builds stay empty with it. A schema-directed read ([TSON-JSON] §5-§8) offers each declaration as it
  * descends ({@link #underDeclaration}), and those components are filled from that.

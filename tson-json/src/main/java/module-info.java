@@ -18,7 +18,7 @@
  * and JEP 540 excludes streaming as a non-goal, so there is nowhere else for that need to go.
  * {@code JsonObjectReader} sits in the front door beside {@code Json}, the way {@code TsonObjectReader}
  * sits beside {@code Tson}: it reads a document straight into a Java object, driven by the target class's
- * own {@code tson-bind} descriptor. JEP 540 excludes data binding as well as streaming, and for a library
+ * own {@code ltr8-bind} descriptor. JEP 540 excludes data binding as well as streaming, and for a library
  * whose point is validated typed data that is the one non-goal worth not inheriting.
  *
  * <p><b>It sits on {@code tson-base}</b>, and on nothing else of this library's engines. That is the whole

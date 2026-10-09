@@ -21,7 +21,7 @@ import java.util.*;
 
 /**
  * Object-binding mode's own {@code record} reader -- reads a record-shaped value into a real, bound
- * Java object via {@code descriptor}, a {@code tson-bind} {@link DataClassRecord} already resolved
+ * Java object via {@code descriptor}, a {@code ltr8-bind} {@link DataClassRecord} already resolved
  * for this record's own schema type name (resolving one is this class's caller's job, not this
  * class's).
  *
@@ -113,7 +113,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                         + ", which has no null to hold it");
             }
             // The component is the target at every depth below the field too (BindTargets), and the bridge and box
-            // are applied here because this reader builds its constructor arguments itself -- tson-bind's binder,
+            // are applied here because this reader builds its constructor arguments itself -- ltr8-bind's binder,
             // which collects a record's arguments through their bridges, is the step a schema-driven read replaces.
             TsonTypeReader<?> rebound = BindTargets.to(field.parser(), target.dataClass(),
                     "field '" + field.schema().name() + "'", "component '" + target.name() + "'",
@@ -162,7 +162,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * binding actually matches on.
      *
      * <p>Read here by reflection rather than carried on {@link DataClassField}, because it answers a
-     * <em>TSON</em> question -- "is a schema field expected to fill this?" -- that {@code tson-bind}'s
+     * <em>TSON</em> question -- "is a schema field expected to fill this?" -- that {@code ltr8-bind}'s
      * generic descriptor has no notion of: the descriptor knows components, not schemas. Both the record
      * component and its accessor are consulted, so the marker works wherever a class can put it.
      */

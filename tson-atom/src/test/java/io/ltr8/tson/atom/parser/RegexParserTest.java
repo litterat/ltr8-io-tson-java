@@ -25,7 +25,7 @@ class RegexParserTest {
     @Test
     void rejectsConstructsOutsideTheIRegexpSubset() {
         // A named capture group and a \d escape are valid java.util.regex but not I-Regexp -- validation
-        // goes through tson-regex (RFC 9485), so this atom rejects them rather than inheriting the JVM's
+        // goes through ltr8-regex (RFC 9485), so this atom rejects them rather than inheriting the JVM's
         // laxer grammar (the whole point of the regex_type spec pin; see RegexParser's Javadoc).
         assertThrows(AtomParseException.class, () -> RegexParser.UNCONSTRAINED.read(token("(?<year>[0-9]{4})")));
         assertThrows(AtomParseException.class, () -> RegexParser.UNCONSTRAINED.read(token("\\d+")));

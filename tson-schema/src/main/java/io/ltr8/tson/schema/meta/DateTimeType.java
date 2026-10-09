@@ -30,7 +30,7 @@ public record DateTimeType(Optional<OffsetDateTime> min, @Field("exclusive_min")
                      Optional<BigInteger> precision) implements Atom {
 
     /**
-     * Carries {@code @Record} because a second constructor exists below, and {@code tson-bind}'s own
+     * Carries {@code @Record} because a second constructor exists below, and {@code ltr8-bind}'s own
      * constructor selection fails outright without it (see {@link IntegerSize}).
      */
     @Record

@@ -156,7 +156,7 @@ which is the same rendering reached from a value instead of from a writer.
 ## Binding: a facade over an engine
 
 `JsonObjectReader` reads a document straight into a Java object, driven by the target class's own
-`tson-bind` descriptor and streaming the event source rather than a tree.
+`ltr8-bind` descriptor and streaming the event source rather than a tree.
 
 **It is a facade over `DataClassObjectReader`**, which is what actually binds a value — the same split
 `TsonObjectReader` makes over the reader of that name in `tson-compiler`, and for the same reason: **a front
@@ -206,7 +206,7 @@ place it was predicted to.
 Three rules are §7-shaped, as far as a Java class can express §7:
 
 - **JSON null at a required component is refused**, exactly as `_` is at a REQUIRED field
-  ([TSON-SCHEMA] §7.6). A component `tson-bind` marks required is a primitive, or one carrying
+  ([TSON-SCHEMA] §7.6). A component `ltr8-bind` marks required is a primitive, or one carrying
   `@Field(required = true)`.
 - **JSON null anywhere else is the absence**, which a bound object spells `null`, having no third state —
   so an omitted member and a null member are indistinguishable in the result, which §7.2 says outright of
@@ -244,7 +244,7 @@ than failing obscurely.
 **Numbers convert exactly or error** (§3.1's "error, never round silently"): every integral narrowing
 runs off one `BigDecimal`, so `1.5` and `2147483648` both fail at an `int` rather than truncating or
 wrapping. `float`/`double` are the exception and are meant to be — rounding onto the binary grid is the
-approximate families' own contract (§5.4). An enum needs no rule here at all: `tson-bind` bridges every
+approximate families' own contract (§5.4). An enum needs no rule here at all: `ltr8-bind` bridges every
 plain Java enum through `EnumStringBridge`, so one arrives as a bridged `String` atom.
 
 **The target picks the parser; the JSON kind decides only whether the content is admitted.** That is §4.1
@@ -277,7 +277,7 @@ of `IntegerParser.hostType`: `byte`→`int8` … `long`→`int64`, `BigInteger`�
 `float32`/`float64`, `BigDecimal`→`number` — **each primitive keyed beside its box**, since a component
 declared `Integer` and one declared `int` are one position as far as a document is concerned, and a hole in
 one half of a pair stays invisible until a caller happens to declare the other. `java.lang.Number` is
-deliberately absent and is refused a layer earlier, by `tson-bind`: it is abstract and names no family, so
+deliberately absent and is refused a layer earlier, by `ltr8-bind`: it is abstract and names no family, so
 there is nothing for the index to answer with. Nothing says a Java `int` means `int32` rather than an
 `integer` bounded to 32 bits — the two admit the same values — and the first is the one worth committing to because it
 makes this read a preview of the schema-directed one: an `int` component reaches the reader an `int32` field

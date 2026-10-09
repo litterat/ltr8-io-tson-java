@@ -38,7 +38,7 @@ import java.util.Optional;
  * without validating it -- e.g. when its schema is unavailable and the class is the intended contract).
  *
  * <p>Either way the class-driven binding itself is done by {@link DataClassObjectReader}, driven by the
- * target class's own {@code tson-bind} {@link DataClass} descriptor: it streams events off a {@link
+ * target class's own {@code ltr8-bind} {@link DataClass} descriptor: it streams events off a {@link
  * TsonReadContext} (never materializing a whole {@code DataValue} tree first, so a large document need not
  * be buffered before binding begins), reports through that context's one error model, and has no positional
  * form or schema-composed defaults (a record must be written braced; an absent required field is a {@code

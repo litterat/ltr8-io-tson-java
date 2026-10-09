@@ -47,7 +47,7 @@ stream/tree/bind so a change says which stage moved. **Per-*value* work needs a 
 per-record map is a fraction of a read and two whole-read figures land within noise of each other, so both
 harnesses also report bytes per bound record, measured between a document of 4 records and one of 64. What
 that costs is a ratchet here; the exact properties are pinned where they are cheap to state — that a name
-index is built once per class in `tson-bind` (`DataClassRecordFieldIndexTest`), and that a repeated
+index is built once per class in `ltr8-bind` (`DataClassRecordFieldIndexTest`), and that a repeated
 *undeclared* field is still reported in each reader's own test, that being the one repeat a filled slot
 cannot answer for — because a threshold tight enough to catch a tenth of a read is a budget the next JDK
 breaks. `AllocationProbe`'s Javadoc has the Flight Recorder
@@ -59,7 +59,7 @@ url/licence, so `publishToMavenLocal` gives another project on the same machine 
 `io.ltr8:tson:0.38.0-SNAPSHOT` dependency instead of an included build. **No remote repository is
 configured, deliberately** — Maven Central needs signed artifacts and a POM with scm/developers, and
 publishing under a name is not a decision the build should make quietly. The jars carry real
-`module-info.class`es, so a consumer works on the class path or the module path. `tson-regex` lands in a
-consumer's POM at runtime scope (an `implementation` dependency of the modules that use it); `tson-annotation`
+`module-info.class`es, so a consumer works on the class path or the module path. `ltr8-regex` lands in a
+consumer's POM at runtime scope (an `implementation` dependency of the modules that use it); `ltr8-annotation`
 lands at compile scope, because `tson-schema` declares it `api`: a module-path compile of anything requiring
 `io.ltr8.tson.schema` needs `io.ltr8.annotation` present, though no public signature names an annotation type.

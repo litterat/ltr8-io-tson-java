@@ -105,7 +105,7 @@ public final class ProcessorConfig {
      * The {@link DataBindContext} a processor built from this configuration binds its object readers and
      * writers against -- defaults to {@link AtomContext#defaultContext()}.
      *
-     * <p><b>The vocabulary for building one is {@code tson-bind}'s, not this class's</b>, so there is one
+     * <p><b>The vocabulary for building one is {@code ltr8-bind}'s, not this class's</b>, so there is one
      * place to learn it and one place it can drift:
      *
      * <pre>{@code

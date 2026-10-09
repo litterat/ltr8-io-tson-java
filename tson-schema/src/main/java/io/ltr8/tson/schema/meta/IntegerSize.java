@@ -15,7 +15,7 @@ import java.math.BigInteger;
  *
  * <p>The canonical constructor is written out explicitly (compact, empty body) purely to carry
  * {@code @Record} -- required as soon as a second, convenience constructor exists (see {@link
- * IntegerType}'s own Javadoc for why {@code tson-bind} needs this).
+ * IntegerType}'s own Javadoc for why {@code ltr8-bind} needs this).
  */
 public record IntegerSize(BigInteger bits, boolean signed) {
 

@@ -29,7 +29,7 @@ import java.util.Optional;
  * produces which representation stays inside each implementation instead of becoming a table every caller
  * keeps. Every family answers it and there is no default; the contract is on the method. **This interface
  * still has no dependency on any binding library**: {@code Class<?>} is a bare JDK type, not
- * {@code tson-bind}'s {@code DataClassAtom}, which is what lets one vocabulary serve every encoding.
+ * {@code ltr8-bind}'s {@code DataClassAtom}, which is what lets one vocabulary serve every encoding.
  *
  * <p>{@link #write(Object)} is {@link #read(String)}'s inverse: given a natural host value,
  * the token text that would read back to an equivalent value (never quoted, never carrying a

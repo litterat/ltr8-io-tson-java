@@ -25,7 +25,7 @@ import io.ltr8.tson.schema.meta.MacType;
  * to colons on a read/write round trip would be this implementation inventing a rule. Validate, then hand
  * back the text as written; {@link #write} is the identity.
  *
- * <p>The grammar is {@link MacAddress}'s ({@code tson-net}): mixing separators ({@code AA-BB:CC-DD:EE-FF}) is
+ * <p>The grammar is {@link MacAddress}'s ({@code ltr8-net}): mixing separators ({@code AA-BB:CC-DD:EE-FF}) is
  * rejected, the two forms being alternatives rather than a character class.
  */
 public record MacParser(MacType constraints) implements AtomTypeParser<String> {

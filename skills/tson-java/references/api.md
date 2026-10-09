@@ -251,7 +251,7 @@ public final class ScriptPolicy {                          // the token policy, 
 
 - `io.ltr8.tson.base.atom` — the **host values** that are TSON's own: `Rational` and `Complex`. What you hold
   after reading `!rational` or `!complex`, and what a component declares to bind one. The network atoms read to
-  `tson-net`'s values (`Iri`, `CidrInet4Network`/`CidrInet6Network`, below) and to the JDK's `Inet4Address`/
+  `ltr8-net`'s values (`Iri`, `CidrInet4Network`/`CidrInet6Network`, below) and to the JDK's `Inet4Address`/
   `Inet6Address`.
 - `io.ltr8.tson.base.bind` — `AtomContext`: `hostTypes()` (the list to `registerAtoms` on a builder) and
   `defaultContext()`, the context both front doors start from.
@@ -478,7 +478,7 @@ everything, are fail-fast by design.
 
 ## `io.ltr8.tson.tree` (module `tson-tree`)
 
-A true leaf — depends on **nothing**, not even `tson-annotation`.
+A true leaf — depends on **nothing**, not even `ltr8-annotation`.
 
 ```java
 public sealed interface TsonValue
@@ -567,7 +567,7 @@ identity with no host must have an absolute path, so `/local/orders.tn`, `file:/
 
 The module exports two packages: `io.ltr8.tson.schema` (the above) and `io.ltr8.tson.schema.meta`, the resolved-schema
 value model — pure records, sealed interfaces and enums, §8's `TypeDefinition` et al. The host values the atoms read to
-are not here (see `tson-base`'s `atom` package and `tson-net`). `Top` is sealed except for its one deliberately open branch,
+are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed except for its one deliberately open branch,
 **`Data`**, which a consumer's own class implements: §4.1's fourth base kind, where an instance of a meta-schema's own
 constructor lives when the thing it describes is not a data type. A consumer registers such a class by carrying
 `@Typename` and being findable by the `metaNameBinder`; `Data.references()` is how its own type references reach the
@@ -575,7 +575,7 @@ linker, declared rather than discovered.
 
 ---
 
-## `io.ltr8.bind` (module `tson-bind`)
+## `io.ltr8.bind` (module `ltr8-bind`)
 
 ```java
 public class DataBindContext {
@@ -597,7 +597,7 @@ Also exports `io.ltr8.bind.mapper` and `io.ltr8.bind.bridge`. See `references/bi
 
 ---
 
-## `io.ltr8.annotation` (module `tson-annotation`)
+## `io.ltr8.annotation` (module `ltr8-annotation`)
 
 `@Typename`, `@Field`, `@Record`, `@Tuple`, `@Union`, `@Atom`, `@Transparent`, `@Profile`, `@Unbound`,
 `@FieldOrder`, `@Namespace`, plus `Annotations` / `Annotation` (the wire-annotation carrier),
@@ -605,7 +605,7 @@ Also exports `io.ltr8.bind.mapper` and `io.ltr8.bind.bridge`. See `references/bi
 
 ---
 
-## `io.ltr8.regex` (module `tson-regex`)
+## `io.ltr8.regex` (module `ltr8-regex`)
 
 A native RFC 9485 I-Regexp engine — a true leaf, no TSON dependency.
 
@@ -625,7 +625,7 @@ how a choice is judged — §5.4 decides choice disjointness by class, never by 
 
 ---
 
-## `io.ltr8.net` (module `tson-net`)
+## `io.ltr8.net` (module `ltr8-net`)
 
 Network text formats, each recognised natively to its RFC — no TSON dependency, usable on its own. `tson-base`
 requires it transitively, so every TSON consumer can name these.

@@ -1,7 +1,7 @@
 # Object binding
 
-Reading straight into your own classes goes through **`tson-bind`** (`io.ltr8.bind`), a generic
-`DataValue`↔Java-object binding engine that depends only on `tson-annotation` and knows nothing about
+Reading straight into your own classes goes through **`ltr8-bind`** (`io.ltr8.bind`), a generic
+`DataValue`↔Java-object binding engine that depends only on `ltr8-annotation` and knows nothing about
 TSON. A `DataBindContext` holds the descriptors; `TsonObjectReader`/`TsonObjectWriter` drive it.
 
 Binding is **reflective** — descriptors are derived from a class under analysis, never authored by
@@ -79,7 +79,7 @@ An integer's host type is the **narrowest** that holds its declared range, so `i
 string — under `NFKC_CASEFOLD`, `Content-Type` arrives as `content-type` — and that is what a bound `String`
 holds.
 
-**The four URI atoms read to `Iri`**, `tson-net`'s RFC 3986/3987 value, so a tree read answers
+**The four URI atoms read to `Iri`**, `ltr8-net`'s RFC 3986/3987 value, so a tree read answers
 `as(Iri.class)` and not `as(URI.class)`. A component may declare `Iri`, `java.net.URI` or `String`. `URI` reads
 by RFC 2396 and cannot hold every reference these atoms admit (an IRI's non-ASCII host, `https://`), so a value
 it cannot hold is refused at a `URI` component; declare `Iri` to take every one. A component typed `Iri` or `URI`
@@ -110,7 +110,7 @@ Tson tson = Tson.of(ProcessorConfig.defaults()
                 .build()));
 ```
 
-**The vocabulary for building a context is `tson-bind`'s**, so all three steps are written out — and two
+**The vocabulary for building a context is `ltr8-bind`'s**, so all three steps are written out — and two
 of them are the ones a caller forgets: `registerAtoms(AtomContext.hostTypes())`, without which the atoms
 are unbound, and `DataNameBinder.orElse` where a caller's own names should sit *over* the kernel's rather
 than replace them. **A name outside the map is an error naming the map**, not a class-not-found from
