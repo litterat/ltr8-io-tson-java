@@ -101,13 +101,14 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `io.ltr8.bind` has none: it knows nothing of TSON and is usable on its own. Beside `Iri`: `InternetAddress` (RFC
   3986's IPv4 and RFC 4291's IPv6 text forms, to octets and back, which `Iri`'s IP literals read through), the
   `CidrNetwork` pair (RFC 4632 / RFC 4291 §2.3 prefixes, with containment and the host-bits rule), `MacAddress` (RFC
-  9542's EUI-48), `HostName` (a domain name in either label form, IDNA2008, over `Punycode`) and `Host` (a `HostName`
-  or a `Host.Address`). Each exists because the JDK's answer is another grammar: `java.net.URI` implements RFC 2396
-  and cannot hold a host beyond US-ASCII, `InetAddress` admits leading zeros, short forms and bare integers, and
-  `java.net.IDN` is IDNA2003. Its one dependency is `ltr8-unicode`, for IDNA2008's derived property and the Bidi rule,
-  which belong with the Unicode tables at their one version. `tson-base` requires it transitively
-  (`CanonicalIdentity`, `SchemaReference`, and its values as host types), `tson-schema`'s coherence checks judge facet
-  entries with it, and `tson-atom` wraps each format in an `AtomTypeParser` that adds the facets.
+  9542's EUI-48), `HostName` (a domain name in either label form, IDNA2008, over `Punycode`), `Host` (a `HostName` or
+  a `Host.Address`) and `MediaType` (RFC 6838, RFC 9110 parameters). Each exists because the JDK's answer is another
+  grammar: `java.net.URI` implements RFC 2396 and cannot hold a host beyond US-ASCII, `InetAddress` admits leading
+  zeros, short forms and bare integers, and `java.net.IDN` is IDNA2003. Its one dependency is `ltr8-unicode`, for
+  IDNA2008's derived property and the Bidi rule, which belong with the Unicode tables at their one version.
+  `tson-base` requires it transitively (`CanonicalIdentity`, `SchemaReference`, and its values as host types),
+  `tson-schema`'s coherence checks judge facet entries with it, and `tson-atom` wraps each format in an
+  `AtomTypeParser` that adds the facets.
 - **`ltr8-unicode`** — **only** `io.ltr8.unicode`: Unicode Character Database properties and the algorithms over them,
   each to its Unicode standard. The tables: `Xid` (UAX #31's `XID_Start`/`XID_Continue`, exact, and `UNICODE_VERSION`,
   the one version every table is checked against), `Nfc` (UAX #15, allocation-free on text already in NFC),

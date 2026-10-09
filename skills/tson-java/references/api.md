@@ -667,6 +667,11 @@ public final class HostName implements Host {        // what !hostname reads to;
 }
 public final class HostSyntaxException extends IllegalArgumentException { public String text(); public String reason(); }
 public final class Punycode { public static String encode(String s); public static String decode(String s); }  // or null
+public final class MediaType {                       // what !media_type reads to; RFC 6838, RFC 9110 parameters
+    public static MediaType parse(String text);      // or MediaTypeSyntaxException; a media range is refused
+    public String type();  public String subtype();  public Optional<String> suffix();
+    public Map<String, String> parameters();         // names lowercase and sorted; charset's value folded
+}                                                    // equal by value; toString() is the canonical text
 ```
 
 `Iri` is the value the four URI atoms read to. `InternetAddress` is strict where `java.net.InetAddress` is not

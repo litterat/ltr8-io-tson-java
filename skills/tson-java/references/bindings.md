@@ -70,6 +70,7 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `cidr4` / `cidr6`                               | `io.ltr8.net.CidrInet4Network` / `CidrInet6Network` |
 | `hostname`                                      | `io.ltr8.net.HostName`, or `String` (lowercase U-labels) |
 | `host`                                          | `io.ltr8.net.Host`, or `String` (the member's canonical text) |
+| `media_type`                                    | `io.ltr8.net.MediaType`, or `String` (lowercase, parameters sorted) |
 | `bytes` (and any `!bytes_type { encoding: … }` instance) | `byte[]`                               |
 | an untyped token (§4 base resolution)           | `Boolean`, `BigInteger`, `BigDecimal`, `String` |
 | `_` (the only no-value spelling)                | a `TsonVoid` node / `null`                    |

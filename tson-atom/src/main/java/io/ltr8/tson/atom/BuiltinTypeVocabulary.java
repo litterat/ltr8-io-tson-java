@@ -14,6 +14,7 @@ import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
 import io.ltr8.tson.atom.parser.HostParser;
 import io.ltr8.tson.atom.parser.HostnameParser;
+import io.ltr8.tson.atom.parser.MediaTypeParser;
 import io.ltr8.tson.atom.parser.Ipv4Parser;
 import io.ltr8.tson.atom.parser.Ipv6Parser;
 import io.ltr8.tson.atom.parser.MacParser;
@@ -61,7 +62,8 @@ import java.util.Optional;
  * §5.5), which reuse those two address grammars for the address half of a network. And with {@code mac_type}
  * ({@code mac}, §5.5, EUI-48 per RFC 9542). And with {@code hostname_type} ({@code hostname}, a domain name in
  * either label form, see {@link HostnameParser}) and {@code host_type} ({@code host}, a host name or an IP
- * address, see {@link HostParser}). Those seven are net.tn's.
+ * address, see {@link HostParser}) and {@code media_type_type} ({@code media_type}, a media type, see
+ * {@link MediaTypeParser}). Those eight are net.tn's.
  *
  * <p>And with {@code email_type} ({@code email}, §5.5's own row beside {@code uuid}/{@code ipv4}/{@code mac},
  * with the shape core.tn gives it) -- the RFC 5322 pin is scoped there to the {@code dot-atom "@" dot-atom}
@@ -122,6 +124,7 @@ public final class BuiltinTypeVocabulary {
         types.put(Cidr6Parser.TYPENAME, Cidr6Parser.UNCONSTRAINED);
         types.put(HostnameParser.TYPENAME, HostnameParser.UNCONSTRAINED);
         types.put(HostParser.TYPENAME, HostParser.UNCONSTRAINED);
+        types.put(MediaTypeParser.TYPENAME, MediaTypeParser.UNCONSTRAINED);
 
         return Map.copyOf(types);
     }

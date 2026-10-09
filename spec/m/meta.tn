@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta.tn?sha256=d0316a128e3b15259639109734ec2d344de1862a1c09f6bc043e56e4b986c398"
+!!id:"https://tson.io/2026/38/m/meta.tn?sha256=0440a1d349af8291c83755f43cf0b6d9ad226e15d248bd2736517e3631d2b07a"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0"
 !!import:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0"
 @doc:"""
@@ -36,8 +36,8 @@
      `complex_type`, with the `complex_component` enum), temporal (`date_type`,
      `time_type`, `datetime_type`, `duration_type`, `period_type`), identifier
      (`uuid_type`, `uri_type`), network (`ipv4_type`, `ipv6_type`,
-     `cidr4_type`, `cidr6_type`, `mac_type`, `hostname_type`, `host_type`), and
-     text (`email_type`).
+     `cidr4_type`, `cidr6_type`, `mac_type`, `hostname_type`, `host_type`,
+     `media_type_type`), and text (`email_type`).
 
   Plus annotation types — the classifying markers `ordering`, `bounded`, `exact`,
   `numeric`; the checked assertion `disjoint`; and the documentary `deprecated`,
@@ -513,6 +513,32 @@
     """
   host_type => atom & atom_specification & {
     spec?: = "https://www.rfc-editor.org/rfc/rfc3987"
+  }
+
+  @doc:"""
+    Media type constraint vocabulary. Instance is `media_type` in net. A media
+    type (RFC 6838) and its parameters (RFC 9110 §8.3.1): the type and subtype
+    are RFC 6838 §4.2's `restricted-name`, and each parameter is a token name,
+    `=` and a token or quoted-string value, after a `;` with optional
+    whitespace around it. Nothing beyond US-ASCII. A media range (`text/*`) is
+    not a media type. The value is the type, the subtype and a map of
+    parameters: the type, subtype and parameter names compare without ASCII
+    case, a quoted value equals its token form, parameter order carries no
+    meaning and a repeated name is a resolver error, and a parameter value
+    keeps its case except `charset`'s, which folds. The canonical text is
+    lowercase, with `charset` folded and parameters sorted by name, each value
+    a token where it is one, joined by `;` without whitespace.
+    `allow_parameters` admits parameters, false by default. `types` lists the
+    top-level types admitted. `suffixes` lists RFC 6839 structured suffixes: a
+    suffix admits a subtype ending `+` and the suffix, and the subtype that is
+    the suffix itself. A refinement withdraws `allow_parameters` and shrinks
+    `types` and `suffixes`; it never widens them.
+    """
+  media_type_type => atom & atom_specification & {
+    spec?:             = "https://www.rfc-editor.org/rfc/rfc6838"
+    allow_parameters?: boolean ~ false
+    types?:            [text]
+    suffixes?:         [text]
   }
 
   @doc:"""

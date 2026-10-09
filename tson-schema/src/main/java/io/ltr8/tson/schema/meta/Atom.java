@@ -14,7 +14,8 @@ public sealed interface Atom extends Top permits ValueType, VoidType, EnumBody, 
         UriType, IriType, RegexType,
         DecimalType, FloatType, RationalType, UuidType, BytesType, DateType, TimeType, DateTimeType, DurationType,
         PeriodType,
-        Cidr4Type, Cidr6Type, EmailType, MacType, Ipv4Type, Ipv6Type, HostnameType, HostType, ComplexType {
+        Cidr4Type, Cidr6Type, EmailType, MacType, Ipv4Type, Ipv6Type, HostnameType, HostType, MediaTypeType,
+        ComplexType {
 
     /**
      * Reports how {@code refined} fails to narrow this atom's own constraints -- an empty list

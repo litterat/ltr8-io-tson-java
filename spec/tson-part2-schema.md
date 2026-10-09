@@ -1970,10 +1970,10 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/37/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/37/tson-guide |
 | meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/38/m/meta-kernel.tn?sha256=45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0 |
-| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/38/m/meta.tn?sha256=d0316a128e3b15259639109734ec2d344de1862a1c09f6bc043e56e4b986c398 |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/38/m/core.tn?sha256=9722782c26bc0907b82b37957333bca7f8c276d3c71c941c6acf674f2b31c5b6 |
-| net.tn | TSON Network Type Library (companion artifact) | https://tson.io/2026/38/m/net.tn?sha256=60c6071567304fa8b233983523509a7e69e63fce1729563e875cba3d016dabd7 |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/38/m/policy.tn?sha256=e18a808eee68c262beea1dddd3367d2ca0163243cff4a2481f89b3af5a57ad57 |
+| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/38/m/meta.tn?sha256=0440a1d349af8291c83755f43cf0b6d9ad226e15d248bd2736517e3631d2b07a |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/38/m/core.tn?sha256=8e2f7be38b91688934330cd744254e4ea16953f5620c830314c3d28744af30ff |
+| net.tn | TSON Network Type Library (companion artifact) | https://tson.io/2026/38/m/net.tn?sha256=86d2b5cfbaf39fed4724698704174dc62da5a07075f27d8130ea309a8b11edbb |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/38/m/policy.tn?sha256=bf1cd805b232acfb033f48c1da0f3d095f501063a56e6aeacbba015a0214a5d2 |
 
 ### 13.3 Informative References
 

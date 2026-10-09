@@ -59,22 +59,22 @@ public final class TsonBundledSchemas {
     public static final String META_KERNEL_SHA256 = "45205ff161067de8a822515d40b757247e362146ccd3c217683fa94a909e9be0";
 
     /** meta's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String META_SHA256 = "d0316a128e3b15259639109734ec2d344de1862a1c09f6bc043e56e4b986c398";
+    public static final String META_SHA256 = "0440a1d349af8291c83755f43cf0b6d9ad226e15d248bd2736517e3631d2b07a";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "9722782c26bc0907b82b37957333bca7f8c276d3c71c941c6acf674f2b31c5b6";
+    public static final String CORE_SHA256 = "8e2f7be38b91688934330cd744254e4ea16953f5620c830314c3d28744af30ff";
 
     /**
      * net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code
      * !!id}. See {@link #META_KERNEL_SHA256}.
      */
-    public static final String NET_SHA256 = "60c6071567304fa8b233983523509a7e69e63fce1729563e875cba3d016dabd7";
+    public static final String NET_SHA256 = "86d2b5cfbaf39fed4724698704174dc62da5a07075f27d8130ea309a8b11edbb";
 
     /**
      * policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s {@code
      * !!id}. See {@link #META_KERNEL_SHA256}.
      */
-    public static final String POLICY_SHA256 = "e18a808eee68c262beea1dddd3367d2ca0163243cff4a2481f89b3af5a57ad57";
+    public static final String POLICY_SHA256 = "bf1cd805b232acfb033f48c1da0f3d095f501063a56e6aeacbba015a0214a5d2";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",

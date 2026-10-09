@@ -135,10 +135,13 @@ name→`AtomType` table (§5).
 and `hostname` — so a document keeps its meaning when it moves under a schema importing that library
 (SPEC-FEEDBACK.md #2). net.tn's `hostname` and `host` are families of their own (#5, #6): `HostnameParser` reads a
 domain name in either label form to an `io.ltr8.net.HostName`, and `HostParser` a host name or an address to an
-`io.ltr8.net.Host`. Both are string-class, their grammar is `io.ltr8.net`'s, and a `String` target receives the
+`io.ltr8.net.Host`, and `MediaTypeParser` (#8) a media type with its parameters to an `io.ltr8.net.MediaType`.
+All three are string-class, their grammar is `io.ltr8.net`'s, and a `String` target receives the
 canonical text — lowercase U-labels, a dotted-quad, unbracketed RFC 5952 — so a list of names declared
 `List<String>` compares by name. A token outside the grammar is a parse failure; `allow_idn: false` refusing an
-internationalized name is a constraint violation, the name being one.
+internationalized name is a constraint violation, the name being one, as are a media type's parameters where
+`allow_parameters` is false and a type or suffix outside `types` or `suffixes`. Only `charset`'s parameter value
+folds: a closed list, since which other registrations fold is the registry's to say.
 
 **`boolean` is in that table** ([TSON-DATA] §5.5): the tokens `true` and `false`, case-sensitive, over
 meta-kernel's `!enum [true false]`. A typed position does not consult the form, so `!boolean "true"` and
@@ -331,12 +334,13 @@ on every text family.
   §5.4 says. `java.time` refuses it as well, so `TimeParser` and `DateTimeParser` report it as a parse error with no
   check of their own.
 - The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.
-- **The atom vocabulary is complete** — `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email`/`hostname`/`host` all have
-  parsers, the CIDR pair reusing the two address grammars and validating §5.5's family-range and host-bits-zero rules on
-  top. All four network families apply `within`/`excluding` and judge the pair for emptiness at schema load — exactly,
-  prefix-tree cover being counting rather than searching, with a network family's prefix bounds folded in, both halves
-  stated by §5.5. The address grammars (`InternetAddress`, `MacAddress`) and the network values live in `ltr8-net`, a
-  leaf beneath `tson-schema`, so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries
-  without the linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its
-  siblings**, and its format check is the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted local
-  parts, domain literals or comments.
+- **The atom vocabulary is complete** —
+  `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email`/`hostname`/`host`/`media_type` all have parsers, the CIDR pair
+  reusing the two address grammars and validating §5.5's family-range and host-bits-zero rules on top. All four network
+  families apply `within`/`excluding` and judge the pair for emptiness at schema load — exactly, prefix-tree cover being
+  counting rather than searching, with a network family's prefix bounds folded in, both halves stated by §5.5. The
+  address grammars (`InternetAddress`, `MacAddress`) and the network values live in `ltr8-net`, a leaf beneath
+  `tson-schema`, so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries without the
+  linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its siblings**, and its
+  format check is the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted local parts, domain literals or
+  comments.

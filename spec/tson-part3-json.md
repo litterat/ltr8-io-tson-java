@@ -336,7 +336,7 @@ The families:
 | `text` and refinements; identifier families | string | §5.6 |
 | `uri`, `uri_reference`, `iri`, `iri_reference`, `regex`, `email`, `uuid`, `mac` | string | §5.6 |
 | `date`, `time`, `datetime`, `duration`, `period` | string | §5.6 |
-| `ipv4`, `ipv6`, `cidr4`, `cidr6`, `hostname`, `host` | string | §5.6 |
+| `ipv4`, `ipv6`, `cidr4`, `cidr6`, `hostname`, `host`, `media_type` | string | §5.6 |
 | `bytes` and its instances | string, in the type's `encoding` alphabet | §5.6 |
 | `void` | null (the void sentinel — its sole value) | §5.7 |
 | `value` | boolean, number, or string | §5.7 |
