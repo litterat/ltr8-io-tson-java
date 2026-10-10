@@ -26,7 +26,8 @@ class JsonFieldNameTypeTest {
               json_name => !identifier_type { start_add: "@" }
               node => !record { name_type: json_name  fields: [
                 { name: "@id"  type: text }  { name: label  type: text } ] }
-              row => !record { name_type: text  fields: [ { name: "first name"  type: text } ] }
+              words => !identifier_type { continue_add: "-"  medial: " " }
+              row => !record { name_type: words  fields: [ { name: "first name"  type: text } ] }
               json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
               ld_node => json_record & { "@id": text  label: text }
               ld_holder => { n: ld_node }

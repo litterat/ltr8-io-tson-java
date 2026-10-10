@@ -839,7 +839,7 @@ class TsonSchemaParserTest {
     @Test
     void metaKernelParses() throws IOException {
         SchemaDocument doc = parse(readFixture("meta-kernel.tn"));
-        assertEquals(60, doc.body().declarations().size());
+        assertEquals(59, doc.body().declarations().size());
     }
 
     @Test

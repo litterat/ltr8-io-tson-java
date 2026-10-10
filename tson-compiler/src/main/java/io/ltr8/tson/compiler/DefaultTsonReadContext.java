@@ -240,7 +240,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * record says otherwise (SPEC-FEEDBACK.md #10). The grammar admits any single-line token in name position, so
      * the match is here, where a failure is reported as a resolver error -- a name the type's contract rejects,
      * as an atom's token would be -- and the name is then judged by no hygiene rule, being no name of the type.
-     * One it admits meets the per-name rules under the type's profile, or none where the type has no profile.
+     * One it admits meets the per-name rules under the type's profile.
      */
     private void judgeFieldName(String name) {
         FieldNameRule rule = cursor.fieldNameRule;
@@ -259,7 +259,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
             refuseFieldName(name, refused.getMessage(), "a value of field name type '" + rule.typeName() + "'");
             return;
         }
-        rule.profile().ifPresent(profile -> judgeName(name, profile));
+        judgeName(name, rule.profile());
     }
 
     private void refuseFieldName(String name, String violation, String expected) {

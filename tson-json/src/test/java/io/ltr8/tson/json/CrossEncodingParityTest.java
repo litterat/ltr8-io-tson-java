@@ -80,10 +80,10 @@ class CrossEncodingParityTest {
               shape     => ( circle | square )
               picked    => { pick: scalars }
               shaped    => { outline: shape }
-              port_label  => !text_enum ["80" "443"]
+              port_label  => !text_type { members: ["80" "443"] }
               port_slot   => ( port_label | int32 )
               ported      => { p: port_slot }
-              answer      => !text_enum ["true" "false"]
+              answer      => !text_type { members: ["true" "false"] }
               answer_slot => ( answer | boolean )
               answered    => { a: answer_slot }
               port_text   => ( port_label | text )
@@ -672,12 +672,12 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * An enum whose type is not an identifier family is string-class whatever its members spell ([TSON-SCHEMA]
-     * §7.4): {@code !text_enum ["80" "443"]} beside {@code int32}, and {@code !text_enum ["true" "false"]} beside
-     * {@code boolean}, are disjoint, and each value goes to the variant of its own class.
+     * A closed set of text values is string-class whatever its members spell ([TSON-SCHEMA] §5.4): {@code
+     * !text_type { members: ["80" "443"] }} beside {@code int32}, and {@code !text_type { members: ["true" "false"]
+     * }} beside {@code boolean}, are disjoint, and each value goes to the variant of its own class.
      */
     @Test
-    void aTextEnumIsStringClassInBoth() {
+    void aTextValueSetIsStringClassInBoth() {
         bothAccept("ported", """
                 { p: "80" }""", """
                 {"p": "80"}""");
@@ -694,7 +694,7 @@ class CrossEncodingParityTest {
 
     /** Beside {@code text} it shares the string class, so the choice is not disjoint and needs the tag in both. */
     @Test
-    void aTextEnumBesideTextNeedsTheTagInBoth() {
+    void aTextValueSetBesideTextNeedsTheTagInBoth() {
         sameVerdict("labelled", """
                 { l: 80 }""", """
                 {"l": 80}""");

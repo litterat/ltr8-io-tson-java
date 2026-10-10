@@ -1,8 +1,10 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TextFamily;
@@ -16,7 +18,8 @@ import java.util.function.Function;
 
 /**
  * Where an entry's {@code name_type} resolves: an enum's, which its members are values of ([TSON-SCHEMA] §7.4), and
- * a record's, which its field names are values of (SPEC-FEEDBACK.md #10). A value the entry's constructor wrote
+ * a record's, which its field names are values of (SPEC-FEEDBACK.md #10). Either names an identifier family, so the
+ * names are judged as names, under its profile. A value the entry's constructor wrote
  * resolves where that constructor is declared, the governing meta's namespace -- so {@code !enum [A B]} names the
  * kernel's {@code identifier}, and a record that says nothing the kernel's {@code field_name}, whatever the schema
  * declares or imports; one an author wrote resolves in the schema's own namespace first. Shared by the linker's
@@ -48,9 +51,22 @@ public final class NameType {
     }
 
     /**
+     * The profile {@code entry}'s names are judged under by [TSON-DATA] §8.2's per-name rules: its name type's, whose
+     * added characters -- a {@code start_add}, a {@code continue_add}, a {@code medial} -- are the profile's own.
+     * Empty where the type resolves to nothing or is no identifier family, each refused on its own.
+     */
+    public static Optional<IdentifierProfile> profile(TypeDefinition entry, Function<String, TypeDefinition> local,
+                                                      Function<String, TypeDefinition> structure) {
+        return of(entry, local, structure)
+                .map(type -> type.definition() == null ? null : type.definition().body())
+                .filter(IdentifierType.class::isInstance)
+                .map(body -> ((IdentifierType) body).profile());
+    }
+
+    /**
      * The form {@code enumeration} matches its members in: its name type's {@code normalization}
      * ([TSON-SCHEMA] §5.5). {@code NONE} for a body that is not an enum, a type that resolves to nothing, or one
-     * that is not a text family -- each refused or reported on its own.
+     * that is no identifier family -- each refused or reported on its own.
      */
     public static Normalization form(TypeDefinition enumeration, Function<String, TypeDefinition> local,
                                      Function<String, TypeDefinition> structure) {

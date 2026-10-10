@@ -15,15 +15,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * An enum is an instance of the kernel's {@code enum_type}: its members, held as text, and the {@code name_type}
- * they are drawn from ([TSON-SCHEMA] §7.4). {@code enum} pins {@code name_type: identifier} and {@code text_enum}
- * pins {@code name_type: text}, and {@code !enum_type { name_type: T  members: [...] }} names any text family. Each
- * member must be a value of {@code T}, and whether {@code T} is an identifier family decides whether the members
- * are names that [TSON-DATA] §8.2's hygiene reaches.
+ * they are drawn from ([TSON-SCHEMA] §7.4). {@code enum} pins {@code name_type: identifier}, and {@code !enum_type {
+ * name_type: T  members: [...] }} names any identifier family. Each member must be a value of {@code T}, and is a
+ * name that [TSON-DATA] §8.2's hygiene reaches under {@code T}'s profile.
  *
- * <p><b>The declaration decides, never the shape of the members.</b> {@code !enum [...]} keeps exactly what it
- * had, hygiene included, and an author reaching for a value set of arbitrary text says so by writing
- * {@code !text_enum}: a resolver that inferred "these look like names, so police them" would switch a spoofing
- * check on and off by accident.
+ * <p><b>An enum is a set of names, and nothing else is.</b> Names a profile beyond the kernel's identifier admits,
+ * such as words separated by single spaces, are an enum over the author's own identifier type; a closed set of
+ * text that is no name is the text family's own {@code members} facet, {@code !text_type { members: [...] }}.
  */
 class EnumTypeTest {
 
@@ -52,8 +50,8 @@ class EnumTypeTest {
         String messages = messages(diagnostics);
         assertEquals(1, diagnostics.size(), messages);
         assertTrue(messages.contains("is not a value of its name_type 'identifier'"), messages);
-        // §7.4: the diagnostic names the spelling that admits the member.
-        assertTrue(messages.contains("'!text_enum [...]'"), messages);
+        // §7.4: the diagnostic names the spelling that admits the member as a value.
+        assertTrue(messages.contains("'!text ^ { members: [...] }'"), messages);
     }
 
     /**
@@ -79,11 +77,22 @@ class EnumTypeTest {
         assertTrue(messages(refused).contains("is not a value of its name_type 'identifier'"), messages(refused));
     }
 
-    /** {@code text_enum}'s type is {@code text}, which admits what no identifier rule would. */
+    /** An author's own identifier type admits names the kernel's does not, and an enum over it has them. */
     @Test
-    void aTextEnumAdmitsMembersNoIdentifierRuleWould() {
-        assertEquals(List.of(), Tson.standard().validateSchema(schema("values", """
-                { activity => !text_enum ["sedentary" "lightly active" "2D"] }""")));
+    void anEnumOverItsOwnIdentifierTypeAdmitsItsNames() {
+        assertEquals(List.of(), Tson.standard().validateSchema(schema("words", """
+                { words    => !identifier_type { continue_add: "-"  medial: " " }
+                  activity => !enum_type { name_type: words  members: [sedentary "lightly active"] } }""")));
+    }
+
+    /** {@code text} is a text family and no identifier family, so an enum over it is refused. */
+    @Test
+    void anEnumOverTextIsRefused() {
+        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("over-text", """
+                { cities => !enum_type { name_type: text  members: ["new york" "los angeles"] } }"""));
+
+        assertTrue(messages(diagnostics).contains("its name_type 'text' is not an identifier family"),
+                messages(diagnostics));
     }
 
     /** The bracket sugar is unchanged, and so is what it means. */
@@ -97,19 +106,21 @@ class EnumTypeTest {
     @Test
     void aRefinementNarrowsTheMembersAndNeverTheType() {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("narrow", """
-                { cities => !text_enum ["new york" "los angeles"]
-                  east   => !cities ^ { members: ["new york"] } }""")));
+                { status => !enum [OPEN ACTIVE DONE]
+                  live   => !status ^ { members: [OPEN ACTIVE] } }""")));
 
         // Through a tightening that pins the type, the constructor itself refuses another value.
         List<Diagnostic> pinned = Tson.standard().validateSchema(schema("retype-pinned", """
-                { names => !text_enum [OPEN DONE]
-                  strict => !names ^ { name_type: identifier } }"""));
-        assertTrue(messages(pinned).contains("'name_type' is fixed on 'text_enum'"), messages(pinned));
+                { upper  => !identifier_type { pattern: "[A-Z]+" }
+                  names  => !enum [OPEN DONE]
+                  strict => !names ^ { name_type: upper } }"""));
+        assertTrue(messages(pinned).contains("'name_type' is fixed on 'enum'"), messages(pinned));
 
         // Through `enum_type` itself, the enum's own narrowing rule does.
         List<Diagnostic> free = Tson.standard().validateSchema(schema("retype-free", """
-                { names => !enum_type { name_type: text  members: [OPEN DONE] }
-                  strict => !names ^ { name_type: identifier } }"""));
+                { upper  => !identifier_type { pattern: "[A-Z]+" }
+                  names  => !enum_type { name_type: identifier  members: [OPEN DONE] }
+                  strict => !names ^ { name_type: upper } }"""));
         assertTrue(messages(free).contains("an enum's name_type is fixed where it is constructed"), messages(free));
     }
 
@@ -136,15 +147,15 @@ class EnumTypeTest {
     }
 
     /**
-     * An enum's labels are drawn from a text family, so a type on another family is refused at schema load --
-     * a numeric value set is {@code integer}'s own {@code members} facet.
+     * An enum's members are drawn from an identifier family, so a type on another family is refused at schema
+     * load -- a numeric value set is {@code integer}'s own {@code members} facet.
      */
     @Test
-    void aTypeThatIsNotATextFamilyIsRefused() {
+    void aTypeThatIsNoIdentifierFamilyIsRefused() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("numbers", """
                 { ports => !enum_type { name_type: integer  members: ["80" "443"] } }"""));
 
-        assertTrue(messages(diagnostics).contains("its name_type 'integer' is not a text family"),
+        assertTrue(messages(diagnostics).contains("its name_type 'integer' is not an identifier family"),
                 messages(diagnostics));
     }
 
@@ -201,10 +212,11 @@ class EnumTypeTest {
      * alternation.
      */
     @Test
-    void aTextEnumReadsItsMembersAndNamesThemOnAMiss() {
+    void anEnumReadsItsMembersAndNamesThemOnAMiss() {
         Tson tson = Tson.standard();
         tson.resolve(schema("read", """
-                { activity => !text_enum ["sedentary" "lightly active"]
+                { words    => !identifier_type { continue_add: "-"  medial: " " }
+                  activity => !enum_type { name_type: words  members: [sedentary "lightly active"] }
                   rec => { a: activity } }"""));
         String head = "!!schema:\"https://example.test/read.tn\"\n!rec ";
 
@@ -218,48 +230,21 @@ class EnumTypeTest {
     }
 
     /**
-     * An enum whose members are texts is string-class whatever they spell ([TSON-SCHEMA] §7.4), so beside an
-     * enum of names that are booleans the choice is disjoint and a value goes to the variant of its own class.
-     * The schema imports nothing: {@code text_enum}'s {@code text} is reached only through the governing meta,
-     * where the constructor pinned it.
+     * A closed set of text values is the text family's own {@code members} facet, string-class whatever its members
+     * spell ([TSON-SCHEMA] §5.4), so beside an enum of names that are booleans the choice is disjoint and a value
+     * goes to the variant of its own class.
      */
     @Test
-    void aTextEnumIsStringClassWhereItsTypeIsReachedOnlyThroughTheMeta() {
+    void aTextValueSetIsStringClassBesideAnEnumOfTheSameSpellings() {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/answers.tn"
                 !!meta:"%s"
-                { reply  => !text_enum ["true" "false"]
+                { reply  => !text_type { members: ["true" "false"] }
                   bit    => !enum [true false]
                   either => ( reply | bit )
                   rec    => { e: either } }""".formatted(TsonBundledSchemas.META_ID));
         String head = "!!schema:\"https://example.test/answers.tn\"\n!rec ";
-
-        assertEquals(List.of(), tson.validate(head + "{ e: \"true\" }"));
-        assertEquals(List.of(), tson.validate(head + "{ e: true }"));
-    }
-
-    /** The class is judged where the enum is declared and travels with it through {@code !!import}. */
-    @Test
-    void anImportedTextEnumKeepsItsClass() {
-        String libraryId = "https://example.test/answer-library.tn";
-        String userId = "https://example.test/answer-user.tn";
-        String library = """
-                !!id:"%s"
-                !!meta:"%s"
-                { reply => !text_enum ["true" "false"] }
-                """.formatted(libraryId, TsonBundledSchemas.META_ID);
-        String user = """
-                !!id:"%s"
-                !!meta:"%s"
-                !!import:"%s"
-                !!import:"%s"
-                { either => ( reply | boolean )
-                  rec    => { e: either } }
-                """.formatted(userId, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID, libraryId);
-        Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(
-                Map.of(libraryId, library, userId, user)))));
-        String head = "!!schema:\"" + userId + "\"\n!rec ";
 
         assertEquals(List.of(), tson.validate(head + "{ e: \"true\" }"));
         assertEquals(List.of(), tson.validate(head + "{ e: true }"));

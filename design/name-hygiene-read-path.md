@@ -87,8 +87,8 @@ because that is the failure that would survive every other test.
 
 **A field name is judged by the record that reads it** (SPEC-FEEDBACK.md #10). The grammar admits any single-line
 token in name position, and the match against the record's `name_type` is here: a name the type refuses is
-`ATOM_FORM_INVALID` and meets no hygiene rule; one it admits meets the per-name rules under the type's profile, or
-none where the type is no identifier family. The rule is the reading record's, passed on the one pull
+`ATOM_FORM_INVALID` and meets no hygiene rule; one it admits meets the per-name rules under the type's profile, an
+identifier family's. The rule is the reading record's, passed on the one pull
 (`TsonReadContext.nextFieldName`), so a record nested in a relaxed one keeps identifier names. A lookahead —
 `RecordMemberDispatchReader`'s discriminator scan — crosses a member's names before the member is chosen, so a field
 name pulled while one is running is held in the cursor's `unjudged` set and judged when a reader outside any

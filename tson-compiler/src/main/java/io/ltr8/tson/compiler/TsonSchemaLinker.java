@@ -10,6 +10,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.resolver.HeldBody;
+import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.*;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -266,17 +267,11 @@ public final class TsonSchemaLinker {
                 default -> List.of();
             };
             String noun = body instanceof RecordBody ? "field names" : "members";
-            // An enum whose type is not an identifier family (`text_enum`) has members that are values rather
-            // than names, so §8.2's two per-name rules do not reach them: a value set carries whatever its
-            // domain carries, and there is nothing to spoof where nothing is looked up by name. The collision
-            // relation stays -- two members that render alike is the hazard either way, and it is a property of
-            // the set (§7.4).
-            boolean perNameRules = body instanceof EnumBody ? EnumLabels.membersAreNames(definition, merged, structure)
-                    : !(body instanceof RecordBody) || FieldNames.namesAreIdentifiers(definition, merged, structure);
-            IdentifierProfile profile = body instanceof RecordBody
-                    ? FieldNames.profile(definition, merged, structure).orElse(IdentifierGrammar.PROFILE)
-                    : IdentifierGrammar.PROFILE;
-            checkScope(receiver, schema, name, definition, names, noun, identifiers, perNameRules, profile);
+            // An enum's members and a record's field names are names of its name type, an identifier family, and
+            // are judged under that type's profile, whose added characters are its own.
+            IdentifierProfile profile = NameType.profile(definition, merged::get, structure)
+                    .orElse(IdentifierGrammar.PROFILE);
+            checkScope(receiver, schema, name, definition, names, noun, identifiers, profile);
             if (body instanceof RecordBody record) {
                 checkFieldValues(receiver, schema, name, definition, record, merged, identifiers);
             }
@@ -294,33 +289,20 @@ public final class TsonSchemaLinker {
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
                                    IdentifierPolicy identifiers) {
-        checkScope(receiver, schema, entry, definition, names, noun, identifiers, true);
+        checkScope(receiver, schema, entry, definition, names, noun, identifiers, IdentifierGrammar.PROFILE);
     }
 
     /**
-     * {@code perNameRules} is false for the one scope whose members are not names -- an enum whose type is not an
-     * identifier family, such as a {@code text_enum} ({@link EnumLabels}). The collision relation runs either way,
-     * where the policy applies it; §8.2's restricted-character and restricted-script rules are per-<em>name</em> and
-     * lapse with the declaration.
+     * The same, judging each name under {@code profile} -- an enum's or a record's name type's, for its members or
+     * field names.
      */
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
-                                   IdentifierPolicy identifiers, boolean perNameRules) {
-        checkScope(receiver, schema, entry, definition, names, noun, identifiers, perNameRules,
-                IdentifierGrammar.PROFILE);
-    }
-
-    /** The same, judging each name under {@code profile} -- a record's field name type's, for its field names. */
-    private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
-                                   TypeDefinition definition, List<String> names, String noun,
-                                   IdentifierPolicy identifiers, boolean perNameRules, IdentifierProfile profile) {
+                                   IdentifierPolicy identifiers, IdentifierProfile profile) {
         if (identifiers.appliesSkeletonDistinctness()) {
             ConfusableNames.firstCollision(names).ifPresent(collision -> refuse(receiver, schema, entry,
                     definition, Diagnostic.Code.CONFUSABLE_NAMES,
                     "'" + entry + "' has " + noun + " that read alike: " + collision.describe()));
-        }
-        if (!perNameRules) {
-            return;
         }
         String singular = noun.substring(0, noun.length() - 1);
         names.forEach(member -> perName(receiver, schema, entry, definition, member,
@@ -584,11 +566,9 @@ public final class TsonSchemaLinker {
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
                                              DiagnosticsReceiver receiver, IdentifierPolicy identifiers) {
         Map<String, String> origins = new LinkedHashMap<>();
-        Set<String> textEnums = new LinkedHashSet<>();
         Map<String, Normalization> enumForms = new LinkedHashMap<>();
         Map<String, TypeDefinition> nameTypes = new LinkedHashMap<>();
-        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins, textEnums, enumForms,
-                nameTypes);
+        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins, enumForms, nameTypes);
 
         // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
         // merges another schema's entries into *this* schema's own returned entries()). !!meta only says
@@ -656,19 +636,16 @@ public final class TsonSchemaLinker {
         }
 
         merged = computeSubtypes(merged, localNames);
-        // Before disjointness: an enum whose members are texts is string-class, and only here can its `type`
-        // be followed into the governing meta, where a constructor's pinned one was written.
+        // Only here can an enum's name type be followed into the governing meta, where a constructor's pinned one
+        // was written.
         for (String name : localNames) {
             TypeDefinition def = merged.get(name);
-            if (def.body() instanceof EnumBody && !EnumLabels.membersAreNames(def, merged, structureNamespace::get)) {
-                textEnums.add(name);
-            }
             Normalization form = EnumLabels.labelForm(def, merged, structureNamespace::get);
             if (form != Normalization.NONE) {
                 enumForms.put(name, form);
             }
         }
-        merged = computeDisjointness(merged, textEnums);
+        merged = computeDisjointness(merged);
         // Before the name checks: a member that is not a value of its enum's name type is the more basic verdict,
         // and the per-name rules would otherwise report it as a restricted character.
         Set<String> refusedEnums = checkEnumTypes(schema, merged, localNames, structureNamespace::get, receiver);
@@ -717,7 +694,7 @@ public final class TsonSchemaLinker {
         checkDisjointAssertions(schema, annotated, localNames, receiver);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
-                annotated, schema.bootstrap()), origins, textEnums, enumForms, nameTypes);
+                annotated, schema.bootstrap()), origins, enumForms, nameTypes);
     }
 
     /**
@@ -1064,13 +1041,12 @@ public final class TsonSchemaLinker {
      * An entry with no {@code !choice} body has nowhere to put the fact, so "absent on every other
      * definition" stops being a rule anyone can break.
      */
-    private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged,
-                                                                   Set<String> textEnums) {
+    private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged) {
         Map<String, TypeDefinition> result = new LinkedHashMap<>(merged);
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             if (entry.getValue().body() instanceof ChoiceBody choice) {
                 result.put(entry.getKey(), entry.getValue().withBody(new ChoiceBody(choice.variants(),
-                        Optional.of(ChoiceDisjointness.derive(choice, merged, textEnums)))));
+                        Optional.of(ChoiceDisjointness.derive(choice, merged)))));
             }
         }
         return result;
@@ -1098,7 +1074,7 @@ public final class TsonSchemaLinker {
      * schema unify -- which is what lets an author pin their own import while a peer's is unpinned.
      */
     private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader,
-                                                            Map<String, String> origins, Set<String> textEnums,
+                                                            Map<String, String> origins,
                                                             Map<String, Normalization> enumForms,
                                                             Map<String, TypeDefinition> nameTypes) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
@@ -1131,9 +1107,6 @@ public final class TsonSchemaLinker {
                 }
                 merged.put(name, entry.getValue());
                 origins.put(name, origin);
-                if (imported.textEnums().contains(name)) {
-                    textEnums.add(name);
-                }
                 Normalization form = imported.enumForms().get(name);
                 if (form != null) {
                     enumForms.put(name, form);

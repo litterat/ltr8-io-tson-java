@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/38/m/core.tn?sha256=fb67fa950d74223dd3e9d3eadc966126263d8b1f09bd6180ba4e010754fa633a"
-!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=4a4b1bd2b3bc75f61ee8acefd92f1c173f6250780a413c26b09586338d5da4ea"
+!!id:"https://tson.io/2026/38/m/core.tn?sha256=3b225e6603bbd0f5fb1238573d6dee6807835dd3ff95b68c13a292a7ec619d6f"
+!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=0fce6ae72d77e4bf72346a7c2a6b0d8a5a539d2ca9011f86048616dbe533ea01"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 38 draft).

@@ -10,17 +10,18 @@ import java.util.Objects;
 
 /**
  * An instance of the meta-kernel's {@code enum_type} constructor, resolved (Part 2 §7.4, §8.1): the {@code
- * name_type} its members are drawn from, and the {@code members} it lists. Backs {@code boolean} ({@code [true false]}), the
- * kernel's own internal enumerations ({@code product_access_type}, {@code field_role}, ...), and every {@code
- * !enum [...]}, {@code !text_enum [...]} and {@code !enum_type { ... }} instance, including those of a meta
- * layer's own {@code enum_type} tightenings. Kept as an ordered {@code List}, matching how {@link
+ * name_type} its members are drawn from, an identifier family, and the {@code members} it lists. Backs {@code
+ * boolean} ({@code [true false]}), the kernel's own internal enumerations ({@code product_access_type}, {@code
+ * field_role}, ...), and every {@code !enum [...]} and {@code !enum_type { ... }} instance, including those of a
+ * meta layer's own {@code enum_type} tightenings. Kept as an ordered {@code List}, matching how {@link
  * TypeDefinition#supertypes} represents a conceptual set -- member order is preserved for deterministic output,
  * not semantically significant.
  *
- * <p><b>Members are text whatever {@code name_type} is</b>, so every enum is this one shape. What it decides --
- * that each member is a value of it, distinct under its equality, and whether the members carry the name-hygiene
- * rules -- needs its own definition, which lives in a namespace this body cannot see, so it is checked at linking
- * rather than by {@link #coherenceCheck}. A record's {@code name_type} is the same mechanism over its field names.
+ * <p><b>Members are held as text whatever {@code name_type} is</b>, so every enum is this one shape. What it
+ * decides -- that each member is a value of it, distinct under its equality, and the profile its members are
+ * judged under as names -- needs its own definition, which lives in a namespace this body cannot see, so it is
+ * checked at linking rather than by {@link #coherenceCheck}. A record's {@code name_type} is the same mechanism
+ * over its field names.
  */
 @Typename(name = "enum")
 public record EnumBody(@Field("name_type") String nameType, List<String> members) implements Atom {

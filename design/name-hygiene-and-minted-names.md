@@ -127,15 +127,12 @@ restricted-character rule (`Identifier_Status`) where a name is *read* — the s
 positions only some of those reach: an enum member and a group's member labels get checked for reading alike
 and for script mixing, and never for a restricted character, invisibly.
 
-**An enum's members are the one scope whose per-name rules are conditional, and the condition is declared.**
-When the enum's `name_type` is an identifier family (`enum`, or `!enum_type { name_type: kebab … }` over a refinement of
-`identifier`), its members are names and all three mechanisms reach them. Otherwise (`text_enum`) they are values:
-the restricted-character and restricted-script rules are per-*name* and lapse — a value set carries whatever its
-domain carries, and nothing is looked up by name there — while the look-alike relation stays, because the set is
-still what a value is matched against and two members that render identically is the same hazard either way.
-`checkScope`'s `perNameRules` flag is that split, and it is the enum's declared `type` that sets it
-(`EnumLabels`), never the shape of the members: inferring "these look like names, so police them" would switch a
-spoofing check on and off by accident. A scope list
+**An enum's members and a record's field names are judged under their name type's profile.** Both `name_type`s
+are identifier families (`enum`'s is the kernel's `identifier`; `!enum_type { name_type: words … }` or a record's
+`name_type: json_name` names the author's own), so the names are names and all three mechanisms reach them, with
+the profile's added characters — a `start_add`, a `continue_add`, a `medial` — counted as its own rather than as
+restricted characters (`NameType.profile`, passed to `checkScope`). A closed set of text that is no name is no enum:
+it is `text_type`'s `members` facet, a value set no name rule reaches. A scope list
 can be reviewed; three call sites cannot. What stays at the reading positions is §7.7's grammar
 (`IdentifierGrammar.validate`), which is validity, is stable across Unicode versions, and really is a parse
 error; `IdentifierGrammar.hygiene` returns the restricted-character rule's verdict rather than throwing,

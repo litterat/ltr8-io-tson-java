@@ -176,7 +176,7 @@ class TextNormalizationTest {
                 !!meta:"https://tson.io/2026/38/m/meta.tn"
                 !!import:"https://tson.io/2026/38/m/core.tn"
                 {
-                  accented => !text_enum ["caf\u00e9" tea]
+                  accented => !enum ["caf\u00e9" tea]
                   order    => { drink: accented }
                 }
                 """);

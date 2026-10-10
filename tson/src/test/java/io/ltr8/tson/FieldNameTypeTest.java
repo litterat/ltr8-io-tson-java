@@ -162,12 +162,30 @@ class FieldNameTypeTest {
         assertEquals(new Node("urn:x", "#/a", "x"), tson.objectReader().read(written, Node.class));
     }
 
+    /**
+     * An identifier type whose profile admits a single space between two characters makes words field names, judged
+     * as names under that profile: a doubled or trailing space is no name of it.
+     */
     @Test
-    void aTextFieldNameTypeAdmitsAnyText() {
-        String texts = schema("texts", """
-              row => !record { name_type: text  fields: [ { name: "first name"  type: text } ] }
+    void aWordsNameTypeAdmitsSpacedNamesAndJudgesThemAsNames() {
+        String words = schema("words", """
+              words => !identifier_type { continue_add: "-"  medial: " " }
+              row => !record { name_type: words  fields: [ { name: "first name"  type: text } ] }
             """);
-        assertEquals(List.of(), read(texts, "texts", "!row { \"first name\": \"Ada\" }"));
+        assertEquals(List.of(), read(words, "words", "!row { \"first name\": \"Ada\" }"));
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, read(words, "words",
+                "!row { \"first name\": \"Ada\"  \"last  name\": \"L\" }").getFirst().code());
+    }
+
+    /** A record's field names are names, so a name type that is no identifier family is refused at schema load. */
+    @Test
+    void aTextNameTypeIsRefused() {
+        var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
+                () -> Tson.standard().resolve(schema("texts", """
+                      row => !record { name_type: text  fields: [ { name: "first name"  type: text } ] }
+                    """)));
+        assertTrue(thrown.getMessage().contains("its name_type 'text' is not an identifier family"),
+                thrown.getMessage());
     }
 
     /** The default does not change under a schema either: an identifier, refused at schema load. */

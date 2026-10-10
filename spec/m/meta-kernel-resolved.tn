@@ -78,19 +78,19 @@
   """
 !schema {
   top => !type_definition {
-    subtypes: [array atom choice data enum enum_type identifier_type integer_type iri_type map product record reference regex_type set_type sum template text_enum text_type tuple type value_type void_type]
+    subtypes: [array atom choice data enum enum_type identifier_type integer_type iri_type map product record reference regex_type set_type sum template text_type tuple type value_type void_type]
     body: !record { fields: [] }
   }
 
   type => !type_definition {
     supertypes: [top]
-    subtypes: [array atom choice enum enum_type identifier_type integer_type iri_type map product record regex_type set_type sum text_enum text_type tuple value_type void_type]
+    subtypes: [array atom choice enum enum_type identifier_type integer_type iri_type map product record regex_type set_type sum text_type tuple value_type void_type]
     body: !record { supertypes: [top]  fields: [] }
   }
 
   atom => !type_definition {
     supertypes: [top type]
-    subtypes: [enum enum_type identifier_type integer_type iri_type regex_type text_enum text_type value_type void_type]
+    subtypes: [enum enum_type identifier_type integer_type iri_type regex_type text_type value_type void_type]
     body: !record { supertypes: [type]  fields: [] }
   }
 
@@ -484,7 +484,7 @@
 
   enum_type => !type_definition {
     supertypes: [atom top type]
-    subtypes: [enum text_enum]
+    subtypes: [enum]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: name_type  type: type_name }
       !record_field { name: members    type: enum_set }
@@ -496,15 +496,6 @@
     supertypes: [atom enum_type top type]
     body: !record { fields: [
       !record_field { name: name_type  type: type_name  optional: true  role: FIXED  value: identifier }
-      !record_field { name: members    type: enum_set }
-    ] }
-  }
-
-  text_enum => !type_definition {
-    source: enum_type
-    supertypes: [atom enum_type top type]
-    body: !record { fields: [
-      !record_field { name: name_type  type: type_name  optional: true  role: FIXED  value: text }
       !record_field { name: members    type: enum_set }
     ] }
   }

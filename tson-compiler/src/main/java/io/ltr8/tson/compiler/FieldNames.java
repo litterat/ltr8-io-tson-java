@@ -20,7 +20,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * What a record's {@code name_type} obliges (SPEC-FEEDBACK.md #10): that it names a text family, that every
+ * What a record's {@code name_type} obliges (SPEC-FEEDBACK.md #10): that it names an identifier family, that every
  * field name the record states -- in {@code fields}, {@code discriminators} and its groups -- is a value of it, and
  * that no two of its fields are one value under its equality. The peer of {@link EnumLabels}, on the same terms: a
  * checker over the linked closure that hands back violations and leaves reporting to the linker.
@@ -28,30 +28,6 @@ import java.util.function.Function;
 final class FieldNames {
 
     private FieldNames() {
-    }
-
-    /**
-     * Whether {@code record}'s field names are names: its field name type is an identifier family. A type that
-     * resolves to nothing is taken to have names, the stricter reading, as {@link EnumLabels#membersAreNames} does.
-     */
-    static boolean namesAreIdentifiers(TypeDefinition record, Map<String, TypeDefinition> merged,
-                                       Function<String, TypeDefinition> structure) {
-        return NameType.of(record, merged::get, structure)
-                .map(type -> EnumLabels.isFamily(type.definition(), "identifier_type", type.lookup()))
-                .orElse(true);
-    }
-
-    /**
-     * The identifier profile {@code record}'s field names are judged under by §8.2's per-name rules: its field name
-     * type's, whose added characters are the profile's own, or empty where the type is no identifier family.
-     */
-    static Optional<io.ltr8.unicode.IdentifierProfile> profile(TypeDefinition record,
-                                                              Map<String, TypeDefinition> merged,
-                                                              Function<String, TypeDefinition> structure) {
-        return NameType.of(record, merged::get, structure)
-                .map(type -> type.definition() == null ? null : type.definition().body())
-                .filter(io.ltr8.tson.schema.meta.IdentifierType.class::isInstance)
-                .map(body -> ((io.ltr8.tson.schema.meta.IdentifierType) body).profile());
     }
 
     /**
@@ -101,10 +77,11 @@ final class FieldNames {
                     + body.nameType() + "' names nothing in scope"));
         }
         NameType.Resolved type = resolved.get();
-        if (!EnumLabels.isFamily(type.definition(), "text_type", type.lookup())) {
+        if (!EnumLabels.isFamily(type.definition(), EnumLabels.IDENTIFIER_TYPE, type.lookup())) {
             return Optional.of(new EnumLabels.Violation(name, "'" + name + "': its name_type '"
-                    + body.nameType() + "' is not a text family -- a record's field names are texts of an "
-                    + "atom-family instance whose constructor IS-A text_type, an identifier by default"));
+                    + body.nameType() + "' is not an identifier family -- a record's field names are names drawn "
+                    + "from an atom-family instance whose constructor IS-A identifier_type; a key that is no name "
+                    + "belongs in a map"));
         }
         Optional<AtomType<?>> parser = AtomParsers.forType(type.definition().body());
         if (parser.isEmpty()) {

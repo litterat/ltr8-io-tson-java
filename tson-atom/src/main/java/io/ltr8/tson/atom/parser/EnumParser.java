@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * Parses and validates against an enum -- an instance of meta-kernel's {@code enum_type} or a tightening of it
- * such as {@code enum} or {@code text_enum} (§7.4). Holds an {@link EnumBody} -- the pure constraint values --
+ * such as {@code enum} (§7.4). Holds an {@link EnumBody} -- the pure constraint values --
  * rather than declaring those fields itself.
  *
  * <p><b>Matches on the token's text directly, never through {@code BaseTypeResolver}'s
