@@ -88,11 +88,13 @@ because that is the failure that would survive every other test.
 **A field name is judged by the record that reads it** (SPEC-FEEDBACK.md #10). The grammar admits any single-line
 token in name position, and the match against the record's `name_type` is here: a name the type refuses is
 `ATOM_FORM_INVALID` and meets no hygiene rule; one it admits meets the per-name rules under the type's profile, an
-identifier family's. The rule is the reading record's, passed on the one pull
-(`TsonReadContext.nextFieldName`), so a record nested in a relaxed one keeps identifier names. A lookahead —
+identifier family's. The rule is the reading record's, passed on the one pull (`TsonReadContext.nextFieldName`), so a
+record nested in a relaxed one keeps identifier names. A name it admits is matched against the declared ones in the
+type's `normalization` (`FieldNameRule.form`, from `TsonLinkedSchema.nameForm`), the equality the linker judged them
+distinct under; under NFC, every name's form already, the index is the declared names themselves. A lookahead —
 `RecordMemberDispatchReader`'s discriminator scan — crosses a member's names before the member is chosen, so a field
-name pulled while one is running is held in the cursor's `unjudged` set and judged when a reader outside any
-lookahead reads it. The set is allocated only when a lookahead crosses a field name.
+name pulled while one is running is held in the cursor's `unjudged` set and judged when a reader outside any lookahead
+reads it. The set is allocated only when a lookahead crosses a field name.
 
 **Not in `TsonDataStream`**, which is where the *token* surface's policy runs and gets exactly-once
 for free by sitting upstream of the rewind. The two surfaces sit on opposite sides of the rewind because they

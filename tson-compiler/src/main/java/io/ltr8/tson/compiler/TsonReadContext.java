@@ -183,14 +183,17 @@ public interface TsonReadContext {
 
     /**
      * What a record's field names are judged by: its name type, an identifier family, by name for messages, the
-     * reader of its values, and the identifier profile §8.2's per-name rules apply under.
+     * reader of its values, the identifier profile §8.2's per-name rules apply under, and the form a name is
+     * matched against the declared ones in.
      */
-    record FieldNameRule(String typeName, io.ltr8.tson.atom.AtomType<?> type, IdentifierProfile profile) {
+    record FieldNameRule(String typeName, io.ltr8.tson.atom.AtomType<?> type, IdentifierProfile profile,
+                         io.ltr8.unicode.Normalization form) {
 
         public FieldNameRule {
             Objects.requireNonNull(typeName, "typeName");
             Objects.requireNonNull(type, "type");
             Objects.requireNonNull(profile, "profile");
+            Objects.requireNonNull(form, "form");
         }
     }
 

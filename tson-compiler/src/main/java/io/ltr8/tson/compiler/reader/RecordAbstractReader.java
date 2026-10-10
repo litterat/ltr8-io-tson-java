@@ -121,6 +121,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     final List<CompiledField> fields;
     final Map<String, Integer> fieldIndex;
+
+    /**
+     * The slot a document's field name fills, keyed in the name type's form (§5.5): {@link #fieldIndex} itself
+     * where that form is NFC, the form every name already arrives in, and otherwise each declared name put into
+     * it, so a name the type holds equal to a declared one is that field.
+     */
+    private final Map<String, Integer> matchIndex;
+    private final io.ltr8.unicode.Normalization nameForm;
     final List<FieldGroup> groups;
 
     /** Each field group as field indexes, compiled once ({@link GroupPlan}). */
@@ -179,6 +187,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
         }
         this.fixedCheck = fixedChecks;
+        this.nameForm = fieldNames == null ? io.ltr8.unicode.Normalization.NFC : fieldNames.form();
+        if (nameForm == io.ltr8.unicode.Normalization.NFC) {
+            this.matchIndex = fieldIndex;
+        } else {
+            this.matchIndex = new HashMap<>();
+            fieldIndex.forEach((declared, at) -> matchIndex.put(nameForm.apply(declared), at));
+        }
         this.groupPlans = groups.stream().map(group -> GroupPlan.of(group, fieldIndex)).toArray(GroupPlan[]::new);
         this.positionalFieldIndex = requiredCount == 1 ? solePositionalField : -1;
         this.declaredFields = fields.stream().map(field -> field.schema().name()).collect(Collectors.joining(" | "));
@@ -266,7 +281,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
             return new TsonReadContext.FieldNameRule(body.nameType(), AtomParsers.forType(identifiers)
                     .orElseThrow(() -> new IllegalStateException("'" + name + "': name_type '" + body.nameType()
-                            + "' has no reader of its own")), identifiers.profile());
+                            + "' has no reader of its own")), identifiers.profile(), context.linked().nameForm(name));
         }).orElse(null);
     }
 
@@ -296,7 +311,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             FieldName fieldName = ctx.nextFieldName(fieldNames);
             boolean nameRefused = ctx.reported() > reportedBeforeName;
 
-            Integer schemaIndex = fieldIndex.get(fieldName.name());
+            Integer schemaIndex = matchIndex.get(matchIndex == fieldIndex ? fieldName.name()
+                    : nameForm.apply(fieldName.name()));
             if (schemaIndex == null) {
                 if (!nameRefused) {
                     ctx.field(fieldName.name()).report(rules.unrecognizedField(fieldName.name()));

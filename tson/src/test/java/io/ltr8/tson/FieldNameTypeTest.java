@@ -235,16 +235,80 @@ class FieldNameTypeTest {
                 "!node { \"@id\": \"x\"  \"a b\": 1  label: \"y\" }")).code());
     }
 
+    /** Two supertypes stating different name types beyond the default compose names no one type was chosen for. */
     @Test
-    void supertypesOfTwoFieldNameTypesDoNotCompose() {
+    void supertypesOfTwoNameTypesDoNotCompose() {
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("disagree", """
                       json_name => !identifier_type { start_add: "@$" }
+                      words => !identifier_type { medial: " " }
                       node => !record { name_type: json_name  fields: [ { name: "@id"  type: text } ] }
-                      plain => { label: text }
-                      both => node & plain & {}
+                      row => !record { name_type: words  fields: [ { name: "first name"  type: text } ] }
+                      both => node & row & {}
                     """)));
-        assertTrue(thrown.getMessage().contains("different field name types"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("state different name types"), thrown.getMessage());
+    }
+
+    /**
+     * A supertype with the kernel's default states no name type of its own, so a translation's record composes a
+     * plain one and takes the other's type; the plain record's names are then judged by that type.
+     */
+    @Test
+    void aPlainSupertypeTakesTheCompositionsNameType() {
+        String mixed = schema("mixed", """
+                  json_name => !identifier_type { start_add: "@$" }
+                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+                  address => { city: text }
+                  node => json_record & address & { "@id": text }
+                """);
+        var resolved = Tson.standard().resolve(mixed);
+        assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) resolved.schema().entries().get("node")
+                .body()).nameType());
+        assertEquals(List.of(), read(mixed, "mixed", "!node { \"@id\": \"x\"  city: \"y\" }"));
+    }
+
+    /** A plain supertype's name that is no value of the composition's name type is refused at schema load. */
+    @Test
+    void aPlainSupertypesNameOutsideTheCompositionsTypeIsRefused() {
+        var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
+                () -> Tson.standard().resolve(schema("mixed-bad", """
+                      json_name => !identifier_type { start_add: "@$" }
+                      json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+                      order => { order-id: text }
+                      node => json_record & order & { "@id": text }
+                    """)));
+        assertTrue(thrown.getMessage().contains("field name 'order-id' is not a value of its name_type 'json_name'"),
+                thrown.getMessage());
+    }
+
+    /**
+     * A document's field name is matched in its name type's form (§5.5): under a case-folding type {@code NAME} is
+     * the field {@code name}, as an enum over the same type matches {@code OPEN} to {@code open}, and the two
+     * spellings in one record are one field written twice.
+     */
+    @Test
+    void aFieldNameIsMatchedInItsNameTypesForm() {
+        String folded = schema("folded", """
+                  folded => !identifier_type { normalization: NFKC_CASEFOLD }
+                  row => !record { name_type: folded  fields: [ { name: name  type: text } ] }
+                """);
+        assertEquals(List.of(), read(folded, "folded", "!row { NAME: \"x\" }"));
+        assertEquals(Diagnostic.Code.DUPLICATE_FIELD, only(read(folded, "folded",
+                "!row { name: \"x\"  NAME: \"y\" }")).code());
+    }
+
+    /** A family's selector is found in its base's name form too, so a member is chosen however its name is cased. */
+    @Test
+    void aSelectorIsMatchedInItsBasesNameForm() {
+        String family = schema("folded-family", """
+                  folded => !identifier_type { normalization: NFKC_CASEFOLD }
+                  base => !record { name_type: folded  extension: ABSTRACT  fields: [] }
+                  pet => abstract base & { kind: text =?  name: text }
+                  dog => pet & { kind?: = "dog"  breed: text }
+                  holder => { p: pet }
+                """);
+        assertEquals(List.of(), read(family, "folded-family",
+                "!holder { p: { KIND: \"dog\"  name: \"Rex\"  Breed: \"corgi\" } }"));
     }
 
     @Test

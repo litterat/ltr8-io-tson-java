@@ -129,10 +129,12 @@ members are the three only, so its `$value` directly follows them and the peek s
 judges annotation members as they arrive: a `$type` in first place must restate the record; `$value` straight after it
 makes the object a wrapper, read at the reader the dispatcher chose for it (`ExactReader`, `Route`), since the value
 inside may carry a tag of its own; a misplaced `$type` or `$value`, any `$schema`, refuse the object, and the rest of
-it is skipped; any other `$`-initial name is matched as a field name. Members read before a refusal have already
-reported, so an invalid document's diagnostics follow its member order — accepted deliberately: holding them back
-would cost every valid document a buffer to tidy the answer for invalid ones. The allocation harness measures what the
-peek saved (`aSchemaDirectedRecordReadsWithoutLookingAhead`).
+it is skipped; any other `$`-initial name is matched as a field name. A member name is matched in NFC and then in the
+record's name type's form (`TsonLinkedSchema.nameForm`, held by `RecordPlan`), so under a case-folding name type
+`NAME` is the field `name`; `TagMembers.lead` puts a sealed base's selectors in the same form. Members read before a
+refusal have already reported, so an invalid document's diagnostics follow its member order — accepted deliberately:
+holding them back would cost every valid document a buffer to tidy the answer for invalid ones. The allocation harness
+measures what the peek saved (`aSchemaDirectedRecordReadsWithoutLookingAhead`).
 
 - **`$schema` is refused everywhere a scoped reader does not stand.** §8.5 admits it only where the effective type is
   a `scoped` instance holding EXTERN, and [TSON-SCHEMA] §7.8 makes it a resolver error at a position that is not

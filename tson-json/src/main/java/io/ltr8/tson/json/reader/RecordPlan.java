@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.base.diagnostics.SubsumptionDiagnostics;
 import io.ltr8.unicode.Nfc;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
@@ -64,6 +65,7 @@ final class RecordPlan {
     final FieldValue[] stated;
 
     private final Map<String, Integer> index;
+    private final Normalization nameForm;
 
     /** Each field group, compiled to slots once ({@link GroupPlan}). */
     private final GroupPlan[] groups;
@@ -85,11 +87,13 @@ final class RecordPlan {
         this.schemaReaders = new JsonTypeReader<?>[count];
         this.stated = new FieldValue[count];
         Map<String, Integer> byName = new HashMap<>();
+        // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule, and
+        // then put into the record's name type's form (§5.5), so a name the type holds equal to a field is it.
+        this.nameForm = context.linked().nameForm(name);
         for (int i = 0; i < count; i++) {
             RecordField field = fields[i];
-            // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule.
             names[i] = Nfc.of(field.name());
-            byName.put(names[i], i);
+            byName.put(nameForm.apply(names[i]), i);
             omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(field.name())));
             schemaReaders[i] = context.readers().resolve(field.type().name());
             if (field.value().isPresent()) {
@@ -97,15 +101,16 @@ final class RecordPlan {
             }
         }
         this.index = Map.copyOf(byName);
-        this.groups = body.groups().stream().map(group -> GroupPlan.of(group, byName)).toArray(GroupPlan[]::new);
+        this.groups = body.groups().stream().map(group -> GroupPlan.of(group, byName, nameForm))
+                .toArray(GroupPlan[]::new);
         this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().stream()
                 .map(RecordField::name).toList()));
         this.subsumption = new SubsumptionDiagnostics(displayName);
     }
 
-    /** The field slot a member name fills, or -1 where it names no field. */
+    /** The field slot an NFC member name fills, in the name type's form, or -1 where it names no field. */
     int slotOf(String memberName) {
-        Integer at = index.get(memberName);
+        Integer at = index.get(nameForm.apply(memberName));
         return at == null ? -1 : at;
     }
 
@@ -231,16 +236,17 @@ final class RecordPlan {
     private record GroupPlan(FieldGroup group, int[][] options, int[][] required, String[] optionText,
                              String text) {
 
-        static GroupPlan of(FieldGroup group, Map<String, Integer> byName) {
+        static GroupPlan of(FieldGroup group, Map<String, Integer> byName, Normalization form) {
             List<List<String>> members = group.members();
             int[][] options = new int[members.size()][];
             int[][] required = new int[members.size()][];
             String[] optionText = new String[members.size()];
             for (int o = 0; o < members.size(); o++) {
                 List<String> option = members.get(o);
-                options[o] = option.stream().mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray();
+                options[o] = option.stream()
+                        .mapToInt(member -> byName.getOrDefault(form.apply(Nfc.of(member)), -1)).toArray();
                 required[o] = option.stream().filter(member -> !group.optionalMembers().contains(member))
-                        .mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray();
+                        .mapToInt(member -> byName.getOrDefault(form.apply(Nfc.of(member)), -1)).toArray();
                 optionText[o] = String.join(" ", option);
             }
             return new GroupPlan(group, options, required, optionText, group.describe());

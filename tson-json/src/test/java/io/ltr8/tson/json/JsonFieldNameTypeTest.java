@@ -29,6 +29,14 @@ class JsonFieldNameTypeTest {
               ref => !record { name_type: json_name  fields: [
                 { name: "$ref"  type: text }  { name: "$id"  type: text  optional: true } ] }
               typed => !record { name_type: json_name  fields: [ { name: "$type"  type: text } ] }
+              address => { city: text }
+              located => ld_node & address
+              folded => !identifier_type { normalization: NFKC_CASEFOLD }
+              frow => !record { name_type: folded  fields: [ { name: name  type: text } ] }
+              fbase => !record { name_type: folded  extension: ABSTRACT  fields: [] }
+              pet => abstract fbase & { kind: text =?  name: text }
+              dog => pet & { kind?: = "dog"  breed: text }
+              kennel => { p: pet }
               words => !identifier_type { continue_add: "-"  medial: " " }
               row => !record { name_type: words  fields: [ { name: "first name"  type: text } ] }
               json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
@@ -73,6 +81,19 @@ class JsonFieldNameTypeTest {
         List<Diagnostic> problems = read("typed", "{\"$type\": \"x\"}");
         assertEquals(List.of(Diagnostic.Code.TYPE_MISMATCH), problems.stream().map(Diagnostic::code).toList(),
                 problems.toString());
+    }
+
+    /** A plain supertype composed with a translation's record takes its name type: both names read from JSON. */
+    @Test
+    void aPlainSupertypeComposesWithATranslationsRecord() {
+        assertEquals(List.of(), read("located", "{\"@id\": \"urn:x\", \"label\": \"y\", \"city\": \"z\"}"));
+    }
+
+    /** A member name is matched in the record's name type's form, and so is a family's selector (§5.5). */
+    @Test
+    void aMemberNameIsMatchedInItsNameTypesForm() {
+        assertEquals(List.of(), read("frow", "{\"NAME\": \"x\"}"));
+        assertEquals(List.of(), read("kennel", "{\"p\": {\"KIND\": \"dog\", \"name\": \"Rex\", \"Breed\": \"c\"}}"));
     }
 
     /** A record composing a fieldless base takes the base's field name type, and reads untagged where it is typed. */

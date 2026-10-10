@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema;
 
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.unicode.Normalization;
 
@@ -90,6 +91,20 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     /** What record {@code entryName}'s field names are judged by -- empty for one {@link #nameTypes} omits. */
     public Optional<TypeDefinition> nameType(String entryName) {
         return Optional.ofNullable(nameTypes.get(entryName));
+    }
+
+    /**
+     * The form record {@code entryName}'s field names are matched in: its name type's {@code normalization}
+     * ([TSON-SCHEMA] §5.5), so a document's name and a declared one that are one value of the type are one field --
+     * the equality the linker judged the declared names distinct under. {@code NFC} for one {@link #nameTypes}
+     * omits, the kernel's {@code field_name} being NFC; no form compares lower than NFC.
+     */
+    public Normalization nameForm(String entryName) {
+        return nameType(entryName).map(TypeDefinition::body)
+                .filter(IdentifierType.class::isInstance)
+                .map(body -> ((IdentifierType) body).normalization())
+                .filter(form -> form != Normalization.NONE)
+                .orElse(Normalization.NFC);
     }
 
     /**

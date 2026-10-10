@@ -740,9 +740,17 @@ relaxed type, defined by the translation and not by the series, such as
   token as a declared field name too, and the linker holds every record to its `name_type`: the type names an
   identifier family, every name in `fields`, `discriminators` and the groups is a value of it, and no two fields are one
   value. A brace-form `{ "first name": text }` is therefore a resolver error rather than a parse error.
-- **Inheritance keeps one family.** A composition takes its record supertypes' `name_type`, whose names it
-  absorbs, and supertypes stating two different ones are a resolver error; a refinement keeps its source's. So the
-  brace form can restate an inherited relaxed name (`tightened => node ^ { "$ref": text }`).
+- **Inheritance keeps one name type.** A composition takes the one `name_type` its record supertypes state beyond
+  the default: a supertype with the kernel's `field_name` states none of its own, so a translation's record composes
+  a plain one (`node => json_record & address & { … }`) and the plain record's names are then judged by the
+  composition's type at load — `order-id` is an identifier but no `json_name`, and is refused there. Two supertypes
+  stating different non-default types are a resolver error; a refinement keeps its source's. So the brace form can
+  restate an inherited relaxed name (`tightened => node ^ { "$ref": text }`).
+- **A field name is matched in its name type's form.** The linker judges two declared names one field under the
+  type's equality, so a reader matches a document's name against the declared ones in the type's `normalization`
+  (§5.5), as an enum matches its members: under a case-folding name type `NAME` is the field `name`, the two
+  spellings in one record are a duplicate field, and a family's selector is found however its name is cased. Both
+  encodings do this; under the default, NFC, nothing changes.
 - **The brace form states a type by composition, and has no syntax of its own.** A relaxed name type is a
   translation's tool, not the go-to form for a TSON record, so the series adds no brace-form spelling for it: a
   translation declares its type once, on a fieldless abstract base, and its records compose it —

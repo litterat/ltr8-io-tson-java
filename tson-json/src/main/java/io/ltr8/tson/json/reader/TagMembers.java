@@ -6,6 +6,7 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
 
 import io.ltr8.unicode.Nfc;
+import io.ltr8.unicode.Normalization;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -82,7 +83,7 @@ final class TagMembers {
 
     /** The leading annotation members of the object at {@code ctx}'s cursor, which must be an {@code ObjectStart}. */
     static Lead lead(JsonReadContext ctx) {
-        return lead(ctx, Set.of());
+        return lead(ctx, Set.of(), Normalization.NFC);
     }
 
     /**
@@ -90,14 +91,15 @@ final class TagMembers {
      * annotation members, in any order among themselves -- a sealed position's discriminators (§6.1.5).
      *
      * <p>Nothing is reported from here: a peek is a question, and what a wrong answer means depends on the
-     * position that asked. The names in {@code wanted} are NFC-normalised, as every member-name comparison in
-     * this encoding is ([TSON-DATA] §2.5).
+     * position that asked. The names in {@code wanted} are in {@code form}, the base's name form (§5.5), and a
+     * member's name is put into it after NFC, as every member-name comparison in this encoding is ([TSON-DATA]
+     * §2.5); the selectors come back keyed in that form.
      */
-    static Lead lead(JsonReadContext ctx, Set<String> wanted) {
-        return JsonReadContext.lookingAhead(ctx, ahead -> readLead(ahead, wanted));
+    static Lead lead(JsonReadContext ctx, Set<String> wanted, Normalization form) {
+        return JsonReadContext.lookingAhead(ctx, ahead -> readLead(ahead, wanted, form));
     }
 
-    private static Lead readLead(JsonReadContext ctx, Set<String> wanted) {
+    private static Lead readLead(JsonReadContext ctx, Set<String> wanted, Normalization form) {
         if (!(ctx.next() instanceof JsonEvent.ObjectStart)) {
             return Lead.NONE;
         }
@@ -127,7 +129,7 @@ final class TagMembers {
         }
         Map<String, JsonEvent> selectors = wanted.isEmpty() ? Map.of() : new LinkedHashMap<>();
         while (selectors.size() < wanted.size() && event instanceof JsonEvent.MemberName member) {
-            String name = Nfc.of(member.name());
+            String name = form.apply(Nfc.of(member.name()));
             JsonEvent value = ctx.peek();
             if (!wanted.contains(name) || selectors.containsKey(name) || !isScalar(value)) {
                 break;

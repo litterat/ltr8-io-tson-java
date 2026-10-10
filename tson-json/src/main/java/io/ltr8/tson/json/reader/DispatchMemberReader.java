@@ -8,6 +8,7 @@ import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.unicode.Nfc;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
@@ -73,7 +74,9 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     private final Set<String> selfNames;
 
     private final List<Selector> selectors;
+    /** The selectors' names in the base's name form (§5.5), what the leading-member peek matches. */
     private final Set<String> selectorNames;
+    private final Normalization nameForm;
 
     /** The pins, as they compare, to the member that states them -- §5.7's mapping, derived and never declared. */
     private final Map<List<Object>, String> members;
@@ -102,8 +105,11 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         TsonSchema schema = context.schema();
         Map<String, TypeDefinition> entries = schema.entries();
         this.selectors = selectorFields.stream().map(field -> selectorOf(field, context.linked())).toList();
-        this.selectorNames = selectors.stream().map(Selector::name).collect(LinkedHashSet::new,
-                Set::add, Set::addAll);
+        // The family's members compose the base, so they share its name type; a template base states none.
+        this.nameForm = selfNames.stream().map(context.linked()::nameForm).filter(form -> form != Normalization.NFC)
+                .findFirst().orElse(Normalization.NFC);
+        this.selectorNames = selectors.stream().map(selector -> nameForm.apply(selector.name()))
+                .collect(LinkedHashSet::new, Set::add, Set::addAll);
         this.members = new LinkedHashMap<>();
         // What each dispatched member admits a deeper tag to name: itself and its own subtypes (§6.1.5).
         Map<String, Set<String>> deeper = new LinkedHashMap<>();
@@ -171,7 +177,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
             EventSkip.value(ctx, found);
             return null;
         }
-        return dispatch(ctx, TagMembers.lead(ctx, selectorNames));
+        return dispatch(ctx, TagMembers.lead(ctx, selectorNames, nameForm));
     }
 
     /** Reached by a tag naming this base from an enclosing position: placed again, from the leading members. */
@@ -191,7 +197,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         }
         List<Object> key = new ArrayList<>(selectors.size());
         for (Selector selector : selectors) {
-            JsonEvent value = tag.selectors().get(selector.name());
+            JsonEvent value = tag.selectors().get(nameForm.apply(selector.name()));
             if (value == null) {
                 // Never a fallback to the tag: the selector is a REQUIRED field of the base, so a value
                 // without it is invalid on §5.2's ordinary terms, and reading the tag instead would make one

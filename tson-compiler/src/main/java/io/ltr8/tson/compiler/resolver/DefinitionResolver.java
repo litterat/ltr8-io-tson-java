@@ -1190,10 +1190,11 @@ final class DefinitionResolver {
     private TypeDefinition resolveComposition(String name, ConstructionDef construction,
                                                List<String> parameters) {
         List<io.ltr8.tson.schema.meta.TypeRef> directSupertypes = new ArrayList<>();
-        // SPEC-FEEDBACK.md #10: a composition inherits its record supertypes' name_type, whose names it
-        // absorbs; supertypes that disagree compose names of two families, which no one type judges.
+        // SPEC-FEEDBACK.md #10: a composition takes the one name type its record supertypes state beyond the
+        // kernel's default. A supertype with the default contributes none, its names then judged at link by the
+        // type the composition takes; two that state different ones compose names no one type was chosen for.
         String nameType = null;
-        String fieldNameTypeFrom = null;
+        String nameTypeFrom = null;
         List<String> transitiveSupertypes = new ArrayList<>();
         Set<String> seenTransitive = new HashSet<>();
         List<RecordField> fields = new ArrayList<>();
@@ -1316,13 +1317,18 @@ final class DefinitionResolver {
             }
 
             absorb(name, supertypeBody, fields, groups, seenFieldNames, inheritedFieldIndex);
+            String stated = supertypeBody.nameType();
+            if (stated.equals(RecordBody.FIELD_NAME)) {
+                continue;
+            }
             if (nameType == null) {
-                nameType = supertypeBody.nameType();
-                fieldNameTypeFrom = supertypeName;
-            } else if (!nameType.equals(supertypeBody.nameType())) {
-                throw new SchemaValidationException("'" + name + "': supertypes '" + fieldNameTypeFrom + "' and '"
-                        + supertypeName + "' state different field name types, '" + nameType + "' and '"
-                        + supertypeBody.nameType() + "' -- a record's field names are of one family");
+                nameType = stated;
+                nameTypeFrom = supertypeName;
+            } else if (!nameType.equals(stated)) {
+                throw new SchemaValidationException("'" + name + "': supertypes '" + nameTypeFrom + "' and '"
+                        + supertypeName + "' state different name types, '" + nameType + "' and '" + stated
+                        + "' -- a record's field names are of one name type, and a supertype with the default "
+                        + "takes the other's");
             }
         }
 
