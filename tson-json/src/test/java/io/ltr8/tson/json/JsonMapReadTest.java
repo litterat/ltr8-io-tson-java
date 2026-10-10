@@ -84,7 +84,7 @@ class JsonMapReadTest {
         assertEquals("/not-a-date", refusal.path().orElseThrow());
     }
 
-    /** §3.2: nothing is reserved at a map position -- keys are data, not names. */
+    /** §3.2: the three mean nothing at a map position -- keys are data, not names. */
     @Test
     void aDollarInitialMemberIsAnOrdinaryKey() {
         assertEquals("""

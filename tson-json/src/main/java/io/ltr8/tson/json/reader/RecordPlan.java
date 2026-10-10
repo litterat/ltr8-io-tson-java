@@ -128,7 +128,7 @@ final class RecordPlan {
     boolean admitsTag(JsonReadContext ctx) {
         if (!(ctx.peek() instanceof JsonEvent.StringValue tag)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                    "this object leads with this encoding's reserved members but no '$type' naming a type (§3.3)",
+                    "this object leads with this encoding's annotation members but no '$type' naming a type (§3.3)",
                     "a '$type' member holding a type name", "no $type");
             return false;
         }
@@ -145,19 +145,19 @@ final class RecordPlan {
     }
 
     /**
-     * A reserved member where none may stand (§3.2, §3.3): a {@code $schema}, which no record position admits;
-     * a {@code $type} or {@code $value} out of its leading place; or a name outside the closed set.
+     * One of §3.2's three where none may stand (§3.3): a {@code $schema}, which no record position admits, or a
+     * {@code $type} or {@code $value} out of its leading place.
      */
-    void refuseReserved(JsonReadContext ctx, String member, boolean tagged) {
+    void refuseTagMember(JsonReadContext ctx, String member, boolean tagged) {
         switch (member) {
-            case ReservedMembers.SCHEMA -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
-            case ReservedMembers.TYPE -> ReservedMembers.refuseMisplaced(ctx, member);
-            case ReservedMembers.VALUE -> ctx.field(member).report(Diagnostic.Code.UNRECOGNIZED_FIELD, tagged
+            case TagMembers.SCHEMA -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
+            case TagMembers.TYPE -> TagMembers.refuseMisplaced(ctx, member);
+            case TagMembers.VALUE -> ctx.field(member).report(Diagnostic.Code.UNRECOGNIZED_FIELD, tagged
                     ? "'$value' follows members of the record's own, and an annotation object in wrapper form "
                             + "admits nothing beside it (§3.3)"
                     : "'$value' belongs to an annotation object in wrapper form, which leads with '$type' "
                             + "naming the value's type (§3.3)", "'$value' straight after a leading '$type'", member);
-            default -> ReservedMembers.refuseUnknown(ctx, member);
+            default -> throw new IllegalStateException("'" + member + "' is none of §3.2's three");
         }
     }
 

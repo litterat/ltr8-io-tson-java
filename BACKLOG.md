@@ -121,7 +121,7 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
     `EntryDisplayName.of` and `locationOf` — `DispatchFactories` and `RecordPlan` both build the display name for
     one OPEN record with subtypes today.
   - **Shared rules as helpers.** The refusal pattern (report, `EventSkip`, return nothing), still written
-    out in each loop and dispatcher; the "reserved members but no `$type`" message written twice
+    out in each loop and dispatcher; the "annotation members but no `$type`" message written twice
     (`RecordPlan.admitsTag`, `DispatchChoiceReader`); the absence spelling `"null"` declared once per family
     (`RecordPlan`, `ArrayReader`, `TupleReader`, `MapEntries`); and failure detected by `ctx.reported() > before`
     (`TreeAtomReader`, `TreeAtomKeyedReader`, `RecordReader.verifyFixed`, `MapPairsReader`) taken from what the

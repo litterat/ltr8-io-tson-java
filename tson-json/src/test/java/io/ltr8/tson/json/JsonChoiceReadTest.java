@@ -172,11 +172,11 @@ class JsonChoiceReadTest {
     }
 
     /**
-     * §8.3.1: the tagged form is recognised from the first member alone, so a reserved name among a map
+     * §8.3.1: the tagged form is recognised from the first member alone, so one of the three among a map
      * variant's later keys is a key -- §5.7's arbitrary-JSON declaration reads it untagged.
      */
     @Test
-    void aReservedNameAfterTheFirstMemberIsAMapKey() {
+    void anAnnotationMemberAfterTheFirstMemberIsAMapKey() {
         assertEquals("""
                 {"a":1,"$type":"x"}""", read("any_json", """
                 {"a": 1, "$type": "x"}""").accepted().toString());
@@ -184,7 +184,7 @@ class JsonChoiceReadTest {
 
     /** The same name leading the object is the tag, and names no variant here. */
     @Test
-    void aLeadingReservedNameIsTheTagEvenWhereAMapCouldTakeIt() {
+    void aLeadingAnnotationMemberIsTheTagEvenWhereAMapCouldTakeIt() {
         Diagnostic refusal = read("any_json", """
                 {"$type": "x", "a": 1}""").refusal();
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());

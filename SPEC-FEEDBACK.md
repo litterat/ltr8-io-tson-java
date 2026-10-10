@@ -680,7 +680,7 @@ yet, so no verdict changes: the corpus passes unchanged.
 ## 10. A record's field names have a type: `record.name_type` (experimental)
 
 **Section:** [TSON-DATA] §2.5 ("A field name is an identifier at every layer"), §7.2.1, §7.7, §8.2; [TSON-SCHEMA]
-§5.2 (`record`), §7.4 (`enum_type.type`), §7.7, §12.1; [TSON-JSON] §3 (the reserved member namespace).
+§5.2 (`record`), §7.4 (`enum_type.type`), §7.7, §12.1; [TSON-JSON] §3 (the annotation members).
 
 **Kind:** proposal, experimental — on the branch `experiment/field-name-type`, not `r2026-38-proposal`.
 
@@ -722,16 +722,16 @@ relaxed type, defined by the translation and not by the series, such as
 - **The default does not change.** A schemaless record's field names are identifiers. A field-name position admits
   any single-line token, and the identifier match moves from the parser to the record, so a schemaless
   `{ "first name": 1 }` is a resolver error rather than a parse error. That is the one verdict that moves.
-- **Part 3's reserved member names move.** Its reserved namespace rests on no declared name beginning with `$`,
-  which a relaxed `name_type` breaks: JSON Schema's and OpenAPI's own members are `$ref`, `$id`, `$defs` and
-  `$schema`, so a translated record names exactly the members Part 3 claims. *Proposed, not yet built:*
-  `!schema`, `!type` and `!value`, with one total rule on the schema side — no record's field name begins with
-  `!`, under any `name_type`. `!` is TSON text's own type-annotation sigil, so `"!type": "dog"` reads as
-  `!dog` does; neither `$` (JSON Schema's) nor `@` (JSON-LD's: `@type`, `@value`) is free, and no ecosystem in
-  view claims `!`. The rule keeps the reservation sound by construction where a character test no longer can,
-  since a name type's profile may add any character. As built, the JSON reader matches a member by its
-  declared name and judges no matched name, so `"@id"` reads under a `json_name` record; a `$`-initial declared
-  name cannot be read from JSON until the move lands, being refused as an unknown reserved member.
+- **Part 3's three names stay, and are used rather than reserved.** Part 3 reserved every `$`-initial member name,
+  sound because no declared name could begin with `$`, which a `name_type` admitting `$` breaks: JSON Schema's and
+  OpenAPI's own members are `$ref`, `$id` and `$defs`. The three annotation members keep their names — `$schema`,
+  `$type`, `$value` sit closest to the vocabularies a JSON user already knows — and are now the only names Part 3
+  gives a meaning: any other `$`-initial name is a field name, so a translated record's `$ref` reads as an ordinary
+  member. A record that declares one of the three obscures it — a leading one is read as the annotation member, one
+  elsewhere is misplaced — and Part 3 §3.2 says so and that a schema SHOULD NOT, rather than refusing the schema.
+  Rejected: moving the three to an unused prefix (`!schema`), which would keep a reservation sound by construction
+  at the price of spellings no JSON user expects. *Implemented on the branch*, in Part 3 §1.3, §3.2, §6.1.1 and
+  §8.3.1 and in the JSON reader.
 - **No shipped `json_name`.** A relaxed type is the translation's own and differs between sources, and the
   implementation needed nothing from the series to support one: `!identifier_type { start_add: "@$" }` is a
   complete definition, read, bound and written like any record's names. A member name no identifier profile can

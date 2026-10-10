@@ -23,9 +23,12 @@ class JsonFieldNameTypeTest {
             !!meta:"https://tson.io/2026/38/m/meta.tn"
             !!import:"https://tson.io/2026/38/m/core.tn"
             {
-              json_name => !identifier_type { start_add: "@" }
+              json_name => !identifier_type { start_add: "@$" }
               node => !record { name_type: json_name  fields: [
                 { name: "@id"  type: text }  { name: label  type: text } ] }
+              ref => !record { name_type: json_name  fields: [
+                { name: "$ref"  type: text }  { name: "$id"  type: text  optional: true } ] }
+              typed => !record { name_type: json_name  fields: [ { name: "$type"  type: text } ] }
               words => !identifier_type { continue_add: "-"  medial: " " }
               row => !record { name_type: words  fields: [ { name: "first name"  type: text } ] }
               json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
@@ -50,6 +53,26 @@ class JsonFieldNameTypeTest {
     void aMemberNameIsReadByItsRecordsFieldNameType() {
         assertEquals(List.of(), read("node", "{\"@id\": \"urn:x\", \"label\": \"y\"}"));
         assertEquals(List.of(), read("row", "{\"first name\": \"Ada\"}"));
+    }
+
+    /**
+     * [TSON-JSON] §3.2 gives meaning to three names and no others, so a JSON Schema translation's {@code $ref} and
+     * {@code $id} are ordinary members of a record whose name type admits them.
+     */
+    @Test
+    void aDollarNameOutsideTheThreeIsAnOrdinaryField() {
+        assertEquals(List.of(), read("ref", "{\"$ref\": \"#/defs/a\", \"$id\": \"urn:a\"}"));
+    }
+
+    /**
+     * A record that declares one of the three obscures it: a leading {@code $type} is the annotation member, read
+     * as a type annotation naming a type, so the field is never read -- the undesirable result §3.2 warns of.
+     */
+    @Test
+    void aRecordDeclaringATagMemberObscuresIt() {
+        List<Diagnostic> problems = read("typed", "{\"$type\": \"x\"}");
+        assertEquals(List.of(Diagnostic.Code.TYPE_MISMATCH), problems.stream().map(Diagnostic::code).toList(),
+                problems.toString());
     }
 
     /** A record composing a fieldless base takes the base's field name type, and reads untagged where it is typed. */

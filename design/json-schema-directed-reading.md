@@ -11,8 +11,8 @@ surface. Current form only; history lives in git.
 - A `$type` is matched after reference flattening at every position that compares a written name against a set, through
   the one index `ReferenceChain.namesMeaning`.
 - Selectors lead their object ([TSON-JSON] §3.3, §6.1.5): every decision is a peek at the leading members
-  (`ReservedMembers.lead`), bounded by the schema, and no reader scans an object.
-- The concrete record reader looks ahead at nothing: its member loop judges every reserved member as it arrives, and
+  (`TagMembers.lead`), bounded by the schema, and no reader scans an object.
+- The concrete record reader looks ahead at nothing: its member loop judges every annotation member as it arrives, and
   `$schema` is refused everywhere except a scoped position.
 - A scoped position opens the scope by consuming `$schema` (`JsonReadContext.consumeLeadingMember`), so no reader
   below it has a second rule for the member; a foreign schema is looked up as the value arrives (`ForeignSchemas`).
@@ -33,7 +33,7 @@ Related: `design/json-encoding.md` (why the stack is separate, the parity guard)
 ## What the stack compiles
 
 The schema-directed reader stack — `JsonTypeReader`/`JsonCompiledSchema`/`JsonSchemaCompiler` — carries [TSON-JSON] §5's
-atoms, the whole of §6's containers, §7's absence, §3.2's reserved namespace and §3.3's annotation object (so §6.1.5's
+atoms, the whole of §6's containers, §7's absence, §3.2's annotation members and §3.3's annotation object (so §6.1.5's
 `$type` selects a subtype — the JSON spelling of `!employee` at a `person` field), and §8.2's discrimination predicate over
 §8.3's class stability, and §8.5's scoped positions, all compiled in **tree mode**. **Bind mode**
 (`ValueReaderFactoryRegistry.bind`) compiles every container, the atoms and the dispatchers.
@@ -88,11 +88,13 @@ document did.
 
 ### The annotation object, and the peek at its leading members
 
-TSON text attaches a type annotation beside a value; JSON has no beside, so §3.3's **annotation object** is
-the carrier — wrapper (`{"$type": "age", "$value": 42}`) or inline (`{"$type": "employee", "name": "Ada"}`,
-when the selected type reads the value as a record) — over §3.2's closed reserved set of `$schema`, `$type`
-and `$value`. §6.1.5 is what it buys at a record position: a tag naming a subtype, validated in full, which
-is the JSON spelling of `!employee` at a `person` field.
+TSON text attaches a type annotation beside a value; JSON has no beside, so §3.3's **annotation object** is the
+carrier — wrapper (`{"$type": "age", "$value": 42}`) or inline (`{"$type": "employee", "name": "Ada"}`, when the
+selected type reads the value as a record) — over §3.2's three annotation members, `$schema`, `$type` and `$value`.
+They are the only names the encoding gives a meaning: any other member name, `$`-initial or not, is a field name
+(`$ref` under a record whose `name_type` admits it) or a key, and a record declaring one of the three obscures it, the
+encoding's reading coming first. §6.1.5 is what it buys at a record position: a tag naming a subtype, validated in
+full, which is the JSON spelling of `!employee` at a `person` field.
 
 **A `$type` is matched after reference flattening, on both sides** ([TSON-SCHEMA] §7.2's own words), and that
 reaches every position here that compares a written name against a set: a plain record's own name and its
@@ -105,32 +107,32 @@ names the same type in both, and `Subsumption.admitting` is the peer function on
 load-bearing for is a template instantiation, whose entry name is minted and non-normative (§8.2) — an alias
 is the only name a document has for one.
 
-**The class is `ReservedMembers`, not the spec's own noun, and the divergence is deliberate.** In this
+**The class is `TagMembers`, not the spec's own noun, and the divergence is deliberate.** In this
 codebase `Annotation` means an `@name` annotation and nothing else — two dozen types say so, from the
 `ltr8-annotation` module through `Annotations`, `TsonAnnotation` and the `AnnotationStart`/`AnnotationEnd`
 events — and those have **no JSON carrier at all**: §4.3 declines one for v1 and makes encoding a value that
 carries them an encode error. A type named for §3.3 would be the single place the word meant something else,
-so it is named for the §3.2 namespace it reads and cites §3.3 throughout. The spec's noun is right for the
+so it is named for the tag its members carry and cites §3.3 throughout. The spec's noun is right for the
 spec, where `@name` annotations are §3.1's and no reader is looking at a Java identifier to tell them apart.
 
 **Recognising one is a bounded peek, because the selectors lead.** A reader cannot read an object's members
 until it knows which reader owns them, and §3.3 puts what decides that first: `$schema` where present, then
 `$type`, and §6.1.5 puts a sealed position's discriminators next, in any order among themselves.
-`ReservedMembers.lead` reads those members and stops at the first that is none of them, and
+`TagMembers.lead` reads those members and stops at the first that is none of them, and
 `JsonReadContext.lookingAhead` replays what it consumed. It holds a scalar value per selector and nothing
 else — a selector whose value is not a scalar stops the peek — so what a reader holds before dispatch is a
 count the schema fixes, never one the document chooses (§10.1 gives the attack this closes). A valid wrapper's
-members are the reserved ones only, so its `$value` directly follows them and the peek sees it there; a
+members are the three only, so its `$value` directly follows them and the peek sees it there; a
 `$value` anywhere else is an extra member of an invalid object, refused by whoever reads it.
 
-**The concrete record reader does no lookahead at all.** It is reached only for its own type, so its member
-loop judges reserved members as they arrive: a `$type` in first place must restate the record; `$value`
-straight after it makes the object a wrapper, read at the reader the dispatcher chose for it (`ExactReader`,
-`Route`), since the value inside may carry a tag of its own; a misplaced `$type` or `$value`, any `$schema`,
-and a name outside the closed set refuse the object, and the rest of it is skipped. Members read before a
-refusal have already reported, so an invalid document's diagnostics follow its member order — accepted
-deliberately: holding them back would cost every valid document a buffer to tidy the answer for invalid ones.
-The allocation harness measures what the peek saved (`aSchemaDirectedRecordReadsWithoutLookingAhead`).
+**The concrete record reader does no lookahead at all.** It is reached only for its own type, so its member loop
+judges annotation members as they arrive: a `$type` in first place must restate the record; `$value` straight after it
+makes the object a wrapper, read at the reader the dispatcher chose for it (`ExactReader`, `Route`), since the value
+inside may carry a tag of its own; a misplaced `$type` or `$value`, any `$schema`, refuse the object, and the rest of
+it is skipped; any other `$`-initial name is matched as a field name. Members read before a refusal have already
+reported, so an invalid document's diagnostics follow its member order — accepted deliberately: holding them back
+would cost every valid document a buffer to tidy the answer for invalid ones. The allocation harness measures what the
+peek saved (`aSchemaDirectedRecordReadsWithoutLookingAhead`).
 
 - **`$schema` is refused everywhere a scoped reader does not stand.** §8.5 admits it only where the effective type is
   a `scoped` instance holding EXTERN, and [TSON-SCHEMA] §7.8 makes it a resolver error at a position that is not
@@ -199,7 +201,7 @@ they compare as (`ValueIdentity`). So a read is one map lookup, and both sides o
 the same parser: a schema pinning `= 0xFF` selects on a document writing `255`, which §4.3 makes the same
 integer. A table keyed on tokens would read that as unmatched.
 
-**The leading members, and no more.** `ReservedMembers.lead` captures the reserved members *and* the
+**The leading members, and no more.** `TagMembers.lead` captures the annotation members *and* the
 discriminators from the front of the object, as many members as the family declares discriminators. One that
 follows another member is missing to the dispatcher, and the refusal says where it has to be — JSON's own
 wording of the shared rule, which `CrossEncodingParityTest` pins as the one difference from TSON text's.
@@ -384,7 +386,7 @@ every instance -- `declared`, `extern`, `dynamic`, and every `extern_of`/`extern
 separates them is two constraint values, `scope` and `schemas`, and not a shape. It is `ScopedReader`'s peer, and
 `design/scope-push.md` has the model; what follows is what the JSON carrier changes.
 
-**The leading members pick the cell** (`ReservedMembers.lead`, which now keeps `$schema`'s string beside
+**The leading members pick the cell** (`TagMembers.lead`, which now keeps `$schema`'s string beside
 `$type`'s). `$schema` leading is EXTERN, `$type` alone is LOCAL, and anything else -- a bare scalar, an array, an
 object leading with none of them, a wrapper with no `$type` -- names no type: a validation error in every mode.
 A cell the instance's `scope` does not hold refuses the value as a validation error, which is also how a

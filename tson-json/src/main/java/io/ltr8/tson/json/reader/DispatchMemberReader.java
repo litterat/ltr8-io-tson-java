@@ -43,7 +43,7 @@ import java.util.Set;
  * the member pinned {@code 0xFF}.
  *
  * <p><b>It reads the leading members and no others.</b> §6.1.5 puts the discriminators first, after any
- * reserved members (§3.3), in any order among themselves, so {@link ReservedMembers#lead} answers both the tag
+ * annotation members (§3.3), in any order among themselves, so {@link TagMembers#lead} answers both the tag
  * and the selectors from as many members as the family declares discriminators -- a count the schema fixes,
  * whatever the document holds (§10.1).
  *
@@ -171,7 +171,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
             EventSkip.value(ctx, found);
             return null;
         }
-        return dispatch(ctx, ReservedMembers.lead(ctx, selectorNames));
+        return dispatch(ctx, TagMembers.lead(ctx, selectorNames));
     }
 
     /** Reached by a tag naming this base from an enclosing position: placed again, from the leading members. */
@@ -180,7 +180,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         return read(ctx);
     }
 
-    private Object dispatch(JsonReadContext ctx, ReservedMembers.Lead tag) {
+    private Object dispatch(JsonReadContext ctx, TagMembers.Lead tag) {
         if (Tags.refusesScope(ctx, tag, displayName, Tags.RECORD)) {
             return null;
         }
@@ -218,7 +218,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         if (tag.type() != null && selfNames.contains(tag.type())) {
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances, and a sealed base has none: naming it selects nothing.
-            ctx.report(extension.tagNamesTheBase(ReservedMembers.TYPE));
+            ctx.report(extension.tagNamesTheBase(TagMembers.TYPE));
             EventSkip.nextValue(ctx);
             return null;
         }
@@ -250,7 +250,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     /** A tag naming a type outside the family -- nothing here admits it, whatever the discriminator says. */
     private Object notAMember(JsonReadContext ctx, String type) {
         if (!NameHygiene.refuses(ctx, type)) {
-            ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+            ctx.field(TagMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
                     "'$type' names '%s', which is not a member of the sealed '%s'".formatted(type, displayName),
                     extension.members(), type);
         }
@@ -259,9 +259,9 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     }
 
     /** §3.3's wrapper form at a sealed position: `$type` places the value and `$value` holds it. */
-    private Object wrapped(JsonReadContext ctx, ReservedMembers.Lead tag) {
+    private Object wrapped(JsonReadContext ctx, TagMembers.Lead tag) {
         if (tag.type() == null) {
-            ctx.report(extension.tagRequired(ReservedMembers.TYPE));
+            ctx.report(extension.tagRequired(TagMembers.TYPE));
             EventSkip.nextValue(ctx);
             return null;
         }

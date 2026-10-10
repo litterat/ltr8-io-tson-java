@@ -133,11 +133,11 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         JsonEvent first = ctx.peek();
 
         // §8.2's decode order, step 1, and §8.3.1's escape rule: at a choice position an object whose first
-        // member is reserved is the tagged form -- always, before any other reading, and from that member
-        // alone. That is what lets a bare map stand as a variant while its keys remain data: a reserved name
+        // member is one of the three is the tagged form -- always, before any other reading, and from that member
+        // alone. That is what lets a bare map stand as a variant while its keys remain data: one of the three
         // among its later keys is a key, and a map holding one rides in a wrapper when it is written.
         if (first instanceof JsonEvent.ObjectStart) {
-            ReservedMembers.Lead lead = ReservedMembers.lead(ctx);
+            TagMembers.Lead lead = TagMembers.lead(ctx);
             if (lead.present()) {
                 return tagged(ctx, lead);
             }
@@ -157,14 +157,14 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * value at any choice position, including positions where the tag could have been omitted". So this runs
      * whether or not §8.2's condition holds, and a redundant tag is never wrong.
      */
-    private Object tagged(JsonReadContext ctx, ReservedMembers.Lead tag) {
+    private Object tagged(JsonReadContext ctx, TagMembers.Lead tag) {
         // §8.5 admits `$schema` at a scoped position -- the open sum -- and a choice is the closed one.
         if (Tags.refusesScope(ctx, tag, name, Tags.CHOICE)) {
             return null;
         }
         if (tag.type() == null) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                    "this object leads with this encoding's reserved members but no '$type' naming a variant of '"
+                    "this object leads with this encoding's annotation members but no '$type' naming a variant of '"
                             + name + "' (§3.3)", "a '$type' member holding a variant name", "no $type");
             EventSkip.nextValue(ctx);
             return null;
@@ -172,7 +172,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         Route route = routes.get(tag.type());
         if (route == null) {
             if (!NameHygiene.refuses(ctx, tag.type())) {
-                ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+                ctx.field(TagMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
                         "'$type' names '%s', which is not a variant of '%s'".formatted(tag.type(), name),
                         String.join(" | ", variants), tag.type());
             }

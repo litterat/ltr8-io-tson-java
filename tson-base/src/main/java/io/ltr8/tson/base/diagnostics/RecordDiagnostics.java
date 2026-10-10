@@ -19,8 +19,8 @@ import io.ltr8.tson.base.Diagnostic;
  * vocabulary. The encoding's own spelling is not lost -- it rides in {@link Refusal#actual}, which echoes
  * what the document literally held and is data rather than prose.
  *
- * <p><b>What is not here</b> is any rule one encoding has and the other does not: JSON's reserved member
- * namespace ([TSON-JSON] §3.2) and TSON's positional record form have no counterpart across the wire, so
+ * <p><b>What is not here</b> is any rule one encoding has and the other does not: JSON's annotation
+ * members ([TSON-JSON] §3.2) and TSON's positional record form have no counterpart across the wire, so
  * each stays with the reader that owns it. A shared class that grew those would be a second switch
  * responsible for rules it cannot name.
  *

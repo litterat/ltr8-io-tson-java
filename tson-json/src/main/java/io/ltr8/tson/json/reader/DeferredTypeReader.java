@@ -34,7 +34,7 @@ public final class DeferredTypeReader implements JsonTypeReader<Object>, ExactRe
     public Object readExact(JsonReadContext ctx, JsonTypeReader<?> wrapped) {
         return target() instanceof ExactReader exact
                 ? exact.readExact(ctx, wrapped)
-                : ReservedMembers.readWrapped(ctx, wrapped);
+                : TagMembers.readWrapped(ctx, wrapped);
     }
 
     private JsonTypeReader<?> target() {
