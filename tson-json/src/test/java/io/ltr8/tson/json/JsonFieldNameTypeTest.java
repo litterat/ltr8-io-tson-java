@@ -27,6 +27,9 @@ class JsonFieldNameTypeTest {
               node => !record { field_name_type: json_name  fields: [
                 { name: "@id"  type: text }  { name: label  type: text } ] }
               row => !record { field_name_type: text  fields: [ { name: "first name"  type: text } ] }
+              json_record => !record { field_name_type: json_name  extension: ABSTRACT  fields: [] }
+              ld_node => json_record & { "@id": text  label: text }
+              ld_holder => { n: ld_node }
             }
             """;
 
@@ -46,5 +49,11 @@ class JsonFieldNameTypeTest {
     void aMemberNameIsReadByItsRecordsFieldNameType() {
         assertEquals(List.of(), read("node", "{\"@id\": \"urn:x\", \"label\": \"y\"}"));
         assertEquals(List.of(), read("row", "{\"first name\": \"Ada\"}"));
+    }
+
+    /** A record composing a fieldless base takes the base's field name type, and reads untagged where it is typed. */
+    @Test
+    void aCompositionReadsItsMembersByItsBasesFieldNameType() {
+        assertEquals(List.of(), read("ld_holder", "{\"n\": {\"@id\": \"urn:x\", \"label\": \"y\"}}"));
     }
 }

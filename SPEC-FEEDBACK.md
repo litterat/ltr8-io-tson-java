@@ -722,6 +722,16 @@ relaxed type, defined by the translation and not by the series, such as
 - **Inheritance keeps one family.** A composition takes its record supertypes' `field_name_type`, whose names it
   absorbs, and supertypes stating two different ones are a resolver error; a refinement keeps its source's. So the
   brace form can restate an inherited relaxed name (`tightened => node ^ { "$ref": text }`).
+- **The brace form states a type by composition, and has no syntax of its own.** A relaxed name type is a
+  translation's tool, not the go-to form for a TSON record, so the series adds no brace-form spelling for it: a
+  translation declares its type once, on a fieldless abstract base, and its records compose it —
+  `json_record => !record { field_name_type: json_name  extension: ABSTRACT  fields: [] }`, then
+  `node => json_record & { "@id": text  label: text }`. This needs nothing beyond the inheritance rule above, and
+  any text family serves, a `text_enum` of admitted names among them. The cost is an IS-A edge to the base, which
+  asks nothing of a position typed by a member: `node` reads untagged. Rejected: inferring `text` from a quoted
+  name, which cannot state a narrower type; a mark at the type-def head (`names json_name { … }`), which reserves
+  a word there as `abstract` does; a type before `;` inside the brace, which gives `;` a second meaning; an
+  annotation, which would make metadata change what a record admits.
 - **Hygiene follows the type.** A record's names meet §8.2's per-name rules under its type's own profile, whose
   added characters are its own (`json_name`'s `@` and `$`), and none where the type is a text family that is no
   identifier family; the collision relation runs either way.
@@ -739,7 +749,6 @@ relaxed type, defined by the translation and not by the series, such as
   states (`@Field("@id")`), as it binds any other, and a writer quotes a name that is no identifier, so the
   document reads back.
 
-**Open:** the default for a JSON member name that is not an identifier; how the brace form states a fresh
-record's `field_name_type`; a template's field name type.
+**Open:** the default for a JSON member name that is not an identifier; a template's field name type.
 
 **Status against Revision 37:** open; experimental, in progress on `experiment/field-name-type`.

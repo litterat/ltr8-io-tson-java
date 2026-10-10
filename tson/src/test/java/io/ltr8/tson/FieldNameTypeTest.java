@@ -200,6 +200,23 @@ class FieldNameTypeTest {
                 .fieldNameType());
     }
 
+    /**
+     * A translation states its name type once, on a fieldless abstract base, and its records take it by composition;
+     * the base's family asks nothing of a position typed by a member, which reads untagged.
+     */
+    @Test
+    void aFieldlessBaseGivesItsCompositionsTheirFieldNameType() {
+        String mixin = schema("mixin", """
+                  json_name => !identifier_type { start_add: "@$" }
+                  json_record => !record { field_name_type: json_name  extension: ABSTRACT  fields: [] }
+                  node => json_record & { "@id": text  label: text }
+                  holder => { n: node }
+                """);
+        assertEquals(List.of(), read(mixin, "mixin", "!holder { n: { \"@id\": \"x\"  label: \"y\" } }"));
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, only(read(mixin, "mixin",
+                "!node { \"@id\": \"x\"  \"a b\": 1  label: \"y\" }")).code());
+    }
+
     @Test
     void supertypesOfTwoFieldNameTypesDoNotCompose() {
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,

@@ -292,6 +292,7 @@ rules for an enum whose `type` is not an identifier family; the collision relati
   scope to resolve it, the identifier grammar it stands for applies. A refused record's names are not judged again by
   the per-name rules, and those rules run under the type's own profile, or not at all for a type that is no
   identifier family. A composition takes its supertypes' type and refuses two that disagree; a refinement keeps its
-  source's. Each record with a type other than the default is recorded in `TsonLinkedSchema.fieldNameTypes`, with
-  the definition it resolves to, merged through imports like `enumForms`, because its readers judge a document's
-  names by it and cannot resolve it themselves.
+  source's. That rule is also how a brace form states one: a fieldless ABSTRACT base carries the type, and the
+  records that compose it take it; there is no brace-form syntax for it. Each record with a type other than the
+  default is recorded in `TsonLinkedSchema.fieldNameTypes`, with the definition it resolves to, merged through
+  imports like `enumForms`, because its readers judge a document's names by it and cannot resolve it themselves.
