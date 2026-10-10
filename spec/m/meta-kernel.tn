@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=b96c33ebec42a73d062f6209852058ad204eb78fc1d90d6488d7038a485ea291"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=34db893f9a7387c91cf3e4ac155b1b6b577d2db56713bdbb8c119365f2d6234e"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -669,22 +669,22 @@
     The author writes `=?` on the field, which is what lowers into this list
     ([TSON-SCHEMA] §5.2).
 
-    `field_name_type` names the family this record's field names belong to:
-    every name in `fields`, `discriminators` and the groups is a value of it,
-    and so is every field name a data value of this record writes. It is
-    `field_name`, an identifier, unless the record says otherwise, and it names
-    an identifier or text family. The field name slots are therefore `text`,
-    each judged by this type.
+    `name_type` names the family this record's field names belong to, as an
+    enum_type's names its members': every name in `fields`, `discriminators`
+    and the groups is a value of it, and so is every field name a data value of
+    this record writes. It is `field_name`, an identifier, unless the record
+    says otherwise, and it names a text family. The field name slots are
+    therefore `text`, each judged by this type.
     """
   record => product & {
-    access_pattern?:  product_access_type = NAMED
-    size_type?:       product_size_type = FIXED
-    fields:           [record_field]
-    groups?:          [field_group]
-    extension?:       record_extension_type ~ OPEN
-    supertypes?:      [type_ref]
-    discriminators?:  [text; 1..]
-    field_name_type?: type_name ~ field_name
+    access_pattern?: product_access_type = NAMED
+    size_type?:      product_size_type = FIXED
+    fields:          [record_field]
+    groups?:         [field_group]
+    extension?:      record_extension_type ~ OPEN
+    supertypes?:     [type_ref]
+    discriminators?: [text; 1..]
+    name_type?:      type_name ~ field_name
   }
 
   @doc:"""
@@ -762,35 +762,37 @@
 
   @doc:"""
     The members of an enum_type. The set's own uniqueness compares the text as
-    written; each member is then read as a value of the enum's `type`, and two
-    that are one value under that type's equality are a duplicate.
+    written; each member is then read as a value of the enum's `name_type`, and
+    two that are one value under that type's equality are a duplicate.
     """
   enum_set => !set_type { element_type: text  min_items: 1 }
 
   @doc:"""
-    An enumeration: a closed set of labels, and the type they are drawn from
-    ([TSON-SCHEMA] §7.4). `type` names a text family — an atom-family instance
-    whose constructor IS-A text_type — and each member must be a value of it,
-    distinct from the others under its equality. Members are held as text
-    whatever `type` is; `type` decides which members may be declared, and
-    whether they are names that carry the name-hygiene rules ([TSON-DATA] §8.2).
+    An enumeration: a closed set of names, and the type they are drawn from
+    ([TSON-SCHEMA] §7.4), as a record's `name_type` is its field names'.
+    `name_type` names a text family — an atom-family instance whose constructor
+    IS-A text_type — and each member must be a value of it, distinct from the
+    others under its equality. Members are held as text whatever `name_type`
+    is; it decides which members may be declared, and, by whether it is an
+    identifier family, whether they carry the name-hygiene rules ([TSON-DATA]
+    §8.2).
 
-    A value `type` takes from a constructor resolves where that constructor is
-    declared; one an author writes resolves in the author's own namespace, so a
-    schema may enumerate labels of a naming vocabulary it declares itself.
-    `type` is fixed once an enum is constructed: a refinement narrows the
+    A value `name_type` takes from a constructor resolves where that constructor
+    is declared; one an author writes resolves in the author's own namespace, so
+    a schema may enumerate names of a naming vocabulary it declares itself.
+    `name_type` is fixed once an enum is constructed: a refinement narrows the
     members and never the type.
     """
   enum_type => atom & {
-    type:    type_name
-    members: enum_set
+    name_type: type_name
+    members:   enum_set
   }
 
-  @doc:"An enumeration of names: the positional `!enum [OPEN DONE]`."
-  enum => enum_type ^ { type?: = identifier }
+  @doc:"An enumeration of identifiers: the positional `!enum [OPEN DONE]`."
+  enum => enum_type ^ { name_type?: = identifier }
 
   @doc:"An enumeration of arbitrary text: the positional `!text_enum [...]`."
-  text_enum => enum_type ^ { type?: = text }
+  text_enum => enum_type ^ { name_type?: = text }
 
   @doc:"""
     Closed sum. `disjoint` is a resolver-derived index over the variant list,

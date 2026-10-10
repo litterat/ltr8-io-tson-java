@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * A record's field names have a type (SPEC-FEEDBACK.md #10), and a JSON record's member names are its field names
- * ([TSON-JSON] §6.1): a member is matched and judged by its record's {@code field_name_type}, as a TSON text field
+ * ([TSON-JSON] §6.1): a member is matched and judged by its record's {@code name_type}, as a TSON text field
  * name is.
  */
 class JsonFieldNameTypeTest {
@@ -24,10 +24,10 @@ class JsonFieldNameTypeTest {
             !!import:"https://tson.io/2026/38/m/core.tn"
             {
               json_name => !identifier_type { start_add: "@" }
-              node => !record { field_name_type: json_name  fields: [
+              node => !record { name_type: json_name  fields: [
                 { name: "@id"  type: text }  { name: label  type: text } ] }
-              row => !record { field_name_type: text  fields: [ { name: "first name"  type: text } ] }
-              json_record => !record { field_name_type: json_name  extension: ABSTRACT  fields: [] }
+              row => !record { name_type: text  fields: [ { name: "first name"  type: text } ] }
+              json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
               ld_node => json_record & { "@id": text  label: text }
               ld_holder => { n: ld_node }
             }

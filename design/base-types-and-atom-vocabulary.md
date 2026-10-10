@@ -154,8 +154,8 @@ that is neither member is the enum miss it is — `ATOM_CONSTRAINT_VIOLATION`, m
 matching is an identity check of the token's decoded text against the members, and the host value is the natural
 parse of the member that matched. `type` governs what may be *declared* — each member a value of it, none two of
 one value — so it is a schema-load question the linker asks (`EnumLabels`). The one fact a reader needs from it
-is the label type's `normalization`: the token and each member are compared in that form, so under a
-case-folding label type `Content-Type` is the member written `content-type`. The type may be an entry of the
+is the name type's `normalization`: the token and each member are compared in that form, so under a
+case-folding name type `Content-Type` is the member written `content-type`. The type may be an entry of the
 governing meta, which only linking sees, so the linker records each enum's form
 (`EnumLabels.labelForm`, `TsonLinkedSchema.enumForms`) and every site that builds an enum parser passes it to
 `AtomParsers.forType(body, form)` — both encodings' atom readers, map keys, pins and selectors, and the linker's

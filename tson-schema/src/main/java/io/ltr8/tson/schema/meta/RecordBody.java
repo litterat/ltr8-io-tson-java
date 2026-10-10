@@ -39,10 +39,10 @@ import java.util.List;
 @Typename(name = "record")
 public record RecordBody(List<TypeRef> supertypes, List<RecordField> fields, List<FieldGroup> groups,
                           RecordExtensionType extension, List<String> discriminators,
-                          @Field("field_name_type") String fieldNameType) implements Product {
+                          @Field("name_type") String nameType) implements Product {
 
     /**
-     * {@code record.field_name_type}'s default: the kernel's {@code field_name}, an identifier
+     * {@code record.name_type}'s default: the kernel's {@code field_name}, an identifier
      * (SPEC-FEEDBACK.md #10). A record that states another names the family its field names belong to.
      */
     public static final String FIELD_NAME = "field_name";
@@ -63,7 +63,7 @@ public record RecordBody(List<TypeRef> supertypes, List<RecordField> fields, Lis
         fields = List.copyOf(fields);
         groups = groups == null ? List.of() : List.copyOf(groups);
         discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
-        fieldNameType = fieldNameType == null ? FIELD_NAME : fieldNameType;
+        nameType = nameType == null ? FIELD_NAME : nameType;
     }
 
     /**

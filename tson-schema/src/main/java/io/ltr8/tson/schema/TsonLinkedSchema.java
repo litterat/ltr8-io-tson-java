@@ -51,25 +51,25 @@ import java.util.Set;
  * through {@code !!import}, each enum judged in the schema that declared it. An enum not listed has names for
  * members, which is also what a schema assembled by hand gets.
  *
- * <p><b>{@code enumForms} is the third</b>, for the same reason: each enum whose label type's {@code normalization}
+ * <p><b>{@code enumForms} is the third</b>, for the same reason: each enum whose name type's {@code normalization}
  * is not {@code NONE} ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's
  * {@code identifier} is NFC, a schema's own case-folding identifier {@code NFKC_CASEFOLD}. An enum not listed
  * matches its members as written.
  *
- * <p><b>{@code fieldNameTypes} is the fourth</b>, for the same reason again: each record whose {@code
- * field_name_type} is not the kernel's {@code field_name} (SPEC-FEEDBACK.md #10), with the definition that type
+ * <p><b>{@code nameTypes} is the fourth</b>, for the same reason again: each record whose {@code
+ * name_type} is not the kernel's {@code field_name} (SPEC-FEEDBACK.md #10), with the definition that type
  * resolves to, by which its readers judge the field names a document writes. A record not listed has
  * identifiers for field names.
  */
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums,
-                               Map<String, Normalization> enumForms, Map<String, TypeDefinition> fieldNameTypes) {
+                               Map<String, Normalization> enumForms, Map<String, TypeDefinition> nameTypes) {
 
     public TsonLinkedSchema {
         Objects.requireNonNull(schema, "schema");
         entryOrigins = Map.copyOf(entryOrigins);
         textEnums = Set.copyOf(textEnums);
         enumForms = Map.copyOf(enumForms);
-        fieldNameTypes = Map.copyOf(fieldNameTypes);
+        nameTypes = Map.copyOf(nameTypes);
     }
 
     /** A schema whose records all have identifiers for field names. */
@@ -101,9 +101,9 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
         return enumForms.getOrDefault(entryName, Normalization.NONE);
     }
 
-    /** What record {@code entryName}'s field names are judged by -- empty for one {@link #fieldNameTypes} omits. */
-    public Optional<TypeDefinition> fieldNameType(String entryName) {
-        return Optional.ofNullable(fieldNameTypes.get(entryName));
+    /** What record {@code entryName}'s field names are judged by -- empty for one {@link #nameTypes} omits. */
+    public Optional<TypeDefinition> nameType(String entryName) {
+        return Optional.ofNullable(nameTypes.get(entryName));
     }
 
     /**

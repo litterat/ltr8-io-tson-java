@@ -586,9 +586,9 @@ public final class TsonSchemaLinker {
         Map<String, String> origins = new LinkedHashMap<>();
         Set<String> textEnums = new LinkedHashSet<>();
         Map<String, Normalization> enumForms = new LinkedHashMap<>();
-        Map<String, TypeDefinition> fieldNameTypes = new LinkedHashMap<>();
+        Map<String, TypeDefinition> nameTypes = new LinkedHashMap<>();
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins, textEnums, enumForms,
-                fieldNameTypes);
+                nameTypes);
 
         // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
         // merges another schema's entries into *this* schema's own returned entries()). !!meta only says
@@ -669,7 +669,7 @@ public final class TsonSchemaLinker {
             }
         }
         merged = computeDisjointness(merged, textEnums);
-        // Before the name checks: a member that is not a value of its enum's type is the more basic verdict,
+        // Before the name checks: a member that is not a value of its enum's name type is the more basic verdict,
         // and the per-name rules would otherwise report it as a restricted character.
         Set<String> refusedEnums = checkEnumTypes(schema, merged, localNames, structureNamespace::get, receiver);
         Set<String> refusedRecords = checkFieldNameTypes(schema, merged, localNames, structureNamespace::get, receiver);
@@ -677,7 +677,7 @@ public final class TsonSchemaLinker {
         for (String name : localNames) {
             if (!refusedRecords.contains(name)) {
                 FieldNames.readBy(merged.get(name), merged, structureNamespace::get)
-                        .ifPresent(type -> fieldNameTypes.put(name, type));
+                        .ifPresent(type -> nameTypes.put(name, type));
             }
         }
         checkNames(receiver, schema, merged, structureNamespace::get, refusedEnums, identifiers);
@@ -717,7 +717,7 @@ public final class TsonSchemaLinker {
         checkDisjointAssertions(schema, annotated, localNames, receiver);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
-                annotated, schema.bootstrap()), origins, textEnums, enumForms, fieldNameTypes);
+                annotated, schema.bootstrap()), origins, textEnums, enumForms, nameTypes);
     }
 
     /**
@@ -756,7 +756,7 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * What each enum's {@code type} obliges ({@link EnumLabels}): a text family, of which every member is a
+     * What each enum's {@code name_type} obliges ({@link EnumLabels}): a text family, of which every member is a
      * value, no two of them one. Refused at schema load, against the enum that states it; the names of the
      * enums refused are returned, so the name checks do not judge the same members a second time.
      */
@@ -772,7 +772,7 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * What each record's {@code field_name_type} obliges ({@link FieldNames}, SPEC-FEEDBACK.md #10): a text
+     * What each record's {@code name_type} obliges ({@link FieldNames}, SPEC-FEEDBACK.md #10): a text
      * family, of which every field name the record states is a value, no two of its fields one. Refused at schema
      * load, against the record that states it; the names of the records refused are returned, so the name checks
      * do not judge the same names a second time.
@@ -1100,7 +1100,7 @@ public final class TsonSchemaLinker {
     private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader,
                                                             Map<String, String> origins, Set<String> textEnums,
                                                             Map<String, Normalization> enumForms,
-                                                            Map<String, TypeDefinition> fieldNameTypes) {
+                                                            Map<String, TypeDefinition> nameTypes) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : imports) {
@@ -1138,7 +1138,7 @@ public final class TsonSchemaLinker {
                 if (form != null) {
                     enumForms.put(name, form);
                 }
-                imported.fieldNameType(name).ifPresent(type -> fieldNameTypes.put(name, type));
+                imported.nameType(name).ifPresent(type -> nameTypes.put(name, type));
             }
         }
         return merged;

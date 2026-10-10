@@ -34,7 +34,7 @@ class TextNormalizationTest {
               name => !identifier_type { continue_add: "-" }
               request => { headers?: {header_name => text}  host?: host  charset?: charset  label?: name }
               idempotent => { header: header_name = Idempotency-Key }
-              safe_header => !enum_type { type: header_name  members: [Accept content-type] }
+              safe_header => !enum_type { name_type: header_name  members: [Accept content-type] }
               allowed => { h: safe_header }
               chosen => { h: safe_header = Content-Type }
               typed_by => <T, N> { w?: T ~ N }
@@ -167,7 +167,7 @@ class TextNormalizationTest {
         assertTrue(refused.getFirst().message().contains("requires unique elements"), refused.toString());
     }
 
-    /** An enum's members match in NFC as well, whatever its label type's form. */
+    /** An enum's members match in NFC as well, whatever its name type's form. */
     @Test
     void anEnumMatchesADecomposedSpellingOfItsMember() {
         Tson tson = Tson.standard();
@@ -192,7 +192,7 @@ class TextNormalizationTest {
         assertTrue(refused.getFirst().message().contains("are one value under NFKC_CASEFOLD"), refused.toString());
     }
 
-    /** An enum matches its members in its label type's form: here a case-folding identifier's. */
+    /** An enum matches its members in its name type's form: here a case-folding identifier's. */
     @Test
     void anEnumMatchesInItsLabelTypesForm() {
         assertEquals(List.of(), codes("!allowed { h: Content-Type }"));
@@ -219,7 +219,7 @@ class TextNormalizationTest {
         assertEquals(1, tson().validateSchema(SCHEMA.replace("schemes: [HTTP https]", "schemes: [\"ht tp\"]")).size());
     }
 
-    /** A template's value argument of an enum type is a value of the enum, matched in the label type's form. */
+    /** A template's value argument of an enum type is a value of the enum, matched in the name type's form. */
     @Test
     void aTemplateValueArgumentOfAnEnumTypeIsMatchedInTheLabelTypesForm() {
         assertEquals(List.of(), tson().validateSchema(SCHEMA));

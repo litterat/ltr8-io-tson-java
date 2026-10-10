@@ -18,7 +18,7 @@ history lives in git.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
 - `RecordExtension`'s FINAL check reads `TypeDefinition.supertypes`, never `RecordBody.supertypes`.
-- An enum's `type` resolves in the governing meta's namespace for the value its constructor pinned (traced through a
+- An enum's `name_type` resolves in the governing meta's namespace for the value its constructor pinned (traced through a
   template's held body), and otherwise in the schema's; the enum checks run before the name checks, and an enum they
   refuse is not judged by name again.
 
@@ -256,36 +256,37 @@ rest of the closure agrees with it.
 - **Group membership is reported instead of the state rule, not beside it.** §5.11 forces a member OPTIONAL,
   so both would fire and the second would name the symptom. One mistake, one verdict.
 
-## What an enum's `type` obliges (`EnumLabels`, §7.4)
+## What an enum's `name_type` obliges (`EnumLabels`, §7.4)
 
-An enum is an instance of `enum_type` or a tightening of it (`enum` pins `type: identifier`, `text_enum` pins `type:
-text`), and `EnumBody` holds `type` as a name beside members held as text. What the name denotes — which family, which
-parser, which equality — lives in a namespace the body cannot see, so the checks are the linker's: `type` names a text
-family (an atom-family instance whose constructor IS-A `text_type`, one hop through `source`), every member parses as a
-value of it (`AtomParsers`), and no two members are one value (`ValueIdentity`). `checkNames` then drops §8.2's per-name
-rules for an enum whose `type` is not an identifier family; the collision relation stays.
+An enum is an instance of `enum_type` or a tightening of it (`enum` pins `name_type: identifier`, `text_enum` pins
+`name_type: text`), and `EnumBody` holds `name_type` as a name beside members held as text. What the name denotes —
+which family, which parser, which equality — lives in a namespace the body cannot see, so the checks are the linker's:
+`name_type` names a text family (an atom-family instance whose constructor IS-A `text_type`, one hop through
+`source`), every member parses as a value of it (`AtomParsers`), and no two members are one value (`ValueIdentity`).
+`checkNames` then drops §8.2's per-name rules for an enum whose `name_type` is not an identifier family; the collision
+relation stays.
 
-- **Two namespaces, by who wrote the value.** An author-written `type` resolves in the schema's own namespace, so an
-  ordinary schema enumerates a vocabulary it declares (`!enum_type { type: kebab … }`). A value the constructor pinned
+- **Two namespaces, by who wrote the value.** An author-written `name_type` resolves in the schema's own namespace, so an
+  ordinary schema enumerates a vocabulary it declares (`!enum_type { name_type: kebab … }`). A value the constructor pinned
   was written in the governing meta and resolves there **first**, so `!enum [A B]` names the kernel's `identifier`
   whatever the schema declares — a schema's own `identifier` is a different type and does not displace it (core
   declares none, leaving the name free). Pinned is found through `source`, and through a template's held body to
   the constructor it applies: `named => names<c>` records `names` as its source, not `enum`.
-- **Before the name checks, and one verdict.** A member that is not a value of `type` is the more basic error, and
+- **Before the name checks, and one verdict.** A member that is not a value of `name_type` is the more basic error, and
   the per-name rules would otherwise report it as a restricted character; an enum refused here is not judged by name.
-- **An unresolved `type` counts as names** for the per-name rules — the stricter reading — and is reported on its own.
-- **The family is recorded, because no reader can recompute it.** An enum whose `type` is not an identifier family is
+- **An unresolved `name_type` counts as names** for the per-name rules — the stricter reading — and is reported on its own.
+- **The family is recorded, because no reader can recompute it.** An enum whose `name_type` is not an identifier family is
   string-class (§7.4), and the JSON encoding spells its members as strings, `"true"` included. The readers hold only
-  `TsonSchema.entries()`, where a pinned `type` may not resolve, so the linker lists such enums in
+  `TsonSchema.entries()`, where a pinned `name_type` may not resolve, so the linker lists such enums in
   `TsonLinkedSchema.textEnums` before deriving `disjoint`. Each enum is judged in the schema that declares it, and an
   import's list is merged with its entries, as `entryOrigins` is.
-- **So is the form, for the same reason.** An enum matches its members in its label type's `normalization`
+- **So is the form, for the same reason.** An enum matches its members in its name type's `normalization`
   ([TSON-SCHEMA] §5.5), and the linker records each one whose form is not `NONE` in `TsonLinkedSchema.enumForms`
   (`EnumLabels.labelForm`), merged through imports the same way. Every site that builds an enum parser passes it to
   `AtomParsers.forType(body, form)`; the linker's own default and pin checks ask `labelForm` or the map directly.
   Where `type` resolves is `resolver.EnumLabelType`'s, shared with materialisation, which checks a template's value
   argument of an enum type before linking has recorded anything.
-- **A record's `field_name_type` is the same contract over its field names** (SPEC-FEEDBACK.md #10, experimental).
+- **A record's `name_type` is the same contract over its field names** (SPEC-FEEDBACK.md #10, experimental).
   `FieldNames` is `EnumLabels`' peer: the type must be a text family, every name the record states — in `fields`,
   `discriminators` and its groups — must be a value of it, and no two fields may be one value under its equality.
   The default, `field_name`, resolves in the structure namespace (`resolver.FieldNameType`); where no kernel is in

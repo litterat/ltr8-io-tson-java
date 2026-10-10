@@ -128,7 +128,7 @@ positions only some of those reach: an enum member and a group's member labels g
 and for script mixing, and never for a restricted character, invisibly.
 
 **An enum's members are the one scope whose per-name rules are conditional, and the condition is declared.**
-When the enum's `type` is an identifier family (`enum`, or `!enum_type { type: kebab … }` over a refinement of
+When the enum's `name_type` is an identifier family (`enum`, or `!enum_type { name_type: kebab … }` over a refinement of
 `identifier`), its members are names and all three mechanisms reach them. Otherwise (`text_enum`) they are values:
 the restricted-character and restricted-script rules are per-*name* and lapse — a value set carries whatever its
 domain carries, and nothing is looked up by name there — while the look-alike relation stays, because the set is

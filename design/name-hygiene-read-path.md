@@ -86,7 +86,7 @@ one name once per lookahead that crossed it. `NameHygieneTest` counts every shap
 because that is the failure that would survive every other test.
 
 **A field name is judged by the record that reads it** (SPEC-FEEDBACK.md #10). The grammar admits any single-line
-token in name position, and the match against the record's `field_name_type` is here: a name the type refuses is
+token in name position, and the match against the record's `name_type` is here: a name the type refuses is
 `ATOM_FORM_INVALID` and meets no hygiene rule; one it admits meets the per-name rules under the type's profile, or
 none where the type is no identifier family. The rule is the reading record's, passed on the one pull
 (`TsonReadContext.nextFieldName`), so a record nested in a relaxed one keeps identifier names. A lookahead —

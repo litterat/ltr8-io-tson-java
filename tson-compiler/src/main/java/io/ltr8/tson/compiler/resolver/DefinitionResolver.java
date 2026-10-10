@@ -355,7 +355,7 @@ final class DefinitionResolver {
         }
         return new TypeDefinition(resolved.source(), resolved.kind(), resolved.supertypes(),
                 resolved.subtypes(), new RecordBody(record.supertypes(), record.fields(), record.groups(),
-                        extension.get(), record.discriminators(), record.fieldNameType()), resolved.position(),
+                        extension.get(), record.discriminators(), record.nameType()), resolved.position(),
                 resolved.annotations());
     }
 
@@ -1190,9 +1190,9 @@ final class DefinitionResolver {
     private TypeDefinition resolveComposition(String name, ConstructionDef construction,
                                                List<String> parameters) {
         List<io.ltr8.tson.schema.meta.TypeRef> directSupertypes = new ArrayList<>();
-        // SPEC-FEEDBACK.md #10: a composition inherits its record supertypes' field_name_type, whose names it
+        // SPEC-FEEDBACK.md #10: a composition inherits its record supertypes' name_type, whose names it
         // absorbs; supertypes that disagree compose names of two families, which no one type judges.
-        String fieldNameType = null;
+        String nameType = null;
         String fieldNameTypeFrom = null;
         List<String> transitiveSupertypes = new ArrayList<>();
         Set<String> seenTransitive = new HashSet<>();
@@ -1316,13 +1316,13 @@ final class DefinitionResolver {
             }
 
             absorb(name, supertypeBody, fields, groups, seenFieldNames, inheritedFieldIndex);
-            if (fieldNameType == null) {
-                fieldNameType = supertypeBody.fieldNameType();
+            if (nameType == null) {
+                nameType = supertypeBody.nameType();
                 fieldNameTypeFrom = supertypeName;
-            } else if (!fieldNameType.equals(supertypeBody.fieldNameType())) {
+            } else if (!nameType.equals(supertypeBody.nameType())) {
                 throw new SchemaValidationException("'" + name + "': supertypes '" + fieldNameTypeFrom + "' and '"
-                        + supertypeName + "' state different field name types, '" + fieldNameType + "' and '"
-                        + supertypeBody.fieldNameType() + "' -- a record's field names are of one family");
+                        + supertypeName + "' state different field name types, '" + nameType + "' and '"
+                        + supertypeBody.nameType() + "' -- a record's field names are of one family");
             }
         }
 
@@ -1338,7 +1338,7 @@ final class DefinitionResolver {
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(directSupertypes, fields, groups, RecordExtensionType.OPEN,
                 construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()),
-                fieldNameType == null ? RecordBody.FIELD_NAME : fieldNameType);
+                nameType == null ? RecordBody.FIELD_NAME : nameType);
         // §5.9: subtraction breaks IS-A. The contract index (type_definition.supertypes) is emptied while the
         // body keeps `directSupertypes` as authorial lineage (record.supertypes) -- the distinction §7.2's
         // subsumption rule reads, so a subtracted type does not stand where its source is expected. `kind` is
@@ -1622,7 +1622,7 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN,
-                markedNames(refined.body().entries()), sourceBody.fieldNameType());
+                markedNames(refined.body().entries()), sourceBody.nameType());
         return new TypeDefinition(source, kind, transitiveSupertypes,
                 List.of(), body);
     }

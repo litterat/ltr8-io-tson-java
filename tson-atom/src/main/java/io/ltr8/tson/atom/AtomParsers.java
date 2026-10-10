@@ -103,8 +103,8 @@ public final class AtomParsers {
     }
 
     /**
-     * {@link #forType(Top)}, with the form an enum matches its members in: its label type's {@code normalization}
-     * ([TSON-SCHEMA] §5.5), which the body does not carry -- {@code enum_type.type} names an entry the governing
+     * {@link #forType(Top)}, with the form an enum matches its members in: its name type's {@code normalization}
+     * ([TSON-SCHEMA] §5.5), which the body does not carry -- {@code enum_type.name_type} names an entry the governing
      * meta may hold, which only linking sees, so the caller supplies what linking recorded
      * ({@code TsonLinkedSchema.enumForms}). Ignored for every other body.
      */

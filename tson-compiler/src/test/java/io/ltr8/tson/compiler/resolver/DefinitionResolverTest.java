@@ -108,7 +108,7 @@ class DefinitionResolverTest {
                     + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } "
                     + "optional: false voidable: false role: \"FREE\" "
                     + "} "
-                    + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }";
+                    + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }";
 
     /**
      * The same shape as the real fixture resolves it. meta-kernel types {@code bits} as a count rather than
@@ -253,12 +253,12 @@ class DefinitionResolverTest {
 
     @Test
     void writesAnEnumBody() throws DataBindException {
-        // Structurally: boolean => !type_definition { source: enum body: !enum { type: identifier  members: [...] } }
+        // Structurally: boolean => !type_definition { source: enum body: !enum { name_type: identifier  members: [...] } }
         TypeDefinition booleanDef = new TypeDefinition(Optional.of(TypeRef.of("enum")), TypeKind.ATOM,
                  List.of(), List.of(), new EnumBody(List.of("true", "false")));
 
         assertEquals("{ source: { name: \"enum\" arguments: [] } "
-                        + "supertypes: [] subtypes: [] body: !enum { type: \"identifier\" "
+                        + "supertypes: [] subtypes: [] body: !enum { name_type: \"identifier\" "
                         + "members: [ \"true\" \"false\" ] } }",
                 write(booleanDef));
     }
@@ -322,7 +322,7 @@ class DefinitionResolverTest {
         assertEquals(List.of(), top.supertypes());
         assertEquals("{ supertypes: [] subtypes: [] "
                 + "body: !record { supertypes: [] fields: [] groups: [] extension: \"OPEN\" "
-                + "discriminators: [] field_name_type: \"field_name\" } }", write(top));
+                + "discriminators: [] name_type: \"field_name\" } }", write(top));
     }
 
     @Test
@@ -355,10 +355,10 @@ class DefinitionResolverTest {
         // atom, sum: empty trailing body, no fields inherited from type (which has none) -- just the composition itself.
         assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: [] groups: [] "
-                + "extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }", write(atom));
+                + "extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }", write(atom));
         assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: [] groups: [] "
-                + "extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }", write(sum));
+                + "extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }", write(sum));
 
         // product: two brand-new fields added by the trailing body (type contributes none).
         assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
@@ -369,7 +369,7 @@ class DefinitionResolverTest {
                 + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
                 + "optional: false voidable: false role: \"FREE\" "
                 + "} "
-                + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }", write(product));
+                + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }", write(product));
 
         // reference: one brand-new field.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
@@ -377,7 +377,7 @@ class DefinitionResolverTest {
                 + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } "
                 + "optional: false voidable: false role: \"FREE\" } "
                 + "] groups: [] extension: \"OPEN\" discriminators: [] "
-                + "field_name_type: \"field_name\" } }", write(reference));
+                + "name_type: \"field_name\" } }", write(reference));
     }
 
     // ── Field groups (§5.11) + constructor flag + OPTIONAL fields: integer_type ──
@@ -423,7 +423,7 @@ class DefinitionResolverTest {
                         + "groups: [ "
                         + "{ members: [ [ \"min\" ] [ \"exclusive_min\" ] ] optional_members: [] optional: true } "
                         + "{ members: [ [ \"max\" ] [ \"exclusive_max\" ] ] optional_members: [] optional: true } "
-                        + "] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(integerType));
     }
 
@@ -590,7 +590,7 @@ class DefinitionResolverTest {
                         + "{ name: \"second\" type: { name: \"text\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(pair));
     }
 
@@ -663,7 +663,7 @@ class DefinitionResolverTest {
                         + "optional: true voidable: false role: \"DEFAULT\" "
                         + ""
                         + "value: false } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(tupleElement));
     }
 
@@ -691,7 +691,7 @@ class DefinitionResolverTest {
                         + "optional: true voidable: false role: \"DEFAULT\" "
                         + ""
                         + "value: false } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(fieldGroup));
     }
 
@@ -705,7 +705,7 @@ class DefinitionResolverTest {
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(pinned));
     }
 
@@ -795,7 +795,7 @@ class DefinitionResolverTest {
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(array));
     }
 
@@ -834,7 +834,7 @@ class DefinitionResolverTest {
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(map));
     }
 
@@ -878,7 +878,7 @@ class DefinitionResolverTest {
                         + "{ name: \"port\" type: { name: \"integer\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(production));
     }
 
@@ -948,7 +948,7 @@ class DefinitionResolverTest {
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(set));
     }
 
@@ -992,24 +992,24 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.ATOM, enumType.kind());
         assertEquals("{ supertypes: [ \"atom\" \"type\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
-                        + "{ name: \"type\" type: { name: \"type_name\" arguments: [] } "
+                        + "{ name: \"name_type\" type: { name: \"type_name\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(enumType));
-        // enum => enum_type ^ { type?: = identifier }: a constructor tightening, `type` pinned and injected, so
+        // enum => enum_type ^ { name_type?: = identifier }: a constructor tightening, `name_type` pinned and injected, so
         // `members` is the one unmarked field and `!enum [A B]` stays the positional form.
         assertEquals(TypeKind.ATOM, enumDef.kind());
         assertEquals(List.of("enum_type", "atom", "type", "top"), enumDef.supertypes());
         assertEquals("{ source: { name: \"enum_type\" arguments: [] } "
                         + "supertypes: [ \"enum_type\" \"atom\" \"type\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"type\" type: { name: \"type_name\" arguments: [] } "
+                        + "{ name: \"name_type\" type: { name: \"type_name\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: identifier } "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] field_name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
                 write(enumDef));
     }
 

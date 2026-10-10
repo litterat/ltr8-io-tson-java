@@ -122,7 +122,7 @@ public final class TsonDataEmitter {
 
     /**
      * {@code name:} -- inserts the inter-element separator itself; the value follows directly. A name that is no
-     * identifier, which a record whose {@code field_name_type} is relaxed may have (SPEC-FEEDBACK.md #10), is
+     * identifier, which a record whose {@code name_type} is relaxed may have (SPEC-FEEDBACK.md #10), is
      * written as a quoted string, the single-line token a field-name position admits.
      */
     public TsonDataEmitter field(String name) {

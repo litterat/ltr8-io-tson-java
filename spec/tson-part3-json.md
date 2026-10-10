@@ -104,7 +104,7 @@ This document was drafted against four type-system changes: three landed in Revi
 
 6. **`disjoint` carries class stability** ([TSON-SCHEMA] §5.4) — a Revision 36 change this document asked for. The two forms that leak across JSON's value kinds — an approximate atom still admitting NaN or the infinities, and a map whose key type forces the pairs form — now have no discrimination class in the model, so the resolver's `disjoint` fact is false wherever this encoding would have needed a second condition. Consumed by: §8.2, whose predicate is the one derived fact, and §8.3, which is now a note on why the two kinds have no class.
 
-7. **An enum's type** ([TSON-SCHEMA] §7.4): an enum's members are labels of the text family its `type` names — `enum` pins `identifier` and its members are names, `text_enum` pins `text` and its members are texts; an enum whose type is not an identifier family is string-class whatever its members' spellings. Consumed by §5.2.
+7. **An enum's type** ([TSON-SCHEMA] §7.4): an enum's members are labels of the text family its `name_type` names — `enum` pins `identifier` and its members are names, `text_enum` pins `text` and its members are texts; an enum whose type is not an identifier family is string-class whatever its members' spellings. Consumed by §5.2.
 
 8. **`identifier` is a text family** ([TSON-SCHEMA] §4.2, §7.4, §11.4). `identifier_type` states a UAX #31 profile as data, `identifier` is its instance and is string-class, and a value typed by an identifier family is a name: the name-hygiene mechanisms reach it, and the keys of a map keyed by one, and the elements of a set of one, are look-alike scopes. Consumed by §5.6, by §6.4, where an identifier-keyed map takes the object form, and by §9.4.
 

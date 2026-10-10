@@ -31,7 +31,7 @@ import java.util.List;
  * form-agnostic behavior {@code MetaKernelBootstrapResolver}'s own hand-written enum converter already uses,
  * "correct for every enum member regardless of what it happens to look like".
  *
- * <p><b>The match is in the label type's form</b> ({@link #form}): an enum over a case-folding identifier admits
+ * <p><b>The match is in the name type's form</b> ({@link #form}): an enum over a case-folding identifier admits
  * a member however it is cased, and the value is the token in that form. The form is not on the body -- the label
  * type may live in the governing meta -- so the caller supplies what linking recorded.
  *
@@ -43,7 +43,7 @@ import java.util.List;
  */
 public record EnumParser(EnumBody constraints, Normalization form) implements AtomTypeParser<String> {
 
-    /** An enum whose label type keeps its text as written. */
+    /** An enum whose name type keeps its text as written. */
     public EnumParser(EnumBody constraints) {
         this(constraints, Normalization.NONE);
     }
@@ -53,7 +53,7 @@ public record EnumParser(EnumBody constraints, Normalization form) implements At
     }
 
     /**
-     * The member the token is, compared in {@link #form} -- the normalization of the enum's label type
+     * The member the token is, compared in {@link #form} -- the normalization of the enum's name type
      * ([TSON-SCHEMA] §5.5) -- so under a case-folding type {@code Content-Type} is the member written
      * {@code content-type}. The value is the token in that form. Each member is put into the form as it is
      * compared, and the two compare in NFC, the floor no text comparison goes below ([TSON-SCHEMA] §5.5) --

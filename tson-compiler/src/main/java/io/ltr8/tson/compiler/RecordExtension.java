@@ -301,7 +301,7 @@ final class RecordExtension {
         return parserFor(field, merged, Map.of());
     }
 
-    /** {@link #parserFor(RecordField, Map)}, an enum selector matching in its label type's form. */
+    /** {@link #parserFor(RecordField, Map)}, an enum selector matching in its name type's form. */
     private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, TypeDefinition> merged,
                                                    Map<String, Normalization> enumForms) {
         if (!field.type().arguments().isEmpty()) {
