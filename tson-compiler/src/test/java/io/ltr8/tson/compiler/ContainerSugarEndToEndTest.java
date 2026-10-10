@@ -359,21 +359,21 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * The kernel types every naming position {@code identifier} (issue #231), and a field name is one at every
-     * layer -- so this is now refused by the grammar, where a schema's field name and a data document's meet the
-     * same rule, rather than by the resolver reading {@code record_field.name} against its declared type. The
-     * resolver's own contract is unchanged and still the backstop for a model built without parsing.
+     * A declared field name is a value of its record's field name type, an identifier by default
+     * (SPEC-FEEDBACK.md #10): the grammar admits any single-line token, and the linker refuses a name the record's
+     * type does not admit, at schema load.
      */
     @Test
-    void aDeclaredFieldNameMustBeAnIdentifier() {
+    void aDeclaredFieldNameMustBeAnIdentifierByDefault() {
         for (String[] c : new String[][] {
                 {"\"first name\"", "U+0020 at index 5 cannot appear in an identifier"},
                 {"a.b", "U+002E at index 1 cannot appear in an identifier"},
                 {"42", "cannot start an identifier -- an identifier never begins with a digit or a sign"},
         }) {
-            ParseException thrown = assertThrows(ParseException.class,
+            io.ltr8.tson.base.SchemaValidationException thrown = assertThrows(
+                    io.ltr8.tson.base.SchemaValidationException.class,
                     () -> compile("  ok => { " + c[0] + ": text }"), c[0]);
-            assertTrue(thrown.getMessage().contains("invalid field name"), thrown.getMessage());
+            assertTrue(thrown.getMessage().contains("name_type 'field_name'"), thrown.getMessage());
             assertTrue(thrown.getMessage().contains(c[1]), thrown.getMessage());
         }
     }

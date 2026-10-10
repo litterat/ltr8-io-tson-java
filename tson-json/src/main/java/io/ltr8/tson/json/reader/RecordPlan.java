@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.base.diagnostics.SubsumptionDiagnostics;
 import io.ltr8.unicode.Nfc;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
@@ -64,6 +65,7 @@ final class RecordPlan {
     final FieldValue[] stated;
 
     private final Map<String, Integer> index;
+    private final Normalization nameForm;
 
     /** Each field group, compiled to slots once ({@link GroupPlan}). */
     private final GroupPlan[] groups;
@@ -85,11 +87,13 @@ final class RecordPlan {
         this.schemaReaders = new JsonTypeReader<?>[count];
         this.stated = new FieldValue[count];
         Map<String, Integer> byName = new HashMap<>();
+        // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule, and
+        // then put into the record's name type's form (§5.5), so a name the type holds equal to a field is it.
+        this.nameForm = context.linked().nameForm(name);
         for (int i = 0; i < count; i++) {
             RecordField field = fields[i];
-            // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule.
             names[i] = Nfc.of(field.name());
-            byName.put(names[i], i);
+            byName.put(nameForm.apply(names[i]), i);
             omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(field.name())));
             schemaReaders[i] = context.readers().resolve(field.type().name());
             if (field.value().isPresent()) {
@@ -97,15 +101,16 @@ final class RecordPlan {
             }
         }
         this.index = Map.copyOf(byName);
-        this.groups = body.groups().stream().map(group -> GroupPlan.of(group, byName)).toArray(GroupPlan[]::new);
+        this.groups = body.groups().stream().map(group -> GroupPlan.of(group, byName, nameForm))
+                .toArray(GroupPlan[]::new);
         this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().stream()
                 .map(RecordField::name).toList()));
         this.subsumption = new SubsumptionDiagnostics(displayName);
     }
 
-    /** The field slot a member name fills, or -1 where it names no field. */
+    /** The field slot an NFC member name fills, in the name type's form, or -1 where it names no field. */
     int slotOf(String memberName) {
-        Integer at = index.get(memberName);
+        Integer at = index.get(nameForm.apply(memberName));
         return at == null ? -1 : at;
     }
 
@@ -128,7 +133,7 @@ final class RecordPlan {
     boolean admitsTag(JsonReadContext ctx) {
         if (!(ctx.peek() instanceof JsonEvent.StringValue tag)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                    "this object leads with this encoding's reserved members but no '$type' naming a type (§3.3)",
+                    "this object leads with this encoding's annotation members but no '$type' naming a type (§3.3)",
                     "a '$type' member holding a type name", "no $type");
             return false;
         }
@@ -145,19 +150,19 @@ final class RecordPlan {
     }
 
     /**
-     * A reserved member where none may stand (§3.2, §3.3): a {@code $schema}, which no record position admits;
-     * a {@code $type} or {@code $value} out of its leading place; or a name outside the closed set.
+     * One of §3.2's three where none may stand (§3.3): a {@code $schema}, which no record position admits, or a
+     * {@code $type} or {@code $value} out of its leading place.
      */
-    void refuseReserved(JsonReadContext ctx, String member, boolean tagged) {
+    void refuseTagMember(JsonReadContext ctx, String member, boolean tagged) {
         switch (member) {
-            case ReservedMembers.SCHEMA -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
-            case ReservedMembers.TYPE -> ReservedMembers.refuseMisplaced(ctx, member);
-            case ReservedMembers.VALUE -> ctx.field(member).report(Diagnostic.Code.UNRECOGNIZED_FIELD, tagged
+            case TagMembers.SCHEMA -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
+            case TagMembers.TYPE -> TagMembers.refuseMisplaced(ctx, member);
+            case TagMembers.VALUE -> ctx.field(member).report(Diagnostic.Code.UNRECOGNIZED_FIELD, tagged
                     ? "'$value' follows members of the record's own, and an annotation object in wrapper form "
                             + "admits nothing beside it (§3.3)"
                     : "'$value' belongs to an annotation object in wrapper form, which leads with '$type' "
                             + "naming the value's type (§3.3)", "'$value' straight after a leading '$type'", member);
-            default -> ReservedMembers.refuseUnknown(ctx, member);
+            default -> throw new IllegalStateException("'" + member + "' is none of §3.2's three");
         }
     }
 
@@ -231,16 +236,17 @@ final class RecordPlan {
     private record GroupPlan(FieldGroup group, int[][] options, int[][] required, String[] optionText,
                              String text) {
 
-        static GroupPlan of(FieldGroup group, Map<String, Integer> byName) {
+        static GroupPlan of(FieldGroup group, Map<String, Integer> byName, Normalization form) {
             List<List<String>> members = group.members();
             int[][] options = new int[members.size()][];
             int[][] required = new int[members.size()][];
             String[] optionText = new String[members.size()];
             for (int o = 0; o < members.size(); o++) {
                 List<String> option = members.get(o);
-                options[o] = option.stream().mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray();
+                options[o] = option.stream()
+                        .mapToInt(member -> byName.getOrDefault(form.apply(Nfc.of(member)), -1)).toArray();
                 required[o] = option.stream().filter(member -> !group.optionalMembers().contains(member))
-                        .mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray();
+                        .mapToInt(member -> byName.getOrDefault(form.apply(Nfc.of(member)), -1)).toArray();
                 optionText[o] = String.join(" ", option);
             }
             return new GroupPlan(group, options, required, optionText, group.describe());

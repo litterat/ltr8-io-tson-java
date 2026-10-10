@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
+import io.ltr8.tson.compiler.TsonReadContext.FieldNameRule;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
@@ -28,9 +29,10 @@ import java.util.Optional;
 final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
     public RecordTreeReader(String name, String displayName, RecordBody body, TsonTypeReaderResolver resolver,
-                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
+                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes,
+                            FieldNameRule fieldNames) {
         // By schema type alone: a tree reader has no binding target to consult (see FieldReaders).
-        super(name, displayName, body, FieldReaders.byType(resolver), schemaLocation);
+        super(name, displayName, body, FieldReaders.byType(resolver), schemaLocation, fieldNames);
         this.annotationTypes = annotationTypes;
     }
 
@@ -47,7 +49,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
             }
             RecordTreeReader ownParser = new RecordTreeReader(name, EntryDisplayName.of(name, typeDefinition),
                     body, resolver, context.locationOf(name, typeDefinition),
-                    AnnotationTypes.of(context));
+                    AnnotationTypes.of(context), fieldNameRule(name, body, context));
             if (typeDefinition.subtypes().isEmpty()) {
                 return ownParser;
             }

@@ -301,7 +301,7 @@ final class RecordExtension {
         return parserFor(field, merged, Map.of());
     }
 
-    /** {@link #parserFor(RecordField, Map)}, an enum selector matching in its label type's form. */
+    /** {@link #parserFor(RecordField, Map)}, an enum selector matching in its name type's form. */
     private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, TypeDefinition> merged,
                                                    Map<String, Normalization> enumForms) {
         if (!field.type().arguments().isEmpty()) {
@@ -342,7 +342,7 @@ final class RecordExtension {
         // The selectors come from `FamilySelectors`, the one derivation both encodings read -- never from
         // parsing the held text, which `tson-json` cannot do and §1.3 says no consumer should have to.
         return new RecordBody(List.of(), FamilySelectors.of(def, merged), List.of(),
-                held.extension().get(), held.discriminators());
+                held.extension().get(), held.discriminators(), RecordBody.FIELD_NAME);
     }
 
     /** The colliding pin, named the way an author reads it: one value, or the tuple the selectors form. */

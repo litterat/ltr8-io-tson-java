@@ -33,7 +33,7 @@ import java.util.Set;
  * reaches that type's reader in one step, and every alias meaning one of them ([TSON-SCHEMA] §7.2's "after
  * reference flattening of both") reaches the same reader.
  *
- * <p><b>It decides from the leading members and reads no further</b> ({@link ReservedMembers#lead}): §3.3
+ * <p><b>It decides from the leading members and reads no further</b> ({@link TagMembers#lead}): §3.3
  * puts {@code $type} first, after a {@code $schema} where one is present, so the selector is known before any
  * of the object's own members, and the reader it selects reads the object once, from the start.
  */
@@ -110,7 +110,7 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
             EventSkip.value(ctx, found);
             return null;
         }
-        return dispatch(ctx, ReservedMembers.lead(ctx));
+        return dispatch(ctx, TagMembers.lead(ctx));
     }
 
     /** Reached by a tag naming this base from an enclosing position: placed again, from the leading members. */
@@ -119,9 +119,9 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
         return read(ctx);
     }
 
-    private Object dispatch(JsonReadContext ctx, ReservedMembers.Lead lead) {
+    private Object dispatch(JsonReadContext ctx, TagMembers.Lead lead) {
         if (untagged != null && (lead.type() == null || !lead.wrapper() && selfNames.contains(lead.type()))) {
-            // Untagged, an inline restatement, or leading reserved members naming no type: all of it is the
+            // Untagged, an inline restatement, or leading annotation members naming no type: all of it is the
             // record's own reader's to judge, on exactly the terms a record without subtypes judges it. A
             // restating wrapper takes its route instead, whose `$value` may name a subtype of its own.
             return untagged instanceof ExactReader exact ? exact.readExact(ctx, this) : untagged.read(ctx);
@@ -132,7 +132,7 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
         if (lead.type() == null) {
             // Before the members: §6.1.5 is explicit that nothing about the object's shape is consulted, so
             // an abstract position with no tag fails whatever it holds.
-            return refuse(ctx, extension.tagRequired(ReservedMembers.TYPE));
+            return refuse(ctx, extension.tagRequired(TagMembers.TYPE));
         }
         Route route = routes.get(lead.type());
         if (route == null) {
@@ -143,8 +143,8 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
                 ctx.report(untagged != null ? subsumption.notAdmissible(lead.type(), admissible())
                         // The base itself is not admissible here, which is the whole of what ABSTRACT means --
                         // where a concrete position would take a tag naming it as a redundant restatement.
-                        : selfNames.contains(lead.type()) ? extension.tagNamesTheBase(ReservedMembers.TYPE)
-                        : extension.notASubtype(ReservedMembers.TYPE, lead.type()));
+                        : selfNames.contains(lead.type()) ? extension.tagNamesTheBase(TagMembers.TYPE)
+                        : extension.notASubtype(TagMembers.TYPE, lead.type()));
             }
             EventSkip.nextValue(ctx);
             return null;

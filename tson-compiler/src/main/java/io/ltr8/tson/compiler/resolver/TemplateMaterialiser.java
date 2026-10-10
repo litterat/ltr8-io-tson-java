@@ -854,7 +854,7 @@ final class TemplateMaterialiser {
                 .map(field -> field.role() == FieldRole.FREE && field.value().isPresent()
                         ? field.withFacts(field.optional(), false, FieldRole.FIXED)
                         : field)
-                .toList(), record.groups(), closedExtension(record));
+                .toList(), record.groups(), closedExtension(record), java.util.List.of(), record.nameType());
     }
 
     /**
@@ -1059,9 +1059,9 @@ final class TemplateMaterialiser {
         }
         Function<String, TypeDefinition> resolve = structural ? metaTypes : this::lookup;
         TypeDefinition definition = resolve.apply(ReferenceChain.terminal(type, resolve::apply));
-        // An enum's argument is matched in its label type's form, which the governing meta may hold.
+        // An enum's argument is matched in its name type's form, which the governing meta may hold.
         Optional<AtomType<?>> parser = definition == null ? Optional.empty() : AtomParsers.forType(definition.body(),
-                EnumLabelType.form(definition, namespace::getTypeDefinition, metaTypes));
+                NameType.form(definition, namespace::getTypeDefinition, metaTypes));
         if (parser.isEmpty()) {
             return; // no scalar reading -- the substituted body's own position judges it
         }

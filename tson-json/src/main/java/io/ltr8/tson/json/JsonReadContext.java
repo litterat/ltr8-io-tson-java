@@ -202,7 +202,7 @@ public final class JsonReadContext {
      * value must still see them all, so reading them to find out is not a substitute.
      *
      * <p>Consumed events are replayed from a buffer rather than re-lexed, so a lookahead costs what it
-     * looked past and never the document. The selectors lead (§3.3, §6.1.5), so what the reserved-member peek
+     * looked past and never the document. The selectors lead (§3.3, §6.1.5), so what the annotation-member peek
      * looks past is a few scalar members, a count the schema fixes (§10.1). {@link #position()} is deliberately left
      * where the lookahead reached rather than restored: a caller looks ahead in order to say something
      * about what it found, and that is where the saying belongs.

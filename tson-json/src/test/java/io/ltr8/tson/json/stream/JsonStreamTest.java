@@ -128,9 +128,9 @@ class JsonStreamTest {
         }
 
         @Test
-        void a_reserved_member_name_is_an_ordinary_name_here() {
-            // §3.2 reserves `$` where an object is read as a record or an annotation object, which is a
-            // question about the position's type.
+        void an_annotation_member_name_is_an_ordinary_name_here() {
+            // §3.2's three mean something where an object is read as a record or an annotation object, which
+            // is a question about the position's type.
             assertEquals(List.of("{", "name($type)", "string(cat)", "}", "end"), events("{\"$type\": \"cat\"}"));
         }
     }

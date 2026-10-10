@@ -82,21 +82,21 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
                 throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);
             }
             String name = member.name();
-            if (ReservedMembers.isReserved(name)) {
-                if (tagged && position == 1 && ReservedMembers.VALUE.equals(name)) {
+            if (TagMembers.isTagMember(name)) {
+                if (tagged && position == 1 && TagMembers.VALUE.equals(name)) {
                     // §3.3's wrapper: the value is `$value`, at the reader the enclosing position chose for it,
                     // since the value inside may carry a tag of its own.
-                    Object value = ReservedMembers.readWrappedValue(ctx, wrapped);
+                    Object value = TagMembers.readWrappedValue(ctx, wrapped);
                     return value == null ? builder.refused() : value;
                 }
-                if (position == 0 && ReservedMembers.TYPE.equals(name)) {
+                if (position == 0 && TagMembers.TYPE.equals(name)) {
                     if (plan.admitsTag(ctx)) {
                         ctx.next();
                         tagged = true;
                         continue;
                     }
                 } else {
-                    plan.refuseReserved(ctx, name, tagged);
+                    plan.refuseTagMember(ctx, name, tagged);
                 }
                 EventSkip.value(ctx, opening);
                 return builder.refused();

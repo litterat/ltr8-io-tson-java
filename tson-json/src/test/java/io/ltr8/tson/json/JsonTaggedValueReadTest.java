@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-JSON] §3.2's reserved namespace and §3.3's annotation object, at the position §6.1.5 defines them
+ * [TSON-JSON] §3.2's annotation members and §3.3's annotation object, at the position §6.1.5 defines them
  * for: a record, where {@code $type} is the JSON spelling of {@code !employee} at a {@code person} field.
  */
 class JsonTaggedValueReadTest {
@@ -133,9 +133,9 @@ class JsonTaggedValueReadTest {
                 .accepted().toString());
     }
 
-    /** §3.3: in wrapper form any member but the reserved three is a resolver error -- it is apparatus, not a record. */
+    /** §3.3: in wrapper form any member but the three is a resolver error -- it is apparatus, not a record. */
     @Test
-    void theWrapperAdmitsNothingBesideTheReservedMembers() {
+    void theWrapperAdmitsNothingBesideTheAnnotationMembers() {
         Diagnostic refusal = read("person", """
                 {"$type": "person", "$value": {"name": "Ada"}, "stray": 1}""").refusal();
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, refusal.code());
@@ -150,9 +150,12 @@ class JsonTaggedValueReadTest {
 
     // ── §3.2's closed set ────────────────────────────────────────────────
 
-    /** §3.2: the set is closed. There is no unknown-reserved-member category and no extension mechanism. */
+    /**
+     * §3.2: the three are the only names the encoding gives a meaning, so any other {@code $}-initial name is an
+     * ordinary member -- here one {@code person} does not declare, refused as any undeclared member is (§6.1.1).
+     */
     @Test
-    void aDollarNameOutsideTheClosedSetIsRefused() {
+    void aDollarNameOutsideTheThreeIsAnOrdinaryMember() {
         Diagnostic refusal = read("person", """
                 {"$comment": "hi", "name": "Ada"}""").refusal();
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, refusal.code());
@@ -184,9 +187,9 @@ class JsonTaggedValueReadTest {
         assertEquals("/$schema", refusal.path().orElseThrow());
     }
 
-    /** §3.2's carve-out: at a map position every member name is an ordinary key, `$`-initial or not. */
+    /** §3.2: at a map position every member name is an ordinary key, the three included. */
     @Test
-    void nothingIsReservedAtAMapPosition() {
+    void aMapKeyMayBeOneOfTheThree() {
         assertEquals("""
                 {"$type":1,"$comment":2}""", read("lookup", """
                 {"$type": 1, "$comment": 2}""").accepted().toString());

@@ -1,10 +1,12 @@
 package io.ltr8.tson.schema;
 
+import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.unicode.Normalization;
 
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import java.util.Optional;
 
 /**
  * The result of {@code TsonSchemaLinker.link} ({@code tson-compiler}) -- proof, at the type level, that a
@@ -40,38 +42,37 @@ import java.util.Set;
  * with a hand-written {@code equals} and the {@code @Record} constructor-selection trap. It lives here rather
  * than on the compiled schema because linking is the only phase that still knows it.
  *
- * <p><b>{@code textEnums} is the second</b>: the entries of the closure that are enums whose {@code type} is
- * not an identifier family ([TSON-SCHEMA] §7.4) -- a {@code !text_enum}, or an enum over any other text
- * family -- so whose members are texts rather than names, and which are string-class whatever their members'
- * spellings. Every encoding's discrimination class needs the fact, and none can derive it: a {@code type} the
- * enum's constructor pinned names an entry of the governing meta-schema, which is not in {@link
- * TsonSchema#entries()} and which linking is the last phase to see. Like {@code entryOrigins} it is carried
- * through {@code !!import}, each enum judged in the schema that declared it. An enum not listed has names for
- * members, which is also what a schema assembled by hand gets.
+ * <p><b>{@code enumForms} is the second</b>: each enum whose name type's {@code normalization} is not {@code NONE}
+ * ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's {@code identifier} is
+ * NFC, a schema's own case-folding identifier {@code NFKC_CASEFOLD}. An enum not listed matches its members as
+ * written. No reader can derive it: a {@code name_type} the enum's constructor pinned names an entry of the
+ * governing meta-schema, which is not in {@link TsonSchema#entries()} and which linking is the last phase to see.
+ * Like {@code entryOrigins} it is carried through {@code !!import}, each enum judged in the schema that declared it.
  *
- * <p><b>{@code enumForms} is the third</b>, for the same reason: each enum whose label type's {@code normalization}
- * is not {@code NONE} ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's
- * {@code identifier} is NFC, a schema's own case-folding identifier {@code NFKC_CASEFOLD}. An enum not listed
- * matches its members as written.
+ * <p><b>{@code nameTypes} is the third</b>, for the same reason: each record whose {@code
+ * name_type} is not the kernel's {@code field_name} (SPEC-FEEDBACK.md #10), with the definition that type
+ * resolves to, by which its readers judge the field names a document writes. A record not listed has
+ * identifiers for field names.
  */
-public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums,
-                               Map<String, Normalization> enumForms) {
+public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
+                               Map<String, Normalization> enumForms, Map<String, TypeDefinition> nameTypes) {
 
     public TsonLinkedSchema {
         Objects.requireNonNull(schema, "schema");
         entryOrigins = Map.copyOf(entryOrigins);
-        textEnums = Set.copyOf(textEnums);
         enumForms = Map.copyOf(enumForms);
+        nameTypes = Map.copyOf(nameTypes);
+    }
+
+    /** A schema whose records all have the kernel's identifiers for field names. */
+    public TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
+                            Map<String, Normalization> enumForms) {
+        this(schema, entryOrigins, enumForms, Map.of());
     }
 
     /** A schema whose enums all match their members as written. */
-    public TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums) {
-        this(schema, entryOrigins, textEnums, Map.of());
-    }
-
-    /** A schema with no enum over a family other than an identifier one. */
     public TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins) {
-        this(schema, entryOrigins, Set.of());
+        this(schema, entryOrigins, Map.of());
     }
 
     /**
@@ -85,6 +86,25 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     /** The form enum {@code entryName} matches its members in -- {@code NONE} for one {@link #enumForms} omits. */
     public Normalization enumForm(String entryName) {
         return enumForms.getOrDefault(entryName, Normalization.NONE);
+    }
+
+    /** What record {@code entryName}'s field names are judged by -- empty for one {@link #nameTypes} omits. */
+    public Optional<TypeDefinition> nameType(String entryName) {
+        return Optional.ofNullable(nameTypes.get(entryName));
+    }
+
+    /**
+     * The form record {@code entryName}'s field names are matched in: its name type's {@code normalization}
+     * ([TSON-SCHEMA] §5.5), so a document's name and a declared one that are one value of the type are one field --
+     * the equality the linker judged the declared names distinct under. {@code NFC} for one {@link #nameTypes}
+     * omits, the kernel's {@code field_name} being NFC; no form compares lower than NFC.
+     */
+    public Normalization nameForm(String entryName) {
+        return nameType(entryName).map(TypeDefinition::body)
+                .filter(IdentifierType.class::isInstance)
+                .map(body -> ((IdentifierType) body).normalization())
+                .filter(form -> form != Normalization.NONE)
+                .orElse(Normalization.NFC);
     }
 
     /**

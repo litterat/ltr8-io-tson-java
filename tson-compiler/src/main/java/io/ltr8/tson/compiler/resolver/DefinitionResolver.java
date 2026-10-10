@@ -355,7 +355,8 @@ final class DefinitionResolver {
         }
         return new TypeDefinition(resolved.source(), resolved.kind(), resolved.supertypes(),
                 resolved.subtypes(), new RecordBody(record.supertypes(), record.fields(), record.groups(),
-                        extension.get(), record.discriminators()), resolved.position(), resolved.annotations());
+                        extension.get(), record.discriminators(), record.nameType()), resolved.position(),
+                resolved.annotations());
     }
 
     /**
@@ -426,21 +427,6 @@ final class DefinitionResolver {
                     value -> Optional.ofNullable(bindAnnotationValue(name, annotation.name(), value)))));
         }
         return annotations.build();
-    }
-
-    /**
-     * Checks a name the author wrote against the kernel's {@code identifier} contract (§7.1's name profile).
-     * The resolver builds {@code record_field.name} and its kin directly rather than round-tripping the
-     * resolved model through the compiled meta reader, so the type these positions carry -- {@code
-     * field_name}, an alias of {@code identifier} -- would otherwise constrain only the positions that *are*
-     * read back as data, which is constructor applications and materialisation. Calling it here is what
-     * makes one contract reach every naming position rather than the subset the model happens to round-trip.
-     */
-    private static void requireIdentifier(String name, String role) {
-        Optional<String> violation = IdentifierGrammar.validate(name);
-        if (violation.isPresent()) {
-            throw new SchemaValidationException("invalid " + role + " -- " + violation.get());
-        }
     }
 
     /**
@@ -1204,6 +1190,11 @@ final class DefinitionResolver {
     private TypeDefinition resolveComposition(String name, ConstructionDef construction,
                                                List<String> parameters) {
         List<io.ltr8.tson.schema.meta.TypeRef> directSupertypes = new ArrayList<>();
+        // SPEC-FEEDBACK.md #10: a record's name type is set where it is declared, the kernel's default included,
+        // and a composition takes its supertypes' one type: supertypes that disagree compose names of two types,
+        // and choosing either would re-judge the other's names by a type they were never declared under.
+        String nameType = null;
+        String nameTypeFrom = null;
         List<String> transitiveSupertypes = new ArrayList<>();
         Set<String> seenTransitive = new HashSet<>();
         List<RecordField> fields = new ArrayList<>();
@@ -1326,6 +1317,16 @@ final class DefinitionResolver {
             }
 
             absorb(name, supertypeBody, fields, groups, seenFieldNames, inheritedFieldIndex);
+            String stated = supertypeBody.nameType();
+            if (nameType == null) {
+                nameType = stated;
+                nameTypeFrom = supertypeName;
+            } else if (!nameType.equals(stated)) {
+                throw new SchemaValidationException("'" + name + "': supertypes '" + nameTypeFrom + "' and '"
+                        + supertypeName + "' have different name types, '" + nameType + "' and '" + stated
+                        + "' -- a record's name type is set where it is declared, the default included, and a "
+                        + "composition cannot change it; declare both over one name type");
+            }
         }
 
         if (construction.body().isPresent()) {
@@ -1339,7 +1340,8 @@ final class DefinitionResolver {
         }
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(directSupertypes, fields, groups, RecordExtensionType.OPEN,
-                construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()));
+                construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()),
+                nameType == null ? RecordBody.FIELD_NAME : nameType);
         // §5.9: subtraction breaks IS-A. The contract index (type_definition.supertypes) is emptied while the
         // body keeps `directSupertypes` as authorial lineage (record.supertypes) -- the distinction §7.2's
         // subsumption rule reads, so a subtracted type does not stand where its source is expected. `kind` is
@@ -1623,7 +1625,7 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN,
-                markedNames(refined.body().entries()));
+                markedNames(refined.body().entries()), sourceBody.nameType());
         return new TypeDefinition(source, kind, transitiveSupertypes,
                 List.of(), body);
     }
@@ -1810,7 +1812,8 @@ final class DefinitionResolver {
         for (RecordEntry entry : entries) {
             resolveEntry(null, entry, fields, groups, seenFieldNames, Map.of(), parameters);
         }
-        return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN, markedNames(entries));
+        return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN, markedNames(entries),
+                RecordBody.FIELD_NAME);
     }
 
     /**
@@ -2101,7 +2104,6 @@ final class DefinitionResolver {
      */
     private RecordField resolveFieldEntry(FieldDef field, List<String> parameters,
                                            Optional<RecordField> inherited) {
-        requireIdentifier(field.name(), "field name");
         io.ltr8.tson.schema.meta.TypeRef type;
         if (field.type().isPresent()) {
             type = resolveTypeRef(field.type().get().typeRef());

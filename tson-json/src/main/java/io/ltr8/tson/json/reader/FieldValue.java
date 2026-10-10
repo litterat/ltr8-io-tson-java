@@ -60,10 +60,7 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
                 "'" + fieldTypeName + "' carries a schema-stated value but has no parser to read it with"));
         AtomForm form = AtomForm.of(atom);
         Object pinned = parser.read(token.text());
-        // An enum whose members are texts spells every member as a string, `"true"` included (§5.2).
-        JsonValue node = linked.textEnums().contains(name)
-                ? new JsonString(token.text())
-                : node(form, pinned, token.text());
+        JsonValue node = node(form, pinned, token.text());
         return new FieldValue(parser, form, pinned, node, token.text());
     }
 

@@ -78,8 +78,8 @@ author's schema nor the sender's document. The record reader carries the display
 name rather than instead of it, because a `$type` resolves against the entry while a message names the
 author's spelling — one place the two genuinely differ.
 
-**What is deliberately not shared** is any rule one encoding has and the other has not: JSON's reserved member
-namespace (§3.2) and TSON's positional record form have no counterpart across the wire, so each stays with the
+**What is deliberately not shared** is any rule one encoding has and the other has not: JSON's annotation
+members (§3.2) and TSON's positional record form have no counterpart across the wire, so each stays with the
 reader that owns it. A shared class that grew those would be a second switch responsible for rules it cannot
 name — the same failure `TsonDiagnostics`/`JsonDiagnostics` were split to avoid.
 

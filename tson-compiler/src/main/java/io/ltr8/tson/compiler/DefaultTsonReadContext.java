@@ -1,16 +1,22 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -60,6 +66,15 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
         /** Where {@link #next()} records what it consumes while a lookahead is running, else {@code null}. */
         List<TsonEvent> recording;
+
+        /** The rule {@link #nextFieldName} is pulling a field name under, else {@code null}: an identifier. */
+        FieldNameRule fieldNameRule;
+
+        /**
+         * Field names a lookahead pulled from the source and nothing has yet read, each judged when a reader
+         * does ({@link #next()}); {@code null} until a lookahead crosses one, so an ordinary read allocates none.
+         */
+        Set<TsonEvent> unjudged;
 
         Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy) {
             this.events = events;
@@ -146,10 +161,26 @@ final class DefaultTsonReadContext implements TsonReadContext {
         if (cursor.recording != null) {
             cursor.recording.add(e);
         }
-        if (fresh) {
+        if (fresh && cursor.recording != null && e instanceof FieldName) {
+            if (cursor.unjudged == null) {
+                cursor.unjudged = Collections.newSetFromMap(new IdentityHashMap<>());
+            }
+            cursor.unjudged.add(e);
+        } else if (fresh || cursor.recording == null && cursor.unjudged != null && cursor.unjudged.remove(e)) {
             checkNameHygiene(e);
         }
         return e;
+    }
+
+    @Override
+    public FieldName nextFieldName(FieldNameRule rule) {
+        FieldNameRule outer = cursor.fieldNameRule;
+        cursor.fieldNameRule = rule;
+        try {
+            return (FieldName) next();
+        } finally {
+            cursor.fieldNameRule = outer;
+        }
     }
 
     /**
@@ -179,7 +210,9 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * <p><b>Only on a freshly pulled event.</b> {@link TsonReadContext#lookingAhead} rewinds what it
      * consumed and a reader replays it, so checking every event would report a refused name once per
      * lookahead that crossed it. {@code NameHygieneTest} pins exactly-once across every shape an annotation
-     * takes, the nested and map-key ones included, because that is what would regress silently.
+     * takes, the nested and map-key ones included, because that is what would regress silently. A field name
+     * differs only in when it is judged: one a lookahead pulls waits for the reader that reads it, since which
+     * rule applies is that reader's to say ({@link #nextFieldName}) and the lookahead's scan cannot know it.
      *
      * <p><b>Not where the token surface's policy runs</b> -- that is {@code TsonDataStream}, which gets
      * exactly-once for free by sitting upstream of the rewind. The two surfaces sit on opposite sides of
@@ -191,12 +224,48 @@ final class DefaultTsonReadContext implements TsonReadContext {
         String name = switch (event) {
             case io.ltr8.tson.compiler.stream.TypeRef typeRef -> typeRef.name();
             case io.ltr8.tson.compiler.stream.AnnotationStart annotation -> annotation.name();
-            case io.ltr8.tson.compiler.stream.FieldName field -> field.name();
+            case FieldName field -> {
+                judgeFieldName(field.name());
+                yield null;
+            }
             default -> null;
         };
         if (name != null) {
             judgeName(name, IdentifierGrammar.PROFILE);
         }
+    }
+
+    /**
+     * [TSON-DATA] §2.5: a record's field name is read by its record's field name type, an identifier unless the
+     * record says otherwise (SPEC-FEEDBACK.md #10). The grammar admits any single-line token in name position, so
+     * the match is here, where a failure is reported as a resolver error -- a name the type's contract rejects,
+     * as an atom's token would be -- and the name is then judged by no hygiene rule, being no name of the type.
+     * One it admits meets the per-name rules under the type's profile.
+     */
+    private void judgeFieldName(String name) {
+        FieldNameRule rule = cursor.fieldNameRule;
+        if (rule == null) {
+            Optional<String> violation = IdentifierGrammar.validate(name);
+            if (violation.isEmpty()) {
+                judgeName(name, IdentifierGrammar.PROFILE);
+                return;
+            }
+            refuseFieldName(name, violation.get(), "an identifier");
+            return;
+        }
+        try {
+            rule.type().read(name);
+        } catch (AtomTypeException refused) {
+            refuseFieldName(name, refused.getMessage(), "a value of field name type '" + rule.typeName() + "'");
+            return;
+        }
+        judgeName(name, rule.profile());
+    }
+
+    private void refuseFieldName(String name, String violation, String expected) {
+        report(Diagnostic.Code.ATOM_FORM_INVALID, "'" + name + "' is not a field name -- " + violation
+                        + ". A record's field names are identifiers unless its type says otherwise; a key that is "
+                        + "not a name belongs in a map, written '{ key => value }'", expected, "'" + name + "'");
     }
 
     /**

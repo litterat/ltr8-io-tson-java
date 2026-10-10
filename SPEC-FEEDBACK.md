@@ -674,3 +674,112 @@ three kinds compose with it; the resolved fixtures carry the entry and the longe
 the bundled schemas are restamped. The Java value model mirrors it: `schema.meta.Type` is a sealed interface between
 `Top` and `Atom`/`Product`/`Sum`, so a body is a type exactly when it is an `instanceof Type`. No check reads `type`
 yet, so no verdict changes: the corpus passes unchanged.
+
+---
+
+## 10. A record's field names have a type: `record.name_type` (experimental)
+
+**Section:** [TSON-DATA] §2.5 ("A field name is an identifier at every layer"), §7.2.1, §7.7, §8.2; [TSON-SCHEMA]
+§5.2 (`record`), §7.4 (`enum_type.type`), §7.7, §12.1; [TSON-JSON] §3 (the annotation members).
+
+**Kind:** proposal, experimental — on the branch `experiment/field-name-type`, not `r2026-38-proposal`.
+
+**The problem.** A field name is an identifier at every layer, so `{ "@id": x }` and `{ "$ref": x }` are parse
+errors, and §2.5's remedy is a map: "a key that is not a name belongs in a map". That serves TSON's own data. It
+fails a schema translated from JSON-LD, OpenAPI or JSON Schema, whose objects are records — a fixed set of declared
+members — with names such as `@context`, `@id` or `$ref`. A map loses the record's declared shape, and renaming the
+member loses the round trip.
+
+**The idea.** Copy `enum_type.type`, which already says which family an enum's members belong to. A record gains
+`name_type?: type_name ~ field_name`, the family its field names belong to, and `enum_type.type` is renamed
+`name_type` to match. The default is the series' own
+`field_name`, an identifier, so nothing changes unless a record says so. A record translated from JSON names a
+relaxed type, defined by the translation and not by the series, such as
+`json_name => !identifier_type { start_add: "@$" }`, or `!identifier_type { medial: " " }` for words.
+
+**Decided so far:**
+
+- **One field for one mechanism: `name_type`, on both.** An enum's members and a record's field names are names
+  drawn from an identifier family, held to it by the same three rules — the type is an identifier family, every
+  declared name is a value of it, no two are one value under its equality. So both constructors spell it
+  `name_type`: `enum_type { name_type: type_name  members: enum_set }`, `enum => enum_type ^ { name_type?: =
+  identifier }`, and `record`'s `name_type?: type_name ~ field_name`. The bare `type` said nothing about what it
+  typed. Only a schema writing `!enum_type { … }` itself changes; `!enum [...]` pins it. Rejected: `label_type`,
+  which fits an enum's members and is never what a field name is called.
+- **A name type is an identifier family, on both, and every name meets §8.2.** Revision 37 lets an enum's `type`
+  name any text family and drops the per-name rules where it is no identifier family (`text_enum`); a record's type
+  would have inherited the same split. Both now name an identifier family — an instance whose constructor IS-A
+  `identifier_type` — so every enum member and every field name is a name, judged under its type's profile, whose
+  added characters are its own. What `text_enum` admitted needs no text family: `identifier_type`'s `medial` facet
+  places a character only between two others and never beside another, so `!identifier_type { medial: " " }` admits
+  `lightly active` and `first name` and refuses a leading, trailing or doubled space, with full hygiene. A closed
+  set of text that is no name is no enum: it is the text family's own `members` facet, `!text_type { members:
+  ["80" "443"] }`, string-class as every text atom is. So **`text_enum` is removed** from the kernel; the series
+  supplies `enum` over its own identifier, and an author declares the identifier type their names need and an
+  `enum_type` over it. The linking fact recording which enums were text-membered (`textEnums`) goes with it, an
+  enum's discrimination class being read off its members as every identifier enum's already was. *Implemented on
+  the branch.*
+- **The default does not change.** A schemaless record's field names are identifiers. A field-name position admits
+  any single-line token, and the identifier match moves from the parser to the record, so a schemaless
+  `{ "first name": 1 }` is a resolver error rather than a parse error. That is the one verdict that moves.
+- **Part 3's three names stay, and are used rather than reserved.** Part 3 reserved every `$`-initial member name,
+  sound because no declared name could begin with `$`, which a `name_type` admitting `$` breaks: JSON Schema's and
+  OpenAPI's own members are `$ref`, `$id` and `$defs`. The three annotation members keep their names — `$schema`,
+  `$type`, `$value` sit closest to the vocabularies a JSON user already knows — and are now the only names Part 3
+  gives a meaning: any other `$`-initial name is a field name, so a translated record's `$ref` reads as an ordinary
+  member. A record that declares one of the three obscures it — a leading one is read as the annotation member, one
+  elsewhere is misplaced — and Part 3 §3.2 says so and that a schema SHOULD NOT, rather than refusing the schema.
+  Rejected: moving the three to an unused prefix (`!schema`), which would keep a reservation sound by construction
+  at the price of spellings no JSON user expects. *Implemented on the branch*, in Part 3 §1.3, §3.2, §6.1.1 and
+  §8.3.1 and in the JSON reader.
+- **No shipped `json_name`.** A relaxed type is the translation's own and differs between sources, and the
+  implementation needed nothing from the series to support one: `!identifier_type { start_add: "@$" }` is a
+  complete definition, read, bound and written like any record's names. A member name no identifier profile can
+  state — the empty string, a leading or doubled space — is a key, and belongs in a map, as §2.5 says.
+- **A schema's field names are judged at load, by the record's type.** The schema grammar admits any single-line
+  token as a declared field name too, and the linker holds every record to its `name_type`: the type names an
+  identifier family, every name in `fields`, `discriminators` and the groups is a value of it, and no two fields are one
+  value. A brace-form `{ "first name": text }` is therefore a resolver error rather than a parse error.
+- **Inheritance keeps one name type.** A record's `name_type` is set where it is declared, the kernel's default
+  `field_name` included, and composition cannot change it: a composition takes its record supertypes' one type, and
+  supertypes with different ones — `json_record & address`, where `address` says nothing and so is `field_name`'s
+  — are a resolver error. Taking the non-default type instead would re-judge `address`'s names by a type they were
+  never declared under, and under a translation's type that must begin with `@` none of them would be a value of
+  it; the record to compose is one declared over the same type, `address => json_record & { city: text }`. A
+  refinement keeps its source's. So the brace form can
+  restate an inherited relaxed name (`tightened => node ^ { "$ref": text }`).
+- **A field name is matched in its name type's form.** The linker judges two declared names one field under the
+  type's equality, so a reader matches a document's name against the declared ones in the type's `normalization`
+  (§5.5), as an enum matches its members: under a case-folding name type `NAME` is the field `name`, the two
+  spellings in one record are a duplicate field, and a family's selector is found however its name is cased. Both
+  encodings do this; under the default, NFC, nothing changes.
+- **The brace form states a type by composition, and has no syntax of its own.** A relaxed name type is a
+  translation's tool, not the go-to form for a TSON record, so the series adds no brace-form spelling for it: a
+  translation declares its type once, on a fieldless abstract base, and its records compose it —
+  `json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }`, then
+  `node => json_record & { "@id": text  label: text }`. This needs nothing beyond the inheritance rule above, and
+  any identifier family serves. The cost is an IS-A edge to the base, which
+  asks nothing of a position typed by a member: `node` reads untagged. Rejected: inferring `text` from a quoted
+  name, which cannot state a narrower type; a mark at the type-def head (`names json_name { … }`), which reserves
+  a word there as `abstract` does; a type before `;` inside the brace, which gives `;` a second meaning; an
+  annotation, which would make metadata change what a record admits.
+- **Hygiene follows the type.** A record's field names and an enum's members meet §8.2's per-name rules under their
+  type's own profile, whose added characters are its own (`json_name`'s `@` and `$`, `words`' medial space), and
+  the collision relation over the scope.
+- **A document's field names are judged by the record that reads them.** A name its record's type refuses is a
+  resolver error, `ATOM_FORM_INVALID`, and draws no "unrecognised field" beside it; a name of the type the record
+  does not declare is unrecognised, as any other. A record nested in a relaxed one judges its own names, so the
+  relaxation does not leak into a value it holds. A name read where no record governs it — a schemaless record, the
+  value of an unrecognised field — is judged as an identifier.
+- **A lookahead does not judge a field name.** A sealed family's discriminator scan crosses a member's names before
+  the member is chosen, and only the member knows its type, so a name the scan crosses is judged when the member
+  reads it. The spec says nothing about when a name is judged relative to dispatch; this is the reading that
+  reports a name once and by the right rule. A family's members compose its base, so they share its type, and the
+  question would only bite a choice whose variants differ in theirs.
+- **A name binds and writes as the record states it.** A host component binds a relaxed name through the name it
+  states (`@Field("@id")`), as it binds any other, and a writer quotes a name that is no identifier, so the
+  document reads back.
+
+**Open:** the default for a JSON member name that is not an identifier; a template's field name type.
+
+**Status against Revision 37:** open; experimental, in progress on `experiment/field-name-type`.

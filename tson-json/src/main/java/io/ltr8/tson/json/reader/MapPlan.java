@@ -36,7 +36,7 @@ import java.util.Optional;
  *       §8.3's class-stability leaks.</li>
  * </ul>
  *
- * <p><b>Nothing is reserved at a map position</b> (§3.2): keys are data, not names, so {@code "$schema"} under
+ * <p><b>The three mean nothing at a map position</b> (§3.2): keys are data, not names, so {@code "$schema"} under
  * {@code {text => text}} is an ordinary key. §8.3.1's escape is for a map standing as a choice variant, and
  * belongs to the choice reader.
  */

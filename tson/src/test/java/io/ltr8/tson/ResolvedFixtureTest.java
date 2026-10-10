@@ -173,7 +173,7 @@ class ResolvedFixtureTest {
     /**
      * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
      * {@code @synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
-     * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark nine keys
+     * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark ten keys
      * in meta-kernel and four in meta.tn; core.tn and net.tn write no inline form and have none, which is as
      * much a statement as the other two.
      *
@@ -184,7 +184,7 @@ class ResolvedFixtureTest {
     void theSameEntriesAreMarkedSyntheticOnBothSides() throws Exception {
         // Non-vacuous: the fixtures really do mark keys, so an empty-equals-empty pass is not available to a
         // scan that stopped matching or a resolver that stopped marking.
-        assertEquals(9, fixtureSynthetics("meta-kernel-resolved.tn").size(), "meta-kernel.tn marks nine keys");
+        assertEquals(10, fixtureSynthetics("meta-kernel-resolved.tn").size(), "meta-kernel.tn marks ten keys");
         assertEquals(4, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks four keys");
 
         assertEquals(fixtureSynthetics("meta-kernel-resolved.tn"),

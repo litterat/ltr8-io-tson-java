@@ -79,7 +79,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                              SchemaLocation schemaLocation,
                              AnnotationTypes annotationTypes) {
         super(name, displayName, body, tokenAware(name, descriptor.fields(),
-                descriptor.annotationsCarrier().orElse(null), resolver, context, schemaLocation), schemaLocation);
+                descriptor.annotationsCarrier().orElse(null), resolver, context, schemaLocation), schemaLocation,
+                fieldNameRule(name, body, context));
         this.descriptor = descriptor;
         this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
         this.annotationTypes = annotationTypes;
@@ -376,7 +377,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 if (labelled != null) {
                     SchemaLocation location = context.locationOf(name, typeDefinition);
                     return new GroupUnionBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
-                            labelled, resolver, location);
+                            labelled, resolver, location, fieldNameRule(name, body, context));
                 }
                 return new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
                         requireRecord(name, dataClass), resolver, context,

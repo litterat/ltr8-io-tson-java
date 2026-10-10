@@ -9,9 +9,9 @@ and why the same table is what untagged reading dispatches on. Current form only
   twice, `false` otherwise, never absent.
 - An `integer` and a `decimal` are one class (`number`); records and maps are one class (`brace`).
 - A variant classifies through its §8.3 reference chain; no class at all makes the choice `false`.
-- An enum's class needs its `type`'s family, which only linking can see (a pinned `type` lives in the governing meta):
-  the linker records the closure's text-membered enums as `TsonLinkedSchema.textEnums`, and every classifier — both
-  encodings' — reads that set rather than re-deriving it.
+- An enum's class is its members' shared class, read off each member's spelling; every enum is over an identifier
+  family, so no fact beyond the body is needed. A closed set of text values is `text_type`'s `members` facet and is
+  string-class as every text atom is, whatever its members spell.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's
   §8.3 reference chain.
 - `ChoiceReader.untaggedRecovery` and the derivation both go through `DiscriminationClass.of`: one fact, not two.

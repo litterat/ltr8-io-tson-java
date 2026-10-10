@@ -8,6 +8,8 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -119,6 +121,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     final List<CompiledField> fields;
     final Map<String, Integer> fieldIndex;
+
+    /**
+     * The slot a document's field name fills, keyed in the name type's form (§5.5): {@link #fieldIndex} itself
+     * where that form is NFC, the form every name already arrives in, and otherwise each declared name put into
+     * it, so a name the type holds equal to a declared one is that field.
+     */
+    private final Map<String, Integer> matchIndex;
+    private final io.ltr8.unicode.Normalization nameForm;
     final List<FieldGroup> groups;
 
     /** Each field group as field indexes, compiled once ({@link GroupPlan}). */
@@ -129,6 +139,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final FixedCheck[] fixedCheck;
     final int positionalFieldIndex;
     final SchemaLocation schemaLocation;
+
+    /**
+     * What this record's field names are judged by as they are read ({@link TsonReadContext#nextFieldName}):
+     * its field name type, or {@code null} for the kernel's {@code field_name}, which a read applies untold.
+     */
+    private final TsonReadContext.FieldNameRule fieldNames;
     /**
      * This type's declared field names in <em>schema</em> order, rendered once for the closure diagnostic
      * ({@link #readFields}) -- both its message and its machine-readable {@code expected}. Schema order, not
@@ -141,8 +157,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final RecordDiagnostics rules;
 
     RecordAbstractReader(String name, String displayName, RecordBody body, FieldReaders readers,
-                          SchemaLocation schemaLocation) {
+                          SchemaLocation schemaLocation, TsonReadContext.FieldNameRule fieldNames) {
         this.name = name;
+        this.fieldNames = fieldNames;
         this.displayName = displayName;
         this.schemaLocation = schemaLocation;
         this.fields = buildFields(body, readers);
@@ -170,6 +187,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
         }
         this.fixedCheck = fixedChecks;
+        this.nameForm = fieldNames == null ? io.ltr8.unicode.Normalization.NFC : fieldNames.form();
+        if (nameForm == io.ltr8.unicode.Normalization.NFC) {
+            this.matchIndex = fieldIndex;
+        } else {
+            this.matchIndex = new HashMap<>();
+            fieldIndex.forEach((declared, at) -> matchIndex.put(nameForm.apply(declared), at));
+        }
         this.groupPlans = groups.stream().map(group -> GroupPlan.of(group, fieldIndex)).toArray(GroupPlan[]::new);
         this.positionalFieldIndex = requiredCount == 1 ? solePositionalField : -1;
         this.declaredFields = fields.stream().map(field -> field.schema().name()).collect(Collectors.joining(" | "));
@@ -246,6 +270,22 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
+     * The rule entry {@code name}'s field names are judged by, from what linking recorded of its field name
+     * type, or {@code null} where it has the kernel's default.
+     */
+    static TsonReadContext.FieldNameRule fieldNameRule(String name, RecordBody body, ValueReaderContext context) {
+        return context.linked().nameType(name).map(type -> {
+            if (!(type.body() instanceof IdentifierType identifiers)) {
+                throw new IllegalStateException("'" + name + "': name_type '" + body.nameType() + "' reached a "
+                        + "reader as no identifier family; the linker admits only one");
+            }
+            return new TsonReadContext.FieldNameRule(body.nameType(), AtomParsers.forType(identifiers)
+                    .orElseThrow(() -> new IllegalStateException("'" + name + "': name_type '" + body.nameType()
+                            + "' has no reader of its own")), identifiers.profile(), context.linked().nameForm(name));
+        }).orElse(null);
+    }
+
+    /**
      * Loops {@code FieldName} events forward until {@code RecordEnd} (the cursor assumed already
      * positioned right after {@code RecordStart} -- see {@link #expectRecordShape}), decoding each
      * recognized, non-fixed field's own value and handing it to {@code sink} -- see this class's own
@@ -264,14 +304,15 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             // reporting it unrecognised would be claiming to have looked it up, which this processor
             // declined to do. Without this a homoglyph draws both the refusal and "unknown field 'x' -- the
             // type declares (x)", which tells a sender to add a field that is already there when the fix is
-            // one character. The refusal is reported by `ctx.next()` itself (name hygiene runs as the event
+            // one character. The refusal is reported by `ctx.nextFieldName` itself (name hygiene runs as the event
             // is pulled), so the delta across that one pull is exactly "this name was refused" -- nothing
             // else reports during it.
             int reportedBeforeName = ctx.reported();
-            FieldName fieldName = (FieldName) ctx.next();
+            FieldName fieldName = ctx.nextFieldName(fieldNames);
             boolean nameRefused = ctx.reported() > reportedBeforeName;
 
-            Integer schemaIndex = fieldIndex.get(fieldName.name());
+            Integer schemaIndex = matchIndex.get(matchIndex == fieldIndex ? fieldName.name()
+                    : nameForm.apply(fieldName.name()));
             if (schemaIndex == null) {
                 if (!nameRefused) {
                     ctx.field(fieldName.name()).report(rules.unrecognizedField(fieldName.name()));

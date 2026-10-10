@@ -12,12 +12,13 @@ history lives in git.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds.
 - A reference to a DATA-kinded entry is refused at every position a type-ref occupies.
-- `entryOrigins`, `textEnums` and `enumForms` are on `TsonLinkedSchema`, never on `TsonSchema` or `TypeDefinition`.
-- An enum's discrimination class is read from `TsonLinkedSchema.textEnums`, never re-derived by a reader.
+- `entryOrigins`, `enumForms` and `nameTypes` are on `TsonLinkedSchema`, never on `TsonSchema` or `TypeDefinition`.
+- An enum's and a record's `name_type` is an identifier family; their names are judged under its profile, never the
+  kernel's identifier's.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
 - `RecordExtension`'s FINAL check reads `TypeDefinition.supertypes`, never `RecordBody.supertypes`.
-- An enum's `type` resolves in the governing meta's namespace for the value its constructor pinned (traced through a
+- An enum's `name_type` resolves in the governing meta's namespace for the value its constructor pinned (traced through a
   template's held body), and otherwise in the schema's; the enum checks run before the name checks, and an enum they
   refuse is not judged by name again.
 
@@ -255,32 +256,43 @@ rest of the closure agrees with it.
 - **Group membership is reported instead of the state rule, not beside it.** §5.11 forces a member OPTIONAL,
   so both would fire and the second would name the symptom. One mistake, one verdict.
 
-## What an enum's `type` obliges (`EnumLabels`, §7.4)
+## What an enum's `name_type` obliges (`EnumLabels`, §7.4)
 
-An enum is an instance of `enum_type` or a tightening of it (`enum` pins `type: identifier`, `text_enum` pins `type:
-text`), and `EnumBody` holds `type` as a name beside members held as text. What the name denotes — which family, which
-parser, which equality — lives in a namespace the body cannot see, so the checks are the linker's: `type` names a text
-family (an atom-family instance whose constructor IS-A `text_type`, one hop through `source`), every member parses as a
-value of it (`AtomParsers`), and no two members are one value (`ValueIdentity`). `checkNames` then drops §8.2's per-name
-rules for an enum whose `type` is not an identifier family; the collision relation stays.
+An enum is an instance of `enum_type` or a tightening of it (`enum` pins `name_type: identifier`), and `EnumBody` holds
+`name_type` as a name beside members held as text. What the name denotes — which family, which parser, which equality,
+which profile — lives in a namespace the body cannot see, so the checks are the linker's: `name_type` names an
+identifier family (an atom-family instance whose constructor IS-A `identifier_type`, one hop through `source`), every
+member parses as a value of it (`AtomParsers`), and no two members are one value (`ValueIdentity`). `checkNames` then
+judges the members by §8.2's per-name rules under that type's profile (`NameType.profile`), whose added characters —
+a `medial: " "` among them — are its own. A closed set of text that is no name is `text_type`'s `members` facet, an
+ordinary text atom, string-class like any other (`design/choice-disjointness.md`).
 
-- **Two namespaces, by who wrote the value.** An author-written `type` resolves in the schema's own namespace, so an
-  ordinary schema enumerates a vocabulary it declares (`!enum_type { type: kebab … }`). A value the constructor pinned
+- **Two namespaces, by who wrote the value.** An author-written `name_type` resolves in the schema's own namespace, so an
+  ordinary schema enumerates a vocabulary it declares (`!enum_type { name_type: kebab … }`). A value the constructor pinned
   was written in the governing meta and resolves there **first**, so `!enum [A B]` names the kernel's `identifier`
   whatever the schema declares — a schema's own `identifier` is a different type and does not displace it (core
   declares none, leaving the name free). Pinned is found through `source`, and through a template's held body to
   the constructor it applies: `named => names<c>` records `names` as its source, not `enum`.
-- **Before the name checks, and one verdict.** A member that is not a value of `type` is the more basic error, and
+- **Before the name checks, and one verdict.** A member that is not a value of `name_type` is the more basic error, and
   the per-name rules would otherwise report it as a restricted character; an enum refused here is not judged by name.
-- **An unresolved `type` counts as names** for the per-name rules — the stricter reading — and is reported on its own.
-- **The family is recorded, because no reader can recompute it.** An enum whose `type` is not an identifier family is
-  string-class (§7.4), and the JSON encoding spells its members as strings, `"true"` included. The readers hold only
-  `TsonSchema.entries()`, where a pinned `type` may not resolve, so the linker lists such enums in
-  `TsonLinkedSchema.textEnums` before deriving `disjoint`. Each enum is judged in the schema that declares it, and an
-  import's list is merged with its entries, as `entryOrigins` is.
-- **So is the form, for the same reason.** An enum matches its members in its label type's `normalization`
-  ([TSON-SCHEMA] §5.5), and the linker records each one whose form is not `NONE` in `TsonLinkedSchema.enumForms`
-  (`EnumLabels.labelForm`), merged through imports the same way. Every site that builds an enum parser passes it to
-  `AtomParsers.forType(body, form)`; the linker's own default and pin checks ask `labelForm` or the map directly.
-  Where `type` resolves is `resolver.EnumLabelType`'s, shared with materialisation, which checks a template's value
+- **An unresolved `name_type`** is judged under the kernel's identifier profile — the stricter reading — and is
+  reported on its own.
+- **The form is recorded, because no reader can recompute it.** An enum matches its members in its name type's
+  `normalization` ([TSON-SCHEMA] §5.5). The readers hold only `TsonSchema.entries()`, where a pinned `name_type` may
+  not resolve, so the linker records each enum whose form is not `NONE` in `TsonLinkedSchema.enumForms`
+  (`EnumLabels.labelForm`). Each enum is judged in the schema that declares it, and an import's map is merged with its
+  entries, as `entryOrigins` is. Every site that builds an enum parser passes the form to `AtomParsers.forType(body,
+  form)`; the linker's own default and pin checks ask `labelForm` or the map directly. Where `name_type` resolves is
+  `resolver.NameType`'s, for enums and records alike, shared with materialisation, which checks a template's value
   argument of an enum type before linking has recorded anything.
+- **A record's `name_type` is the same contract over its field names** (SPEC-FEEDBACK.md #10, experimental).
+  `FieldNames` is `EnumLabels`' peer: the type must be an identifier family, every name the record states — in
+  `fields`, `discriminators` and its groups — must be a value of it, and no two fields may be one value under its
+  equality. The default, `field_name`, resolves in the structure namespace (`resolver.NameType`); where no kernel is
+  in scope to resolve it, the identifier grammar it stands for applies. A refused record's names are not judged again
+  by the per-name rules, and those rules run under the type's own profile. A composition takes its supertypes' one
+  type — the default is a type like any other, set where a record is declared — and refuses two that disagree; a
+  refinement keeps its source's. That rule is also how a brace form states one: a fieldless ABSTRACT base carries the
+  type, and the records that compose it take it; there is no brace-form syntax for it. Each record with a type other
+  than the default is recorded in `TsonLinkedSchema.nameTypes`, with the definition it resolves to, merged through
+  imports like `enumForms`, because its readers judge a document's names by it and cannot resolve it themselves.
