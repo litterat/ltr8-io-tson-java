@@ -29,7 +29,7 @@ class JsonFieldNameTypeTest {
               ref => !record { name_type: json_name  fields: [
                 { name: "$ref"  type: text }  { name: "$id"  type: text  optional: true } ] }
               typed => !record { name_type: json_name  fields: [ { name: "$type"  type: text } ] }
-              address => { city: text }
+              address => json_record & { city: text }
               located => ld_node & address
               folded => !identifier_type { normalization: NFKC_CASEFOLD }
               frow => !record { name_type: folded  fields: [ { name: name  type: text } ] }
@@ -83,9 +83,9 @@ class JsonFieldNameTypeTest {
                 problems.toString());
     }
 
-    /** A plain supertype composed with a translation's record takes its name type: both names read from JSON. */
+    /** Two records declared over one name type compose, and both one's names and the other's read from JSON. */
     @Test
-    void aPlainSupertypeComposesWithATranslationsRecord() {
+    void twoRecordsOfOneNameTypeCompose() {
         assertEquals(List.of(), read("located", "{\"@id\": \"urn:x\", \"label\": \"y\", \"city\": \"z\"}"));
     }
 

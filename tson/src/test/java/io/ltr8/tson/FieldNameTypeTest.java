@@ -235,7 +235,7 @@ class FieldNameTypeTest {
                 "!node { \"@id\": \"x\"  \"a b\": 1  label: \"y\" }")).code());
     }
 
-    /** Two supertypes stating different name types beyond the default compose names no one type was chosen for. */
+    /** Two supertypes with different name types compose names of two types, which no one type judges. */
     @Test
     void supertypesOfTwoNameTypesDoNotCompose() {
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
@@ -246,39 +246,32 @@ class FieldNameTypeTest {
                       row => !record { name_type: words  fields: [ { name: "first name"  type: text } ] }
                       both => node & row & {}
                     """)));
-        assertTrue(thrown.getMessage().contains("state different name types"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("have different name types"), thrown.getMessage());
     }
 
     /**
-     * A supertype with the kernel's default states no name type of its own, so a translation's record composes a
-     * plain one and takes the other's type; the plain record's names are then judged by that type.
+     * The default is a name type like any other: a plain record's names are {@code field_name}'s, set where it is
+     * declared, so a translation's record cannot compose it -- its names were never declared as the other type's.
+     * The record to compose is one declared over the translation's type.
      */
     @Test
-    void aPlainSupertypeTakesTheCompositionsNameType() {
-        String mixed = schema("mixed", """
-                  json_name => !identifier_type { start_add: "@$" }
-                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
-                  address => { city: text }
-                  node => json_record & address & { "@id": text }
-                """);
-        var resolved = Tson.standard().resolve(mixed);
-        assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) resolved.schema().entries().get("node")
-                .body()).nameType());
-        assertEquals(List.of(), read(mixed, "mixed", "!node { \"@id\": \"x\"  city: \"y\" }"));
-    }
-
-    /** A plain supertype's name that is no value of the composition's name type is refused at schema load. */
-    @Test
-    void aPlainSupertypesNameOutsideTheCompositionsTypeIsRefused() {
+    void aPlainSupertypeDoesNotComposeWithATranslationsRecord() {
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
-                () -> Tson.standard().resolve(schema("mixed-bad", """
+                () -> Tson.standard().resolve(schema("mixed", """
                       json_name => !identifier_type { start_add: "@$" }
                       json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
-                      order => { order-id: text }
-                      node => json_record & order & { "@id": text }
+                      address => { city: text }
+                      node => json_record & address & { "@id": text }
                     """)));
-        assertTrue(thrown.getMessage().contains("field name 'order-id' is not a value of its name_type 'json_name'"),
-                thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'json_name' and 'field_name'"), thrown.getMessage());
+
+        String declared = schema("declared", """
+                  json_name => !identifier_type { start_add: "@$" }
+                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+                  address => json_record & { city: text }
+                  node => json_record & address & { "@id": text }
+                """);
+        assertEquals(List.of(), read(declared, "declared", "!node { \"@id\": \"x\"  city: \"y\" }"));
     }
 
     /**

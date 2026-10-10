@@ -1190,9 +1190,9 @@ final class DefinitionResolver {
     private TypeDefinition resolveComposition(String name, ConstructionDef construction,
                                                List<String> parameters) {
         List<io.ltr8.tson.schema.meta.TypeRef> directSupertypes = new ArrayList<>();
-        // SPEC-FEEDBACK.md #10: a composition takes the one name type its record supertypes state beyond the
-        // kernel's default. A supertype with the default contributes none, its names then judged at link by the
-        // type the composition takes; two that state different ones compose names no one type was chosen for.
+        // SPEC-FEEDBACK.md #10: a record's name type is set where it is declared, the kernel's default included,
+        // and a composition takes its supertypes' one type: supertypes that disagree compose names of two types,
+        // and choosing either would re-judge the other's names by a type they were never declared under.
         String nameType = null;
         String nameTypeFrom = null;
         List<String> transitiveSupertypes = new ArrayList<>();
@@ -1318,17 +1318,14 @@ final class DefinitionResolver {
 
             absorb(name, supertypeBody, fields, groups, seenFieldNames, inheritedFieldIndex);
             String stated = supertypeBody.nameType();
-            if (stated.equals(RecordBody.FIELD_NAME)) {
-                continue;
-            }
             if (nameType == null) {
                 nameType = stated;
                 nameTypeFrom = supertypeName;
             } else if (!nameType.equals(stated)) {
                 throw new SchemaValidationException("'" + name + "': supertypes '" + nameTypeFrom + "' and '"
-                        + supertypeName + "' state different name types, '" + nameType + "' and '" + stated
-                        + "' -- a record's field names are of one name type, and a supertype with the default "
-                        + "takes the other's");
+                        + supertypeName + "' have different name types, '" + nameType + "' and '" + stated
+                        + "' -- a record's name type is set where it is declared, the default included, and a "
+                        + "composition cannot change it; declare both over one name type");
             }
         }
 

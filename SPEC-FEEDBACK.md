@@ -740,11 +740,13 @@ relaxed type, defined by the translation and not by the series, such as
   token as a declared field name too, and the linker holds every record to its `name_type`: the type names an
   identifier family, every name in `fields`, `discriminators` and the groups is a value of it, and no two fields are one
   value. A brace-form `{ "first name": text }` is therefore a resolver error rather than a parse error.
-- **Inheritance keeps one name type.** A composition takes the one `name_type` its record supertypes state beyond
-  the default: a supertype with the kernel's `field_name` states none of its own, so a translation's record composes
-  a plain one (`node => json_record & address & { … }`) and the plain record's names are then judged by the
-  composition's type at load — `order-id` is an identifier but no `json_name`, and is refused there. Two supertypes
-  stating different non-default types are a resolver error; a refinement keeps its source's. So the brace form can
+- **Inheritance keeps one name type.** A record's `name_type` is set where it is declared, the kernel's default
+  `field_name` included, and composition cannot change it: a composition takes its record supertypes' one type, and
+  supertypes with different ones — `json_record & address`, where `address` says nothing and so is `field_name`'s
+  — are a resolver error. Taking the non-default type instead would re-judge `address`'s names by a type they were
+  never declared under, and under a translation's type that must begin with `@` none of them would be a value of
+  it; the record to compose is one declared over the same type, `address => json_record & { city: text }`. A
+  refinement keeps its source's. So the brace form can
   restate an inherited relaxed name (`tightened => node ^ { "$ref": text }`).
 - **A field name is matched in its name type's form.** The linker judges two declared names one field under the
   type's equality, so a reader matches a document's name against the declared ones in the type's `normalization`

@@ -290,10 +290,9 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
   `fields`, `discriminators` and its groups — must be a value of it, and no two fields may be one value under its
   equality. The default, `field_name`, resolves in the structure namespace (`resolver.NameType`); where no kernel is
   in scope to resolve it, the identifier grammar it stands for applies. A refused record's names are not judged again
-  by the per-name rules, and those rules run under the type's own profile. A composition takes the one type its
-  supertypes state beyond the default — a plain supertype states none, its names judged here by the type the
-  composition takes — and refuses two non-default types that disagree; a refinement keeps its source's. That rule is
-  also how a brace form states one: a fieldless ABSTRACT base carries the type, and the records that compose it take
-  it; there is no brace-form syntax for it. Each record with a type other than the default is recorded in
-  `TsonLinkedSchema.nameTypes`, with the definition it resolves to, merged through imports like `enumForms`, because
-  its readers judge a document's names by it and cannot resolve it themselves.
+  by the per-name rules, and those rules run under the type's own profile. A composition takes its supertypes' one
+  type — the default is a type like any other, set where a record is declared — and refuses two that disagree; a
+  refinement keeps its source's. That rule is also how a brace form states one: a fieldless ABSTRACT base carries the
+  type, and the records that compose it take it; there is no brace-form syntax for it. Each record with a type other
+  than the default is recorded in `TsonLinkedSchema.nameTypes`, with the definition it resolves to, merged through
+  imports like `enumForms`, because its readers judge a document's names by it and cannot resolve it themselves.
