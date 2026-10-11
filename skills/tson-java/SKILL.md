@@ -454,6 +454,32 @@ the policy flags (§8.2's name hygiene and §9.1's `--max-depth`) for the three 
 **`references/cli.md` has the rest** — every flag, the policy options and the rules that keep one from
 meaning nothing, the `--output json`/`tson` shapes field by field, and the CLI's own pitfalls.
 
+## Field names that are not identifiers
+
+A record's field names are identifiers by default. A schema translated from JSON-LD, JSON Schema or OpenAPI
+has members such as `@id`, `@type` or `$ref`, and a record can declare them as written by naming a **name
+type**: an `identifier_type` whose profile admits the extra characters. State it once, on a fieldless abstract
+base, and compose that base; a composition takes its supertypes' one name type (`SPEC-FEEDBACK.md` #10):
+
+```
+json_name   => !identifier_type { start_add: "@$" }
+json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+node        => json_record & { "@id": text  "$ref"?: text  label: text }
+```
+
+- **In TSON text a relaxed name is quoted** (`!node { "@id": "urn:x"  label: "y" }`); the writer quotes it for you.
+- **In JSON it is an ordinary member** (`{"@id": "urn:x", "label": "y"}`), and `$ref`/`$id` are field names: only
+  `$schema`, `$type` and `$value` mean anything to the encoding, so a record should not declare those three.
+- **Bind it through the component that states it**: `public record Node(@Field("@id") String id,
+  @Field("$ref") String ref, String label) {}`.
+- **Other name types**: words with a space (`!identifier_type { continue_add: "-"  medial: " " }`), names compared
+  without case (`normalization: NFKC_CASEFOLD`, so `NAME` is the field `name`), HTTP-style header names (`start:
+  ASCII  continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD`). A name type's normalization must imply NFC.
+- **Records that inherit share one name type**, the default included: a plain record composed into a `json_record`
+  is refused, so declare it over the same base.
+- **What still needs a map**: a key that is no name at all -- empty, leading or trailing spaces, invisible
+  characters -- and an open set of keys. A name type admits names, not arbitrary strings.
+
 ## The JSON encoding
 
 `tson-json` reads and writes JSON as a TSON encoding ([TSON-JSON]): the same data model, the same schemas,
@@ -517,6 +543,8 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | `SchemaAccess.httpSchemas()` with no host                       | deny by default means nothing is permitted                          | name the hosts explicitly                                   |
 | a `LIMIT_EXCEEDED` read as "invalid document"                   | this deployment's depth bound refused it; the bytes may be fine     | raise `LimitsPolicy.maxDepth` if the depth is legitimate    |
 | a schemaless bind failing on `UNRECOGNIZED_FIELD`               | a schemaless bind is closed, as a schema-driven one is              | declare the field, or `ignoringUnknownFields()` deliberately |
+| `"@id"` refused in a record, or a map for JSON-LD members       | a record's field names are identifiers unless it names a name type   | compose a base with `name_type` (Field names that are not identifiers) |
+| a plain record composed with a `json_record`                    | supertypes must share one name type, the default included           | declare the reused record over the same base                |
 | a `FetchPolicy` beside `SchemaAccess.of(…)`                     | that source carries its own, set on its own builder; refused        | state it on the builder that makes the source               |
 | a `SCHEMA_*` fetch code read as "invalid document"              | nothing was checked                                                 | route on the code; only `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` are worth a retry |
 | your own copy of the "not a verdict" code set                   | two consumers drift apart over the same diagnostic                  | ask `Diagnostic.Code.verdict()`                             |

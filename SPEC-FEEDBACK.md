@@ -886,3 +886,67 @@ relaxed type, defined by the translation and not by the series, such as
 judged at its declaration, where today they are judged at each application, under the closed record's name type.
 
 **Status against Revision 37:** open; under consideration, implemented on `record-name-type`.
+
+## 11. The guide and the schema skill should say what `record.name_type` makes possible, and when to use it
+
+**Section:** [TSON-GUIDE] (a new section, beside its schema-authoring and gradual-adoption material); the
+`tson-schema` skill published with the series (`skills/tson-schema/SKILL.md`: "Records and fields", "Enums",
+"Converting from another schema language", "Pitfalls", and `references/converting.md`).
+
+**Kind:** documentation, non-normative — follows #10.
+
+**The problem.** #10 changes what a name can be at three positions an author meets constantly, and neither
+document a schema author reads says so. The `tson-schema` skill still states the old rule ("names are
+identifiers (no leading digit, no leading `_`)") and an enum spelling (`profile: TEXT`) the kernel no longer has,
+and its conversion section gives no answer for JSON Schema's or JSON-LD's own member names. An author converting
+an OpenAPI document reaches for a map, which loses the record, or renames the member, which loses the round
+trip; a model following the skill does the same, at scale. #10 is the normative half; this is the half that
+tells an author when to reach for it — and, as important, when not to, since a relaxed name type is a
+translation's tool rather than the default for a new TSON schema.
+
+**Proposed: one section in each, on the same outline.**
+
+1. **What a name is.** Field names, enum members and identifier-typed map keys are values of a *name type*, an
+   identifier family. The default is the series' identifier everywhere, so a schema that says nothing is
+   unchanged. Type names, annotation names, template parameters and directives stay identifiers: they are the
+   schema language's own names.
+2. **What breaking out makes possible**, each with a one-line schema:
+   - *Translating JSON vocabularies* — JSON-LD (`@id`, `@type`, `@context`), JSON Schema and OpenAPI (`$ref`,
+     `$id`, `$defs`): `json_name => !identifier_type { start_add: "@$" }`, stated once on a fieldless ABSTRACT
+     base the translated records compose.
+   - *Words as names* — spreadsheet or CSV columns, form labels (`first name`): `!identifier_type { continue_add:
+     "-"  medial: " " }`, which refuses a leading, trailing or doubled space.
+   - *Names compared without case* — HTTP-style headers, case-insensitive configuration keys: `start: ASCII
+     continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD`, or `NFKC_CASEFOLD` beyond ASCII; a document's
+     `Content-Type` is the field `content-type`.
+   - *A vocabulary with its own spelling rules* — kebab-case or other house styles as an enum's or a record's
+     name type, so a misspelt member is refused at load.
+3. **When it is the right tool.** The names are fixed by someone else — a standard, a wire format, an existing
+   API — and the record's shape is known, so it should stay a record rather than become a map.
+4. **When it is not.**
+   - A new TSON schema whose names are yours: use identifiers; nothing gains from relaxing them.
+   - An open or unbounded set of keys, or keys that are no names at all (empty, padded, invisible characters):
+     a map, as [TSON-DATA] §2.5 always said.
+   - A closed set of text values that are not names: `text_type`'s `members` facet, not an enum.
+5. **What it costs**, so the choice is made knowingly.
+   - Relaxed names are quoted in TSON text, and a host binding names them (`@Field("@id")`).
+   - Records joined by inheritance share one name type, the default included, so a reused plain record is
+     re-based on the translation's base. The SchemaStore conversion measured it: 369 records declare relaxed
+     names, and 2,167 take the type.
+   - In JSON, `$schema`, `$type` and `$value` still belong to the encoding; a record should not declare them.
+   - A processor reading a document without its schema cannot judge relaxed names.
+6. **Safety that stays on.** Every name is still judged by [TSON-DATA] §8.2's rules under its type's profile,
+   look-alikes included, and a profile may not add an invisible character, a control or a space other than
+   U+0020; the type's normalization must imply NFC.
+7. **A worked conversion**: a small JSON-LD or OpenAPI fragment, its TSON schema over `json_record`, one TSON
+   document and the same value in JSON, read back through a bound class.
+
+**And in the skill specifically:** replace the identifier-only sentence in "Records and fields" with a pointer to
+the new section; rewrite "Enums" for `enum_type { name_type: … }` and drop `profile: TEXT` (a closed text set is
+`!text ^ { members: [...] }`); add the JSON-LD/JSON Schema/OpenAPI member-name row to `references/converting.md`
+and the conversion section; and add pitfall rows for a map used where a relaxed record fits, and a plain record
+composed with a translation's base.
+
+**Status against Revision 37:** open; documentation for #10. The implementation's own consumer skill
+(`skills/tson-java/SKILL.md`, "Field names that are not identifiers") carries the reading and binding half and
+can serve as a model.

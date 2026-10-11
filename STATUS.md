@@ -25,6 +25,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Temporal types — `date`, `time`, `datetime`, `duration`, `period`
 - [x] Object binding — Java records, hand-written immutable classes, `Map<K, V>`, tuples, plain
       enums, sealed interfaces/unions
+- [x] Typed field names — `record.name_type` names the identifier family a record's field names belong to, as
+      `enum_type.name_type` does an enum's members, so a record declares `@id`, `$ref` or `first name` as written,
+      judged under its own name type in both encodings (SPEC-FEEDBACK.md #10)
 - [x] Wire-format annotation access — a bound record's own `@name[:value]` annotations, via an
       opt-in carrier component
 - [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above,
