@@ -52,10 +52,10 @@ class MultiErrorCollectionTest {
         entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
                 List.of(), new IntegerType(new IntegerSize(8, true))));
         entries.put("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer"))));
-        entries.put("my_record", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("value", TypeRef.of("integer")),
-                RecordField.required("tag", TypeRef.of("integer")),
-                RecordField.required("items", TypeRef.of("numbers"))))));
+        entries.put("my_record", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("value", RecordField.required(TypeRef.of("integer"))),
+                Map.entry("tag", RecordField.required(TypeRef.of("integer"))),
+                Map.entry("items", RecordField.required(TypeRef.of("numbers")))))));
         TsonSchema schema = new TsonSchema("https://example.test/multi-error.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));

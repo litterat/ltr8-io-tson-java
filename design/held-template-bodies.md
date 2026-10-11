@@ -56,7 +56,7 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     an open entry compares like every other entry.
 - **A held body closes by one process, whatever wrote it** (`closeHeld`). `<T> [T]` and `<T> { x: T }` are both
   an application with a parameter standing in a slot — `!array { element_type: T }` and
-  `!record { fields: [ { name: x  type: T } ] }` — so both substitute by the same walk and are then bound
+  `!record { fields: { x => { type: T } } }` — so both substitute by the same walk and are then bound
   through **their own constructor's compiled reader**, the same one a written `!array { … }` or `!record { … }`
   binds through. Once its parameters go concrete a held body is no longer a template at all, but the
   constructor body those bindings always described, and the entry carries an ordinary
@@ -272,7 +272,7 @@ and `<0xFF>` are one application while `1` and `1.0` stay two, §4 resolving the
 §8.2's rule exactly, recorded as written and compared as the value denoted.
 
 **Every template holds its body**, so one process closes them all.
-§5.2 says `{ x: T }` denotes `!record { fields: [ { name: x  type: T } ] }`, and `SchemaDesugarer` rewrites
+§5.2 says `{ x: T }` denotes `!record { fields: { x => { type: T } } }`, and `SchemaDesugarer` rewrites
 it there, where the body is written; a **composition or refinement** template is held one phase later
 (`DefinitionResolver.holdIfOpen`), because both absorb fields from a source and the form to hold is the
 *flattened* one — but through `WireForm.heldRecord`, so two producers of the wire form share one

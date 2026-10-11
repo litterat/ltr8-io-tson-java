@@ -189,7 +189,7 @@ class OperandFollowsReferenceChainTest {
 
     /** The field names of an entry's record body, in declaration order. */
     private static List<String> fieldNames(TsonLinkedSchema linked, String entry) {
-        return ((RecordBody) linked.schema().entries().get(entry).body()).fields().stream()
-                .map(RecordField::name).toList();
+        return ((RecordBody) linked.schema().entries().get(entry).body()).fields().keySet().stream()
+                .toList();
     }
 }

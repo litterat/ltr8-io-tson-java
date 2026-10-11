@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.Set;
 
 /**
@@ -826,20 +827,21 @@ final class DefinitionResolver {
             RecordValue bindings) {
         Set<String> bound = new LinkedHashSet<>();
         for (RecordValue.Field binding : bindings.fields()) {
-            if (vocabulary.fields().stream().noneMatch(field -> field.name().equals(binding.name()))) {
+            if (!vocabulary.fields().containsKey(binding.name())) {
                 throw new SchemaValidationException("'" + name + "': '" + target + "' has no field '"
                         + binding.name() + "' to bind (§7.2) -- its fields are "
-                        + vocabulary.fields().stream().map(RecordField::name).toList());
+                        + List.copyOf(vocabulary.fields().keySet()));
             }
             bound.add(binding.name());
         }
-        for (RecordField field : vocabulary.fields()) {
-            if (!field.optional() && field.value().isEmpty() && !bound.contains(field.name())) {
+        for (Map.Entry<String, RecordField> entry : vocabulary.fields().entrySet()) {
+            RecordField field = entry.getValue();
+            if (!field.optional() && field.value().isEmpty() && !bound.contains(entry.getKey())) {
                 // No application of this template could ever produce a valid instance, so the template is
                 // wrong wherever the application is -- exactly the case the declaration is the right place
                 // to report.
                 throw new SchemaValidationException("'" + name + "': '" + target + "' requires a '"
-                        + field.name() + "', and nothing binds it (§7.2), so no application of this template "
+                        + entry.getKey() + "', and nothing binds it (§7.2), so no application of this template "
                         + "could build one");
             }
         }
@@ -1276,10 +1278,10 @@ final class DefinitionResolver {
         String nameTypeFrom = null;   // the first record supertype, whose name type the rest must share
         List<String> transitiveSupertypes = new ArrayList<>();
         Set<String> seenTransitive = new HashSet<>();
-        List<RecordField> fields = new ArrayList<>();
+        SequencedMap<String, RecordField> fields = new LinkedHashMap<>();
         List<FieldGroup> groups = new ArrayList<>();
         Set<String> seenFieldNames = new HashSet<>();
-        Map<String, Integer> inheritedFieldIndex = new LinkedHashMap<>();
+        Set<String> inheritedFields = new HashSet<>();
 
         for (TypeRef supertypeRef : construction.supertypes()) {
             if (supertypeRef instanceof GenericRef generic) {
@@ -1335,7 +1337,7 @@ final class DefinitionResolver {
                 RecordBody absorbed = namesOwnParameter(generic, parameters)
                         ? operand.body()
                         : (RecordBody) TemplateMaterialiser.fixRoutedValues(operand.body());
-                absorb(name, absorbed, fields, groups, seenFieldNames, inheritedFieldIndex);
+                absorb(name, absorbed, fields, groups, seenFieldNames, inheritedFields);
                 continue;
             }
             if (!(supertypeRef instanceof SimpleRef simple)) {
@@ -1395,7 +1397,7 @@ final class DefinitionResolver {
                 addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
             }
 
-            absorb(name, supertypeBody, fields, groups, seenFieldNames, inheritedFieldIndex);
+            absorb(name, supertypeBody, fields, groups, seenFieldNames, inheritedFields);
             if (nameTypeFrom == null) {
                 nameType = supertypeBody.nameType();
                 nameTypeFrom = supertypeName;
@@ -1406,7 +1408,7 @@ final class DefinitionResolver {
 
         if (construction.body().isPresent()) {
             for (RecordEntry entry : construction.body().get().entries()) {
-                resolveEntry(name, entry, fields, groups, seenFieldNames, inheritedFieldIndex, parameters);
+                resolveEntry(name, entry, fields, groups, seenFieldNames, inheritedFields, parameters);
             }
         }
 
@@ -1466,7 +1468,7 @@ final class DefinitionResolver {
      * equals ({@link #dissolveInto}), and removing every member drops the group with them.
      */
     private static void applyRemovals(String declarationName, RemovalSet removal, Set<String> bodyDeclared,
-                                       List<RecordField> fields, List<FieldGroup> groups) {
+                                       SequencedMap<String, RecordField> fields, List<FieldGroup> groups) {
         Set<String> removed = new LinkedHashSet<>();
         for (String fieldName : removal.fieldNames()) {
             if (bodyDeclared.contains(fieldName)) {
@@ -1474,7 +1476,7 @@ final class DefinitionResolver {
                         + "', which this declaration's own body also declares -- a declaration cannot both state "
                         + "a field and remove it (§5.9 rule 4)");
             }
-            if (fields.stream().noneMatch(field -> field.name().equals(fieldName))) {
+            if (!fields.containsKey(fieldName)) {
                 throw new SchemaValidationException("'" + declarationName + "': removal names '" + fieldName
                         + "', which is not a field of the composed type -- only an inherited field can be "
                         + "removed (§5.9 rule 2)");
@@ -1505,7 +1507,7 @@ final class DefinitionResolver {
         groups.clear();
         groups.addAll(surviving);
 
-        fields.removeIf(field -> removed.contains(field.name()));
+        fields.keySet().removeAll(removed);
     }
 
     /**
@@ -1528,15 +1530,15 @@ final class DefinitionResolver {
      * optional; in an optional group every member is optional. A sole member takes the group's own
      * {@code optional} for both its marks.
      */
-    private static void dissolveInto(List<RecordField> fields, List<String> option, List<String> optional,
-                                     boolean optionalGroup) {
-        for (int i = 0; i < fields.size(); i++) {
-            RecordField field = fields.get(i);
-            if (!option.contains(field.name())) {
+    private static void dissolveInto(SequencedMap<String, RecordField> fields, List<String> option,
+                                     List<String> optional, boolean optionalGroup) {
+        for (Map.Entry<String, RecordField> entry : fields.entrySet()) {
+            if (!option.contains(entry.getKey())) {
                 continue;
             }
-            boolean omittable = optionalGroup || optional.contains(field.name());
-            fields.set(i, field.withFacts(omittable, option.size() == 1 ? omittable : field.voidable(),
+            RecordField field = entry.getValue();
+            boolean omittable = optionalGroup || optional.contains(entry.getKey());
+            entry.setValue(field.withFacts(omittable, option.size() == 1 ? omittable : field.voidable(),
                     FieldRole.FREE));
         }
     }
@@ -1671,16 +1673,13 @@ final class DefinitionResolver {
     private TypeDefinition refineOnto(String name, RefinedDef refined,
             List<String> parameters, Optional<io.ltr8.tson.schema.meta.TypeRef> source,
             List<String> transitiveSupertypes, RecordBody sourceBody) {
-        List<RecordField> fields = new ArrayList<>(sourceBody.fields());
+        SequencedMap<String, RecordField> fields = new LinkedHashMap<>(sourceBody.fields());
         List<FieldGroup> groups = new ArrayList<>(sourceBody.groups());
-        Map<String, Integer> inheritedFieldIndex = new LinkedHashMap<>();
-        for (int i = 0; i < fields.size(); i++) {
-            inheritedFieldIndex.put(fields.get(i).name(), i);
-        }
+        Set<String> inheritedFields = Set.copyOf(sourceBody.fields().keySet());
 
         for (RecordEntry entry : refined.body().entries()) {
             if (entry instanceof GroupDef groupDef) {
-                if (!restatesInheritedGroup(name, groupDef, fields, groups, inheritedFieldIndex)) {
+                if (!restatesInheritedGroup(name, groupDef, fields, groups, inheritedFields)) {
                     throw new SchemaValidationException("'" + name + "': the group ("
                             + groupDef.fieldGroup().describe() + ") names no inherited group -- a "
                             + "refinement copies its source's whole field set and admits no new fields or "
@@ -1689,13 +1688,13 @@ final class DefinitionResolver {
                 continue;
             }
             FieldDef fieldDef = (FieldDef) entry;
-            Integer index = inheritedFieldIndex.get(fieldDef.name());
-            if (index == null) {
+            RecordField inherited = fields.get(fieldDef.name());
+            if (inherited == null) {
                 throw new SchemaValidationException("'" + name + "': refinement body field '" + fieldDef.name()
                         + "' names no inherited field -- a refinement copies its source's whole field set and "
                         + "admits no new fields; composition (`&`) is what adds one (§5.7)");
             }
-            fields.set(index, resolveTighteningField(name, fieldDef, fields.get(index), groups, parameters));
+            fields.put(fieldDef.name(), resolveTighteningField(name, fieldDef, inherited, groups, parameters));
         }
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
@@ -1735,13 +1734,13 @@ final class DefinitionResolver {
      * -- a closed supertype's own {@code RecordBody} and an open operand's substituted one -- so an operand
      * that contributes no name still contributes its fields on exactly the terms one that does would.
      */
-    private void absorb(String name, RecordBody source, List<RecordField> fields, List<FieldGroup> groups,
-            Set<String> seenFieldNames, Map<String, Integer> inheritedFieldIndex) {
-        for (RecordField field : source.fields()) {
-            requireFieldNameNotSeen(name, field.name(), seenFieldNames, FieldOrigin.SUPERTYPE);
-            seenFieldNames.add(field.name());
-            inheritedFieldIndex.put(field.name(), fields.size());
-            fields.add(field);
+    private void absorb(String name, RecordBody source, SequencedMap<String, RecordField> fields,
+            List<FieldGroup> groups, Set<String> seenFieldNames, Set<String> inheritedFields) {
+        for (Map.Entry<String, RecordField> field : source.fields().entrySet()) {
+            requireFieldNameNotSeen(name, field.getKey(), seenFieldNames, FieldOrigin.SUPERTYPE);
+            seenFieldNames.add(field.getKey());
+            inheritedFields.add(field.getKey());
+            fields.put(field.getKey(), field.getValue());
         }
         groups.addAll(source.groups());
     }
@@ -1881,11 +1880,11 @@ final class DefinitionResolver {
     // ── Record bodies, fields, and field groups (§5.2, §5.11) ─────────────
 
     private RecordBody resolveRecordBody(List<RecordEntry> entries, List<String> parameters) {
-        List<RecordField> fields = new ArrayList<>();
+        SequencedMap<String, RecordField> fields = new LinkedHashMap<>();
         List<FieldGroup> groups = new ArrayList<>();
         Set<String> seenFieldNames = new HashSet<>();
         for (RecordEntry entry : entries) {
-            resolveEntry(null, entry, fields, groups, seenFieldNames, Map.of(), parameters);
+            resolveEntry(null, entry, fields, groups, seenFieldNames, Set.of(), parameters);
         }
         return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN, markedNames(entries),
                 Optional.empty());
@@ -1926,38 +1925,34 @@ final class DefinitionResolver {
 
     /**
      * {@code declarationName} is only used to word error messages -- {@code null} for a fresh
-     * record, where {@code inheritedFieldIndex} is always empty (no supertype means no field could
-     * ever be inherited, so every entry is either genuinely new or a genuine duplicate declaration,
-     * the latter still unsupported). A {@link FieldDef} whose name is a key of {@code
-     * inheritedFieldIndex} is a *tightening* entry (§5.7): it's resolved against, and replaces in
-     * place, the already-inherited field at that index, rather than being appended as new.
+     * record, where {@code inheritedFields} is always empty (no supertype means no field could
+     * ever be inherited, so every entry is either genuinely new or a duplicate declaration). A {@link
+     * FieldDef} whose name is in {@code inheritedFields} is a *tightening* entry (§5.7): it's resolved
+     * against, and replaces in place, the already-inherited field of that name, rather than being appended.
      */
-    private void resolveEntry(String declarationName, RecordEntry entry, List<RecordField> fields,
+    private void resolveEntry(String declarationName, RecordEntry entry, SequencedMap<String, RecordField> fields,
                                List<FieldGroup> groups, Set<String> seenFieldNames,
-                               Map<String, Integer> inheritedFieldIndex, List<String> parameters) {
+                               Set<String> inheritedFields, List<String> parameters) {
         switch (entry) {
             case FieldDef fieldDef -> {
-                Integer index = inheritedFieldIndex.get(fieldDef.name());
-                if (index != null) {
-                    fields.set(index, resolveTighteningField(declarationName, fieldDef, fields.get(index), groups,
-                            parameters));
+                if (inheritedFields.contains(fieldDef.name())) {
+                    fields.put(fieldDef.name(), resolveTighteningField(declarationName, fieldDef,
+                            fields.get(fieldDef.name()), groups, parameters));
                 } else {
                     requireFieldNameNotSeen(declarationName, fieldDef.name(), seenFieldNames, FieldOrigin.BODY_FIELD);
-                    RecordField field = resolveField(fieldDef, parameters, Optional.empty());
-                    seenFieldNames.add(field.name());
-                    fields.add(field);
+                    seenFieldNames.add(fieldDef.name());
+                    fields.put(fieldDef.name(), resolveField(fieldDef, parameters, Optional.empty()));
                 }
             }
             case GroupDef groupDef -> {
-                if (restatesInheritedGroup(declarationName, groupDef, fields, groups, inheritedFieldIndex)) {
+                if (restatesInheritedGroup(declarationName, groupDef, fields, groups, inheritedFields)) {
                     return;
                 }
                 for (GroupDef.Member member : groupDef.members()) {
                     requireFieldNameNotSeen(declarationName, member.name(), seenFieldNames,
                             FieldOrigin.GROUP_MEMBER);
-                    RecordField field = resolveGroupMember(member);
-                    seenFieldNames.add(field.name());
-                    fields.add(field);
+                    seenFieldNames.add(member.name());
+                    fields.put(member.name(), resolveGroupMember(member));
                 }
                 groups.add(groupDef.fieldGroup());
             }
@@ -2090,7 +2085,7 @@ final class DefinitionResolver {
      * fix.
      *
      * <p>Tightening never reaches here: a body field naming an <em>inherited</em> field is routed by {@code
-     * inheritedFieldIndex} in {@link #resolveEntry} before this is consulted for that name.
+     * inheritedFields} in {@link #resolveEntry} before this is consulted for that name.
      */
     private static void requireFieldNameNotSeen(String declarationName, String fieldName,
                                                  Set<String> seenFieldNames, FieldOrigin origin) {
@@ -2208,7 +2203,7 @@ final class DefinitionResolver {
         // the value is concrete -- and that is what FieldModifiers decides.
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), field.omittable(), voidable, field.modifier(), parameters);
-        return new RecordField(field.name(), type, resolved.optional(), resolved.voidable(), resolved.role(),
+        return new RecordField(type, resolved.optional(), resolved.voidable(), resolved.role(),
                 resolved.value().map(DefinitionResolver::toMetaToken), Annotations.empty(),
                 positions.of(field));
     }
@@ -2232,7 +2227,7 @@ final class DefinitionResolver {
      * <p>Returns {@code true} having applied the restatement, or {@code false} when this group names nothing
      * inherited and is therefore a genuinely new one -- which a composition body appends and a refinement
      * body rejects, each at its own call site. A fresh record reaches here with an empty {@code
-     * inheritedFieldIndex} and so always takes the {@code false} path.
+     * inheritedFields} and so always takes the {@code false} path.
      *
      * <p>Only the <em>group's</em> state changes. Members flatten as {@code OPTIONAL} whatever the group says
      * (§5.11), so a restatement never rewrites the member fields; tightening an individual member is the
@@ -2242,11 +2237,12 @@ final class DefinitionResolver {
      * SchemaValidationException} -- and each says which of the four rules was broken, since a
      * restatement that got the order wrong and one that changed a member's type need different fixes.
      */
-    private boolean restatesInheritedGroup(String declarationName, GroupDef groupDef, List<RecordField> fields,
-                                            List<FieldGroup> groups, Map<String, Integer> inheritedFieldIndex) {
+    private boolean restatesInheritedGroup(String declarationName, GroupDef groupDef,
+                                            SequencedMap<String, RecordField> fields, List<FieldGroup> groups,
+                                            Set<String> inheritedFields) {
         FieldGroup restatement = groupDef.fieldGroup();
         List<String> restated = restatement.memberNames();
-        List<String> inheritedMembers = restated.stream().filter(inheritedFieldIndex::containsKey).toList();
+        List<String> inheritedMembers = restated.stream().filter(inheritedFields::contains).toList();
         if (inheritedMembers.isEmpty()) {
             return false;
         }
@@ -2283,8 +2279,7 @@ final class DefinitionResolver {
         }
         for (GroupDef.Member member : groupDef.members()) {
             io.ltr8.tson.schema.meta.TypeRef restatedType = resolveTypeRef(member.typeRef());
-            io.ltr8.tson.schema.meta.TypeRef inheritedType =
-                    fields.get(inheritedFieldIndex.get(member.name())).type();
+            io.ltr8.tson.schema.meta.TypeRef inheritedType = fields.get(member.name()).type();
             if (!restatedType.equals(inheritedType)) {
                 throw new SchemaValidationException(prefix + "gives member '" + member.name() + "' the type "
                         + "'" + restatedType.name() + "' where the source declares '" + inheritedType.name()
@@ -2312,7 +2307,7 @@ final class DefinitionResolver {
      * governed by the group (§5.11), and voidable exactly where its type carries {@code ?}.
      */
     private RecordField resolveGroupMember(GroupDef.Member member) {
-        return new RecordField(member.name(), resolveTypeRef(member.typeRef()), true, member.voidable(), FieldRole.FREE,
+        return new RecordField(resolveTypeRef(member.typeRef()), true, member.voidable(), FieldRole.FREE,
                 Optional.empty(), annotationsOf(member.name(), member.annotations()), Optional.empty());
     }
 

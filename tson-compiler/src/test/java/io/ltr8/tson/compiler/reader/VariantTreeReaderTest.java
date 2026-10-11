@@ -46,20 +46,20 @@ class VariantTreeReaderTest {
         // No type parameter: this fixture is about subtypes dispatch, and the `T` it used to carry was
         // incidental -- a declared parameter the body never references is now a §5.10 error.
         entries.put("response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of(), List.of(), RecordBody.of(List.of())));
+                List.of(), List.of(), RecordBody.of(RecordBody.fieldMap())));
         entries.put("success_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
                 List.of("response"), List.of(),
-                RecordBody.of(List.of(RecordField.required("value", TypeRef.of("integer"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("value", RecordField.required(TypeRef.of("integer")))))));
         entries.put("failure_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
                 List.of("response"), List.of(),
-                RecordBody.of(List.of(RecordField.required("error_code", TypeRef.of("integer"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("error_code", RecordField.required(TypeRef.of("integer")))))));
         // A second, unrelated subtypes-bearing type whose OWN body has a real required field, to
         // prove the "no type-ref -> own body" fallback still enforces that body's own requirements.
         entries.put("shape", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
                 List.of(), List.of(),
-                RecordBody.of(List.of(RecordField.required("sides", TypeRef.of("integer"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("sides", RecordField.required(TypeRef.of("integer")))))));
         entries.put("triangle", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("shape"), List.of(), RecordBody.of(List.of())));
+                List.of("shape"), List.of(), RecordBody.of(RecordBody.fieldMap())));
         return new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn",
                 List.of(), entries);
     }

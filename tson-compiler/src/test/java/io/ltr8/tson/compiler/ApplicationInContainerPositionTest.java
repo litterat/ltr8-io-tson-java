@@ -64,7 +64,8 @@ class ApplicationInContainerPositionTest {
 
     private static String fieldType(TsonCompiledSchema compiled, String record, String field) {
         RecordBody body = (RecordBody) compiled.schema().entries().get(record).body();
-        return body.fields().stream().filter(f -> f.name().equals(field)).findFirst().orElseThrow()
+        return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
                 .type().name();
     }
 
@@ -123,7 +124,7 @@ class ApplicationInContainerPositionTest {
         assertEquals(TypeRef.of(instantiation), children.elementType(), "the knot");
         assertEquals(Optional.of(BigInteger.ONE), children.minItems());
         assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries().get(instantiation).body())
-                .fields().get(0).type(), "T bound at the value field too");
+                .fields().values().stream().toList().get(0).type(), "T bound at the value field too");
     }
 
     /** The open form the fixture rests on: an array template whose element is an application of {@code tree}. */
@@ -393,7 +394,8 @@ class ApplicationInContainerPositionTest {
         TypeDefinition instantiation = compiled.schema().entries().get(array.elementType().name());
 
         assertEquals(List.of(), instantiation.parameters(), "closed");
-        assertEquals(TypeRef.of("text"), ((RecordBody) instantiation.body()).fields().get(0).type(),
+        assertEquals(TypeRef.of("text"), ((RecordBody) instantiation.body()).fields()
+                .values().stream().toList().get(0).type(),
                 "T bound");
         assertNotNull(compiled.get("box_carrier")
                 .read(TestDocuments.document("{ a: [ { a: \"x\" } ] }")));
@@ -412,7 +414,8 @@ class ApplicationInContainerPositionTest {
         String inner = fieldType(compiled, array.elementType().name(), "a");
 
         assertEquals(TypeRef.of("int32"),
-                ((RecordBody) compiled.schema().entries().get(inner).body()).fields().get(0).type());
+                ((RecordBody) compiled.schema().entries().get(inner).body()).fields()
+                        .values().stream().toList().get(0).type());
     }
 
     /**
@@ -464,7 +467,7 @@ class ApplicationInContainerPositionTest {
                 .get(fieldType(compiled, "m", "entries")).body());
 
         assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries()
-                .get(map.valueType().name()).body()).fields().get(0).type());
+                .get(map.valueType().name()).body()).fields().values().stream().toList().get(0).type());
     }
 
     /**

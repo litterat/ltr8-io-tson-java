@@ -850,11 +850,10 @@ final class TemplateMaterialiser {
         if (!(body instanceof RecordBody record)) {
             return body;
         }
-        return new RecordBody(record.supertypes(), record.fields().stream()
-                .map(field -> field.role() == FieldRole.FREE && field.value().isPresent()
+        return new RecordBody(record.supertypes(), record.mapFields(
+                field -> field.role() == FieldRole.FREE && field.value().isPresent()
                         ? field.withFacts(field.optional(), false, FieldRole.FIXED)
-                        : field)
-                .toList(), record.groups(), closedExtension(record), java.util.List.of(), record.nameType());
+                        : field), record.groups(), closedExtension(record), java.util.List.of(), record.nameType());
     }
 
     /**

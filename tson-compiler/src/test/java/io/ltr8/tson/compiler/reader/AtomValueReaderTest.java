@@ -52,7 +52,7 @@ class AtomValueReaderTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("field", atomEntry);
         entries.put("holder", TypeDefinition.product(
-                RecordBody.of(List.of(RecordField.required("value", TypeRef.of("field"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("value", RecordField.required(TypeRef.of("field")))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
@@ -164,7 +164,7 @@ class AtomValueReaderTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put(typeName, realEntry);
         entries.put("holder", TypeDefinition.product(
-                RecordBody.of(List.of(RecordField.required("value", TypeRef.of(typeName))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("value", RecordField.required(TypeRef.of(typeName)))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);

@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
@@ -614,7 +615,8 @@ class SchemaDesugarerTest {
         Instance box = assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
         assertEquals("record", box.target());
         assertEquals(List.of("T"), box.typeParams(), "the declaration's own list, as written");
-        assertEquals(new TokenValue("v", TokenForm.UNQUOTED), fieldSlot(box, 0, "name"));
+        assertEquals(new TokenValue("v", TokenForm.UNQUOTED), fieldKey(box, 0),
+                "the field's name is its key in the held field map");
         assertEquals(new TokenValue("T", TokenForm.UNQUOTED), fieldSlot(box, 0, "type"),
                 "the parameter stands in the slot, as it does in every other held form");
 
@@ -722,12 +724,21 @@ class SchemaDesugarerTest {
                 .reduce((a, b) -> a + " " + b).orElse("") + "] }";
     }
 
+    /** The {@code fields} map of a held {@code !record} binding record. */
+    private static MapValue heldFields(Instance template) {
+        RecordValue binding = (RecordValue) template.value().coreValue();
+        return (MapValue) binding.fields().stream().filter(f -> f.name().equals("fields"))
+                .findFirst().orElseThrow().value().value().coreValue();
+    }
+
+    /** The key -- the field's name -- of the {@code n}th entry in a held {@code !record}'s {@code fields}. */
+    private static CoreValue fieldKey(Instance template, int n) {
+        return heldFields(template).entries().get(n).key().coreValue();
+    }
+
     /** One member of the {@code n}th {@code record_field} in a held {@code !record} binding record. */
     private static CoreValue fieldSlot(Instance template, int n, String member) {
-        RecordValue binding = (RecordValue) template.value().coreValue();
-        ArrayValue fields = (ArrayValue) binding.fields().stream().filter(f -> f.name().equals("fields"))
-                .findFirst().orElseThrow().value().value().coreValue();
-        RecordValue field = (RecordValue) fields.elements().get(n).value().coreValue();
+        RecordValue field = (RecordValue) heldFields(template).entries().get(n).value().value().coreValue();
         return field.fields().stream().filter(f -> f.name().equals(member)).findFirst().orElseThrow()
                 .value().value().coreValue();
     }

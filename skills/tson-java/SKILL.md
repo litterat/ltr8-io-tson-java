@@ -463,7 +463,7 @@ base, and compose that base; a composition takes its supertypes' one name type (
 
 ```
 json_name   => !identifier_type { start_add: "@$" }
-json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
 node        => json_record & { "@id": text  "$ref"?: text  label: text }
 ```
 

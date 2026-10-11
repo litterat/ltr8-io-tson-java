@@ -187,7 +187,7 @@ class SubtypeTemplateFamilyTest {
         String thin = target(compiled, "thin_of");
 
         assertEquals(List.of("payload"), ((RecordBody) compiled.schema().entries().get(thin).body()).fields()
-                .stream().map(f -> f.name()).toList(), "the subtraction really ran");
+                .keySet().stream().toList(), "the subtraction really ran");
         // Not IS-A result: the only edge is to thin, whose declared member thin_of is (§8.2's entry shape).
         assertEquals(List.of("thin"), compiled.schema().entries().get(thin).supertypes(), "contract: broken");
         assertEquals(List.of(), ((RecordBody) compiled.schema().entries().get(thin).body()).supertypes(),

@@ -262,7 +262,7 @@ public final class TsonSchemaLinker {
             // too would report the one mistake twice.
             List<String> names = switch (body) {
                 case RecordBody record when !refusedEnums.contains(name) ->
-                        record.fields().stream().map(RecordField::name).toList();
+                        List.copyOf(record.fields().keySet());
                 case EnumBody enumBody when !refusedEnums.contains(name) -> List.copyOf(enumBody.members());
                 default -> List.of();
             };
@@ -319,7 +319,8 @@ public final class TsonSchemaLinker {
     private static void checkFieldValues(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                          TypeDefinition definition, RecordBody record,
                                          Map<String, TypeDefinition> merged, IdentifierPolicy identifiers) {
-        for (RecordField field : record.fields()) {
+        for (Map.Entry<String, RecordField> declared : record.fields().entrySet()) {
+            RecordField field = declared.getValue();
             if (field.value().isEmpty()) {
                 continue;
             }
@@ -331,7 +332,7 @@ public final class TsonSchemaLinker {
                 String what = field.role() == FieldRole.FIXED ? "a fixed value" : "a default";
                 perName(receiver, schema, entry, definition,
                         family.get().normalization().apply(field.value().get().text()),
-                        "'" + entry + "' has " + what + " for '" + field.name() + "' where ", identifiers,
+                        "'" + entry + "' has " + what + " for '" + declared.getKey() + "' where ", identifiers,
                         family.get().profile());
             }
         }
@@ -1194,14 +1195,15 @@ public final class TsonSchemaLinker {
                 for (TypeRef supertype : r.supertypes()) {
                     validateTypeRef(supertype, namespace, ownParameters, entryName, " supertype");
                 }
-                for (RecordField field : r.fields()) {
-                    validateTypeRef(field.type(), namespace, ownParameters, entryName,
-                            " field '" + field.name() + "'");
-                    checkFieldValue(entryName, field, namespace, structureNamespace, ownParameters);
+                for (Map.Entry<String, RecordField> field : r.fields().entrySet()) {
+                    validateTypeRef(field.getValue().type(), namespace, ownParameters, entryName,
+                            " field '" + field.getKey() + "'");
+                    checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, structureNamespace,
+                            ownParameters);
                 }
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.memberNames()) {
-                        if (r.fields().stream().noneMatch(f -> f.name().equals(member))) {
+                        if (!r.fields().containsKey(member)) {
                             throw new SchemaValidationException(
                                     "'" + entryName + "' has a field group referencing unknown field '" + member + "'");
                         }
@@ -1438,7 +1440,7 @@ public final class TsonSchemaLinker {
     /** Every name an entry's body mentions, for {@link #checkOpenEntryUsesEveryParameter}. */
     private static void collectBodyNames(Top body, Set<String> into) {
         switch (body) {
-            case RecordBody record -> record.fields().forEach(field -> {
+            case RecordBody record -> record.fields().values().forEach(field -> {
                 collectNames(field.type(), into);
                 // A routed parameter rides `value` like any other token, so it is named here too -- which is
                 // what keeps `<S> base ^ { status: = S }` from reading as a template that never uses S.
@@ -1528,8 +1530,9 @@ public final class TsonSchemaLinker {
      * a held body is not read as this vocabulary at all, so the only parametric field reaching here has
      * already been substituted by materialisation, and is checked against the argument it was closed with.
      */
-    private static void checkFieldValue(String entryName, RecordField field, Map<String, TypeDefinition> namespace,
-                                         Map<String, TypeDefinition> structureNamespace, List<String> ownParameters) {
+    private static void checkFieldValue(String entryName, String fieldName, RecordField field,
+                                        Map<String, TypeDefinition> namespace,
+                                        Map<String, TypeDefinition> structureNamespace, List<String> ownParameters) {
         if (field.value().isEmpty() || ownParameters.contains(field.type().name())) {
             return;
         }
@@ -1550,7 +1553,7 @@ public final class TsonSchemaLinker {
         Optional<AtomType<?>> parser = AtomParsers.forType(target.body(),
                 EnumLabels.labelForm(target, namespace, structureNamespace::get));
         if (parser.isEmpty()) {
-            throw notAScalarType(entryName, field, value, target.body());
+            throw notAScalarType(entryName, fieldName, field, value, target.body());
         }
         try {
             // The token is in hand and one of the two atoms cares which form it was (see TokenAtomType),
@@ -1565,7 +1568,7 @@ public final class TsonSchemaLinker {
             // they are written, and the value is echoed as the schema spells it -- quoted if it was quoted,
             // so the author reads back their own line rather than a normalisation of it. The atom's own
             // message follows: it already states the rule and cites the section, so nothing here restates it.
-            throw new SchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
+            throw new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
                     + "declared '" + field.type().name() + "', but its "
                     + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " "
                     + asWritten(value) + " is not a value of that type -- " + e.getMessage() + ". §5.2 makes "
@@ -1589,9 +1592,9 @@ public final class TsonSchemaLinker {
      * "the value must be the field's declared type" as requiring a type a token denotes directly, which is
      * what §5.2's "Which fields may carry a value" states.
      */
-    private static SchemaValidationException notAScalarType(String entryName, RecordField field,
+    private static SchemaValidationException notAScalarType(String entryName, String fieldName, RecordField field,
                                                                  Token value, Top body) {
-        return new SchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
+        return new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
                 + "declared '" + field.type().name() + "', which is " + describe(body) + ", so it cannot "
                 + "have " + (field.role() == FieldRole.DEFAULT ? "a default" : "a fixed value")
                 + " -- " + asWritten(value) + " is a token, and §5.2 admits only a bare token there. A "

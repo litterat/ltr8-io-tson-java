@@ -98,8 +98,8 @@ class SealedFamilyCheckTest {
         RecordBody member = (RecordBody) tson.schemaRegistry()
                 .get("https://example.test/inherit.tn").orElseThrow()
                 .schema().entries().get("dog").body();
-        RecordField pinned = member.fields().stream()
-                .filter(f -> f.name().equals("pet_type")).findFirst().orElseThrow();
+        RecordField pinned = member.fields().entrySet().stream()
+                .filter(f -> f.getKey().equals("pet_type")).map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
 
         assertEquals("fixed", pinned.describe(), "the member pins the selector");
         assertTrue(member.discriminators().isEmpty(),

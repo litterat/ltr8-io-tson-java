@@ -64,7 +64,7 @@ import java.util.Optional;
  * nothing else.
  *
  * <p><b>{@link SchemaDesugarer} runs first, exactly as it does for every other schema</b> -- meta-kernel
- * writes plenty of sugar ({@code fields: [record_field]}, <code>schema =&gt; {type_name =&gt;
+ * writes plenty of sugar ({@code groups?: [field_group]}, <code>schema =&gt; {type_name =&gt;
  * type_definition}</code>) and there is no reason for the kernel to resolve a different set of forms than
  * anything else does. It needs no accommodation at all: the desugar table is fixed by the sugar forms
  * (§5.3), so the phase consults no governing meta -- which for meta-kernel would have been the very entries

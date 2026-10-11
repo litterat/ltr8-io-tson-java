@@ -2,10 +2,12 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.unicode.Nfc;
 
-import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 
 /**
  * The fields a SEALED family dispatches on, resolved from the base's {@code discriminators} list -- one
@@ -13,7 +15,7 @@ import java.util.Optional;
  * member.
  *
  * <p><b>Why the names alone are not enough.</b> {@code record.discriminators} and {@code
- * template.discriminators} hold {@code field_name}s, and every consumer needs each selector's declared
+ * template.discriminators} hold field names, and every consumer needs each selector's declared
  * <em>type</em> as well: a pin is a bare token (§12.1) and only the type says which parser reads it. So the
  * names are resolved back to fields here, and where they come from differs by the kind of base.
  *
@@ -41,16 +43,17 @@ public final class FamilySelectors {
     }
 
     /**
-     * The selector fields {@code definition} dispatches on, in the order {@code discriminators} states --
-     * which is the order their pins are compared as a tuple.
+     * The selector fields {@code definition} dispatches on, keyed by their declared names, in the order {@code
+     * discriminators} states -- which is the order their pins are compared as a tuple.
      *
      * @param entries the closure this base's members are looked up in, for a template base
      */
-    public static List<RecordField> of(TypeDefinition definition, Map<String, TypeDefinition> entries) {
+    public static SequencedMap<String, RecordField> of(TypeDefinition definition,
+                                                       Map<String, TypeDefinition> entries) {
         return switch (definition.body()) {
             case RecordBody record -> declared(record);
             case TemplateBody held -> fromMembers(held.discriminators(), definition.subtypes(), entries);
-            default -> List.of();
+            default -> Collections.emptyNavigableMap();
         };
     }
 
@@ -87,12 +90,12 @@ public final class FamilySelectors {
      * the linker reports that as the author's error, and a reader built over a schema that failed to load is
      * not a case this has to serve.
      */
-    private static List<RecordField> declared(RecordBody record) {
-        List<RecordField> selectors = new ArrayList<>(record.discriminators().size());
+    private static SequencedMap<String, RecordField> declared(RecordBody record) {
+        SequencedMap<String, RecordField> selectors = new LinkedHashMap<>();
         for (String name : record.discriminators()) {
-            field(record, name).ifPresent(selectors::add);
+            field(record, name).ifPresent(found -> selectors.put(found.getKey(), found.getValue()));
         }
-        return List.copyOf(selectors);
+        return Collections.unmodifiableSequencedMap(selectors);
     }
 
     /**
@@ -103,29 +106,33 @@ public final class FamilySelectors {
      * being what each member supplies and what the dispatch compares. A member's own copy is FIXED and would
      * say a selector is already decided, which is the opposite of what it is for.
      */
-    private static List<RecordField> fromMembers(List<String> names, List<String> members,
-                                                  Map<String, TypeDefinition> entries) {
-        List<RecordField> selectors = new ArrayList<>(names.size());
+    private static SequencedMap<String, RecordField> fromMembers(List<String> names, List<String> members,
+                                                                 Map<String, TypeDefinition> entries) {
+        SequencedMap<String, RecordField> selectors = new LinkedHashMap<>();
         for (String name : names) {
             for (String member : members) {
                 TypeDefinition definition = entries.get(member);
                 if (definition == null || !(definition.body() instanceof RecordBody record)) {
                     continue;
                 }
-                Optional<RecordField> found = field(record, name);
+                Optional<Map.Entry<String, RecordField>> found = field(record, name);
                 if (found.isPresent()) {
-                    selectors.add(new RecordField(found.get().name(), found.get().type(), false, false,
-                            FieldRole.FREE, Optional.empty(), found.get().annotations(), Optional.empty()));
+                    RecordField field = found.get().getValue();
+                    selectors.put(found.get().getKey(), new RecordField(field.type(), false, false,
+                            FieldRole.FREE, Optional.empty(), field.annotations(), Optional.empty()));
                     break;
                 }
             }
         }
-        return List.copyOf(selectors);
+        return Collections.unmodifiableSequencedMap(selectors);
     }
 
-    /** One field by name, compared as §2.5 compares a field name -- NFC-normalised, never by spelling. */
-    private static Optional<RecordField> field(RecordBody record, String name) {
+    /**
+     * One field by name with its declared spelling, compared as §2.5 compares a field name -- NFC-normalised,
+     * never by spelling.
+     */
+    private static Optional<Map.Entry<String, RecordField>> field(RecordBody record, String name) {
         String wanted = Nfc.of(name);
-        return record.fields().stream().filter(f -> Nfc.of(f.name()).equals(wanted)).findFirst();
+        return record.fields().entrySet().stream().filter(f -> Nfc.of(f.getKey()).equals(wanted)).findFirst();
     }
 }

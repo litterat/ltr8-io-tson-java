@@ -51,11 +51,11 @@ class FieldNameTypeTest {
               json_name => !identifier_type { start_add: "@$" }
               node => !record {
                 name_type: json_name
-                fields: [
-                  { name: "@id"  type: text }
-                  { name: "$ref"  type: text  optional: true }
-                  { name: label  type: text }
-                ]
+                fields: {
+                  "@id" => { type: text }
+                  "$ref" => { type: text  optional: true }
+                  label => { type: text }
+                }
               }
             """);
 
@@ -98,8 +98,8 @@ class FieldNameTypeTest {
         String nested = schema("nested", """
                   json_name => !identifier_type { start_add: "@$" }
                   plain => { a: text }
-                  holder => !record { name_type: json_name  fields: [
-                    { name: "@id"  type: text }  { name: inner  type: plain } ] }
+                  holder => !record { name_type: json_name  fields: {
+                    "@id" => { type: text }  inner => { type: plain } } }
                 """);
         assertEquals(List.of(), read(nested, "nested", "!holder { \"@id\": \"x\"  inner: { a: \"y\" } }"));
         List<Diagnostic> problems = read(nested, "nested", "!holder { \"@id\": \"x\"  inner: { \"@a\": \"y\" } }");
@@ -118,7 +118,7 @@ class FieldNameTypeTest {
     void aDiscriminatorScanLeavesTheNamesItCrossesToTheMember() {
         String family = schema("family", """
                   json_name => !identifier_type { start_add: "@$" }
-                  node => !record { name_type: json_name  fields: [ { name: "@id"  type: text } ] }
+                  node => !record { name_type: json_name  fields: { "@id" => { type: text } } }
                   pet => abstract node & { "@type": text =?  name: text }
                   dog => pet & { "@type"?: = "dog"  breed: text }
                   cat => pet & { "@type"?: = "cat"  indoor: boolean }
@@ -181,7 +181,7 @@ class FieldNameTypeTest {
     void aWordsNameTypeAdmitsSpacedNamesAndJudgesThemAsNames() {
         String words = schema("words", """
               words => !identifier_type { continue_add: "-"  medial: " " }
-              row => !record { name_type: words  fields: [ { name: "first name"  type: text } ] }
+              row => !record { name_type: words  fields: { "first name" => { type: text } } }
             """);
         assertEquals(List.of(), read(words, "words", "!row { \"first name\": \"Ada\" }"));
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, read(words, "words",
@@ -193,7 +193,7 @@ class FieldNameTypeTest {
     void aTextNameTypeIsRefused() {
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("texts", """
-                      row => !record { name_type: text  fields: [ { name: "first name"  type: text } ] }
+                      row => !record { name_type: text  fields: { "first name" => { type: text } } }
                     """)));
         assertTrue(thrown.getMessage().contains("its name_type 'text' is not an identifier family"),
                 thrown.getMessage());
@@ -208,10 +208,10 @@ class FieldNameTypeTest {
     void aNameTypesFormMustImplyNfc() {
         for (String body : new String[] {
                 "raw => !identifier_type { normalization: NONE }\n"
-                        + "row => !record { name_type: raw  fields: [ { name: a  type: text } ] }",
+                        + "row => !record { name_type: raw  fields: { a => { type: text } } }",
                 "raw => !identifier_type { normalization: NONE }\nkinds => !enum_type { name_type: raw  members: [a] }",
                 "folded => !identifier_type { normalization: ASCII_CASEFOLD }\n"
-                        + "row => !record { name_type: folded  fields: [ { name: a  type: text } ] }"}) {
+                        + "row => !record { name_type: folded  fields: { a => { type: text } } }"}) {
             var thrown = org.junit.jupiter.api.Assertions.assertThrows(
                     io.ltr8.tson.base.SchemaValidationException.class,
                     () -> Tson.standard().resolve(schema("forms", body)), body);
@@ -222,7 +222,7 @@ class FieldNameTypeTest {
               header => !identifier_type { start: NONE  continue: NONE  normalization: ASCII_CASEFOLD
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789"
                 medial: "-" }
-              headers => !record { name_type: header  fields: [ { name: "content-type"  type: text } ] }
+              headers => !record { name_type: header  fields: { "content-type" => { type: text } } }
             """));
     }
 
@@ -234,7 +234,7 @@ class FieldNameTypeTest {
     void anAsciiBaseMakesAnHttpFieldNameOneLine() {
         String headers = schema("headers", """
               header => !identifier_type { start: ASCII  continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD }
-              headers => !record { name_type: header  fields: [ { name: "content-type"  type: text } ] }
+              headers => !record { name_type: header  fields: { "content-type" => { type: text } } }
             """);
         assertEquals(List.of(), read(headers, "headers", "!headers { \"Content-Type\": \"text/plain\" }"));
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, only(read(headers, "headers",
@@ -246,12 +246,12 @@ class FieldNameTypeTest {
     void aNameOutsideTheRecordsTypeIsRefusedAtSchemaLoad() {
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("default", """
-                      node => !record { fields: [ { name: "@id"  type: text } ] }
+                      node => !record { fields: { "@id" => { type: text } } }
                     """)));
         assertTrue(thrown.getMessage().contains("field name '@id' is not an identifier"), thrown.getMessage());
         org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("number", """
-                      node => !record { name_type: int32  fields: [ { name: "1"  type: text } ] }
+                      node => !record { name_type: int32  fields: { "1" => { type: text } } }
                     """)));
     }
 
@@ -260,8 +260,8 @@ class FieldNameTypeTest {
     void aCompositionAndARefinementInheritTheFieldNameType() {
         var schema = Tson.standard().resolve(schema("inherit", """
               json_name => !identifier_type { start_add: "@$" }
-              node => !record { name_type: json_name  fields: [
-                { name: "@id"  type: text }  { name: "$ref"  type: text  optional: true } ] }
+              node => !record { name_type: json_name  fields: {
+                "@id" => { type: text }  "$ref" => { type: text  optional: true } } }
               labelled => node & { label: text }
               tightened => node ^ { "$ref": text }
             """));
@@ -279,7 +279,7 @@ class FieldNameTypeTest {
     void aFieldlessBaseGivesItsCompositionsTheirFieldNameType() {
         String mixin = schema("mixin", """
                   json_name => !identifier_type { start_add: "@$" }
-                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
                   node => json_record & { "@id": text  label: text }
                   holder => { n: node }
                 """);
@@ -297,11 +297,11 @@ class FieldNameTypeTest {
     void aTemplateHoldsAndClosesNamesThatAreNoIdentifiers() {
         String templates = schema("templates", """
                   json_name => !identifier_type { start_add: "@" }
-                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
                   page => <T> json_record & { "@id": T  "@type"?: text }
                   p => page<text>
                   words => !identifier_type { continue_add: "-"  medial: " " }
-                  row => <T> !record { name_type: words  fields: [ { name: "first name"  type: T } ] }
+                  row => <T> !record { name_type: words  fields: { "first name" => { type: T } } }
                   r => row<text>
                 """);
         assertEquals(List.of(), read(templates, "templates", "!p { \"@id\": \"x\" }"));
@@ -324,10 +324,10 @@ class FieldNameTypeTest {
         String explicit = schema("explicit", """
                   json_name => !identifier_type { start_add: "@" }
                   other => !identifier_type { start_add: "$" }
-                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
-                  n => !record { supertypes: [json_record]  fields: [ { name: "@id"  type: text } ] }
+                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
+                  n => !record { supertypes: [json_record]  fields: { "@id" => { type: text } } }
                   folded => !identifier_type { normalization: NFKC_CASEFOLD }
-                  fbase => !record { name_type: folded  extension: ABSTRACT  fields: [] }
+                  fbase => !record { name_type: folded  extension: ABSTRACT  fields: {} }
                   box => <T> fbase & { name: T }
                   b => box<text>
                 """);
@@ -337,8 +337,8 @@ class FieldNameTypeTest {
                 () -> Tson.standard().resolve(schema("restated", """
                       json_name => !identifier_type { start_add: "@" }
                       other => !identifier_type { start_add: "$" }
-                      json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
-                      n => !record { name_type: other  supertypes: [json_record]  fields: [] }
+                      json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
+                      n => !record { name_type: other  supertypes: [json_record]  fields: {} }
                     """)));
         assertTrue(thrown.getMessage().contains("is not its supertypes' 'json_name'"), thrown.getMessage());
     }
@@ -370,10 +370,10 @@ class FieldNameTypeTest {
         Tson.standard().resolve(schema("aliases", """
               json_name => !identifier_type { start_add: "@" }
               jn => json_name
-              a => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
-              b => !record { name_type: jn  extension: ABSTRACT  fields: [] }
+              a => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
+              b => !record { name_type: jn  extension: ABSTRACT  fields: {} }
               ab => a & b & { "@id": text }
-              i => !record { name_type: identifier  extension: ABSTRACT  fields: [] }
+              i => !record { name_type: identifier  extension: ABSTRACT  fields: {} }
               plain => { x: text }
               ip => i & plain
             """));
@@ -387,10 +387,10 @@ class FieldNameTypeTest {
     @Test
     void aSchemasOwnReferencesMatchItsFieldNamesExactly() {
         for (String body : new String[] {
-                "row => !record { name_type: folded  fields: [ { name: name  type: text  optional: true }\n"
-                        + "  { name: email  type: text  optional: true } ]\n"
+                "row => !record { name_type: folded  fields: { name => { type: text  optional: true }\n"
+                        + "  email => { type: text  optional: true } }\n"
                         + "  groups: [ { members: [ [NAME] [email] ] } ] }",
-                "row => !record { name_type: folded  fields: [ { name: name  type: text } ] }\n"
+                "row => !record { name_type: folded  fields: { name => { type: text } } }\n"
                         + "tight => row ^ { NAME: text }"}) {
             org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                     () -> Tson.standard().resolve(schema("exact",
@@ -419,13 +419,13 @@ class FieldNameTypeTest {
     void aStatedNameTypeResolvesInTheAuthorsSchemaFirst() {
         String local = schema("local-field-name", """
               field_name => !identifier_type { start_add: "@" }
-              stated => !record { name_type: field_name  fields: [ { name: "@id"  type: text } ] }
+              stated => !record { name_type: field_name  fields: { "@id" => { type: text } } }
             """);
         assertEquals(List.of(), read(local, "local-field-name", "!stated { \"@id\": \"x\" }"));
         org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("absent", """
                       field_name => !identifier_type { start_add: "@" }
-                      absent => !record { fields: [ { name: "@id"  type: text } ] }
+                      absent => !record { fields: { "@id" => { type: text } } }
                     """)));
     }
 
@@ -436,8 +436,8 @@ class FieldNameTypeTest {
                 () -> Tson.standard().resolve(schema("disagree", """
                       json_name => !identifier_type { start_add: "@$" }
                       words => !identifier_type { medial: " " }
-                      node => !record { name_type: json_name  fields: [ { name: "@id"  type: text } ] }
-                      row => !record { name_type: words  fields: [ { name: "first name"  type: text } ] }
+                      node => !record { name_type: json_name  fields: { "@id" => { type: text } } }
+                      row => !record { name_type: words  fields: { "first name" => { type: text } } }
                       both => node & row & {}
                     """)));
         assertTrue(thrown.getMessage().contains("have different name types"), thrown.getMessage());
@@ -453,7 +453,7 @@ class FieldNameTypeTest {
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("mixed", """
                       json_name => !identifier_type { start_add: "@$" }
-                      json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+                      json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
                       address => { city: text }
                       node => json_record & address & { "@id": text }
                     """)));
@@ -461,7 +461,7 @@ class FieldNameTypeTest {
 
         String declared = schema("declared", """
                   json_name => !identifier_type { start_add: "@$" }
-                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
                   address => json_record & { city: text }
                   node => json_record & address & { "@id": text }
                 """);
@@ -477,7 +477,7 @@ class FieldNameTypeTest {
     void aFieldNameIsMatchedInItsNameTypesForm() {
         String folded = schema("folded", """
                   folded => !identifier_type { normalization: NFKC_CASEFOLD }
-                  row => !record { name_type: folded  fields: [ { name: name  type: text } ] }
+                  row => !record { name_type: folded  fields: { name => { type: text } } }
                 """);
         assertEquals(List.of(), read(folded, "folded", "!row { NAME: \"x\" }"));
         assertEquals(Diagnostic.Code.DUPLICATE_FIELD, only(read(folded, "folded",
@@ -493,7 +493,7 @@ class FieldNameTypeTest {
     void aFoldedNamesPathIsTheNameAsWritten() {
         String folded = schema("folded-path", """
                   folded => !identifier_type { normalization: NFKC_CASEFOLD }
-                  row => !record { name_type: folded  fields: [ { name: count  type: int32 } ] }
+                  row => !record { name_type: folded  fields: { count => { type: int32 } } }
                 """);
         Diagnostic wrong = only(read(folded, "folded-path", "!row { COUNT: x }"));
         assertEquals("/COUNT", wrong.path().orElseThrow());
@@ -509,7 +509,7 @@ class FieldNameTypeTest {
     void aSelectorIsMatchedInItsBasesNameForm() {
         String family = schema("folded-family", """
                   folded => !identifier_type { normalization: NFKC_CASEFOLD }
-                  base => !record { name_type: folded  extension: ABSTRACT  fields: [] }
+                  base => !record { name_type: folded  extension: ABSTRACT  fields: {} }
                   pet => abstract base & { kind: text =?  name: text }
                   dog => pet & { kind?: = "dog"  breed: text }
                   holder => { p: pet }

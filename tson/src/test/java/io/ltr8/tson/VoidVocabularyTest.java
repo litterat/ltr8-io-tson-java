@@ -30,8 +30,8 @@ class VoidVocabularyTest {
               entries => !map { key_type: text  value_type: int32  voidable: true }
               pair    => !tuple { elements: [{ element_type: int32 } { element_type: text  voidable: true }] }
               one     => { only: voidable_tuple1<int32> }
-              contact => !record { fields: [ { name: email  type: text  optional: true }
-                                             { name: phone  type: text  optional: true } ]
+              contact => !record { fields: { email => { type: text  optional: true }
+                                             phone => { type: text  optional: true } }
                                    groups: [ { members: [[email] [phone]]  optional: true } ] }
             }
             """;

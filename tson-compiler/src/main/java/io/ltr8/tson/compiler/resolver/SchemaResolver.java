@@ -873,7 +873,7 @@ public final class SchemaResolver {
     private static TypeDefinition unresolved(Optional<SourcePosition> position, List<String> parameters) {
         // An open placeholder holds its body like every other open entry, so nothing downstream has to keep
         // a second substitution path for the one shape that did not -- see WireForm.heldEmptyRecord.
-        Top body = parameters.isEmpty() ? RecordBody.of(List.of())
+        Top body = parameters.isEmpty() ? RecordBody.of(new java.util.LinkedHashMap<>())
                 : HeldBody.held(parameters, WireForm.heldEmptyRecord());
         return new TypeDefinition(Optional.empty(),
                 parameters.isEmpty() ? TypeKind.PRODUCT : TypeKind.TEMPLATE, List.of(), List.of(), body, position, Annotations.empty());

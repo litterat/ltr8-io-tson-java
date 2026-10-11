@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=ebc246b5185d8d7c7829113f9c8a242324452542dc2ad32f11a4bbdbe0adde12"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=97a563ace4f0d2ae6303c84d050b527cf28db4ea5b7255e1149f723875157c01"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -569,12 +569,13 @@
     void, the void sentinel `_` written in its place; `role`, what `value` is
     for; and `value`, a concrete default or fixed value read against the field's
     declared type — for a type_ref-typed slot, a reference in the bare
-    positional form. Each is one mark of the spelling `name?: type? ~ value`:
-    the name's `?`, the type's `?`, and `~` or `=` with its value. What omission
-    yields is derived, never stored: a missing field that is not optional is an
-    error, and a missing optional one with a value has it injected — except at a
-    field group's member, whose presence is the group's and which is never
-    supplied.
+    positional form. Its name is not among them: a field is a value of
+    `record.fields`, keyed by its name. Each fact is one mark of the spelling
+    `name?: type? ~ value`: the name's `?`, the type's `?`, and `~` or `=` with
+    its value. What omission yields is derived, never stored: a missing field
+    that is not optional is an error, and a missing optional one with a value
+    has it injected — except at a field group's member, whose presence is the
+    group's and which is never supplied.
 
     Within a template body it also carries a parameter, and needs no label to do
     so: a token there is a parameter exactly when its text resolves into the
@@ -603,7 +604,6 @@
     container's part is never missing, so a container has no `optional`.
     """
   record_field => {
-    name:      text
     type:      type_ref
     optional?: boolean ~ false
     voidable?: boolean ~ false
@@ -624,8 +624,8 @@
     Field group — a presence rule over fields of a record ([TSON-SCHEMA]
     §5.11). `members` lists the group's options in source order, each the
     fields it holds; a group has at least one option, and an option at least
-    one field. Every member is declared in the enclosing record's `fields`
-    list, `optional` there and carrying no value, and sits in one option of one
+    one field. Every member is declared in the enclosing record's `fields`,
+    `optional` there and carrying no value, and sits in one option of one
     group. An option is chosen when any of its members is present.
 
     `optional_members` names the members that may be missing once their option
@@ -642,6 +642,15 @@
     optional_members?: [text; 1..]
     optional?:         boolean ~ false
   }
+
+  @doc:"""
+    The fields of a record ([TSON-SCHEMA] §5.2): each field's name mapped to its
+    facts, in declaration order, which is part of the value. A name is written
+    once, by its spelling, as the key; two spellings that are one value of the
+    record's `name_type` are a resolver error. The keys are `text`, each judged
+    by that `name_type`.
+    """
+  field_map => !map { key_type: text  value_type: record_field  ordered: true }
 
   @doc:"""
     A record: named fields, fixed by the type, with the field groups over them.
@@ -683,7 +692,7 @@
   record => product & {
     access_pattern?: product_access_type = NAMED
     size_type?:      product_size_type = FIXED
-    fields:          [record_field]
+    fields:          field_map
     groups?:         [field_group]
     extension?:      record_extension_type ~ OPEN
     supertypes?:     [type_ref]

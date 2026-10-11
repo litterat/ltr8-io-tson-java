@@ -101,14 +101,14 @@ class DefinitionResolverTest {
 
     private static final String EXPECTED_INTEGER_SIZE =
             "{ supertypes: [] subtypes: [] "
-                    + "body: !record { supertypes: [] fields: [ "
-                    + "{ name: \"bits\" type: { name: \"integer\" arguments: [] } "
+                    + "body: !record { supertypes: [] fields: { "
+                    + "\"bits\" => { type: { name: \"integer\" arguments: [] } "
                     + "optional: false voidable: false role: \"FREE\" "
                     + "} "
-                    + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } "
+                    + "\"signed\" => { type: { name: \"boolean\" arguments: [] } "
                     + "optional: false voidable: false role: \"FREE\" "
                     + "} "
-                    + "] groups: [] extension: \"OPEN\" discriminators: [] } }";
+                    + "} groups: [] extension: \"OPEN\" discriminators: [] } }";
 
     /**
      * The same shape as the real fixture resolves it. meta-kernel types {@code bits} as a count rather than
@@ -116,8 +116,8 @@ class DefinitionResolverTest {
      * about the kernel's own field types -- keep the plainer spelling.
      */
     private static final String EXPECTED_FIXTURE_INTEGER_SIZE =
-            EXPECTED_INTEGER_SIZE.replace("{ name: \"bits\" type: { name: \"integer\"",
-                    "{ name: \"bits\" type: { name: \"non_negative_integer\"");
+            EXPECTED_INTEGER_SIZE.replace("\"bits\" => { type: { name: \"integer\"",
+                    "\"bits\" => { type: { name: \"non_negative_integer\"");
 
     /** Throws if ever actually invoked -- most tests below never reach {@code Instance}/{@code AtomRefinement} binding at all; the ones that do build their own {@link DefinitionResolver} wrapping a real compiled reader instead of using this field. */
     private static final DefinitionMetaReader NEVER_CALLED = (type, value) -> {
@@ -321,7 +321,7 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.PRODUCT, top.kind());
         assertEquals(List.of(), top.supertypes());
         assertEquals("{ supertypes: [] subtypes: [] "
-                + "body: !record { supertypes: [] fields: [] groups: [] extension: \"OPEN\" "
+                + "body: !record { supertypes: [] fields: {} groups: [] extension: \"OPEN\" "
                 + "discriminators: [] } }", write(top));
     }
 
@@ -354,29 +354,29 @@ class DefinitionResolverTest {
 
         // atom, sum: empty trailing body, no fields inherited from type (which has none) -- just the composition itself.
         assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: [] groups: [] "
+                + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: {} groups: [] "
                 + "extension: \"OPEN\" discriminators: [] } }", write(atom));
         assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: [] groups: [] "
+                + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: {} groups: [] "
                 + "extension: \"OPEN\" discriminators: [] } }", write(sum));
 
         // product: two brand-new fields added by the trailing body (type contributes none).
         assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: [ "
-                + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: { "
+                + "\"access_pattern\" => { type: { name: \"product_access_type\" arguments: [] } "
                 + "optional: false voidable: false role: \"FREE\" "
                 + "} "
-                + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                + "\"size_type\" => { type: { name: \"product_size_type\" arguments: [] } "
                 + "optional: false voidable: false role: \"FREE\" "
                 + "} "
-                + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(product));
+                + "} groups: [] extension: \"OPEN\" discriminators: [] } }", write(product));
 
         // reference: one brand-new field.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
-                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } "
+                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: { "
+                + "\"target\" => { type: { name: \"type_ref\" arguments: [] } "
                 + "optional: false voidable: false role: \"FREE\" } "
-                + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(reference));
+                + "} groups: [] extension: \"OPEN\" discriminators: [] } }", write(reference));
     }
 
     // ── Field groups (§5.11) + constructor flag + OPTIONAL fields: integer_type ──
@@ -397,28 +397,28 @@ class DefinitionResolverTest {
         assertEquals(List.of("atom", "type", "top"), integerType.supertypes());
 
         assertEquals("{ supertypes: [ \"atom\" \"type\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
-                        + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } "
+                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: { "
+                        + "\"size\" => { type: { name: \"integer_size\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"min\" type: { name: \"integer\" arguments: [] } "
+                        + "\"min\" => { type: { name: \"integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } "
+                        + "\"exclusive_min\" => { type: { name: \"integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"max\" type: { name: \"integer\" arguments: [] } "
+                        + "\"max\" => { type: { name: \"integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } "
+                        + "\"exclusive_max\" => { type: { name: \"integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "\"multiple_of\" => { type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } "
+                        + "\"members\" => { type: { name: \"integer_member_set\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
-                        + "} ] "
+                        + "} } "
                         + "groups: [ "
                         + "{ members: [ [ \"min\" ] [ \"exclusive_min\" ] ] optional_members: [] optional: true } "
                         + "{ members: [ [ \"max\" ] [ \"exclusive_max\" ] ] optional_members: [] optional: true } "
@@ -570,8 +570,8 @@ class DefinitionResolverTest {
         assertEquals("{ source: { name: \"record\" arguments: [] } "
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ " + typeParameter("A") + " " + typeParameter("B") + " ] "
-                        + "template: \"!record { fields: [ "
-                        + "{ name: first type: A } { name: second type: B } ] }\" "
+                        + "template: \"!record { fields: { "
+                        + "first => { type: A } second => { type: B } } }\" "
                         + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(pair));
     }
@@ -582,14 +582,14 @@ class DefinitionResolverTest {
         TypeDefinition pair = resolveSnippet("pair => { first: text  second: text }");
 
         assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"first\" type: { name: \"text\" arguments: [] } "
+                        + "body: !record { supertypes: [] fields: { "
+                        + "\"first\" => { type: { name: \"text\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"second\" type: { name: \"text\" arguments: [] } "
+                        + "\"second\" => { type: { name: \"text\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                        + "} groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pair));
     }
 
@@ -616,7 +616,7 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"base\" ] "
                         + "subtypes: [] body: !template { parameters: [ " + typeParameter("T") + " ] "
                         + "template: \"!record { supertypes: [ base ] "
-                        + "fields: [ { name: value type: T } ] }\" "
+                        + "fields: { value => { type: T } } }\" "
                         + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(box));
     }
@@ -638,7 +638,7 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"base\" ] "
                         + "subtypes: [] body: !template { parameters: [ " + typeParameter("T") + " ] "
                         + "template: \"!record { supertypes: [ base ] "
-                        + "fields: [ { name: id type: text } { name: value type: T } ] }\" "
+                        + "fields: { id => { type: text } value => { type: T } } }\" "
                         + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(entries.get("box")));
     }
@@ -654,15 +654,15 @@ class DefinitionResolverTest {
         TypeDefinition tupleElement = resolver.resolve(schemaMap.declarations().get("tuple_element"));
 
         assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "body: !record { supertypes: [] fields: { "
+                        + "\"element_type\" => { type: { name: \"type_ref\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"voidable\" type: { name: \"boolean\" arguments: [] } "
+                        + "\"voidable\" => { type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" "
                         + ""
                         + "value: false } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                        + "} groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(tupleElement));
     }
 
@@ -679,18 +679,18 @@ class DefinitionResolverTest {
         TypeDefinition fieldGroup = resolver.resolve(schemaMap.declarations().get("field_group"));
 
         assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"members\" type: { name: \"array_array_text_1_3600e7d5_1_1b8fef23\" "
+                        + "body: !record { supertypes: [] fields: { "
+                        + "\"members\" => { type: { name: \"array_array_text_1_3600e7d5_1_1b8fef23\" "
                         + "arguments: [] } optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"optional_members\" type: { name: \"array_text_1_3600e7d5\" arguments: [] } "
+                        + "\"optional_members\" => { type: { name: \"array_text_1_3600e7d5\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"optional\" type: { name: \"boolean\" arguments: [] } "
+                        + "\"optional\" => { type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" "
                         + ""
                         + "value: false } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                        + "} groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(fieldGroup));
     }
 
@@ -701,10 +701,10 @@ class DefinitionResolverTest {
         TypeDefinition pinned = resolveSnippet("pinned => { access_pattern?: product_access_type = INDEX }");
 
         assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                        + "body: !record { supertypes: [] fields: { "
+                        + "\"access_pattern\" => { type: { name: \"product_access_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                        + "} groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pinned));
     }
 
@@ -730,8 +730,8 @@ class DefinitionResolverTest {
         assertEquals("{ source: { name: \"record\" arguments: [] } "
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ " + typeParameter("T") + " ] "
-                        + "template: \"!record { fields: [ "
-                        + "{ name: value type: type_ref value: T } ] "
+                        + "template: \"!record { fields: { "
+                        + "value => { type: type_ref value: T } } "
                         + "discriminators: [ value ] }\" "
                         + "extension: \"ABSTRACT\" discriminators: [ \"value\" ] } }",
                 write(sized));
@@ -748,8 +748,8 @@ class DefinitionResolverTest {
         assertEquals("{ source: { name: \"record\" arguments: [] } "
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ " + typeParameter("N") + " ] "
-                        + "template: \"!record { fields: [ "
-                        + "{ name: attempts type: integer optional: true role: DEFAULT value: N } ] }\" "
+                        + "template: \"!record { fields: { "
+                        + "attempts => { type: integer optional: true role: DEFAULT value: N } } }\" "
                         + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(retry));
     }
@@ -775,26 +775,26 @@ class DefinitionResolverTest {
         assertEquals(List.of("product", "type", "top"), array.supertypes());
         assertEquals("{ "
                         + "supertypes: [ \"product\" \"type\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
-                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                        + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: { "
+                        + "\"access_pattern\" => { type: { name: \"product_access_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
-                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                        + "\"size_type\" => { type: { name: \"product_size_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "\"element_type\" => { type: { name: \"type_ref\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "{ name: \"voidable\" type: { name: \"boolean\" arguments: [] } "
+                        + "\"voidable\" => { type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } "
-                        + "{ name: \"ordered\" type: { name: \"boolean\" arguments: [] } "
+                        + "\"ordered\" => { type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" value: true } "
-                        + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
+                        + "\"unique_items\" => { type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "\"min_items\" => { type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "\"max_items\" => { type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                        + "} groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(array));
     }
 
@@ -814,26 +814,26 @@ class DefinitionResolverTest {
         assertEquals(List.of("product", "type", "top"), map.supertypes());
         assertEquals("{ "
                         + "supertypes: [ \"product\" \"type\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
-                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                        + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: { "
+                        + "\"access_pattern\" => { type: { name: \"product_access_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: NAMED } "
-                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                        + "\"size_type\" => { type: { name: \"product_size_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
-                        + "{ name: \"key_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "\"key_type\" => { type: { name: \"type_ref\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "{ name: \"value_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "\"value_type\" => { type: { name: \"type_ref\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "{ name: \"voidable\" type: { name: \"boolean\" arguments: [] } "
+                        + "\"voidable\" => { type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } "
-                        + "{ name: \"ordered\" type: { name: \"boolean\" arguments: [] } "
+                        + "\"ordered\" => { type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "\"min_items\" => { type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "\"max_items\" => { type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                        + "} groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(map));
     }
 
@@ -869,15 +869,15 @@ class DefinitionResolverTest {
         TypeDefinition production = resolver.resolve(schemaMap.declarations().get("production"));
 
         assertEquals("{ supertypes: [ \"config\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"config\" arguments: [] } ] fields: [ "
-                        + "{ name: \"host\" type: { name: \"text\" arguments: [] } "
+                        + "body: !record { supertypes: [ { name: \"config\" arguments: [] } ] fields: { "
+                        + "\"host\" => { type: { name: \"text\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" "
                         + ""
                         + "value: \"prod.example.com\" } "
-                        + "{ name: \"port\" type: { name: \"integer\" arguments: [] } "
+                        + "\"port\" => { type: { name: \"integer\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                        + "} groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(production));
     }
 
@@ -928,26 +928,26 @@ class DefinitionResolverTest {
         assertEquals("{ source: { name: \"array\" arguments: [] } "
                         + ""
                         + "supertypes: [ \"array\" \"product\" \"type\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                        + "body: !record { supertypes: [] fields: { "
+                        + "\"access_pattern\" => { type: { name: \"product_access_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
-                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                        + "\"size_type\" => { type: { name: \"product_size_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "\"element_type\" => { type: { name: \"type_ref\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "{ name: \"voidable\" type: { name: \"boolean\" arguments: [] } "
+                        + "\"voidable\" => { type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: false } "
-                        + "{ name: \"ordered\" type: { name: \"boolean\" arguments: [] } "
+                        + "\"ordered\" => { type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: false } "
-                        + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
+                        + "\"unique_items\" => { type: { name: \"boolean\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: true } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "\"min_items\" => { type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
+                        + "\"max_items\" => { type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                        + "} groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(set));
     }
 
@@ -990,12 +990,12 @@ class DefinitionResolverTest {
         // enum_type => atom & { type: type_name  members: enum_set }: the constructor, `type` required.
         assertEquals(TypeKind.ATOM, enumType.kind());
         assertEquals("{ supertypes: [ \"atom\" \"type\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
-                        + "{ name: \"name_type\" type: { name: \"type_name\" arguments: [] } "
+                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: { "
+                        + "\"name_type\" => { type: { name: \"type_name\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
+                        + "\"members\" => { type: { name: \"enum_set\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                        + "} groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(enumType));
         // enum => enum_type ^ { name_type?: = identifier }: a constructor tightening, `name_type` pinned and injected, so
         // `members` is the one unmarked field and `!enum [A B]` stays the positional form.
@@ -1003,12 +1003,12 @@ class DefinitionResolverTest {
         assertEquals(List.of("enum_type", "atom", "type", "top"), enumDef.supertypes());
         assertEquals("{ source: { name: \"enum_type\" arguments: [] } "
                         + "supertypes: [ \"enum_type\" \"atom\" \"type\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"name_type\" type: { name: \"type_name\" arguments: [] } "
+                        + "body: !record { supertypes: [] fields: { "
+                        + "\"name_type\" => { type: { name: \"type_name\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: identifier } "
-                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
+                        + "\"members\" => { type: { name: \"enum_set\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+                        + "} groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(enumDef));
     }
 
@@ -1781,8 +1781,8 @@ class DefinitionResolverTest {
         RecordBody body = bodyOf(entries.get("strict"));
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), false)), body.groups());
         assertEquals(List.of("a", "min", "exclusive_min"), fieldNames(entries.get("strict")));
-        assertEquals("optional", body.fields().get(1).describe());
-        assertEquals("optional", body.fields().get(2).describe());
+        assertEquals("optional", body.fields().values().stream().toList().get(1).describe());
+        assertEquals("optional", body.fields().values().stream().toList().get(2).describe());
         // the source keeps its own OPTIONAL group -- the restatement builds a new list, it does not edit it
         assertTrue(bodyOf(entries.get("bounds")).groups().get(0).optional());
     }
@@ -1891,18 +1891,24 @@ class DefinitionResolverTest {
                 }
                 """).get("config"));
 
-        assertEquals(RecordField.required("host", TypeRef.of("text")), body.fields().get(0));
-        assertEquals(RecordField.defaulted("port", TypeRef.of("integer"), new Token("8080", Token.Form.UNQUOTED)),
-                body.fields().get(1));
-        assertEquals(RecordField.fixed("debug", TypeRef.of("boolean"), new Token("false", Token.Form.UNQUOTED)),
-                body.fields().get(2));
-        assertEquals(RecordField.optionalVoidable("label", TypeRef.of("text")), body.fields().get(3));
-        assertEquals(RecordField.marker("version", TypeRef.of("text"), new Token("2.0", Token.Form.SINGLE_LINE_QUOTED)),
-                body.fields().get(4));
-        assertEquals(RecordField.voidable("note", TypeRef.of("text")), body.fields().get(5));
-        assertEquals(new RecordField("timeout", TypeRef.of("integer"), true, true, FieldRole.DEFAULT,
-                Optional.of(new Token("30", Token.Form.UNQUOTED))), body.fields().get(6));
-        assertEquals(RecordField.optionalVoidable("extra", TypeRef.of("void")), body.fields().get(7));
+        assertEquals(Map.entry("host", RecordField.required(TypeRef.of("text"))),
+                body.fields().sequencedEntrySet().stream().toList().get(0));
+        assertEquals(Map.entry("port", RecordField.defaulted(TypeRef.of("integer"), new Token("8080", Token.Form.UNQUOTED))),
+                body.fields().sequencedEntrySet().stream().toList().get(1));
+        assertEquals(Map.entry("debug", RecordField.fixed(TypeRef.of("boolean"), new Token("false", Token.Form.UNQUOTED))),
+                body.fields().sequencedEntrySet().stream().toList().get(2));
+        assertEquals(Map.entry("label", RecordField.optionalVoidable(TypeRef.of("text"))),
+                body.fields().sequencedEntrySet().stream().toList().get(3));
+        assertEquals(Map.entry("version", RecordField.marker(TypeRef.of("text"),
+                new Token("2.0", Token.Form.SINGLE_LINE_QUOTED))),
+                body.fields().sequencedEntrySet().stream().toList().get(4));
+        assertEquals(Map.entry("note", RecordField.voidable(TypeRef.of("text"))),
+                body.fields().sequencedEntrySet().stream().toList().get(5));
+        assertEquals(Map.entry("timeout", new RecordField(TypeRef.of("integer"), true, true, FieldRole.DEFAULT,
+                Optional.of(new Token("30", Token.Form.UNQUOTED)))),
+                        body.fields().sequencedEntrySet().stream().toList().get(6));
+        assertEquals(Map.entry("extra", RecordField.optionalVoidable(TypeRef.of("void"))),
+                body.fields().sequencedEntrySet().stream().toList().get(7));
     }
 
     /**
@@ -1940,8 +1946,8 @@ class DefinitionResolverTest {
                 anonymous => base ^ { nickname?: void? }
                 """);
 
-        RecordField nickname = bodyOf(entries.get("anonymous")).fields().get(1);
-        assertEquals(RecordField.optionalVoidable("nickname", TypeRef.of("void")), nickname);
+        RecordField nickname = bodyOf(entries.get("anonymous")).fields().values().stream().toList().get(1);
+        assertEquals(RecordField.optionalVoidable(TypeRef.of("void")), nickname);
         // unlike removal (§5.9), IS-A survives -- the field is still in the contract
         assertEquals(List.of("base"), entries.get("anonymous").supertypes());
         assertEquals(List.of("name", "nickname"), fieldNames(entries.get("anonymous")));
@@ -1996,10 +2002,10 @@ class DefinitionResolverTest {
         RecordBody body = bodyOf(resolveAll(BOUNDS
                 + "  pinned => bounds ^ { min: = 0  exclusive_min: integer = 1 }").get("pinned"));
 
-        RecordField min = body.fields().get(1);
-        assertEquals(RecordField.fixed("min", TypeRef.of("integer"), new Token("0", Token.Form.UNQUOTED)), min);
+        RecordField min = body.fields().values().stream().toList().get(1);
+        assertEquals(RecordField.fixed(TypeRef.of("integer"), new Token("0", Token.Form.UNQUOTED)), min);
         assertEquals(RecordField.Omitted.NOTHING, min.omitted(true));
-        assertEquals("fixed", body.fields().get(2).describe());
+        assertEquals("fixed", body.fields().values().stream().toList().get(2).describe());
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), true)), body.groups());
     }
 
@@ -2028,7 +2034,7 @@ class DefinitionResolverTest {
         RecordBody body = bodyOf(resolveAll(FRAGMENT).get("fragment"));
         assertEquals(List.of(group(List.of(List.of("include"), List.of("name", "type")), List.of("name", "type"),
                 false)), body.groups());
-        assertTrue(body.fields().stream().allMatch(RecordField::optional), "members are optional fields");
+        assertTrue(body.fields().values().stream().allMatch(RecordField::optional), "members are optional fields");
     }
 
     /** {@code +} lowers to one REQUIRED option, every member optional within it. */
@@ -2044,7 +2050,7 @@ class DefinitionResolverTest {
     void aRestatedMemberWithoutItsMarkIsRequiredInItsOption() {
         RecordBody body = bodyOf(resolveAll(FRAGMENT + "  strict => fragment ^ { name: text }").get("strict"));
         assertEquals(List.of("type"), body.groups().getFirst().optionalMembers());
-        assertTrue(body.fields().stream().allMatch(RecordField::optional), "and still an optional field");
+        assertTrue(body.fields().values().stream().allMatch(RecordField::optional), "and still an optional field");
 
         RecordBody kept = bodyOf(resolveAll(FRAGMENT + "  same => fragment ^ { name?: text }").get("same"));
         assertEquals(List.of("name", "type"), kept.groups().getFirst().optionalMembers());
@@ -2094,11 +2100,12 @@ class DefinitionResolverTest {
 
         RecordBody noSocket = bodyOf(entries.get("no_socket"));
         assertEquals(List.of(), noSocket.groups());
-        assertEquals(List.of("required", "required"), noSocket.fields().stream().map(RecordField::describe).toList());
+        assertEquals(List.of("required", "required"), noSocket.fields()
+                .values().stream().map(RecordField::describe).toList());
 
         RecordBody noB = bodyOf(entries.get("no_b"));
         assertEquals(List.of(), noB.groups());
-        assertEquals("optional", noB.fields().getFirst().describe());
+        assertEquals("optional", noB.fields().sequencedValues().getFirst().describe());
     }
 
     // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
@@ -2237,7 +2244,7 @@ class DefinitionResolverTest {
     }
 
     private static List<String> fieldNames(TypeDefinition definition) {
-        return bodyOf(definition).fields().stream().map(RecordField::name).toList();
+        return bodyOf(definition).fields().keySet().stream().toList();
     }
 
     /**
@@ -2287,7 +2294,7 @@ class DefinitionResolverTest {
         TypeDefinition view = entries.get("account_view");
         assertEquals(List.of("name", "email"), fieldNames(view));
         // the tightening replaced the inherited field in place, and removal ran afterwards
-        assertEquals("defaulted", bodyOf(view).fields().get(1).describe());
+        assertEquals("defaulted", bodyOf(view).fields().values().stream().toList().get(1).describe());
     }
 
     /**
@@ -2336,7 +2343,7 @@ class DefinitionResolverTest {
         TypeDefinition dissolved = entries.get("one_bound");
         assertEquals(List.of("a", "min"), fieldNames(dissolved));
         assertEquals(List.of(), bodyOf(dissolved).groups());
-        assertEquals("required", bodyOf(dissolved).fields().get(1).describe());
+        assertEquals("required", bodyOf(dissolved).fields().values().stream().toList().get(1).describe());
         // the source still has both members and its group
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), false)),
                 bodyOf(entries.get("bounds")).groups());
@@ -2350,7 +2357,7 @@ class DefinitionResolverTest {
                 one_bound => bounds - { exclusive_min }
                 """);
 
-        assertEquals("optional", bodyOf(entries.get("one_bound")).fields().get(1).describe());
+        assertEquals("optional", bodyOf(entries.get("one_bound")).fields().values().stream().toList().get(1).describe());
     }
 
     /** Three members less one is still a group: two members left, state untouched. */
@@ -2429,7 +2436,7 @@ class DefinitionResolverTest {
         RecordBody body = assertInstanceOf(RecordBody.class, pet.body());
 
         assertTrue(pet.annotations().isEmpty(), "the definition mark is gone from the channel");
-        assertTrue(body.fields().get(0).annotations().isEmpty(), "and so is the field mark");
+        assertTrue(body.fields().values().stream().toList().get(0).annotations().isEmpty(), "and so is the field mark");
     }
 
     /**
@@ -2488,7 +2495,8 @@ class DefinitionResolverTest {
                 pet => abstract { pet_type: text =?  name: text }
                 dog => pet & { pet_type?: = "dog"  breed: text }""").body());
 
-        RecordField pinned = dog.fields().stream().filter(f -> f.name().equals("pet_type")).findFirst()
+        RecordField pinned = dog.fields().entrySet().stream().filter(f -> f.getKey().equals("pet_type"))
+                .map(Map.Entry::getValue).findFirst()
                 .orElseThrow();
         assertEquals("fixed", pinned.describe(), "the member pins the selector");
         assertTrue(dog.discriminators().isEmpty(), "and the mark stays with the base that declared it");

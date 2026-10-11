@@ -36,8 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
  * {@code integer}, {@code text}/{@code iri}/{@code regex}, and six {@code enum} instances,
  * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
- * resolve to the expected kind/body -- all 58 of the real fixture's declarations resolve, alongside the
- * nine entries {@link SchemaDesugarer} injects for their argument-bearing applications.
+ * resolve to the expected kind/body -- all 60 of the real fixture's declarations resolve, alongside the
+ * eight entries {@link SchemaDesugarer} injects for their argument-bearing applications.
  */
 class MetaKernelBootstrapResolverTest {
 
@@ -137,21 +137,21 @@ class MetaKernelBootstrapResolverTest {
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is the 59 declarations the fixture writes plus one injected declaration per distinct sugar form
-     * within them -- nine {@code array} entries from §5.3's {@code [X]} field-type sugar. They are the same
+     * output is the 60 declarations the fixture writes plus one injected declaration per distinct sugar form
+     * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar. They are the same
      * entries the linker used to synthesize; producing them here is what leaves the linker with nothing to
      * materialize (see {@code MetaKernelSchemaRegistryTest}). {@code enum}'s member set is not among them:
      * it is the fixture's own {@code enum_set} declaration, since {@code set} has no sugar and a {@code !}
-     * form stays prohibited at a field position (§5.2).
+     * form stays prohibited at a field position (§5.2) -- and {@code record.fields} is the fixture's own
+     * {@code field_map} for the same reason, an ordered map having no sugar either.
      */
     @Test
-    void theFixtureDeclarationsResolveAlongsideNineDesugaredEntries() {
+    void theFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         assertEquals(68, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_text", "array_type_ref",
-                "array_type_name", "array_type_argument", "array_template_param", "array_field_group",
-                "array_record_field")) {
+                "array_type_name", "array_type_argument", "array_template_param", "array_field_group")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),
                     "expected a desugared entry with head '" + head + "'");
         }

@@ -94,8 +94,8 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 ## Record templates
 
 - **A record template is normalised here too, and for the same reason the sugar forms are** (`recordBinding`).
-  §5.2 says a bare record body denotes `!record { fields: [ … ] }`, so `test => <T> { x: T }` leaves this
-  phase as `test => <T> !record { fields: [ { name: x  type: T } ] }` — a held application like `<T> [T]`, and
+  §5.2 says a bare record body denotes `!record { fields: { … } }`, so `test => <T> { x: T }` leaves this
+  phase as `test => <T> !record { fields: { x => { type: T } } }` — a held application like `<T> [T]`, and
   closed by the same process. The rule is as fixed and as closed as the sugar table: §5.2's six field
   spellings decide `state` and `value` from the two marks the author wrote, and nothing else is consulted.
   - **Only a *template*.** A closed record still resolves at its declaration into a `RecordBody`, because
@@ -140,6 +140,6 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
       `DefinitionResolver.annotationWireValue` and nothing structural does.
   - **§5.11's uniqueness rule is asked here as well**, and asking it twice is not duplication: the resolver's
     copy sees a closed record body and this one sees a template's, which after normalisation are two
-    different phases. Left to the constructor's own reader instead, the wire form carries two `record_field`
-    records in an array, where repetition is not an error at all — so `bl => <T> { v: T  v: T }` would ship
-    with no verdict.
+    different phases. Left to the constructor's own reader instead, the wire form carries one name twice as
+    a key of `fields`, and the map's duplicate-key refusal would name neither the declaration nor which way
+    the name was repeated — a field twice, or a group member repeating one.

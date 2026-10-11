@@ -124,8 +124,9 @@ final class TypeInhabitance {
             Set<String> inhabited) {
         Set<String> grouped = new HashSet<>();
         record.groups().forEach(group -> grouped.addAll(group.memberNames()));
-        for (RecordField field : record.fields()) {
-            if (grouped.contains(field.name()) || demandsNothing(field)) {
+        for (Map.Entry<String, RecordField> entry : record.fields().entrySet()) {
+            RecordField field = entry.getValue();
+            if (grouped.contains(entry.getKey()) || demandsNothing(field)) {
                 continue;
             }
             if (!satisfiable(field, namespace, inhabited)) {
@@ -161,8 +162,8 @@ final class TypeInhabitance {
     /** The member's field can be stated; a member naming no field is the linker's to report, and counts as one. */
     private static boolean memberSatisfiable(String member, RecordBody record, Map<String, TypeDefinition> namespace,
             Set<String> inhabited) {
-        return record.fields().stream().filter(field -> field.name().equals(member)).findFirst()
-                .map(field -> satisfiable(field, namespace, inhabited)).orElse(true);
+        RecordField field = record.fields().get(member);
+        return field == null || satisfiable(field, namespace, inhabited);
     }
 
     /**
@@ -249,8 +250,9 @@ final class TypeInhabitance {
             Set<String> inhabited) {
         Set<String> grouped = new HashSet<>();
         record.groups().forEach(group -> grouped.addAll(group.memberNames()));
-        for (RecordField field : record.fields()) {
-            if (!grouped.contains(field.name()) && !demandsNothing(field)
+        for (Map.Entry<String, RecordField> entry : record.fields().entrySet()) {
+            RecordField field = entry.getValue();
+            if (!grouped.contains(entry.getKey()) && !demandsNothing(field)
                     && !satisfiable(field, namespace, inhabited)) {
                 return field.type().name();
             }
@@ -259,7 +261,7 @@ final class TypeInhabitance {
                 .filter(group -> !group.optional() && group.members().stream()
                         .noneMatch(option -> choosable(option, group, record, namespace, inhabited)))
                 .flatMap(group -> group.memberNames().stream())
-                .flatMap(member -> record.fields().stream().filter(field -> field.name().equals(member)))
+                .flatMap(member -> java.util.Optional.ofNullable(record.fields().get(member)).stream())
                 .filter(field -> !satisfiable(field, namespace, inhabited))
                 .map(field -> field.type().name()).findFirst().orElse(null);
     }

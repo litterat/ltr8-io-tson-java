@@ -96,7 +96,7 @@ class ChoiceSugarResolutionTest {
         assertEquals(List.of("text", "integer"), variantNames(choice.getValue()));
 
         RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person").body());
-        assertEquals(choice.getKey(), person.fields().getFirst().type().name());
+        assertEquals(choice.getKey(), person.fields().sequencedValues().getFirst().type().name());
     }
 
     /**
@@ -123,6 +123,6 @@ class ChoiceSugarResolutionTest {
 
         String choice = injected(schema, "choice_text_integer_").getKey();
         RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person").body());
-        assertEquals(List.of(choice, choice), person.fields().stream().map(field -> field.type().name()).toList());
+        assertEquals(List.of(choice, choice), person.fields().values().stream().map(field -> field.type().name()).toList());
     }
 }

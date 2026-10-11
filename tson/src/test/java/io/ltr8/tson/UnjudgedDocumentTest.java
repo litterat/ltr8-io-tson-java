@@ -41,7 +41,7 @@ class UnjudgedDocumentTest {
                 !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   json_name => !identifier_type { start_add: "@" }
-                  node => !record { name_type: json_name  fields: [ { name: "@id"  type: nonesuch } ] }
+                  node => !record { name_type: json_name  fields: { "@id" => { type: nonesuch } } }
                 }
                 """;
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(uri -> broken)));

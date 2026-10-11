@@ -35,8 +35,8 @@ class ReferenceChainTest {
     }
 
     private static TypeRef fieldType(TypeDefinition definition, String field) {
-        return assertInstanceOf(RecordBody.class, definition.body()).fields().stream()
-                .filter(f -> f.name().equals(field)).findFirst().orElseThrow().type();
+        return assertInstanceOf(RecordBody.class, definition.body()).fields().entrySet().stream()
+                .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow().type();
     }
 
     private static TypeDefinition kernelEntry(String name) {

@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -145,7 +146,7 @@ class PerFieldSchemaPositionTest {
      */
     @Test
     void positionDoesNotParticipateInIdentity() {
-        RecordField bare = RecordField.required("f", TypeRef.of("text"));
+        RecordField bare = RecordField.required(TypeRef.of("text"));
         RecordField located = bare.withPosition(Optional.of(new SourcePosition() {
             @Override
             public int line() {

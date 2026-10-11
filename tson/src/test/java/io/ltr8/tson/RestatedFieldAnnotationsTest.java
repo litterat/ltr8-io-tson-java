@@ -76,7 +76,8 @@ class RestatedFieldAnnotationsTest {
     private static RecordField field(String type, String name) {
         TsonLinkedSchema linked = Tson.standard().resolve(SCHEMA);
         RecordBody body = (RecordBody) linked.schema().entries().get(type).body();
-        return body.fields().stream().filter(f -> f.name().equals(name)).findFirst().orElseThrow();
+        return body.fields().entrySet().stream().filter(f -> f.getKey().equals(name))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
     private static List<String> names(String type, String field) {

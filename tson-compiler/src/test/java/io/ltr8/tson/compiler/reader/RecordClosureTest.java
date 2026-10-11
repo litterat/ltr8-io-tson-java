@@ -59,11 +59,11 @@ class RecordClosureTest {
         entries.put("normalization", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD"))));
         entries.put("integer", atom(IntegerType.UNCONSTRAINED));
-        entries.put("addr", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("city", TypeRef.of("text"))))));
-        entries.put("person", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("name", TypeRef.of("text")),
-                RecordField.required("address", TypeRef.of("addr"))))));
+        entries.put("addr", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("city", RecordField.required(TypeRef.of("text")))))));
+        entries.put("person", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("name", RecordField.required(TypeRef.of("text"))),
+                Map.entry("address", RecordField.required(TypeRef.of("addr")))))));
         TsonSchema schema = new TsonSchema("https://example.test/closure.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         return TsonSchemaCompiler.compile(new TsonLinkedSchema(schema), ValueReaderFactoryRegistry.tree());
@@ -148,14 +148,14 @@ class RecordClosureTest {
         entries.put("text_member_set", TypeDefinition.product(ArrayBody.of(TypeRef.of("text"))));
         entries.put("normalization", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD"))));
-        entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.optionalVoidable("min_length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("max_length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("pattern", TypeRef.of("text")),
-                RecordField.optionalVoidable("members", TypeRef.of("text_member_set")),
-                RecordField.defaulted("normalization", TypeRef.of("normalization"),
-                        new Token("NONE", Token.Form.UNQUOTED))))));
+        entries.put("text_type", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
+                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
+                        new Token("NONE", Token.Form.UNQUOTED)))))));
         TsonSchema schema = new TsonSchema("https://example.test/bind-closure.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();

@@ -73,7 +73,8 @@ class ContainerSugarEndToEndTest {
     /** The entry a field's type names, which every fixture here reaches the injected declaration through. */
     private static TypeDefinition fieldTypeEntry(TsonCompiledSchema compiled, String record, String field) {
         RecordBody body = (RecordBody) compiled.schema().entries().get(record).body();
-        String name = body.fields().stream().filter(f -> f.name().equals(field)).findFirst().orElseThrow()
+        String name = body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
                 .type().name();
         return compiled.schema().entries().get(name);
     }
@@ -431,7 +432,7 @@ class ContainerSugarEndToEndTest {
 
         RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b").body());
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(box.fields().get(0).type().name()).body());
+                .get(box.fields().values().stream().toList().get(0).type().name()).body());
 
         assertEquals(TypeRef.of("text"), array.elementType());
     }
@@ -451,7 +452,8 @@ class ContainerSugarEndToEndTest {
         RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b").body());
         RecordBody holder = (RecordBody) compiled.schema().entries().get("holder").body();
 
-        assertEquals(holder.fields().get(1).type().name(), box.fields().get(0).type().name());
+        assertEquals(holder.fields().values().stream().toList().get(1).type().name(),
+                box.fields().values().stream().toList().get(0).type().name());
         assertEquals(1, compiled.schema().entries().keySet().stream()
                 .filter(n -> n.startsWith("array_text_")).count(),
                 () -> "one array_text entry, shared: " + compiled.schema().entries().keySet());
@@ -478,8 +480,8 @@ class ContainerSugarEndToEndTest {
                   direct => { d: [box<text>] }""");
 
         String direct = ((RecordBody) compiled.schema().entries().get("direct").body())
-                .fields().getFirst().type().name();
-        String closed = ((RecordBody) bodyOf(compiled, "use")).fields().getFirst().type().name();
+                .fields().sequencedValues().getFirst().type().name();
+        String closed = ((RecordBody) bodyOf(compiled, "use")).fields().sequencedValues().getFirst().type().name();
 
         assertEquals(closed, direct, () -> "one entry for one form: " + compiled.schema().entries().keySet());
         // The closed form only: `array_box_p0_...` is the template's own open synthetic, which stays an entry
@@ -503,7 +505,7 @@ class ContainerSugarEndToEndTest {
                   direct => { d: [box<text>] }""");
 
         String array = ((RecordBody) compiled.schema().entries().get("direct").body())
-                .fields().getFirst().type().name();
+                .fields().sequencedValues().getFirst().type().name();
         String element = ((ArrayBody) compiled.schema().entries().get(array).body()).elementType().name();
 
         assertTrue(array.contains(element),
@@ -526,7 +528,7 @@ class ContainerSugarEndToEndTest {
             // it is `use` itself, a declaration naming an application being that instantiation (#15).
             RecordBody closed = assertInstanceOf(RecordBody.class,
                     compiled.schema().entries().get("use").body(), body);
-            Top variant = compiled.schema().entries().get(closed.fields().getFirst().type().name()).body();
+            Top variant = compiled.schema().entries().get(closed.fields().sequencedValues().getFirst().type().name()).body();
             assertTrue(variant instanceof ChoiceBody || variant instanceof TupleBody,
                     () -> body + " closed to " + variant);
         }

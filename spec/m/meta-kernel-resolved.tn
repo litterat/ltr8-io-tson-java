@@ -79,69 +79,69 @@
 !schema {
   top => !type_definition {
     subtypes: [array atom choice data enum enum_type identifier_type integer_type iri_type map product record reference regex_type set_type sum template text_type tuple type value_type void_type]
-    body: !record { fields: [] }
+    body: !record { fields: {} }
   }
 
   type => !type_definition {
     supertypes: [top]
     subtypes: [array atom choice enum enum_type identifier_type integer_type iri_type map product record regex_type set_type sum text_type tuple value_type void_type]
-    body: !record { supertypes: [top]  fields: [] }
+    body: !record { supertypes: [top]  fields: {} }
   }
 
   atom => !type_definition {
     supertypes: [top type]
     subtypes: [enum enum_type identifier_type integer_type iri_type regex_type text_type value_type void_type]
-    body: !record { supertypes: [type]  fields: [] }
+    body: !record { supertypes: [type]  fields: {} }
   }
 
   product => !type_definition {
     supertypes: [top type]
     subtypes: [array map record set_type tuple]
-    body: !record { supertypes: [type]  fields: [
-      !record_field { name: access_pattern  type: product_access_type }
-      !record_field { name: size_type       type: product_size_type }
-    ] }
+    body: !record { supertypes: [type]  fields: {
+      access_pattern => !record_field { type: product_access_type }
+      size_type      => !record_field { type: product_size_type }
+    } }
   }
 
   sum => !type_definition {
     supertypes: [top type]
     subtypes: [choice]
-    body: !record { supertypes: [type]  fields: [] }
+    body: !record { supertypes: [type]  fields: {} }
   }
 
   data => !type_definition {
     supertypes: [top]
-    body: !record { supertypes: [top]  fields: [] }
+    body: !record { supertypes: [top]  fields: {} }
   }
 
   reference => !type_definition {
     supertypes: [top]
-    body: !record { supertypes: [top]  fields: [
-      !record_field { name: target  type: type_ref }
-    ] }
+    body: !record { supertypes: [top]  fields: {
+      target => !record_field { type: type_ref }
+    } }
   }
 
   template_param => !type_definition {
-    body: !record { fields: [
-      !record_field { name: name   type: param_name }
-      !record_field { name: type   type: type_ref }
-      !record_field { name: bound  type: type_ref  optional: true }
-    ] }
+    body: !record { fields: {
+      name  => !record_field { type: param_name }
+      type  => !record_field { type: type_ref }
+      bound => !record_field { type: type_ref  optional: true }
+    } }
   }
 
   template => !type_definition {
     supertypes: [top]
-    body: !record { supertypes: [top]  fields: [
-      !record_field { name: parameters      type: array_template_param_xxhash }
-      !record_field { name: template        type: text }
-      !record_field { name: extension       type: record_extension_type  optional: true }
-      !record_field { name: discriminators  type: array_text_1_xxhash  optional: true }
-    ] }
+    body: !record { supertypes: [top]  fields: {
+      parameters     => !record_field { type: array_template_param_xxhash }
+      template       => !record_field { type: text }
+      extension      => !record_field { type: record_extension_type  optional: true }
+      discriminators => !record_field { type: array_text_1_xxhash  optional: true }
+    } }
   }
 
   value_type => !type_definition {
     supertypes: [atom top type]
-    body: !record { supertypes: [atom]  fields: [] }
+    body: !record { supertypes: [atom]  fields: {} }
   }
 
   value => !type_definition {
@@ -151,7 +151,7 @@
 
   void_type => !type_definition {
     supertypes: [atom top type]
-    body: !record { supertypes: [atom]  fields: [] }
+    body: !record { supertypes: [atom]  fields: {} }
   }
 
   void => !type_definition {
@@ -165,23 +165,23 @@
   }
 
   integer_size => !type_definition {
-    body: !record { fields: [
-      !record_field { name: bits    type: non_negative_integer }
-      !record_field { name: signed  type: boolean }
-    ] }
+    body: !record { fields: {
+      bits   => !record_field { type: non_negative_integer }
+      signed => !record_field { type: boolean }
+    } }
   }
 
   integer_type => !type_definition {
     supertypes: [atom top type]
-    body: !record { supertypes: [atom]  fields: [
-      !record_field { name: size           type: integer_size  optional: true }
-      !record_field { name: min            type: integer  optional: true }
-      !record_field { name: exclusive_min  type: integer  optional: true }
-      !record_field { name: max            type: integer  optional: true }
-      !record_field { name: exclusive_max  type: integer  optional: true }
-      !record_field { name: multiple_of    type: non_negative_integer  optional: true }
-      !record_field { name: members        type: integer_member_set  optional: true }
-    ]
+    body: !record { supertypes: [atom]  fields: {
+      size          => !record_field { type: integer_size  optional: true }
+      min           => !record_field { type: integer  optional: true }
+      exclusive_min => !record_field { type: integer  optional: true }
+      max           => !record_field { type: integer  optional: true }
+      exclusive_max => !record_field { type: integer  optional: true }
+      multiple_of   => !record_field { type: non_negative_integer  optional: true }
+      members       => !record_field { type: integer_member_set  optional: true }
+    }
     groups: [
       !field_group { members: [[min] [exclusive_min]]  optional: true }
       !field_group { members: [[max] [exclusive_max]]  optional: true }
@@ -202,14 +202,14 @@
   text_type => !type_definition {
     supertypes: [atom top type]
     subtypes: [identifier_type iri_type regex_type]
-    body: !record { supertypes: [atom]  fields: [
-      !record_field { name: min_length     type: non_negative_integer  optional: true }
-      !record_field { name: max_length     type: non_negative_integer  optional: true }
-      !record_field { name: length         type: non_negative_integer  optional: true }
-      !record_field { name: pattern        type: regex    optional: true }
-      !record_field { name: members        type: text_member_set  optional: true }
-      !record_field { name: normalization  type: normalization  optional: true  role: DEFAULT  value: NONE }
-    ] }
+    body: !record { supertypes: [atom]  fields: {
+      min_length    => !record_field { type: non_negative_integer  optional: true }
+      max_length    => !record_field { type: non_negative_integer  optional: true }
+      length        => !record_field { type: non_negative_integer  optional: true }
+      pattern       => !record_field { type: regex    optional: true }
+      members       => !record_field { type: text_member_set  optional: true }
+      normalization => !record_field { type: normalization  optional: true  role: DEFAULT  value: NONE }
+    } }
   }
 
   text => !type_definition {
@@ -219,9 +219,9 @@
 
   atom_specification => !type_definition {
     subtypes: [identifier_type iri_type regex_type]
-    body: !record { fields: [
-      !record_field { name: spec  type: iri }
-    ] }
+    body: !record { fields: {
+      spec => !record_field { type: iri }
+    } }
   }
 
   identifier_base => !type_definition {
@@ -236,21 +236,21 @@
 
   identifier_type => !type_definition {
     supertypes: [atom atom_specification text_type top type]
-    body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length     type: non_negative_integer  optional: true }
-      !record_field { name: max_length     type: non_negative_integer  optional: true }
-      !record_field { name: length         type: non_negative_integer  optional: true }
-      !record_field { name: pattern        type: regex    optional: true }
-      !record_field { name: members        type: text_member_set  optional: true }
-      !record_field { name: normalization  type: normalization  optional: true  role: DEFAULT  value: NFC }
-      !record_field { name: spec           type: iri   optional: true  role: FIXED  value: "https://www.unicode.org/reports/tr31/" }
-      !record_field { name: start          type: identifier_base  optional: true  role: DEFAULT  value: XID }
-      !record_field { name: continue       type: identifier_base  optional: true  role: DEFAULT  value: XID }
-      !record_field { name: start_add      type: text  optional: true }
-      !record_field { name: continue_add   type: text  optional: true }
-      !record_field { name: medial         type: text  optional: true }
-      !record_field { name: exclude        type: text  optional: true }
-    ] }
+    body: !record { supertypes: [text_type atom_specification]  fields: {
+      min_length    => !record_field { type: non_negative_integer  optional: true }
+      max_length    => !record_field { type: non_negative_integer  optional: true }
+      length        => !record_field { type: non_negative_integer  optional: true }
+      pattern       => !record_field { type: regex    optional: true }
+      members       => !record_field { type: text_member_set  optional: true }
+      normalization => !record_field { type: normalization  optional: true  role: DEFAULT  value: NFC }
+      spec          => !record_field { type: iri   optional: true  role: FIXED  value: "https://www.unicode.org/reports/tr31/" }
+      start         => !record_field { type: identifier_base  optional: true  role: DEFAULT  value: XID }
+      continue      => !record_field { type: identifier_base  optional: true  role: DEFAULT  value: XID }
+      start_add     => !record_field { type: text  optional: true }
+      continue_add  => !record_field { type: text  optional: true }
+      medial        => !record_field { type: text  optional: true }
+      exclude       => !record_field { type: text  optional: true }
+    } }
   }
 
   identifier => !type_definition {
@@ -260,18 +260,18 @@
 
   iri_type => !type_definition {
     supertypes: [atom atom_specification text_type top type]
-    body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length      type: non_negative_integer  optional: true }
-      !record_field { name: max_length      type: non_negative_integer  optional: true }
-      !record_field { name: length          type: non_negative_integer  optional: true }
-      !record_field { name: pattern         type: regex    optional: true }
-      !record_field { name: members         type: text_member_set  optional: true }
-      !record_field { name: normalization   type: normalization  optional: true  role: FIXED  value: NONE }
-      !record_field { name: spec            type: iri      optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3987" }
-      !record_field { name: schemes         type: scheme_set  optional: true }
-      !record_field { name: allow_relative  type: boolean  optional: true  role: DEFAULT  value: true }
-      !record_field { name: allow_fragment  type: boolean  optional: true  role: DEFAULT  value: true }
-    ] }
+    body: !record { supertypes: [text_type atom_specification]  fields: {
+      min_length     => !record_field { type: non_negative_integer  optional: true }
+      max_length     => !record_field { type: non_negative_integer  optional: true }
+      length         => !record_field { type: non_negative_integer  optional: true }
+      pattern        => !record_field { type: regex    optional: true }
+      members        => !record_field { type: text_member_set  optional: true }
+      normalization  => !record_field { type: normalization  optional: true  role: FIXED  value: NONE }
+      spec           => !record_field { type: iri      optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3987" }
+      schemes        => !record_field { type: scheme_set  optional: true }
+      allow_relative => !record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+      allow_fragment => !record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+    } }
   }
 
   scheme_set => !type_definition {
@@ -291,15 +291,15 @@
 
   regex_type => !type_definition {
     supertypes: [atom atom_specification text_type top type]
-    body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length     type: non_negative_integer  optional: true }
-      !record_field { name: max_length     type: non_negative_integer  optional: true }
-      !record_field { name: length         type: non_negative_integer  optional: true }
-      !record_field { name: pattern        type: regex  optional: true }
-      !record_field { name: members        type: text_member_set  optional: true }
-      !record_field { name: normalization  type: normalization  optional: true  role: FIXED  value: NONE }
-      !record_field { name: spec           type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9485" }
-    ] }
+    body: !record { supertypes: [text_type atom_specification]  fields: {
+      min_length    => !record_field { type: non_negative_integer  optional: true }
+      max_length    => !record_field { type: non_negative_integer  optional: true }
+      length        => !record_field { type: non_negative_integer  optional: true }
+      pattern       => !record_field { type: regex  optional: true }
+      members       => !record_field { type: text_member_set  optional: true }
+      normalization => !record_field { type: normalization  optional: true  role: FIXED  value: NONE }
+      spec          => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9485" }
+    } }
   }
 
   regex => !type_definition {
@@ -323,17 +323,17 @@
   }
 
   type_ref => !type_definition {
-    body: !record { fields: [
-      !record_field { name: name       type: type_name }
-      !record_field { name: arguments  type: array_type_argument_xxhash  optional: true }
-    ] }
+    body: !record { fields: {
+      name      => !record_field { type: type_name }
+      arguments => !record_field { type: array_type_argument_xxhash  optional: true }
+    } }
   }
 
   type_argument => !type_definition {
-    body: !record { fields: [
-      !record_field { name: name   type: type_ref  optional: true }
-      !record_field { name: value  type: value  optional: true }
-    ]
+    body: !record { fields: {
+      name  => !record_field { type: type_ref  optional: true }
+      value => !record_field { type: value  optional: true }
+    }
     groups: [
       !field_group { members: [[name] [value]] }
     ] }
@@ -375,95 +375,99 @@
   }
 
   record_field => !type_definition {
-    body: !record { fields: [
-      !record_field { name: name           type: text }
-      !record_field { name: type           type: type_ref }
-      !record_field { name: optional       type: boolean  optional: true  role: DEFAULT  value: false }
-      !record_field { name: voidable       type: boolean  optional: true  role: DEFAULT  value: false }
-      !record_field { name: role           type: field_role  optional: true  role: DEFAULT  value: FREE }
-      !record_field { name: value          type: value  optional: true }
-    ] }
+    body: !record { fields: {
+      type     => !record_field { type: type_ref }
+      optional => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      voidable => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      role     => !record_field { type: field_role  optional: true  role: DEFAULT  value: FREE }
+      value    => !record_field { type: value  optional: true }
+    } }
   }
 
   tuple_element => !type_definition {
-    body: !record { fields: [
-      !record_field { name: element_type  type: type_ref }
-      !record_field { name: voidable      type: boolean  optional: true  role: DEFAULT  value: false }
-    ] }
+    body: !record { fields: {
+      element_type => !record_field { type: type_ref }
+      voidable     => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+    } }
   }
 
   field_group => !type_definition {
-    body: !record { fields: [
-      !record_field { name: members           type: array_array_text_1_3600e7d5_1_xxhash }
-      !record_field { name: optional_members  type: array_text_1_xxhash  optional: true }
-      !record_field { name: optional          type: boolean  optional: true  role: DEFAULT  value: false }
-    ] }
+    body: !record { fields: {
+      members          => !record_field { type: array_array_text_1_3600e7d5_1_xxhash }
+      optional_members => !record_field { type: array_text_1_xxhash  optional: true }
+      optional         => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+    } }
+  }
+
+  field_map => !type_definition {
+    source: map
+    body: !map { key_type: text  value_type: record_field  ordered: true }
   }
 
   record => !type_definition {
     supertypes: [product top type]
-    body: !record { supertypes: [product]  fields: [
-      !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: NAMED }
-      !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: FIXED }
-      !record_field { name: fields          type: array_record_field_xxhash }
-      !record_field { name: groups          type: array_field_group_xxhash  optional: true }
-      !record_field { name: extension       type: record_extension_type  optional: true  role: DEFAULT  value: OPEN }
-      !record_field { name: supertypes      type: array_type_ref_xxhash   optional: true }
-      !record_field { name: discriminators  type: array_text_1_xxhash  optional: true }
-      !record_field { name: name_type       type: type_name  optional: true }
-    ] }
+    body: !record { supertypes: [product]  fields: {
+      access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: NAMED }
+      size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: FIXED }
+      fields         => !record_field { type: field_map }
+      groups         => !record_field { type: array_field_group_xxhash  optional: true }
+      extension      => !record_field { type: record_extension_type  optional: true  role: DEFAULT  value: OPEN }
+      supertypes     => !record_field { type: array_type_ref_xxhash   optional: true }
+      discriminators => !record_field { type: array_text_1_xxhash  optional: true }
+      name_type      => !record_field { type: type_name  optional: true }
+    } }
   }
 
   array => !type_definition {
     supertypes: [product top type]
     subtypes: [set_type]
-    body: !record { supertypes: [product]  fields: [
-      !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: INDEX }
-      !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
-      !record_field { name: element_type    type: type_ref }
-      !record_field { name: voidable        type: boolean  optional: true  role: DEFAULT  value: false }
-      !record_field { name: ordered         type: boolean  optional: true  role: DEFAULT  value: true }
-      !record_field { name: unique_items    type: boolean  optional: true  role: DEFAULT  value: false }
-      !record_field { name: min_items       type: non_negative_integer  optional: true }
-      !record_field { name: max_items       type: non_negative_integer  optional: true }
-    ] }
+    body: !record { supertypes: [product]  fields: {
+      access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: INDEX }
+      size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
+      element_type   => !record_field { type: type_ref }
+      voidable       => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      ordered        => !record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+      unique_items   => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      min_items      => !record_field { type: non_negative_integer  optional: true }
+      max_items      => !record_field { type: non_negative_integer  optional: true }
+    } }
   }
 
   set_type => !type_definition {
     source: array
     supertypes: [array product top type]
-    body: !record { fields: [
-      !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: INDEX }
-      !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
-      !record_field { name: element_type    type: type_ref }
-      !record_field { name: voidable        type: boolean  optional: true  role: FIXED  value: false }
-      !record_field { name: ordered         type: boolean  optional: true  role: FIXED  value: false }
-      !record_field { name: unique_items    type: boolean  optional: true  role: FIXED  value: true }
-      !record_field { name: min_items       type: non_negative_integer  optional: true }
-      !record_field { name: max_items       type: non_negative_integer  optional: true }
-    ] }
+    body: !record { fields: {
+      access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: INDEX }
+      size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
+      element_type   => !record_field { type: type_ref }
+      voidable       => !record_field { type: boolean  optional: true  role: FIXED  value: false }
+      ordered        => !record_field { type: boolean  optional: true  role: FIXED  value: false }
+      unique_items   => !record_field { type: boolean  optional: true  role: FIXED  value: true }
+      min_items      => !record_field { type: non_negative_integer  optional: true }
+      max_items      => !record_field { type: non_negative_integer  optional: true }
+    } }
   }
   map => !type_definition {
     supertypes: [product top type]
-    body: !record { supertypes: [product]  fields: [
-      !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: NAMED }
-      !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
-      !record_field { name: key_type        type: type_ref }
-      !record_field { name: value_type      type: type_ref }
-      !record_field { name: voidable        type: boolean  optional: true  role: DEFAULT  value: false }
-      !record_field { name: ordered         type: boolean  optional: true  role: DEFAULT  value: false }
-      !record_field { name: min_items       type: non_negative_integer  optional: true }
-      !record_field { name: max_items       type: non_negative_integer  optional: true }
-    ] }
+    body: !record { supertypes: [product]  fields: {
+      access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: NAMED }
+      size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
+      key_type       => !record_field { type: type_ref }
+      value_type     => !record_field { type: type_ref }
+      voidable       => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      ordered        => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      min_items      => !record_field { type: non_negative_integer  optional: true }
+      max_items      => !record_field { type: non_negative_integer  optional: true }
+    } }
   }
 
   tuple => !type_definition {
     supertypes: [product top type]
-    body: !record { supertypes: [product]  fields: [
-      !record_field { name: access_pattern  type: product_access_type  optional: true  role: FIXED  value: INDEX }
-      !record_field { name: size_type       type: product_size_type    optional: true  role: FIXED  value: FIXED }
-      !record_field { name: elements        type: array_tuple_element_xxhash }
-    ] }
+    body: !record { supertypes: [product]  fields: {
+      access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: INDEX }
+      size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: FIXED }
+      elements       => !record_field { type: array_tuple_element_xxhash }
+    } }
   }
 
   enum_set => !type_definition {
@@ -485,36 +489,36 @@
   enum_type => !type_definition {
     supertypes: [atom top type]
     subtypes: [enum]
-    body: !record { supertypes: [atom]  fields: [
-      !record_field { name: name_type  type: type_name }
-      !record_field { name: members    type: enum_set }
-    ] }
+    body: !record { supertypes: [atom]  fields: {
+      name_type => !record_field { type: type_name }
+      members   => !record_field { type: enum_set }
+    } }
   }
 
   enum => !type_definition {
     source: enum_type
     supertypes: [atom enum_type top type]
-    body: !record { fields: [
-      !record_field { name: name_type  type: type_name  optional: true  role: FIXED  value: identifier }
-      !record_field { name: members    type: enum_set }
-    ] }
+    body: !record { fields: {
+      name_type => !record_field { type: type_name  optional: true  role: FIXED  value: identifier }
+      members   => !record_field { type: enum_set }
+    } }
   }
 
   choice => !type_definition {
     supertypes: [sum top type]
-    body: !record { supertypes: [sum]  fields: [
-      !record_field { name: variants  type: array_type_ref_xxhash }
-      !record_field { name: disjoint  type: boolean  optional: true }
-    ] }
+    body: !record { supertypes: [sum]  fields: {
+      variants => !record_field { type: array_type_ref_xxhash }
+      disjoint => !record_field { type: boolean  optional: true }
+    } }
   }
 
   type_definition => !type_definition {
-    body: !record { fields: [
-      !record_field { name: source       type: type_ref  optional: true }
-      !record_field { name: supertypes   type: array_type_name_xxhash  optional: true }
-      !record_field { name: subtypes     type: array_type_name_xxhash  optional: true }
-      !record_field { name: body         type: top }
-    ] }
+    body: !record { fields: {
+      source     => !record_field { type: type_ref  optional: true }
+      supertypes => !record_field { type: array_type_name_xxhash  optional: true }
+      subtypes   => !record_field { type: array_type_name_xxhash  optional: true }
+      body       => !record_field { type: top }
+    } }
   }
 
   schema => !type_definition {
@@ -540,11 +544,6 @@
   @synthetic array_type_argument_xxhash => !type_definition {
     source: array
     body: !array { element_type: type_argument }
-  }
-
-  @synthetic array_record_field_xxhash => !type_definition {
-    source: array
-    body: !array { element_type: record_field }
   }
 
   @synthetic array_array_text_1_3600e7d5_1_xxhash => !type_definition {

@@ -30,6 +30,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.Set;
 
 /**
@@ -88,13 +89,14 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
      * alternative was fabricating a record body for a template that has none, which put the choice of "which
      * fields select" in two places that could disagree.
      */
-    RecordMemberDispatchReader(Set<String> selfNames, String displayName, List<RecordField> selectorFields,
+    RecordMemberDispatchReader(Set<String> selfNames, String displayName, SequencedMap<String, RecordField> selectorFields,
                                 Set<String> subtypes, ValueReaderContext context,
                                 TsonTypeReaderResolver readerFor) {
         Map<String, TypeDefinition> entries = context.schema().entries();
         this.selfNames = Set.copyOf(selfNames);
         this.readerFor = readerFor;
-        this.selectors = selectorFields.stream().map(field -> selectorOf(field, entries, context.linked())).toList();
+        this.selectors = selectorFields.entrySet().stream()
+                .map(field -> selectorOf(field.getKey(), field.getValue(), entries, context.linked())).toList();
         // The family's members compose the base, so they share its name type; a template base states none.
         this.nameForm = selfNames.stream().map(context.linked()::nameForm)
                 .filter(form -> form != io.ltr8.unicode.Normalization.NFC).findFirst()
@@ -122,22 +124,22 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
-    private static Selector selectorOf(RecordField field, Map<String, TypeDefinition> entries,
+    private static Selector selectorOf(String name, RecordField field, Map<String, TypeDefinition> entries,
                                        TsonLinkedSchema linked) {
         String terminal = ReferenceChain.terminal(field.type().name(), entries);
         TypeDefinition target = entries.get(terminal);
         AtomType<?> parser = AtomParsers.forType(target.body(), linked.enumForm(terminal)).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
-        return new Selector(Nfc.of(field.name()), parser);
+        return new Selector(Nfc.of(name), parser);
     }
 
     /** One member's pins in the base's declaration order, or null where it does not pin them all. */
     private List<Object> pinsOf(RecordBody record) {
         List<Object> key = new ArrayList<>(selectors.size());
         for (Selector selector : selectors) {
-            Optional<RecordField> field = record.fields().stream()
-                    .filter(f -> Nfc.of(f.name()).equals(selector.name())).findFirst();
+            Optional<RecordField> field = record.fields().entrySet().stream()
+                    .filter(f -> Nfc.of(f.getKey()).equals(selector.name())).map(Map.Entry::getValue).findFirst();
             if (field.isEmpty() || field.get().role() != FieldRole.FIXED
                     || field.get().value().isEmpty()) {
                 return null; // the linker already refused this; the family is read without it

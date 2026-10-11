@@ -39,10 +39,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class RecordTreeReaderTest {
 
-    private static TsonLinkedSchema pointSchema(TypeDefinition integerEntry, RecordField valueField) {
+    private static TsonLinkedSchema pointSchema(TypeDefinition integerEntry,
+                                                Map.Entry<String, RecordField> valueField) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", integerEntry);
-        entries.put("point", TypeDefinition.product(RecordBody.of(List.of(valueField))));
+        entries.put("point", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(valueField))));
         return new TsonLinkedSchema(new TsonSchema("test-schema", "test-meta", List.of(), entries));
     }
 
@@ -68,7 +69,8 @@ class RecordTreeReaderTest {
     @Test
     void unconstrainedIntegerFieldReadsFromRealDataText() {
         TsonCompiledSchema compiled = compile(
-                pointSchema(atomEntry(IntegerType.UNCONSTRAINED), RecordField.required("value", TypeRef.of("integer"))));
+                pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                        Map.entry("value", RecordField.required(TypeRef.of("integer")))));
 
         assertEquals(BigInteger.valueOf(42), read(compiled, "{ value: 42 }").get("value"));
     }
@@ -77,7 +79,7 @@ class RecordTreeReaderTest {
     void constrainedIntegerFieldValidatesAgainstItsOwnDeclaredRange() {
         TsonCompiledSchema compiled = compile(
                 pointSchema(atomEntry(new IntegerType(new IntegerSize(8, true))),
-                        RecordField.required("value", TypeRef.of("integer"))));
+                        Map.entry("value", RecordField.required(TypeRef.of("integer")))));
 
         assertEquals((byte) 100, read(compiled, "{ value: 100 }").get("value"));
         assertThrows(ReadException.class, () -> read(compiled, "{ value: 200 }"));
@@ -86,7 +88,8 @@ class RecordTreeReaderTest {
     @Test
     void missingRequiredFieldThrows() {
         TsonCompiledSchema compiled = compile(
-                pointSchema(atomEntry(IntegerType.UNCONSTRAINED), RecordField.required("value", TypeRef.of("integer"))));
+                pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                        Map.entry("value", RecordField.required(TypeRef.of("integer")))));
 
         ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{}"));
         assertTrue(thrown.getMessage().contains("value"), thrown.getMessage());
@@ -94,7 +97,7 @@ class RecordTreeReaderTest {
 
     @Test
     void missingOrVoidOptionalFieldReadsAsNull() {
-        RecordField optional = RecordField.optionalVoidable("value", TypeRef.of("integer"));
+        Map.Entry<String, RecordField> optional = Map.entry("value", RecordField.optionalVoidable(TypeRef.of("integer")));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), optional));
 
         assertNull(read(compiled, "{}").get("value"));
@@ -102,8 +105,8 @@ class RecordTreeReaderTest {
     }
 
     /** {@code value?: integer = token}. */
-    private static RecordField fixed(String token) {
-        return RecordField.fixed("value", TypeRef.of("integer"), new Token(token, Token.Form.UNQUOTED));
+    private static Map.Entry<String, RecordField> fixed(String token) {
+        return Map.entry("value", RecordField.fixed(TypeRef.of("integer"), new Token(token, Token.Form.UNQUOTED)));
     }
 
     /**
@@ -235,8 +238,8 @@ class RecordTreeReaderTest {
 
     @Test
     void requiredDefaultFieldFillsFromTheSchemaWhenAbsentButExplicitValueStillWins() {
-        RecordField defaulted = RecordField.defaulted("value", TypeRef.of("integer"),
-                new Token("7", Token.Form.UNQUOTED));
+        Map.Entry<String, RecordField> defaulted = Map.entry("value", RecordField.defaulted(TypeRef.of("integer"),
+                new Token("7", Token.Form.UNQUOTED)));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), defaulted));
 
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
@@ -251,8 +254,8 @@ class RecordTreeReaderTest {
      */
     @Test
     void requiredDefaultFieldRejectsAWrittenVoidSentinelWhileOmissionStillInjects() {
-        RecordField defaulted = RecordField.defaulted("value", TypeRef.of("integer"),
-                new Token("7", Token.Form.UNQUOTED));
+        Map.Entry<String, RecordField> defaulted = Map.entry("value", RecordField.defaulted(TypeRef.of("integer"),
+                new Token("7", Token.Form.UNQUOTED)));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), defaulted));
 
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));

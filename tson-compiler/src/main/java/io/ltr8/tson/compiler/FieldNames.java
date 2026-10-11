@@ -8,7 +8,6 @@ import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.ArrayList;
@@ -25,6 +24,11 @@ import java.util.function.Function;
  * field name the record states -- in {@code fields}, {@code discriminators} and its groups -- is a value of it, and
  * that no two of its fields are one value under its equality. The peer of {@link EnumLabels}, on the same terms: a
  * checker over the linked closure that hands back violations and leaves reporting to the linker.
+ *
+ * <p><b>Two fields of one spelling never reach here.</b> {@code record.fields} is a map keyed by the name, so a name
+ * written twice is the map's duplicate key, refused where the record is read or resolved. What is left for this
+ * check is two spellings that are one name under the type's equality -- {@code NAME} and {@code name} under a
+ * case-folding type -- which only a resolved name type can decide.
  */
 final class FieldNames {
 
@@ -64,10 +68,10 @@ final class FieldNames {
         Optional<NameType.Resolved> resolved = NameType.of(definition, merged::get, structure);
         if (resolved.isEmpty() && body.nameType().isEmpty()) {
             // The default where no kernel is in scope to resolve it: the identifier grammar it stands for.
-            for (RecordField field : body.fields()) {
-                Optional<String> violation = io.ltr8.tson.atom.IdentifierGrammar.validate(field.name());
+            for (String field : body.fields().keySet()) {
+                Optional<String> violation = io.ltr8.tson.atom.IdentifierGrammar.validate(field);
                 if (violation.isPresent()) {
-                    return Optional.of(new EnumLabels.Violation(name, "'" + name + "': field name '" + field.name()
+                    return Optional.of(new EnumLabels.Violation(name, "'" + name + "': field name '" + field
                             + "' is not an identifier: " + violation.get()));
                 }
             }
@@ -100,15 +104,15 @@ final class FieldNames {
         boolean identifier = NameType.isIdentifier(type, structure);
         String ofType = identifier ? "an identifier" : "a value of its name_type '" + body.nameTypeName() + "'";
         Map<Object, String> seen = new HashMap<>();
-        for (RecordField field : body.fields()) {
-            Optional<EnumLabels.Violation> problem = read(name, ofType, parser.get(), field.name());
+        for (String field : body.fields().keySet()) {
+            Optional<EnumLabels.Violation> problem = read(name, ofType, parser.get(), field);
             if (problem.isPresent()) {
                 return problem;
             }
-            String earlier = seen.putIfAbsent(ValueIdentity.of(parser.get().read(field.name())), field.name());
-            if (earlier != null && !earlier.equals(field.name())) {
+            String earlier = seen.putIfAbsent(ValueIdentity.of(parser.get().read(field)), field);
+            if (earlier != null) {
                 return Optional.of(new EnumLabels.Violation(name, "'" + name + "': fields '" + earlier + "' and '"
-                        + field.name() + "' are one " + (identifier ? "field name"
+                        + field + "' are one " + (identifier ? "field name"
                                 : "value of its name_type '" + body.nameTypeName() + "'")));
             }
         }

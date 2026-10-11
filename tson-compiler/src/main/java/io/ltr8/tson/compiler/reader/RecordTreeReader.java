@@ -101,7 +101,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
     /** Puts a decoded field value into {@code result} as a node, omitting a {@code null} (a missing field -- already reported). */
     private void putField(Map<String, TsonValue> result, int schemaIndex, Object decoded) {
         if (decoded != null) {
-            result.put(fields.get(schemaIndex).schema().name(), (TsonValue) decoded);
+            result.put(fields.get(schemaIndex).name(), (TsonValue) decoded);
         }
     }
 }

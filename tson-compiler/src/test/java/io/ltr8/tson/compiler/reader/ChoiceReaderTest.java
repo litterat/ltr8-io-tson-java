@@ -37,9 +37,9 @@ class ChoiceReaderTest {
         entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
                 List.of(), List.of(), IntegerType.UNCONSTRAINED));
         entries.put("email", TypeDefinition.product(
-                RecordBody.of(List.of(RecordField.required("address", TypeRef.of("integer"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("address", RecordField.required(TypeRef.of("integer")))))));
         entries.put("phone", TypeDefinition.product(
-                RecordBody.of(List.of(RecordField.required("number", TypeRef.of("integer"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("number", RecordField.required(TypeRef.of("integer")))))));
         entries.put("contact_method", TypeDefinition.product(
                 new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone")))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",

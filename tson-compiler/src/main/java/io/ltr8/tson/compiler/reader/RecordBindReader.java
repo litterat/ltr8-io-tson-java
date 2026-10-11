@@ -89,7 +89,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         List<String> mismatches = new ArrayList<>();
         for (int i = 0; i < fields.size(); i++) {
             CompiledField field = fields.get(i);
-            DataClassField target = findTargetField(descriptor.fields(), field.schema().name());
+            DataClassField target = findTargetField(descriptor.fields(), field.name());
             targetField[i] = target;
             if (target == null) {
                 // The one exemption is FIXED (either state): the schema settles the value, so a component
@@ -103,13 +103,13 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 // the first time a caller sends it, which is the bug this check exists to prevent. One rule
                 // for every field beats two that differ on when the developer finds out.
                 if (field.schema().role() != FieldRole.FIXED) {
-                    mismatches.add("no component for field '" + field.schema().name() + "'");
+                    mismatches.add("no component for field '" + field.name() + "'");
                 }
                 continue;
             }
             String deliversNull = deliversNull(field.schema(), omitted(i));
             if (deliversNull != null && target.dataClass().typeClass().isPrimitive()) {
-                mismatches.add("field '" + field.schema().name() + "' " + deliversNull + ", and component '"
+                mismatches.add("field '" + field.name() + "' " + deliversNull + ", and component '"
                         + target.name() + "' binds " + target.dataClass().typeClass().getName()
                         + ", which has no null to hold it");
             }
@@ -117,10 +117,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             // are applied here because this reader builds its constructor arguments itself -- ltr8-bind's binder,
             // which collects a record's arguments through their bridges, is the step a schema-driven read replaces.
             TsonTypeReader<?> rebound = BindTargets.to(field.parser(), target.dataClass(),
-                    "field '" + field.schema().name() + "'", "component '" + target.name() + "'",
-                    new BindTargets.Site(field.schema().name(), resolver, this.annotationTypes, mismatches), true);
+                    "field '" + field.name() + "'", "component '" + target.name() + "'",
+                    new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches), true);
             if (rebound != field.parser()) {
-                field = new CompiledField(field.schema(), rebound);
+                field = new CompiledField(field.name(), field.schema(), rebound);
                 fields.set(i, field);
             }
             if (field.schema().value().isPresent()) {
@@ -224,8 +224,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private static FieldReaders tokenAware(String name, DataClassField[] classFields, DataClassField carrier,
                                             TsonTypeReaderResolver resolver, ValueReaderContext context,
                                             SchemaLocation location) {
-        return field -> {
-            DataClassField target = findTargetField(classFields, carrier, field.name());
+        return (fieldName, field) -> {
+            DataClassField target = findTargetField(classFields, carrier, fieldName);
             if (target != null && target.type() == io.ltr8.tson.schema.meta.Token.class) {
                 return AtomTypeReader.of(name, RawTokenParser.INSTANCE, location);
             }

@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
@@ -59,10 +60,8 @@ final class WireForm {
     // ── The vocabulary's own member names ────────────────────────────────────────────────────────
 
     /**
-     * The {@code name} member. One constant for the two records that spell it alike -- {@code type_ref.name},
-     * carrying a reference, and {@code record_field.name}, carrying a field name. What tells an application
-     * from anything else is never this member alone but its pairing with {@link #ARGUMENTS}; see
-     * {@link #isApplication}.
+     * {@code type_ref.name}, carrying a reference. What tells an application from anything else is never this
+     * member alone but its pairing with {@link #ARGUMENTS}; see {@link #isApplication}.
      */
     static final String NAME = "name";
 
@@ -137,6 +136,20 @@ final class WireForm {
         return new ArrayValue(names.stream().map(name -> scoped(declaredName(name))).toList());
     }
 
+    /**
+     * {@code record.fields} as a held body writes it: a map from each field's declared name ({@link
+     * #declaredName}) to its {@code record_field}, in declaration order. An empty one is the empty brace, which
+     * is what the text parses back to.
+     */
+    static CoreValue fieldMap(List<MapValue.MapEntry> entries) {
+        return entries.isEmpty() ? new EmptyBrace() : new MapValue(entries);
+    }
+
+    /** One {@link #fieldMap} entry: the field's declared name as the key, its facts as the value. */
+    static MapValue.MapEntry fieldEntry(String name, ScopedValue field) {
+        return new MapValue.MapEntry(new DataValue(List.of(), Optional.empty(), declaredName(name)), field);
+    }
+
     /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
     static ScopedValue scoped(CoreValue value) {
         return scoped(value, List.of());
@@ -184,11 +197,6 @@ final class WireForm {
                 : TokenForm.SINGLE_LINE_QUOTED);
     }
 
-    /** {@link #declaredName} as a record member's value. */
-    static RecordValue.Field declaredNameField(String member, String name) {
-        return new RecordValue.Field(member, scoped(declaredName(name)));
-    }
-
     static TokenForm tokenForm(Token.Form form) {
         return switch (form) {
             case UNQUOTED -> TokenForm.UNQUOTED;
@@ -215,7 +223,7 @@ final class WireForm {
     }
 
     /**
-     * The held body an <b>error placeholder</b> carries -- {@code !record { fields: [] }}, the zero-field
+     * The held body an <b>error placeholder</b> carries -- {@code !record { fields: {} }}, the zero-field
      * record both absorbing stand-ins already stood for, now held like every other open body.
      *
      * <p><b>It exists so that "an open entry's body is held or a {@code Reference}" has no exceptions.</b>
@@ -230,7 +238,7 @@ final class WireForm {
      */
     static DataValue heldEmptyRecord() {
         return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(List.of(
-                new RecordValue.Field(FIELDS, scoped(new ArrayValue(List.of()))))));
+                new RecordValue.Field(FIELDS, scoped(fieldMap(List.of()))))));
     }
 
     /**
@@ -249,17 +257,18 @@ final class WireForm {
      * everything structural stays here.
      */
     static DataValue heldRecord(RecordBody body, Function<Object, DataValue> annotationValue) {
-        List<ScopedValue> fields = new ArrayList<>();
-        for (RecordField field : body.fields()) {
+        List<MapValue.MapEntry> fields = new ArrayList<>();
+        for (Map.Entry<String, RecordField> declared : body.fields().entrySet()) {
+            RecordField field = declared.getValue();
             List<RecordValue.Field> members = new ArrayList<>();
-            members.add(declaredNameField(NAME, field.name()));
             members.add(new RecordValue.Field(TYPE, scoped(refValue(field.type()))));
             addFacts(members, field.optional(), field.voidable(), field.role());
             // The two channels collapse into one: a literal keeps its own token form, and a routed parameter
             // is a bare name standing where the literal would.
             field.value().ifPresent(token -> members.add(new RecordValue.Field(VALUE,
                     scoped(new TokenValue(token.text(), tokenForm(token.form()))))));
-            fields.add(scoped(new RecordValue(members), annotations(field.annotations(), annotationValue)));
+            fields.add(fieldEntry(declared.getKey(),
+                    scoped(new RecordValue(members), annotations(field.annotations(), annotationValue))));
         }
         List<ScopedValue> groups = new ArrayList<>();
         for (FieldGroup group : body.groups()) {
@@ -273,7 +282,7 @@ final class WireForm {
                     .map(supertype -> scoped(refValue(supertype))).toList()))));
         }
         body.nameType().ifPresent(stated -> binding.add(nameField(NAME_TYPE, stated)));
-        binding.add(new RecordValue.Field(FIELDS, scoped(new ArrayValue(fields))));
+        binding.add(new RecordValue.Field(FIELDS, scoped(fieldMap(fields))));
         if (!groups.isEmpty()) {
             binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));
         }
@@ -396,12 +405,12 @@ final class WireForm {
     private static String declaredType(RecordValue binding, String name) {
         for (RecordValue.Field member : binding.fields()) {
             if (!FIELDS.equals(member.name())
-                    || !(member.value().value().coreValue() instanceof ArrayValue fields)) {
+                    || !(member.value().value().coreValue() instanceof MapValue fields)) {
                 continue;
             }
-            for (ScopedValue element : fields.elements()) {
-                if (element.value().coreValue() instanceof RecordValue field
-                        && name.equals(memberToken(field, NAME))) {
+            for (MapValue.MapEntry entry : fields.entries()) {
+                if (entry.key().coreValue() instanceof TokenValue key && name.equals(key.text())
+                        && entry.value().value().coreValue() instanceof RecordValue field) {
                     return memberToken(field, TYPE);
                 }
             }

@@ -176,7 +176,7 @@ class ParameterKindTest {
                   use   => { w: weird<text> }""");
 
         String instantiation = ((RecordBody) compiled.schema().entries().get("use").body())
-                .fields().getFirst().type().name();
+                .fields().sequencedValues().getFirst().type().name();
         TypeArgument argument = compiled.schema().entries().get(instantiation).source().orElseThrow()
                 .arguments().getFirst();
 
@@ -205,6 +205,6 @@ class ParameterKindTest {
 
         TypeDefinition composed = compiled.schema().entries().get("x");
         assertEquals(List.of("a", "b"), ((RecordBody) composed.body()).fields()
-                .stream().map(io.ltr8.tson.schema.meta.RecordField::name).toList());
+                .keySet().stream().toList());
     }
 }

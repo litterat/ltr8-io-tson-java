@@ -20,6 +20,8 @@ field states, groups, subtraction, and the exception boundary. Current form only
   omission yields, so the order on it is checked on `RecordField.omitted`.
 - Subtraction runs last, empties `type_definition.supertypes` (every supertype goes) and keeps `record.supertypes` as
   lineage.
+- A field's name is its key in `record.fields`, an ordered map (`RecordBody.fields`, the kernel's `field_map`), and
+  never one of its facts; declaration order is part of the value, and `RecordBody` compares it.
 - `subtypes` is linking's throughout: a closed entry's own `subtypes` is empty when it is minted.
 - A schema error's verdict doesn't change when this library improves; a gap's does. `SchemaResolver` collects three
   exception types into a `Diagnostic`, and the type picks the code: `SchemaValidationException` → `SCHEMA_ERROR`,
@@ -175,7 +177,10 @@ are kept in step deliberately.
   restating a field group in a refinement or composition body (§5.11 — the same options, their members in the
   same order, types verbatim, a member's `?` dropped but never added, state tightening OPTIONAL→REQUIRED only;
   the member fields never change, since members flatten as optional regardless).
-- **A resolved field is four facts, not a state** (`RecordField`, the kernel's `record_field`), and §5.2's
+- **A resolved field is four facts, not a state** (`RecordField`, the kernel's `record_field`), held under its
+  name in `record.fields`: the name is the map's key, said once, so a resolver building a body puts each field
+  under the name its entry declares, and a tightening replaces the inherited value in place, keeping its position
+  — supertypes' fields first, in their order, then the body's. §5.2's
   spelling `name?: type? ~ value` has one mark per fact: the name's `?` is `optional` (the key may be omitted),
   the type's `?` is `voidable` (a written `_` is admitted), and `~`/`=` give the `role` (DEFAULT or FIXED) and
   its `value`. `FieldModifiers.of` maps the marks one to one and adds only its refusals: a default on an

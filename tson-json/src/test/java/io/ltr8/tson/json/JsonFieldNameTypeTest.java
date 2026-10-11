@@ -25,26 +25,26 @@ class JsonFieldNameTypeTest {
             !!import:"https://tson.io/2026/38/m/core.tn"
             {
               json_name => !identifier_type { start_add: "@$" }
-              node => !record { name_type: json_name  fields: [
-                { name: "@id"  type: text }  { name: label  type: text } ] }
-              ref => !record { name_type: json_name  fields: [
-                { name: "$ref"  type: text }  { name: "$id"  type: text  optional: true } ] }
-              typed => !record { name_type: json_name  fields: [ { name: "$type"  type: text } ] }
+              node => !record { name_type: json_name  fields: {
+                "@id" => { type: text }  label => { type: text } } }
+              ref => !record { name_type: json_name  fields: {
+                "$ref" => { type: text }  "$id" => { type: text  optional: true } } }
+              typed => !record { name_type: json_name  fields: { "$type" => { type: text } } }
               address => json_record & { city: text }
               located => ld_node & address
               folded => !identifier_type { normalization: NFKC_CASEFOLD }
-              frow => !record { name_type: folded  fields: [ { name: name  type: text } ] }
-              fbase => !record { name_type: folded  extension: ABSTRACT  fields: [] }
+              frow => !record { name_type: folded  fields: { name => { type: text } } }
+              fbase => !record { name_type: folded  extension: ABSTRACT  fields: {} }
               pet => abstract fbase & { kind: text =?  name: text }
               dog => pet & { kind?: = "dog"  breed: text }
               kennel => { p: pet }
               words => !identifier_type { continue_add: "-"  medial: " " }
-              row => !record { name_type: words  fields: [ { name: "first name"  type: text } ] }
-              json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+              row => !record { name_type: words  fields: { "first name" => { type: text } } }
+              json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
               ld_node => json_record & { "@id": text  label: text }
               ld_holder => { n: ld_node }
               ld_name => !identifier_type { start_add: "@" }
-              ld_only => !record { name_type: ld_name  fields: [ { name: "@id"  type: text } ] }
+              ld_only => !record { name_type: ld_name  fields: { "@id" => { type: text } } }
               plain => { a: text }
             }
             """;

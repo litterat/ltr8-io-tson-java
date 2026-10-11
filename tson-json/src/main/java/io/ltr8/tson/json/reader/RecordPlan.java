@@ -60,6 +60,9 @@ final class RecordPlan {
     /** Each field's name as a member name compares and is written -- NFC, computed once. */
     final String[] names;
 
+    /** Each field's name as the record declares it -- what a schema pointer and a message name it by. */
+    final String[] declaredNames;
+
     final RecordField[] fields;
 
     /** What each field yields when the document never writes it ({@link RecordField#omitted}). */
@@ -97,7 +100,8 @@ final class RecordPlan {
         this.displayName = EntryDisplayName.of(name, definition, context.schema().entries());
         this.selfNames = Set.copyOf(context.admitting(List.of(name)));
         int count = body.fields().size();
-        this.fields = body.fields().toArray(RecordField[]::new);
+        this.declaredNames = body.fields().keySet().toArray(String[]::new);
+        this.fields = body.fields().values().toArray(RecordField[]::new);
         this.names = new String[count];
         this.omitted = new RecordField.Omitted[count];
         this.schemaReaders = new JsonTypeReader<?>[count];
@@ -115,9 +119,10 @@ final class RecordPlan {
         this.nameProfile = identifiers == null ? IdentifierGrammar.PROFILE : identifiers.profile();
         for (int i = 0; i < count; i++) {
             RecordField field = fields[i];
-            names[i] = Nfc.of(field.name());
+            String declared = declaredNames[i];
+            names[i] = Nfc.of(declared);
             byName.put(nameForm.apply(names[i]), i);
-            omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(field.name())));
+            omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(declared)));
             schemaReaders[i] = context.readers().resolve(field.type().name());
             if (field.value().isPresent()) {
                 stated[i] = FieldValue.of(context.linked(), field.type().name(), field.value().get());
@@ -126,8 +131,7 @@ final class RecordPlan {
         this.index = Map.copyOf(byName);
         this.groups = body.groups().stream().map(group -> GroupPlan.of(group, byName, nameForm))
                 .toArray(GroupPlan[]::new);
-        this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().stream()
-                .map(RecordField::name).toList()));
+        this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().keySet()));
         this.subsumption = new SubsumptionDiagnostics(displayName);
     }
 
@@ -143,12 +147,12 @@ final class RecordPlan {
      * folds case, and only the written name is a pointer into the document.
      */
     JsonReadContext field(JsonReadContext ctx, int at, String memberName) {
-        return ctx.schemaField(memberName, fields[at].name(), fields[at].position());
+        return ctx.schemaField(memberName, declaredNames[at], fields[at].position());
     }
 
     /** {@link #field(JsonReadContext, int, String)} for a field the document never wrote, which has one name. */
     JsonReadContext field(JsonReadContext ctx, int at) {
-        return field(ctx, at, fields[at].name());
+        return field(ctx, at, declaredNames[at]);
     }
 
     /**
@@ -158,7 +162,7 @@ final class RecordPlan {
      */
     void duplicate(JsonReadContext ctx, int at, String memberName, JsonEvent.MemberName first) {
         field(ctx, at, memberName).report(first == null ? rules.duplicateField(memberName)
-                : rules.duplicateField(memberName, fields[at].name(), Nfc.of(first.name()), first.position()));
+                : rules.duplicateField(memberName, declaredNames[at], Nfc.of(first.name()), first.position()));
     }
 
     /** Whether this record's name type folds, so a repeat may be another spelling ({@link #duplicate}). */

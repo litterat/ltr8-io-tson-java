@@ -45,8 +45,8 @@ class TsonSchemaCompilerTest {
         // A -> B -> A. Compiling "A" at all (without a StackOverflowError) is what this proves --
         // B's own field circles back to A while A is still mid-construction, exactly the edge
         // DeferredTypeReader exists for.
-        RecordBody bodyA = RecordBody.of(List.of(RecordField.required("b", TypeRef.of("B"))));
-        RecordBody bodyB = RecordBody.of(List.of(RecordField.required("a", TypeRef.of("A"))));
+        RecordBody bodyA = RecordBody.of(RecordBody.fieldMap(Map.entry("b", RecordField.required(TypeRef.of("B")))));
+        RecordBody bodyB = RecordBody.of(RecordBody.fieldMap(Map.entry("a", RecordField.required(TypeRef.of("A")))));
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("A", TypeDefinition.product(bodyA));
         entries.put("B", TypeDefinition.product(bodyB));
@@ -62,7 +62,8 @@ class TsonSchemaCompilerTest {
 
     @Test
     void directSelfReferenceCompilesWithoutStackOverflow() {
-        RecordBody selfReferencing = RecordBody.of(List.of(RecordField.required("child", TypeRef.of("Node"))));
+        RecordBody selfReferencing =
+                RecordBody.of(RecordBody.fieldMap(Map.entry("child", RecordField.required(TypeRef.of("Node")))));
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("Node", TypeDefinition.product(selfReferencing));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
@@ -82,7 +83,7 @@ class TsonSchemaCompilerTest {
         // attempted at all until asked for); "used" (which never references "orphan") reads normally either
         // way.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("used", TypeDefinition.product(RecordBody.of(List.of())));
+        entries.put("used", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap())));
         entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.DATA,  List.of(), List.of(), new EndpointBody("/search")));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
@@ -117,8 +118,8 @@ class TsonSchemaCompilerTest {
     @Test
     void getOnAnUnknownNameEnumeratesTheTypesTheSchemaDoesDeclare() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("first", TypeDefinition.product(RecordBody.of(List.of())));
-        entries.put("second", TypeDefinition.product(RecordBody.of(List.of())));
+        entries.put("first", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap())));
+        entries.put("second", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap())));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
