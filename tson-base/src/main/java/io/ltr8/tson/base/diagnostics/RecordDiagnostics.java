@@ -66,13 +66,15 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     /**
      * {@link #duplicateField(String)} under a name type that folds case, where the repeat {@code stated} and the
      * first statement {@code first} may be two spellings of the field {@code declared}: the message names the
-     * field and where it was first given, so a repair finds the other spelling without searching for it.
+     * field and where it was first given, so a repair finds the other spelling without searching for it. The
+     * position is written {@code line:column:byteOffset}, as every position a report carries is.
      */
     public Refusal duplicateField(String stated, String declared, String first, SourcePosition firstAt) {
         return new Refusal(Diagnostic.Code.DUPLICATE_FIELD,
-                ("duplicate field '%s' on '%s' -- the field '%s' is already given, as '%s' at %d:%d, and a record "
-                        + "states each field at most once (§2.5)")
-                        .formatted(stated, typeName, declared, first, firstAt.line(), firstAt.column()),
+                ("duplicate field '%s' on '%s' -- the field '%s' is already given, as '%s' at %d:%d:%d, and a "
+                        + "record states each field at most once (§2.5)")
+                        .formatted(stated, typeName, declared, first, firstAt.line(), firstAt.column(),
+                                firstAt.byteOffset()),
                 "each field stated once", "'" + stated + "' stated again");
     }
 

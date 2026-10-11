@@ -137,7 +137,7 @@ class JsonFieldNameTypeTest {
         assertEquals(1, repeated.size(), repeated::toString);
         assertEquals(Diagnostic.Code.DUPLICATE_FIELD, repeated.getFirst().code());
         assertEquals("/NAME", repeated.getFirst().path().orElseThrow());
-        assertTrue(repeated.getFirst().message().contains("the field 'name' is already given, as 'name' at 1:2"),
+        assertTrue(repeated.getFirst().message().contains("the field 'name' is already given, as 'name' at 1:2:1"),
                 repeated.getFirst()::message);
     }
 

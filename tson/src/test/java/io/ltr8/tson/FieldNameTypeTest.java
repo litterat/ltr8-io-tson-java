@@ -359,7 +359,7 @@ class FieldNameTypeTest {
         assertEquals("/row/count", wrong.schemaPointer().orElseThrow());
         Diagnostic repeated = only(read(folded, "folded-path", "!row { COUNT: 1  Count: 2 }"));
         assertEquals("/Count", repeated.path().orElseThrow());
-        assertTrue(repeated.message().contains("the field 'count' is already given, as 'COUNT' at 2:8"),
+        assertTrue(repeated.message().contains("the field 'count' is already given, as 'COUNT' at 2:8:"),
                 repeated.message());
     }
 
