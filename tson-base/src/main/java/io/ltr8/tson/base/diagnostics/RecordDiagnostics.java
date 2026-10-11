@@ -54,12 +54,18 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
                         .formatted(field, typeName, nameType, reason, declaredFields), declaredFields, field);
     }
 
-    /** [TSON-DATA] §2.5: a record states each field at most once, and the repeat states a value for nothing. */
-    public Refusal duplicateField(String field) {
+    /**
+     * [TSON-DATA] §2.5: a record states each field at most once, and the repeat states a value for nothing.
+     * {@code stated} is the repeat as written and {@code declared} the field it is; they differ where the
+     * record's name type folds case, and the message then names the field both spellings are.
+     */
+    public Refusal duplicateField(String stated, String declared) {
+        String which = stated.equals(declared) ? ""
+                : ", which is the field '%s' as an earlier spelling was".formatted(declared);
         return new Refusal(Diagnostic.Code.DUPLICATE_FIELD,
-                "duplicate field '%s' on '%s' -- a record states each field at most once (§2.5), and the repeat "
-                        .formatted(field, typeName) + "states a value for nothing",
-                "each field stated once", "'" + field + "' stated again");
+                "duplicate field '%s' on '%s'%s -- a record states each field at most once (§2.5), and the repeat "
+                        .formatted(stated, typeName, which) + "states a value for nothing",
+                "each field stated once", "'" + stated + "' stated again");
     }
 
     /** A required field the document never mentioned. */

@@ -137,14 +137,23 @@ final class RecordPlan {
         return at == null ? -1 : at;
     }
 
-    /** {@code ctx} one declared field deeper, stepping the data path, the schema pointer and the schema line. */
+    /**
+     * {@code ctx} one declared field deeper, stepping the data path by {@code memberName}, the member as the
+     * document wrote it (NFC), and the schema pointer and line by the field -- the two differ where the name type
+     * folds case, and only the written name is a pointer into the document.
+     */
+    JsonReadContext field(JsonReadContext ctx, int at, String memberName) {
+        return ctx.schemaField(memberName, fields[at].name(), fields[at].position());
+    }
+
+    /** {@link #field(JsonReadContext, int, String)} for a field the document never wrote, which has one name. */
     JsonReadContext field(JsonReadContext ctx, int at) {
-        return ctx.schemaField(fields[at].name(), fields[at].position());
+        return field(ctx, at, fields[at].name());
     }
 
     /** §3.1: a repeated member name is an error at the repeated occurrence; the later value still wins. */
     void duplicate(JsonReadContext ctx, int at, String memberName) {
-        field(ctx, at).report(rules.duplicateField(memberName));
+        field(ctx, at, memberName).report(rules.duplicateField(memberName, fields[at].name()));
     }
 
     /**

@@ -96,15 +96,19 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * what matters beyond this implementation: any port descends the same way and would inherit the same
      * waste from the same shape.
      *
-     * <p>{@code schemaToo} is what keeps the two pointers apart. Every schema step is a data step, but not
+     * <p>{@code schemaName} is what keeps the two pointers apart. Every schema step is a data step, but not
      * the reverse: an array index moves through the document without moving through the schema, whose
      * element type is declared once for the whole array. So one chain carries both, and the schema pointer
-     * renders the marked subset.
+     * renders the subset that has a schema name. The two names of one step differ where a name type's form
+     * matches a document's {@code Content-Type} to a declared {@code content-type}: the data path spells the
+     * key as written, which is the only spelling RFC 6901 finds in the document, and the schema pointer the
+     * declaration.
      *
-     * @param name  the field name, or {@code null} for an array index
-     * @param index the array index, meaningful only when {@code name} is {@code null}
+     * @param name       the field name as the document wrote it, or {@code null} for an array index
+     * @param index      the array index, meaningful only when {@code name} is {@code null}
+     * @param schemaName the declared field's name, or {@code null} for a step the schema pointer does not take
      */
-    private record PathStep(PathStep parent, String name, int index, boolean schemaToo) {
+    private record PathStep(PathStep parent, String name, int index, String schemaName) {
     }
 
     private final Cursor cursor;
@@ -374,9 +378,9 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     /**
-     * The RFC 6901 pointer {@link #tail}'s chain spells: every step for the data path, the {@code schemaToo}
-     * ones for the schema pointer. Rendered nowhere else, and reached only by {@link #report} and a caller
-     * that asks.
+     * The RFC 6901 pointer {@link #tail}'s chain spells: every step for the data path, the ones with a
+     * {@code schemaName} for the schema pointer, by that name. Rendered nowhere else, and reached only by
+     * {@link #report} and a caller that asks.
      */
     private String render(boolean schemaOnly) {
         StringBuilder out = new StringBuilder();
@@ -392,7 +396,10 @@ final class DefaultTsonReadContext implements TsonReadContext {
             return;
         }
         append(out, step.parent(), schemaOnly);   // parent first: the chain links backwards, the pointer reads forwards
-        if (schemaOnly && !step.schemaToo()) {
+        if (schemaOnly) {
+            if (step.schemaName() != null) {
+                out.append('/').append(escape(step.schemaName()));
+            }
             return;
         }
         out.append('/');
@@ -405,19 +412,19 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public TsonReadContext field(String name) {
-        return stepping(new PathStep(tail, name, -1, false));
+        return stepping(new PathStep(tail, name, -1, null));
     }
 
     @Override
     public TsonReadContext index(int i) {
-        return stepping(new PathStep(tail, null, i, false));
+        return stepping(new PathStep(tail, null, i, null));
     }
 
     @Override
-    public TsonReadContext schemaField(String name, Optional<SourcePosition> fieldPosition) {
+    public TsonReadContext schemaField(String stated, String declared, Optional<SourcePosition> fieldPosition) {
         // The same one allocation stepping() makes for every other descent; the ternary only chooses which
         // position it carries, and an absent one leaves the enclosing record's exactly as before.
-        return new DefaultTsonReadContext(cursor, new PathStep(tail, name, -1, schemaRoot != null),
+        return new DefaultTsonReadContext(cursor, new PathStep(tail, stated, -1, schemaRoot != null ? declared : null),
                 schemaRoot, schemaId, fieldPosition.isPresent() ? fieldPosition : schemaPosition,
                 positionOverride);
     }

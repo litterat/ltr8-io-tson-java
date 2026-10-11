@@ -326,9 +326,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 EventSkip.scopedValue(ctx);
                 continue;
             }
+            // The data path spells the name as written, the schema pointer as declared: under a folding name type
+            // the two differ, and only the written one is a pointer into the document (schemaField).
+            RecordField declared = fields.get(schemaIndex).schema();
             if (seen[schemaIndex]) {
-                ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position())
-                        .report(rules.duplicateField(fieldName.name()));
+                ctx.schemaField(fieldName.name(), declared.name(), declared.position())
+                        .report(rules.duplicateField(fieldName.name(), declared.name()));
             }
             if (fixedCheck[schemaIndex] != null) {
                 // A FIXED field's value comes from the schema, never the data -- but the data may still
@@ -342,8 +345,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
             SchemaRef push = ScopePush.notAdmitted(ctx, fields.get(schemaIndex).parser());
             if (push != null) {
-                ScopePush.refuse(ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position()),
-                        fields.get(schemaIndex).schema().type().name(), push);
+                ScopePush.refuse(ctx.schemaField(fieldName.name(), declared.name(), declared.position()),
+                        declared.type().name(), push);
             }
             Object decoded;
             if (ctx.peek() instanceof VoidEvent) {
@@ -351,7 +354,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 decoded = valueForVoidField(schemaIndex, ctx);
             } else {
                 decoded = fields.get(schemaIndex).parser()
-                        .read(ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position()));
+                        .read(ctx.schemaField(fieldName.name(), declared.name(), declared.position()));
             }
             sink.accept(schemaIndex, decoded);
             seen[schemaIndex] = true;
@@ -365,7 +368,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         boolean[] seen = new boolean[fields.size()];
         int index = positionalFieldIndex;
         Object decoded = fields.get(index).parser()
-                .read(ctx.schemaField(fields.get(index).schema().name(), fields.get(index).schema().position()));
+                .read(ctx.schemaField(fields.get(index).schema().name(), fields.get(index).schema().name(),
+                        fields.get(index).schema().position()));
         sink.accept(index, decoded);
         seen[index] = true;
         return seen;
@@ -471,7 +475,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             return statedVoidValue();
         }
         if (schema.role() == FieldRole.DEFAULT) {
-            ctx.schemaField(schema.name(), schema.position())
+            ctx.schemaField(schema.name(), schema.name(), schema.position())
                     .report(rules.voidAtDefaultedField(schema.name(), VOID));
             return precomputedValue[schemaIndex];
         }
@@ -479,7 +483,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         // valueForMissingField reported "missing required field", which tells an author they forgot a field
         // they can see themselves writing -- §5.2's rule is that `_` asserts absence at a position the schema
         // always fills, and that is what the diagnostic should say.
-        ctx.schemaField(schema.name(), schema.position())
+        ctx.schemaField(schema.name(), schema.name(), schema.position())
                 .report(rules.voidAtRequiredField(schema.name(), VOID));
         return null;
     }
@@ -514,7 +518,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         RecordField schema = fields.get(schemaIndex).schema();
         return switch (omitted[schemaIndex]) {
             case MISSING -> {
-                ctx.schemaField(schema.name(), schema.position())
+                ctx.schemaField(schema.name(), schema.name(), schema.position())
                         .report(rules.missingRequiredField(schema.name()));
                 yield null;
             }
@@ -543,7 +547,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         SchemaRef push = ScopePush.notAdmitted(ctx, fields.get(schemaIndex).parser());
         FixedCheck check = fixedCheck[schemaIndex];
         RecordField schema = fields.get(schemaIndex).schema();
-        TsonReadContext fieldCtx = ctx.schemaField(fieldName, schema.position());
+        TsonReadContext fieldCtx = ctx.schemaField(fieldName, schema.name(), schema.position());
         if (push != null) {
             // A FIXED field's type is an atom or an enum (§5.2), so it is never scoped and the directive is
             // always refused here -- but it is refused rather than ignored, which is the point.

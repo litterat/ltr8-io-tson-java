@@ -161,6 +161,23 @@ final class ValidateCommand {
             return 2;
         }
 
+        // Every schema file on the command line loads before any document is read, as a --schema file does:
+        // one that does not load is the invocation's problem, and a document naming it is never read against it,
+        // so reporting the failure in that document's report would claim a check that never happened. A run
+        // that binds its schema either way gets one outcome.
+        for (String id : declaredIds) {
+            String identity = CanonicalIdentity.canonicalize(id);
+            if (tson.schemaRegistry().getByCanonicalIdentity(identity).isPresent()) {
+                continue;   // loaded already, as an import of one before it
+            }
+            List<Diagnostic> problems = tson.validateSchema(schemas.get(identity));
+            if (!problems.isEmpty()) {
+                System.out.println(format.render(ValidationRun.failed(policy,
+                        problems.stream().map(CliDiagnostic::from).toList())));
+                return 2;
+            }
+        }
+
         // Every file's report is collected before anything is printed: the envelope's own verdict is the
         // AND across the files, so there is nothing to emit until the last one is in.
         Json json = binding == null ? null

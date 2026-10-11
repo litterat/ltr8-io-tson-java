@@ -123,6 +123,23 @@ class JsonFieldNameTypeTest {
         }
     }
 
+    /**
+     * Under a folding name type a member and its field are spelled two ways, and each pointer takes its own: the
+     * data path the member as written, the only spelling RFC 6901 finds in the document, the schema pointer the
+     * declaration. A repeat is reported at the repeat, naming the field both spellings are.
+     */
+    @Test
+    void aFoldedMembersPathIsTheMemberAsWritten() {
+        Diagnostic wrong = read("frow", "{\"NAME\": 5}").getFirst();
+        assertEquals("/NAME", wrong.path().orElseThrow());
+        assertEquals("/frow/name", wrong.schemaPointer().orElseThrow());
+        List<Diagnostic> repeated = read("frow", "{\"name\": \"a\", \"NAME\": \"b\"}");
+        assertEquals(1, repeated.size(), repeated::toString);
+        assertEquals(Diagnostic.Code.DUPLICATE_FIELD, repeated.getFirst().code());
+        assertEquals("/NAME", repeated.getFirst().path().orElseThrow());
+        assertTrue(repeated.getFirst().message().contains("which is the field 'name'"), repeated.getFirst()::message);
+    }
+
     /** A record composing a fieldless base takes the base's field name type, and reads untagged where it is typed. */
     @Test
     void aCompositionReadsItsMembersByItsBasesFieldNameType() {

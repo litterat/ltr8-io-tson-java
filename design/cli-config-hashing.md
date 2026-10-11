@@ -87,7 +87,10 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
 `tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each
 as schema or data (`TsonDocumentPeek.of(…).isSchemaDocument()` — a header carrying `!!meta` is a schema document),
 exposes the schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the
-`!!schema` URI selects the schema, the root type-ref selects the type, no `!!schema` means schemaless.
+`!!schema` URI selects the schema, the root type-ref selects the type, no `!!schema` means schemaless. **Every
+schema file loads before any document is read** (`Tson.validateSchema`), as a `--schema` file does: one that does
+not load fails the run `UNDETERMINED`, exit 2, with its diagnostics, since a document naming it would never be read
+against it and reporting the schema's error in that document's report would be a rejection for a check never made.
 **A TSON data document is fully self-describing, so it takes no `--type`**; `--schema`/`--type` exist for JSON
 inputs alone, which can name neither for themselves ("JSON inputs" below).
 

@@ -207,6 +207,24 @@ class ValidateCommandTest {
         assertTrue(output.contains("[ATOM_FORM_INVALID]"), output);
     }
 
+    /**
+     * A schema file that does not load is the invocation's problem however the data binds it: named by a
+     * document's own !!schema, as by --schema, the run is UNDETERMINED and exits 2 before any document is read
+     * against it, rather than reporting the schema's error as that document's rejection.
+     */
+    @Test
+    void aSchemaFileThatDoesNotLoadIsUndeterminedNotARejection(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA.replace("b: int32", "b: nonesuch"));
+        Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
+
+        String output = captureStdout(() ->
+                assertEquals(2, ValidateCommand.run(inputs(schema, data), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
+
+        assertTrue(output.contains("\"outcome\":\"UNDETERMINED\""), output);
+        assertTrue(output.contains("\"files\":[]"), output);
+        assertTrue(output.contains("SCHEMA_ERROR") && output.contains("nonesuch"), output);
+    }
+
     // --- infra ---
 
     @Test
@@ -304,13 +322,15 @@ class ValidateCommandTest {
 
     @Test
     void aSchemaPinnedByItsOwnHashResolvesAgainstAPlainReference(@TempDir Path dir) throws IOException {
-        // The schema's !!id carries a ?sha256= pin; the data's !!schema is plain. Matching is by
-        // canonical identity (the hash is not identity), so it still validates.
+        // The schema's !!id carries a ?sha256= pin, its own content's (the id line is not hashed); the data's
+        // !!schema is plain. Matching is by canonical identity (the hash is not identity), so it still validates.
+        String body = "!!meta:\"https://tson.io/2026/38/m/meta.tn\"\n"
+                + "!!import:\"https://tson.io/2026/38/m/core.tn\"\n"
+                + "{ my_record => { a: int32  b: int32 } }\n";
+        String unpinned = "!!id:\"https://example.test/cli-validate.tn\"\n" + body;
+        String pin = io.ltr8.tson.compiler.TsonContentHash.sha256(unpinned.getBytes(StandardCharsets.UTF_8));
         Path schema = writeFile(dir, "schema.tn",
-                "!!id:\"https://example.test/cli-validate.tn?sha256=" + "a".repeat(64) + "\"\n"
-                        + "!!meta:\"https://tson.io/2026/38/m/meta.tn\"\n"
-                        + "!!import:\"https://tson.io/2026/38/m/core.tn\"\n"
-                        + "{ my_record => { a: int32  b: int32 } }\n");
+                "!!id:\"https://example.test/cli-validate.tn?sha256=" + pin + "\"\n" + body);
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->

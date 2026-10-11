@@ -119,8 +119,14 @@ public interface TsonReadContext {
      *
      * <p><b>Absent keeps the enclosing record's position</b>, which is the honest answer for a document whose
      * source this resolver never saw -- a hand-built one, or the bootstrap.
+     *
+     * <p><b>Two names, because the document and the schema may spell one field two ways</b>: under a
+     * case-folding name type a document's {@code Content-Type} is the field {@code content-type}. The data path
+     * takes {@code stated}, the name as the document wrote it, since RFC 6901 compares exactly and a pointer to
+     * the declared spelling names nothing in the document; the schema pointer takes {@code declared}. A field
+     * the document never wrote -- a missing or defaulted one -- passes its declared name as both.
      */
-    TsonReadContext schemaField(String name, Optional<SourcePosition> fieldPosition);
+    TsonReadContext schemaField(String stated, String declared, Optional<SourcePosition> fieldPosition);
 
     /**
      * A copy of this context anchored on the record now reading: {@code declaration}'s identity and position

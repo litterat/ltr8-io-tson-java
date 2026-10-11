@@ -343,6 +343,24 @@ class FieldNameTypeTest {
                 "!row { name: \"x\"  NAME: \"y\" }")).code());
     }
 
+    /**
+     * Under a folding name type a document's name and its field are spelled two ways, and each pointer takes its
+     * own: the data path the name as written, the schema pointer the declaration; a repeat names the field.
+     */
+    @Test
+    void aFoldedNamesPathIsTheNameAsWritten() {
+        String folded = schema("folded-path", """
+                  folded => !identifier_type { normalization: NFKC_CASEFOLD }
+                  row => !record { name_type: folded  fields: [ { name: count  type: int32 } ] }
+                """);
+        Diagnostic wrong = only(read(folded, "folded-path", "!row { COUNT: x }"));
+        assertEquals("/COUNT", wrong.path().orElseThrow());
+        assertEquals("/row/count", wrong.schemaPointer().orElseThrow());
+        Diagnostic repeated = only(read(folded, "folded-path", "!row { count: 1  Count: 2 }"));
+        assertEquals("/Count", repeated.path().orElseThrow());
+        assertTrue(repeated.message().contains("which is the field 'count'"), repeated.message());
+    }
+
     /** A family's selector is found in its base's name form too, so a member is chosen however its name is cased. */
     @Test
     void aSelectorIsMatchedInItsBasesNameForm() {
