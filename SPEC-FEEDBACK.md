@@ -686,7 +686,7 @@ yet, so no verdict changes: the corpus passes unchanged.
 constructor's `discriminators`), §8.2's constructor-refinement table (`text_enum`), §10's meta-kernel inventory,
 §12.1, §13.2 (the artifact pins); [TSON-JSON] §1, §3 (the annotation members), §6.1.1, §9.4.
 
-**Kind:** proposal, under consideration for adoption — on the branch `experiment/field-name-type`, PR into
+**Kind:** proposal, under consideration for adoption — on the branch `record-name-type`, PR into
 `r2026-38-proposal`.
 
 **The problem.** A field name is an identifier at every layer, so `{ "@id": x }` and `{ "$ref": x }` are parse
@@ -885,4 +885,4 @@ relaxed type, defined by the translation and not by the series, such as
 **Open:** the default for a JSON member name that is not an identifier; whether a template's field names are
 judged at its declaration, where today they are judged at each application, under the closed record's name type.
 
-**Status against Revision 37:** open; under consideration, implemented on `experiment/field-name-type`.
+**Status against Revision 37:** open; under consideration, implemented on `record-name-type`.
