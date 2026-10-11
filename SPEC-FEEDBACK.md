@@ -787,6 +787,13 @@ relaxed type, defined by the translation and not by the series, such as
   reads it. The spec says nothing about when a name is judged relative to dispatch; this is the reading that
   reports a name once and by the right rule. A family's members compose its base, so they share its type, and the
   question would only bite a choice whose variants differ in theirs.
+- **An ASCII base for an ASCII name.** A name compared the way ASCII protocols compare theirs — an HTTP field
+  name, a URI scheme — had to list the alphabet in `start_add` and again in `continue_add` over a `NONE` base,
+  since `ASCII_CASEFOLD` implies NFC only over ASCII. `identifier_base` gains `ASCII`, XID's ASCII members
+  (Start `A-Z a-z`, Continue adding `0-9 _`), so an HTTP field name is one line —
+  `!identifier_type { start: ASCII  continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD }` — and the
+  kernel's `scheme_name` is `start: ASCII  continue: ASCII  continue_add: "+-."  exclude: "_"`. *Implemented on
+  the branch.*
 - **A name binds and writes as the record states it.** A host component binds a relaxed name through the name it
   states (`@Field("@id")`), as it binds any other, and a writer quotes a name that is no identifier, so the
   document reads back.

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=52f734ce9516101c22719a9a4bc3b5e2c1a4eec6072eae71e70c61ac22f053ea"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=629483f1747af03931529da1d9c687396846fb4482ffff929522c39d9f7451bf"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -298,9 +298,10 @@
 
   @doc:"""
     The base a UAX #31 Start or Continue set is drawn from: XID_Start /
-    XID_Continue, ID_Start / ID_Continue, or the empty set.
+    XID_Continue, ID_Start / ID_Continue, their ASCII members (Start A-Z a-z,
+    Continue adding 0-9 and "_"), or the empty set.
     """
-  identifier_base => !enum [XID ID NONE]
+  identifier_base => !enum [XID ID ASCII NONE]
 
   @doc:"""
     The form a text value is put into. NONE keeps the text as written. NFC and
@@ -413,10 +414,8 @@
     A URI scheme (RFC 3986 §3.1): a letter, then letters, digits, "+", "-" and
     ".". A scheme compares without case, so its value is the text folded.
     """
-  scheme_name => !identifier_type { start: NONE  continue: NONE
-    start_add: "abcdefghijklmnopqrstuvwxyz"
-    continue_add: "abcdefghijklmnopqrstuvwxyz0123456789+-."
-    normalization: ASCII_CASEFOLD }
+  scheme_name => !identifier_type { start: ASCII  continue: ASCII
+    continue_add: "+-."  exclude: "_"  normalization: ASCII_CASEFOLD }
 
   @doc:"An IRI (RFC 3987 §2.2): the scheme is required."
   iri => !iri_type { allow_relative: false }

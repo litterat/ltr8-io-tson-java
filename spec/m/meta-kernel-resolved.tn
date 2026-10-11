@@ -226,7 +226,7 @@
 
   identifier_base => !type_definition {
     source: enum
-    body: !enum { members: [XID ID NONE] }
+    body: !enum { members: [XID ID ASCII NONE] }
   }
 
   normalization => !type_definition {
@@ -281,7 +281,7 @@
 
   scheme_name => !type_definition {
     source: identifier_type
-    body: !identifier_type { start: NONE  continue: NONE  start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789+-."  normalization: ASCII_CASEFOLD }
+    body: !identifier_type { start: ASCII  continue: ASCII  continue_add: "+-."  exclude: "_"  normalization: ASCII_CASEFOLD }
   }
 
   iri => !type_definition {

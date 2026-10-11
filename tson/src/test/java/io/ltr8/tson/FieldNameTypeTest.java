@@ -220,10 +220,25 @@ class FieldNameTypeTest {
         }
         Tson.standard().resolve(schema("ascii", """
               header => !identifier_type { start: NONE  continue: NONE  normalization: ASCII_CASEFOLD
-                start_add: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                continue_add: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" medial: "-" }
+                start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789"
+                medial: "-" }
               headers => !record { name_type: header  fields: [ { name: "content-type"  type: text } ] }
             """));
+    }
+
+    /**
+     * The {@code ASCII} base makes a case-insensitive ASCII name type one line, an HTTP field name's: admitted under
+     * {@code ASCII_CASEFOLD}, and a document's {@code Content-Type} is the field {@code content-type}.
+     */
+    @Test
+    void anAsciiBaseMakesAnHttpFieldNameOneLine() {
+        String headers = schema("headers", """
+              header => !identifier_type { start: ASCII  continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD }
+              headers => !record { name_type: header  fields: [ { name: "content-type"  type: text } ] }
+            """);
+        assertEquals(List.of(), read(headers, "headers", "!headers { \"Content-Type\": \"text/plain\" }"));
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, only(read(headers, "headers",
+                "!headers { \"content-type\": \"a\"  \"x-\u00e9\": 1 }")).code());
     }
 
     /** The default does not change under a schema either: an identifier, refused at schema load. */

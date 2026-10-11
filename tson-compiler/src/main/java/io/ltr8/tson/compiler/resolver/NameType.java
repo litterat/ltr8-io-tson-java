@@ -95,7 +95,8 @@ public final class NameType {
      * form that implies NFC: under one that does not, two canonically equivalent spellings are two names that
      * render alike, the confusion §8.2's rules exist to refuse, and no reader could match a document's name to a
      * declared one without choosing a form the type never stated. {@code NONE} implies none; {@code ASCII_CASEFOLD}
-     * implies NFC only of ASCII text, so it names a type whose every character is ASCII.
+     * implies NFC only of ASCII text, so it names a type whose every character is ASCII -- an {@code ASCII} or
+     * empty base, and additions within ASCII.
      */
     public static Optional<String> formRefusal(IdentifierType type) {
         return switch (type.normalization()) {
@@ -103,15 +104,20 @@ public final class NameType {
                     + "are two names; a name type's form implies NFC");
             case ASCII_CASEFOLD -> asciiOnly(type) ? Optional.empty() : Optional.of("its normalization is "
                     + "ASCII_CASEFOLD, which leaves text beyond ASCII unnormalized, and its profile admits such text; "
-                    + "a name type's form implies NFC -- use NFKC_CASEFOLD, or admit only ASCII");
+                    + "a name type's form implies NFC -- use NFKC_CASEFOLD, or admit only ASCII "
+                    + "('start: ASCII  continue: ASCII')");
             case NFC, NFKC, NFKC_CASEFOLD -> Optional.empty();
         };
     }
 
     private static boolean asciiOnly(IdentifierType type) {
-        return type.start() == IdentifierProfile.Base.NONE && type.continueBase() == IdentifierProfile.Base.NONE
+        return asciiBase(type.start()) && asciiBase(type.continueBase())
                 && Stream.of(type.startAdd(), type.continueAdd(), type.medial())
                         .flatMap(Optional::stream).allMatch(text -> text.chars().allMatch(c -> c < 0x80));
+    }
+
+    private static boolean asciiBase(IdentifierProfile.Base base) {
+        return base == IdentifierProfile.Base.ASCII || base == IdentifierProfile.Base.NONE;
     }
 
     private static Optional<Resolved> ofEnum(TypeDefinition enumeration, EnumBody body,

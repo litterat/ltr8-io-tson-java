@@ -10,7 +10,8 @@ refusal interacts with the verdicts around it. Current form only; history lives 
   field name a lookahead pulls is the one deferral: it is judged when a reader reads it, under that reader's rule.
 - A record reader pulls its own names through `nextFieldName(rule)`, its name type (`FieldNameRule.FIELD_NAME` where
   it states none, never `null`); every other pull of a field name — schemaless readers, `EventSkip` — judges it as a
-  schemaless record's, an identifier or `ATOM_FORM_INVALID`.
+  schemaless record's, an identifier or `ATOM_FORM_INVALID`, except a root value a read abandons, which
+  `discardUnjudged` skips with no name rule at all.
 - A name its record's type refuses is reported nothing at the pull: the reader reports it `UNRECOGNIZED_FIELD` with
   the type's reason (`FieldNameRule.refusal`), in both encodings. A field name's refusals are at the field's pointer.
 - A refused name draws no verdict beside its refusal: both record readers checkpoint `ctx.reported()` across the pull

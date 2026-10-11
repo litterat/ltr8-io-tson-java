@@ -21,9 +21,10 @@ import java.util.Optional;
  * </pre>
  *
  * with a base of {@code XID_Start}/{@code XID_Continue} ({@link Base#XID}), {@code ID_Start}/{@code ID_Continue}
- * ({@link Base#ID}) or the empty set ({@link Base#NONE}), and the whole text in the {@link Normalization} form
- * the profile requires. A medial character stands only between two others, and never beside another medial;
- * the set is disjoint from Start and Continue, or the rule could not tell which one a character is using.
+ * ({@link Base#ID}), their ASCII members ({@link Base#ASCII}) or the empty set ({@link Base#NONE}), and the whole
+ * text in the {@link Normalization} form the profile requires. A medial character stands only between two others,
+ * and never beside another medial; the set is disjoint from Start and Continue, or the rule could not tell which
+ * one a character is using.
  *
  * <p>Everything else follows from the base rather than from a clause of its own -- whitespace, C0/C1 controls,
  * {@code Cf} format characters, emoji and unassigned code points are none of them {@code XID_Continue}.
@@ -51,6 +52,12 @@ public final class IdentifierProfile {
         XID,
         /** {@code ID_Start} / {@code ID_Continue}: XID plus the few characters whose NFKC form is not one. */
         ID,
+        /**
+         * XID's ASCII members: Start is {@code A-Z a-z}, Continue adds {@code 0-9 _}. The base of a name compared
+         * the way ASCII protocols compare theirs -- an HTTP field name, a URI scheme -- which would otherwise list
+         * the alphabet in its additions.
+         */
+        ASCII,
         /** The empty set: the additions are the whole set. */
         NONE
     }
@@ -151,7 +158,7 @@ public final class IdentifierProfile {
         if (contains(exclude, cp)) {
             return " -- this profile excludes it";
         }
-        if (start != Base.NONE && startAdd.length == 0) {
+        if ((start == Base.XID || start == Base.ID) && startAdd.length == 0) {
             return Character.isDigit(cp) || cp == '-' || cp == '+' || cp == '.'
                     ? " -- an identifier never begins with a digit or a sign" : "";
         }
@@ -159,11 +166,14 @@ public final class IdentifierProfile {
         for (int c : startAdd) {
             added.appendCodePoint(c);
         }
-        return " -- its Start characters are " + switch (start) {
-            case XID -> "XID_Start and '" + added + "'";
-            case ID -> "ID_Start and '" + added + "'";
-            case NONE -> "'" + added + "'";
+        String base = switch (start) {
+            case XID -> "XID_Start";
+            case ID -> "ID_Start";
+            case ASCII -> "the ASCII letters";
+            case NONE -> "";
         };
+        return " -- its Start characters are " + (added.isEmpty() ? base
+                : base.isEmpty() ? "'" + added + "'" : base + " and '" + added + "'");
     }
 
     private boolean isStart(int cp) {
@@ -178,6 +188,7 @@ public final class IdentifierProfile {
         return switch (base) {
             case XID -> start ? Xid.isStart(cp) : Xid.isContinue(cp);
             case ID -> start ? Xid.isIdStart(cp) : Xid.isIdContinue(cp);
+            case ASCII -> cp < 0x80 && (start ? Xid.isStart(cp) : Xid.isContinue(cp));
             case NONE -> false;
         };
     }

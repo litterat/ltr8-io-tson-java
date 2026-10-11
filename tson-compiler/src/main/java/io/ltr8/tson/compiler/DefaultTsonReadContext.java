@@ -75,6 +75,9 @@ final class DefaultTsonReadContext implements TsonReadContext {
          */
         Set<TsonEvent> unjudged;
 
+        /** False while {@link #discardUnjudged} skips a value no rule is judging; true for the whole of a read. */
+        boolean judging = true;
+
         Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy) {
             this.events = events;
             this.receiver = receiver;
@@ -220,6 +223,9 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * to run wherever a name is actually delivered.
      */
     private void checkNameHygiene(TsonEvent event) {
+        if (!cursor.judging) {
+            return;
+        }
         String name = switch (event) {
             case io.ltr8.tson.compiler.stream.TypeRef typeRef -> typeRef.name();
             case io.ltr8.tson.compiler.stream.AnnotationStart annotation -> annotation.name();
@@ -301,6 +307,25 @@ final class DefaultTsonReadContext implements TsonReadContext {
      */
     private static void refuse(TsonReadContext at, String name, String violation, Diagnostic.Code code) {
         at.report(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
+    }
+
+    /**
+     * Skips the data value at {@code ctx}'s cursor judging nothing in it: no name in it meets a name rule. For a
+     * value a read abandons unread -- its schema could not be obtained or did not load, or names no type the
+     * root could take -- since a document no schema is judging is not judged ([TSON-DATA] §8.1), and judging its
+     * names by the schemaless rule would hand down verdicts a schema might have relaxed, beside the one problem
+     * that is the real one. The syntax is still read, because skipping a value is parsing it. The cast cannot
+     * fail for a context this library made (see {@link #lookingAhead}).
+     */
+    static void discardUnjudged(TsonReadContext ctx) {
+        Cursor cursor = ((DefaultTsonReadContext) ctx).cursor;
+        boolean outer = cursor.judging;
+        cursor.judging = false;
+        try {
+            io.ltr8.tson.compiler.stream.EventSkip.dataValue(ctx);
+        } finally {
+            cursor.judging = outer;
+        }
     }
 
     /**

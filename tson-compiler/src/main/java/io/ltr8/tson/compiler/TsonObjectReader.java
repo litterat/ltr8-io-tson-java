@@ -732,7 +732,8 @@ public final class TsonObjectReader {
     }
 
     /**
-     * Reports {@code code}/{@code message}, discards the root value, and yields no object -- see {@link
+     * Reports {@code code}/{@code message}, discards the root value unjudged ({@link
+     * DefaultTsonReadContext#discardUnjudged}), and yields no object -- see {@link
      * #readAgainstSchema}. There is deliberately no overload that omits {@code expected}/{@code actual}: a
      * facade-level failure is exactly the kind a machine consumer must be able to act on without reading
      * prose, and the omitting overload this used to have is how three of them ended up with a blank
@@ -741,7 +742,7 @@ public final class TsonObjectReader {
     private static <T> T abandon(TsonReadContext ctx, Diagnostic.Code code, String message, String expected,
             String actual) {
         ctx.report(code, message, expected, actual);
-        EventSkip.dataValue(ctx);
+        DefaultTsonReadContext.discardUnjudged(ctx);
         return null;
     }
 
@@ -754,7 +755,7 @@ public final class TsonObjectReader {
      */
     private static <T> T abandon(TsonReadContext ctx, SchemaFailure failure, String message, String actual) {
         ctx.report(failure.code(), message, failure.expected(), actual);
-        EventSkip.dataValue(ctx);
+        DefaultTsonReadContext.discardUnjudged(ctx);
         return null;
     }
 
@@ -782,7 +783,7 @@ public final class TsonObjectReader {
             return abandon(ctx, failure, e.getMessage(), schemaUri);
         }
         if (compiled == null) {
-            EventSkip.dataValue(ctx);
+            DefaultTsonReadContext.discardUnjudged(ctx);
             return null;
         }
         String name = typeName;

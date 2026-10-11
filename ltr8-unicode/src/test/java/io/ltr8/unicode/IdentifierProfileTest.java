@@ -69,6 +69,20 @@ class IdentifierProfileTest {
         assertTrue(excluded.endsWith("this profile excludes it"), excluded);
     }
 
+    /**
+     * The ASCII base is XID's ASCII members -- a letter to start, then letters, digits and {@code _} -- so an HTTP
+     * field name is the base and a medial {@code -}, with no alphabet listed.
+     */
+    @Test
+    void theAsciiBaseIsXidsAsciiMembers() {
+        IdentifierProfile header = profile(Base.ASCII, Base.ASCII, "", "", "-", "", Normalization.NFC);
+        admits(header, "Content-Type", "x-request-id", "a_b", "h2");
+        assertTrue(refuses(header, "caf\u00e9").contains("cannot appear"));
+        assertTrue(refuses(header, "\u00e9t\u00e9").endsWith("its Start characters are the ASCII letters"));
+        refuses(header, "_a");
+        refuses(header, "2a");
+    }
+
     /** An ASCII-only name: no base at all, every character listed. */
     @Test
     void aNoneBaseAdmitsOnlyItsAdditions() {
