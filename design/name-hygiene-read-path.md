@@ -8,8 +8,11 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 - The token policy is the stream's, not the context's: a context rewinds, a stream produces each token exactly once.
 - The per-name rules run in `DefaultTsonReadContext`, only on a freshly pulled event — never on a replayed one. A
   field name a lookahead pulls is the one deferral: it is judged when a reader reads it, under that reader's rule.
-- A record reader pulls its own names through `nextFieldName(rule)`, its field name type; every other pull of a
-  field name — schemaless readers, `EventSkip` — judges it as an identifier.
+- A record reader pulls its own names through `nextFieldName(rule)`, its name type (`FieldNameRule.FIELD_NAME` where
+  it states none, never `null`); every other pull of a field name — schemaless readers, `EventSkip` — judges it as a
+  schemaless record's, an identifier or `ATOM_FORM_INVALID`.
+- A name its record's type refuses is reported nothing at the pull: the reader reports it `UNRECOGNIZED_FIELD` with
+  the type's reason (`FieldNameRule.refusal`), in both encodings. A field name's refusals are at the field's pointer.
 - A refused name draws no verdict beside its refusal: both record readers checkpoint `ctx.reported()` across the pull
   and skip their `UNRECOGNIZED_FIELD`.
 - Both surfaces are allocation-free when nothing is refused: `IdentifierPolicy.judge` answers a passing name with the
@@ -86,15 +89,21 @@ one name once per lookahead that crossed it. `NameHygieneTest` counts every shap
 because that is the failure that would survive every other test.
 
 **A field name is judged by the record that reads it** (SPEC-FEEDBACK.md #10). The grammar admits any single-line
-token in name position, and the match against the record's `name_type` is here: a name the type refuses is
-`ATOM_FORM_INVALID` and meets no hygiene rule; one it admits meets the per-name rules under the type's profile, an
-identifier family's. The rule is the reading record's, passed on the one pull (`TsonReadContext.nextFieldName`), so a
-record nested in a relaxed one keeps identifier names. A name it admits is matched against the declared ones in the
-type's `normalization` (`FieldNameRule.form`, from `TsonLinkedSchema.nameForm`), the equality the linker judged them
-distinct under; under NFC, every name's form already, the index is the declared names themselves. A lookahead —
-`RecordMemberDispatchReader`'s discriminator scan — crosses a member's names before the member is chosen, so a field
-name pulled while one is running is held in the cursor's `unjudged` set and judged when a reader outside any lookahead
-reads it. The set is allocated only when a lookahead crosses a field name.
+token in name position, and the match against the record's `name_type` is here: a name the type refuses meets no
+hygiene rule and is reported nothing at the pull, since it can match no declared field and `RecordAbstractReader`
+reports it `UNRECOGNIZED_FIELD` — plain under the default, naming the type and its reason under a declared one; one it
+admits meets the per-name rules under the type's profile, an identifier family's, at the field's pointer. The JSON
+reader's `RecordPlan.unmatched` gives the same verdicts in the same order, so the two encodings agree on one code.
+Only a schemaless record, with no field list to be unknown against, reports a name that is no identifier as
+`ATOM_FORM_INVALID`. The default rule asks §7.7's grammar rather than the identifier parser, so the check on every
+name of an ordinary document allocates nothing. The rule is the reading record's, passed on the one pull
+(`TsonReadContext.nextFieldName`), so a record nested in a relaxed one keeps identifier names. A name it admits is
+matched against the declared ones in the type's `normalization` (`FieldNameRule.form`, from
+`TsonLinkedSchema.nameForm`), the equality the linker judged them distinct under; under NFC, every name's form
+already, the index is the declared names themselves. A lookahead — `RecordMemberDispatchReader`'s discriminator scan —
+crosses a member's names before the member is chosen, so a field name pulled while one is running is held in the
+cursor's `unjudged` set and judged when a reader outside any lookahead reads it. The set is allocated only when a
+lookahead crosses a field name.
 
 **Not in `TsonDataStream`**, which is where the *token* surface's policy runs and gets exactly-once
 for free by sitting upstream of the rewind. The two surfaces sit on opposite sides of the rewind because they

@@ -49,7 +49,7 @@ class EnumTypeTest {
 
         String messages = messages(diagnostics);
         assertEquals(1, diagnostics.size(), messages);
-        assertTrue(messages.contains("is not a value of its name_type 'identifier'"), messages);
+        assertTrue(messages.contains("member 'lightly active' is not an identifier"), messages);
         // §7.4: the diagnostic names the spelling that admits the member as a value.
         assertTrue(messages.contains("'!text ^ { members: [...] }'"), messages);
     }
@@ -74,7 +74,7 @@ class EnumTypeTest {
         List<Diagnostic> refused = Tson.standard().validateSchema(schema("held-enum-bad", """
                 { names => <M> !enum [a b M]
                   named => names<"not a name"> }"""));
-        assertTrue(messages(refused).contains("is not a value of its name_type 'identifier'"), messages(refused));
+        assertTrue(messages(refused).contains("is not an identifier"), messages(refused));
     }
 
     /** An author's own identifier type admits names the kernel's does not, and an enum over it has them. */

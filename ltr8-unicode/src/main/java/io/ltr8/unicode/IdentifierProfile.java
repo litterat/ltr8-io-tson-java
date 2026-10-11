@@ -96,9 +96,7 @@ public final class IdentifierProfile {
         }
         int first = text.codePointAt(0);
         if (!isStart(first)) {
-            return Optional.of(at(text, first, 0) + " cannot start an identifier"
-                    + (Character.isDigit(first) || first == '-' || first == '+' || first == '.'
-                            ? " -- an identifier never begins with a digit or a sign" : ""));
+            return Optional.of(at(text, first, 0) + " cannot start an identifier" + whyNotStart(first));
         }
         boolean afterMedial = false;
         for (int i = Character.charCount(first); i < text.length(); ) {
@@ -143,6 +141,29 @@ public final class IdentifierProfile {
             }
         }
         return List.copyOf(problems);
+    }
+
+    /**
+     * Why {@code cp} is not Start, in this profile's own terms: a profile with additions or no base names its
+     * Start set, since a reason given for the property alone would describe some other profile's names.
+     */
+    private String whyNotStart(int cp) {
+        if (contains(exclude, cp)) {
+            return " -- this profile excludes it";
+        }
+        if (start != Base.NONE && startAdd.length == 0) {
+            return Character.isDigit(cp) || cp == '-' || cp == '+' || cp == '.'
+                    ? " -- an identifier never begins with a digit or a sign" : "";
+        }
+        StringBuilder added = new StringBuilder();
+        for (int c : startAdd) {
+            added.appendCodePoint(c);
+        }
+        return " -- its Start characters are " + switch (start) {
+            case XID -> "XID_Start and '" + added + "'";
+            case ID -> "ID_Start and '" + added + "'";
+            case NONE -> "'" + added + "'";
+        };
     }
 
     private boolean isStart(int cp) {

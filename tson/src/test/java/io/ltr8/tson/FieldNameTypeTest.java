@@ -18,11 +18,15 @@ class FieldNameTypeTest {
         return problems.getFirst();
     }
 
-    /** The default does not change: a schemaless record's field names are identifiers, now a resolver error. */
+    /**
+     * A schemaless record's field names are identifiers, and with no declared fields to be unknown against, one
+     * that is no identifier is a resolver error, at its own path.
+     */
     @Test
     void aSchemalessFieldNameThatIsNoIdentifierIsAResolverError() {
         Diagnostic problem = only(Tson.standard().validate("{ \"first name\": 1 }"));
         assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, problem.code());
+        assertEquals("/first name", problem.path().orElseThrow());
         assertTrue(problem.message().contains("belongs in a map"), problem.message());
         assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, only(Tson.standard().validate("{ \"@id\": 1 }")).code());
     }
@@ -74,14 +78,18 @@ class FieldNameTypeTest {
         assertEquals(List.of(), read(JSON_LD, "json-ld", "!node { \"@id\": \"a\"  \"$ref\": \"r\"  label: \"b\" }"));
     }
 
-    /** A name of the type the record does not declare is unrecognised, as any other is; one outside it is refused. */
+    /**
+     * A name of the type the record does not declare is unrecognised, as any other is; one outside the type can be
+     * no field either, and is unrecognised at its own path with the type's reason.
+     */
     @Test
-    void aNameOutsideTheRecordsTypeIsRefusedAndOneInsideItIsLookedUp() {
+    void aNameOutsideTheRecordsTypeIsUnknownWithTheTypesReason() {
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, only(read(JSON_LD, "json-ld",
                 "!node { \"@id\": \"a\"  \"@type\": \"t\"  label: \"b\" }")).code());
         Diagnostic refused = only(read(JSON_LD, "json-ld", "!node { \"@id\": \"a\"  \"a b\": 1  label: \"b\" }"));
-        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, refused.code());
-        assertTrue(refused.expected().contains("json_name"), refused.expected());
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, refused.code());
+        assertEquals("/a b", refused.path().orElseThrow());
+        assertTrue(refused.message().contains("not a value of the record's name type 'json_name'"), refused.message());
     }
 
     /** The rule is the reading record's: a record nested in a relaxed one keeps its own identifier names. */
@@ -95,8 +103,11 @@ class FieldNameTypeTest {
                 """);
         assertEquals(List.of(), read(nested, "nested", "!holder { \"@id\": \"x\"  inner: { a: \"y\" } }"));
         List<Diagnostic> problems = read(nested, "nested", "!holder { \"@id\": \"x\"  inner: { \"@a\": \"y\" } }");
-        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID, Diagnostic.Code.FIELD_REQUIRED),
+        assertEquals(List.of(Diagnostic.Code.UNRECOGNIZED_FIELD, Diagnostic.Code.FIELD_REQUIRED),
                 problems.stream().map(Diagnostic::code).toList(), problems.toString());
+        assertEquals("/inner/@a", problems.getFirst().path().orElseThrow());
+        assertTrue(problems.getFirst().message().startsWith("unknown field '@a' on 'plain' -- a record is closed"),
+                problems.getFirst().message());
     }
 
     /**
@@ -117,7 +128,7 @@ class FieldNameTypeTest {
                 "!holder { p: { \"@id\": \"x\"  \"@type\": \"dog\"  name: \"Rex\"  breed: \"corgi\" } }"));
         List<Diagnostic> problems = read(family, "family",
                 "!holder { p: { \"@id\": \"x\"  \"a b\": 1  \"@type\": \"dog\"  name: \"Rex\"  breed: \"c\" } }");
-        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, only(problems).code());
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, only(problems).code());
     }
 
     /** A JSON-LD node bound to a Java record, whose components name the members they hold. */
@@ -173,7 +184,7 @@ class FieldNameTypeTest {
               row => !record { name_type: words  fields: [ { name: "first name"  type: text } ] }
             """);
         assertEquals(List.of(), read(words, "words", "!row { \"first name\": \"Ada\" }"));
-        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, read(words, "words",
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, read(words, "words",
                 "!row { \"first name\": \"Ada\"  \"last  name\": \"L\" }").getFirst().code());
     }
 
@@ -188,6 +199,33 @@ class FieldNameTypeTest {
                 thrown.getMessage());
     }
 
+    /**
+     * A name type's form implies NFC, for a record's names and an enum's alike: under {@code NONE}, two canonically
+     * equivalent spellings would be two names. {@code ASCII_CASEFOLD} implies NFC only of ASCII, so it is admitted
+     * for a type whose every character is ASCII and refused for one whose profile reaches beyond.
+     */
+    @Test
+    void aNameTypesFormMustImplyNfc() {
+        for (String body : new String[] {
+                "raw => !identifier_type { normalization: NONE }\n"
+                        + "row => !record { name_type: raw  fields: [ { name: a  type: text } ] }",
+                "raw => !identifier_type { normalization: NONE }\nkinds => !enum_type { name_type: raw  members: [a] }",
+                "folded => !identifier_type { normalization: ASCII_CASEFOLD }\n"
+                        + "row => !record { name_type: folded  fields: [ { name: a  type: text } ] }"}) {
+            var thrown = org.junit.jupiter.api.Assertions.assertThrows(
+                    io.ltr8.tson.base.SchemaValidationException.class,
+                    () -> Tson.standard().resolve(schema("forms", body)), body);
+            assertTrue(thrown.getMessage().contains("cannot judge names") && thrown.getMessage().contains("NFC"),
+                    thrown.getMessage());
+        }
+        Tson.standard().resolve(schema("ascii", """
+              header => !identifier_type { start: NONE  continue: NONE  normalization: ASCII_CASEFOLD
+                start_add: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                continue_add: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" medial: "-" }
+              headers => !record { name_type: header  fields: [ { name: "content-type"  type: text } ] }
+            """));
+    }
+
     /** The default does not change under a schema either: an identifier, refused at schema load. */
     @Test
     void aNameOutsideTheRecordsTypeIsRefusedAtSchemaLoad() {
@@ -195,7 +233,7 @@ class FieldNameTypeTest {
                 () -> Tson.standard().resolve(schema("default", """
                       node => !record { fields: [ { name: "@id"  type: text } ] }
                     """)));
-        assertTrue(thrown.getMessage().contains("name_type 'field_name'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("field name '@id' is not an identifier"), thrown.getMessage());
         org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("number", """
                       node => !record { name_type: int32  fields: [ { name: "1"  type: text } ] }
@@ -231,7 +269,7 @@ class FieldNameTypeTest {
                   holder => { n: node }
                 """);
         assertEquals(List.of(), read(mixin, "mixin", "!holder { n: { \"@id\": \"x\"  label: \"y\" } }"));
-        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, only(read(mixin, "mixin",
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, only(read(mixin, "mixin",
                 "!node { \"@id\": \"x\"  \"a b\": 1  label: \"y\" }")).code());
     }
 

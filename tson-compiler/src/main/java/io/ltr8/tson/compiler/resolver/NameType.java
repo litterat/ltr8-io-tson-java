@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * Where an entry's {@code name_type} resolves: an enum's, which its members are values of ([TSON-SCHEMA] §7.4), and
@@ -78,6 +79,39 @@ public final class NameType {
                         ? family.normalization()
                         : Normalization.NONE)
                 .orElse(Normalization.NONE);
+    }
+
+    /**
+     * Whether {@code type} is the kernel's {@code identifier} -- an enum's default, and through {@code field_name} a
+     * record's -- whose names a refusal calls identifiers, where it names any other type, the author's own.
+     */
+    public static boolean isIdentifier(Resolved type, Function<String, TypeDefinition> structure) {
+        return type.definition() != null
+                && type.definition() == structure.apply(ReferenceChain.terminal(EnumBody.IDENTIFIER, structure));
+    }
+
+    /**
+     * Why {@code type}'s {@code normalization} cannot judge names, or empty when it can. Names are compared in a
+     * form that implies NFC: under one that does not, two canonically equivalent spellings are two names that
+     * render alike, the confusion §8.2's rules exist to refuse, and no reader could match a document's name to a
+     * declared one without choosing a form the type never stated. {@code NONE} implies none; {@code ASCII_CASEFOLD}
+     * implies NFC only of ASCII text, so it names a type whose every character is ASCII.
+     */
+    public static Optional<String> formRefusal(IdentifierType type) {
+        return switch (type.normalization()) {
+            case NONE -> Optional.of("its normalization is NONE, under which two canonically equivalent spellings "
+                    + "are two names; a name type's form implies NFC");
+            case ASCII_CASEFOLD -> asciiOnly(type) ? Optional.empty() : Optional.of("its normalization is "
+                    + "ASCII_CASEFOLD, which leaves text beyond ASCII unnormalized, and its profile admits such text; "
+                    + "a name type's form implies NFC -- use NFKC_CASEFOLD, or admit only ASCII");
+            case NFC, NFKC, NFKC_CASEFOLD -> Optional.empty();
+        };
+    }
+
+    private static boolean asciiOnly(IdentifierType type) {
+        return type.start() == IdentifierProfile.Base.NONE && type.continueBase() == IdentifierProfile.Base.NONE
+                && Stream.of(type.startAdd(), type.continueAdd(), type.medial())
+                        .flatMap(Optional::stream).allMatch(text -> text.chars().allMatch(c -> c < 0x80));
     }
 
     private static Optional<Resolved> ofEnum(TypeDefinition enumeration, EnumBody body,

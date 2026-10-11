@@ -116,6 +116,23 @@ class TsonDataParserTest {
                 () -> parse("!!id:\"https://example.com/x.tn\"\n!!meta:\"https://example.com/m.tn\" { }"));
     }
 
+    /**
+     * §7.1: a token-initial {@code _} is the void sentinel, so {@code _id} is two tokens with no separator. The
+     * error is at either half, and says what was meant: a name, written quoted.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"{ _id: 1 }", "!_id 1", "[_id]", "{ a: 1  _b: 2 }"})
+    void aLeadingUnderscoreIsAParseErrorThatSaysToQuoteTheName(String source) {
+        String message = messageOf(source);
+        assertTrue(message.contains("cannot be written unquoted") && message.contains("quote it, \"_"), message);
+    }
+
+    /** The hint is only for a name: a sentinel separated from what follows is the sentinel, and its error is its own. */
+    @Test
+    void aSeparatedUnderscoreGetsNoNameHint() {
+        assertTrue(!messageOf("!_ x").contains("quote it"));
+    }
+
     @Test
     void multilineTokenAsDirectiveArgumentIsParseError() {
         assertThrows(ParseException.class, () -> parse("!!id:\"\"\"\nx\n\"\"\"\n_"));

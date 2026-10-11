@@ -13,6 +13,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.compiler.lexer.Token;
@@ -133,6 +134,7 @@ public final class TsonDataStream implements TsonEventSource {
     private int lastEndLine;
     private int lastEndColumn;
     private int lastEndByteOffset;
+    private TokenType lastType;
 
     private final Deque<Frame> frames = new ArrayDeque<>();
     private final Deque<TsonEvent> ready = new ArrayDeque<>();
@@ -456,6 +458,7 @@ public final class TsonDataStream implements TsonEventSource {
         lastEndLine = t.endLine();
         lastEndColumn = t.endColumn();
         lastEndByteOffset = t.endByteOffset();
+        lastType = t.type();
         switch (t.type()) {
             case LBRACE, LBRACKET, LPAREN -> {
                 nesting++;
@@ -498,13 +501,38 @@ public final class TsonDataStream implements TsonEventSource {
 
     /** The failure {@link #expect} raises, for a throw site that decides on more than one token's type. */
     ParseException mismatch(String construct) {
-        return new ParseException("expected " + construct + ", found " + describe(peekToken()),
+        return new ParseException("expected " + construct + ", found " + describe(peekToken()) + underscored(),
                 construct, describe(peekToken()), peekToken().start());
     }
 
     /** A parse failure that states a rule rather than a substitution, so it carries no {@code expected}/{@code actual} pair. */
     ParseException parseError(String message) {
-        return new ParseException(message, peekToken().start());
+        return new ParseException(message + underscored(), peekToken().start());
+    }
+
+    /**
+     * What an author who wrote {@code _id} meant, where the failure is at either half of it: §7.1 makes the
+     * token-initial {@code _} the void sentinel, so {@code _id} lexes as {@code _} then {@code id} with no
+     * separator between them (§2.4), and the error at either token names neither. Empty for any other failure.
+     */
+    private String underscored() {
+        Token at = peekToken();
+        String name = null;
+        if (at.type() == TokenType.UNQUOTED && lastType == TokenType.VOID
+                && lastEndByteOffset == at.startByteOffset()) {
+            name = "_" + at.text();
+        } else if (at.type() == TokenType.VOID) {
+            try {
+                Token next = peekSecond();
+                if (next.type() == TokenType.UNQUOTED && next.startByteOffset() == at.endByteOffset()) {
+                    name = "_" + next.text();
+                }
+            } catch (LexException unreadable) {
+                // The next token is itself an error; this one's message stands without the hint.
+            }
+        }
+        return name == null ? "" : " -- '" + name + "' cannot be written unquoted, since a token-initial '_' is the "
+                + "void sentinel (§2.9); quote it, \"" + name + "\", where a quoted token is admitted";
     }
 
     /**

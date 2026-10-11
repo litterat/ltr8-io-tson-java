@@ -752,7 +752,11 @@ relaxed type, defined by the translation and not by the series, such as
   type's equality, so a reader matches a document's name against the declared ones in the type's `normalization`
   (§5.5), as an enum matches its members: under a case-folding name type `NAME` is the field `name`, the two
   spellings in one record are a duplicate field, and a family's selector is found however its name is cased. Both
-  encodings do this; under the default, NFC, nothing changes.
+  encodings do this; under the default, NFC, nothing changes. So a name type's form implies NFC, on a record and an
+  enum alike: under `NONE`, two canonically equivalent spellings would be two names that render alike, and no
+  reader could match a document's name without choosing a form the type never stated. `NONE` is refused at load,
+  and `ASCII_CASEFOLD`, which leaves text beyond ASCII as written, is admitted only for a type whose every character
+  is ASCII; `NFKC_CASEFOLD` is the fold for any other.
 - **The brace form states a type by composition, and has no syntax of its own.** A relaxed name type is a
   translation's tool, not the go-to form for a TSON record, so the series adds no brace-form spelling for it: a
   translation declares its type once, on a fieldless abstract base, and its records compose it —
@@ -766,11 +770,18 @@ relaxed type, defined by the translation and not by the series, such as
 - **Hygiene follows the type.** A record's field names and an enum's members meet §8.2's per-name rules under their
   type's own profile, whose added characters are its own (`json_name`'s `@` and `$`, `words`' medial space), and
   the collision relation over the scope.
-- **A document's field names are judged by the record that reads them.** A name its record's type refuses is a
-  resolver error, `ATOM_FORM_INVALID`, and draws no "unrecognised field" beside it; a name of the type the record
-  does not declare is unrecognised, as any other. A record nested in a relaxed one judges its own names, so the
-  relaxation does not leak into a value it holds. A name read where no record governs it — a schemaless record, the
-  value of an unrecognised field — is judged as an identifier.
+- **A document's field names are judged by the record that reads them.** A name the record does not declare is an
+  unrecognised field (§7.2), at its own pointer, whether or not it is a value of the record's name type: one that is
+  not can be no declared field, since every declared name is one, so it is unknown on the same terms. Under the
+  default the message is the plain one any undeclared name draws; under a declared name type it names the type and
+  its reason, since those are the rules the author has to look up. Schema-load refusals follow the same split: a
+  default enum's member or record's field "is not an identifier", an author's type's "is not a value of its
+  name_type 'json_name'". Being no name, it meets no §8.2 rule; a name of the type meets them under the
+  type's profile first. Both encodings report the same code — a JSON member name has no grammar, so the one verdict
+  JSON can give a name outside the type is the closure error, and TSON gives the same rather than a second code for
+  one fact. A record nested in a relaxed one judges its own names, so the relaxation does not leak into a value it
+  holds. A schemaless record has no declared fields to be unknown against, so there a field name that is no
+  identifier is a resolver error, `ATOM_FORM_INVALID`, at its own pointer.
 - **A lookahead does not judge a field name.** A sealed family's discriminator scan crosses a member's names before
   the member is chosen, and only the member knows its type, so a name the scan crosses is judged when the member
   reads it. The spec says nothing about when a name is judged relative to dispatch; this is the reading that

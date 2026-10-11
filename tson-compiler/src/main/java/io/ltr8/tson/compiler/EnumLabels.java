@@ -7,6 +7,7 @@ import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
@@ -87,25 +88,36 @@ final class EnumLabels {
                     + "family's own 'members' facet: '!text ^ { members: [...] }' or '!integer ^ { members: [80 443] }',"
                     + " not an enum"));
         }
+        if (label.definition().body() instanceof IdentifierType identifiers) {
+            Optional<String> form = NameType.formRefusal(identifiers);
+            if (form.isPresent()) {
+                return Optional.of(new Violation(name, "'" + name + "': its name_type '" + body.nameType() + "' "
+                        + "cannot judge names -- " + form.get()));
+            }
+        }
         Optional<AtomType<?>> parser = AtomParsers.forType(label.definition().body());
         if (parser.isEmpty()) {
             return Optional.empty(); // a text family this library has no parser for: nothing to judge members by
         }
+        // Under the kernel's identifier, the default, a refusal speaks of identifiers as any name's would; only an
+        // author's own name type is named, since its rules are the ones the author has to look up.
+        boolean identifier = NameType.isIdentifier(label, structure);
+        String ofType = identifier ? "an identifier" : "a value of its name_type '" + body.nameType() + "'";
         Map<Object, String> seen = new HashMap<>();
         for (String member : body.members()) {
             Object value;
             try {
                 value = parser.get().read(member);
             } catch (AtomTypeException refused) {
-                return Optional.of(new Violation(name, "'" + name + "': member '" + member + "' is not a value of "
-                        + "its name_type '" + body.nameType() + "': " + refused.getMessage()
-                        + (body.nameType().equals(EnumBody.IDENTIFIER)
-                                ? " -- a closed set of text that is no name is '!text ^ { members: [...] }'" : "")));
+                return Optional.of(new Violation(name, "'" + name + "': member '" + member + "' is not " + ofType
+                        + ": " + refused.getMessage()
+                        + (identifier ? " -- a closed set of text that is no name is '!text ^ { members: [...] }'" : "")));
             }
             String earlier = seen.putIfAbsent(ValueIdentity.of(value), member);
             if (earlier != null) {
                 return Optional.of(new Violation(name, "'" + name + "': members '" + earlier + "' and '" + member
-                        + "' are one value of its name_type '" + body.nameType() + "' (§7.4)"));
+                        + "' are one " + (identifier ? "identifier" : "value of its name_type '" + body.nameType() + "'")
+                        + " (§7.4)"));
             }
         }
         return Optional.empty();

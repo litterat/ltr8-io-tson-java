@@ -1,8 +1,13 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.base.diagnostics.SubsumptionDiagnostics;
+import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Nfc;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.json.JsonReadContext;
@@ -11,6 +16,7 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -18,6 +24,7 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -67,6 +74,15 @@ final class RecordPlan {
     private final Map<String, Integer> index;
     private final Normalization nameForm;
 
+    /**
+     * The record's name type, by name for messages, and its reader -- {@code null} for the kernel's
+     * {@code field_name}, which §7.7's grammar answers without allocating -- and the profile a member name it
+     * admits is judged under ({@link #unmatched}).
+     */
+    private final String nameType;
+    private final AtomType<?> nameReader;
+    private final IdentifierProfile nameProfile;
+
     /** Each field group, compiled to slots once ({@link GroupPlan}). */
     private final GroupPlan[] groups;
 
@@ -90,6 +106,13 @@ final class RecordPlan {
         // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule, and
         // then put into the record's name type's form (§5.5), so a name the type holds equal to a field is it.
         this.nameForm = context.linked().nameForm(name);
+        this.nameType = body.nameType();
+        IdentifierType identifiers = context.linked().nameType(name)
+                .map(type -> type.body() instanceof IdentifierType family ? family : null)
+                .orElse(null);
+        this.nameReader = identifiers == null ? null : AtomParsers.forType(identifiers).orElseThrow(() ->
+                new IllegalStateException("'" + name + "': name_type '" + nameType + "' has no reader of its own"));
+        this.nameProfile = identifiers == null ? IdentifierGrammar.PROFILE : identifiers.profile();
         for (int i = 0; i < count; i++) {
             RecordField field = fields[i];
             names[i] = Nfc.of(field.name());
@@ -167,17 +190,38 @@ final class RecordPlan {
     }
 
     /**
-     * A member no declared field matches: §6.1.1's closure error. §8.2 before §6.1.1, and the order is the
-     * point: a name-hygiene refusal MUST NOT be reported in one of §8.1's four categories, so a look-alike field
-     * name is refused here rather than told it is unknown -- which would be a verdict on the document for a
-     * policy rule, and would advise adding a field that is already declared.
+     * A member no declared field matches: §6.1.1's closure error, judged by the record's name type
+     * (SPEC-FEEDBACK.md #10). A name that is no value of the type can be no field and is no name, so it is
+     * unknown, with the type's reason, and meets no hygiene rule. One the type admits meets §8.2 first, under
+     * the type's profile, and the order is the point: a name-hygiene refusal MUST NOT be reported in one of
+     * §8.1's four categories, so a look-alike field name is refused here rather than told it is unknown -- which
+     * would be a verdict on the document for a policy rule, and would advise adding a field already declared.
      */
     void unmatched(JsonReadContext ctx, String memberName) {
         JsonReadContext at = ctx.field(memberName);
-        if (!NameHygiene.refuses(ctx, memberName)) {
+        Optional<String> notAName = nameRefusal(memberName);
+        if (notAName.isPresent()) {
+            // Under the default the message is the plain one, as for any undeclared identifier; only an author's
+            // own name type is named, with its reason, since its rules are the ones to look up.
+            at.report(nameReader == null ? rules.unrecognizedField(memberName)
+                    : rules.unrecognizedField(memberName, nameType, notAName.get()));
+        } else if (!NameHygiene.refusesMember(ctx, memberName, nameProfile)) {
             at.report(rules.unrecognizedField(memberName));
         }
         EventSkip.nextValue(at);
+    }
+
+    /** Why {@code memberName} is no value of the record's name type, or empty when it is one. */
+    private Optional<String> nameRefusal(String memberName) {
+        if (nameReader == null) {
+            return IdentifierGrammar.validate(memberName);
+        }
+        try {
+            nameReader.read(memberName);
+            return Optional.empty();
+        } catch (AtomTypeException refused) {
+            return Optional.of(refused.getMessage());
+        }
     }
 
     /**

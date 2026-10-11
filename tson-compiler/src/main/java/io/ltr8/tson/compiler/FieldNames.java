@@ -6,6 +6,7 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -67,7 +68,7 @@ final class FieldNames {
                 Optional<String> violation = io.ltr8.tson.atom.IdentifierGrammar.validate(field.name());
                 if (violation.isPresent()) {
                     return Optional.of(new EnumLabels.Violation(name, "'" + name + "': field name '" + field.name()
-                            + "' is not a value of its name_type 'field_name': " + violation.get()));
+                            + "' is not an identifier: " + violation.get()));
                 }
             }
             return Optional.empty();
@@ -83,20 +84,32 @@ final class FieldNames {
                     + "from an atom-family instance whose constructor IS-A identifier_type; a key that is no name "
                     + "belongs in a map"));
         }
+        if (type.definition().body() instanceof IdentifierType identifiers) {
+            Optional<String> form = NameType.formRefusal(identifiers);
+            if (form.isPresent()) {
+                return Optional.of(new EnumLabels.Violation(name, "'" + name + "': its name_type '"
+                        + body.nameType() + "' cannot judge names -- " + form.get()));
+            }
+        }
         Optional<AtomType<?>> parser = AtomParsers.forType(type.definition().body());
         if (parser.isEmpty()) {
             return Optional.empty();
         }
+        // Under the default, field_name, a refusal speaks of identifiers as any name's would; only an author's own name
+        // type is named, since its rules are the ones the author has to look up.
+        boolean identifier = NameType.isIdentifier(type, structure);
+        String ofType = identifier ? "an identifier" : "a value of its name_type '" + body.nameType() + "'";
         Map<Object, String> seen = new HashMap<>();
         for (RecordField field : body.fields()) {
-            Optional<EnumLabels.Violation> problem = read(name, body, parser.get(), field.name());
+            Optional<EnumLabels.Violation> problem = read(name, ofType, parser.get(), field.name());
             if (problem.isPresent()) {
                 return problem;
             }
             String earlier = seen.putIfAbsent(ValueIdentity.of(parser.get().read(field.name())), field.name());
             if (earlier != null && !earlier.equals(field.name())) {
                 return Optional.of(new EnumLabels.Violation(name, "'" + name + "': fields '" + earlier + "' and '"
-                        + field.name() + "' are one value of its name_type '" + body.nameType() + "'"));
+                        + field.name() + "' are one " + (identifier ? "field name"
+                                : "value of its name_type '" + body.nameType() + "'")));
             }
         }
         Set<String> referenced = new LinkedHashSet<>(body.discriminators());
@@ -105,7 +118,7 @@ final class FieldNames {
             group.optionalMembers().forEach(referenced::add);
         }
         for (String reference : referenced) {
-            Optional<EnumLabels.Violation> problem = read(name, body, parser.get(), reference);
+            Optional<EnumLabels.Violation> problem = read(name, ofType, parser.get(), reference);
             if (problem.isPresent()) {
                 return problem;
             }
@@ -113,15 +126,14 @@ final class FieldNames {
         return Optional.empty();
     }
 
-    private static Optional<EnumLabels.Violation> read(String name, RecordBody body, AtomType<?> parser,
+    private static Optional<EnumLabels.Violation> read(String name, String ofType, AtomType<?> parser,
                                                        String fieldName) {
         try {
             parser.read(fieldName);
             return Optional.empty();
         } catch (AtomTypeException refused) {
             return Optional.of(new EnumLabels.Violation(name, "'" + name + "': field name '" + fieldName
-                    + "' is not a value of its name_type '" + body.nameType() + "': "
-                    + refused.getMessage()));
+                    + "' is not " + ofType + ": " + refused.getMessage()));
         }
     }
 }

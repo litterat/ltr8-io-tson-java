@@ -16,6 +16,9 @@ form only; history lives in git.
 - NFC normalization applies to *unquoted* tokens only; `Pattern_White_Space` is the spec's fixed 11-character set,
   hardcoded.
 - `TsonDataStream` is the only thing that walks source text; `TsonDataParser` holds no grammar logic of its own.
+- `_id` lexes as the void sentinel then `id`, and the lexer never refuses it: the failure is a parse error at whichever
+  half the grammar trips on, which `TsonDataStream.mismatch`/`parseError` extend with "quote it" (`underscored`).
+  Refusing in the lexer would move a parser-category error into the lexer's.
 - Neither tier dedupes fields or keys, resolves `EmptyBrace`, or interprets token text — intentional gaps (§1.2). A name
   is the exception: type-ref, annotation and field names are matched against `IdentifierProfile`, after NFC
   normalisation for a field name.

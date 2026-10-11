@@ -42,6 +42,18 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
                         .formatted(field, typeName, declaredFields), declaredFields, field);
     }
 
+    /**
+     * {@link #unrecognizedField(String)} for a name that is no value of the record's name type {@code nameType}
+     * (SPEC-FEEDBACK.md #10), which {@code reason} says why: no declared field can be it, so it is unknown on
+     * the same terms, and the field list is the repair either way.
+     */
+    public Refusal unrecognizedField(String field, String nameType, String reason) {
+        return new Refusal(Diagnostic.Code.UNRECOGNIZED_FIELD,
+                ("unknown field '%s' on '%s' -- it is not a value of the record's name type '%s' (%s), and a record "
+                        + "is closed under its type (§7.2), whose fields are (%s)")
+                        .formatted(field, typeName, nameType, reason, declaredFields), declaredFields, field);
+    }
+
     /** [TSON-DATA] §2.5: a record states each field at most once, and the repeat states a value for nothing. */
     public Refusal duplicateField(String field) {
         return new Refusal(Diagnostic.Code.DUPLICATE_FIELD,

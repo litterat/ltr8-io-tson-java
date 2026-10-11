@@ -142,7 +142,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * What this record's field names are judged by as they are read ({@link TsonReadContext#nextFieldName}):
-     * its field name type, or {@code null} for the kernel's {@code field_name}, which a read applies untold.
+     * its name type, the kernel's {@code field_name} where it states none.
      */
     private final TsonReadContext.FieldNameRule fieldNames;
     /**
@@ -187,7 +187,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
         }
         this.fixedCheck = fixedChecks;
-        this.nameForm = fieldNames == null ? io.ltr8.unicode.Normalization.NFC : fieldNames.form();
+        this.nameForm = fieldNames.form();
         if (nameForm == io.ltr8.unicode.Normalization.NFC) {
             this.matchIndex = fieldIndex;
         } else {
@@ -270,8 +270,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * The rule entry {@code name}'s field names are judged by, from what linking recorded of its field name
-     * type, or {@code null} where it has the kernel's default.
+     * The rule entry {@code name}'s field names are judged by, from what linking recorded of its name type, or
+     * {@link TsonReadContext.FieldNameRule#FIELD_NAME} where it has the kernel's default.
      */
     static TsonReadContext.FieldNameRule fieldNameRule(String name, RecordBody body, ValueReaderContext context) {
         return context.linked().nameType(name).map(type -> {
@@ -282,7 +282,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             return new TsonReadContext.FieldNameRule(body.nameType(), AtomParsers.forType(identifiers)
                     .orElseThrow(() -> new IllegalStateException("'" + name + "': name_type '" + body.nameType()
                             + "' has no reader of its own")), identifiers.profile(), context.linked().nameForm(name));
-        }).orElse(null);
+        }).orElse(TsonReadContext.FieldNameRule.FIELD_NAME);
     }
 
     /**
@@ -315,7 +315,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     : nameForm.apply(fieldName.name()));
             if (schemaIndex == null) {
                 if (!nameRefused) {
-                    ctx.field(fieldName.name()).report(rules.unrecognizedField(fieldName.name()));
+                    // Under the default the message is the plain one, as for any undeclared identifier; only an
+                    // author's own name type is named, with its reason, since its rules are the ones to look up.
+                    String stated = fieldName.name();
+                    Optional<String> notAName = fieldNames == TsonReadContext.FieldNameRule.FIELD_NAME
+                            ? Optional.empty() : fieldNames.refusal(stated);
+                    ctx.field(stated).report(notAName.isEmpty() ? rules.unrecognizedField(stated)
+                            : rules.unrecognizedField(stated, fieldNames.typeName(), notAName.get()));
                 }
                 EventSkip.scopedValue(ctx);
                 continue;

@@ -741,6 +741,10 @@ class TsonSchemaParserTest {
         assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/38/m/meta.tn"
                 { _id => text }"""));
+        ParseException field = assertThrows(ParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                { r => { _id: text } }"""));
+        assertTrue(field.getMessage().contains("quote it, \"_id\""), field.getMessage());
     }
 
     /** A type parameter is a name through the same {@code param_name} role, and reaches the same check. */

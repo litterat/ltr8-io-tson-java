@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A record's field names have a type (SPEC-FEEDBACK.md #10), and a JSON record's member names are its field names
@@ -42,6 +43,9 @@ class JsonFieldNameTypeTest {
               json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
               ld_node => json_record & { "@id": text  label: text }
               ld_holder => { n: ld_node }
+              ld_name => !identifier_type { start_add: "@" }
+              ld_only => !record { name_type: ld_name  fields: [ { name: "@id"  type: text } ] }
+              plain => { a: text }
             }
             """;
 
@@ -94,6 +98,29 @@ class JsonFieldNameTypeTest {
     void aMemberNameIsMatchedInItsNameTypesForm() {
         assertEquals(List.of(), read("frow", "{\"NAME\": \"x\"}"));
         assertEquals(List.of(), read("kennel", "{\"p\": {\"KIND\": \"dog\", \"name\": \"Rex\", \"Breed\": \"c\"}}"));
+    }
+
+    /**
+     * An undeclared member is judged by its record's name type, not the default's: one the type admits and the
+     * record does not declare is unknown, and one outside the type -- here a {@code $} where only {@code @} starts
+     * a name of {@code ld_only}, and a {@code /} in a plain record -- can be no field and is unknown. Neither is a
+     * name-policy refusal, and each lists the record's fields; a declared name type is named with its reason, and
+     * the default, whose rules are any identifier's, is not.
+     */
+    @Test
+    void anUndeclaredMemberIsJudgedByItsRecordsNameType() {
+        for (String[] at : new String[][] {
+                {"node", "{\"@id\": \"urn:x\", \"label\": \"y\", \"$ref\": 1}", "/$ref", null},
+                {"ld_only", "{\"@id\": \"urn:x\", \"$ref\": 1}", "/$ref", "'ld_name'"},
+                {"plain", "{\"a\": \"x\", \"react/display-name\": 1}", "/react~1display-name", null}}) {
+            List<Diagnostic> problems = read(at[0], at[1]);
+            assertEquals(1, problems.size(), problems::toString);
+            Diagnostic unknown = problems.getFirst();
+            assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, unknown.code(), unknown::toString);
+            assertEquals(at[2], unknown.path().orElseThrow());
+            assertTrue(at[3] == null ? !unknown.message().contains("name type")
+                    : unknown.message().contains("not a value of the record's name type " + at[3]), unknown::message);
+        }
     }
 
     /** A record composing a fieldless base takes the base's field name type, and reads untagged where it is typed. */

@@ -131,7 +131,10 @@ makes the object a wrapper, read at the reader the dispatcher chose for it (`Exa
 inside may carry a tag of its own; a misplaced `$type` or `$value`, any `$schema`, refuse the object, and the rest of
 it is skipped; any other `$`-initial name is matched as a field name. A member name is matched in NFC and then in the
 record's name type's form (`TsonLinkedSchema.nameForm`, held by `RecordPlan`), so under a case-folding name type
-`NAME` is the field `name`; `TagMembers.lead` puts a sealed base's selectors in the same form. Members read before a
+`NAME` is the field `name`; `TagMembers.lead` puts a sealed base's selectors in the same form. A member that matches
+nothing is judged by that name type too (`RecordPlan.unmatched`), as TSON's record reader judges it: one that is no
+value of the type is `UNRECOGNIZED_FIELD` with the type's reason and meets no hygiene rule, being no name; one that is
+meets §8.2 under the type's profile, and only then is unknown. Members read before a
 refusal have already reported, so an invalid document's diagnostics follow its member order — accepted deliberately:
 holding them back would cost every valid document a buffer to tidy the answer for invalid ones. The allocation harness
 measures what the peek saved (`aSchemaDirectedRecordReadsWithoutLookingAhead`).

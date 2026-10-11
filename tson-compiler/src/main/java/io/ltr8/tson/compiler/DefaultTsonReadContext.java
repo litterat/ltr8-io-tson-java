@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.stream.FieldName;
@@ -67,7 +66,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** Where {@link #next()} records what it consumes while a lookahead is running, else {@code null}. */
         List<TsonEvent> recording;
 
-        /** The rule {@link #nextFieldName} is pulling a field name under, else {@code null}: an identifier. */
+        /** The rule {@link #nextFieldName} is pulling a field name under, else {@code null}: a schemaless record's. */
         FieldNameRule fieldNameRule;
 
         /**
@@ -231,41 +230,34 @@ final class DefaultTsonReadContext implements TsonReadContext {
             default -> null;
         };
         if (name != null) {
-            judgeName(name, IdentifierGrammar.PROFILE);
+            judgeName(name, IdentifierGrammar.PROFILE, false);
         }
     }
 
     /**
-     * [TSON-DATA] §2.5: a record's field name is read by its record's field name type, an identifier unless the
-     * record says otherwise (SPEC-FEEDBACK.md #10). The grammar admits any single-line token in name position, so
-     * the match is here, where a failure is reported as a resolver error -- a name the type's contract rejects,
-     * as an atom's token would be -- and the name is then judged by no hygiene rule, being no name of the type.
-     * One it admits meets the per-name rules under the type's profile.
+     * [TSON-DATA] §2.5: a record's field name is read by its record's name type (SPEC-FEEDBACK.md #10). Under a
+     * schema-directed record's {@link FieldNameRule}, a name the type refuses is reported nothing here: it can
+     * match no declared field, the reader reports it {@code UNRECOGNIZED_FIELD} with the type's reason, and being
+     * no name of the type it meets no hygiene rule. One the type admits meets the per-name rules under its profile.
+     * A schemaless record has no type but §2.5's identifier, and no field list to report against, so there a name
+     * the grammar refuses is {@code ATOM_FORM_INVALID}. Either refusal is at the field's own path.
      */
     private void judgeFieldName(String name) {
         FieldNameRule rule = cursor.fieldNameRule;
-        if (rule == null) {
-            Optional<String> violation = IdentifierGrammar.validate(name);
-            if (violation.isEmpty()) {
-                judgeName(name, IdentifierGrammar.PROFILE);
-                return;
+        if (rule != null) {
+            if (rule.refusal(name).isEmpty()) {
+                judgeName(name, rule.profile(), true);
             }
-            refuseFieldName(name, violation.get(), "an identifier");
             return;
         }
-        try {
-            rule.type().read(name);
-        } catch (AtomTypeException refused) {
-            refuseFieldName(name, refused.getMessage(), "a value of field name type '" + rule.typeName() + "'");
+        Optional<String> violation = IdentifierGrammar.validate(name);
+        if (violation.isPresent()) {
+            field(name).report(Diagnostic.Code.ATOM_FORM_INVALID, "'" + name + "' is not a field name -- "
+                    + violation.get() + ". A record's field names are identifiers (§2.5); a key that is not a name "
+                    + "belongs in a map, written '{ key => value }'", "an identifier", "'" + name + "'");
             return;
         }
-        judgeName(name, rule.profile());
-    }
-
-    private void refuseFieldName(String name, String violation, String expected) {
-        report(Diagnostic.Code.ATOM_FORM_INVALID, "'" + name + "' is not a field name -- " + violation
-                        + ". A record's field names are identifiers unless its type says otherwise; a key that is "
-                        + "not a name belongs in a map, written '{ key => value }'", expected, "'" + name + "'");
+        judgeName(name, IdentifierGrammar.PROFILE, true);
     }
 
     /**
@@ -277,7 +269,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
      */
     @Override
     public boolean refusesName(String name, IdentifierProfile profile) {
-        return judgeName(name, profile);
+        return judgeName(name, profile, false);
     }
 
     @Override
@@ -285,13 +277,18 @@ final class DefaultTsonReadContext implements TsonReadContext {
         return cursor.identifierPolicy;
     }
 
-    private boolean judgeName(String name, IdentifierProfile profile) {
+    /**
+     * The per-name rules over {@code name}, reported at this context's position or, for a field name, at the
+     * field's own -- a step built only when there is something to report, since this runs on every name.
+     */
+    private boolean judgeName(String name, IdentifierProfile profile, boolean fieldName) {
         List<IdentifierPolicy.Violation> violations = cursor.identifierPolicy.judge(name, profile);
         if (violations.isEmpty()) {
             return false;
         }
+        TsonReadContext at = fieldName ? field(name) : this;
         for (IdentifierPolicy.Violation violation : violations) {
-            refuse(name, violation.reason(), violation.code());
+            refuse(at, name, violation.reason(), violation.code());
         }
         return true;
     }
@@ -302,8 +299,8 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * does not admit want different fixes, so they are two codes rather than one code and a discriminator
      * beside it.
      */
-    private void refuse(String name, String violation, Diagnostic.Code code) {
-        report(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
+    private static void refuse(TsonReadContext at, String name, String violation, Diagnostic.Code code) {
+        at.report(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
     }
 
     /**

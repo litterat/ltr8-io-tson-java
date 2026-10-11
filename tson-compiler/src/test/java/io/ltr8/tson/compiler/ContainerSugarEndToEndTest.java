@@ -373,7 +373,8 @@ class ContainerSugarEndToEndTest {
             io.ltr8.tson.base.SchemaValidationException thrown = assertThrows(
                     io.ltr8.tson.base.SchemaValidationException.class,
                     () -> compile("  ok => { " + c[0] + ": text }"), c[0]);
-            assertTrue(thrown.getMessage().contains("name_type 'field_name'"), thrown.getMessage());
+            assertTrue(thrown.getMessage().contains("is not an identifier"), thrown.getMessage());
+            assertTrue(!thrown.getMessage().contains("name_type"), thrown.getMessage());
             assertTrue(thrown.getMessage().contains(c[1]), thrown.getMessage());
         }
     }

@@ -13,7 +13,8 @@ history lives in git.
   name the closure already binds.
 - A reference to a DATA-kinded entry is refused at every position a type-ref occupies.
 - `entryOrigins`, `enumForms` and `nameTypes` are on `TsonLinkedSchema`, never on `TsonSchema` or `TypeDefinition`.
-- An enum's and a record's `name_type` is an identifier family; their names are judged under its profile, never the
+- An enum's and a record's `name_type` is an identifier family whose `normalization` implies NFC (`NONE` never;
+  `ASCII_CASEFOLD` only over ASCII — `NameType.formRefusal`); their names are judged under its profile, never the
   kernel's identifier's.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
@@ -286,13 +287,15 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
   `resolver.NameType`'s, for enums and records alike, shared with materialisation, which checks a template's value
   argument of an enum type before linking has recorded anything.
 - **A record's `name_type` is the same contract over its field names** (SPEC-FEEDBACK.md #10, experimental).
-  `FieldNames` is `EnumLabels`' peer: the type must be an identifier family, every name the record states — in
-  `fields`, `discriminators` and its groups — must be a value of it, and no two fields may be one value under its
-  equality. The default, `field_name`, resolves in the structure namespace (`resolver.NameType`); where no kernel is
-  in scope to resolve it, the identifier grammar it stands for applies. A refused record's names are not judged again
-  by the per-name rules, and those rules run under the type's own profile. A composition takes its supertypes' one
-  type — the default is a type like any other, set where a record is declared — and refuses two that disagree; a
-  refinement keeps its source's. That rule is also how a brace form states one: a fieldless ABSTRACT base carries the
-  type, and the records that compose it take it; there is no brace-form syntax for it. Each record with a type other
-  than the default is recorded in `TsonLinkedSchema.nameTypes`, with the definition it resolves to, merged through
-  imports like `enumForms`, because its readers judge a document's names by it and cannot resolve it themselves.
+  `FieldNames` is `EnumLabels`' peer: the type must be an identifier family, every name the record states — in `fields`,
+  `discriminators` and its groups — must be a value of it, and no two fields may be one value under its equality. Both
+  checkers refuse a type whose `normalization` does not imply NFC (`NameType.formRefusal`): a reader matches names in
+  the type's form, and under `NONE` two canonically equivalent spellings would be two names. The default, `field_name`,
+  resolves in the structure namespace (`resolver.NameType`); where no kernel is in scope to resolve it, the identifier
+  grammar it stands for applies. A refused record's names are not judged again by the per-name rules, and those rules
+  run under the type's own profile. A composition takes its supertypes' one type — the default is a type like any other,
+  set where a record is declared — and refuses two that disagree; a refinement keeps its source's. That rule is also how
+  a brace form states one: a fieldless ABSTRACT base carries the type, and the records that compose it take it; there is
+  no brace-form syntax for it. Each record with a type other than the default is recorded in
+  `TsonLinkedSchema.nameTypes`, with the definition it resolves to, merged through imports like `enumForms`, because its
+  readers judge a document's names by it and cannot resolve it themselves.

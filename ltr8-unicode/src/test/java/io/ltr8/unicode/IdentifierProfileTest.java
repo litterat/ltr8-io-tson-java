@@ -52,6 +52,23 @@ class IdentifierProfileTest {
         assertTrue(refuses(js, "a-b").contains("cannot appear"));
     }
 
+    /**
+     * A refused first character is explained in the profile's own terms: the base's reason where the profile is
+     * its base alone, and its Start set where the profile adds to it or has no base -- never the base's reason for a
+     * profile whose names are not the base's.
+     */
+    @Test
+    void aRefusedStartNamesThisProfilesStartSet() {
+        assertTrue(refuses(DASH_CONTINUES, "2d").contains("never begins with a digit or a sign"));
+        String js = refuses(profile(Base.ID, Base.ID, "$_", "$", "", "", Normalization.NFC), "2d");
+        assertTrue(js.endsWith("cannot start an identifier -- its Start characters are ID_Start and '$_'"), js);
+        String abc = refuses(profile(Base.NONE, Base.NONE, "abc", "", "", "", Normalization.NFC), "1x");
+        assertTrue(abc.endsWith("its Start characters are 'abc'"), abc);
+        assertTrue(!abc.contains("digit or a sign"), abc);
+        String excluded = refuses(profile(Base.XID, Base.XID, "", "", "", "q", Normalization.NFC), "qa");
+        assertTrue(excluded.endsWith("this profile excludes it"), excluded);
+    }
+
     /** An ASCII-only name: no base at all, every character listed. */
     @Test
     void aNoneBaseAdmitsOnlyItsAdditions() {
