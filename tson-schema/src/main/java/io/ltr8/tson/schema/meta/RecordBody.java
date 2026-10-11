@@ -100,6 +100,9 @@ public record RecordBody(List<TypeRef> supertypes, SequencedMap<String, RecordFi
     /**
      * Order-sensitive over {@link #fields}: the kernel's {@code field_map} is {@code ordered: true}, so two records
      * declaring the same fields in different orders are two values, where {@code Map.equals} would call them one.
+     * The override stands in for an ordered-map value type: a {@link SequencedMap} keeps order and compares as a
+     * set, so the equality the kernel states has to be written here until a map type that owns it carries
+     * {@code fields}.
      */
     @Override
     public boolean equals(Object o) {

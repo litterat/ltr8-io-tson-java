@@ -1013,6 +1013,9 @@ not change. A template's held body spells its record the same way: `<T> { x: T }
   error #10 states, judged by the name type's equality, which only a resolved type has. The brace form's own repeat
   stays the resolver's, which can say whether a field or a group member repeated the name. Running here: the first is
   the map reader's refusal, the second the linker's name-type check, and the third the resolver's; a test pins each.
+  The split follows from the key type being `text`, and is where the implementation stands rather than where the
+  rule ends: once `field_map` is keyed by the record's name type itself, the map's key equality is that type's, and
+  the linker's check over two spellings becomes the map's own uniqueness.
 - **Records only.** `template.parameters` and `template_param.name`, `tuple.elements` and `field_group` are unchanged,
   and this entry makes no claim about them.
 
