@@ -29,8 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BootstrapReferencesTest {
 
     private static RecordField field(TypeDefinition definition, String name) {
-        return assertInstanceOf(RecordBody.class, definition.body()).fields().stream()
-                .filter(f -> f.name().equals(name)).findFirst().orElseThrow();
+        return assertInstanceOf(RecordBody.class, definition.body()).fields().entrySet().stream()
+                .filter(f -> f.getKey().equals(name)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
     /** meta-kernel's own references, stated as written -- the fixture's own spelling. */

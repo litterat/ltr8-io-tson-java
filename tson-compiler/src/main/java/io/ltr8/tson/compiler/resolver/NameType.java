@@ -6,6 +6,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TextFamily;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -167,10 +168,11 @@ public final class NameType {
                 head = HeldBody.of(held).application().typeRef();
                 continue;
             }
-            return constructor != null && constructor.body() instanceof RecordBody record && record.fields().stream()
-                    .filter(field -> field.name().equals(NAME_TYPE) && field.role() == FieldRole.FIXED)
-                    .flatMap(field -> field.value().stream())
-                    .anyMatch(value -> value.text().equals(body.nameType()));
+            return constructor != null && constructor.body() instanceof RecordBody record
+                    && Optional.ofNullable(record.fields().get(NAME_TYPE))
+                            .filter(field -> field.role() == FieldRole.FIXED)
+                            .flatMap(RecordField::value)
+                            .filter(value -> value.text().equals(body.nameType())).isPresent();
         }
         return false;
     }

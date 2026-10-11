@@ -68,13 +68,15 @@ class RecordTemplateTest {
     /** The entry a field's type names -- how every fixture here reaches the materialised instantiation. */
     private static String fieldType(TsonCompiledSchema compiled, String record, String field) {
         RecordBody body = (RecordBody) compiled.schema().entries().get(record).body();
-        return body.fields().stream().filter(f -> f.name().equals(field)).findFirst().orElseThrow()
+        return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
                 .type().name();
     }
 
     private static RecordField fieldOf(TsonCompiledSchema compiled, String entry, String field) {
         RecordBody body = (RecordBody) compiled.schema().entries().get(entry).body();
-        return body.fields().stream().filter(f -> f.name().equals(field)).findFirst().orElseThrow();
+        return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
     /** Entry names that look materialised -- derived from {@code head} rather than declared. */

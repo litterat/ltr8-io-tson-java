@@ -74,14 +74,14 @@ final class BindRecordBuilder implements RecordBuilder {
             boolean[] filled = new boolean[descriptor.fields().length];
             List<String> mismatches = new ArrayList<>();
             for (int i = 0; i < count; i++) {
-                Integer at = descriptor.fieldIndex().get(plan.fields[i].name());
+                Integer at = descriptor.fieldIndex().get(plan.declaredNames[i]);
                 if (at == null) {
                     argument[i] = -1;
                     // A FIXED field is exempt: the schema settles its value, so a component would hold a constant
                     // the schema already knows. Every other field needs one -- an OPTIONAL one included, being
                     // exactly the field that works in development and fails the first time a caller sends it.
                     if (plan.fields[i].role() != FieldRole.FIXED) {
-                        mismatches.add("no component for field '" + plan.fields[i].name() + "'");
+                        mismatches.add("no component for field '" + plan.declaredNames[i] + "'");
                     }
                     continue;
                 }
@@ -90,14 +90,14 @@ final class BindRecordBuilder implements RecordBuilder {
                 filled[at] = true;
                 String deliversNull = deliversNull(plan.fields[i], plan.omitted[i]);
                 if (deliversNull != null && component.dataClass().typeClass().isPrimitive()) {
-                    mismatches.add("field '" + plan.fields[i].name() + "' " + deliversNull + ", and component '"
+                    mismatches.add("field '" + plan.declaredNames[i] + "' " + deliversNull + ", and component '"
                             + component.name() + "' binds " + component.dataClass().typeClass().getName()
                             + ", which has no null to hold it");
                 }
-                readers[i] = BindTargets.to(readers[i], component.dataClass(), "field '" + plan.fields[i].name()
+                readers[i] = BindTargets.to(readers[i], component.dataClass(), "field '" + plan.declaredNames[i]
                         + "'", "component '" + component.name() + "'", mismatches);
                 if (plan.stated[i] != null && component.dataClass() instanceof DataClassAtom bound) {
-                    injected[i] = statedValue(plan.stated[i], bound, plan.fields[i].name(), mismatches);
+                    injected[i] = statedValue(plan.stated[i], bound, plan.declaredNames[i], mismatches);
                 }
             }
             DataClassField carrier = descriptor.annotationsCarrier().orElse(null);

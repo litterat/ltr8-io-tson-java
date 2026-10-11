@@ -65,8 +65,8 @@ class TemplateDiscriminatorTest {
     }
 
     private static RecordField fieldOf(TsonCompiledSchema compiled, String entry, String field) {
-        return bodyOf(compiled, entry).fields().stream()
-                .filter(f -> f.name().equals(field)).findFirst().orElseThrow();
+        return bodyOf(compiled, entry).fields().entrySet().stream()
+                .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
     private static final String FAMILY = """

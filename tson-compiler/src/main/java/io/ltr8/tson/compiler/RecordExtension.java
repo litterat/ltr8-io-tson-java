@@ -26,6 +26,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.Set;
 
 /**
@@ -131,15 +132,14 @@ final class RecordExtension {
         // no instantiations. It needs no inherited-selector exemption either: a member states no discriminators
         // of its own, where the per-field mark had to be cleared at each one to say the same thing.
         List<String> declared = FamilySelectors.namesOf(def);
-        List<RecordField> marked = declared.stream()
-                .map(selector -> record.fields().stream().filter(f -> f.name().equals(selector)).findFirst())
-                .flatMap(Optional::stream)
-                .toList();
         if (declared.isEmpty() || record.extension() != RecordExtensionType.ABSTRACT) {
             return;
         }
-        for (RecordField field : marked) {
-            checkDiscriminatorField(name, field, record.groups(), merged, violations);
+        for (String selector : declared) {
+            RecordField field = record.fields().get(selector);
+            if (field != null) {
+                checkDiscriminatorField(name, selector, field, record.groups(), merged, violations);
+            }
         }
     }
 
@@ -170,24 +170,24 @@ final class RecordExtension {
      * differently -- so nothing else asks whether its type could hold a pin at all, and a family whose
      * selector is a record would be discovered only by the subtypes failing one at a time.
      */
-    private static void checkDiscriminatorField(String name, RecordField field, List<FieldGroup> groups,
-            Map<String, TypeDefinition> merged, List<Violation> violations) {
+    private static void checkDiscriminatorField(String name, String fieldName, RecordField field,
+            List<FieldGroup> groups, Map<String, TypeDefinition> merged, List<Violation> violations) {
         // Group membership is checked first and alone: §5.11 forces a member optional, so the state rule
         // would fire too and report the symptom beside the cause. One mistake, one verdict.
-        if (groups.stream().anyMatch(group -> group.hasMember(field.name()))) {
-            violations.add(new Violation(name, "'" + name + "': discriminator field '" + field.name()
+        if (groups.stream().anyMatch(group -> group.hasMember(fieldName))) {
+            violations.add(new Violation(name, "'" + name + "': discriminator field '" + fieldName
                     + "' is a member of a field group, whose members are mutually exclusive and uniformly "
                     + "optional (§5.11) -- so a conforming value may leave it out, and a selector that may be "
                     + "absent selects nothing. Declare it beside the group instead"));
         } else if (field.optional() || field.voidable() || field.role() != FieldRole.FREE) {
-            violations.add(new Violation(name, "'" + name + "': discriminator field '" + field.name()
+            violations.add(new Violation(name, "'" + name + "': discriminator field '" + fieldName
                     + "' is " + field.describe() + ", and must be required -- an optional selector leaves a value "
                     + "with nothing to dispatch on, and a pinned or defaulted one fixes in the base what each "
                     + "subtype has to state differently (§5.2, §5.7)"));
         }
         Optional<AtomType<?>> parser = parserFor(field, merged);
         if (parser.isEmpty()) {
-            violations.add(new Violation(name, "'" + name + "': discriminator field '" + field.name()
+            violations.add(new Violation(name, "'" + name + "': discriminator field '" + fieldName
                     + "' is declared '" + field.type().name() + "', which is not an atom or an enum -- a "
                     + "subtype pins it with a bare token (§12.1), so a type no token denotes has no pin to be "
                     + "told apart by (§5.2)"));
@@ -201,8 +201,8 @@ final class RecordExtension {
             List<Violation> violations) {
         // The same derivation the dispatchers read, never a second filter over the fields: a check that
         // decided "which fields select" differently from the read could pass a family no reader can place.
-        List<RecordField> selectors = FamilySelectors.of(def, merged);
-        if (selectors.isEmpty() || selectors.stream().anyMatch(f -> parserFor(f, merged).isEmpty())) {
+        SequencedMap<String, RecordField> selectors = FamilySelectors.of(def, merged);
+        if (selectors.isEmpty() || selectors.values().stream().anyMatch(f -> parserFor(f, merged).isEmpty())) {
             return; // already reported against the base, and a pin has nothing to be read at
         }
         Map<List<Object>, String> seen = new LinkedHashMap<>();
@@ -255,18 +255,17 @@ final class RecordExtension {
      * types are the one set known before a subtype is selected, so distinctness has to be judged in the same
      * terms a decoder will compare in. A subtype narrowing the field narrows a subset of that type.
      */
-    private static List<Object> pinsOf(String base, String subtype, List<RecordField> selectors,
+    private static List<Object> pinsOf(String base, String subtype, SequencedMap<String, RecordField> selectors,
             RecordBody record, Map<String, TypeDefinition> merged, Set<String> localNames,
             Map<String, Normalization> enumForms,
             List<Violation> violations) {
         List<Object> pins = new ArrayList<>(selectors.size());
-        for (RecordField selector : selectors) {
-            RecordField pinned = record.fields().stream()
-                    .filter(f -> f.name().equals(selector.name())).findFirst().orElse(null);
+        for (Map.Entry<String, RecordField> selector : selectors.entrySet()) {
+            RecordField pinned = record.fields().get(selector.getKey());
             if (pinned == null || pinned.role() != FieldRole.FIXED || pinned.value().isEmpty()) {
                 if (localNames.contains(subtype)) {
                     violations.add(new Violation(subtype, "'" + subtype + "' is a subtype of the sealed '"
-                            + base + "' but does not pin its discriminator '" + selector.name() + "' -- every "
+                            + base + "' but does not pin its discriminator '" + selector.getKey() + "' -- every "
                             + "member of a sealed family states its own value for each selector, with `= `, "
                             + "and it is those values a position typed '" + base + "' dispatches on. "
                             + (pinned == null ? "The field is not restated here."
@@ -275,7 +274,7 @@ final class RecordExtension {
                 }
                 return null;
             }
-            Object value = decode(selector, pinned.value().get(), merged, enumForms);
+            Object value = decode(selector.getValue(), pinned.value().get(), merged, enumForms);
             if (value == null) {
                 return null; // the pin is not a value of the declared type -- checkFieldValue's verdict
             }
@@ -346,13 +345,15 @@ final class RecordExtension {
     }
 
     /** The colliding pin, named the way an author reads it: one value, or the tuple the selectors form. */
-    private static String describe(List<RecordField> selectors, List<Object> pins) {
+    private static String describe(SequencedMap<String, RecordField> selectors, List<Object> pins) {
         if (selectors.size() == 1) {
             return "value " + pins.get(0);
         }
         StringBuilder rendered = new StringBuilder("combination (");
-        for (int i = 0; i < selectors.size(); i++) {
-            rendered.append(i == 0 ? "" : ", ").append(selectors.get(i).name()).append(": ").append(pins.get(i));
+        int i = 0;
+        for (String selector : selectors.keySet()) {
+            rendered.append(i == 0 ? "" : ", ").append(selector).append(": ").append(pins.get(i));
+            i++;
         }
         return rendered.append(")").toString();
     }

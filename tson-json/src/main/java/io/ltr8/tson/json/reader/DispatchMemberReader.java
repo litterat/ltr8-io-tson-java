@@ -28,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.Set;
 
 /**
@@ -94,7 +95,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
      * own declared type. Taking the fields rather than a {@code RecordBody} is what lets one dispatcher serve
      * both, and is the same signature its {@code tson-compiler} peer takes.
      */
-    DispatchMemberReader(Set<String> selfNames, String displayName, List<RecordField> selectorFields,
+    DispatchMemberReader(Set<String> selfNames, String displayName, SequencedMap<String, RecordField> selectorFields,
                            Set<String> subtypes,
                            ValueReaderContext context, JsonSchemaLocation schemaLocation,
                            RecordDiagnostics rules) {
@@ -104,7 +105,8 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         this.rules = rules;
         TsonSchema schema = context.schema();
         Map<String, TypeDefinition> entries = schema.entries();
-        this.selectors = selectorFields.stream().map(field -> selectorOf(field, context.linked())).toList();
+        this.selectors = selectorFields.entrySet().stream()
+                .map(field -> selectorOf(field.getKey(), field.getValue(), context.linked())).toList();
         // The family's members compose the base, so they share its name type; a template base states none.
         this.nameForm = selfNames.stream().map(context.linked()::nameForm).filter(form -> form != Normalization.NFC)
                 .findFirst().orElse(Normalization.NFC);
@@ -137,7 +139,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
-    private static Selector selectorOf(RecordField field, TsonLinkedSchema linked) {
+    private static Selector selectorOf(String name, RecordField field, TsonLinkedSchema linked) {
         ReferenceChain.Resolved target = ReferenceChain.terminal(linked.schema(), field.type().name()).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' names nothing this schema declares"));
@@ -145,15 +147,15 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
                 .orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
-        return new Selector(Nfc.of(field.name()), parser, AtomForm.of(target.definition().body()));
+        return new Selector(Nfc.of(name), parser, AtomForm.of(target.definition().body()));
     }
 
     /** One member's pins in the base's declaration order, or null where it does not pin them all. */
     private List<Object> pinsOf(RecordBody record) {
         List<Object> key = new ArrayList<>(selectors.size());
         for (Selector selector : selectors) {
-            Optional<RecordField> field = record.fields().stream()
-                    .filter(f -> Nfc.of(f.name()).equals(selector.name())).findFirst();
+            Optional<RecordField> field = record.fields().entrySet().stream()
+                    .filter(f -> Nfc.of(f.getKey()).equals(selector.name())).map(Map.Entry::getValue).findFirst();
             if (field.isEmpty() || field.get().role() != FieldRole.FIXED
                     || field.get().value().isEmpty()) {
                 return null; // the linker already refused this; the family is read without it

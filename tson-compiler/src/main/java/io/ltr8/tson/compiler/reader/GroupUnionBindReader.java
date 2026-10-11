@@ -57,8 +57,8 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
                           FieldNameRule fieldNames) {
         // Per field, so a member whose own component is a Token reads the token where its sibling of the
         // same schema type reads the value -- see RecordBindReader.tokenAware for why a slot wants one.
-        super(name, displayName, body, field -> {
-            DataClassRecord member = members.get(field.name());
+        super(name, displayName, body, (fieldName, field) -> {
+            DataClassRecord member = members.get(fieldName);
             Class<?> component = member == null ? null : member.fields()[0].type();
             return component == io.ltr8.tson.schema.meta.Token.class
                     ? AtomTypeReader.of(name, RawTokenParser.INSTANCE, schemaLocation)
@@ -97,7 +97,7 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
             if (!seen[i]) {
                 continue;
             }
-            String fieldName = fields.get(i).schema().name();
+            String fieldName = fields.get(i).name();
             DataClassRecord member = members.get(fieldName);
             if (member == null) {
                 anchoredCtx.report(Diagnostic.Code.UNRECOGNIZED_FIELD, "'" + name + "' has no bound form "

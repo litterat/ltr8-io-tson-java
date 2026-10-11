@@ -63,7 +63,7 @@ class DirectApplicationDeclarationTest {
         TypeDefinition bx = linked.schema().entries().get("bx");
         assertEquals(TypeKind.PRODUCT, bx.kind(), "the declaration is the instantiation, not a hop to one");
         RecordBody body = assertInstanceOf(RecordBody.class, bx.body(), "its body is the closed record");
-        assertEquals(List.of("item"), body.fields().stream().map(f -> f.name()).toList());
+        assertEquals(List.of("item"), body.fields().keySet().stream().toList());
     }
 
     /** §8.2 keys an instantiation's identity on the application, which {@code source} records as written. */
@@ -103,7 +103,7 @@ class DirectApplicationDeclarationTest {
         assertEquals(List.of(), named(linked, "box_"),
                 () -> "one entry for one application: " + linked.schema().entries().keySet());
         RecordBody holder = (RecordBody) linked.schema().entries().get("holder").body();
-        assertEquals("bx", holder.fields().get(0).type().name(),
+        assertEquals("bx", holder.fields().values().stream().toList().get(0).type().name(),
                 "the field names the declaration, which is what the application denotes");
     }
 

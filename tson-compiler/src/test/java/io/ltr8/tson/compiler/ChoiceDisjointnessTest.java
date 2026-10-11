@@ -78,14 +78,14 @@ class ChoiceDisjointnessTest {
     @Test
     void aContainerAndAScalarAreDisjoint() {
         TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
-        TypeRef p = product("point", RecordBody.of(List.of()));
+        TypeRef p = product("point", RecordBody.of(RecordBody.fieldMap()));
         assertTrue(disjoint(i, p));
     }
 
     @Test
     void aBraceAndABracketVariantAreDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
-        TypeRef record = product("point", RecordBody.of(List.of()));
+        TypeRef record = product("point", RecordBody.of(RecordBody.fieldMap()));
         TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), false, true, false,
                 Optional.empty(), Optional.empty()));
         assertTrue(disjoint(record, array));
@@ -176,10 +176,10 @@ class ChoiceDisjointnessTest {
     @Test
     void twoRecordsAreNotDisjointHoweverTheirFieldsDiffer() {
         atom("text", TextType.UNCONSTRAINED);
-        TypeRef circle = product("circle", RecordBody.of(List.of(
-                RecordField.required("radius", TypeRef.of("text")))));
-        TypeRef square = product("square", RecordBody.of(List.of(
-                RecordField.required("side", TypeRef.of("text")))));
+        TypeRef circle = product("circle", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("radius", RecordField.required(TypeRef.of("text"))))));
+        TypeRef square = product("square", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("side", RecordField.required(TypeRef.of("text"))))));
         assertFalse(disjoint(circle, square));
     }
 
@@ -187,7 +187,7 @@ class ChoiceDisjointnessTest {
     @Test
     void aRecordAndAMapAreNotDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
-        TypeRef record = product("point", RecordBody.of(List.of()));
+        TypeRef record = product("point", RecordBody.of(RecordBody.fieldMap()));
         TypeRef map = product("lookup", new MapBody(TypeRef.of("text"), TypeRef.of("text"), false, false,
                 Optional.empty(), Optional.empty()));
         assertFalse(disjoint(record, map));
@@ -251,7 +251,7 @@ class ChoiceDisjointnessTest {
         namespace.put("inner", new TypeDefinition(Optional.empty(), TypeKind.SUM, 
                 List.of(), List.of(),
                 new ChoiceBody(List.of(TypeRef.of("integer"), TypeRef.of("text")))));
-        TypeRef record = product("point", RecordBody.of(List.of()));
+        TypeRef record = product("point", RecordBody.of(RecordBody.fieldMap()));
         assertFalse(disjoint(TypeRef.of("inner"), record));
     }
 

@@ -62,8 +62,9 @@ class ValueParamFixedFieldTest {
         if (definition.body() instanceof Reference alias) {
             definition = linked.schema().entries().get(alias.target().name());
         }
-        return ((RecordBody) definition.body()).fields().stream()
-                .filter(field -> field.name().equals("status")).findFirst().orElseThrow();
+        return ((RecordBody) definition.body()).fields().entrySet().stream()
+                .filter(field -> field.getKey().equals("status"))
+                        .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
     private static List<Diagnostic> validate(Tson tson, String type) {

@@ -30,7 +30,7 @@ class TopKindHierarchyTest {
 
     @Test
     void productFamilyVariantsAreProductAndTop() {
-        RecordBody record = RecordBody.of(List.of());
+        RecordBody record = RecordBody.of(RecordBody.fieldMap());
         ArrayBody array = ArrayBody.of(TypeRef.of("integer"));
         MapBody map = MapBody.of(TypeRef.of("text"), TypeRef.of("text"));
         TupleBody tuple = new TupleBody(List.of());

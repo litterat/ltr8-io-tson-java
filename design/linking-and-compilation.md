@@ -16,6 +16,8 @@ history lives in git.
 - An enum's and a record's `name_type` is an identifier family whose `normalization` implies NFC (`NONE` never;
   `ASCII_CASEFOLD` only over ASCII — `NameType.formRefusal`); their names are judged under its profile, never the
   kernel's identifier's.
+- `FieldNames` never sees two fields of one spelling — `record.fields` is a map, and its reader refuses the repeat —
+  so its duplicate check is two spellings that are one value of the record's name type, and nothing else.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
 - `RecordExtension`'s FINAL check reads `TypeDefinition.supertypes`, never `RecordBody.supertypes`.
@@ -306,3 +308,12 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
   document's names are matched in the type's form. Each record with a type other than the default is recorded in
   `TsonLinkedSchema.nameTypes`, with the definition it resolves to, merged through imports like `enumForms`, because its
   readers judge a document's names by it and cannot resolve it themselves.
+- **A duplicate field is refused by whichever layer can see it, and only by that one** (SPEC-FEEDBACK.md #12).
+  `record.fields` is a map keyed by the name (`field_map`, `ordered: true`, keys `text`), so one spelling written
+  twice in the explicit `!record { fields: { … } }` form is the map's duplicate key: `DUPLICATE_MAP_KEY` where the
+  form is read as data, and that refusal restated against the declaration where a schema writes it. The brace form's
+  repeat is the resolver's, which says whether a field or a group member repeated it. What no map can see — two
+  spellings that are one value of the record's name type, `name` and `NAME` under a case fold — is `FieldNames`',
+  since only a resolved name type has an equality to ask. The key type is `text` rather than `field_name` for the
+  reason `discriminators` is: the record's `name_type`, not the kernel's identifier, decides which names it may
+  declare.

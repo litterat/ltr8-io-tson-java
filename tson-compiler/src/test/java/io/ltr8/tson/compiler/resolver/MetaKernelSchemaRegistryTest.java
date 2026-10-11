@@ -62,10 +62,10 @@ class MetaKernelSchemaRegistryTest {
         // field-type sugar, repeated uses of one form deduplicating to one entry -- `[text; 1..]` serves both
         // `discriminators`, `field_group.optional_members` and the options inside `field_group.members`. `enum`'s
         // member set is not among them: `enum_set` is a declaration the fixture writes, since `set` has no sugar
-        // of its own.
+        // of its own, and nor is `record.fields`, the fixture's own ordered `field_map`.
         Set<String> expectedHeads = Set.of("array_tuple_element", "array_text",
                 "array_type_ref", "array_type_name", "array_type_argument", "array_template_param",
-                "array_field_group", "array_record_field");
+                "array_field_group");
         Set<String> syntheticNames = new HashSet<>(linked.schema().entries().keySet());
         syntheticNames.removeIf(name -> expectedHeads.stream().noneMatch(head -> name.startsWith(head + "_")));
         assertEquals(expectedHeads.size(), syntheticNames.size(), syntheticNames.toString());
@@ -76,9 +76,9 @@ class MetaKernelSchemaRegistryTest {
 
         TypeDefinition enumDef = linked.schema().entries().get("enum");
         RecordBody enumBody = (RecordBody) enumDef.body();
-        RecordField membersField = enumBody.fields().stream()
-                .filter(f -> f.name().equals("members"))
-                .findFirst().orElseThrow();
+        RecordField membersField = enumBody.fields().entrySet().stream()
+                .filter(f -> f.getKey().equals("members"))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
         assertEquals(TypeRef.of("enum_set"), membersField.type());
     }
 

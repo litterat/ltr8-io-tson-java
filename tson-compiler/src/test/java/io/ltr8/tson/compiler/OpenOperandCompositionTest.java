@@ -79,7 +79,7 @@ class OpenOperandCompositionTest {
         assertEquals(List.of("base", "box"), c.supertypes(),
                 "the ancestors arrive by value, and the edge runs to the family base the operand applies");
         assertEquals(List.of("tag", "item", "extra"),
-                ((RecordBody) c.body()).fields().stream().map(f -> f.name()).toList(),
+                ((RecordBody) c.body()).fields().keySet().stream().toList(),
                 "the operand's fields flatten in, left to right, with the body's own appended");
         assertEquals(List.of("box"), ((RecordBody) c.body()).supertypes().stream()
                         .map(io.ltr8.tson.schema.meta.TypeRef::name).toList(),
@@ -136,10 +136,11 @@ class OpenOperandCompositionTest {
 
         RecordBody closed = (RecordBody) compiled.schema().entries()
                 .get(aliasTarget(compiled, "use")).body();
-        assertEquals(List.of("id", "tag", "value"), closed.fields().stream().map(f -> f.name()).toList(),
+        assertEquals(List.of("id", "tag", "value"), closed.fields().keySet().stream().toList(),
                 "customer's field, then box's flattened field set, in composition order");
-        assertEquals("text", closed.fields().get(2).type().name(),
-                () -> "the parameter absorbed from box<T> closes with vip: " + closed.fields().get(2));
+        assertEquals("text", closed.fields().values().stream().toList().get(2).type().name(),
+                () -> "the parameter absorbed from box<T> closes with vip: "
+                        + closed.fields().values().stream().toList().get(2));
     }
 
     /**
@@ -222,8 +223,9 @@ class OpenOperandCompositionTest {
 
         RecordBody closed = (RecordBody) compiled.schema().entries()
                 .get(aliasTarget(compiled, "use")).body();
-        assertEquals(List.of("tag", "note", "value"), closed.fields().stream().map(f -> f.name()).toList());
-        assertEquals("text", closed.fields().get(2).type().name(), "the parameter survived the refinement");
+        assertEquals(List.of("tag", "note", "value"), closed.fields().keySet().stream().toList());
+        assertEquals("text", closed.fields().values().stream().toList().get(2).type().name(),
+                "the parameter survived the refinement");
     }
 
     /**
@@ -245,13 +247,14 @@ class OpenOperandCompositionTest {
 
         RecordBody closed = (RecordBody) compiled.schema().entries()
                 .get(aliasTarget(compiled, "use")).body();
-        String v = closed.fields().stream().filter(f -> f.name().equals("v")).findFirst().orElseThrow()
+        String v = closed.fields().entrySet().stream().filter(f -> f.getKey().equals("v"))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
                 .type().name();
 
         RecordBody held = (RecordBody) compiled.schema().entries().get(v).body();
-        assertEquals(List.of("u"), held.fields().stream().map(f -> f.name()).toList(),
+        assertEquals(List.of("u"), held.fields().keySet().stream().toList(),
                 () -> "'v' should name the inner<text> instantiation, not bare 'inner': " + v);
-        assertEquals("text", held.fields().get(0).type().name(),
+        assertEquals("text", held.fields().values().stream().toList().get(0).type().name(),
                 "the argument list survived, so U closed to text");
     }
 

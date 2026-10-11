@@ -501,7 +501,7 @@ final class ParameterTypes {
                 record(wire, constructor, vocabulary);
                 return;
             }
-            List<RecordField> unmarked = vocabulary.fields().stream().filter(f -> !f.optional()).toList();
+            List<RecordField> unmarked = vocabulary.fields().values().stream().filter(f -> !f.optional()).toList();
             if (unmarked.size() == 1) {
                 value(payload, unmarked.getFirst().type());
             }
@@ -516,7 +516,7 @@ final class ParameterTypes {
                     routed(token.text(), wire);
                     continue;
                 }
-                vocabulary.fields().stream().filter(f -> f.name().equals(written.name())).findFirst()
+                Optional.ofNullable(vocabulary.fields().get(written.name()))
                         .ifPresent(field -> value(value, field.type()));
             }
         }

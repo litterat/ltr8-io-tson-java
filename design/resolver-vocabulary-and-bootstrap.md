@@ -33,8 +33,10 @@ once.
 
 **`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names;
 the `scoped`/`nameField` builders every producer goes through; `refValue` and its inverse
-`typeRefOf`/`argumentOf`; the held-record writers `heldRecord`/`heldEmptyRecord`; and §5.10 `substitute` over
-a held body.
+`typeRefOf`/`argumentOf`; the held-record writers `heldRecord`/`heldEmptyRecord`, which spell `fields` as a map
+from each field's declared name to its `record_field` (`fieldMap`/`fieldEntry`); and §5.10 `substitute` over a
+held body. Every walk over a held body descends into a map's keys and values as it does into a record or an
+array, `fields` being one.
 
 - **Why one class and not a producer beside one phase and a consumer beside another.** A held body is written
   by two phases (`SchemaDesugarer` lifting a sugar form, `DefinitionResolver` holding a composition or

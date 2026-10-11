@@ -148,7 +148,7 @@ class ArrayTreeReaderTest {
         Map<String, TypeDefinition> extra = new LinkedHashMap<>();
         extra.put("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer"))));
         extra.put("holder", TypeDefinition.product(
-                RecordBody.of(List.of(RecordField.required("items", TypeRef.of("numbers"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("items", RecordField.required(TypeRef.of("numbers")))))));
         TsonCompiledSchema compiled = compile(extra);
 
         @SuppressWarnings("unchecked")

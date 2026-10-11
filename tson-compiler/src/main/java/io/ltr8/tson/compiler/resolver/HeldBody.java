@@ -156,6 +156,11 @@ public final class HeldBody {
                     .forEach(field -> collectApplications(field.value().value().coreValue(), into));
             case ArrayValue array -> array.elements()
                     .forEach(element -> collectApplications(element.value().coreValue(), into));
+            // `record.fields` is a map, and an application stands in a field's value as readily as in an array.
+            case MapValue map -> map.entries().forEach(entry -> {
+                collectApplications(entry.key().coreValue(), into);
+                collectApplications(entry.value().value().coreValue(), into);
+            });
             default -> { } // a token names a type but applies nothing
         }
     }

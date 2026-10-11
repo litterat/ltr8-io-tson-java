@@ -108,14 +108,14 @@ class RecordBindReaderTest {
         entries.put("text_member_set", TypeDefinition.product(ArrayBody.of(TypeRef.of("text"))));
         entries.put("normalization", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD"))));
-        entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.optionalVoidable("min_length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("max_length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("pattern", TypeRef.of("text")),
-                RecordField.optionalVoidable("members", TypeRef.of("text_member_set")),
-                RecordField.defaulted("normalization", TypeRef.of("normalization"),
-                        new Token("NONE", Token.Form.UNQUOTED))))));
+        entries.put("text_type", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
+                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
+                        new Token("NONE", Token.Form.UNQUOTED)))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
@@ -144,15 +144,15 @@ class RecordBindReaderTest {
         entries.put("text_member_set", TypeDefinition.product(ArrayBody.of(TypeRef.of("text"))));
         entries.put("normalization", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD"))));
-        entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.fixed("min_length", TypeRef.of("integer"), new io.ltr8.tson.schema.meta.Token("3",
-                        io.ltr8.tson.schema.meta.Token.Form.UNQUOTED)),
-                RecordField.optionalVoidable("max_length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("pattern", TypeRef.of("text")),
-                RecordField.optionalVoidable("members", TypeRef.of("text_member_set")),
-                RecordField.defaulted("normalization", TypeRef.of("normalization"),
-                        new Token("NONE", Token.Form.UNQUOTED))))));
+        entries.put("text_type", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("min_length", RecordField.fixed(TypeRef.of("integer"), new io.ltr8.tson.schema.meta.Token("3",
+                        io.ltr8.tson.schema.meta.Token.Form.UNQUOTED))),
+                Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
+                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
+                        new Token("NONE", Token.Form.UNQUOTED)))))));
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
                 new TsonLinkedSchema(new TsonSchema("https://example.test/s.tn",
                         "https://example.test/meta.tn", List.of(), entries)),
@@ -226,28 +226,28 @@ class RecordBindReaderTest {
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD"))));
         entries.put("text_type", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
                 List.of(), List.of("email_type"),
-                RecordBody.of(List.of(
-                        RecordField.optionalVoidable("min_length", TypeRef.of("integer")),
-                        RecordField.optionalVoidable("max_length", TypeRef.of("integer")),
-                        RecordField.optionalVoidable("length", TypeRef.of("integer")),
-                        RecordField.optionalVoidable("pattern", TypeRef.of("text")),
-                        RecordField.optionalVoidable("members", TypeRef.of("text_member_set")),
-                        RecordField.defaulted("normalization", TypeRef.of("normalization"),
-                                new Token("NONE", Token.Form.UNQUOTED))))));
+                RecordBody.of(RecordBody.fieldMap(
+                        Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                        Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                        Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                        Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
+                        Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                        Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
+                                new Token("NONE", Token.Form.UNQUOTED)))))));
         // Both bodies carry the constructor's whole resolved field shape. An abbreviated stand-in used to
         // compile and silently bind null into the components it left out; the binding check refuses it now,
         // which is the same trap CLAUDE.md records against UriType/RegexType, caught at the fixture instead.
         entries.put("email_type", new TypeDefinition(Optional.of(TypeRef.of("text_type")), TypeKind.PRODUCT,
                  List.of("text_type"), List.of(),
-                RecordBody.of(List.of(
-                        RecordField.optionalVoidable("min_length", TypeRef.of("integer")),
-                        RecordField.optionalVoidable("max_length", TypeRef.of("integer")),
-                        RecordField.optionalVoidable("length", TypeRef.of("integer")),
-                        RecordField.optionalVoidable("pattern", TypeRef.of("text")),
-                        RecordField.optionalVoidable("members", TypeRef.of("text_member_set")),
-                        RecordField.defaulted("normalization", TypeRef.of("normalization"),
-                                new Token("NONE", Token.Form.UNQUOTED)),
-                        RecordField.optionalVoidable("spec", TypeRef.of("text"))))));
+                RecordBody.of(RecordBody.fieldMap(
+                        Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                        Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                        Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                        Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
+                        Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                        Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
+                                new Token("NONE", Token.Form.UNQUOTED))),
+                        Map.entry("spec", RecordField.optionalVoidable(TypeRef.of("text")))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();

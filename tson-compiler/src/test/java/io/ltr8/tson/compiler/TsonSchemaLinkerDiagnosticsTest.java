@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SequencedMap;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,18 +39,26 @@ class TsonSchemaLinkerDiagnosticsTest {
     private record Pos(int line, int column, int byteOffset) implements SourcePosition {
     }
 
-    private static TypeDefinition record(int line, RecordField... fields) {
+    private static TypeDefinition record(int line) {
+        return record(line, RecordBody.fieldMap());
+    }
+
+    private static TypeDefinition record(int line, Map.Entry<String, RecordField> field) {
+        return record(line, RecordBody.fieldMap(field));
+    }
+
+    private static TypeDefinition record(int line, SequencedMap<String, RecordField> fields) {
         return new TypeDefinition(Optional.empty(), io.ltr8.tson.schema.meta.TypeKind.PRODUCT, 
-                List.of(), List.of(), RecordBody.of(List.of(fields)),
+                List.of(), List.of(), RecordBody.of(fields),
                 Optional.of(new Pos(line, 3, line * 10)), io.ltr8.annotation.Annotations.empty());
     }
 
     /** Three entries, each with a field naming a type nothing declares -- three independent failures. */
     private static TsonSchema threeUnresolvedReferences() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("a", record(4, RecordField.required("x", TypeRef.of("no_such_type"))));
-        entries.put("b", record(5, RecordField.required("y", TypeRef.of("also_missing"))));
-        entries.put("c", record(6, RecordField.required("z", TypeRef.of("missing_too"))));
+        entries.put("a", record(4, Map.entry("x", RecordField.required(TypeRef.of("no_such_type")))));
+        entries.put("b", record(5, Map.entry("y", RecordField.required(TypeRef.of("also_missing")))));
+        entries.put("c", record(6, Map.entry("z", RecordField.required(TypeRef.of("missing_too")))));
         entries.put("fine", record(7));
         return new TsonSchema(ID, "https://tson.io/2026/38/m/meta.tn", List.of(), entries);
     }
@@ -97,10 +106,10 @@ class TsonSchemaLinkerDiagnosticsTest {
     @Test
     void unresolvedSupertypesAndFieldTypesAreBothCollected() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("bad_field", record(4, RecordField.required("x", TypeRef.of("no_such_type"))));
+        entries.put("bad_field", record(4, Map.entry("x", RecordField.required(TypeRef.of("no_such_type")))));
         entries.put("bad_supertype", new TypeDefinition(Optional.empty(),
                 io.ltr8.tson.schema.meta.TypeKind.PRODUCT,  List.of("no_such_parent"),
-                List.of(), RecordBody.of(List.of()), Optional.of(new Pos(5, 3, 50)),
+                List.of(), RecordBody.of(RecordBody.fieldMap()), Optional.of(new Pos(5, 3, 50)),
                 io.ltr8.annotation.Annotations.empty()));
         entries.put("fine", record(6));
 

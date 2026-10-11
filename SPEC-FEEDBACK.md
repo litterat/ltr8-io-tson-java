@@ -780,7 +780,7 @@ relaxed type, defined by the translation and not by the series, such as
 - **The brace form states a type by composition, and has no syntax of its own.** A relaxed name type is a
   translation's tool, not the go-to form for a TSON record, so the series adds no brace-form spelling for it: a
   translation declares its type once, on a fieldless abstract base, and its records compose it —
-  `json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }`, then
+  `json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }`, then
   `node => json_record & { "@id": text  label: text }`. This needs nothing beyond the inheritance rule above, and
   any identifier family serves. The cost is an IS-A edge to the base, which
   asks nothing of a position typed by a member: `node` reads untagged. Rejected: inferring `text` from a quoted
@@ -950,3 +950,96 @@ composed with a translation's base.
 **Status against Revision 37:** open; documentation for #10. The implementation's own consumer skill
 (`skills/tson-java/SKILL.md`, "Field names that are not identifiers") carries the reading and binding half and
 can serve as a model.
+
+---
+
+## 12. A record's fields are a map keyed by name: `record_field` carries no `name`
+
+**Section:** [TSON-SCHEMA] §5.2 (`record`, the explicit `!record { fields: … }` form, and the rewrite of a bare record
+body), §8.1 (`record_field`, `record`, and a record's resolved output), §13.2 (the artifact pins).
+
+**Kind:** proposal — the one declaring slot in the kernel written as a list.
+
+**The problem.** A field's name is its position in the record, the key a document writes it under; it is not a fact
+about the field. Every other position in the kernel that declares names says so by its shape: a schema is
+`{type_name => type_definition}`, the name the key and the definition the value, and an enum's members are a set.
+`record.fields` is the exception, `[record_field]`, each element carrying `name: text` beside its four facts. So the
+name is data the field holds rather than the place it sits, and two things follow. The explicit form
+`!record { fields: [ { name: a … } { name: a … } ] }` is well-formed data, an array admitting repetition, so the first
+thing a field set promises, that each name is declared once, has no shape behind it and is left to a resolver rule.
+And a field can be carried detached from the record it is a position of, its name travelling with it as though it
+were its own.
+
+**Proposed, and running.** `fields` is an ordered map from a field's name to its facts, and `record_field` drops
+`name`:
+
+```
+record_field => {
+  type:      type_ref
+  optional?: boolean ~ false
+  voidable?: boolean ~ false
+  role?:     field_role ~ FREE
+  value?:    value
+}
+field_map => !map { key_type: text  value_type: record_field  ordered: true }
+record    => product & { … fields: field_map … }
+```
+
+The explicit form is `point => !record { fields: { x => { type: int32 }  y => { type: int32  optional: true } } }`, and
+a record's resolved output is `!record { fields: { x => !record_field { type: int32 } … } }`; a name that is no
+identifier is a quoted key, `"@id" => { type: text }`. The brace form an author writes, `{ x: int32  y?: int32 }`, does
+not change. A template's held body spells its record the same way: `<T> { x: T }` holds
+`!record { fields: { x => { type: T } } }`.
+
+**The decisions it makes, stated so none is read later as an accident:**
+
+- **The map is ordered.** Declaration order is part of a record's value: resolved output states the fields in it, a
+  diagnostic naming a record's fields lists them in it, and a composition's fields are its supertypes', in their order,
+  then its body's. Two records declaring the same fields in different orders are therefore two values, where an
+  unordered map would call them one, and a resolved-output comparison could not tell a resolver that kept the order
+  from one that sorted it. The kernel states this with the explicit `!map { … ordered: true }`, since the
+  brace-map sugar `{text => record_field}` has no place for the facet, and names it, `field_map`, because a type
+  position admits no inline constructor application (§5.3) — as `enum_set` names its set.
+- **The key type is `text`, not `field_name`.** Which names a record may declare is its `name_type`'s to say
+  (SPEC-FEEDBACK.md #10): `json_name` admits `@id`, which `field_name` does not, and a key type of `field_name` would
+  refuse it before the name type was consulted. `record.discriminators` is `[text; 1..]` and `field_group`'s member
+  slots are `text` for the same reason; `fields` follows them. Each key is judged by the record's `name_type` at link,
+  as every other name the record states is.
+- **A duplicate is refused by the layer that can see it.** One spelling written twice in the explicit form is the
+  map's duplicate key ([TSON-DATA] §2.6), refused where the map is read and before any name type is consulted: read
+  as data governed by meta.tn it is a duplicate key at `/fields/x`, and written in a schema it is that refusal
+  restated against the declaration, a resolver error by §8.1's phase rule. Two spellings that are one value of the
+  record's name type — `name` and `NAME` under a case fold — are two keys the map admits, and remain the resolver
+  error #10 states, judged by the name type's equality, which only a resolved type has. The brace form's own repeat
+  stays the resolver's, which can say whether a field or a group member repeated the name. Running here: the first is
+  the map reader's refusal, the second the linker's name-type check, and the third the resolver's; a test pins each.
+- **Records only.** `template.parameters` and `template_param.name`, `tuple.elements` and `field_group` are unchanged,
+  and this entry makes no claim about them.
+
+**Breaking changes, against Revision 37:**
+
+- `record_field.name` is removed and `record.fields` is `field_map`: a schema writing the explicit
+  `!record { fields: [ { name: a  type: T } ] }` writes `!record { fields: { a => { type: T } } }`, and data typed
+  `record_field` states no `name`.
+- Every record's resolved output changes shape, and so does every held record body.
+- The kernel gains `field_map` and loses the synthetic array of `record_field` that `[record_field]` lifted to.
+- Every bundled schema's `!!id` pin changes (§13.2).
+
+**Suggested resolution.**
+
+- [TSON-SCHEMA] §5.2: "A record's fields are a map from each field's name to its `record_field`, in declaration
+  order, which is part of the record's value. A bare record body `{ a: T … }` denotes `!record { fields: { a => {
+  type: T } … } }`. A field name is a key of `fields`, `text`, and a value of the record's `name_type`: a name written
+  twice is a duplicate key ([TSON-DATA] §2.6), and two names that are one value of the name type are a resolver
+  error."
+- [TSON-SCHEMA] §8.1: `record_field` without `name`; `field_map => !map { key_type: text  value_type: record_field
+  ordered: true }` beside it; `record.fields: field_map`; the resolved-output examples written with the map.
+- [TSON-SCHEMA] §13.2: the five artifact rows carry the re-stamped pins.
+
+**Status against Revision 37:** open; running on `r2026-38-proposal`. `meta-kernel.tn` declares `field_map` and the
+new `record_field`; the resolved fixtures carry both (`ResolvedFixtureTest`), and the bundled schemas are restamped.
+The Java value model mirrors it: `RecordField` has no name, and `RecordBody.fields` is a `SequencedMap<String,
+RecordField>` whose order `RecordBody.equals` compares. The resolver, the linker, held template bodies and both
+encodings' readers key fields by name; the corpus restates every explicit record and every resolved output in the
+map form and adds vectors for the explicit form, its duplicate key, and declaration order. Part 2's cached §13.2
+table is not re-stamped here.

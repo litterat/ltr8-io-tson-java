@@ -43,7 +43,7 @@ class EnumTreeReaderTest {
         // so there's nothing simpler about trying to trim it down. One extra local entry on top.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>(MetaKernelBootstrapResolver.getMetaKernelSchema().entries());
         entries.put("flag_holder", TypeDefinition.product(
-                RecordBody.of(List.of(RecordField.required("flag", TypeRef.of("boolean"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("flag", RecordField.required(TypeRef.of("boolean")))))));
         // !!meta must be the real meta-kernel identity, not a placeholder -- this schema's own
         // locals are meta-kernel's real constructor vocabulary verbatim, plus one extra entry, so
         // TsonSchemaLinker's own "only a meta-kernel-governed schema may declare constructors" check

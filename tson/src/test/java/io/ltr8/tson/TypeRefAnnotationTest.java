@@ -29,16 +29,16 @@ class TypeRefAnnotationTest {
     }
 
     private static TypeRef fieldType(TypeDefinition definition) {
-        return assertInstanceOf(RecordBody.class, definition.body()).fields().getFirst().type();
+        return assertInstanceOf(RecordBody.class, definition.body()).fields().sequencedValues().getFirst().type();
     }
 
     /** An annotation written on the reference itself, read off a document. */
     @Test
     void anAnnotationOnATypeRefIsKept() {
         TypeRef type = fieldType(read("""
-                !type_definition { body: !record { fields: [
-                  !record_field { name: n  type: @doc:"the token itself" token }
-                ] } }"""));
+                !type_definition { body: !record { fields: {
+                  n => !record_field { type: @doc:"the token itself" token }
+                } } }"""));
 
         assertEquals("token", type.name());
         assertEquals("the token itself", type.annotations().get("doc").orElseThrow().value().orElseThrow());
@@ -48,18 +48,18 @@ class TypeRefAnnotationTest {
     @Test
     void anUnannotatedTypeRefCarriesNothing() {
         assertTrue(fieldType(read("""
-                !type_definition { body: !record { fields: [
-                  !record_field { name: n  type: token }
-                ] } }""")).annotations().values().isEmpty());
+                !type_definition { body: !record { fields: {
+                  n => !record_field { type: token }
+                } } }""")).annotations().values().isEmpty());
     }
 
     /** And it writes back out, so a resolved-form round trip does not quietly drop it. */
     @Test
     void anAnnotatedTypeRefWritesBackAsOne() {
         TypeRef type = fieldType(read("""
-                !type_definition { body: !record { fields: [
-                  !record_field { name: n  type: @doc:"the token itself" token }
-                ] } }"""));
+                !type_definition { body: !record { fields: {
+                  n => !record_field { type: @doc:"the token itself" token }
+                } } }"""));
 
         String written = new TsonObjectWriter(SchemaMetaNameBinder.defaultContext()).toTson(type);
 

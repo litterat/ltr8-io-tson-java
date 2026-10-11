@@ -97,7 +97,7 @@ final class MetaRefs {
             // back with nothing to dispatch on.
             case RecordBody record -> new RecordBody(mapRecordSupertypes
                     ? record.supertypes().stream().map(map).toList() : record.supertypes(),
-                    record.fields().stream().map(field -> field.withType(map.apply(field.type()))).toList(),
+                    record.mapFields(field -> field.withType(map.apply(field.type()))),
                     record.groups(), record.extension(), record.discriminators(), record.nameType());
             case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.voidable(),
                     array.ordered(), array.uniqueItems(), array.minItems(), array.maxItems());

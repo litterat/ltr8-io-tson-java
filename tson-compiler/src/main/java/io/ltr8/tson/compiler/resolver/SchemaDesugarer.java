@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -350,7 +351,7 @@ final class SchemaDesugarer {
                 // see currentParameters.
                 StructuralDef body = structuralDef(structural.body());
                 // §5.2's own rewrite, applied where the body is written: a bare record body denotes
-                // `!record { fields: [ ... ] }`, so a record template becomes the construction it always
+                // `!record { fields: { ... } }`, so a record template becomes the construction it always
                 // was and is held like every other open form. See recordBinding.
                 //
                 // Every parameterised record body takes this path, `~`-marked or not. The other route --
@@ -723,7 +724,7 @@ final class SchemaDesugarer {
     }
 
     /**
-     * {@code !record { fields: [ { name: x  type: T } ... ] }} -- §5.2's own rewrite of a bare record body,
+     * {@code !record { fields: { x => { type: T } ... } }} -- §5.2's own rewrite of a bare record body,
      * applied where the body is written so that a record template holds an application like every other open
      * form.
      *
@@ -749,7 +750,7 @@ final class SchemaDesugarer {
      * has acquired a value into an optional FIXED one.
      */
     private Binding recordBinding(RecordDef record) {
-        List<ScopedValue> fields = new ArrayList<>();
+        List<MapValue.MapEntry> fields = new ArrayList<>();
         List<ScopedValue> groups = new ArrayList<>();
         List<ScopedValue> discriminators = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
@@ -757,7 +758,7 @@ final class SchemaDesugarer {
             switch (entry) {
                 case FieldDef field -> {
                     requireFieldNameUnseen(field.name(), seen, "this body declares it twice");
-                    fields.add(recordField(field));
+                    fields.add(WireForm.fieldEntry(field.name(), recordField(field)));
                     // `=?`, or -- in a template -- a pin taken from a value parameter, which supplies one
                     // value per application and so one per member (§5.10). Only a
                     // *fresh* record body derives: this is the declaration that states the selector, where a
@@ -775,17 +776,17 @@ final class SchemaDesugarer {
                         // says so, and the group records its options, their optional members and its own state
                         // (§5.11) -- the shape the resolver builds.
                         List<RecordValue.Field> memberFields = new ArrayList<>(List.of(
-                                WireForm.declaredNameField(WireForm.NAME, member.name()),
                                 new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(member.typeRef())))));
                         WireForm.addFacts(memberFields, true, member.voidable(), FieldRole.FREE);
-                        fields.add(WireForm.scoped(new RecordValue(memberFields), member.annotations()));
+                        fields.add(WireForm.fieldEntry(member.name(),
+                                WireForm.scoped(new RecordValue(memberFields), member.annotations())));
                     }
                     groups.add(WireForm.group(group.fieldGroup(), group.annotations()));
                 }
             }
         }
         List<RecordValue.Field> binding = new ArrayList<>();
-        binding.add(new RecordValue.Field(WireForm.FIELDS, WireForm.scoped(new ArrayValue(fields))));
+        binding.add(new RecordValue.Field(WireForm.FIELDS, WireForm.scoped(WireForm.fieldMap(fields))));
         if (!groups.isEmpty()) {
             binding.add(new RecordValue.Field(WireForm.GROUPS, WireForm.scoped(new ArrayValue(groups))));
         }
@@ -808,7 +809,8 @@ final class SchemaDesugarer {
      * the resolver's copy sees a closed record body, this one sees a template's, and after normalisation
      * those are two different phases. The rule is syntactic -- two entries, one name -- so it needs nothing
      * the resolver has and this phase does not. Left to the constructor's own reader instead, the wire form
-     * would carry two {@code record_field} records in an array, where repetition is not an error at all.
+     * would carry one name twice as a key of {@code fields}, reported as a duplicate map key with no word of
+     * which declaration wrote it, or which way -- a field twice, or a group member repeating one.
      */
     private static void requireFieldNameUnseen(String name, Set<String> seen, String explanation) {
         if (!seen.add(name)) {
@@ -857,7 +859,6 @@ final class SchemaDesugarer {
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), field.omittable(), type.voidable(), field.modifier(), currentParameters);
         List<RecordValue.Field> members = new ArrayList<>();
-        members.add(WireForm.declaredNameField(WireForm.NAME, field.name()));
         members.add(new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(type.typeRef()))));
         WireForm.addFacts(members, resolved.optional(), resolved.voidable(), resolved.role());
         resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.scoped(token))));
@@ -991,6 +992,9 @@ final class SchemaDesugarer {
                     .anyMatch(element -> namesToken(element.value().coreValue(), text));
             case RecordValue record -> record.fields().stream()
                     .anyMatch(field -> namesToken(field.value().value().coreValue(), text));
+            case MapValue map -> map.entries().stream()
+                    .anyMatch(entry -> namesToken(entry.key().coreValue(), text)
+                            || namesToken(entry.value().value().coreValue(), text));
             default -> false;
         };
     }
@@ -1050,6 +1054,11 @@ final class SchemaDesugarer {
                     .map(element -> renameScoped(element, substitution)).toList());
             case RecordValue record -> new RecordValue(record.fields().stream()
                     .map(field -> new RecordValue.Field(field.name(), renameScoped(field.value(), substitution)))
+                    .toList());
+            case MapValue map -> new MapValue(map.entries().stream()
+                    .map(entry -> new MapValue.MapEntry(new DataValue(entry.key().annotations(),
+                            entry.key().typeRef(), renameValue(entry.key().coreValue(), substitution)),
+                            renameScoped(entry.value(), substitution)))
                     .toList());
             default -> value;
         };

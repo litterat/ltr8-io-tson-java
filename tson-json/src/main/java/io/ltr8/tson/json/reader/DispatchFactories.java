@@ -64,7 +64,7 @@ final class DispatchFactories {
     private static RecordDiagnostics rules(String name, TypeDefinition definition, RecordBody body,
                                            ValueReaderContext context) {
         return new RecordDiagnostics(displayName(name, definition, context),
-                String.join(" | ", body.fields().stream().map(RecordField::name).toList()));
+                String.join(" | ", body.fields().keySet()));
     }
 
     /**

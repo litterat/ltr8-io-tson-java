@@ -71,7 +71,7 @@ final class BindGroupUnionBuilder implements RecordBuilder {
             for (int i = 0; i < readers.length; i++) {
                 String component = members[i].fields()[0].name();
                 readers[i] = BindTargets.to(readers[i], members[i].fields()[0].dataClass(), "field '"
-                        + plan.fields[i].name() + "'", "component '" + component + "' of "
+                        + plan.declaredNames[i] + "'", "component '" + component + "' of "
                         + members[i].typeClass().getSimpleName(), mismatches);
             }
         }

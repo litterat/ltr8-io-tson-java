@@ -56,7 +56,7 @@ class TsonSchemaLinkerTest {
     }
 
     private static TypeDefinition emptyRecord() {
-        return TypeDefinition.product(RecordBody.of(List.of()));
+        return TypeDefinition.product(RecordBody.of(RecordBody.fieldMap()));
     }
 
     /** A declared choice -- what {@code (A | B)} resolves to. {@code disjoint} is the linker's to derive. */
@@ -130,8 +130,8 @@ class TsonSchemaLinkerTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
         entries.put("set", emptyRecord());
-        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(RecordField.required("members",
-                new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
+        entries.put("container", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(Map.entry("members",
+                RecordField.required(new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token"))))))))));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
@@ -165,10 +165,10 @@ class TsonSchemaLinkerTest {
     void anArgumentBearingSourceIsCarriedThroughWithoutMaterialising() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
-        entries.put("other", template("U", "!record { fields: [ { name: v  type: U } ] }"));
+        entries.put("other", template("U", "!record { fields: { v => { type: U } } }"));
         TypeRef otherOfToken = new TypeRef("other", List.of(new TypeArgument.Ref(TypeRef.of("token"))));
         entries.put("generic", new TypeDefinition(Optional.of(otherOfToken), TypeKind.PRODUCT,
-                List.of(), List.of(), RecordBody.of(List.of())));
+                List.of(), List.of(), RecordBody.of(RecordBody.fieldMap())));
 
         TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
 
@@ -186,10 +186,10 @@ class TsonSchemaLinkerTest {
     @Test
     void aParameterStandingInSourceIsUnresolved() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("other", template("U", "!record { fields: [ { name: v  type: U } ] }"));
+        entries.put("other", template("U", "!record { fields: { v => { type: U } } }"));
         entries.put("generic", new TypeDefinition(
                 Optional.of(new TypeRef("other", List.of(new TypeArgument.Ref(TypeRef.of("T"))))),
-                TypeKind.PRODUCT, List.of(), List.of(), RecordBody.of(List.of())));
+                TypeKind.PRODUCT, List.of(), List.of(), RecordBody.of(RecordBody.fieldMap())));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
@@ -200,8 +200,8 @@ class TsonSchemaLinkerTest {
     @Test
     void rejectsAFieldReferencingAnUndeclaredType() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("field", TypeRef.of("no_such_type"))))));
+        entries.put("container", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("field", RecordField.required(TypeRef.of("no_such_type")))))));
 
         SchemaValidationException ex = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
@@ -423,7 +423,7 @@ class TsonSchemaLinkerTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("parent", emptyRecord().withPosition(position).withAnnotations(doc));
         entries.put("child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("parent"), List.of(), RecordBody.of(List.of())));
+                List.of("parent"), List.of(), RecordBody.of(RecordBody.fieldMap())));
 
         TypeDefinition parent = TsonSchemaLinker.link(schemaOf(entries), null).schema().entries().get("parent");
 
@@ -436,7 +436,7 @@ class TsonSchemaLinkerTest {
     void rejectsAnUnresolvedSupertype() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("no_such_supertype"), List.of(), RecordBody.of(List.of())));
+                List.of("no_such_supertype"), List.of(), RecordBody.of(RecordBody.fieldMap())));
 
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(schemaOf(entries), null));
     }
@@ -445,7 +445,7 @@ class TsonSchemaLinkerTest {
     void rejectsAFieldGroupReferencingAnUnknownField() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("thing", TypeDefinition.product(new RecordBody(List.of(),
-                List.of(RecordField.required("a", TypeRef.of("thing"))),
+                RecordBody.fieldMap(Map.entry("a", RecordField.required(TypeRef.of("thing")))),
                 List.of(FieldGroup.ofSingles(List.of("not_a_real_field"), true)),
                 io.ltr8.tson.schema.meta.RecordExtensionType.OPEN)));
 
@@ -461,7 +461,7 @@ class TsonSchemaLinkerTest {
 
         Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
         localEntries.put("local_a", TypeDefinition.product(
-                RecordBody.of(List.of(RecordField.required("field", TypeRef.of("imported_a"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("field", RecordField.required(TypeRef.of("imported_a")))))));
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
                 "https://example.test/meta.tn", List.of("https://example.test/import.tn"), localEntries);
 
@@ -567,15 +567,15 @@ class TsonSchemaLinkerTest {
     @Test
     void populatesSubtypesAsTheReverseOfSupertypes() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("response", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("status", TypeRef.of("token"))))));
+        entries.put("response", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("status", RecordField.required(TypeRef.of("token")))))));
         entries.put("token", valueEntry());
         entries.put("success_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
                 List.of("response"), List.of(),
-                RecordBody.of(List.of(RecordField.required("data", TypeRef.of("token"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("data", RecordField.required(TypeRef.of("token")))))));
         entries.put("failure_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
                 List.of("response"), List.of(),
-                RecordBody.of(List.of(RecordField.required("error", TypeRef.of("token"))))));
+                RecordBody.of(RecordBody.fieldMap(Map.entry("error", RecordField.required(TypeRef.of("token")))))));
 
         TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
 
@@ -592,9 +592,9 @@ class TsonSchemaLinkerTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("top", emptyRecord());
         entries.put("mid", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("top"), List.of(), RecordBody.of(List.of())));
+                List.of("top"), List.of(), RecordBody.of(RecordBody.fieldMap())));
         entries.put("leaf", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("mid", "top"), List.of(), RecordBody.of(List.of())));
+                List.of("mid", "top"), List.of(), RecordBody.of(RecordBody.fieldMap())));
 
         TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
 
@@ -608,9 +608,9 @@ class TsonSchemaLinkerTest {
         // registration -- computeSubtypes must union with that, not replace it.
         Map<String, TypeDefinition> importedEntries = new LinkedHashMap<>();
         importedEntries.put("imported_base", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of(), List.of("imported_child"), RecordBody.of(List.of())));
+                List.of(), List.of("imported_child"), RecordBody.of(RecordBody.fieldMap())));
         importedEntries.put("imported_child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("imported_base"), List.of(), RecordBody.of(List.of())));
+                List.of("imported_base"), List.of(), RecordBody.of(RecordBody.fieldMap())));
         TsonSchema imported = schemaOf(importedEntries);
         Map<String, TsonLinkedSchema> byIdentity = Map.of(
                 CanonicalIdentity.canonicalize("https://example.test/import.tn"), new TsonLinkedSchema(imported));
@@ -618,7 +618,7 @@ class TsonSchemaLinkerTest {
 
         Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
         localEntries.put("local_child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("imported_base"), List.of(), RecordBody.of(List.of())));
+                List.of("imported_base"), List.of(), RecordBody.of(RecordBody.fieldMap())));
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
                 "https://example.test/meta.tn", List.of("https://example.test/import.tn"), localEntries);
 

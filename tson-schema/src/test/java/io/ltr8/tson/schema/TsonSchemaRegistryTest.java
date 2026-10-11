@@ -26,9 +26,9 @@ class TsonSchemaRegistryTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("token", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
                 List.of(), new ValueType()));
-        entries.put("set_token", TypeDefinition.product(RecordBody.of(List.of())));
-        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("members", TypeRef.of("set_token"))))));
+        entries.put("set_token", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap())));
+        entries.put("container", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("members", RecordField.required(TypeRef.of("set_token")))))));
         return new TsonSchema("https://example.test/registry-test.tn",
                 "https://example.test/meta.tn", List.of(), entries);
     }

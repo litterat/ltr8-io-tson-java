@@ -221,7 +221,7 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
                 continue;
             }
             switch (plan.omitted[i]) {
-                case MISSING -> plan.field(ctx, i).report(plan.rules.missingRequiredField(plan.fields[i].name()));
+                case MISSING -> plan.field(ctx, i).report(plan.rules.missingRequiredField(plan.declaredNames[i]));
                 case VALUE -> slots[i] = injected[i];
                 case NOTHING -> { }
             }

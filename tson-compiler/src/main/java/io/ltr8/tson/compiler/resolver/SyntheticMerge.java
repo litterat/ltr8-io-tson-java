@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.schema.Instance;
@@ -113,8 +114,8 @@ final class SyntheticMerge {
 
     /**
      * Whether any slot of the binding record holds an application -- {@code type_ref}'s record form, the one
-     * shape {@code SchemaDesugarer} writes for an application standing in a slot. Nested records and arrays
-     * recurse, so {@code [[box<text>]]} and {@code (box<text> | int32)} are found alike.
+     * shape {@code SchemaDesugarer} writes for an application standing in a slot. Nested records, arrays and
+     * maps recurse, so {@code [[box<text>]]} and {@code (box<text> | int32)} are found alike.
      */
     private static boolean holdsApplication(CoreValue value) {
         return switch (value) {
@@ -122,6 +123,8 @@ final class SyntheticMerge {
                     || record.fields().stream().anyMatch(f -> holdsApplication(f.value().value().coreValue()));
             case ArrayValue array ->
                     array.elements().stream().anyMatch(e -> holdsApplication(e.value().coreValue()));
+            case MapValue map -> map.entries().stream().anyMatch(e -> holdsApplication(e.key().coreValue())
+                    || holdsApplication(e.value().value().coreValue()));
             default -> false;
         };
     }

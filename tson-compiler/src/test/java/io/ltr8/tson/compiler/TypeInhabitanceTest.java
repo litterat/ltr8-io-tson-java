@@ -242,9 +242,9 @@ class TypeInhabitanceTest {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("x", TypeDefinition.product(RecordBody.of(
-                List.of(RecordField.required("y", TypeRef.of("y"))))));
+                RecordBody.fieldMap(Map.entry("y", RecordField.required(TypeRef.of("y")))))));
         entries.put("y", TypeDefinition.product(RecordBody.of(
-                List.of(RecordField.required("x", TypeRef.of("x"))))));
+                RecordBody.fieldMap(Map.entry("x", RecordField.required(TypeRef.of("x")))))));
 
         TsonSchemaLinker.link(new TsonSchema("https://example.test/two.tn",
                 TsonBundledSchemas.META_KERNEL_ID, List.of(), entries), null, problems);

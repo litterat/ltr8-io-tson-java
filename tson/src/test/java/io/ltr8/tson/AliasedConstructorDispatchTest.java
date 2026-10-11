@@ -60,6 +60,6 @@ class AliasedConstructorDispatchTest {
     /** A record body still dispatches to its own class, not to whatever the binder last resolved. */
     @Test
     void anUnaliasedBodyIsUnaffected() {
-        assertInstanceOf(RecordBody.class, read("!record { fields: [] }").body());
+        assertInstanceOf(RecordBody.class, read("!record { fields: {} }").body());
     }
 }
