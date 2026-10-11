@@ -288,6 +288,78 @@ class FieldNameTypeTest {
                 "!node { \"@id\": \"x\"  \"a b\": 1  label: \"y\" }")).code());
     }
 
+    /**
+     * A template's held body is text, and a declared name that is no identifier is written quoted in it, so a
+     * template composing a translation's base, a plain template declaring one, and an explicit one over a words
+     * type all hold and close; a plain one applied gives the identifier verdict its hand-written record would.
+     */
+    @Test
+    void aTemplateHoldsAndClosesNamesThatAreNoIdentifiers() {
+        String templates = schema("templates", """
+                  json_name => !identifier_type { start_add: "@" }
+                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+                  page => <T> json_record & { "@id": T  "@type"?: text }
+                  p => page<text>
+                  words => !identifier_type { continue_add: "-"  medial: " " }
+                  row => <T> !record { name_type: words  fields: [ { name: "first name"  type: T } ] }
+                  r => row<text>
+                """);
+        assertEquals(List.of(), read(templates, "templates", "!p { \"@id\": \"x\" }"));
+        assertEquals(List.of(), read(templates, "templates", "!r { \"first name\": \"Ada\" }"));
+        var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
+                () -> Tson.standard().resolve(schema("plain-template", """
+                      box => <T> { "@id": T }
+                      b => box<text>
+                    """)));
+        assertTrue(thrown.getMessage().contains("field name '@id' is not an identifier"), thrown.getMessage());
+    }
+
+    /**
+     * The name type's inheritance is the record constructor's, not the {@code &} sugar's: the explicit
+     * {@code !record { supertypes: [...] }} takes its supertypes' type when it states none and is refused when it
+     * states another, and a template composing a base closes to the record its hand-written spelling is.
+     */
+    @Test
+    void theRecordConstructorTakesItsSupertypesNameType() {
+        String explicit = schema("explicit", """
+                  json_name => !identifier_type { start_add: "@" }
+                  other => !identifier_type { start_add: "$" }
+                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+                  n => !record { supertypes: [json_record]  fields: [ { name: "@id"  type: text } ] }
+                  folded => !identifier_type { normalization: NFKC_CASEFOLD }
+                  fbase => !record { name_type: folded  extension: ABSTRACT  fields: [] }
+                  box => <T> fbase & { name: T }
+                  b => box<text>
+                """);
+        assertEquals(List.of(), read(explicit, "explicit", "!n { \"@id\": \"x\" }"));
+        assertEquals(List.of(), read(explicit, "explicit", "!b { NAME: \"x\" }"));
+        var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
+                () -> Tson.standard().resolve(schema("restated", """
+                      json_name => !identifier_type { start_add: "@" }
+                      other => !identifier_type { start_add: "$" }
+                      json_record => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+                      n => !record { name_type: other  supertypes: [json_record]  fields: [] }
+                    """)));
+        assertTrue(thrown.getMessage().contains("is not its supertypes' 'json_name'"), thrown.getMessage());
+    }
+
+    /**
+     * A profile's additions are its own, so the restricted-character rule does not judge them; a character that
+     * renders as nothing, or as a character it is not, is the floor no addition lifts, refused at load.
+     */
+    @Test
+    void aProfileMayNotAddAnInvisibleCharacter() {
+        for (String added : new String[] {"continue_add: \"\\u{AD}\"", "medial: \"\\u{200B}\"",
+                "medial: \"\\u{202E}\"", "continue_add: \"\\u{7}\"", "medial: \"\\u{A0}\""}) {
+            var thrown = org.junit.jupiter.api.Assertions.assertThrows(
+                    io.ltr8.tson.base.SchemaValidationException.class,
+                    () -> Tson.standard().resolve(schema("invisible", "zw => !identifier_type { " + added + " }")),
+                    added);
+            assertTrue(thrown.getMessage().contains("which a profile may not add"), thrown.getMessage());
+        }
+        Tson.standard().resolve(schema("spaced", "words => !identifier_type { medial: \" \" }"));
+    }
+
     /** Two supertypes with different name types compose names of two types, which no one type judges. */
     @Test
     void supertypesOfTwoNameTypesDoNotCompose() {

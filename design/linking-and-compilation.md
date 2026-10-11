@@ -293,9 +293,11 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
   the type's form, and under `NONE` two canonically equivalent spellings would be two names. The default, `field_name`,
   resolves in the structure namespace (`resolver.NameType`); where no kernel is in scope to resolve it, the identifier
   grammar it stands for applies. A refused record's names are not judged again by the per-name rules, and those rules
-  run under the type's own profile. A composition takes its supertypes' one type — the default is a type like any other,
-  set where a record is declared — and refuses two that disagree; a refinement keeps its source's. That rule is also how
-  a brace form states one: a fieldless ABSTRACT base carries the type, and the records that compose it take it; there is
-  no brace-form syntax for it. Each record with a type other than the default is recorded in
-  `TsonLinkedSchema.nameTypes`, with the definition it resolves to, merged through imports like `enumForms`, because its
-  readers judge a document's names by it and cannot resolve it themselves.
+  run under the type's own profile. A record with supertypes takes their one type — the default is a type like any
+  other, set where a record is declared — refuses two that disagree, and refuses a stated type that is not theirs; a
+  refinement keeps its source's. The rule is the record constructor's, applied on `&` (`resolveComposition`) and on the
+  explicit `!record { supertypes: … }` alike (`withSupertypesNameType`), which is why the kernel's `name_type` has no
+  `~` default. That rule is also how a brace form states one: a fieldless ABSTRACT base carries the type, and the
+  records that compose it take it; there is no brace-form syntax for it. Each record with a type other than the default
+  is recorded in `TsonLinkedSchema.nameTypes`, with the definition it resolves to, merged through imports like
+  `enumForms`, because its readers judge a document's names by it and cannot resolve it themselves.

@@ -147,7 +147,35 @@ public final class IdentifierProfile {
                 problems.add("U+%04X is medial and also Start or Continue".formatted(cp));
             }
         }
+        for (int[] added : new int[][] {startAdd, continueAdd, medial}) {
+            for (int cp : added) {
+                invisible(cp).ifPresent(why -> problems.add("U+%04X is %s, which a profile may not add: a name "
+                        .formatted(cp, why) + "holding it reads as one without it, so no name rule could tell "
+                        + "the two apart"));
+            }
+        }
         return List.copyOf(problems);
+    }
+
+    /**
+     * The floor a profile's additions cannot lift: a character that renders as nothing, or as a character it is
+     * not. {@link #restrictedCharacter} counts an added character as the profile's own, so without this an
+     * addition would carry a soft hyphen or a bidi override into names past every UTS #39 rule -- {@code
+     * pass\u00ADword} beside {@code password}, under the strictest policy. Default_Ignorable_Code_Point covers
+     * Bidi_Control and the format characters that matter; a control and a space other than U+0020 are the rest
+     * (U+0020 itself stays, a medial space being how a name type holds words).
+     */
+    private static Optional<String> invisible(int cp) {
+        if (NfkcCasefold.isDefaultIgnorable(cp)) {
+            return Optional.of("Default_Ignorable_Code_Point");
+        }
+        if (Character.getType(cp) == Character.CONTROL) {
+            return Optional.of("a control character");
+        }
+        if (cp != ' ' && IdnaProperty.isWhiteSpace(cp)) {
+            return Optional.of("a space other than U+0020");
+        }
+        return Optional.empty();
     }
 
     /**

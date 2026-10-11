@@ -554,8 +554,13 @@ public final class TsonTreeReader {
 
     /** The document's value alone, from a header already read -- shared by the source and peek routes. */
     private TsonValue valueFrom(TsonReadContext ctx, DocumentStart start, boolean ignoreSchema) {
-        TsonValue result = (ignoreSchema || tree == null || start.schema().isEmpty())
-                ? schemaless.read(ctx)
+        boolean schemaless = ignoreSchema || tree == null || start.schema().isEmpty();
+        if (schemaless && start.schema().isPresent()) {
+            // A document naming a schema, read without it: its field names are that schema's to judge.
+            DefaultTsonReadContext.leavingFieldNamesToTheSchema(ctx);
+        }
+        TsonValue result = schemaless
+                ? this.schemaless.read(ctx)
                 : readAgainstSchema(start.schema().get(), ctx, null);
         requireDocumentEnd(ctx);
         return result;

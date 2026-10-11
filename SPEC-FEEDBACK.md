@@ -721,7 +721,19 @@ relaxed type, defined by the translation and not by the series, such as
   the branch.*
 - **The default does not change.** A schemaless record's field names are identifiers. A field-name position admits
   any single-line token, and the identifier match moves from the parser to the record, so a schemaless
-  `{ "first name": 1 }` is a resolver error rather than a parse error. That is the one verdict that moves.
+  `{ "first name": 1 }` is a resolver error rather than a parse error.
+- **A document that names a schema has its field names judged by that schema, and only by it.** Part 1 §1.5 makes a
+  Class 1 processor refuse a field name that is no identifier, and §1.5 also says a Class 1 processor does not act
+  on schemas; under this proposal a document naming a schema may hold `"@id"` validly, so the two conflict. The
+  rule running here: §2.5's identifier rule holds a field name in a document that names no schema; in one that
+  names a schema, a processor reading it without that schema — a Class 1 processor, or a Class 2 one told to
+  ignore it — holds field names to no name rule, judging what it can (syntax, type-refs and annotation names,
+  which are identifiers at every layer, the built-in vocabulary, and the look-alike relation over a record's
+  set). A Class 2 processor that cannot obtain or load the schema leaves the document unjudged, [TSON-DATA]
+  §8.1's fifth outcome, rather than judging it by the schemaless rule. Part 1 §1.5's MUST would read "a field
+  name that is not an identifier, in a document that names no schema". This keeps Part 1 a layer that Parts 2
+  and 3 add to rather than modify: Part 1 decides which documents its own rule reaches, and leaves the rest to
+  the layer that owns the type. *Implemented on the branch.*
 - **Part 3's three names stay, and are used rather than reserved.** Part 3 reserved every `$`-initial member name,
   sound because no declared name could begin with `$`, which a `name_type` admitting `$` breaks: JSON Schema's and
   OpenAPI's own members are `$ref`, `$id` and `$defs`. The three annotation members keep their names — `$schema`,
@@ -740,14 +752,17 @@ relaxed type, defined by the translation and not by the series, such as
   token as a declared field name too, and the linker holds every record to its `name_type`: the type names an
   identifier family, every name in `fields`, `discriminators` and the groups is a value of it, and no two fields are one
   value. A brace-form `{ "first name": text }` is therefore a resolver error rather than a parse error.
-- **Inheritance keeps one name type.** A record's `name_type` is set where it is declared, the kernel's default
-  `field_name` included, and composition cannot change it: a composition takes its record supertypes' one type, and
-  supertypes with different ones — `json_record & address`, where `address` says nothing and so is `field_name`'s
-  — are a resolver error. Taking the non-default type instead would re-judge `address`'s names by a type they were
-  never declared under, and under a translation's type that must begin with `@` none of them would be a value of
-  it; the record to compose is one declared over the same type, `address => json_record & { city: text }`. A
-  refinement keeps its source's. So the brace form can
-  restate an inherited relaxed name (`tightened => node ^ { "$ref": text }`).
+- **Inheritance keeps one name type, as the record constructor's rule.** A record's `name_type` is set where it is
+  declared, `field_name` included, and a subtype cannot change it: a record with supertypes takes their one type when
+  it states none, one that states a type beside supertypes must state theirs, and supertypes with different ones —
+  `json_record & address`, where `address` says nothing and so is `field_name`'s — are a resolver error. The rule
+  belongs to the constructor rather than to `&`: the kernel's `name_type?: type_name` carries no `~ field_name`
+  default, since a default cannot depend on supertypes, and its doc states the rule, so the explicit `!record {
+  supertypes: [json_record] … }` and a template's closed application are held to it exactly as `json_record & { … }`
+  is. Taking the non-default type instead would re-judge `address`'s names by a type they were never declared under,
+  and under a translation's type that must begin with `@` none of them would be a value of it; the record to compose
+  is one declared over the same type, `address => json_record & { city: text }`. A refinement keeps its source's. So
+  the brace form can restate an inherited relaxed name (`tightened => node ^ { "$ref": text }`).
 - **A field name is matched in its name type's form.** The linker judges two declared names one field under the
   type's equality, so a reader matches a document's name against the declared ones in the type's `normalization`
   (§5.5), as an enum matches its members: under a case-folding name type `NAME` is the field `name`, the two
@@ -767,9 +782,14 @@ relaxed type, defined by the translation and not by the series, such as
   name, which cannot state a narrower type; a mark at the type-def head (`names json_name { … }`), which reserves
   a word there as `abstract` does; a type before `;` inside the brace, which gives `;` a second meaning; an
   annotation, which would make metadata change what a record admits.
-- **Hygiene follows the type.** A record's field names and an enum's members meet §8.2's per-name rules under their
-  type's own profile, whose added characters are its own (`json_name`'s `@` and `$`, `words`' medial space), and
-  the collision relation over the scope.
+- **Hygiene follows the type, over a floor no profile lifts.** A record's field names and an enum's members meet
+  §8.2's per-name rules under their type's own profile, whose added characters are its own (`json_name`'s `@` and
+  `$`, `words`' medial space), and the collision relation over the scope. Since an added character meets no
+  restricted-character rule, an `identifier_type` may not add one that renders as nothing or as another
+  character: a Default_Ignorable_Code_Point (so every Bidi_Control), a control, or a space other than U+0020.
+  Without the floor a soft hyphen in `continue_add` makes `pass\u{AD}word` and `password` two names no rule tells
+  apart, and a converter deriving a profile from a hostile source's names would carry it in. U+0020 stays
+  admissible, a medial space being how a name type holds words.
 - **A document's field names are judged by the record that reads them.** A name the record does not declare is an
   unrecognised field (§7.2), at its own pointer, whether or not it is a value of the record's name type: one that is
   not can be no declared field, since every declared name is one, so it is unknown on the same terms. Under the
@@ -796,8 +816,10 @@ relaxed type, defined by the translation and not by the series, such as
   the branch.*
 - **A name binds and writes as the record states it.** A host component binds a relaxed name through the name it
   states (`@Field("@id")`), as it binds any other, and a writer quotes a name that is no identifier, so the
-  document reads back.
+  document reads back. A template's held body is written the same way, a declared name that is no identifier
+  quoted, so a template declaring or composing relaxed names holds and closes.
 
-**Open:** the default for a JSON member name that is not an identifier; a template's field name type.
+**Open:** the default for a JSON member name that is not an identifier; whether a template's field names are
+judged at its declaration, where today they are judged at each application, under the closed record's name type.
 
 **Status against Revision 37:** open; experimental, in progress on `experiment/field-name-type`.

@@ -681,6 +681,9 @@ final class DefinitionResolver {
         // comes with an empty chain, since IS-A stops at construction (§4.1), so `requireApplicable` refuses
         // it. Parameters empty and IS-A `top` therefore imply a record body.
         Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
+        if (body instanceof RecordBody record && !record.supertypes().isEmpty()) {
+            body = withSupertypesNameType(name, record, statesMember(instance.value(), WireForm.NAME_TYPE));
+        }
         if (body instanceof io.ltr8.tson.schema.meta.Reference reference) {
             // `!reference { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
             // denotes the same entry: `kind: REFERENCE` (§4.1 -- a type_kind, not one the supertype chain
@@ -690,6 +693,51 @@ final class DefinitionResolver {
             return TypeDefinition.reference(reference.target());
         }
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(), List.of(), List.of(), body);
+    }
+
+    /**
+     * {@code record}'s name type under the record constructor's rule (SPEC-FEEDBACK.md #10): a record with
+     * supertypes takes their one name type when it states none, and one that states a name type must state
+     * theirs. A record's name type is set where it is declared, {@code field_name} included, and a subtype
+     * absorbs or restates its supertypes' names, which no other type judges; so the rule is the constructor's,
+     * and the explicit {@code !record { supertypes: [...] }} is held to it exactly as {@code &} is.
+     */
+    private RecordBody withSupertypesNameType(String name, RecordBody record, boolean stated) {
+        String inherited = null;
+        String from = null;
+        for (io.ltr8.tson.schema.meta.TypeRef supertype : record.supertypes()) {
+            TypeDefinition definition = namespaceDefinitions.getTypeDefinition(
+                    ReferenceChain.terminal(supertype.name(), namespaceDefinitions::getTypeDefinition));
+            if (definition == null || !(definition.body() instanceof RecordBody supertypeBody)) {
+                continue;   // not a record: refused on its own terms
+            }
+            if (inherited == null) {
+                inherited = supertypeBody.nameType();
+                from = supertype.name();
+            } else if (!inherited.equals(supertypeBody.nameType())) {
+                throw new SchemaValidationException("'" + name + "': supertypes '" + from + "' and '"
+                        + supertype.name() + "' have different name types, '" + inherited + "' and '"
+                        + supertypeBody.nameType() + "' -- a record's name type is set where it is declared, the "
+                        + "default included, and a subtype cannot change it; declare both over one name type");
+            }
+        }
+        if (inherited == null || inherited.equals(record.nameType())) {
+            return record;
+        }
+        if (stated) {
+            throw new SchemaValidationException("'" + name + "': its name_type '" + record.nameType()
+                    + "' is not its supertypes' '" + inherited + "' (from '" + from + "') -- a record's name type "
+                    + "is set where it is declared, the default included, and a subtype cannot change it; omit "
+                    + "name_type to take the supertypes'");
+        }
+        return new RecordBody(record.supertypes(), record.fields(), record.groups(), record.extension(),
+                record.discriminators(), inherited);
+    }
+
+    /** Whether {@code value}, a constructor application's payload, states {@code member} by name. */
+    private static boolean statesMember(DataValue value, String member) {
+        return value.coreValue() instanceof RecordValue record
+                && record.fields().stream().anyMatch(field -> field.name().equals(member));
     }
 
     /**

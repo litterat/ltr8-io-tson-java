@@ -764,8 +764,7 @@ final class SchemaDesugarer {
                     // refinement template pinning a constructor's own facet (`array ^ { element_type: = T }`)
                     // states nothing about a family and flattens through another path.
                     if (FieldModifiers.discriminates(field) || parametricallyPinned(field)) {
-                        discriminators.add(WireForm.scoped(
-                                new TokenValue(field.name(), TokenForm.UNQUOTED)));
+                        discriminators.add(WireForm.scoped(WireForm.declaredName(field.name())));
                     }
                 }
                 case GroupDef group -> {
@@ -776,7 +775,7 @@ final class SchemaDesugarer {
                         // says so, and the group records its options, their optional members and its own state
                         // (§5.11) -- the shape the resolver builds.
                         List<RecordValue.Field> memberFields = new ArrayList<>(List.of(
-                                WireForm.nameField(WireForm.NAME, member.name()),
+                                WireForm.declaredNameField(WireForm.NAME, member.name()),
                                 new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(member.typeRef())))));
                         WireForm.addFacts(memberFields, true, member.voidable(), FieldRole.FREE);
                         fields.add(WireForm.scoped(new RecordValue(memberFields), member.annotations()));
@@ -858,7 +857,7 @@ final class SchemaDesugarer {
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), field.omittable(), type.voidable(), field.modifier(), currentParameters);
         List<RecordValue.Field> members = new ArrayList<>();
-        members.add(WireForm.nameField(WireForm.NAME, field.name()));
+        members.add(WireForm.declaredNameField(WireForm.NAME, field.name()));
         members.add(new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(type.typeRef()))));
         WireForm.addFacts(members, resolved.optional(), resolved.voidable(), resolved.role());
         resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.scoped(token))));

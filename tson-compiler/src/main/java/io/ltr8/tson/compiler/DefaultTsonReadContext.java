@@ -78,6 +78,12 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** False while {@link #discardUnjudged} skips a value no rule is judging; true for the whole of a read. */
         boolean judging = true;
 
+        /**
+         * True for a read without a schema of a document that names one ({@link #leavingFieldNamesToTheSchema}):
+         * its field names are the named schema's to judge, so no schemaless rule judges them.
+         */
+        boolean fieldNamesTheSchemas;
+
         Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy) {
             this.events = events;
             this.receiver = receiver;
@@ -260,6 +266,9 @@ final class DefaultTsonReadContext implements TsonReadContext {
             }
             return;
         }
+        if (cursor.fieldNamesTheSchemas) {
+            return;
+        }
         Optional<String> violation = IdentifierGrammar.validate(name);
         if (violation.isPresent()) {
             field(name).report(Diagnostic.Code.ATOM_FORM_INVALID, "'" + name + "' is not a field name -- "
@@ -311,6 +320,19 @@ final class DefaultTsonReadContext implements TsonReadContext {
      */
     private static void refuse(TsonReadContext at, String name, String violation, Diagnostic.Code code) {
         at.report(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
+    }
+
+    /**
+     * Marks {@code ctx}'s read as one without a schema of a document that names one: a Class 1 read, or one
+     * told to ignore the schema. [TSON-DATA] §2.5's identifier rule holds a schemaless document's field names,
+     * and a document that names a schema has field names of that schema's types (SPEC-FEEDBACK.md #10), which a
+     * read without it cannot know; so its field names meet neither the identifier grammar nor the per-name
+     * rules, and the read judges what it can -- syntax, type-refs and annotation names, which are identifiers
+     * at every layer, and the built-in vocabulary. The look-alike rule over a record's set stays, being a
+     * relation between names whatever their type. The cast cannot fail (see {@link #lookingAhead}).
+     */
+    static void leavingFieldNamesToTheSchema(TsonReadContext ctx) {
+        ((DefaultTsonReadContext) ctx).cursor.fieldNamesTheSchemas = true;
     }
 
     /**

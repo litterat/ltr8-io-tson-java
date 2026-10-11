@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=629483f1747af03931529da1d9c687396846fb4482ffff929522c39d9f7451bf"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=5e961f6ced70080e41807ab88d50a8da6cbe74b146fe49c65f6faa8e9527d89e"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -671,10 +671,13 @@
     `name_type` names the family this record's field names belong to, as an
     enum_type's names its members': every name in `fields`, `discriminators`
     and the groups is a value of it, and so is every field name a data value of
-    this record writes. It is `field_name`, the kernel's identifier, unless the
-    record says otherwise, and it names an identifier family, so every field
-    name is a name under its profile. The field name slots are therefore
-    `text`, each judged by this type.
+    this record writes. It names an identifier family, so every field name is a
+    name under its profile, and the field name slots are therefore `text`, each
+    judged by this type. A record's name type is set where it is declared and
+    a subtype cannot change it: absent, it is its supertypes' one name type,
+    and `field_name`, the kernel's identifier, for a record with none; stated
+    beside supertypes, it is theirs. Supertypes with different name types do
+    not compose.
     """
   record => product & {
     access_pattern?: product_access_type = NAMED
@@ -684,7 +687,7 @@
     extension?:      record_extension_type ~ OPEN
     supertypes?:     [type_ref]
     discriminators?: [text; 1..]
-    name_type?:      type_name ~ field_name
+    name_type?:      type_name
   }
 
   @doc:"""

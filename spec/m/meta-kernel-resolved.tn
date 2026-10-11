@@ -410,7 +410,7 @@
       !record_field { name: extension       type: record_extension_type  optional: true  role: DEFAULT  value: OPEN }
       !record_field { name: supertypes      type: array_type_ref_xxhash   optional: true }
       !record_field { name: discriminators  type: array_text_1_xxhash  optional: true }
-      !record_field { name: name_type       type: type_name  optional: true  role: DEFAULT  value: field_name }
+      !record_field { name: name_type       type: type_name  optional: true }
     ] }
   }
 

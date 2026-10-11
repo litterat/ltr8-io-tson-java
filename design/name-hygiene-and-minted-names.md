@@ -127,17 +127,17 @@ restricted-character rule (`Identifier_Status`) where a name is *read* — the s
 positions only some of those reach: an enum member and a group's member labels get checked for reading alike
 and for script mixing, and never for a restricted character, invisibly.
 
-**An enum's members and a record's field names are judged under their name type's profile.** Both `name_type`s
-are identifier families (`enum`'s is the kernel's `identifier`; `!enum_type { name_type: words … }` or a record's
-`name_type: json_name` names the author's own), so the names are names and all three mechanisms reach them, with
-the profile's added characters — a `start_add`, a `continue_add`, a `medial` — counted as its own rather than as
-restricted characters (`NameType.profile`, passed to `checkScope`). A closed set of text that is no name is no enum:
-it is `text_type`'s `members` facet, a value set no name rule reaches. A scope list
-can be reviewed; three call sites cannot. What stays at the reading positions is §7.7's grammar
-(`IdentifierGrammar.validate`), which is validity, is stable across Unicode versions, and really is a parse
-error; `IdentifierGrammar.hygiene` returns the restricted-character rule's verdict rather than throwing,
-because a refusal is not
-one.
+**An enum's members and a record's field names are judged under their name type's profile.** Both `name_type`s are
+identifier families (`enum`'s is the kernel's `identifier`; `!enum_type { name_type: words … }` or a record's
+`name_type: json_name` names the author's own), so the names are names and all three mechanisms reach them, with the
+profile's added characters — a `start_add`, a `continue_add`, a `medial` — counted as its own rather than as
+restricted characters (`NameType.profile`, passed to `checkScope`). That exemption has a floor
+(`IdentifierProfile.incoherence`): an addition may not be a Default_Ignorable_Code_Point, a control, or a space other
+than U+0020, or a profile could carry an invisible character past every rule. A closed set of text that is no name is
+no enum: it is `text_type`'s `members` facet, a value set no name rule reaches. A scope list can be reviewed; three
+call sites cannot. What stays at the reading positions is §7.7's grammar (`IdentifierGrammar.validate`), which is
+validity, is stable across Unicode versions, and really is a parse error; `IdentifierGrammar.hygiene` returns the
+restricted-character rule's verdict rather than throwing, because a refusal is not one.
 
 **A refusal carries a policy code, not `SCHEMA_ERROR`** (`TsonDiagnostics.ofSchemaRefusal`): `CONFUSABLE_NAMES`
 for names that read alike, `RESTRICTED_CHARACTER` for a character outside the identifier profile and
