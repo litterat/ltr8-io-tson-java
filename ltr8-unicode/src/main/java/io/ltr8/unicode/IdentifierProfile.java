@@ -21,9 +21,10 @@ import java.util.Optional;
  * </pre>
  *
  * with a base of {@code XID_Start}/{@code XID_Continue} ({@link Base#XID}), {@code ID_Start}/{@code ID_Continue}
- * ({@link Base#ID}) or the empty set ({@link Base#NONE}), and the whole text in the {@link Normalization} form
- * the profile requires. A medial character stands only between two others, and never beside another medial;
- * the set is disjoint from Start and Continue, or the rule could not tell which one a character is using.
+ * ({@link Base#ID}), their ASCII members ({@link Base#ASCII}) or the empty set ({@link Base#NONE}), and the whole
+ * text in the {@link Normalization} form the profile requires. A medial character stands only between two others,
+ * and never beside another medial; the set is disjoint from Start and Continue, or the rule could not tell which
+ * one a character is using.
  *
  * <p>Everything else follows from the base rather than from a clause of its own -- whitespace, C0/C1 controls,
  * {@code Cf} format characters, emoji and unassigned code points are none of them {@code XID_Continue}.
@@ -51,6 +52,12 @@ public final class IdentifierProfile {
         XID,
         /** {@code ID_Start} / {@code ID_Continue}: XID plus the few characters whose NFKC form is not one. */
         ID,
+        /**
+         * XID's ASCII members: Start is {@code A-Z a-z}, Continue adds {@code 0-9 _}. The base of a name compared
+         * the way ASCII protocols compare theirs -- an HTTP field name, a URI scheme -- which would otherwise list
+         * the alphabet in its additions.
+         */
+        ASCII,
         /** The empty set: the additions are the whole set. */
         NONE
     }
@@ -96,9 +103,7 @@ public final class IdentifierProfile {
         }
         int first = text.codePointAt(0);
         if (!isStart(first)) {
-            return Optional.of(at(text, first, 0) + " cannot start an identifier"
-                    + (Character.isDigit(first) || first == '-' || first == '+' || first == '.'
-                            ? " -- an identifier never begins with a digit or a sign" : ""));
+            return Optional.of(at(text, first, 0) + " cannot start an identifier" + whyNotStart(first));
         }
         boolean afterMedial = false;
         for (int i = Character.charCount(first); i < text.length(); ) {
@@ -142,7 +147,61 @@ public final class IdentifierProfile {
                 problems.add("U+%04X is medial and also Start or Continue".formatted(cp));
             }
         }
+        for (int[] added : new int[][] {startAdd, continueAdd, medial}) {
+            for (int cp : added) {
+                invisible(cp).ifPresent(why -> problems.add("U+%04X is %s, which a profile may not add: a name "
+                        .formatted(cp, why) + "holding it reads as one without it, so no name rule could tell "
+                        + "the two apart"));
+            }
+        }
         return List.copyOf(problems);
+    }
+
+    /**
+     * The floor a profile's additions cannot lift: a character that renders as nothing, or as a character it is
+     * not. {@link #restrictedCharacter} counts an added character as the profile's own, so without this an
+     * addition would carry a soft hyphen or a bidi override into names past every UTS #39 rule -- {@code
+     * pass\u00ADword} beside {@code password}, under the strictest policy. Default_Ignorable_Code_Point covers
+     * Bidi_Control and the format characters that matter; a control and a space other than U+0020 are the rest
+     * (U+0020 itself stays, a medial space being how a name type holds words).
+     */
+    private static Optional<String> invisible(int cp) {
+        if (NfkcCasefold.isDefaultIgnorable(cp)) {
+            return Optional.of("Default_Ignorable_Code_Point");
+        }
+        if (Character.getType(cp) == Character.CONTROL) {
+            return Optional.of("a control character");
+        }
+        if (cp != ' ' && IdnaProperty.isWhiteSpace(cp)) {
+            return Optional.of("a space other than U+0020");
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Why {@code cp} is not Start, in this profile's own terms: a profile with additions or no base names its
+     * Start set, since a reason given for the property alone would describe some other profile's names.
+     */
+    private String whyNotStart(int cp) {
+        if (contains(exclude, cp)) {
+            return " -- this profile excludes it";
+        }
+        if ((start == Base.XID || start == Base.ID) && startAdd.length == 0) {
+            return Character.isDigit(cp) || cp == '-' || cp == '+' || cp == '.'
+                    ? " -- an identifier never begins with a digit or a sign" : "";
+        }
+        StringBuilder added = new StringBuilder();
+        for (int c : startAdd) {
+            added.appendCodePoint(c);
+        }
+        String base = switch (start) {
+            case XID -> "XID_Start";
+            case ID -> "ID_Start";
+            case ASCII -> "the ASCII letters";
+            case NONE -> "";
+        };
+        return " -- its Start characters are " + (added.isEmpty() ? base
+                : base.isEmpty() ? "'" + added + "'" : base + " and '" + added + "'");
     }
 
     private boolean isStart(int cp) {
@@ -157,6 +216,7 @@ public final class IdentifierProfile {
         return switch (base) {
             case XID -> start ? Xid.isStart(cp) : Xid.isContinue(cp);
             case ID -> start ? Xid.isIdStart(cp) : Xid.isIdContinue(cp);
+            case ASCII -> cp < 0x80 && (start ? Xid.isStart(cp) : Xid.isContinue(cp));
             case NONE -> false;
         };
     }

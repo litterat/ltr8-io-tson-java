@@ -8,6 +8,7 @@ import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.unicode.Nfc;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
@@ -43,7 +44,7 @@ import java.util.Set;
  * the member pinned {@code 0xFF}.
  *
  * <p><b>It reads the leading members and no others.</b> §6.1.5 puts the discriminators first, after any
- * reserved members (§3.3), in any order among themselves, so {@link ReservedMembers#lead} answers both the tag
+ * annotation members (§3.3), in any order among themselves, so {@link TagMembers#lead} answers both the tag
  * and the selectors from as many members as the family declares discriminators -- a count the schema fixes,
  * whatever the document holds (§10.1).
  *
@@ -73,7 +74,9 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     private final Set<String> selfNames;
 
     private final List<Selector> selectors;
+    /** The selectors' names in the base's name form (§5.5), what the leading-member peek matches. */
     private final Set<String> selectorNames;
+    private final Normalization nameForm;
 
     /** The pins, as they compare, to the member that states them -- §5.7's mapping, derived and never declared. */
     private final Map<List<Object>, String> members;
@@ -102,8 +105,11 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         TsonSchema schema = context.schema();
         Map<String, TypeDefinition> entries = schema.entries();
         this.selectors = selectorFields.stream().map(field -> selectorOf(field, context.linked())).toList();
-        this.selectorNames = selectors.stream().map(Selector::name).collect(LinkedHashSet::new,
-                Set::add, Set::addAll);
+        // The family's members compose the base, so they share its name type; a template base states none.
+        this.nameForm = selfNames.stream().map(context.linked()::nameForm).filter(form -> form != Normalization.NFC)
+                .findFirst().orElse(Normalization.NFC);
+        this.selectorNames = selectors.stream().map(selector -> nameForm.apply(selector.name()))
+                .collect(LinkedHashSet::new, Set::add, Set::addAll);
         this.members = new LinkedHashMap<>();
         // What each dispatched member admits a deeper tag to name: itself and its own subtypes (§6.1.5).
         Map<String, Set<String>> deeper = new LinkedHashMap<>();
@@ -171,7 +177,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
             EventSkip.value(ctx, found);
             return null;
         }
-        return dispatch(ctx, ReservedMembers.lead(ctx, selectorNames));
+        return dispatch(ctx, TagMembers.lead(ctx, selectorNames, nameForm));
     }
 
     /** Reached by a tag naming this base from an enclosing position: placed again, from the leading members. */
@@ -180,7 +186,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         return read(ctx);
     }
 
-    private Object dispatch(JsonReadContext ctx, ReservedMembers.Lead tag) {
+    private Object dispatch(JsonReadContext ctx, TagMembers.Lead tag) {
         if (Tags.refusesScope(ctx, tag, displayName, Tags.RECORD)) {
             return null;
         }
@@ -191,7 +197,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         }
         List<Object> key = new ArrayList<>(selectors.size());
         for (Selector selector : selectors) {
-            JsonEvent value = tag.selectors().get(selector.name());
+            JsonEvent value = tag.selectors().get(nameForm.apply(selector.name()));
             if (value == null) {
                 // Never a fallback to the tag: the selector is a REQUIRED field of the base, so a value
                 // without it is invalid on §5.2's ordinary terms, and reading the tag instead would make one
@@ -218,7 +224,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         if (tag.type() != null && selfNames.contains(tag.type())) {
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances, and a sealed base has none: naming it selects nothing.
-            ctx.report(extension.tagNamesTheBase(ReservedMembers.TYPE));
+            ctx.report(extension.tagNamesTheBase(TagMembers.TYPE));
             EventSkip.nextValue(ctx);
             return null;
         }
@@ -250,7 +256,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     /** A tag naming a type outside the family -- nothing here admits it, whatever the discriminator says. */
     private Object notAMember(JsonReadContext ctx, String type) {
         if (!NameHygiene.refuses(ctx, type)) {
-            ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+            ctx.field(TagMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
                     "'$type' names '%s', which is not a member of the sealed '%s'".formatted(type, displayName),
                     extension.members(), type);
         }
@@ -259,9 +265,9 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     }
 
     /** §3.3's wrapper form at a sealed position: `$type` places the value and `$value` holds it. */
-    private Object wrapped(JsonReadContext ctx, ReservedMembers.Lead tag) {
+    private Object wrapped(JsonReadContext ctx, TagMembers.Lead tag) {
         if (tag.type() == null) {
-            ctx.report(extension.tagRequired(ReservedMembers.TYPE));
+            ctx.report(extension.tagRequired(TagMembers.TYPE));
             EventSkip.nextValue(ctx);
             return null;
         }

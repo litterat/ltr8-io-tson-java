@@ -72,6 +72,8 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         }
         int reportedBefore = ctx.reported();
         Object[] slots = new Object[plan.names.length];
+        // Kept only where a repeat may be another spelling, so an ordinary read allocates none (RecordPlan.duplicate).
+        JsonEvent.MemberName[] firstGiven = plan.folds() ? new JsonEvent.MemberName[slots.length] : null;
         boolean tagged = false;
         for (int position = 0; ; position++) {
             JsonEvent event = ctx.next();
@@ -82,21 +84,21 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
                 throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);
             }
             String name = member.name();
-            if (ReservedMembers.isReserved(name)) {
-                if (tagged && position == 1 && ReservedMembers.VALUE.equals(name)) {
+            if (TagMembers.isTagMember(name)) {
+                if (tagged && position == 1 && TagMembers.VALUE.equals(name)) {
                     // §3.3's wrapper: the value is `$value`, at the reader the enclosing position chose for it,
                     // since the value inside may carry a tag of its own.
-                    Object value = ReservedMembers.readWrappedValue(ctx, wrapped);
+                    Object value = TagMembers.readWrappedValue(ctx, wrapped);
                     return value == null ? builder.refused() : value;
                 }
-                if (position == 0 && ReservedMembers.TYPE.equals(name)) {
+                if (position == 0 && TagMembers.TYPE.equals(name)) {
                     if (plan.admitsTag(ctx)) {
                         ctx.next();
                         tagged = true;
                         continue;
                     }
                 } else {
-                    plan.refuseReserved(ctx, name, tagged);
+                    plan.refuseTagMember(ctx, name, tagged);
                 }
                 EventSkip.value(ctx, opening);
                 return builder.refused();
@@ -108,7 +110,9 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
                 continue;
             }
             if (slots[at] != null) {
-                plan.duplicate(ctx, at, memberName);
+                plan.duplicate(ctx, at, memberName, firstGiven == null ? null : firstGiven[at]);
+            } else if (firstGiven != null) {
+                firstGiven[at] = member;
             }
             slots[at] = readField(ctx, at, memberName);
         }
@@ -128,12 +132,12 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         if (ctx.peek() instanceof JsonEvent.NullValue) {
             return statedNull(ctx, at, memberName);
         }
-        return readValue(ctx, at);
+        return readValue(ctx, at, memberName);
     }
 
     /** A child's value for its slot: what it read, or {@link Slots#REFUSED} where it refused. */
-    private Object readValue(JsonReadContext ctx, int at) {
-        Object value = readers[at].read(plan.field(ctx, at));
+    private Object readValue(JsonReadContext ctx, int at, String memberName) {
+        Object value = readers[at].read(plan.field(ctx, at, memberName));
         return value == null ? Slots.REFUSED : value;
     }
 
@@ -153,10 +157,10 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
             // §6.1.2: "at REQUIRED_DEFAULT the fix is omission, which injects the default". Injecting here
             // anyway would substitute a value the document explicitly disclaimed, so the default is still what
             // the field decodes to and only the verdict changes.
-            plan.field(ctx, at).report(plan.rules.voidAtDefaultedField(memberName, RecordPlan.NULL));
+            plan.field(ctx, at, memberName).report(plan.rules.voidAtDefaultedField(memberName, RecordPlan.NULL));
             return injected[at];
         }
-        plan.field(ctx, at).report(plan.rules.voidAtRequiredField(memberName, RecordPlan.NULL));
+        plan.field(ctx, at, memberName).report(plan.rules.voidAtRequiredField(memberName, RecordPlan.NULL));
         return Slots.VOID;
     }
 
@@ -178,17 +182,17 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         if (event instanceof JsonEvent.NullValue) {
             ctx.next();
             // A field pinned to a value is never voidable: `_` is not the pin.
-            plan.field(ctx, at).report(plan.rules.voidAtFixedField(memberName, String.valueOf(pin.pinned()),
+            plan.field(ctx, at, memberName).report(plan.rules.voidAtFixedField(memberName, String.valueOf(pin.pinned()),
                     RecordPlan.NULL));
             return Slots.VOID;
         }
         String content = pin.form().contentOf(event);
         if (content == null) {
             // Not a value of the field's type at all. The reader reports it; nothing is compared.
-            return readValue(ctx, at);
+            return readValue(ctx, at, memberName);
         }
         int before = ctx.reported();
-        Object written = readValue(ctx, at);
+        Object written = readValue(ctx, at, memberName);
         if (ctx.reported() > before) {
             return written;
         }
@@ -199,8 +203,8 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
             return written;   // already reported by the field's own reader
         }
         if (!Objects.equals(ValueIdentity.of(value), ValueIdentity.of(pin.pinned()))) {
-            plan.field(ctx, at).report(plan.rules.fixedFieldContradicted(memberName, Nodes.rendered(pin.pinned()),
-                    content));
+            plan.field(ctx, at, memberName).report(plan.rules.fixedFieldContradicted(memberName,
+                    Nodes.rendered(pin.pinned()), content));
         }
         // The schema's value, which is what an omitted FIXED member gets too: whether the document stated it
         // decides nothing about what the field holds (§6.1.3).

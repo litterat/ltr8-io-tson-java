@@ -74,7 +74,7 @@ final class ChoiceReader {
         Map<DiscriminationClass, String> byClass = new EnumMap<>(DiscriminationClass.class);
         for (TypeRef variant : body.variants()) {
             Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(),
-                    linked.schema().entries(), linked.textEnums());
+                    linked.schema().entries());
             if (variantClass.isEmpty() || !variantClass.get().scalar()
                     || byClass.putIfAbsent(variantClass.get(), variant.name()) != null) {
                 return Map.of(); // a classless or container variant, or two variants sharing a class -> keep the tag

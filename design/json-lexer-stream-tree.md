@@ -11,7 +11,7 @@ alignment with JEP 540 does and does not claim. Current form only; history lives
   replaced, and every position carries a byte offset.
 - A number is its exact source lexeme; nothing converts. `JsonNumber` holds the lexeme and equality is over it.
 - Whitespace is RFC 8259's four characters and line breaks are LF, CR and CRLF; NEL/LS/PS are ordinary characters here.
-- Lexer and stream are grammar only: member names are not deduped, no value is interpreted, no member name is reserved.
+- Lexer and stream are grammar only: member names are not deduped, no value is interpreted, no member name has a meaning.
 - Producing `EndOfDocument` is what pulls past the root value, and so what rejects trailing content.
 - `NullValue` is a value in the event layer; JSON null as the void sentinel is a typed position's question.
 - Nesting depth is bounded in `JsonStream` against the shared `LimitsPolicy` and refused with `LimitExceededException`,
@@ -143,7 +143,7 @@ have forced.
 **Grammar only**, on §3.1's own layering, and three things follow: member names are not deduped (§3.1 makes a
 repeat an error whose *category* follows the position's type, which no grammar layer holds — the tree applies
 the rule where JEP 540 does, the schema-directed decode applies it with a category); no value is interpreted;
-and no member name is reserved, §3.2's `$`-namespace being a question about the position's type.
+and no member name has a meaning, §3.2's three annotation members being a question about the position's type.
 
 **One constructor**, `JsonStream(ByteSource, ProcessorPolicy, DiagnosticsReceiver)`. A stream reads under a
 policy and reports through a receiver, and both are always true, so neither is defaulted: a caller with

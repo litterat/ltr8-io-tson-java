@@ -29,7 +29,7 @@ import java.util.Set;
  * e.g. {@code RecordBody}'s own is {@code "record"}, not {@code "record_body"}), so this forward
  * (schema-name -> Class) direction needs the {@code "_body"} suffix added explicitly; nothing
  * recovers it mechanically from the bare name alone. A constructor that tightens another -- {@code set_type}
- * over {@code array}, {@code enum} and {@code text_enum} over {@code enum_type} -- needs no entry here: it
+ * over {@code array}, {@code enum} over {@code enum_type} -- needs no entry here: it
  * restates fields and adds none, and the bind lookup falls back along its chain to the constructor it
  * tightens ({@code ValueReaderContext.bindingNamesFor}).
  *

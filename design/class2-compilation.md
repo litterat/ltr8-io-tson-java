@@ -116,8 +116,8 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
   a `REFERENCE` body, in declaration order, then the entry's own name, then — for a constructor tightening
   another — that constructor's, up its chain — and `RecordBindReader` and `TupleBindReader` try them in that
-  order, so `ping => msg_of<"ping", ping_body>` binds under `ping`, and `set_type`, `text_enum` and a meta
-  layer's `kebab_enum => enum_type ^ { type?: = kebab }` bind as the constructor they tighten: a tightening
+  order, so `ping => msg_of<"ping", ping_body>` binds under `ping`, and `set_type`, `enum` and a meta
+  layer's `kebab_enum => enum_type ^ { name_type?: = kebab }` bind as the constructor they tighten: a tightening
   restates fields and adds none (§5.7), so the source's class is theirs. It is tried last, and confined to
   constructors — an ordinary record refining another may be bound to a narrower class, and falling back to
   its parent's would lose that silently.

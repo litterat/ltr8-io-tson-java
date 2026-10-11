@@ -1,9 +1,16 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.unicode.Normalization;
+import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 
@@ -112,8 +119,14 @@ public interface TsonReadContext {
      *
      * <p><b>Absent keeps the enclosing record's position</b>, which is the honest answer for a document whose
      * source this resolver never saw -- a hand-built one, or the bootstrap.
+     *
+     * <p><b>Two names, because the document and the schema may spell one field two ways</b>: under a
+     * case-folding name type a document's {@code Content-Type} is the field {@code content-type}. The data path
+     * takes {@code stated}, the name as the document wrote it, since RFC 6901 compares exactly and a pointer to
+     * the declared spelling names nothing in the document; the schema pointer takes {@code declared}. A field
+     * the document never wrote -- a missing or defaulted one -- passes its declared name as both.
      */
-    TsonReadContext schemaField(String name, Optional<SourcePosition> fieldPosition);
+    TsonReadContext schemaField(String stated, String declared, Optional<SourcePosition> fieldPosition);
 
     /**
      * A copy of this context anchored on the record now reading: {@code declaration}'s identity and position
@@ -170,6 +183,52 @@ public interface TsonReadContext {
      * caller can leave the value out rather than admit a name the processor declined.
      */
     boolean refusesName(String name, IdentifierProfile profile);
+
+    /**
+     * Pulls the next event, a record's field name, under {@code rule} -- the name type of the schema-directed
+     * record reading it (SPEC-FEEDBACK.md #10), where {@link #next()} reads a field name as a schemaless record's,
+     * an identifier or {@code ATOM_FORM_INVALID}. A name its type admits meets §8.2's per-name rules under the
+     * type's profile; one it refuses is reported nothing here, since it can match no declared field and the
+     * reader's {@code UNRECOGNIZED_FIELD} says so with the type's reason ({@link FieldNameRule#refusal}). A field
+     * name a lookahead pulls is judged when it is read, so it is judged once.
+     */
+    FieldName nextFieldName(FieldNameRule rule);
+
+    /**
+     * What a schema-directed record's field names are judged by: its name type, an identifier family, by name for
+     * messages, the reader of its values, the identifier profile §8.2's per-name rules apply under, and the form a
+     * name is matched against the declared ones in.
+     */
+    record FieldNameRule(String typeName, AtomType<?> type, IdentifierProfile profile, Normalization form) {
+
+        /** The kernel's {@code field_name}, a record's name type where it states none: [TSON-DATA] §7.7's grammar. */
+        public static final FieldNameRule FIELD_NAME = new FieldNameRule("field_name",
+                AtomParsers.forType(IdentifierType.IDENTIFIER).orElseThrow(), IdentifierGrammar.PROFILE,
+                Normalization.NFC);
+
+        public FieldNameRule {
+            Objects.requireNonNull(typeName, "typeName");
+            Objects.requireNonNull(type, "type");
+            Objects.requireNonNull(profile, "profile");
+            Objects.requireNonNull(form, "form");
+        }
+
+        /**
+         * Why {@code name} is no value of this type, or empty when it is one. The default asks the grammar, which
+         * answers without allocating, since it is asked of every field name of an ordinary document.
+         */
+        public Optional<String> refusal(String name) {
+            if (this == FIELD_NAME) {
+                return IdentifierGrammar.validate(name);
+            }
+            try {
+                type.read(name);
+                return Optional.empty();
+            } catch (AtomTypeException refused) {
+                return Optional.of(refused.getMessage());
+            }
+        }
+    }
 
     /**
      * The identifier policy this read judges names under -- what a reader enumerating a scope asks before it
@@ -257,5 +316,17 @@ public interface TsonReadContext {
      */
     static <T> T lookingAhead(TsonReadContext ctx, java.util.function.Function<TsonReadContext, T> lookahead) {
         return DefaultTsonReadContext.lookingAhead(ctx, lookahead);
+    }
+
+    /**
+     * Skips the scoped value at {@code ctx}'s cursor -- a record field's, any {@code !!schema} directive included --
+     * holding no name in it to a name rule: the value of a field its record does not declare, which is reported
+     * once, at the field, and read no further. No type governs it, so judging its names by the schemaless rule
+     * would hand down verdicts its producer's schema might not share, beside the one problem that is real; the
+     * JSON reader skips the same member the same way. Its syntax is still read, since skipping it is parsing it.
+     * Static for the reason {@link #lookingAhead} is.
+     */
+    static void skipUnjudged(TsonReadContext ctx) {
+        DefaultTsonReadContext.skipUnjudged(ctx);
     }
 }

@@ -144,19 +144,21 @@ class ConfusableNameScopesTest {
     }
 
     /**
-     * <b>A {@code text_enum} takes the members out of §8.2's two per-<em>name</em> rules and leaves the
-     * collision relation in place</b> (§7.4): its type is {@code text}, not an identifier family, so its members
-     * are not names and policing their characters and scripts is a category error; two members that render alike
-     * is still the hazard, because the set is still what a value is matched against.
+     * <b>An enum's members are names judged under its name type's profile</b> (§7.4): a character the profile
+     * adds is its own, so the space {@code words} admits as a medial is no restricted character, while one the
+     * profile does not add still is, and two members that render alike still collide.
      */
     @Test
-    void aTextEnumDropsThePerNameRulesAndKeepsTheCollisionOne() {
-        String restricted = "a" + new String(Character.toChars(0x0132)) + "b";
-        // The restricted-character rule is per-name, and these are not names.
-        assertNotNull(compile("  st => !text_enum [\"" + restricted + "\"]"));
+    void anEnumsMembersAreJudgedUnderItsNameTypesProfile() {
+        String words = "  words => !identifier_type { medial: \" \" }\n";
+        assertNotNull(compile(words + "  st => !enum_type { name_type: words  members: [\"lightly active\"] }"));
 
-        assertTrue(refused("  st => !text_enum [\"ACTIVE\" \"" + CYR_CAP_A + "CTIVE\"]")
-                .contains("has members that read alike"));
+        String restricted = "a" + new String(Character.toChars(0x0132)) + "b";
+        String message = refused(words + "  st => !enum_type { name_type: words  members: [\"" + restricted + "\"] }");
+        assertTrue(message.contains("Restricted"), message);
+
+        assertTrue(refused(words + "  st => !enum_type { name_type: words  members: [ACTIVE \"" + CYR_CAP_A
+                + "CTIVE\"] }").contains("has members that read alike"));
     }
 
     /**

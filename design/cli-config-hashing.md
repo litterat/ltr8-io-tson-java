@@ -84,10 +84,16 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
 
 ## CLI (`tson-cli`)
 
-`tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each
-as schema or data (`TsonDocumentPeek.of(…).isSchemaDocument()` — a header carrying `!!meta` is a schema document),
-exposes the schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the
-`!!schema` URI selects the schema, the root type-ref selects the type, no `!!schema` means schemaless.
+`tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each as schema
+or data (`TsonDocumentPeek.of(…).isSchemaDocument()` — a header carrying `!!meta` is a schema document), exposes the
+schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the `!!schema` URI
+selects the schema, the root type-ref selects the type, no `!!schema` means schemaless. **Every schema file loads
+before any document is read** (`Tson.validateSchema`), so a schema that does not load is known to be the schema's
+fault, not a document's. A document naming it is skipped unread, and its report is `UNDETERMINED`, carrying the
+schema's diagnostics — reporting them as the document's `REJECTED` would claim a check never made — while every other
+document is judged as usual, so one broken schema in a batch costs only the documents that need it. Such a run exits
+2, ranked below 70 and 78 only: the schema file is the runner's to fix before anything else means much. A `--schema`
+that does not load binds every JSON input, so it fails the run before any is read.
 **A TSON data document is fully self-describing, so it takes no `--type`**; `--schema`/`--type` exist for JSON
 inputs alone, which can name neither for themselves ("JSON inputs" below).
 

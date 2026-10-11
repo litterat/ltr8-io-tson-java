@@ -38,16 +38,9 @@ enum DiscriminationClass {
 
     BOOLEAN, NUMBER, STRING, BRACE, BRACKET;
 
-    /**
-     * The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none.
-     * An enum linking listed in {@link TsonLinkedSchema#textEnums} has texts for members and is {@link #STRING}
-     * whatever their spellings ([TSON-SCHEMA] §7.4).
-     */
+    /** The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none. */
     static Optional<DiscriminationClass> of(TsonLinkedSchema linked, String name) {
-        return ReferenceChain.terminal(linked.schema(), name).flatMap(resolved ->
-                resolved.definition().body() instanceof EnumBody && linked.textEnums().contains(resolved.name())
-                        ? Optional.of(STRING)
-                        : classify(resolved.definition()));
+        return ReferenceChain.terminal(linked.schema(), name).flatMap(resolved -> classify(resolved.definition()));
     }
 
     private static Optional<DiscriminationClass> classify(TypeDefinition definition) {

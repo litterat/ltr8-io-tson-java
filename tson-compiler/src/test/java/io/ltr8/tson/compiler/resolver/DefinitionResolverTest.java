@@ -253,12 +253,12 @@ class DefinitionResolverTest {
 
     @Test
     void writesAnEnumBody() throws DataBindException {
-        // Structurally: boolean => !type_definition { source: enum body: !enum { type: identifier  members: [...] } }
+        // Structurally: boolean => !type_definition { source: enum body: !enum { name_type: identifier  members: [...] } }
         TypeDefinition booleanDef = new TypeDefinition(Optional.of(TypeRef.of("enum")), TypeKind.ATOM,
                  List.of(), List.of(), new EnumBody(List.of("true", "false")));
 
         assertEquals("{ source: { name: \"enum\" arguments: [] } "
-                        + "supertypes: [] subtypes: [] body: !enum { type: \"identifier\" "
+                        + "supertypes: [] subtypes: [] body: !enum { name_type: \"identifier\" "
                         + "members: [ \"true\" \"false\" ] } }",
                 write(booleanDef));
     }
@@ -680,10 +680,10 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"members\" type: { name: \"array_array_field_name_1_5d4d7dc5_1_0942e088\" "
+                        + "{ name: \"members\" type: { name: \"array_array_text_1_3600e7d5_1_1b8fef23\" "
                         + "arguments: [] } optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "{ name: \"optional_members\" type: { name: \"array_field_name_1_5d4d7dc5\" arguments: [] } "
+                        + "{ name: \"optional_members\" type: { name: \"array_text_1_3600e7d5\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
                         + "{ name: \"optional\" type: { name: \"boolean\" arguments: [] } "
@@ -991,20 +991,20 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.ATOM, enumType.kind());
         assertEquals("{ supertypes: [ \"atom\" \"type\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
-                        + "{ name: \"type\" type: { name: \"type_name\" arguments: [] } "
+                        + "{ name: \"name_type\" type: { name: \"type_name\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(enumType));
-        // enum => enum_type ^ { type?: = identifier }: a constructor tightening, `type` pinned and injected, so
+        // enum => enum_type ^ { name_type?: = identifier }: a constructor tightening, `name_type` pinned and injected, so
         // `members` is the one unmarked field and `!enum [A B]` stays the positional form.
         assertEquals(TypeKind.ATOM, enumDef.kind());
         assertEquals(List.of("enum_type", "atom", "type", "top"), enumDef.supertypes());
         assertEquals("{ source: { name: \"enum_type\" arguments: [] } "
                         + "supertypes: [ \"enum_type\" \"atom\" \"type\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"type\" type: { name: \"type_name\" arguments: [] } "
+                        + "{ name: \"name_type\" type: { name: \"type_name\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: identifier } "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "

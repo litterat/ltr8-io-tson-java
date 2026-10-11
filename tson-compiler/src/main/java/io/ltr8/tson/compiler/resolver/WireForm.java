@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
@@ -106,6 +107,12 @@ final class WireForm {
      */
     static final String EXTENSION = "extension";
 
+    /**
+     * {@code record.name_type} -- the type a record's field names are values of (SPEC-FEEDBACK.md #10). Written
+     * exactly where the record states one, so a held body keeps the difference between stating and not.
+     */
+    static final String NAME_TYPE = "name_type";
+
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
 
     /**
@@ -127,7 +134,7 @@ final class WireForm {
 
     /** A list of field names as the array of bare names a resolved document writes. */
     private static ArrayValue names(List<String> names) {
-        return new ArrayValue(names.stream().map(name -> scoped(new TokenValue(name, TokenForm.UNQUOTED))).toList());
+        return new ArrayValue(names.stream().map(name -> scoped(declaredName(name))).toList());
     }
 
     /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
@@ -163,6 +170,23 @@ final class WireForm {
 
     static RecordValue.Field nameField(String name, String text) {
         return new RecordValue.Field(name, scoped(new TokenValue(text, TokenForm.UNQUOTED)));
+    }
+
+    /**
+     * A declared field name -- in {@code fields}, a group, {@code discriminators} -- as an author writes one:
+     * unquoted where it is an identifier, quoted where it is not. A record's names are its name type's values
+     * (SPEC-FEEDBACK.md #10), so {@code "@id"} or {@code "first name"} is a field name, and written unquoted
+     * it is not one token: a held body would not parse back. Quoting is safe for the parameter channel, which
+     * keys on unquoted tokens, because a parameter's name is an identifier and so is never quoted here.
+     */
+    static TokenValue declaredName(String name) {
+        return new TokenValue(name, IdentifierGrammar.validate(name).isEmpty() ? TokenForm.UNQUOTED
+                : TokenForm.SINGLE_LINE_QUOTED);
+    }
+
+    /** {@link #declaredName} as a record member's value. */
+    static RecordValue.Field declaredNameField(String member, String name) {
+        return new RecordValue.Field(member, scoped(declaredName(name)));
     }
 
     static TokenForm tokenForm(Token.Form form) {
@@ -228,7 +252,7 @@ final class WireForm {
         List<ScopedValue> fields = new ArrayList<>();
         for (RecordField field : body.fields()) {
             List<RecordValue.Field> members = new ArrayList<>();
-            members.add(nameField(NAME, field.name()));
+            members.add(declaredNameField(NAME, field.name()));
             members.add(new RecordValue.Field(TYPE, scoped(refValue(field.type()))));
             addFacts(members, field.optional(), field.voidable(), field.role());
             // The two channels collapse into one: a literal keeps its own token form, and a routed parameter
@@ -248,6 +272,7 @@ final class WireForm {
             binding.add(new RecordValue.Field(SUPERTYPES, scoped(new ArrayValue(body.supertypes().stream()
                     .map(supertype -> scoped(refValue(supertype))).toList()))));
         }
+        body.nameType().ifPresent(stated -> binding.add(nameField(NAME_TYPE, stated)));
         binding.add(new RecordValue.Field(FIELDS, scoped(new ArrayValue(fields))));
         if (!groups.isEmpty()) {
             binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));
@@ -257,7 +282,7 @@ final class WireForm {
         if (!body.discriminators().isEmpty()) {
             binding.add(new RecordValue.Field(DISCRIMINATORS, scoped(new ArrayValue(
                     body.discriminators().stream()
-                            .map(name -> scoped(new TokenValue(name, TokenForm.UNQUOTED))).toList()))));
+                            .map(name -> scoped(declaredName(name))).toList()))));
         }
         return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(binding));
     }

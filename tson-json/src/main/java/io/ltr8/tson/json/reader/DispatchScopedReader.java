@@ -23,9 +23,9 @@ import java.util.Map;
  * or {@code extern_type} materialises -- because what separates them is two constraint values and not a shape.
  * It selects a reader and builds nothing, so one class serves every mode.
  *
- * <p><b>The leading members pick the cell</b> ({@link ReservedMembers#lead}). An annotation object leading with
+ * <p><b>The leading members pick the cell</b> ({@link TagMembers#lead}). An annotation object leading with
  * {@code $schema} is EXTERN; one leading with {@code $type} alone is LOCAL; any other value -- a bare scalar,
- * an array, an object with no reserved member -- names no type, and is a validation error in every mode, the
+ * an array, an object with no annotation member -- names no type, and is a validation error in every mode, the
  * position promising no type for it to be read as. A cell the instance's {@code scope} does not hold refuses the
  * value it would have taken.
  *
@@ -94,7 +94,7 @@ final class DispatchScopedReader implements JsonTypeReader<Object> {
             return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR, untyped(), UNTYPED_EXPECTED,
                     JsonAtoms.describe(ctx.peek()));
         }
-        ReservedMembers.Lead lead = ReservedMembers.lead(ctx);
+        TagMembers.Lead lead = TagMembers.lead(ctx);
         if (!lead.present()) {
             return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR, untyped(), UNTYPED_EXPECTED,
                     "an object naming no type");
@@ -103,7 +103,7 @@ final class DispatchScopedReader implements JsonTypeReader<Object> {
     }
 
     /** A value naming a type in the governing namespace: {@code $type} alone, resolved as at any other position. */
-    private Object readLocal(JsonReadContext ctx, ReservedMembers.Lead lead) {
+    private Object readLocal(JsonReadContext ctx, TagMembers.Lead lead) {
         if (!body.admits(ScopeKind.LOCAL)) {
             return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR,
                     "'" + displayName + "' takes a value from a foreign schema, so the value must lead with "
@@ -130,16 +130,16 @@ final class DispatchScopedReader implements JsonTypeReader<Object> {
      * §8.5's EXTERN cell: {@code $schema} names the schema, {@code $type} names the type within it, and the
      * foreign schema's compiled reader validates the value in full.
      */
-    private Object readExtern(JsonReadContext ctx, ReservedMembers.Lead lead) {
+    private Object readExtern(JsonReadContext ctx, TagMembers.Lead lead) {
         String uri = lead.schemaRef();
         if (!body.admits(ScopeKind.EXTERN)) {
             return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR,
                     "'" + displayName + "' takes a type this schema declares or imports, so a value here cannot "
                             + "open a scope" + (uri == null ? "" : " onto '" + uri + "'") + " (§8.5)",
-                    "an annotation object carrying no '$schema'", ReservedMembers.SCHEMA);
+                    "an annotation object carrying no '$schema'", TagMembers.SCHEMA);
         }
         if (uri == null) {
-            ctx.field(ReservedMembers.SCHEMA).report(Diagnostic.Code.TYPE_MISMATCH,
+            ctx.field(TagMembers.SCHEMA).report(Diagnostic.Code.TYPE_MISMATCH,
                     "'$schema' holds a schema reference, which is a string (§3.2)", "a string", "not a string");
             EventSkip.nextValue(ctx);
             return null;

@@ -207,6 +207,41 @@ class ValidateCommandTest {
         assertTrue(output.contains("[ATOM_FORM_INVALID]"), output);
     }
 
+    /**
+     * A schema file that does not load leaves a document naming it unjudged, not rejected: the document is never
+     * read against it, so its report is UNDETERMINED, carrying the schema's diagnostics, and the run exits 2.
+     */
+    @Test
+    void aSchemaFileThatDoesNotLoadLeavesItsDocumentsUndetermined(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA.replace("b: int32", "b: nonesuch"));
+        Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
+
+        String output = captureStdout(() ->
+                assertEquals(2, ValidateCommand.run(inputs(schema, data), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
+
+        assertTrue(output.startsWith("{\"outcome\":\"UNDETERMINED\""), output);
+        assertTrue(output.contains("\"file\":\"" + data + "\",\"outcome\":\"UNDETERMINED\""), output);
+        assertTrue(output.contains("SCHEMA_ERROR") && output.contains("nonesuch"), output);
+        assertTrue(!output.contains("REJECTED"), output);
+    }
+
+    /** One broken schema in a batch costs only the documents that name it: every other document is still judged. */
+    @Test
+    void aBrokenSchemaDoesNotStopTheDocumentsOfAnotherSchema(@TempDir Path dir) throws IOException {
+        Path broken = writeFile(dir, "broken.tn", RECORD_SCHEMA.replace("cli-validate", "cli-broken")
+                .replace("b: int32", "b: nonesuch"));
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
+        Path unjudged = writeFile(dir, "unjudged.tson", selfDescribing("{ a: 1  b: 2 }")
+                .replace("cli-validate", "cli-broken"));
+        Path judged = writeFile(dir, "judged.tson", selfDescribing("{ a: 1  b: 2 }"));
+
+        String output = captureStdout(() -> assertEquals(2, ValidateCommand.run(
+                inputs(broken, schema, unjudged, judged), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
+
+        assertTrue(output.contains("\"file\":\"" + unjudged + "\",\"outcome\":\"UNDETERMINED\""), output);
+        assertTrue(output.contains("\"file\":\"" + judged + "\",\"outcome\":\"ACCEPTED\""), output);
+    }
+
     // --- infra ---
 
     @Test
@@ -304,13 +339,15 @@ class ValidateCommandTest {
 
     @Test
     void aSchemaPinnedByItsOwnHashResolvesAgainstAPlainReference(@TempDir Path dir) throws IOException {
-        // The schema's !!id carries a ?sha256= pin; the data's !!schema is plain. Matching is by
-        // canonical identity (the hash is not identity), so it still validates.
+        // The schema's !!id carries a ?sha256= pin, its own content's (the id line is not hashed); the data's
+        // !!schema is plain. Matching is by canonical identity (the hash is not identity), so it still validates.
+        String body = "!!meta:\"https://tson.io/2026/38/m/meta.tn\"\n"
+                + "!!import:\"https://tson.io/2026/38/m/core.tn\"\n"
+                + "{ my_record => { a: int32  b: int32 } }\n";
+        String unpinned = "!!id:\"https://example.test/cli-validate.tn\"\n" + body;
+        String pin = io.ltr8.tson.compiler.TsonContentHash.sha256(unpinned.getBytes(StandardCharsets.UTF_8));
         Path schema = writeFile(dir, "schema.tn",
-                "!!id:\"https://example.test/cli-validate.tn?sha256=" + "a".repeat(64) + "\"\n"
-                        + "!!meta:\"https://tson.io/2026/38/m/meta.tn\"\n"
-                        + "!!import:\"https://tson.io/2026/38/m/core.tn\"\n"
-                        + "{ my_record => { a: int32  b: int32 } }\n");
+                "!!id:\"https://example.test/cli-validate.tn?sha256=" + pin + "\"\n" + body);
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->

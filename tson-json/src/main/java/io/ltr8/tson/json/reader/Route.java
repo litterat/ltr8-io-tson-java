@@ -40,9 +40,9 @@ record Route(JsonTypeReader<?> entry, JsonTypeReader<?> inline) {
      * inline object goes to the exact reader, and where there is none -- a type that does not read an object
      * as its own value -- the object can only be a wrapper, and is read as one, refusing what it is not.
      */
-    Object read(JsonReadContext ctx, ReservedMembers.Lead lead) {
+    Object read(JsonReadContext ctx, TagMembers.Lead lead) {
         if (lead.wrapper() || !(inline instanceof ExactReader exact)) {
-            return ReservedMembers.readWrapped(ctx, entry);
+            return TagMembers.readWrapped(ctx, entry);
         }
         return exact.readExact(ctx, entry);
     }

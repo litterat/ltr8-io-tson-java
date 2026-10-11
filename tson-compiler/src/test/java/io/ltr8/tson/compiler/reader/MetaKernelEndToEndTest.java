@@ -65,7 +65,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(69, registered.entries().size());
+        assertEquals(68, registered.entries().size());
     }
 
     @Test
@@ -95,7 +95,7 @@ class MetaKernelEndToEndTest {
 
     @Test
     void readsEnumsOwnMembersFieldAgainstRealData() {
-        // enum => enum_type ^ { type?: = identifier }: the pinned `type` is injected, and `members` reads
+        // enum => enum_type ^ { name_type?: = identifier }: the pinned `name_type` is injected, and `members` reads
         // through enum_set, a genuine ArrayBody.
         TsonCompiledSchema compiled = compiled();
 

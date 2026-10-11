@@ -336,9 +336,8 @@ public final class MetaKernelBootstrapResolver {
      * kernel stating another profile would describe a scheme this implementation does not read.
      */
     private static void requireSchemeNameProfile(Instance instance) {
-        Map<String, String> expected = Map.of("start", "NONE", "continue", "NONE",
-                "start_add", "abcdefghijklmnopqrstuvwxyz", "continue_add", "abcdefghijklmnopqrstuvwxyz0123456789+-.",
-                "normalization", "ASCII_CASEFOLD");
+        Map<String, String> expected = Map.of("start", "ASCII", "continue", "ASCII", "continue_add", "+-.",
+                "exclude", "_", "normalization", "ASCII_CASEFOLD");
         Map<String, String> stated = new HashMap<>();
         if (instance.value().coreValue() instanceof RecordValue record) {
             for (RecordValue.Field field : record.fields()) {

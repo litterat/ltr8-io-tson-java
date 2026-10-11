@@ -11,9 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@code text_type.members} -- the sparse case on the text tier, as {@code integer_type.members} is on the
- * integer one (§7.4). It is not the spelling for a bare text value set, which is a
- * {@code text_enum}; it is for a value set on a type whose <em>other</em> facets are also
- * wanted, where the family's own parsing still applies.
+ * integer one (§7.4). It is the spelling for a closed set of text values, an enum being a set of
+ * names, and the type's <em>other</em> facets still apply, as does the family's own parsing.
  *
  * <p><b>The two rules that are not read off the declaration.</b> Every member must satisfy the other facets
  * on the same body, the pattern included -- and {@code pattern} and {@code members} are each settable once,

@@ -1,16 +1,21 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -61,6 +66,24 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** Where {@link #next()} records what it consumes while a lookahead is running, else {@code null}. */
         List<TsonEvent> recording;
 
+        /** The rule {@link #nextFieldName} is pulling a field name under, else {@code null}: a schemaless record's. */
+        FieldNameRule fieldNameRule;
+
+        /**
+         * Field names a lookahead pulled from the source and nothing has yet read, each judged when a reader
+         * does ({@link #next()}); {@code null} until a lookahead crosses one, so an ordinary read allocates none.
+         */
+        Set<TsonEvent> unjudged;
+
+        /** False while {@link #discardUnjudged} skips a value no rule is judging; true for the whole of a read. */
+        boolean judging = true;
+
+        /**
+         * True for a read without a schema of a document that names one ({@link #leavingFieldNamesToTheSchema}):
+         * its field names are the named schema's to judge, so no schemaless rule judges them.
+         */
+        boolean fieldNamesTheSchemas;
+
         Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy) {
             this.events = events;
             this.receiver = receiver;
@@ -79,15 +102,19 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * what matters beyond this implementation: any port descends the same way and would inherit the same
      * waste from the same shape.
      *
-     * <p>{@code schemaToo} is what keeps the two pointers apart. Every schema step is a data step, but not
+     * <p>{@code schemaName} is what keeps the two pointers apart. Every schema step is a data step, but not
      * the reverse: an array index moves through the document without moving through the schema, whose
      * element type is declared once for the whole array. So one chain carries both, and the schema pointer
-     * renders the marked subset.
+     * renders the subset that has a schema name. The two names of one step differ where a name type's form
+     * matches a document's {@code Content-Type} to a declared {@code content-type}: the data path spells the
+     * key as written, which is the only spelling RFC 6901 finds in the document, and the schema pointer the
+     * declaration.
      *
-     * @param name  the field name, or {@code null} for an array index
-     * @param index the array index, meaningful only when {@code name} is {@code null}
+     * @param name       the field name as the document wrote it, or {@code null} for an array index
+     * @param index      the array index, meaningful only when {@code name} is {@code null}
+     * @param schemaName the declared field's name, or {@code null} for a step the schema pointer does not take
      */
-    private record PathStep(PathStep parent, String name, int index, boolean schemaToo) {
+    private record PathStep(PathStep parent, String name, int index, String schemaName) {
     }
 
     private final Cursor cursor;
@@ -146,10 +173,26 @@ final class DefaultTsonReadContext implements TsonReadContext {
         if (cursor.recording != null) {
             cursor.recording.add(e);
         }
-        if (fresh) {
+        if (fresh && cursor.recording != null && e instanceof FieldName) {
+            if (cursor.unjudged == null) {
+                cursor.unjudged = Collections.newSetFromMap(new IdentityHashMap<>());
+            }
+            cursor.unjudged.add(e);
+        } else if (fresh || cursor.recording == null && cursor.unjudged != null && cursor.unjudged.remove(e)) {
             checkNameHygiene(e);
         }
         return e;
+    }
+
+    @Override
+    public FieldName nextFieldName(FieldNameRule rule) {
+        FieldNameRule outer = cursor.fieldNameRule;
+        cursor.fieldNameRule = rule;
+        try {
+            return (FieldName) next();
+        } finally {
+            cursor.fieldNameRule = outer;
+        }
     }
 
     /**
@@ -179,7 +222,9 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * <p><b>Only on a freshly pulled event.</b> {@link TsonReadContext#lookingAhead} rewinds what it
      * consumed and a reader replays it, so checking every event would report a refused name once per
      * lookahead that crossed it. {@code NameHygieneTest} pins exactly-once across every shape an annotation
-     * takes, the nested and map-key ones included, because that is what would regress silently.
+     * takes, the nested and map-key ones included, because that is what would regress silently. A field name
+     * differs only in when it is judged: one a lookahead pulls waits for the reader that reads it, since which
+     * rule applies is that reader's to say ({@link #nextFieldName}) and the lookahead's scan cannot know it.
      *
      * <p><b>Not where the token surface's policy runs</b> -- that is {@code TsonDataStream}, which gets
      * exactly-once for free by sitting upstream of the rewind. The two surfaces sit on opposite sides of
@@ -188,15 +233,50 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * to run wherever a name is actually delivered.
      */
     private void checkNameHygiene(TsonEvent event) {
+        if (!cursor.judging) {
+            return;
+        }
         String name = switch (event) {
             case io.ltr8.tson.compiler.stream.TypeRef typeRef -> typeRef.name();
             case io.ltr8.tson.compiler.stream.AnnotationStart annotation -> annotation.name();
-            case io.ltr8.tson.compiler.stream.FieldName field -> field.name();
+            case FieldName field -> {
+                judgeFieldName(field.name());
+                yield null;
+            }
             default -> null;
         };
         if (name != null) {
-            judgeName(name, IdentifierGrammar.PROFILE);
+            judgeName(name, IdentifierGrammar.PROFILE, false);
         }
+    }
+
+    /**
+     * [TSON-DATA] §2.5: a record's field name is read by its record's name type (SPEC-FEEDBACK.md #10). Under a
+     * schema-directed record's {@link FieldNameRule}, a name the type refuses is reported nothing here: it can
+     * match no declared field, the reader reports it {@code UNRECOGNIZED_FIELD} with the type's reason, and being
+     * no name of the type it meets no hygiene rule. One the type admits meets the per-name rules under its profile.
+     * A schemaless record has no type but §2.5's identifier, and no field list to report against, so there a name
+     * the grammar refuses is {@code ATOM_FORM_INVALID}. Either refusal is at the field's own path.
+     */
+    private void judgeFieldName(String name) {
+        FieldNameRule rule = cursor.fieldNameRule;
+        if (rule != null) {
+            if (rule.refusal(name).isEmpty()) {
+                judgeName(name, rule.profile(), true);
+            }
+            return;
+        }
+        if (cursor.fieldNamesTheSchemas) {
+            return;
+        }
+        Optional<String> violation = IdentifierGrammar.validate(name);
+        if (violation.isPresent()) {
+            field(name).report(Diagnostic.Code.ATOM_FORM_INVALID, "'" + name + "' is not a field name -- "
+                    + violation.get() + ". A record's field names are identifiers (§2.5); a key that is not a name "
+                    + "belongs in a map, written '{ key => value }'", "an identifier", "'" + name + "'");
+            return;
+        }
+        judgeName(name, IdentifierGrammar.PROFILE, true);
     }
 
     /**
@@ -208,7 +288,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
      */
     @Override
     public boolean refusesName(String name, IdentifierProfile profile) {
-        return judgeName(name, profile);
+        return judgeName(name, profile, false);
     }
 
     @Override
@@ -216,13 +296,18 @@ final class DefaultTsonReadContext implements TsonReadContext {
         return cursor.identifierPolicy;
     }
 
-    private boolean judgeName(String name, IdentifierProfile profile) {
+    /**
+     * The per-name rules over {@code name}, reported at this context's position or, for a field name, at the
+     * field's own -- a step built only when there is something to report, since this runs on every name.
+     */
+    private boolean judgeName(String name, IdentifierProfile profile, boolean fieldName) {
         List<IdentifierPolicy.Violation> violations = cursor.identifierPolicy.judge(name, profile);
         if (violations.isEmpty()) {
             return false;
         }
+        TsonReadContext at = fieldName ? field(name) : this;
         for (IdentifierPolicy.Violation violation : violations) {
-            refuse(name, violation.reason(), violation.code());
+            refuse(at, name, violation.reason(), violation.code());
         }
         return true;
     }
@@ -233,8 +318,49 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * does not admit want different fixes, so they are two codes rather than one code and a discriminator
      * beside it.
      */
-    private void refuse(String name, String violation, Diagnostic.Code code) {
-        report(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
+    private static void refuse(TsonReadContext at, String name, String violation, Diagnostic.Code code) {
+        at.report(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
+    }
+
+    /**
+     * Marks {@code ctx}'s read as one without a schema of a document that names one: a Class 1 read, or one
+     * told to ignore the schema. [TSON-DATA] §2.5's identifier rule holds a schemaless document's field names,
+     * and a document that names a schema has field names of that schema's types (SPEC-FEEDBACK.md #10), which a
+     * read without it cannot know; so its field names meet neither the identifier grammar nor the per-name
+     * rules, and the read judges what it can -- syntax, type-refs and annotation names, which are identifiers
+     * at every layer, and the built-in vocabulary. The look-alike rule over a record's set stays, being a
+     * relation between names whatever their type. The cast cannot fail (see {@link #lookingAhead}).
+     */
+    static void leavingFieldNamesToTheSchema(TsonReadContext ctx) {
+        ((DefaultTsonReadContext) ctx).cursor.fieldNamesTheSchemas = true;
+    }
+
+    /**
+     * Skips the data value at {@code ctx}'s cursor judging nothing in it: no name in it meets a name rule. For a
+     * value a read abandons unread -- its schema could not be obtained or did not load, or names no type the
+     * root could take -- since a document no schema is judging is not judged ([TSON-DATA] §8.1), and judging its
+     * names by the schemaless rule would hand down verdicts a schema might have relaxed, beside the one problem
+     * that is the real one. The syntax is still read, because skipping a value is parsing it. The cast cannot
+     * fail for a context this library made (see {@link #lookingAhead}).
+     */
+    static void discardUnjudged(TsonReadContext ctx) {
+        unjudged(ctx, io.ltr8.tson.compiler.stream.EventSkip::dataValue);
+    }
+
+    /** {@link TsonReadContext#skipUnjudged}'s implementation, which carries the contract. */
+    static void skipUnjudged(TsonReadContext ctx) {
+        unjudged(ctx, io.ltr8.tson.compiler.stream.EventSkip::scopedValue);
+    }
+
+    private static void unjudged(TsonReadContext ctx, java.util.function.Consumer<TsonReadContext> skip) {
+        Cursor cursor = ((DefaultTsonReadContext) ctx).cursor;
+        boolean outer = cursor.judging;
+        cursor.judging = false;
+        try {
+            skip.accept(ctx);
+        } finally {
+            cursor.judging = outer;
+        }
     }
 
     /**
@@ -283,9 +409,9 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     /**
-     * The RFC 6901 pointer {@link #tail}'s chain spells: every step for the data path, the {@code schemaToo}
-     * ones for the schema pointer. Rendered nowhere else, and reached only by {@link #report} and a caller
-     * that asks.
+     * The RFC 6901 pointer {@link #tail}'s chain spells: every step for the data path, the ones with a
+     * {@code schemaName} for the schema pointer, by that name. Rendered nowhere else, and reached only by
+     * {@link #report} and a caller that asks.
      */
     private String render(boolean schemaOnly) {
         StringBuilder out = new StringBuilder();
@@ -301,7 +427,10 @@ final class DefaultTsonReadContext implements TsonReadContext {
             return;
         }
         append(out, step.parent(), schemaOnly);   // parent first: the chain links backwards, the pointer reads forwards
-        if (schemaOnly && !step.schemaToo()) {
+        if (schemaOnly) {
+            if (step.schemaName() != null) {
+                out.append('/').append(escape(step.schemaName()));
+            }
             return;
         }
         out.append('/');
@@ -314,19 +443,19 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public TsonReadContext field(String name) {
-        return stepping(new PathStep(tail, name, -1, false));
+        return stepping(new PathStep(tail, name, -1, null));
     }
 
     @Override
     public TsonReadContext index(int i) {
-        return stepping(new PathStep(tail, null, i, false));
+        return stepping(new PathStep(tail, null, i, null));
     }
 
     @Override
-    public TsonReadContext schemaField(String name, Optional<SourcePosition> fieldPosition) {
+    public TsonReadContext schemaField(String stated, String declared, Optional<SourcePosition> fieldPosition) {
         // The same one allocation stepping() makes for every other descent; the ternary only chooses which
         // position it carries, and an absent one leaves the enclosing record's exactly as before.
-        return new DefaultTsonReadContext(cursor, new PathStep(tail, name, -1, schemaRoot != null),
+        return new DefaultTsonReadContext(cursor, new PathStep(tail, stated, -1, schemaRoot != null ? declared : null),
                 schemaRoot, schemaId, fieldPosition.isPresent() ? fieldPosition : schemaPosition,
                 positionOverride);
     }

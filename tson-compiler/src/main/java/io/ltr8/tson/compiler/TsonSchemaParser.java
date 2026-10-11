@@ -517,9 +517,9 @@ public final class TsonSchemaParser extends TsonDataParser {
         expect(TokenType.MINUS, "a removal clause's '-'");
         expect(TokenType.LBRACE, "a removal set's opening '{'");
         List<String> names = new ArrayList<>();
-        names.add(expectFieldNameToken("a removed field name").text());
+        names.add(expectDeclaredFieldName("a removed field name").text());
         while (consumeSeparatorOrCloseCheck(TokenType.RBRACE)) {
-            names.add(expectFieldNameToken("a removed field name").text());
+            names.add(expectDeclaredFieldName("a removed field name").text());
         }
         expect(TokenType.RBRACE, "a removal set's closing '}'");
         return new RemovalSet(names);
@@ -559,7 +559,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     private FieldDef parseFieldDef(List<Annotation> annotations) {
         // Taken before the token is consumed, exactly as a declaration's own name position is.
         Position namePosition = peek().start();
-        Token name = expectFieldNameToken("a record field name");
+        Token name = expectDeclaredFieldName("a record field name");
         // The name's `?`: the key may be omitted (§5.2). `?` is always a token of its own, so `a?:` needs no
         // lexer change, and adjacency is what keeps `a ?:` from reading as the same mark.
         boolean omittable = consumeAdjacentQuestion();
@@ -658,7 +658,7 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private GroupDef.Member parseGroupMember() {
         List<Annotation> annotations = parseAnnotationList();
-        Token name = expectFieldNameToken("a field group member's name");
+        Token name = expectDeclaredFieldName("a field group member's name");
         // Optional once the member's option is chosen: the option, not the record, is what the mark is about.
         boolean omittable = consumeAdjacentQuestion();
         expect(TokenType.COLON, "a field group member's ':'");
@@ -1009,6 +1009,15 @@ public final class TsonSchemaParser extends TsonDataParser {
         Token t = expect(TokenType.UNQUOTED, context);
         requireIdentifierName(t);
         return t.text();
+    }
+
+    /**
+     * A field name a schema declares: the shared {@code field-name} production, any single-line token. What the
+     * name may be is its record's field name type (SPEC-FEEDBACK.md #10), which the linker judges every declared
+     * name by once the record and the type it inherits are resolved.
+     */
+    private Token expectDeclaredFieldName(String construct) {
+        return expectFieldNameToken(construct);
     }
 
     private void requireIdentifierName(Token t) {

@@ -37,10 +37,8 @@ import io.ltr8.tson.schema.meta.UuidType;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * The granularity at which TSON text discriminates an untagged value: [TSON-DATA] §4's three scalar
@@ -71,18 +69,11 @@ public enum DiscriminationClass {
      * an alias and its target one type); a cycle, having no terminal, has no class. An empty result makes
      * the enclosing choice non-disjoint and blocks untagged recovery -- the conservative side, the tag
      * stays required.
-     *
-     * <p>{@code textEnums} is linking's {@code TsonLinkedSchema.textEnums}: the enums whose members are texts
-     * rather than names, which are {@link #STRING} whatever their members' spellings ([TSON-SCHEMA] §7.4).
      */
-    public static Optional<DiscriminationClass> of(String name, Map<String, TypeDefinition> namespace,
-                                                   Set<String> textEnums) {
+    public static Optional<DiscriminationClass> of(String name, Map<String, TypeDefinition> namespace) {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
-        return ReferenceChain.terminalDefinition(name, namespace).flatMap(definition ->
-                definition.body() instanceof EnumBody && textEnums.contains(ReferenceChain.terminal(name, namespace))
-                        ? Optional.of(STRING)
-                        : classify(definition));
+        return ReferenceChain.terminalDefinition(name, namespace).flatMap(DiscriminationClass::classify);
     }
 
     private static Optional<DiscriminationClass> classify(TypeDefinition def) {

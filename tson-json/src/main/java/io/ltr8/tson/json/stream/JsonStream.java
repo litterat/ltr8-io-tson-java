@@ -40,8 +40,8 @@ import java.util.NoSuchElementException;
  * <li><b>It does not interpret a value.</b> A number is its source lexeme (§5.3), a string is its
  *     decoded content, and {@code null} is a JSON value rather than the void sentinel -- §7 turns it
  *     into one, at a typed position, which this layer has none of.
- * <li><b>It reserves no member name.</b> §3.2's {@code $}-namespace is reserved where an object is read
- *     as a record or an annotation object, which is a question about the position's type.
+ * <li><b>It gives no member name a meaning.</b> §3.2's three annotation members mean something where an object
+ *     is read as a record or an annotation object, which is a question about the position's type.
  * </ul>
  *
  * <p><b>Nesting depth is bounded here</b> ([TSON-JSON] §10.1), because this is the one place every

@@ -12,6 +12,9 @@ lives in git.
   else to a synthetic — and any other body shape is an `IllegalStateException`.
 - A held body is text; the parsed form is a working value that is never retained, and nothing outside `resolver` sees a
   `DataValue`.
+- A declared field name that is no identifier (`"@id"`, `"first name"`) is written quoted (`WireForm.declaredName`), or
+  the text does not parse back; quoting never hides a parameter, whose name is an identifier. A record's non-default
+  `name_type` is written too.
 - Substitution is one rule at every depth: an **unquoted** token in a tree, rewritten when its text resolves into the
   entry's `parameters` (§8.1's shadowing rule); a quoted token is a literal.
 - §5.7's fixation happens at closing (`fixRoutedValues`): a routed `= P` arrives required and FREE and becomes

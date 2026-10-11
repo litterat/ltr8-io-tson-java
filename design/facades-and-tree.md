@@ -11,6 +11,9 @@ form only; history lives in git.
 - A failure reaching or resolving the schema is a diagnostic, not an exception — and a schema's own
   diagnostics go to the facade's receiver, never through `ctx.report`, which would stamp a data position on
   them.
+- A root value a read abandons — its schema not obtained, not loaded, or declaring no type the root names — is
+  skipped unjudged (`DefaultTsonReadContext.discardUnjudged`): parsed, so a syntax error still reports, and held to
+  no name rule, since no schema is judging it and the schemaless rule would refuse names the schema may admit.
 - A `TsonReadContext` always carries an identifier policy: `of(events, receiver)` defaults it to Highly Restrictive
   and `of(events, receiver, policy)` refuses `null`. The token policy is applied by the stream, not the context,
   because the context rewinds and a check there would report one token twice.

@@ -202,7 +202,7 @@ public final class JsonReadContext {
      * value must still see them all, so reading them to find out is not a substitute.
      *
      * <p>Consumed events are replayed from a buffer rather than re-lexed, so a lookahead costs what it
-     * looked past and never the document. The selectors lead (§3.3, §6.1.5), so what the reserved-member peek
+     * looked past and never the document. The selectors lead (§3.3, §6.1.5), so what the annotation-member peek
      * looks past is a few scalar members, a count the schema fixes (§10.1). {@link #position()} is deliberately left
      * where the lookahead reached rather than restored: a caller looks ahead in order to say something
      * about what it found, and that is where the saying belongs.
@@ -342,10 +342,15 @@ public final class JsonReadContext {
      *
      * <p>{@code fieldPosition} is a parameter rather than a second overload because every caller has the field
      * in hand: two ways to take this descent would mean the one that forgot the line was the shorter one.
+     *
+     * <p><b>Two names, because the document and the schema may spell one field two ways</b>: under a
+     * case-folding name type a member {@code Content-Type} is the field {@code content-type}. The data path takes
+     * {@code stated}, the member as written, since RFC 6901 compares exactly and a pointer to the declared
+     * spelling names nothing in the document; the schema pointer takes {@code declared}.
      */
-    public JsonReadContext schemaField(String name, Optional<SourcePosition> fieldPosition) {
-        return new JsonReadContext(cursor, new PathStep(tail, name, -1),
-                schemaLocation == null ? null : schemaLocation.field(name, fieldPosition), pinnedPosition);
+    public JsonReadContext schemaField(String stated, String declared, Optional<SourcePosition> fieldPosition) {
+        return new JsonReadContext(cursor, new PathStep(tail, stated, -1),
+                schemaLocation == null ? null : schemaLocation.field(declared, fieldPosition), pinnedPosition);
     }
 
     /**

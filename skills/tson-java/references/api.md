@@ -528,10 +528,11 @@ public record TsonDocument(Optional<String> id, Optional<String> schema, TsonVal
 public record TsonSchema(String id, String meta, List<String> imports,
                          AnnotatedMap<String, TypeDefinition> entries, boolean bootstrap) {}
 
-public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums,
-                               Map<String, Normalization> enumForms) {
+public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
+                               Map<String, Normalization> enumForms, Map<String, TypeDefinition> nameTypes) {
     public String originOf(String entryName);       // which document declared it, transitively
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
+    public Optional<TypeDefinition> nameType(String entryName); // a record's name_type, where not field_name
 }
 
 public final class TsonSchemaRegistry implements TsonSchemaLoader {
@@ -555,8 +556,8 @@ public final class TsonBundledSchemas {
 shape; the CLI's `diagnostics.tn` imports it for its report's `policy` field. No document selects the policy it is
 judged under.
 
-`textEnums` and `enumForms` are what linking alone knows about the enums of the closure: which are text enums
-(string-class whatever their members spell), and the form each matches its members in.
+`enumForms` and `nameTypes` are what linking alone knows about the closure's names: the form each enum matches its
+members in, and the identifier type each record with a `name_type` of its own judges its field names by.
 
 `register` rejecting a duplicate identity, plus an unmodifiable `entries()`, **is** the "locked"
 guarantee. `CanonicalIdentity` (§2.2.1's algorithm) is `tson-base`'s, `io.ltr8.tson.base.CanonicalIdentity`:

@@ -70,7 +70,10 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private final Set<String> selfNames;
 
     private final List<Selector> selectors;
-    private final Set<String> selectorNames;
+
+    /** Each selector's name in the base's name form (§5.5), to the name as declared -- what the scan matches. */
+    private final Map<String, String> selectorNames;
+    private final io.ltr8.unicode.Normalization nameForm;
     private final Map<List<Object>, String> members;
     private final Map<String, Set<String>> deeper;
     private final TsonTypeReaderResolver readerFor;
@@ -92,7 +95,12 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.selfNames = Set.copyOf(selfNames);
         this.readerFor = readerFor;
         this.selectors = selectorFields.stream().map(field -> selectorOf(field, entries, context.linked())).toList();
-        this.selectorNames = new LinkedHashSet<>(selectors.stream().map(Selector::name).toList());
+        // The family's members compose the base, so they share its name type; a template base states none.
+        this.nameForm = selfNames.stream().map(context.linked()::nameForm)
+                .filter(form -> form != io.ltr8.unicode.Normalization.NFC).findFirst()
+                .orElse(io.ltr8.unicode.Normalization.NFC);
+        this.selectorNames = new LinkedHashMap<>();
+        selectors.forEach(selector -> selectorNames.put(nameForm.apply(selector.name()), selector.name()));
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
         for (String subtype : subtypes) {
@@ -209,8 +217,9 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             if (!(ctx.next() instanceof FieldName field)) {
                 return found;
             }
-            if (selectorNames.contains(field.name()) && ctx.peek() instanceof TokenEvent token) {
-                found.putIfAbsent(field.name(), token);
+            String selector = selectorNames.get(nameForm.apply(field.name()));
+            if (selector != null && ctx.peek() instanceof TokenEvent token) {
+                found.putIfAbsent(selector, token);
             }
             EventSkip.scopedValue(ctx);
         }

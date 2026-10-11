@@ -13,6 +13,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.compiler.lexer.Token;
@@ -133,6 +134,7 @@ public final class TsonDataStream implements TsonEventSource {
     private int lastEndLine;
     private int lastEndColumn;
     private int lastEndByteOffset;
+    private TokenType lastType;
 
     private final Deque<Frame> frames = new ArrayDeque<>();
     private final Deque<TsonEvent> ready = new ArrayDeque<>();
@@ -456,6 +458,7 @@ public final class TsonDataStream implements TsonEventSource {
         lastEndLine = t.endLine();
         lastEndColumn = t.endColumn();
         lastEndByteOffset = t.endByteOffset();
+        lastType = t.type();
         switch (t.type()) {
             case LBRACE, LBRACKET, LPAREN -> {
                 nesting++;
@@ -498,13 +501,38 @@ public final class TsonDataStream implements TsonEventSource {
 
     /** The failure {@link #expect} raises, for a throw site that decides on more than one token's type. */
     ParseException mismatch(String construct) {
-        return new ParseException("expected " + construct + ", found " + describe(peekToken()),
+        return new ParseException("expected " + construct + ", found " + describe(peekToken()) + underscored(),
                 construct, describe(peekToken()), peekToken().start());
     }
 
     /** A parse failure that states a rule rather than a substitution, so it carries no {@code expected}/{@code actual} pair. */
     ParseException parseError(String message) {
-        return new ParseException(message, peekToken().start());
+        return new ParseException(message + underscored(), peekToken().start());
+    }
+
+    /**
+     * What an author who wrote {@code _id} meant, where the failure is at either half of it: §7.1 makes the
+     * token-initial {@code _} the void sentinel, so {@code _id} lexes as {@code _} then {@code id} with no
+     * separator between them (§2.4), and the error at either token names neither. Empty for any other failure.
+     */
+    private String underscored() {
+        Token at = peekToken();
+        String name = null;
+        if (at.type() == TokenType.UNQUOTED && lastType == TokenType.VOID
+                && lastEndByteOffset == at.startByteOffset()) {
+            name = "_" + at.text();
+        } else if (at.type() == TokenType.VOID) {
+            try {
+                Token next = peekSecond();
+                if (next.type() == TokenType.UNQUOTED && next.startByteOffset() == at.endByteOffset()) {
+                    name = "_" + next.text();
+                }
+            } catch (LexException unreadable) {
+                // The next token is itself an error; this one's message stands without the hint.
+            }
+        }
+        return name == null ? "" : " -- '" + name + "' cannot be written unquoted, since a token-initial '_' is the "
+                + "void sentinel (§2.9); quote it, \"" + name + "\", where a quoted token is admitted";
     }
 
     /**
@@ -712,43 +740,19 @@ public final class TsonDataStream implements TsonEventSource {
      * the multi-line form is not a name. Shared with [TSON-SCHEMA]'s identical production (§12.1).
      * {@code construct} names the position in the author's voice, exactly as {@link #expect}'s does.
      *
-     * <p>The two spellings are two spellings of one name: {@link #requireFieldName} matches the decoded text
-     * against the identifier profile whichever was written, so quoting carries a name that would otherwise
-     * resolve as a number and never a key that is not a name at all.
+     * <p>The grammar admits any single-line token here: what a field name may be is its record's to say
+     * (SPEC-FEEDBACK.md #10), so the identifier match is not this production's. A schemaless record's field
+     * names are identifiers, and the read context judges each one as it is delivered.
      */
     Token expectFieldNameToken(String construct) {
         Token name = peekToken();
         if (!isFieldNameTokenType(name.type())) {
             throw mismatch(construct);
         }
-        requireFieldName(name);
         advance();
         return name;
     }
 
-    /**
-     * A field name is an identifier, at every layer (§2.5, §7.7). A record's fields are the named members of a
-     * shape, which is what makes them declarable; a key that is not a name is what a <b>map</b> is for, and the
-     * diagnostic says so, that being the one place this rule meets an author.
-     *
-     * <p>Matching runs on the <em>decoded</em> text, so it reaches both spellings the production admits -- the
-     * quoted form is not an escape hatch from the profile, only from the lexical accidents of the unquoted one.
-     *
-     * <p><b>Normalised before it is matched, which is the one thing the profile does not decide here.</b>
-     * {@code IdentifierProfile} requires NFC as a <em>form</em> and would refuse a decomposed name outright, but
-     * §2.5 gives a field name its identity by NFC-normalised comparison -- a decomposed spelling is the same
-     * name, not a different one, and the corpus says so by making the pair a duplicate-field error. The lexer
-     * already normalises the unquoted spelling, so refusing the form here would make the quoted spelling the
-     * stricter of the two, which is the asymmetry this rule exists to remove.
-     */
-    private void requireFieldName(Token name) {
-        Optional<String> violation = IdentifierGrammar.validate(Nfc.of(name.text()));
-        if (violation.isPresent()) {
-            throw new ParseException("invalid field name -- " + violation.get()
-                    + ". A record's fields are names a schema can declare; a key that is not a name belongs in "
-                    + "a map, written '{ key => value }'", name.start());
-        }
-    }
 
     // ── The explicit frame stack replacing recursion ────────────────────────────────────
 
@@ -885,7 +889,6 @@ public final class TsonDataStream implements TsonEventSource {
                     if (!isFieldNameTokenType(t1.type())) {
                         throw mismatch("a record field name");
                     }
-                    requireFieldName(t1);
                     advance(); // field-name token
                     advance(); // ':'
                     ready.add(new RecordStart(lbrace.start()));

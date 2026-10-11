@@ -45,7 +45,8 @@ class JsonAtomReadTest {
               day        => date
               blob       => bytes
               colour     => !enum [ RED GREEN BLUE ]
-              activity   => !text_enum ["sedentary" "lightly active"]
+              words      => !identifier_type { continue_add: "-"  medial: " " }
+              activity   => !enum_type { name_type: words  members: [sedentary "lightly active"] }
               country    => !text ^ { length: 2  members: ["AU" "NZ"] }
               flag       => boolean
               nothing    => void
@@ -221,12 +222,12 @@ class JsonAtomReadTest {
     }
 
     /**
-     * A value-set enum needs nothing from this encoding: its members are text either way, and a JSON string
-     * is matched against them by content exactly as a TSON token is (§5.1). The profile governs what may be
-     * <em>declared</em>, which is a schema-load question this encoding never sees.
+     * An enum over an author's own identifier type needs nothing from this encoding: its members are held as text,
+     * and a JSON string is matched against them by content exactly as a TSON token is (§5.1). The profile governs
+     * what may be <em>declared</em>, which is a schema-load question this encoding never sees.
      */
     @Test
-    void aValueSetEnumReadsAMemberNoIdentifierRuleWouldAdmit() {
+    void anEnumOverItsOwnIdentifierTypeReadsAMemberTheKernelsWouldNotAdmit() {
         assertEquals("lightly active", read("activity", "\"lightly active\"").accepted());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
                 read("activity", "\"very active\"").refusal().code());

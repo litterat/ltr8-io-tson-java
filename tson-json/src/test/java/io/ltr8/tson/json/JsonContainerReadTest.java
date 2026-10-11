@@ -63,7 +63,7 @@ class JsonContainerReadTest {
               maybe_pair => [text?, int32]
               nested     => { who: person  labels: [text] }
 
-              answer     => !text_enum ["true" "false"]
+              answer     => !text_type { members: ["true" "false"] }
               survey     => { reply?: answer ~ "true"  agreed?: boolean ~ true }
             }
             """;

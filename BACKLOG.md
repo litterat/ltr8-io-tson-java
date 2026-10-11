@@ -76,6 +76,28 @@ it — and no schema declares one, so nothing in this stack reads a schema-side 
 written. A record is closed under its type and open-ended data is a declared map-typed field, identically in both
 encodings ([TSON-JSON] §6.1.1).
 
+- [ ] **A key-sorted JSON document with a `$`-named field loses its tag — [TSON-JSON] §3.3.** §3.3 requires `$type`
+  (after any `$schema`) to lead its object and argues that code-point sorting preserves that; with `record.name_type`
+  admitting `$ref`, `$id` and `$defs` as field names, those sort first, so RFC 8785 canonical output of a tagged
+  value — `{"$ref": "#/a", "$type": "sub", …}` — is refused as a misplaced `$type`. The leading-`$type` rule itself
+  is expected to be relaxed, so settle that first, then decide what the reader admits: the annotation members
+  anywhere within the object's leading run of `$`-named members (a run bounded by the record's declared `$` fields,
+  so the lookahead stays fixed by the schema), or the sorting claim withdrawn.
+
+- [ ] **A record declaring `$schema`, `$type` or `$value` encodes to JSON that reads back as something else.**
+  [TSON-JSON] §3.2 says a schema SHOULD NOT declare one of the three, and a record that does obscures it on read
+  (`JsonFieldNameTypeTest.aRecordDeclaringATagMemberObscuresIt`); written, its value is a JSON object whose leading
+  `$type` member is taken as a tag, which principle 5 ("never a silent drop") and the Class 3 equivalence rule do not
+  allow. For review: make it a JSON encode error while the schema stays legal (a TSON-only schema may want the
+  field), or refuse the schema outright, and make §3.2 a MUST either way.
+
+- [ ] **How an enum whose members can begin with a digit encodes in JSON — [TSON-JSON] §5.2.** A name type may admit
+  a leading digit, which makes an enum over it number-class (`ports => !enum_type { name_type: digits  members: ["80"
+  "443"] }`; `(ports | integer)` with `@disjoint` is refused), and §5.2's headline (number-class encodes as a JSON
+  number) contradicts its next sentence (a member beyond the identifier grammar encodes as a string); an enum whose
+  members span classes is not covered. Candidate rule: an enum always encodes as a JSON string, its members being
+  names, while its class stays its members' for TSON's disjointness.
+
 - [ ] **A JSON document has no in-band way to name its schema — §3.4's second route.** The out-of-band route
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
   and it is the one the spec calls the expected production route. What is left is the in-band one: a root value
@@ -121,7 +143,7 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
     `EntryDisplayName.of` and `locationOf` — `DispatchFactories` and `RecordPlan` both build the display name for
     one OPEN record with subtypes today.
   - **Shared rules as helpers.** The refusal pattern (report, `EventSkip`, return nothing), still written
-    out in each loop and dispatcher; the "reserved members but no `$type`" message written twice
+    out in each loop and dispatcher; the "annotation members but no `$type`" message written twice
     (`RecordPlan.admitsTag`, `DispatchChoiceReader`); the absence spelling `"null"` declared once per family
     (`RecordPlan`, `ArrayReader`, `TupleReader`, `MapEntries`); and failure detected by `ctx.reported() > before`
     (`TreeAtomReader`, `TreeAtomKeyedReader`, `RecordReader.verifyFixed`, `MapPairsReader`) taken from what the
@@ -163,6 +185,11 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   — and §6's directive half, the place TSON text and JSON deliberately differ, is exactly what a single-encoding
   corpus cannot express. Needs the upstream decision on whether that is a layer, a further conformance class, or a
   per-vector encoding axis, before any vectors are owed; `RUNNER.md` is normative for whichever shape it takes.
+  There are no Part 3 vectors at all yet, so the first set is owed as soon as the shape is settled, starting with
+  what `record.name_type` decided for JSON and Java tests alone pin today (`JsonFieldNameTypeTest`,
+  `JsonTaggedValueReadTest`): `$ref`/`$id` read as declared fields; a declared `$type` obscured by the annotation
+  member; an undeclared `$foo` as a validation error; a member outside its record's name type unknown, not refused;
+  a member matched in a folding name type's form, its repeat a duplicate at its own spelling.
 
 ## Module structure
 
@@ -262,6 +289,13 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   only consumer-facing prose; `design/` is internal.
 
 ## Miscellaneous
+
+- [ ] **Whether a closed set of text binds to a host enum.** [TSON-SCHEMA] §7.4 lets an enum bind to "a host enum by a
+  mapping the binder owns". `text_enum` is gone from the kernel, and a closed set of text that is no name is now
+  `text_type`'s `members` facet (`!text ^ { members: [...] }`), an atom rather than an enum, so a schema that bound
+  such a set to a Java enum may have lost the mapping. Check what `ltr8-bind` does with a `text_type` carrying
+  `members` at an enum-typed component; if it refuses, decide whether the binder maps a member set as it maps an
+  enum's members, and pin the answer in a bind-mode test.
 
 - [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
   `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a

@@ -101,12 +101,13 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      * an alias naming it must never redirect its binding.
      *
      * <p><b>A tightened constructor binds as the one it tightens.</b> {@code set_type => array ^ { ... }} and
-     * {@code text_enum => enum_type ^ { type?: = text }} restate fields and add none (§5.7), so their instances
-     * have the shape of the source's, and a class for the source is a class for them. Without the fallback every
-     * such constructor -- a meta layer's {@code kebab_enum => enum_type ^ { type?: = kebab }} included -- would
-     * need a class of its own for a shape it does not change. It is tried last, so a class mapped under the
-     * tightening's own name still wins, and it is confined to constructors: an ordinary record refining another
-     * may be bound to a narrower class, and falling back to its parent's would lose that silently.
+     * {@code enum => enum_type ^ { name_type?: = identifier }} restate fields and add none (§5.7), so their
+     * instances have the shape of the source's, and a class for the source is a class for them. Without the
+     * fallback every such constructor -- a meta layer's {@code kebab_enum => enum_type ^ { name_type?: = kebab }}
+     * included -- would need a class of its own for a shape it does not change. It is tried last, so a class
+     * mapped under the tightening's own name still wins, and it is confined to constructors: an ordinary record
+     * refining another may be bound to a narrower class, and falling back to its parent's would lose that
+     * silently.
      */
     public List<String> bindingNamesFor(String name, TypeDefinition definition) {
         List<String> written = definition.position().isPresent()

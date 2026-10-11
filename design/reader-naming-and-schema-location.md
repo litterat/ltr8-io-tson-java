@@ -14,7 +14,9 @@ in git.
 - Both pointers are rendered from the `PathStep` chain only when a diagnostic is built; concatenating per step is
   quadratic in depth.
 - The pointer is the path taken (`/point/y`), not the leaf reached (`/int32` in core.tn).
-- `schemaField` steps data and schema together; `field`/`index` step the data alone.
+- `schemaField` steps data and schema together; `field`/`index` step the data alone. It takes two names — the
+  field as the document wrote it for the data path, as declared for the schema pointer — which differ under a
+  case-folding name type, where only the written one is an RFC 6901 pointer into the document.
 - `schemaId` and `schemaPosition` are always the same declaration's; `ValueReaderContext.locationOf` is the single
   construction site.
 - A position table is identity-keyed, so every phase that rebuilds a node has to carry it over; `schemaField` takes the
@@ -122,10 +124,11 @@ RFC 6901 pointer into it. The constraint is not lost with the leaf: `message` st
 
 **Two descent rules produce it**, both on `TsonReadContext`:
 
-- `schemaField(name)` steps the data path *and* the schema pointer — the one descent the schema has its own
-  name for. `field(name)`/`index(i)` step the data alone: the schema says one thing about every entry of a
-  map, so `/person/tags` is the schema location of every `/tags/<key>`, and an *unrecognized* field names
-  nothing in the schema at all, so extending the pointer with it would invent a location that does not exist.
+- `schemaField(stated, declared)` steps the data path *and* the schema pointer — the one descent the schema has
+  its own name for, each by its own spelling. `field(name)`/`index(i)` step the data alone: the schema says one
+  thing about every entry of a map, so `/person/tags` is the schema location of every `/tags/<key>`, and an
+  *unrecognized* field names nothing in the schema at all, so extending the pointer with it would invent a
+  location that does not exist.
 - `inRecord(declaration)` / `underDeclaration(declaration)` decide the anchor. A **record** re-anchors
   `schemaId`/`schemaPosition` on itself, because it declares the field the pointer now ends with — and seeds
   the pointer with its own name only if nothing has yet, which is what makes the outermost record the path's
