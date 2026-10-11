@@ -299,6 +299,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     final boolean[] readFields(TsonReadContext ctx, FieldSink sink) {
         boolean[] seen = new boolean[fields.size()];
+        // Under a folding name type a repeat may be another spelling, so its report names the first statement and
+        // where it stands; under NFC the spellings are one and nothing is kept, so an ordinary read allocates none.
+        FieldName[] firstGiven = matchIndex == fieldIndex ? null : new FieldName[fields.size()];
         while (!(ctx.peek() instanceof RecordEnd)) {
             // A name [TSON-DATA] §8.2 refused was never read, so nothing here can hold a verdict about it:
             // reporting it unrecognised would be claiming to have looked it up, which this processor
@@ -330,8 +333,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             // the two differ, and only the written one is a pointer into the document (schemaField).
             RecordField declared = fields.get(schemaIndex).schema();
             if (seen[schemaIndex]) {
-                ctx.schemaField(fieldName.name(), declared.name(), declared.position())
-                        .report(rules.duplicateField(fieldName.name(), declared.name()));
+                FieldName first = firstGiven == null ? null : firstGiven[schemaIndex];
+                ctx.schemaField(fieldName.name(), declared.name(), declared.position()).report(first == null
+                        ? rules.duplicateField(fieldName.name())
+                        : rules.duplicateField(fieldName.name(), declared.name(), first.name(), first.position()));
+            } else if (firstGiven != null) {
+                firstGiven[schemaIndex] = fieldName;
             }
             if (fixedCheck[schemaIndex] != null) {
                 // A FIXED field's value comes from the schema, never the data -- but the data may still

@@ -1,6 +1,7 @@
 package io.ltr8.tson.base.diagnostics;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.SourcePosition;
 
 /**
  * What a record's rules say when a document breaks one -- stated once, for every encoding.
@@ -54,17 +55,24 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
                         .formatted(field, typeName, nameType, reason, declaredFields), declaredFields, field);
     }
 
-    /**
-     * [TSON-DATA] §2.5: a record states each field at most once, and the repeat states a value for nothing.
-     * {@code stated} is the repeat as written and {@code declared} the field it is; they differ where the
-     * record's name type folds case, and the message then names the field both spellings are.
-     */
-    public Refusal duplicateField(String stated, String declared) {
-        String which = stated.equals(declared) ? ""
-                : ", which is the field '%s' as an earlier spelling was".formatted(declared);
+    /** [TSON-DATA] §2.5: a record states each field at most once, and the repeat states a value for nothing. */
+    public Refusal duplicateField(String field) {
         return new Refusal(Diagnostic.Code.DUPLICATE_FIELD,
-                "duplicate field '%s' on '%s'%s -- a record states each field at most once (§2.5), and the repeat "
-                        .formatted(stated, typeName, which) + "states a value for nothing",
+                "duplicate field '%s' on '%s' -- a record states each field at most once (§2.5), and the repeat "
+                        .formatted(field, typeName) + "states a value for nothing",
+                "each field stated once", "'" + field + "' stated again");
+    }
+
+    /**
+     * {@link #duplicateField(String)} under a name type that folds case, where the repeat {@code stated} and the
+     * first statement {@code first} may be two spellings of the field {@code declared}: the message names the
+     * field and where it was first given, so a repair finds the other spelling without searching for it.
+     */
+    public Refusal duplicateField(String stated, String declared, String first, SourcePosition firstAt) {
+        return new Refusal(Diagnostic.Code.DUPLICATE_FIELD,
+                ("duplicate field '%s' on '%s' -- the field '%s' is already given, as '%s' at %d:%d, and a record "
+                        + "states each field at most once (§2.5)")
+                        .formatted(stated, typeName, declared, first, firstAt.line(), firstAt.column()),
                 "each field stated once", "'" + stated + "' stated again");
     }
 

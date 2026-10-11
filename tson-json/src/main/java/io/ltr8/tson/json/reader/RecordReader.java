@@ -72,6 +72,8 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         }
         int reportedBefore = ctx.reported();
         Object[] slots = new Object[plan.names.length];
+        // Kept only where a repeat may be another spelling, so an ordinary read allocates none (RecordPlan.duplicate).
+        JsonEvent.MemberName[] firstGiven = plan.folds() ? new JsonEvent.MemberName[slots.length] : null;
         boolean tagged = false;
         for (int position = 0; ; position++) {
             JsonEvent event = ctx.next();
@@ -108,7 +110,9 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
                 continue;
             }
             if (slots[at] != null) {
-                plan.duplicate(ctx, at, memberName);
+                plan.duplicate(ctx, at, memberName, firstGiven == null ? null : firstGiven[at]);
+            } else if (firstGiven != null) {
+                firstGiven[at] = member;
             }
             slots[at] = readField(ctx, at, memberName);
         }

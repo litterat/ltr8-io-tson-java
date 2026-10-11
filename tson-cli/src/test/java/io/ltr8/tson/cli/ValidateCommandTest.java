@@ -208,21 +208,38 @@ class ValidateCommandTest {
     }
 
     /**
-     * A schema file that does not load is the invocation's problem however the data binds it: named by a
-     * document's own !!schema, as by --schema, the run is UNDETERMINED and exits 2 before any document is read
-     * against it, rather than reporting the schema's error as that document's rejection.
+     * A schema file that does not load leaves a document naming it unjudged, not rejected: the document is never
+     * read against it, so its report is UNDETERMINED, carrying the schema's diagnostics, and the run exits 2.
      */
     @Test
-    void aSchemaFileThatDoesNotLoadIsUndeterminedNotARejection(@TempDir Path dir) throws IOException {
+    void aSchemaFileThatDoesNotLoadLeavesItsDocumentsUndetermined(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA.replace("b: int32", "b: nonesuch"));
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->
                 assertEquals(2, ValidateCommand.run(inputs(schema, data), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
 
-        assertTrue(output.contains("\"outcome\":\"UNDETERMINED\""), output);
-        assertTrue(output.contains("\"files\":[]"), output);
+        assertTrue(output.startsWith("{\"outcome\":\"UNDETERMINED\""), output);
+        assertTrue(output.contains("\"file\":\"" + data + "\",\"outcome\":\"UNDETERMINED\""), output);
         assertTrue(output.contains("SCHEMA_ERROR") && output.contains("nonesuch"), output);
+        assertTrue(!output.contains("REJECTED"), output);
+    }
+
+    /** One broken schema in a batch costs only the documents that name it: every other document is still judged. */
+    @Test
+    void aBrokenSchemaDoesNotStopTheDocumentsOfAnotherSchema(@TempDir Path dir) throws IOException {
+        Path broken = writeFile(dir, "broken.tn", RECORD_SCHEMA.replace("cli-validate", "cli-broken")
+                .replace("b: int32", "b: nonesuch"));
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
+        Path unjudged = writeFile(dir, "unjudged.tson", selfDescribing("{ a: 1  b: 2 }")
+                .replace("cli-validate", "cli-broken"));
+        Path judged = writeFile(dir, "judged.tson", selfDescribing("{ a: 1  b: 2 }"));
+
+        String output = captureStdout(() -> assertEquals(2, ValidateCommand.run(
+                inputs(broken, schema, unjudged, judged), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
+
+        assertTrue(output.contains("\"file\":\"" + unjudged + "\",\"outcome\":\"UNDETERMINED\""), output);
+        assertTrue(output.contains("\"file\":\"" + judged + "\",\"outcome\":\"ACCEPTED\""), output);
     }
 
     // --- infra ---

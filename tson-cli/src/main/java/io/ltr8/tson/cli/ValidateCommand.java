@@ -23,8 +23,10 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * {@code tson validate [--output text|json|tson] <file|->...} -- validates data documents.
@@ -57,8 +59,9 @@ final class ValidateCommand {
     /**
      * @param binding the schema and root type every JSON input is read against ([TSON-JSON] §3.4), or null
      *                when the run holds no JSON
-     * @return exit code: 0 every data file valid, 1 at least one invalid, 2 a usage/classification failure,
-     *         69 a document whose schema no file here declares, 70 a document that could not be checked at
+     * @return exit code: 0 every data file valid, 1 at least one invalid, 2 a usage/classification failure or
+     *         a schema file that does not load (ranked below 70 and 78 only), 69 a document whose schema no file
+     *         here declares, 70 a document that could not be checked at
      *         all because a construct in its schema is a gap in this library ({@link TsonCli#exitCodeFor})
      */
     static int run(List<ValidateInput> inputs, OutputFormat format, PolicyOptions policies,
@@ -161,20 +164,19 @@ final class ValidateCommand {
             return 2;
         }
 
-        // Every schema file on the command line loads before any document is read, as a --schema file does:
-        // one that does not load is the invocation's problem, and a document naming it is never read against it,
-        // so reporting the failure in that document's report would claim a check that never happened. A run
-        // that binds its schema either way gets one outcome.
+        // Every schema file on the command line loads before any document is read, so a schema that does not
+        // load is known to be the schema's problem, not any document's: a document naming it is never read
+        // against it, and is UNDETERMINED with the schema's diagnostics rather than REJECTED for a check never
+        // made. Every other document is still judged, so one broken schema in a batch costs only the documents
+        // that need it. (A --schema that does not load binds every JSON input, so bind() fails the run.)
+        Set<String> broken = new HashSet<>();
         for (String id : declaredIds) {
             String identity = CanonicalIdentity.canonicalize(id);
             if (tson.schemaRegistry().getByCanonicalIdentity(identity).isPresent()) {
                 continue;   // loaded already, as an import of one before it
             }
-            List<Diagnostic> problems = tson.validateSchema(schemas.get(identity));
-            if (!problems.isEmpty()) {
-                System.out.println(format.render(ValidationRun.failed(policy,
-                        problems.stream().map(CliDiagnostic::from).toList())));
-                return 2;
+            if (!tson.validateSchema(schemas.get(identity)).isEmpty()) {
+                broken.add(identity);
             }
         }
 
@@ -208,13 +210,24 @@ final class ValidateCommand {
                 errors = List.of(CliDiagnostic.minimal(Diagnostic.Code.VALIDATION_ERROR,
                         cannotRead(dataInput, e)));
             }
-            reports.add(FileReport.of(dataInput.name(), errors));
+            reports.add(unjudgedBy(broken, errors) ? new FileReport(dataInput.name(), Outcome.UNDETERMINED, errors)
+                    : FileReport.of(dataInput.name(), errors));
         }
 
         ValidationRun run = ValidationRun.of(policy, reports);
         System.out.println(format.render(run));
-        return run.outcome() == Outcome.ACCEPTED ? 0 : TsonCli.exitCodeFor(reports.stream()
+        if (run.outcome() == Outcome.ACCEPTED) {
+            return 0;
+        }
+        int exit = TsonCli.exitCodeFor(reports.stream().filter(report -> !unjudgedBy(broken, report.errors()))
                 .flatMap(report -> report.errors().stream()).map(CliDiagnostic::code).toList());
+        if (reports.stream().anyMatch(report -> unjudgedBy(broken, report.errors())) && exit != 70 && exit != 78) {
+            System.err.println("note: some documents were not checked -- a schema file they name does not load"
+                    + " (see the SCHEMA_ERROR entries above). Nothing is known about those documents; fix the"
+                    + " schema and rerun.");
+            return 2;
+        }
+        return exit;
     }
 
     /**
@@ -240,6 +253,15 @@ final class ValidateCommand {
     private static boolean isJson(ValidateInput input, JsonBinding binding) {
         return binding != null
                 && (JsonBinding.isJsonFile(input.name()) || input instanceof ValidateInput.OfStdin);
+    }
+
+    /**
+     * Whether {@code errors} are a schema's that did not load and nothing of the document's own: the document
+     * was skipped unread, so it is unjudged. A syntax error beside them is the document's, and still rejects it.
+     */
+    private static boolean unjudgedBy(Set<String> broken, List<CliDiagnostic> errors) {
+        return !broken.isEmpty() && !errors.isEmpty() && errors.stream().allMatch(error ->
+                error.code() == Diagnostic.Code.SCHEMA_ERROR && error.schemaId().filter(broken::contains).isPresent());
     }
 
     /**

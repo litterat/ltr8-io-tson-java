@@ -151,9 +151,19 @@ final class RecordPlan {
         return field(ctx, at, fields[at].name());
     }
 
-    /** §3.1: a repeated member name is an error at the repeated occurrence; the later value still wins. */
-    void duplicate(JsonReadContext ctx, int at, String memberName) {
-        field(ctx, at, memberName).report(rules.duplicateField(memberName, fields[at].name()));
+    /**
+     * §3.1: a repeated member name is an error at the repeated occurrence; the later value still wins. Under a
+     * folding name type {@code first} is the member that first gave the field, which the report names with its
+     * position, a repeat there possibly being another spelling; {@code null} under NFC, where the two are one.
+     */
+    void duplicate(JsonReadContext ctx, int at, String memberName, JsonEvent.MemberName first) {
+        field(ctx, at, memberName).report(first == null ? rules.duplicateField(memberName)
+                : rules.duplicateField(memberName, fields[at].name(), Nfc.of(first.name()), first.position()));
+    }
+
+    /** Whether this record's name type folds, so a repeat may be another spelling ({@link #duplicate}). */
+    boolean folds() {
+        return nameForm != Normalization.NFC;
     }
 
     /**

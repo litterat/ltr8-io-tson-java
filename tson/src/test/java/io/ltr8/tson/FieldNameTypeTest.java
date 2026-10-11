@@ -345,7 +345,8 @@ class FieldNameTypeTest {
 
     /**
      * Under a folding name type a document's name and its field are spelled two ways, and each pointer takes its
-     * own: the data path the name as written, the schema pointer the declaration; a repeat names the field.
+     * own: the data path the name as written, the schema pointer the declaration; a repeat names the field and
+     * where it was first given, as whatever spelling it was given in.
      */
     @Test
     void aFoldedNamesPathIsTheNameAsWritten() {
@@ -356,9 +357,10 @@ class FieldNameTypeTest {
         Diagnostic wrong = only(read(folded, "folded-path", "!row { COUNT: x }"));
         assertEquals("/COUNT", wrong.path().orElseThrow());
         assertEquals("/row/count", wrong.schemaPointer().orElseThrow());
-        Diagnostic repeated = only(read(folded, "folded-path", "!row { count: 1  Count: 2 }"));
+        Diagnostic repeated = only(read(folded, "folded-path", "!row { COUNT: 1  Count: 2 }"));
         assertEquals("/Count", repeated.path().orElseThrow());
-        assertTrue(repeated.message().contains("which is the field 'count'"), repeated.message());
+        assertTrue(repeated.message().contains("the field 'count' is already given, as 'COUNT' at 2:8"),
+                repeated.message());
     }
 
     /** A family's selector is found in its base's name form too, so a member is chosen however its name is cased. */
