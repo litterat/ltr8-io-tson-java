@@ -682,7 +682,7 @@ final class DefinitionResolver {
         // it. Parameters empty and IS-A `top` therefore imply a record body.
         Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
         if (body instanceof RecordBody record && !record.supertypes().isEmpty()) {
-            body = withSupertypesNameType(name, record, statesMember(instance.value(), WireForm.NAME_TYPE));
+            body = withSupertypesNameType(name, record);
         }
         if (body instanceof io.ltr8.tson.schema.meta.Reference reference) {
             // `!reference { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
@@ -702,43 +702,74 @@ final class DefinitionResolver {
      * absorbs or restates its supertypes' names, which no other type judges; so the rule is the constructor's,
      * and the explicit {@code !record { supertypes: [...] }} is held to it exactly as {@code &} is.
      */
-    private RecordBody withSupertypesNameType(String name, RecordBody record, boolean stated) {
-        String inherited = null;
-        String from = null;
+    private RecordBody withSupertypesNameType(String name, RecordBody record) {
+        Optional<String> inherited = Optional.empty();
+        String from = null;   // the first record supertype, whose name type the rest must share
         for (io.ltr8.tson.schema.meta.TypeRef supertype : record.supertypes()) {
             TypeDefinition definition = namespaceDefinitions.getTypeDefinition(
                     ReferenceChain.terminal(supertype.name(), namespaceDefinitions::getTypeDefinition));
             if (definition == null || !(definition.body() instanceof RecordBody supertypeBody)) {
                 continue;   // not a record: refused on its own terms
             }
-            if (inherited == null) {
+            if (from == null) {
                 inherited = supertypeBody.nameType();
                 from = supertype.name();
-            } else if (!inherited.equals(supertypeBody.nameType())) {
-                throw new SchemaValidationException("'" + name + "': supertypes '" + from + "' and '"
-                        + supertype.name() + "' have different name types, '" + inherited + "' and '"
-                        + supertypeBody.nameType() + "' -- a record's name type is set where it is declared, the "
-                        + "default included, and a subtype cannot change it; declare both over one name type");
+            } else {
+                requireOneNameType(name, from, inherited, supertype.name(), supertypeBody.nameType());
             }
         }
-        if (inherited == null || inherited.equals(record.nameType())) {
+        if (from == null || record.nameType().isPresent() && sameNameType(inherited, record.nameType())) {
             return record;
         }
-        if (stated) {
-            throw new SchemaValidationException("'" + name + "': its name_type '" + record.nameType()
-                    + "' is not its supertypes' '" + inherited + "' (from '" + from + "') -- a record's name type "
-                    + "is set where it is declared, the default included, and a subtype cannot change it; omit "
-                    + "name_type to take the supertypes'");
+        if (record.nameType().isPresent()) {
+            throw new SchemaValidationException("'" + name + "': its name_type '" + record.nameTypeName()
+                    + "' is not its supertypes' '" + inherited.orElse(RecordBody.FIELD_NAME) + "' (from '" + from
+                    + "') -- a record's name type is set where it is declared, the default included, and a "
+                    + "subtype cannot change it; omit name_type to take the supertypes'");
         }
         return new RecordBody(record.supertypes(), record.fields(), record.groups(), record.extension(),
                 record.discriminators(), inherited);
     }
 
-    /** Whether {@code value}, a constructor application's payload, states {@code member} by name. */
-    private static boolean statesMember(DataValue value, String member) {
-        return value.coreValue() instanceof RecordValue record
-                && record.fields().stream().anyMatch(field -> field.name().equals(member));
+    /** §5.8's one name type over a subtype's supertypes: {@code a} from {@code aFrom} and {@code b} from {@code bFrom}. */
+    private void requireOneNameType(String name, String aFrom, Optional<String> a, String bFrom, Optional<String> b) {
+        if (!sameNameType(a, b)) {
+            throw new SchemaValidationException("'" + name + "': supertypes '" + aFrom + "' and '" + bFrom
+                    + "' have different name types, '" + a.orElse(RecordBody.FIELD_NAME) + "' and '"
+                    + b.orElse(RecordBody.FIELD_NAME) + "' -- a record's name type is set where it is declared, "
+                    + "the default included, and a subtype cannot change it; declare both over one name type");
+        }
     }
+
+    /**
+     * Whether two records' name types are one type: the same entry at the end of each one's reference chain, not
+     * the same spelling, so {@code jn => json_name} is {@code json_name} and the kernel's {@code field_name} is
+     * {@code identifier}. Each resolves where {@link NameType} resolves it -- one the record states in the schema's
+     * own namespace first, the absent default in the structure -- and two that resolve to nothing are compared as
+     * written, the linker refusing each on its own.
+     */
+    private boolean sameNameType(Optional<String> a, Optional<String> b) {
+        String ka = nameTypeIdentity(a);
+        String kb = nameTypeIdentity(b);
+        return ka != null && kb != null ? ka.equals(kb) : a.equals(b);
+    }
+
+    /** {@code nameType}'s terminal entry, qualified by the namespace it is in, or {@code null} where it is in none. */
+    private String nameTypeIdentity(Optional<String> nameType) {
+        String written = nameType.orElse(RecordBody.FIELD_NAME);
+        if (nameType.isPresent() && namespaceDefinitions.getTypeDefinition(written) != null) {
+            String terminal = ReferenceChain.terminal(written, namespaceDefinitions::getTypeDefinition);
+            if (namespaceDefinitions.getTypeDefinition(terminal) != null) {
+                return "schema:" + terminal;
+            }
+            written = terminal;   // an alias of a structure entry, which the walk below continues
+        }
+        if (metaDefinitions.getTypeDefinition(written) == null) {
+            return null;
+        }
+        return "structure:" + ReferenceChain.terminal(written, metaDefinitions::getTypeDefinition);
+    }
+
 
     /**
      * {@code <T, N> !array { element_type: T  min_items: N }} -- the open counterpart of {@link
@@ -1241,8 +1272,8 @@ final class DefinitionResolver {
         // SPEC-FEEDBACK.md #10: a record's name type is set where it is declared, the kernel's default included,
         // and a composition takes its supertypes' one type: supertypes that disagree compose names of two types,
         // and choosing either would re-judge the other's names by a type they were never declared under.
-        String nameType = null;
-        String nameTypeFrom = null;
+        Optional<String> nameType = Optional.empty();
+        String nameTypeFrom = null;   // the first record supertype, whose name type the rest must share
         List<String> transitiveSupertypes = new ArrayList<>();
         Set<String> seenTransitive = new HashSet<>();
         List<RecordField> fields = new ArrayList<>();
@@ -1365,15 +1396,11 @@ final class DefinitionResolver {
             }
 
             absorb(name, supertypeBody, fields, groups, seenFieldNames, inheritedFieldIndex);
-            String stated = supertypeBody.nameType();
-            if (nameType == null) {
-                nameType = stated;
+            if (nameTypeFrom == null) {
+                nameType = supertypeBody.nameType();
                 nameTypeFrom = supertypeName;
-            } else if (!nameType.equals(stated)) {
-                throw new SchemaValidationException("'" + name + "': supertypes '" + nameTypeFrom + "' and '"
-                        + supertypeName + "' have different name types, '" + nameType + "' and '" + stated
-                        + "' -- a record's name type is set where it is declared, the default included, and a "
-                        + "composition cannot change it; declare both over one name type");
+            } else {
+                requireOneNameType(name, nameTypeFrom, nameType, supertypeName, supertypeBody.nameType());
             }
         }
 
@@ -1389,7 +1416,7 @@ final class DefinitionResolver {
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(directSupertypes, fields, groups, RecordExtensionType.OPEN,
                 construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()),
-                nameType == null ? RecordBody.FIELD_NAME : nameType);
+                nameType);
         // §5.9: subtraction breaks IS-A. The contract index (type_definition.supertypes) is emptied while the
         // body keeps `directSupertypes` as authorial lineage (record.supertypes) -- the distinction §7.2's
         // subsumption rule reads, so a subtracted type does not stand where its source is expected. `kind` is
@@ -1861,7 +1888,7 @@ final class DefinitionResolver {
             resolveEntry(null, entry, fields, groups, seenFieldNames, Map.of(), parameters);
         }
         return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN, markedNames(entries),
-                RecordBody.FIELD_NAME);
+                Optional.empty());
     }
 
     /**

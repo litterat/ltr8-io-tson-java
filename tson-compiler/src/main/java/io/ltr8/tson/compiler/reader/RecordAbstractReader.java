@@ -276,11 +276,11 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     static TsonReadContext.FieldNameRule fieldNameRule(String name, RecordBody body, ValueReaderContext context) {
         return context.linked().nameType(name).map(type -> {
             if (!(type.body() instanceof IdentifierType identifiers)) {
-                throw new IllegalStateException("'" + name + "': name_type '" + body.nameType() + "' reached a "
+                throw new IllegalStateException("'" + name + "': name_type '" + body.nameTypeName() + "' reached a "
                         + "reader as no identifier family; the linker admits only one");
             }
-            return new TsonReadContext.FieldNameRule(body.nameType(), AtomParsers.forType(identifiers)
-                    .orElseThrow(() -> new IllegalStateException("'" + name + "': name_type '" + body.nameType()
+            return new TsonReadContext.FieldNameRule(body.nameTypeName(), AtomParsers.forType(identifiers)
+                    .orElseThrow(() -> new IllegalStateException("'" + name + "': name_type '" + body.nameTypeName()
                             + "' has no reader of its own")), identifiers.profile(), context.linked().nameForm(name));
         }).orElse(TsonReadContext.FieldNameRule.FIELD_NAME);
     }
@@ -326,7 +326,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     ctx.field(stated).report(notAName.isEmpty() ? rules.unrecognizedField(stated)
                             : rules.unrecognizedField(stated, fieldNames.typeName(), notAName.get()));
                 }
-                EventSkip.scopedValue(ctx);
+                TsonReadContext.skipUnjudged(ctx);
                 continue;
             }
             // The data path spells the name as written, the schema pointer as declared: under a folding name type

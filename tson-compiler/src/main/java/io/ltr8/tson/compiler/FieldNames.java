@@ -39,7 +39,7 @@ final class FieldNames {
     static Optional<TypeDefinition> readBy(TypeDefinition record, Map<String, TypeDefinition> merged,
                                            Function<String, TypeDefinition> structure) {
         if (record == null || !(record.body() instanceof RecordBody body)
-                || body.nameType().equals(RecordBody.FIELD_NAME)) {
+                || body.nameType().isEmpty()) {
             return Optional.empty();
         }
         return NameType.of(record, merged::get, structure).map(NameType.Resolved::definition);
@@ -62,7 +62,7 @@ final class FieldNames {
                                                         Map<String, TypeDefinition> merged,
                                                         Function<String, TypeDefinition> structure) {
         Optional<NameType.Resolved> resolved = NameType.of(definition, merged::get, structure);
-        if (resolved.isEmpty() && body.nameType().equals(RecordBody.FIELD_NAME)) {
+        if (resolved.isEmpty() && body.nameType().isEmpty()) {
             // The default where no kernel is in scope to resolve it: the identifier grammar it stands for.
             for (RecordField field : body.fields()) {
                 Optional<String> violation = io.ltr8.tson.atom.IdentifierGrammar.validate(field.name());
@@ -75,12 +75,12 @@ final class FieldNames {
         }
         if (resolved.isEmpty()) {
             return Optional.of(new EnumLabels.Violation(name, "'" + name + "': its name_type '"
-                    + body.nameType() + "' names nothing in scope"));
+                    + body.nameTypeName() + "' names nothing in scope"));
         }
         NameType.Resolved type = resolved.get();
         if (!EnumLabels.isFamily(type.definition(), EnumLabels.IDENTIFIER_TYPE, type.lookup())) {
             return Optional.of(new EnumLabels.Violation(name, "'" + name + "': its name_type '"
-                    + body.nameType() + "' is not an identifier family -- a record's field names are names drawn "
+                    + body.nameTypeName() + "' is not an identifier family -- a record's field names are names drawn "
                     + "from an atom-family instance whose constructor IS-A identifier_type; a key that is no name "
                     + "belongs in a map"));
         }
@@ -88,7 +88,7 @@ final class FieldNames {
             Optional<String> form = NameType.formRefusal(identifiers);
             if (form.isPresent()) {
                 return Optional.of(new EnumLabels.Violation(name, "'" + name + "': its name_type '"
-                        + body.nameType() + "' cannot judge names -- " + form.get()));
+                        + body.nameTypeName() + "' cannot judge names -- " + form.get()));
             }
         }
         Optional<AtomType<?>> parser = AtomParsers.forType(type.definition().body());
@@ -98,7 +98,7 @@ final class FieldNames {
         // Under the default, field_name, a refusal speaks of identifiers as any name's would; only an author's own name
         // type is named, since its rules are the ones the author has to look up.
         boolean identifier = NameType.isIdentifier(type, structure);
-        String ofType = identifier ? "an identifier" : "a value of its name_type '" + body.nameType() + "'";
+        String ofType = identifier ? "an identifier" : "a value of its name_type '" + body.nameTypeName() + "'";
         Map<Object, String> seen = new HashMap<>();
         for (RecordField field : body.fields()) {
             Optional<EnumLabels.Violation> problem = read(name, ofType, parser.get(), field.name());
@@ -109,7 +109,7 @@ final class FieldNames {
             if (earlier != null && !earlier.equals(field.name())) {
                 return Optional.of(new EnumLabels.Violation(name, "'" + name + "': fields '" + earlier + "' and '"
                         + field.name() + "' are one " + (identifier ? "field name"
-                                : "value of its name_type '" + body.nameType() + "'")));
+                                : "value of its name_type '" + body.nameTypeName() + "'")));
             }
         }
         Set<String> referenced = new LinkedHashSet<>(body.discriminators());

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=5e961f6ced70080e41807ab88d50a8da6cbe74b146fe49c65f6faa8e9527d89e"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=ebc246b5185d8d7c7829113f9c8a242324452542dc2ad32f11a4bbdbe0adde12"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -135,13 +135,14 @@
     the pins are compared as a tuple. It is `record.discriminators` for a base
     that is a template, and on the same terms: **whether it is present is what
     says how the members are selected** — by reading those fields where it is,
-    by the tag where it is not.
+    by the tag where it is not. Its names are text, as `record.discriminators`'
+    are, each a value of the base's name type.
     """
   template => top & {
     parameters:      [template_param]
     template:        text
     extension?:      record_extension_type
-    discriminators?: [field_name; 1..]
+    discriminators?: [text; 1..]
   }
 
   @doc:"""

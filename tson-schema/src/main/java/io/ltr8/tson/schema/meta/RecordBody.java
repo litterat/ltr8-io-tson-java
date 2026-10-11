@@ -5,6 +5,7 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The kernel's {@code record} constructor's own vocabulary, resolved (Part 2 §5.2, §8.1): {@code
@@ -39,11 +40,13 @@ import java.util.List;
 @Typename(name = "record")
 public record RecordBody(List<TypeRef> supertypes, List<RecordField> fields, List<FieldGroup> groups,
                           RecordExtensionType extension, List<String> discriminators,
-                          @Field("name_type") String nameType) implements Product {
+                          @Field("name_type") Optional<String> nameType) implements Product {
 
     /**
-     * {@code record.name_type}'s default: the kernel's {@code field_name}, an identifier
-     * (SPEC-FEEDBACK.md #10). A record that states another names the family its field names belong to.
+     * The kernel's {@code field_name}, an identifier: a record's name type where neither it nor a supertype states
+     * one (SPEC-FEEDBACK.md #10). {@link #nameType} keeps the difference between stating {@code field_name} and
+     * stating nothing, because the two resolve in different namespaces: a name an author wrote resolves in the
+     * author's own schema first, as an enum's does, and the absent default is the kernel's.
      */
     public static final String FIELD_NAME = "field_name";
 
@@ -63,7 +66,12 @@ public record RecordBody(List<TypeRef> supertypes, List<RecordField> fields, Lis
         fields = List.copyOf(fields);
         groups = groups == null ? List.of() : List.copyOf(groups);
         discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
-        nameType = nameType == null ? FIELD_NAME : nameType;
+        nameType = nameType == null ? Optional.empty() : nameType;
+    }
+
+    /** The name type's name, for a message: the one stated, or {@link #FIELD_NAME}. */
+    public String nameTypeName() {
+        return nameType.orElse(FIELD_NAME);
     }
 
     /**
@@ -72,11 +80,11 @@ public record RecordBody(List<TypeRef> supertypes, List<RecordField> fields, Lis
      */
     public RecordBody(List<TypeRef> supertypes, List<RecordField> fields, List<FieldGroup> groups,
                        RecordExtensionType extension) {
-        this(supertypes, fields, groups, extension, List.of(), FIELD_NAME);
+        this(supertypes, fields, groups, extension, List.of(), Optional.empty());
     }
 
     /** A fresh record body: no supertypes, no field groups, just plain fields, extensible. */
     public static RecordBody of(List<RecordField> fields) {
-        return new RecordBody(List.of(), fields, List.of(), RecordExtensionType.OPEN, List.of(), FIELD_NAME);
+        return new RecordBody(List.of(), fields, List.of(), RecordExtensionType.OPEN, List.of(), Optional.empty());
     }
 }

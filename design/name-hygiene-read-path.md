@@ -11,8 +11,9 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 - A record reader pulls its own names through `nextFieldName(rule)`, its name type (`FieldNameRule.FIELD_NAME` where
   it states none, never `null`); every other pull of a field name — schemaless readers, `EventSkip` — judges it as a
   schemaless record's, an identifier or `ATOM_FORM_INVALID`, except a root value a read abandons, which
-  `discardUnjudged` skips with no name rule at all, and a document that names a schema read without it
-  (`leavingFieldNamesToTheSchema`), whose field names are that schema's to judge.
+  `discardUnjudged` skips with no name rule at all, the value of a field its record does not declare, which
+  `TsonReadContext.skipUnjudged` skips the same way (as the JSON reader skips the member), and a document that names
+  a schema read without it (`leavingFieldNamesToTheSchema`), whose field names are that schema's to judge.
 - A name its record's type refuses is reported nothing at the pull: the reader reports it `UNRECOGNIZED_FIELD` with
   the type's reason (`FieldNameRule.refusal`), in both encodings. A field name's refusals are at the field's pointer.
 - A refused name draws no verdict beside its refusal: both record readers checkpoint `ctx.reported()` across the pull

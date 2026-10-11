@@ -109,7 +109,7 @@ final class WireForm {
 
     /**
      * {@code record.name_type} -- the type a record's field names are values of (SPEC-FEEDBACK.md #10). Written
-     * only where it is not {@code field_name}, so a held body states it exactly when the record has another.
+     * exactly where the record states one, so a held body keeps the difference between stating and not.
      */
     static final String NAME_TYPE = "name_type";
 
@@ -272,9 +272,7 @@ final class WireForm {
             binding.add(new RecordValue.Field(SUPERTYPES, scoped(new ArrayValue(body.supertypes().stream()
                     .map(supertype -> scoped(refValue(supertype))).toList()))));
         }
-        if (!body.nameType().equals(RecordBody.FIELD_NAME)) {
-            binding.add(nameField(NAME_TYPE, body.nameType()));
-        }
+        body.nameType().ifPresent(stated -> binding.add(nameField(NAME_TYPE, stated)));
         binding.add(new RecordValue.Field(FIELDS, scoped(new ArrayValue(fields))));
         if (!groups.isEmpty()) {
             binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));

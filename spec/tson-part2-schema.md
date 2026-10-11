@@ -1969,11 +1969,11 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/37/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/37/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/37/tson-guide |
-| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/38/m/meta-kernel.tn?sha256=b96c33ebec42a73d062f6209852058ad204eb78fc1d90d6488d7038a485ea291 |
-| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/38/m/meta.tn?sha256=6561c8305e7c604382079802ea62f5d074c045e99d315ce926b5cf76ae0f90af |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/38/m/core.tn?sha256=4d2d1cbde525a3e8d9d1dcbb58951909829152d6b019901552629b80de6533e1 |
-| net.tn | TSON Network Type Library (companion artifact) | https://tson.io/2026/38/m/net.tn?sha256=430468a9cc0b2276e2aa13ce2fe5cbf95c81d9392c381203d0deca620d0975a0 |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/38/m/policy.tn?sha256=e9018cc2a02b512d68f45ba32e9d10e9bbdb020ba45b579cfa90a8b34d703afb |
+| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/38/m/meta-kernel.tn?sha256=ebc246b5185d8d7c7829113f9c8a242324452542dc2ad32f11a4bbdbe0adde12 |
+| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/38/m/meta.tn?sha256=db4054f1cce260c1da0d93d44bd246dae399434564f7342ee5b9813768eb89df |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/38/m/core.tn?sha256=1d0237afbc49c6f204c17fcabae084ab62e35999c5fa1869ad208d814c694152 |
+| net.tn | TSON Network Type Library (companion artifact) | https://tson.io/2026/38/m/net.tn?sha256=d178f7196d269ac4b18cbc8668498268a2df093907681eb077a928ae20660d1b |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/38/m/policy.tn?sha256=5d2ad26508c28ec1b2188bdd19fc610171d6f41e1b629f52509d6814b93cfc27 |
 
 ### 13.3 Informative References
 

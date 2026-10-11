@@ -266,9 +266,9 @@ class FieldNameTypeTest {
               tightened => node ^ { "$ref": text }
             """));
         assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) schema.schema().entries().get("labelled").body())
-                .nameType());
+                .nameTypeName());
         assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) schema.schema().entries().get("tightened").body())
-                .nameType());
+                .nameTypeName());
     }
 
     /**
@@ -358,6 +358,75 @@ class FieldNameTypeTest {
             assertTrue(thrown.getMessage().contains("which a profile may not add"), thrown.getMessage());
         }
         Tson.standard().resolve(schema("spaced", "words => !identifier_type { medial: \" \" }"));
+    }
+
+    /**
+     * Two name types are one when their reference chains end at one entry, not when they are spelled alike: an
+     * alias of {@code json_name} composes with it, and so does the kernel's {@code identifier} with the default
+     * {@code field_name}, an alias of it.
+     */
+    @Test
+    void nameTypesAreOneByTheEntryTheyResolveTo() {
+        Tson.standard().resolve(schema("aliases", """
+              json_name => !identifier_type { start_add: "@" }
+              jn => json_name
+              a => !record { name_type: json_name  extension: ABSTRACT  fields: [] }
+              b => !record { name_type: jn  extension: ABSTRACT  fields: [] }
+              ab => a & b & { "@id": text }
+              i => !record { name_type: identifier  extension: ABSTRACT  fields: [] }
+              plain => { x: text }
+              ip => i & plain
+            """));
+    }
+
+    /**
+     * A schema's own references to its fields -- a group's members, a refinement's restated field -- match the
+     * declared names exactly, under a folding name type too: the schema is one author's text, and only a
+     * document's spelling is matched in the type's form.
+     */
+    @Test
+    void aSchemasOwnReferencesMatchItsFieldNamesExactly() {
+        for (String body : new String[] {
+                "row => !record { name_type: folded  fields: [ { name: name  type: text  optional: true }\n"
+                        + "  { name: email  type: text  optional: true } ]\n"
+                        + "  groups: [ { members: [ [NAME] [email] ] } ] }",
+                "row => !record { name_type: folded  fields: [ { name: name  type: text } ] }\n"
+                        + "tight => row ^ { NAME: text }"}) {
+            org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
+                    () -> Tson.standard().resolve(schema("exact",
+                            "folded => !identifier_type { normalization: NFKC_CASEFOLD }\n" + body)), body);
+        }
+    }
+
+    /**
+     * An undeclared field's value is skipped unjudged, as the JSON reader skips the member: no type governs it,
+     * so the one problem is the field itself, and names inside it meet no rule.
+     */
+    @Test
+    void anUndeclaredFieldsValueIsSkippedUnjudged() {
+        List<Diagnostic> problems = read(JSON_LD, "json-ld",
+                "!node { \"@id\": \"a\"  label: \"b\"  extra: { \"@z\": 1  \"a b\": 2 } }");
+        assertEquals(List.of(Diagnostic.Code.UNRECOGNIZED_FIELD), problems.stream().map(Diagnostic::code).toList(),
+                problems.toString());
+        assertEquals("/extra", problems.getFirst().path().orElseThrow());
+    }
+
+    /**
+     * A name type a record states resolves in the author's own schema first, as an enum's does, so a schema's own
+     * {@code field_name} is the one a record naming it gets; a record stating none has the kernel's.
+     */
+    @Test
+    void aStatedNameTypeResolvesInTheAuthorsSchemaFirst() {
+        String local = schema("local-field-name", """
+              field_name => !identifier_type { start_add: "@" }
+              stated => !record { name_type: field_name  fields: [ { name: "@id"  type: text } ] }
+            """);
+        assertEquals(List.of(), read(local, "local-field-name", "!stated { \"@id\": \"x\" }"));
+        org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
+                () -> Tson.standard().resolve(schema("absent", """
+                      field_name => !identifier_type { start_add: "@" }
+                      absent => !record { fields: [ { name: "@id"  type: text } ] }
+                    """)));
     }
 
     /** Two supertypes with different name types compose names of two types, which no one type judges. */

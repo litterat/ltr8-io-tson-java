@@ -344,11 +344,20 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * fail for a context this library made (see {@link #lookingAhead}).
      */
     static void discardUnjudged(TsonReadContext ctx) {
+        unjudged(ctx, io.ltr8.tson.compiler.stream.EventSkip::dataValue);
+    }
+
+    /** {@link TsonReadContext#skipUnjudged}'s implementation, which carries the contract. */
+    static void skipUnjudged(TsonReadContext ctx) {
+        unjudged(ctx, io.ltr8.tson.compiler.stream.EventSkip::scopedValue);
+    }
+
+    private static void unjudged(TsonReadContext ctx, java.util.function.Consumer<TsonReadContext> skip) {
         Cursor cursor = ((DefaultTsonReadContext) ctx).cursor;
         boolean outer = cursor.judging;
         cursor.judging = false;
         try {
-            io.ltr8.tson.compiler.stream.EventSkip.dataValue(ctx);
+            skip.accept(ctx);
         } finally {
             cursor.judging = outer;
         }

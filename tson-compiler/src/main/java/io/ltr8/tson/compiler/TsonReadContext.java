@@ -317,4 +317,16 @@ public interface TsonReadContext {
     static <T> T lookingAhead(TsonReadContext ctx, java.util.function.Function<TsonReadContext, T> lookahead) {
         return DefaultTsonReadContext.lookingAhead(ctx, lookahead);
     }
+
+    /**
+     * Skips the scoped value at {@code ctx}'s cursor -- a record field's, any {@code !!schema} directive included --
+     * holding no name in it to a name rule: the value of a field its record does not declare, which is reported
+     * once, at the field, and read no further. No type governs it, so judging its names by the schemaless rule
+     * would hand down verdicts its producer's schema might not share, beside the one problem that is real; the
+     * JSON reader skips the same member the same way. Its syntax is still read, since skipping it is parsing it.
+     * Static for the reason {@link #lookingAhead} is.
+     */
+    static void skipUnjudged(TsonReadContext ctx) {
+        DefaultTsonReadContext.skipUnjudged(ctx);
+    }
 }

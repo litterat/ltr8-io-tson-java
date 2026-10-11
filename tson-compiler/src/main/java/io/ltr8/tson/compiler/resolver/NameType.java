@@ -134,11 +134,14 @@ public final class NameType {
         return Optional.empty();
     }
 
-    /** The kernel's default was written by the {@code record} constructor, so it resolves in the structure first. */
+    /**
+     * A name type the record states was written by its author, so it resolves in the schema's own namespace first,
+     * as an enum's does; the absent default is the kernel's {@code field_name}, resolved in the structure first.
+     */
     private static Optional<Resolved> ofRecord(RecordBody body, Function<String, TypeDefinition> local,
                                                Function<String, TypeDefinition> structure) {
-        String name = body.nameType();
-        Function<String, TypeDefinition> first = name.equals(RecordBody.FIELD_NAME) ? structure : local;
+        String name = body.nameTypeName();
+        Function<String, TypeDefinition> first = body.nameType().isEmpty() ? structure : local;
         Function<String, TypeDefinition> second = first == structure ? local : structure;
         for (Function<String, TypeDefinition> namespace : List.of(first, second)) {
             if (namespace.apply(name) != null) {

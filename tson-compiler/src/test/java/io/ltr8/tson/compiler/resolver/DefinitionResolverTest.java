@@ -108,7 +108,7 @@ class DefinitionResolverTest {
                     + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } "
                     + "optional: false voidable: false role: \"FREE\" "
                     + "} "
-                    + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }";
+                    + "] groups: [] extension: \"OPEN\" discriminators: [] } }";
 
     /**
      * The same shape as the real fixture resolves it. meta-kernel types {@code bits} as a count rather than
@@ -322,7 +322,7 @@ class DefinitionResolverTest {
         assertEquals(List.of(), top.supertypes());
         assertEquals("{ supertypes: [] subtypes: [] "
                 + "body: !record { supertypes: [] fields: [] groups: [] extension: \"OPEN\" "
-                + "discriminators: [] name_type: \"field_name\" } }", write(top));
+                + "discriminators: [] } }", write(top));
     }
 
     @Test
@@ -355,10 +355,10 @@ class DefinitionResolverTest {
         // atom, sum: empty trailing body, no fields inherited from type (which has none) -- just the composition itself.
         assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: [] groups: [] "
-                + "extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }", write(atom));
+                + "extension: \"OPEN\" discriminators: [] } }", write(atom));
         assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"type\" arguments: [] } ] fields: [] groups: [] "
-                + "extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }", write(sum));
+                + "extension: \"OPEN\" discriminators: [] } }", write(sum));
 
         // product: two brand-new fields added by the trailing body (type contributes none).
         assertEquals("{ supertypes: [ \"type\" \"top\" ] subtypes: [] "
@@ -369,15 +369,14 @@ class DefinitionResolverTest {
                 + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
                 + "optional: false voidable: false role: \"FREE\" "
                 + "} "
-                + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }", write(product));
+                + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(product));
 
         // reference: one brand-new field.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
                 + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } "
                 + "optional: false voidable: false role: \"FREE\" } "
-                + "] groups: [] extension: \"OPEN\" discriminators: [] "
-                + "name_type: \"field_name\" } }", write(reference));
+                + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(reference));
     }
 
     // ── Field groups (§5.11) + constructor flag + OPTIONAL fields: integer_type ──
@@ -423,7 +422,7 @@ class DefinitionResolverTest {
                         + "groups: [ "
                         + "{ members: [ [ \"min\" ] [ \"exclusive_min\" ] ] optional_members: [] optional: true } "
                         + "{ members: [ [ \"max\" ] [ \"exclusive_max\" ] ] optional_members: [] optional: true } "
-                        + "] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] extension: \"OPEN\" discriminators: [] } }",
                 write(integerType));
     }
 
@@ -590,7 +589,7 @@ class DefinitionResolverTest {
                         + "{ name: \"second\" type: { name: \"text\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pair));
     }
 
@@ -663,7 +662,7 @@ class DefinitionResolverTest {
                         + "optional: true voidable: false role: \"DEFAULT\" "
                         + ""
                         + "value: false } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(tupleElement));
     }
 
@@ -691,7 +690,7 @@ class DefinitionResolverTest {
                         + "optional: true voidable: false role: \"DEFAULT\" "
                         + ""
                         + "value: false } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(fieldGroup));
     }
 
@@ -705,7 +704,7 @@ class DefinitionResolverTest {
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
                         + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pinned));
     }
 
@@ -795,7 +794,7 @@ class DefinitionResolverTest {
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(array));
     }
 
@@ -834,7 +833,7 @@ class DefinitionResolverTest {
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(map));
     }
 
@@ -878,7 +877,7 @@ class DefinitionResolverTest {
                         + "{ name: \"port\" type: { name: \"integer\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(production));
     }
 
@@ -948,7 +947,7 @@ class DefinitionResolverTest {
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
                         + "optional: true voidable: false role: \"FREE\" "
                         + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(set));
     }
 
@@ -996,7 +995,7 @@ class DefinitionResolverTest {
                         + "optional: false voidable: false role: \"FREE\" } "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(enumType));
         // enum => enum_type ^ { name_type?: = identifier }: a constructor tightening, `name_type` pinned and injected, so
         // `members` is the one unmarked field and `!enum [A B]` stays the positional form.
@@ -1009,7 +1008,7 @@ class DefinitionResolverTest {
                         + "optional: true voidable: false role: \"FIXED\" value: identifier } "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
                         + "optional: false voidable: false role: \"FREE\" } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] name_type: \"field_name\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(enumDef));
     }
 

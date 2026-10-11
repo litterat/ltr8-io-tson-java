@@ -677,12 +677,17 @@ yet, so no verdict changes: the corpus passes unchanged.
 
 ---
 
-## 10. A record's field names have a type: `record.name_type` (experimental)
+## 10. A record's field names have a type: `record.name_type`
 
-**Section:** [TSON-DATA] §2.5 ("A field name is an identifier at every layer"), §7.2.1, §7.7, §8.2; [TSON-SCHEMA]
-§5.2 (`record`), §7.4 (`enum_type.type`), §7.7, §12.1; [TSON-JSON] §3 (the annotation members).
+**Section:** [TSON-DATA] §1.5 (the Class 1 name MUST), §2.5 ("A field name is an identifier at every layer"), §2.8
+(record detection: "field names are identifiers"), §7.1 (`{ "_id": 1 }` a parse error), §7.2.1, §7.7, §8.2;
+[TSON-SCHEMA] §5.2 (`record`, `record.discriminators`), §5.4 (an enum's class read off its `type`), §5.5, §5.8,
+§5.11 (`field_group`'s member slots), §7.4 (`enum_type.type`, `text_enum`), §7.7, §8.1 (the `template`
+constructor's `discriminators`), §8.2's constructor-refinement table (`text_enum`), §10's meta-kernel inventory,
+§12.1, §13.2 (the artifact pins); [TSON-JSON] §1, §3 (the annotation members), §6.1.1, §9.4.
 
-**Kind:** proposal, experimental — on the branch `experiment/field-name-type`, not `r2026-38-proposal`.
+**Kind:** proposal, under consideration for adoption — on the branch `experiment/field-name-type`, PR into
+`r2026-38-proposal`.
 
 **The problem.** A field name is an identifier at every layer, so `{ "@id": x }` and `{ "$ref": x }` are parse
 errors, and §2.5's remedy is a map: "a key that is not a name belongs in a map". That serves TSON's own data. It
@@ -691,9 +696,9 @@ members — with names such as `@context`, `@id` or `$ref`. A map loses the reco
 member loses the round trip.
 
 **The idea.** Copy `enum_type.type`, which already says which family an enum's members belong to. A record gains
-`name_type?: type_name ~ field_name`, the family its field names belong to, and `enum_type.type` is renamed
+`name_type?: type_name`, the family its field names belong to, and `enum_type.type` is renamed
 `name_type` to match. The default is the series' own
-`field_name`, an identifier, so nothing changes unless a record says so. A record translated from JSON names a
+`field_name`, an identifier, so nothing changes unless a record or a supertype says so. A record translated from JSON names a
 relaxed type, defined by the translation and not by the series, such as
 `json_name => !identifier_type { start_add: "@$" }`, or `!identifier_type { medial: " " }` for words.
 
@@ -810,7 +815,7 @@ relaxed type, defined by the translation and not by the series, such as
 - **An ASCII base for an ASCII name.** A name compared the way ASCII protocols compare theirs — an HTTP field
   name, a URI scheme — had to list the alphabet in `start_add` and again in `continue_add` over a `NONE` base,
   since `ASCII_CASEFOLD` implies NFC only over ASCII. `identifier_base` gains `ASCII`, XID's ASCII members
-  (Start `A-Z a-z`, Continue adding `0-9 _`), so an HTTP field name is one line —
+  (Start `A-Z a-z`, Continue adding `0-9 _`), so an HTTP-style header name is one line —
   `!identifier_type { start: ASCII  continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD }` — and the
   kernel's `scheme_name` is `start: ASCII  continue: ASCII  continue_add: "+-."  exclude: "_"`. *Implemented on
   the branch.*
@@ -819,7 +824,65 @@ relaxed type, defined by the translation and not by the series, such as
   document reads back. A template's held body is written the same way, a declared name that is no identifier
   quoted, so a template declaring or composing relaxed names holds and closes.
 
+- **Two name types are one by the entry they resolve to.** Composition compares name types, and it compares the
+  entries at the ends of their reference chains, not their spellings: `jn => json_name` is `json_name`, and the
+  kernel's `field_name` is its `identifier`, so a record stating `identifier` composes with one stating nothing.
+  Comparing spellings would refuse a composition of one type under two names.
+- **A name type a record states resolves in the author's schema first.** As an enum's `name_type` does: a schema
+  declaring its own `field_name` has that one when a record writes `name_type: field_name`, and a record writing
+  none has the kernel's. The resolved form keeps the difference, writing `name_type` exactly where it was stated.
+- **A schema's own references to its fields match exactly.** A group's members, a refinement's or removal's
+  restated field and a `discriminators` entry name a declared field by its declared spelling, under a folding name
+  type too: the schema is one author's text, so a reference spelled differently is a mistake to report, and only
+  a document's names, which another party writes, are matched in the type's form.
+- **An undeclared field's value is skipped unjudged.** No type governs it, so the one problem is the field itself,
+  reported once at its pointer; the names inside it meet no name rule, in either encoding.
+
+**Breaking changes, against Revision 37:**
+
+- `enum_type.type` is `enum_type.name_type`; a schema writing `!enum_type { type: … }` must rename the field
+  (`!enum [...]` is unchanged).
+- `text_enum` is removed; `!text_enum [...]` becomes `!text ^ { members: [...] }`, or an enum over an
+  `identifier_type` admitting the names (`medial: " "` for words).
+- An enum's `name_type` must be an identifier family, so an enum over `text` or another text family is refused.
+- A name type's `normalization` must imply NFC: `NONE`, and `ASCII_CASEFOLD` over a profile reaching beyond ASCII,
+  are refused, for enums as for records.
+- An `identifier_type` may not add a Default_Ignorable_Code_Point, a control, or a space other than U+0020.
+- `identifier_base` gains `ASCII`, and the kernel's `scheme_name` is restated over it (the same set).
+- A field-name position admits any single-line token. A schemaless `{ "first name": 1 }` moves from parse error to
+  resolver error; a schema-directed record's undeclared non-name, TSON or JSON, is a validation error
+  (`UNRECOGNIZED_FIELD`), where JSON's undeclared `$foo` was a resolver error; and a document that names a schema,
+  read without it, has field names no rule judges.
+- Part 3: only `$schema`, `$type` and `$value` carry meaning; any other `$`-initial member is a field name or a
+  key.
+- Every bundled schema's `!!id` pin changes (§13.2).
+
+**Proposed text for Parts 1 and 2** (the running behaviour; wording for the editor):
+
+- [TSON-DATA] §1.5: the MUST to match every name against §7.7 reads "every type-annotation and annotation name,
+  and every field name of a document that names no schema"; a document that names a schema has field names its
+  schema judges ([TSON-SCHEMA] §5.2).
+- [TSON-DATA] §2.5: "A field name is an identifier at every layer" becomes "A field name is a value of its
+  record's name type ([TSON-SCHEMA] §5.2): an identifier where no schema says otherwise, and always in a
+  schemaless document". The remedy "a key that is not a name belongs in a map" stays.
+- [TSON-DATA] §2.8: a record's first field name is a bare token "that is an unquoted or single-line token"; the
+  clause "whose decoded text is an identifier" and "field names are identifiers" move to §2.5's schemaless rule.
+- [TSON-DATA] §7.1: the sentence making `{ "_id": 1 }` a parse error reads "a resolver error in a schemaless
+  document, and a parse error unquoted"; `_` stays outside identifier Start.
+- [TSON-SCHEMA] §5.2: `record` gains `name_type?: type_name`, stated with its rule — absent, the supertypes' one
+  name type, `field_name` with none; stated beside supertypes, theirs; supertypes that disagree do not compose —
+  and `discriminators?: [text; 1..]`.
+- [TSON-SCHEMA] §5.4: an enum's class is read off its members under its `name_type`, an identifier family; the
+  `text_enum` sentence goes.
+- [TSON-SCHEMA] §5.11, §8.1 and §10's inventory: `field_group`'s and `template`'s field-name slots are `text`,
+  `enum_type`'s field is `name_type`, `text_enum` and its member set go, `identifier_base` is `[XID ID ASCII
+  NONE]`, and `record` carries `name_type?: type_name`.
+- [TSON-SCHEMA] §7.4: `enum_type.type` is `name_type`, an identifier family whose `normalization` implies NFC;
+  `text_enum` is removed and §7.4 points a closed set of text at `text_type`'s `members`.
+- [TSON-SCHEMA] §8.2's constructor-refinement table drops `text_enum`.
+- [TSON-SCHEMA] §13.2: the five artifact rows carry the re-stamped pins.
+
 **Open:** the default for a JSON member name that is not an identifier; whether a template's field names are
 judged at its declaration, where today they are judged at each application, under the closed record's name type.
 
-**Status against Revision 37:** open; experimental, in progress on `experiment/field-name-type`.
+**Status against Revision 37:** open; under consideration, implemented on `experiment/field-name-type`.
