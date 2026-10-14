@@ -1,8 +1,8 @@
 # Record dispatch: `RecordDispatch` and the discriminated-family readers
 
-How a position typed by a record is read according to `record.extension` ([TSON-SCHEMA] §5.2), and the
-`UNKNOWN_TYPE_REF`/`TYPE_MISMATCH` line the dispatchers share with the rest of the vocabulary. Current form only;
-history lives in git.
+How a position typed by a record is read according to `record.extension` ([TSON-SCHEMA] §5.2), the
+`UNKNOWN_TYPE_REF`/`TYPE_MISMATCH` line the dispatchers share with the rest of the vocabulary, and what a bare token
+at a record position is: §5.6's positional form, or a value by name. Current form only; history lives in git.
 
 **Invariants**
 
@@ -18,6 +18,9 @@ history lives in git.
 - `UNKNOWN_TYPE_REF` means the written name denotes nothing; a name that resolves and is not admissible, or a required
   selector that is absent, is `TYPE_MISMATCH`.
 - The pin table is keyed by `ValueIdentity`, and the selector scan is a `lookingAhead` that rewinds.
+- A bare token fills a record's one positional field (§5.6) only where that field is atom-typed; an unquoted token
+  well-formed as a qualified name is otherwise a value by name, read only by a `QualifiedName` component.
+  `QualifiedNameReader.nameIn` is the one statement of which tokens are names.
 
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
@@ -91,3 +94,27 @@ the line is stated once, here.
 sides go through one parser: a schema pinning `= "dog"` matches an unquoted `dog`, and `= 0xFF` matches `255`.
 The scan for the selectors is a `lookingAhead` and rewinds, because a record's fields have no significant
 order — the selector may arrive after the fields it selects.
+
+## A bare token at a record position: positional, or a value by name
+
+**§5.6's positional form keeps a bare token only where it would fill an atom-typed field** (SPEC-FEEDBACK.md #13).
+A record whose one non-optional field is atom-typed takes a bare value as that field — `type_ref`'s `name` is a
+`type_name`, which is how `request: search_request` at a `type_ref` slot stays a type reference. Where the field is
+a product or a sum, an unquoted token well-formed as a qualified name (`QualifiedNameReader.nameIn`: each
+`.`-separated segment a [TSON-DATA] §7.7 identifier) is a **value by name**, and the record reader does not read it
+as the field: `record_field`'s `p: x` for `p: { type: x }` is the withdrawn spelling, and `q: some_record` at a
+`record` position is "expected a record for 'record', found the name 'some_record'" (`TYPE_MISMATCH`) where it was
+read as `{ fields: some_record }`. A token that is no name (`42`) fills the field as it always did. The fact is
+decided once per reader, at construction, from the positional field's declared type followed through its reference
+chain (`RecordAbstractReader.bareTokenFillsPositionally`); a type the compiled namespace cannot follow (a
+parameter) answers atom, which keeps the form exactly as it was. JSON has no positional form, so the rule has no
+JSON side.
+
+**A value by name is read only where the bound component holds one.** A `QualifiedName` component at a
+record-typed slot gets a `QualifiedNameReader` in place of the type's own reader (`BindTargets`, judged by the schema
+type rather than by its reader, so the type need not bind a class of its own), which keeps the name as written and
+resolves nothing — the linker does (`design/linking-and-compilation.md`). Everywhere else a name at such a position
+is the `TYPE_MISMATCH` above: tree mode has no node for a name, and a component holding the record's class cannot
+hold one. A data document's read resolves a name no more than it resolves a `type_ref`. At a `QualifiedName` slot a
+quoted token is text, and a framed (`@a x`, `!t x`) or braced value is refused as `expected the name of a 'method'
+value` — the component's verdict, since a class wanting the record inline declares the record's class.

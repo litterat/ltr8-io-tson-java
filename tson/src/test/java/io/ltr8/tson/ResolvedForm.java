@@ -222,10 +222,20 @@ final class ResolvedForm {
      * A §8 resolved-schema document, bound back into the value model. The text names no governing schema of
      * its own -- meta.tn is what governs every one of these, and the reader says so.
      */
-    @SuppressWarnings("unchecked")
     static Map<String, TypeDefinition> readResolved(Tson tson, String resolvedText) {
+        return readResolved(tson, resolvedText, TsonBundledSchemas.META_ID);
+    }
+
+    /**
+     * {@link #readResolved(Tson, String)} under the meta layer {@code governingMeta} instead of meta.tn: the schema
+     * the subject's own {@code !!meta} names, which imports meta.tn and adds the constructors only it declares. A
+     * {@code data} constructor's instance is typed by that layer alone, so a resolved document holding one reads
+     * back only under it; for a subject governed by meta.tn the two are the same read.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, TypeDefinition> readResolved(Tson tson, String resolvedText, String governingMeta) {
         return (Map<String, TypeDefinition>) tson.objectReader()
-                .withSchema(TsonBundledSchemas.META_ID)
+                .withSchema(governingMeta)
                 .readAs(resolvedText, "schema", Object.class);
     }
 }

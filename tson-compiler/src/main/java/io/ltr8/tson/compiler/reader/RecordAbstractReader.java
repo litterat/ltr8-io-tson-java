@@ -18,6 +18,10 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.QualifiedName;
+import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -78,6 +83,16 @@ import java.util.stream.Collectors;
  * consults it on the one path that isn't already record-shaped, and {@link #readPositional} then
  * reads whatever's already sitting at the cursor directly as that single field's own value, with no
  * synthetic wrapping needed at all.
+ *
+ * <p><b>A name is not a positional fill where the fill would be product-typed</b> (SPEC-FEEDBACK.md #13). At a
+ * record-typed position an unquoted token well-formed as a qualified name ({@link QualifiedNameReader#nameIn})
+ * is a value written by name, so the positional form keeps a bare token only where its one field is
+ * <b>atom</b>-typed -- {@code type_ref}'s {@code name}, a {@code type_name}, which is how a type reference
+ * keeps its bare spelling -- and loses it where the field is a product or a sum: {@code record_field}'s
+ * {@code p: x} for {@code p: { type: x }} is the withdrawn spelling. The fact is decided once, here
+ * ({@link #positionalTakesNames}); what the record reader does with a name it does not take is refuse it as no
+ * record, since a component that holds the name is read by {@link QualifiedNameReader} instead and never
+ * reaches this class. A token that is no name -- {@code 42} -- still fills the field as before.
  */
 abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
@@ -139,6 +154,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final RecordField.Omitted[] omitted;
     private final FixedCheck[] fixedCheck;
     final int positionalFieldIndex;
+
+    /**
+     * Whether the positional field's declared type is a product or a sum rather than an atom, so a token
+     * well-formed as a qualified name at this position is a value by name rather than that field's value.
+     */
+    private final boolean positionalTakesNames;
     final SchemaLocation schemaLocation;
 
     /**
@@ -157,8 +178,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     /** What this record's rules say when a document breaks one -- shared with the JSON reader ([TSON-JSON] §9.4). */
     private final RecordDiagnostics rules;
 
+    /**
+     * @param namespace the compiled schema's entries, through which the positional field's declared type is
+     *                  followed to its body ({@link #positionalTakesNames})
+     */
     RecordAbstractReader(String name, String displayName, RecordBody body, FieldReaders readers,
-                          SchemaLocation schemaLocation, TsonReadContext.FieldNameRule fieldNames) {
+                          SchemaLocation schemaLocation, TsonReadContext.FieldNameRule fieldNames,
+                          Function<String, TypeDefinition> namespace) {
         this.name = name;
         this.fieldNames = fieldNames;
         this.displayName = displayName;
@@ -197,6 +223,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         }
         this.groupPlans = groups.stream().map(group -> GroupPlan.of(group, fieldIndex)).toArray(GroupPlan[]::new);
         this.positionalFieldIndex = requiredCount == 1 ? solePositionalField : -1;
+        this.positionalTakesNames = positionalFieldIndex >= 0
+                && !atomTyped(fields.get(positionalFieldIndex).schema(), namespace);
         this.declaredFields = fields.stream().map(field -> field.name()).collect(Collectors.joining(" | "));
         this.rules = new RecordDiagnostics(displayName, declaredFields);
     }
@@ -244,9 +272,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * EmptyBraceEvent} ({@link Shape#EMPTY}, consumed -- every non-fixed field falls straight to
      * its own default/required handling), a value eligible for {@link #positionalFieldIndex}
      * ({@link Shape#POSITIONAL}, nothing consumed -- {@link #readPositional} reads the value
-     * directly), or neither ({@link Shape#MISMATCH}: {@code TYPE_MISMATCH} reported, whatever was
-     * actually there discarded). A caller seeing {@link Shape#MISMATCH} must stop processing this
-     * record entirely rather than also reporting every one of its own fields as separately missing.
+     * directly; a value by name is not eligible where the positional field is product- or sum-typed),
+     * or neither ({@link Shape#MISMATCH}: {@code TYPE_MISMATCH} reported, whatever was actually there
+     * discarded). A caller seeing {@link Shape#MISMATCH} must stop processing this record entirely
+     * rather than also reporting every one of its own fields as separately missing.
      */
     final ShapeResult expectRecordShape(TsonReadContext ctx) {
         EventSkip.annotationsAndTypeRef(ctx);
@@ -260,12 +289,48 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             ctx.next();
             return new ShapeResult(Shape.EMPTY, anchor);
         }
-        if (positionalFieldIndex >= 0) {
+        if (positionalFieldIndex >= 0 && !positionalTakesNames) {
             return new ShapeResult(Shape.POSITIONAL, anchor);
         }
-        ctx.report(rules.notARecord(TypeRefCheck.describe(e)));
+        Optional<QualifiedName> byName = QualifiedNameReader.nameIn(e);
+        if (positionalFieldIndex >= 0 && byName.isEmpty()) {
+            return new ShapeResult(Shape.POSITIONAL, anchor);
+        }
+        ctx.report(rules.notARecord(byName.map(written -> "the name '" + written + "'")
+                .orElseGet(() -> TypeRefCheck.describe(e))));
         EventSkip.coreValue(ctx);
         return new ShapeResult(Shape.MISMATCH, anchor);
+    }
+
+    /**
+     * Whether a bare token at a position of record type {@code body} fills its one positional field (§5.6) --
+     * false where the record has none, and where that field is product- or sum-typed, so a token well-formed
+     * as a qualified name there is a value by name (SPEC-FEEDBACK.md #13). {@link BindTargets} asks it before
+     * giving a slot of this type a {@link QualifiedNameReader}: a type whose bare token is positional holds no
+     * name, and a type with no positional field holds one wherever it is a record.
+     */
+    static boolean bareTokenFillsPositionally(RecordBody body, Function<String, TypeDefinition> namespace) {
+        RecordField sole = null;
+        for (RecordField field : body.fields().values()) {
+            if (!field.optional()) {
+                if (sole != null) {
+                    return false;
+                }
+                sole = field;
+            }
+        }
+        return sole != null && atomTyped(sole, namespace);
+    }
+
+    /**
+     * Whether {@code field}'s declared type is an atom, followed through its reference chain ([TSON-SCHEMA] §8.3).
+     * A name the namespace does not hold -- a type parameter, an application not yet minted -- answers true, which
+     * keeps the positional form exactly as it was for every position this rule cannot judge.
+     */
+    private static boolean atomTyped(RecordField field, Function<String, TypeDefinition> namespace) {
+        String terminal = ReferenceChain.terminal(field.type().name(), namespace);
+        TypeDefinition definition = namespace.apply(terminal);
+        return definition == null || definition.body() instanceof Atom;
     }
 
     /**

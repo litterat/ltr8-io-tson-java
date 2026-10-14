@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Tree mode's {@code record} reader -- reads a record-shaped value into a {@link TsonRecord} (name → {@link
@@ -30,9 +31,9 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
     public RecordTreeReader(String name, String displayName, RecordBody body, TsonTypeReaderResolver resolver,
                             SchemaLocation schemaLocation, AnnotationTypes annotationTypes,
-                            FieldNameRule fieldNames) {
+                            FieldNameRule fieldNames, Function<String, TypeDefinition> namespace) {
         // By schema type alone: a tree reader has no binding target to consult (see FieldReaders).
-        super(name, displayName, body, FieldReaders.byType(resolver), schemaLocation, fieldNames);
+        super(name, displayName, body, FieldReaders.byType(resolver), schemaLocation, fieldNames, namespace);
         this.annotationTypes = annotationTypes;
     }
 
@@ -49,7 +50,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
             }
             RecordTreeReader ownParser = new RecordTreeReader(name, EntryDisplayName.of(name, typeDefinition),
                     body, resolver, context.locationOf(name, typeDefinition),
-                    AnnotationTypes.of(context), fieldNameRule(name, body, context));
+                    AnnotationTypes.of(context), fieldNameRule(name, body, context), context.schema().entries()::get);
             if (typeDefinition.subtypes().isEmpty()) {
                 return ownParser;
             }

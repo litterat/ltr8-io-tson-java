@@ -91,8 +91,9 @@ import java.util.function.Function;
  * TypeDefinition.subtypes} (the reverse of {@code supertypes}, for *this schema's own merged view* of every
  * entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for why crediting a
  * subtype onto an imported entry's copy here never touches the imported schema's own separately-registered
- * original), derives choice disjointness, and checks that every reference anywhere in the schema actually
- * resolves. A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
+ * original), derives choice disjointness, checks that every reference anywhere in the schema actually
+ * resolves, and resolves and judges every value a {@code Data} body holds by name ({@code ValuesByName}). A
+ * {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
  * link a schema before registering it, same as any other caller. Identities are canonicalized through
@@ -688,6 +689,7 @@ public final class TsonSchemaLinker {
             }
         }
 
+        checkValuesByName(schema, merged, origins, localNames, governingMeta, loader, receiver);
         checkEveryEntryIsInhabited(schema, merged, localNames, receiver);
         checkRecordExtension(schema, merged, localNames, origins, enumForms, receiver);
 
@@ -696,6 +698,32 @@ public final class TsonSchemaLinker {
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
                 annotated, schema.bootstrap()), origins, enumForms, nameTypes);
+    }
+
+    /**
+     * The values each local {@code Data} entry holds by name, resolved in this schema's namespace and judged
+     * against the slots they fill (SPEC-FEEDBACK.md #13, {@link ValuesByName}). Each refused name is its own
+     * diagnostic, against the entry that holds it.
+     *
+     * <p><b>Local entries only</b>, as for inhabitance: an imported body's names were judged when its own schema
+     * linked, in its own namespace, and judging them again here would be judging them in the wrong one. Runs
+     * after {@link #validateEntry}, so a body's unresolved {@code type_ref} is reported first and on its own.
+     */
+    private static void checkValuesByName(TsonSchema schema, Map<String, TypeDefinition> merged,
+                                          Map<String, String> origins, Set<String> localNames,
+                                          Optional<TsonLinkedSchema> governingMeta, TsonSchemaLoader loader,
+                                          DiagnosticsReceiver receiver) {
+        if (governingMeta.isEmpty()) {
+            return; // only meta-kernel links without a registered meta, and it declares no Data entry
+        }
+        ValuesByName values = new ValuesByName(schema, merged, origins, governingMeta.get(), loader);
+        for (String name : localNames) {
+            TypeDefinition definition = merged.get(name);
+            if (definition.body() instanceof Data data) {
+                values.check(name, definition, data, refused ->
+                        reportOrThrow(receiver, schema, name, merged, refused.getMessage(), refused));
+            }
+        }
     }
 
     /**

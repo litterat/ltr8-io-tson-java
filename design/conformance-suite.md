@@ -12,6 +12,8 @@ rules are walked. Current form only; history lives in git.
 - A skip is not a pass: CI sets `TSON_REQUIRE_TEST_SUITE`, and the pin is a commit, never a branch.
 - At the schema and link layers the category is the phase's; each diagnostic must be a verdict (`Code.verdict()`).
 - Add vectors in the same session as lexer/parser/resolver work; the corpus moves before `SUITE_PIN`.
+- A fixture's `data` constructor is bound to a host class of the runner's own (`SuiteBindings`, one record per
+  constructor in `io.ltr8.tson.suite.data`), the same binding in both runners and in `SidecarSchemasTest`.
 
 Related: `design/name-hygiene-and-minted-names.md`, `design/name-hygiene-read-path.md`, `design/json-unicode-policies.md`.
 
@@ -120,6 +122,22 @@ defaults to Highly Restrictive
 whole-name (§8.2's SHOULD) and relaxes through `withIdentifierPolicy`, which §8.2 requires be code rather
 than ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
 may legitimately be anything.
+
+**A `data` constructor needs a host class, and the runner supplies it.** An instance of a meta layer's `data`
+constructor reads only into a class the reading application binds ([TSON-SCHEMA] §4.1,
+`design/meta-layer-data-kind.md`), so a vector whose schema applies one — the link layer's values-by-name vectors
+over `fixtures/meta-service.tn`'s `interface` and `binding` — cannot be judged by a runner that binds nothing. The
+corpus states the constructor in a fixture meta-schema and stays language-agnostic; the host side is the runner's:
+`SuiteBindings` (`tson-compiler/src/testShared`) carries a record per constructor, named for it so the name binder's
+package convention finds it, composed onto the library's own binder (`ProcessorConfig.withMetaNameBinder` at the front
+door, `SchemaMetaNameBinder.contextExtendedWith` where a registry is built directly). `SidecarSchemasTest` resolves
+the fixtures under the same binding, since a fixture applying a constructor would otherwise fail there for want of a
+class rather than for anything about the fixture. A new fixture constructor is a new record beside them; the
+fixture's `@doc` lists the constructors it declares, which is the corpus's half of the contract (`RUNNER.md`).
+**A `schema/` vector's expected side is read under the subject's own `meta`** (`ResolvedForm.readResolved` with the
+sidecar's `meta` resolved), and the object reader binds through `SuiteBindings` too: a fixture meta imports meta.tn
+and adds its constructors, and a `data` instance in resolved output is typed by that layer alone, so a vector
+showing a value by name written back as written reads only there. For a subject under meta.tn it is the same read.
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
 documentation: every sidecar read against the schema it declares, plus the negatives the groups exist

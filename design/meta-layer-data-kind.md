@@ -10,9 +10,12 @@ history lives in git.
 - The registration is a `@Typename` and a name binder, and nothing else: no reader family, no
   `ValueReaderFactoryRegistry` entry.
 - A constructor with no resolvable class is an error where it is written.
-- `Data.references()` is declared, not discovered; a reference slot is typed `type_ref`, not `type_name`.
+- `Data.references()` and `Data.names()` are declared, not discovered; a reference slot is typed `type_ref`, not
+  `type_name`, and a slot holding a value by name is typed by the value's type, its component a `QualifiedName`.
+- A name travels with its slot (`Data.Named.slot`), the path from the body to the field it fills; the linker reads
+  the slot's declared type off the constructor's resolved fields, never off the Java class.
 - `TypeInhabitance` and `DiscriminationClass` handle a `Data` body by their `default` arm, which is safe only while the
-  linker refuses any reference naming a DATA entry.
+  linker refuses any *type reference* naming a DATA entry. A value by name may name one: it is a value, not a type.
 - A meta-schema keeps a constructor this library cannot build a reader for, as an `ErrorReader`; it is never dropped.
 - `!!meta` merges nothing into the type-name namespace: shared vocabulary goes in a third ordinary schema.
 
@@ -57,6 +60,23 @@ which must sit at the schema layer because that is the only layer able to name r
   reference slot `type_ref` rather than `type_name` (§5.6's positional form keeps the author writing a bare
   name either way). §9's guidance for extension meta-schemas is the other half: a slot holding a type reference
   MUST be typed `type_ref`, which is what makes it participate in reference walking and identity.
+- **`Data.names()` is the second declared channel: the values a body holds by name** (SPEC-FEEDBACK.md #13). A
+  slot typed by a constructor or a record (`request?: record`, `method: method`) whose component is a
+  `schema.meta.QualifiedName` reads an unquoted dotted name (`orders.methods.place_order`) as written, and the body
+  hands each one to the linker as a `Data.Named` — the name, and the slot it fills as a path of field names, map
+  keys and array indexes from the body (`["methods", "place_order", "request"]`). The path is the least the linker
+  needs and the most a body can say without the schema: the slot's *declared type* is the meta's to state, so the
+  linker walks the path through the constructor's resolved fields to find it, and judges the referent against it
+  (`design/linking-and-compilation.md`). A sibling of `references()` rather than a widening of it: a union of
+  `TypeRef` and named slot would make `TypeRef` implement it and every existing body wrap its references, for two
+  things the linker checks differently — a reference against the namespace, a name against a slot. A body that
+  holds names in a nested record (an interface's methods) collects them itself, since the nested record is no `Data`
+  and has no channel of its own; the corpus's `Interface`/`Method` (`tson-compiler/src/testShared`) is the shape.
+- **Where a `QualifiedName` component may stand is checked when the reader is built** (`BindTargets`): the slot's
+  type must be a record whose bare token is not positional. At an atom a token is a literal, and at `type_ref` it
+  fills `name` (§5.6) and is a type reference, so a `QualifiedName` there is a `BindMismatchException`. The
+  component holds a name and nothing else: a braced value at the slot is refused at the read, which is the
+  binding's verdict — a class wanting a record value inline declares that record's class instead.
 - **§8.2 reaches a body's values at the read, not at the link.** The linker's name walk sees a bound `Data`
   body as an opaque object, so `SchemaResolver` reads a `data` constructor's payload under the registry's
   identifier policy and the readers judge it as they judge a data document: the keys of an identifier-keyed map
@@ -66,10 +86,14 @@ which must sit at the schema layer because that is the only layer able to name r
 - **The silent defaults are worth knowing.** `TypeInhabitance` calls a `Data` body inhabited and
   `DiscriminationClass` gives it none, both by their `default` arm. Neither matters while the linker refuses
   to let anything name such an entry as a type — which is what makes that refusal load-bearing rather than
-  a nicety.
+  a nicety. A value by name may reach a DATA entry (`orders.methods.place_order` starts at one), and that is
+  no exception: a slot holding a value is not a type position, so `response: orders` at a `type_ref` slot is
+  still §4.1's refusal and `request: orders` at a `record` slot is refused as no `record`.
 - **Resolved output is ordinary.** §8.1's `body` carries an instance of whichever constructor built the
   entry, and a meta-schema's own constructor is not a special case: a DATA entry writes as
-  `body: !operation { ... }`, formally indistinguishable from `!record { ... }`. What makes that work is a
+  `body: !operation { ... }`, formally indistinguishable from `!record { ... }`. A `QualifiedName` writes as the
+  bare token it was read from (`ResolverBindContext` registers it as an atom; `AtomWriter` writes it unquoted),
+  so a name round-trips as written, as a reference chain does (§8.3). What makes that work is a
   general `ltr8-bind` rule (`DataClassUnion`) — a non-sealed union branch stands for its own implementations,
   which exact-class membership would never match.
 - **A meta-schema keeps a constructor this library cannot build a reader for**, its factory standing in as
