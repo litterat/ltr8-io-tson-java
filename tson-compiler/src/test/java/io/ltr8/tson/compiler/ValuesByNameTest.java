@@ -277,7 +277,7 @@ class ValuesByNameTest {
     /** A component holding a name at a slot whose bare token is something else is the class's mistake. */
     @Test
     void aNameIsBoundOnlyWhereATokenIsNoPositionalFill() {
-        assertMisbound("name_at_text", "text", "which is no record");
+        assertMisbound("name_at_text", "text", "is no record");
         assertMisbound("name_at_type_ref", "type_ref", "fills its one field positionally");
     }
 

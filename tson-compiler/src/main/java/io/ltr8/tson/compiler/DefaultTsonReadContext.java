@@ -84,10 +84,15 @@ final class DefaultTsonReadContext implements TsonReadContext {
          */
         boolean fieldNamesTheSchemas;
 
-        Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy) {
+        /** Whether the read is of a value inside a schema document ({@link #readsSchemaDocument()}). */
+        final boolean schemaDocument;
+
+        Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy,
+               boolean schemaDocument) {
             this.events = events;
             this.receiver = receiver;
             this.identifierPolicy = identifierPolicy;
+            this.schemaDocument = schemaDocument;
         }
     }
 
@@ -150,7 +155,14 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
                               IdentifierPolicy identifierPolicy) {
-        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy), null, null, null,
+        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy, false), null, null, null,
+                Optional.empty(), Optional.empty());
+    }
+
+    /** {@link #of(TsonEventSource, DiagnosticsReceiver, IdentifierPolicy)} for a value inside a schema document. */
+    static TsonReadContext ofSchemaDocument(TsonEventSource events, DiagnosticsReceiver receiver,
+                                            IdentifierPolicy identifierPolicy) {
+        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy, true), null, null, null,
                 Optional.empty(), Optional.empty());
     }
 
@@ -294,6 +306,11 @@ final class DefaultTsonReadContext implements TsonReadContext {
     @Override
     public IdentifierPolicy identifierPolicy() {
         return cursor.identifierPolicy;
+    }
+
+    @Override
+    public boolean readsSchemaDocument() {
+        return cursor.schemaDocument;
     }
 
     /**

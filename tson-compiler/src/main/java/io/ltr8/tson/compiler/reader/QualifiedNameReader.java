@@ -20,9 +20,9 @@ import java.util.Optional;
  *
  * <p><b>What a name is, stated once for both readers that ask</b> ({@link #nameIn}): an <b>unquoted</b> token
  * whose text splits at each {@code .} into segments that are each a [TSON-DATA] §7.7 identifier. A quoted token
- * is text, never a name, and a token that is not one -- {@code 42}, {@code a..b} -- is read as whatever else
+ * is text, never a name, and a token that is not one -- {@code 42}, {@code orders.1x} -- is read as whatever else
  * the position admits. {@link RecordAbstractReader} asks the same question to decide when §5.6's positional form
- * loses the token, so the two cannot disagree about which tokens are names.
+ * loses the token in a schema document, so the two cannot disagree about which tokens are names.
  *
  * <p><b>Nothing is resolved here.</b> The name is the author's, kept as written; the linker resolves it against
  * the governed schema's namespace and judges the referent against the slot's declared type, as it judges a
@@ -35,11 +35,11 @@ import java.util.Optional;
  */
 final class QualifiedNameReader implements TsonTypeReader<QualifiedName> {
 
-    /** The position's declared type, as a message names it. */
-    private final String typeName;
+    /** What the position holds, as a message names it: {@code a 'method' value}. */
+    private final String expected;
 
-    QualifiedNameReader(String typeName) {
-        this.typeName = typeName;
+    QualifiedNameReader(String expected) {
+        this.expected = expected;
     }
 
     /** The name {@code event} spells, or empty where it is no unquoted token well-formed as a qualified name. */
@@ -60,7 +60,7 @@ final class QualifiedNameReader implements TsonTypeReader<QualifiedName> {
             return name.get();
         }
         String found = found(event);
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the name of a '" + typeName + "' value, found " + found
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the name of " + expected + ", found " + found
                 + " -- this position holds a value by name, written as dotted identifiers", "a qualified name", found);
         EventSkip.annotationsAndTypeRef(ctx);
         EventSkip.coreValue(ctx);

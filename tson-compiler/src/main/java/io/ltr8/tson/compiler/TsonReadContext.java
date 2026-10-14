@@ -238,6 +238,15 @@ public interface TsonReadContext {
     IdentifierPolicy identifierPolicy();
 
     /**
+     * Whether this read is of a value inside a <b>schema document</b> -- a constructor's binding record or a data
+     * entry's body, replayed through the governing meta's readers by the resolver ({@link #schemaDocument}).
+     * There, and only there, a bare name at a record position is a value written by name rather than §5.6's
+     * positional fill (SPEC-FEEDBACK.md #13): a schema has a namespace to resolve the name in, and a data document
+     * has none. False for every data document, so a data read is unchanged by the rule.
+     */
+    boolean readsSchemaDocument();
+
+    /**
      * How many problems have been reported through this read so far, counting every scoped copy since they
      * share one cursor. Monotonic, and independent of what the receiver does with them, so a reader can
      * checkpoint around a child read ({@code int before = ctx.reported(); ...; if (ctx.reported() > before)})
@@ -292,6 +301,15 @@ public interface TsonReadContext {
      */
     static TsonReadContext throwing(TsonEventSource events, IdentifierPolicy identifierPolicy) {
         return of(events, DiagnosticsReceiver.throwing(), identifierPolicy);
+    }
+
+    /**
+     * {@link #throwing} for a value inside a schema document, which {@link #readsSchemaDocument()} answers true
+     * for -- the resolver's replay of a constructor's binding record or a data entry's body, and nothing else.
+     */
+    static TsonReadContext schemaDocument(TsonEventSource events, IdentifierPolicy identifierPolicy) {
+        Objects.requireNonNull(identifierPolicy, "identifierPolicy");
+        return DefaultTsonReadContext.ofSchemaDocument(events, DiagnosticsReceiver.throwing(), identifierPolicy);
     }
 
     /**

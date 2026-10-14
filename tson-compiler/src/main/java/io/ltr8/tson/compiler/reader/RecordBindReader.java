@@ -80,7 +80,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                              AnnotationTypes annotationTypes) {
         super(name, displayName, body, tokenAware(name, descriptor.fields(),
                 descriptor.annotationsCarrier().orElse(null), resolver, context, schemaLocation), schemaLocation,
-                fieldNameRule(name, body, context), context.schema().entries()::get);
+                fieldNameRule(name, body, context));
         this.descriptor = descriptor;
         this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
         this.annotationTypes = annotationTypes;
@@ -116,10 +116,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             // The component is the target at every depth below the field too (BindTargets), and the bridge and box
             // are applied here because this reader builds its constructor arguments itself -- ltr8-bind's binder,
             // which collects a record's arguments through their bridges, is the step a schema-driven read replaces.
-            TsonTypeReader<?> rebound = BindTargets.to(field.schema().type().name(), field.parser(),
-                    target.dataClass(), "field '" + field.name() + "'", "component '" + target.name() + "'",
-                    new BindTargets.Site(field.name(), resolver, context.schema().entries()::get,
-                            this.annotationTypes, mismatches), true);
+            TsonTypeReader<?> rebound = BindTargets.to(field.parser(), target.dataClass(),
+                    "field '" + field.name() + "'", "component '" + target.name() + "'",
+                    new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches), true);
             if (rebound != field.parser()) {
                 field = new CompiledField(field.name(), field.schema(), rebound);
                 fields.set(i, field);
@@ -378,8 +377,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 if (labelled != null) {
                     SchemaLocation location = context.locationOf(name, typeDefinition);
                     return new GroupUnionBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
-                            labelled, resolver, location, fieldNameRule(name, body, context),
-                            context.schema().entries()::get);
+                            labelled, resolver, location, fieldNameRule(name, body, context));
                 }
                 return new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
                         requireRecord(name, dataClass), resolver, context,

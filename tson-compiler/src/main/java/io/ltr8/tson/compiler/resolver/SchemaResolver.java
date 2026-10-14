@@ -879,10 +879,14 @@ public final class SchemaResolver {
                 parameters.isEmpty() ? TypeKind.PRODUCT : TypeKind.TEMPLATE, List.of(), List.of(), body, position, Annotations.empty());
     }
 
-    /** One already-resolved {@code DataValue} replayed through a compiled reader, judging names under {@code names}. */
+    /**
+     * One already-resolved {@code DataValue} replayed through a compiled reader, judging names under {@code names},
+     * as a read of a schema document's value ({@link TsonReadContext#readsSchemaDocument()}): a bare name at a
+     * record position is a value by name here and nowhere else.
+     */
     private static Object read(TsonTypeReader<?> reader, io.ltr8.tson.compiler.ast.DataValue value,
                                IdentifierPolicy names) {
-        return reader.read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)), names));
+        return reader.read(TsonReadContext.schemaDocument(new ListEventSource(DataValueEvents.of(value)), names));
     }
 
     /**

@@ -9,16 +9,12 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.QualifiedName;
-import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TupleElement;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * A position's reader bound to what a Java target declares -- a record component, or, at any depth below one, a
@@ -39,11 +35,12 @@ import java.util.function.Function;
  *       class needs the tuple's arity and somewhere for each voidable position's void value.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
  *       nothing is rebuilt.</li>
- *   <li><b>A {@link QualifiedName} target</b> holds the value by name (SPEC-FEEDBACK.md #13), so the position's
- *       own reader is set aside for a {@link QualifiedNameReader} -- judged by the schema type rather than by its
- *       reader, since a name needs no class for the type it names a value of. The type must be a record whose
- *       bare token is not positional: at an atom a token is a literal, and at {@code type_ref} it is a type
- *       reference ({@link RecordAbstractReader#bareTokenFillsPositionally}).</li>
+ *   <li><b>A {@link QualifiedName} target</b> holds the value by name (SPEC-FEEDBACK.md #13), as a {@code TypeRef}
+ *       component holds a type reference, so the position's reader is set aside for a {@link QualifiedNameReader}.
+ *       The position must be a record whose bare token is not positional
+ *       ({@link RecordAbstractReader#bareTokenFillsPositionally}): at an atom, an array, a map or a tuple a name
+ *       has no place, and at {@code type_ref} a bare token is a type reference. A record type no class is bound
+ *       to still takes a name, which needs no class for the value it names.</li>
  * </ul>
  * The target's bridge, then its {@code Annotated} box, wrap whatever comes out. Anything else -- a dispatcher, a
  * choice, a gap -- is read as it is.
@@ -59,12 +56,9 @@ final class BindTargets {
     private BindTargets() {
     }
 
-    /**
-     * What every rebuild at one record field shares: the field's name, the schema's readers and entries, the
-     * mismatches.
-     */
-    record Site(String field, TsonTypeReaderResolver resolver, Function<String, TypeDefinition> namespace,
-                AnnotationTypes annotationTypes, List<String> mismatches) {
+    /** What every rebuild at one record field shares: the field's name, the schema's readers, the mismatches. */
+    record Site(String field, TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes,
+                List<String> mismatches) {
     }
 
     /**
@@ -74,41 +68,36 @@ final class BindTargets {
      * @param where the target, as a message names it -- {@code component 'age'}
      * @param top   whether this is the field's own position, whose rebuilt reader takes the field's name
      */
-    static TsonTypeReader<?> to(String typeName, TsonTypeReader<?> reader, DataClass target, String what,
-                                String where, Site site, boolean top) {
+    static TsonTypeReader<?> to(TsonTypeReader<?> reader, DataClass target, String what, String where, Site site,
+                                boolean top) {
         DataClass payload = target instanceof DataClassAnnotated boxed ? boxed.valueClass() : target;
-        if (payload.typeClass() != QualifiedName.class) {
-            return to(reader, target, what, where, site, top);
-        }
-        TsonTypeReader<?> named = byName(typeName, what, where, site);
-        return AnnotationBoxing.wrap(ElementBridging.wrap(named, payload), target, site.annotationTypes());
+        TsonTypeReader<?> bound = payload.typeClass() == QualifiedName.class ? byName(reader, what, where, site)
+                : shaped(reader, payload, what, where, site, top);
+        return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
     }
 
     /**
-     * The reader for a position of schema type {@code typeName} whose target holds a {@link QualifiedName},
-     * recording a mismatch where that type holds no name.
+     * The reader for a position read by {@code reader} whose target holds a {@link QualifiedName}, recording a
+     * mismatch where that position holds no name.
      */
-    private static TsonTypeReader<?> byName(String typeName, String what, String where, Site site) {
-        TypeDefinition declared = site.namespace().apply(ReferenceChain.terminal(typeName, site.namespace()));
-        if (declared == null || !(declared.body() instanceof RecordBody record)) {
-            site.mismatches().add(what + " is typed '" + typeName + "', which is no record, and " + where
-                    + " holds a " + QualifiedName.class.getSimpleName() + " -- a value stands by name only at a "
-                    + "record-typed position (a constructor, or a record a schema declares)");
-        } else if (RecordAbstractReader.bareTokenFillsPositionally(record, site.namespace())) {
-            site.mismatches().add(what + " is typed '" + typeName + "', whose bare token fills its one field "
-                    + "positionally (§5.6), and " + where + " holds a " + QualifiedName.class.getSimpleName()
-                    + " -- a name stands only where a bare token is not that field's value");
+    private static TsonTypeReader<?> byName(TsonTypeReader<?> reader, String what, String where, Site site) {
+        TsonTypeReader<?> slot = RecordAbstractReader.unwrapped(reader);
+        String holds = where + " holds a " + QualifiedName.class.getSimpleName();
+        if (slot instanceof RecordAbstractReader<?> record) {
+            if (record.bareTokenFillsPositionally()) {
+                site.mismatches().add(what + " is typed '" + record.displayName + "', whose bare token fills its "
+                        + "one field positionally (§5.6), and " + holds + " -- a name stands only where a bare "
+                        + "token is not that field's value");
+            }
+            return new QualifiedNameReader("a '" + record.displayName + "' value");
         }
-        return new QualifiedNameReader(typeName);
-    }
-
-    /** {@code reader} bound to {@code target} -- {@link #to(String, TsonTypeReader, DataClass, String, String,
-     * Site, boolean)} for a target that holds the value rather than its name. */
-    private static TsonTypeReader<?> to(TsonTypeReader<?> reader, DataClass target, String what, String where,
-                                        Site site, boolean top) {
-        DataClass payload = target instanceof DataClassAnnotated boxed ? boxed.valueClass() : target;
-        TsonTypeReader<?> bound = shaped(reader, payload, what, where, site, top);
-        return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
+        if (slot instanceof ErrorReader || slot instanceof RecordTagDispatchReader
+                || slot instanceof RecordMemberDispatchReader || slot == null) {
+            return new QualifiedNameReader("a value for " + what);
+        }
+        site.mismatches().add(what + " is no record, and " + holds + " -- a value stands by name only at a "
+                + "record-typed position (a constructor, or a record a schema declares)");
+        return reader;
     }
 
     private static TsonTypeReader<?> shaped(TsonTypeReader<?> reader, DataClass target, String what, String where,
@@ -170,8 +159,7 @@ final class BindTargets {
                     + collection.typeClass().getSimpleName() + ", which has no null to hold one");
         }
         String targetName = collection.typeClass().getSimpleName();
-        String elementType = array.body.elementType().name();
-        TsonTypeReader<?> element = to(elementType, site.resolver().resolve(elementType),
+        TsonTypeReader<?> element = to(site.resolver().resolve(array.body.elementType().name()),
                 collection.arrayDataClass(), what + "'s element", targetName + "'s element", site, false);
         return new ArrayBindReader(top ? site.field() : array.name, top ? site.field() : array.displayName,
                 array.body, collection, element, array.schemaLocation, array.elementsAreNames);
@@ -188,11 +176,9 @@ final class BindTargets {
                     + keyed.typeClass().getName() + ", which does not keep insertion order -- declare a SequencedMap");
         }
         String targetName = keyed.typeClass().getSimpleName();
-        String keyType = map.body.keyType().name();
-        String valueType = map.body.valueType().name();
-        TsonTypeReader<?> key = to(keyType, site.resolver().resolve(keyType), keyed.keyDataClass(),
+        TsonTypeReader<?> key = to(site.resolver().resolve(map.body.keyType().name()), keyed.keyDataClass(),
                 what + "'s key", targetName + "'s key", site, false);
-        TsonTypeReader<?> value = to(valueType, site.resolver().resolve(valueType), keyed.valueDataClass(),
+        TsonTypeReader<?> value = to(site.resolver().resolve(map.body.valueType().name()), keyed.valueDataClass(),
                 what + "'s value", targetName + "'s value", site, false);
         return new MapBindReader(top ? site.field() : map.name, top ? site.field() : map.displayName, map.body,
                 keyed, key, value, map.schemaLocation, map.keysAreNames);
@@ -221,8 +207,7 @@ final class BindTargets {
         List<TsonTypeReader<?>> positions = new ArrayList<>(tuple.body.elements().size());
         for (int i = 0; i < tuple.body.elements().size(); i++) {
             TupleElement element = tuple.body.elements().get(i);
-            String positionType = element.elementType().name();
-            positions.add(to(positionType, site.resolver().resolve(positionType),
+            positions.add(to(site.resolver().resolve(element.elementType().name()),
                     positional.elements()[i].dataClass(), what + "'s position " + i,
                     targetName + "'s element " + i, site, false));
         }

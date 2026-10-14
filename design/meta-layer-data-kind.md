@@ -72,8 +72,8 @@ which must sit at the schema layer because that is the only layer able to name r
   things the linker checks differently — a reference against the namespace, a name against a slot. A body that
   holds names in a nested record (an interface's methods) collects them itself, since the nested record is no `Data`
   and has no channel of its own; the corpus's `Interface`/`Method` (`tson-compiler/src/testShared`) is the shape.
-- **Where a `QualifiedName` component may stand is checked when the reader is built** (`BindTargets`): the slot's
-  type must be a record whose bare token is not positional. At an atom a token is a literal, and at `type_ref` it
+- **Where a `QualifiedName` component may stand is checked when the reader is built** (`BindTargets`): the slot
+  must be read by a record whose bare token is not positional. At an atom a token is a literal, and at `type_ref` it
   fills `name` (§5.6) and is a type reference, so a `QualifiedName` there is a `BindMismatchException`. The
   component holds a name and nothing else: a braced value at the slot is refused at the read, which is the
   binding's verdict — a class wanting a record value inline declares that record's class instead.

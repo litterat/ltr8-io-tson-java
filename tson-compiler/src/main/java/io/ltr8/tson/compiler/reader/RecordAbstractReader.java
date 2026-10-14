@@ -18,10 +18,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.QualifiedName;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -84,15 +80,18 @@ import java.util.stream.Collectors;
  * reads whatever's already sitting at the cursor directly as that single field's own value, with no
  * synthetic wrapping needed at all.
  *
- * <p><b>A name is not a positional fill where the fill would be product-typed</b> (SPEC-FEEDBACK.md #13). At a
- * record-typed position an unquoted token well-formed as a qualified name ({@link QualifiedNameReader#nameIn})
- * is a value written by name, so the positional form keeps a bare token only where its one field is
- * <b>atom</b>-typed -- {@code type_ref}'s {@code name}, a {@code type_name}, which is how a type reference
- * keeps its bare spelling -- and loses it where the field is a product or a sum: {@code record_field}'s
- * {@code p: x} for {@code p: { type: x }} is the withdrawn spelling. The fact is decided once, here
- * ({@link #positionalTakesNames}); what the record reader does with a name it does not take is refuse it as no
- * record, since a component that holds the name is read by {@link QualifiedNameReader} instead and never
- * reaches this class. A token that is no name -- {@code 42} -- still fills the field as before.
+ * <p><b>In a schema document, a name is not a positional fill where the fill would be product-typed</b>
+ * (SPEC-FEEDBACK.md #13). When the read is of a value inside a schema document ({@link
+ * TsonReadContext#readsSchemaDocument()}), an unquoted token well-formed as a qualified name ({@link
+ * QualifiedNameReader#nameIn}) at a record position is a value written by name, so the positional form keeps a
+ * bare token only where its one field is <b>atom</b>-typed -- {@code type_ref}'s {@code name}, a {@code
+ * type_name}, which is how a type reference keeps its bare spelling -- and loses it where the field is a product
+ * or a sum: {@code !record { fields: { p => x } }} is refused. The record reader refuses a name it does not take
+ * as no record, since a component that holds the name is read by {@link QualifiedNameReader} instead and never
+ * reaches this class. A data document has no namespace to resolve a name in, so its reads are untouched: there
+ * {@code p: x} at a {@code record_field} position still fills {@code type}. Whether the positional field is
+ * atom-typed is read off its own compiled reader ({@link #bareTokenFillsPositionally}), the one this class was
+ * built with.
  */
 abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
@@ -156,10 +155,11 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final int positionalFieldIndex;
 
     /**
-     * Whether the positional field's declared type is a product or a sum rather than an atom, so a token
-     * well-formed as a qualified name at this position is a value by name rather than that field's value.
+     * The positional field's reader as this class was built with it, before a subclass rebinds the field to a
+     * Java target -- what {@link #bareTokenFillsPositionally} asks whether the field is atom-typed; {@code null}
+     * where the record has no positional field.
      */
-    private final boolean positionalTakesNames;
+    private final TsonTypeReader<?> positionalReader;
     final SchemaLocation schemaLocation;
 
     /**
@@ -178,13 +178,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     /** What this record's rules say when a document breaks one -- shared with the JSON reader ([TSON-JSON] §9.4). */
     private final RecordDiagnostics rules;
 
-    /**
-     * @param namespace the compiled schema's entries, through which the positional field's declared type is
-     *                  followed to its body ({@link #positionalTakesNames})
-     */
     RecordAbstractReader(String name, String displayName, RecordBody body, FieldReaders readers,
-                          SchemaLocation schemaLocation, TsonReadContext.FieldNameRule fieldNames,
-                          Function<String, TypeDefinition> namespace) {
+                          SchemaLocation schemaLocation, TsonReadContext.FieldNameRule fieldNames) {
         this.name = name;
         this.fieldNames = fieldNames;
         this.displayName = displayName;
@@ -223,8 +218,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         }
         this.groupPlans = groups.stream().map(group -> GroupPlan.of(group, fieldIndex)).toArray(GroupPlan[]::new);
         this.positionalFieldIndex = requiredCount == 1 ? solePositionalField : -1;
-        this.positionalTakesNames = positionalFieldIndex >= 0
-                && !atomTyped(fields.get(positionalFieldIndex).schema(), namespace);
+        this.positionalReader = positionalFieldIndex >= 0 ? fields.get(positionalFieldIndex).parser() : null;
         this.declaredFields = fields.stream().map(field -> field.name()).collect(Collectors.joining(" | "));
         this.rules = new RecordDiagnostics(displayName, declaredFields);
     }
@@ -289,11 +283,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             ctx.next();
             return new ShapeResult(Shape.EMPTY, anchor);
         }
-        if (positionalFieldIndex >= 0 && !positionalTakesNames) {
-            return new ShapeResult(Shape.POSITIONAL, anchor);
-        }
-        Optional<QualifiedName> byName = QualifiedNameReader.nameIn(e);
-        if (positionalFieldIndex >= 0 && byName.isEmpty()) {
+        Optional<QualifiedName> byName = ctx.readsSchemaDocument() ? QualifiedNameReader.nameIn(e) : Optional.empty();
+        if (positionalFieldIndex >= 0 && (byName.isEmpty() || bareTokenFillsPositionally())) {
             return new ShapeResult(Shape.POSITIONAL, anchor);
         }
         ctx.report(rules.notARecord(byName.map(written -> "the name '" + written + "'")
@@ -303,34 +294,51 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * Whether a bare token at a position of record type {@code body} fills its one positional field (§5.6) --
-     * false where the record has none, and where that field is product- or sum-typed, so a token well-formed
-     * as a qualified name there is a value by name (SPEC-FEEDBACK.md #13). {@link BindTargets} asks it before
-     * giving a slot of this type a {@link QualifiedNameReader}: a type whose bare token is positional holds no
-     * name, and a type with no positional field holds one wherever it is a record.
+     * Whether a bare token at this record's position fills its one positional field (§5.6) in a schema document --
+     * false where the record has none, and where that field is product- or sum-typed, so a token well-formed as a
+     * qualified name there is a value by name (SPEC-FEEDBACK.md #13). {@link BindTargets} asks it before giving a
+     * slot of this type a {@link QualifiedNameReader}: a type whose bare token is positional holds no name.
+     *
+     * <p>Asked of the field's own reader rather than of its declaration, at the read rather than at construction:
+     * a recursive schema hands this class a {@link DeferredTypeReader} for a field still being built, which can
+     * say what it stands for only once compilation has finished.
      */
-    static boolean bareTokenFillsPositionally(RecordBody body, Function<String, TypeDefinition> namespace) {
-        RecordField sole = null;
-        for (RecordField field : body.fields().values()) {
-            if (!field.optional()) {
-                if (sole != null) {
-                    return false;
-                }
-                sole = field;
-            }
-        }
-        return sole != null && atomTyped(sole, namespace);
+    final boolean bareTokenFillsPositionally() {
+        return positionalReader != null && readsAnAtom(positionalReader);
     }
 
     /**
-     * Whether {@code field}'s declared type is an atom, followed through its reference chain ([TSON-SCHEMA] §8.3).
-     * A name the namespace does not hold -- a type parameter, an application not yet minted -- answers true, which
-     * keeps the positional form exactly as it was for every position this rule cannot judge.
+     * Whether {@code reader} reads an atom, looking through a §7.2 subsumption guard and a deferred reader. A reader
+     * this cannot see through -- a gap -- answers true, which keeps the positional form as it was.
      */
-    private static boolean atomTyped(RecordField field, Function<String, TypeDefinition> namespace) {
-        String terminal = ReferenceChain.terminal(field.type().name(), namespace);
-        TypeDefinition definition = namespace.apply(terminal);
-        return definition == null || definition.body() instanceof Atom;
+    static boolean readsAnAtom(TsonTypeReader<?> reader) {
+        TsonTypeReader<?> inner = unwrapped(reader);
+        return switch (inner) {
+            case null -> true;
+            case AtomTypeReader<?> ignored -> true;
+            case AtomTreeReader ignored -> true;
+            case VoidReader ignored -> true;
+            case VoidTreeReader ignored -> true;
+            case ErrorReader ignored -> true;
+            default -> false;
+        };
+    }
+
+    /** {@code reader} with any subsumption guard and finished deferral removed; {@code null} for an unfinished one. */
+    static TsonTypeReader<?> unwrapped(TsonTypeReader<?> reader) {
+        TsonTypeReader<?> current = reader;
+        while (true) {
+            if (current instanceof VariantSchemaReader guard) {
+                current = guard.wrapped();
+            } else if (current instanceof DeferredTypeReader<?> deferred) {
+                current = deferred.resolved();
+                if (current == null) {
+                    return null;
+                }
+            } else {
+                return current;
+            }
+        }
     }
 
     /**

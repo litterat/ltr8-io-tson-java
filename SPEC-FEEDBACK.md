@@ -1074,18 +1074,21 @@ holds a value declared elsewhere, written by its name.**
 
 **Proposed.** Two rules, both outside the kernel.
 
-*A bare name at a product-typed position is a qualified name.* At a data position whose declared type is PRODUCT-kind
-— a constructor, or a record a schema declares — an unquoted token that is well-formed as a qualified name is one,
-and the position's value is the value it names. It resolves to a store element whose declared type IS-A the
+*A bare name at a product-typed position in a schema document is a qualified name.* At a position inside a schema
+document — a constructor's binding record, a data entry's body — whose declared type is PRODUCT-kind — a
+constructor, or a record a schema declares — an unquoted token that is well-formed as a qualified name is one, and
+the position's value is the value it names. The name resolves to a store element whose declared type IS-A the
 position's type (§7.2), and is refused where nothing resolves or where what resolves is of another type: found
-first, judged after, never a choice among candidates. `request: place_order_request` resolves to an entry whose
-body is built by `record`; `request: user_id` resolves to an entry built by `uuid_type` and is refused for that
-reason, with no bound written anywhere. A token at an atom-typed position stays a literal, as `verb: GET` is, and
-§5.6's positional form keeps a bare token exactly where it would fill an **atom**-typed field — which is `type_ref`,
-whose `name` is `type_name`, so a type reference reads as it does today — and loses it where it would fill a
-product-typed one, which no canonical output writes (`record_field`'s `p: x` for `p: { type: x }` is the one such
-spelling, and §8.1 writes the explicit record). The positional form stays a spelling rule for data values; by name
-is the spelling for a value that already has a name.
+first, judged after, never a choice among candidates. `request: place_order_request` resolves to an entry whose body
+is built by `record`; `request: user_id` resolves to an entry built by `uuid_type` and is refused for that reason,
+with no bound written anywhere. The rule is a schema document's alone: a name resolves in a schema's namespace, and
+a data document has none, so a data document reads every bare token as it does today. A token at an atom-typed
+position stays a literal, as `verb: GET` is, and §5.6's positional form keeps a bare token exactly where it would
+fill an **atom**-typed field — which is `type_ref`, whose `name` is `type_name`, so a type reference reads as it
+does today — and loses it where it would fill a product-typed one in a schema document, which no canonical output
+writes (`!record { fields: { p => x } }` for `p => { type: x }` is the one such spelling, and §8.1 writes the
+explicit record). The positional form stays a spelling rule for data values; by name is the spelling, in a schema,
+for a value that already has a name.
 
 *A qualified name is segments joined by `.`.* The first segment is a type name and resolves as a `type_ref` does,
 locally and through imports, alias hops followed (§8.3). Each further segment selects **in a value**: a field of a
@@ -1209,16 +1212,18 @@ vectors over a `meta-service.tn` fixture: names as list elements and map values,
 subtype of the slot's type, an enum-keyed map entered by a label, literals at atom-typed slots, the resolved output,
 and refusals of a quoted name, malformed segments, a dotted name at a `type_ref` slot, a text-keyed map, a framed
 name, the meta's own constructor named from a governed schema, an open entry, a segment through a list, and the
-withdrawn positional spelling in a data document and in `!record { fields: { p => x } }`. The pieces:
+withdrawn positional spelling `!record { fields: { p => x } }`; a `validate/` vector pins that a data document's
+positional fills, the product-typed one included, read as before. The pieces:
 
 - *The value.* `schema.meta.QualifiedName`, segments joined by `.`, beside `TypeRef` and not merged with it. A
   consumer's `Data` class declares a slot holding a value by name as a `QualifiedName` component, the way it declares
   a `type_ref` slot as `TypeRef`.
-- *The read.* §5.6's positional form keeps a bare token where the record's one positional field is atom-typed and
+- *The read.* In a schema document — the resolver's replay of a binding record or a data body, which the read
+  context marks — §5.6's positional form keeps a bare token where the record's one positional field is atom-typed and
   loses it where that field is a product or a sum; there an unquoted token whose segments are each a [TSON-DATA] §7.7
-  identifier is a name. A `QualifiedName` component reads it as written; any other reader of that position — tree
-  mode, a component holding the record's own class — refuses it as no record (`TYPE_MISMATCH`), since nothing in a
-  data read resolves it. A quoted token is text, never a name.
+  identifier is a name. A `QualifiedName` component reads it as written; the record's own reader refuses it as no
+  record (`TYPE_MISMATCH`). A quoted token is text, never a name. Data documents read as before, in tree and bind
+  mode alike.
 - *The resolver* keeps the name as written, and resolved output writes it back as the bare token it was read from.
 - *The linker* resolves each name a body declares through `Data.names()`, a sibling of `Data.references()` that
   carries each name with its slot (the path of field names, map keys and indexes from the body), and judges as the
@@ -1234,9 +1239,12 @@ withdrawn positional spelling in a data document and in `!record { fields: { p =
    An array-, map- or tuple-typed slot holds no value by name. The broader reading (every PRODUCT kind) would let a
    name stand for a list, which the segment rules never reach (no `[n]`), so a slot of that kind could only name a
    map or list entry by its key — a use the proposal does not make.
-3. *A name in a data document* is refused where it stands rather than read and left unresolved, except where a bound
-   component holds a `QualifiedName`: §5.12's store is a schema's namespace, and a data document has none. Such a
-   component receives the name unresolved, as a `type_ref` in a data document is.
+3. *The rule does not reach a data document.* §5.12's store is a schema's namespace, and a data document has none,
+   so nothing there could resolve a name: a data document's bare token at a record position fills the positional
+   field whatever its type, `p: x` at a `record_field` position included, exactly as before. The other reading —
+   the rule over all schema-backed data, as §5.6's positional form is — would refuse in a data document a spelling
+   that reads today, for a name nothing there can look up. A host class that declares a `QualifiedName` component
+   still receives a name, unresolved, as a `TypeRef` component receives a type reference.
 4. *An entry's declared type* is its `source` where that names a constructor of the declaring schema's meta layer,
    and otherwise the kernel constructor its body mirrors — so an enum built by a meta layer's `text_enum` is a
    `text_enum`, not only an `enum`. "Its body's constructor" alone would lose that.
@@ -1259,14 +1267,16 @@ withdrawn positional spelling in a data document and in `!record { fields: { p =
     body, so a qualified name has no JSON position. The suggestion's "a JSON string at the position" stands for when
     one exists.
 
-**Breaking changes, against Revision 37:** the positional bare token at a product-typed fill is withdrawn (no bundled
-schema or corpus vector writes one); no kernel entry, pin or resolved fixture changes.
+**Breaking changes, against Revision 37:** in a schema document, the positional bare token at a product-typed fill is
+withdrawn (no bundled schema or corpus vector writes one); data documents are unchanged; no kernel entry, pin or
+resolved fixture changes.
 
 **Suggested resolution.**
 
 - [TSON-SCHEMA] §5.6, after "The positional form is general over schema-backed data": "A bare token at a position
-  whose declared type is PRODUCT-kind is a qualified name (§5.12) unless the positional form would fill an atom-typed
-  field, in which case it fills it. The explicit record is the only spelling of a product-typed fill."
+  whose declared type is PRODUCT-kind, in a schema document, is a qualified name (§5.12) unless the positional form
+  would fill an atom-typed field, in which case it fills it; there the explicit record is the only spelling of a
+  product-typed fill. A data document has no namespace to resolve a name in, and reads every bare token positionally."
 - [TSON-SCHEMA] new §5.12 "Values by name": the two rules above — the position, the store, the judgement, the segment
   grammar, resolution "as written" in output — with `orders.methods.place_order` as the example and the refusal table.
 - [TSON-SCHEMA] §5.10: the sentence on a bound at a field notes that a product-typed field written by name needs none.

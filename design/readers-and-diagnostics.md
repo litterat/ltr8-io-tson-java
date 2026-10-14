@@ -38,8 +38,11 @@ is small and parsed once.)
   path segment — a *node*, not a string, see
   `design/reader-naming-and-schema-location.md`), `at`/`withSchemaPosition`/`withPosition`,
   `report(code, message, expected, actual)`, `reported()`. The factories are `of(events, receiver)`,
-  `of(events, receiver, identifierPolicy)` and `throwing(events, identifierPolicy)`, over one
-  implementation. **The context holds no error policy**: `report` builds the `Diagnostic` from the path and
+  `of(events, receiver, identifierPolicy)`, `throwing(events, identifierPolicy)` and
+  `schemaDocument(events, identifierPolicy)`, over one implementation. The last is the resolver's replay of a value
+  inside a schema document, the one read whose `readsSchemaDocument()` is true; the readers consult it for the one
+  rule that is a schema document's alone, a bare name at a record position being a value by name
+  (`design/record-dispatch.md`). **The context holds no error policy**: `report` builds the `Diagnostic` from the path and
   positions it tracks and hands it to the read's **`DiagnosticsReceiver`**, which decides its fate —
   `throwing()` raises `ReadException` at the first problem, `collecting()` accumulates into a
   `DiagnosticsCollector`, and a caller's own `void report(Diagnostic)` can stream them anywhere. No

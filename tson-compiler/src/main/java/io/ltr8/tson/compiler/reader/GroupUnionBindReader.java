@@ -12,10 +12,8 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.Map;
-import java.util.function.Function;
 
 /**
  * Binds an <b>untagged labelled choice</b> -- a record whose fields form one REQUIRED group, exactly one of
@@ -56,7 +54,7 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
 
     GroupUnionBindReader(String name, String displayName, RecordBody body, Map<String, DataClassRecord> members,
                           TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
-                          FieldNameRule fieldNames, Function<String, TypeDefinition> namespace) {
+                          FieldNameRule fieldNames) {
         // Per field, so a member whose own component is a Token reads the token where its sibling of the
         // same schema type reads the value -- see RecordBindReader.tokenAware for why a slot wants one.
         super(name, displayName, body, (fieldName, field) -> {
@@ -65,7 +63,7 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
             return component == io.ltr8.tson.schema.meta.Token.class
                     ? AtomTypeReader.of(name, RawTokenParser.INSTANCE, schemaLocation)
                     : resolver.resolve(field.type().name());
-        }, schemaLocation, fieldNames, namespace);
+        }, schemaLocation, fieldNames);
         this.members = members;
     }
 

@@ -50,13 +50,14 @@ class QualifiedNameReaderTest {
     @Test
     void theReaderKeepsTheNameAsWritten() {
         assertEquals(QualifiedName.of("a", "b"),
-                new QualifiedNameReader("method").read(TestDocuments.document("a.b")));
+                new QualifiedNameReader("a 'method' value").read(TestDocuments.document("a.b")));
     }
 
     @Test
     void aBracedValueIsNoName() {
         List<Diagnostic> reported = new ArrayList<>();
-        assertNull(new QualifiedNameReader("method").read(TestDocuments.document("{ a: 1 }", reported::add)));
+        assertNull(new QualifiedNameReader("a 'method' value")
+                .read(TestDocuments.document("{ a: 1 }", reported::add)));
         assertEquals(1, reported.size(), reported.toString());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, reported.getFirst().code());
         assertTrue(reported.getFirst().message().contains("expected the name of a 'method' value, found a record"),
