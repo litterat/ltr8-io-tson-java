@@ -5,6 +5,7 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
@@ -16,6 +17,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -84,10 +86,18 @@ final class DefaultTsonReadContext implements TsonReadContext {
          */
         boolean fieldNamesTheSchemas;
 
-        Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy) {
+        /**
+         * Where a schema document's read hands each reference it produces by name ({@link #heldByName}); {@code
+         * null} for every other read, which is what {@link #readsSchemaDocument()} answers from.
+         */
+        final BiConsumer<List<String>, TypeRef> heldByName;
+
+        Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy,
+               BiConsumer<List<String>, TypeRef> heldByName) {
             this.events = events;
             this.receiver = receiver;
             this.identifierPolicy = identifierPolicy;
+            this.heldByName = heldByName;
         }
     }
 
@@ -150,8 +160,16 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
                               IdentifierPolicy identifierPolicy) {
-        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy), null, null, null,
+        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy, null), null, null, null,
                 Optional.empty(), Optional.empty());
+    }
+
+    /** {@link #of(TsonEventSource, DiagnosticsReceiver, IdentifierPolicy)} for a value inside a schema document. */
+    static TsonReadContext ofSchemaDocument(TsonEventSource events, DiagnosticsReceiver receiver,
+                                            IdentifierPolicy identifierPolicy,
+                                            BiConsumer<List<String>, TypeRef> heldByName) {
+        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy, heldByName), null, null,
+                null, Optional.empty(), Optional.empty());
     }
 
     private DefaultTsonReadContext stepping(PathStep step) {
@@ -294,6 +312,24 @@ final class DefaultTsonReadContext implements TsonReadContext {
     @Override
     public IdentifierPolicy identifierPolicy() {
         return cursor.identifierPolicy;
+    }
+
+    @Override
+    public boolean readsSchemaDocument() {
+        return cursor.heldByName != null;
+    }
+
+    @Override
+    public void heldByName(TypeRef reference) {
+        if (cursor.heldByName == null) {
+            return;
+        }
+        List<String> slot = new ArrayList<>();
+        for (PathStep step = tail; step != null; step = step.parent()) {
+            slot.add(step.name() != null ? step.name() : Integer.toString(step.index()));
+        }
+        Collections.reverse(slot);
+        cursor.heldByName.accept(List.copyOf(slot), reference);
     }
 
     /**

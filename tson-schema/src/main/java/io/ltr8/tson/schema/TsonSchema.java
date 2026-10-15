@@ -1,10 +1,13 @@
 package io.ltr8.tson.schema;
 
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -17,22 +20,16 @@ import java.util.Objects;
  * SchemaMap}. {@code entries}' insertion order is preserved, matching {@code SchemaMap.
  * declarations}' own ordering guarantee.
  *
- * <p><b>{@code id} is required, not {@code Optional}</b> (2026-07-26, on the user's own explicit
- * direction) -- the grammar itself marks {@code !!id} optional (a raw parsed {@code SchemaDocument}
- * can genuinely lack one), but a {@code TsonSchema} value -- the *resolved*, actually-usable thing
- * this module represents -- always needs a real identity. A document with no {@code !!id} simply
- * never becomes a {@code TsonSchema} at all -- {@code TsonSchemaResolver}'s own document-level
- * resolution enforces this before ever constructing one (see its own Javadoc on {@code
- * resolveSchema}'s {@code !!id} validation).
+ * <p><b>{@code id} is required, not {@code Optional}</b> -- the grammar itself marks {@code !!id} optional (a raw
+ * parsed {@code SchemaDocument} can genuinely lack one), but a {@code TsonSchema} value -- the *resolved*,
+ * actually-usable thing this module represents -- always needs a real identity. A document with no {@code !!id}
+ * simply never becomes a {@code TsonSchema} at all -- {@code TsonSchemaResolver}'s own document-level resolution
+ * enforces this before ever constructing one (see its own Javadoc on {@code resolveSchema}'s {@code !!id}
+ * validation).
  *
- * <p><b>A record, not a plain class</b> (2026-07-26, on the user's own explicit direction) --
- * previously kept as a plain class specifically so a bootstrap subclass ({@code MetaSchema}) could
- * {@code extend} it directly; now that {@code MetaSchema} is gone, nothing needs to subclass this
- * anymore, so a record -- genuinely immutable, matching {@code imports}/{@code entries}'s own
- * already-defensive copying, and with accessor names that were already following record-style
- * bare-noun convention by hand -- is the better fit. The compact constructor still defensively
- * copies both collections; a second, convenience constructor covers the common case (fresh,
- * non-bootstrap) without every caller spelling out the trailing boolean.
+ * <p><b>A record</b>, genuinely immutable: the compact constructor defensively copies every collection, and
+ * convenience constructors cover the common case (fresh, non-bootstrap, nothing held by name) without every caller
+ * spelling out the trailing components.
  *
  * <p><b>No {@code materialised} flag</b> -- "has this schema been
  * through linking" is a *type* distinction, not a runtime-checked boolean: {@code
@@ -59,9 +56,28 @@ import java.util.Objects;
  * object in the entire system, ever, so a dedicated type would only relocate the flag (it would
  * still need to survive linking, so {@link TsonLinkedSchema} would need to carry it too) without
  * buying any safety a universal property like linked-ness actually needs.
+ *
+ * <p><b>{@link #valuesByName()}</b> -- for each entry whose body is a {@code data} constructor's instance, the
+ * references that body holds by name (SPEC-FEEDBACK.md #13), each with the slot it fills, as the resolver's read
+ * collected them: the reader records what it produced at a slot holding a value by name, so the list depends on
+ * nothing the host class declares. The linker resolves each and judges it against the slot's declared type. A fact
+ * the resolver hands the linker, never part of §8's output: no resolved document writes it.
  */
 public record TsonSchema(String id, String meta, List<String> imports, AnnotatedMap<String, TypeDefinition> entries,
-                          boolean bootstrap) {
+                          boolean bootstrap, Map<String, List<ValueByName>> valuesByName) {
+
+    /**
+     * One reference a {@code data} body holds by name: {@code slot} is the path from the body to the position it
+     * fills -- a field name at a record, a key at a map, an index at an array, as the read descended -- and
+     * {@code reference} the {@code type_ref} value read there, its {@code name} the qualified name as written.
+     */
+    public record ValueByName(List<String> slot, TypeRef reference) {
+
+        public ValueByName {
+            slot = List.copyOf(slot);
+            Objects.requireNonNull(reference, "reference");
+        }
+    }
 
     public TsonSchema {
         Objects.requireNonNull(id, "!!id is required");
@@ -70,6 +86,15 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
         // AnnotatedMap is fillable while a binder or resolver builds one, so copy to an immutable form --
         // entries() has always been unmodifiable and that is part of a registered schema being locked.
         entries = AnnotatedMap.copyOf(entries);
+        Map<String, List<ValueByName>> held = new LinkedHashMap<>();
+        valuesByName.forEach((name, values) -> held.put(name, List.copyOf(values)));
+        valuesByName = Collections.unmodifiableMap(held);
+    }
+
+    /** No value held by name -- every schema whose entries apply no {@code data} constructor that holds one. */
+    public TsonSchema(String id, String meta, List<String> imports, AnnotatedMap<String, TypeDefinition> entries,
+                       boolean bootstrap) {
+        this(id, meta, imports, entries, bootstrap, Map.of());
     }
 
     /**
@@ -89,6 +114,6 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
 
     /** This schema with {@code name}'s own annotations recorded -- everything else unchanged. */
     public TsonSchema withNameAnnotations(String name, Annotations annotations) {
-        return new TsonSchema(id, meta, imports, entries.withAnnotations(name, annotations), bootstrap);
+        return new TsonSchema(id, meta, imports, entries.withAnnotations(name, annotations), bootstrap, valuesByName);
     }
 }

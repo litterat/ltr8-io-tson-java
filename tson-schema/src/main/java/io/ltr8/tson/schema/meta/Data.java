@@ -31,6 +31,14 @@ import java.util.List;
  * Java side carries alone. §9 adds the rule an extension author needs beside it: a constructor field
  * holding a type reference MUST be typed {@code type_ref}, which is what makes the slot participate in
  * flattening, {@code @alias} recording, and structural identity.
+ *
+ * <p><b>A body's references reach the linker two ways.</b> Its type references, at slots typed {@code type_ref},
+ * it declares through {@link #references()}. The values it holds by name (SPEC-FEEDBACK.md #13) -- at a slot typed
+ * by a constructor or a record, a {@link TypeRef} carrying the qualified name as written -- it does not declare:
+ * the resolver's read records each one it produces, with its slot, and the linker judges them from that record
+ * whatever the class returns, so a by-name reference returned from {@link #references()} too is harmless. Both are
+ * one host shape because both are references that must resolve; a reference type ({@code ref<T>}) folds the two
+ * into one judgement by the slot's declared type.
  */
 public non-sealed interface Data extends Top {
 

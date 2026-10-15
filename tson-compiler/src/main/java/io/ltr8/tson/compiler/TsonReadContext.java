@@ -14,8 +14,10 @@ import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 /**
  * Carried through every {@link TsonTypeReader#read(TsonReadContext)} call -- the read's own pull
@@ -238,6 +240,23 @@ public interface TsonReadContext {
     IdentifierPolicy identifierPolicy();
 
     /**
+     * Whether this read is of a value inside a <b>schema document</b> -- a constructor's binding record or a data
+     * entry's body, replayed through the governing meta's readers by the resolver ({@link #schemaDocument}).
+     * There, and only there, a bare name at a record position is a value written by name rather than §5.6's
+     * positional fill (SPEC-FEEDBACK.md #13): a schema has a namespace to resolve the name in, and a data document
+     * has none. False for every data document, so a data read is unchanged by the rule.
+     */
+    boolean readsSchemaDocument();
+
+    /**
+     * Records {@code reference}, read by name at this context's position (SPEC-FEEDBACK.md #13), with the slot it
+     * fills -- the path this context has descended from the value's root. Only a schema document's read keeps it,
+     * handing it to the sink its factory was given ({@link #schemaDocument}); anywhere else it is dropped, a data
+     * document having no namespace to judge it in.
+     */
+    void heldByName(io.ltr8.tson.schema.meta.TypeRef reference);
+
+    /**
      * How many problems have been reported through this read so far, counting every scoped copy since they
      * share one cursor. Monotonic, and independent of what the receiver does with them, so a reader can
      * checkpoint around a child read ({@code int before = ctx.reported(); ...; if (ctx.reported() > before)})
@@ -292,6 +311,19 @@ public interface TsonReadContext {
      */
     static TsonReadContext throwing(TsonEventSource events, IdentifierPolicy identifierPolicy) {
         return of(events, DiagnosticsReceiver.throwing(), identifierPolicy);
+    }
+
+    /**
+     * {@link #throwing} for a value inside a schema document, which {@link #readsSchemaDocument()} answers true
+     * for -- the resolver's replay of a constructor's binding record or a data entry's body, and nothing else.
+     * Each reference the read produces by name reaches {@code heldByName} with its slot ({@link #heldByName}).
+     */
+    static TsonReadContext schemaDocument(TsonEventSource events, IdentifierPolicy identifierPolicy,
+                                          BiConsumer<List<String>, io.ltr8.tson.schema.meta.TypeRef> heldByName) {
+        Objects.requireNonNull(identifierPolicy, "identifierPolicy");
+        Objects.requireNonNull(heldByName, "heldByName");
+        return DefaultTsonReadContext.ofSchemaDocument(events, DiagnosticsReceiver.throwing(), identifierPolicy,
+                heldByName);
     }
 
     /**

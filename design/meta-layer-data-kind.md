@@ -10,9 +10,16 @@ history lives in git.
 - The registration is a `@Typename` and a name binder, and nothing else: no reader family, no
   `ValueReaderFactoryRegistry` entry.
 - A constructor with no resolvable class is an error where it is written.
-- `Data.references()` is declared, not discovered; a reference slot is typed `type_ref`, not `type_name`.
+- `Data.references()` is declared, not discovered, and serves `type_ref` slots; a reference slot is typed `type_ref`,
+  not `type_name`. A slot holding a value by name is typed by the value's type, and nothing declares its references:
+  the resolver's read records each with its slot (`TsonSchema.valuesByName`). Both bind a `TypeRef` -- every reference
+  has one host shape, and only the linker's judgement differs by slot.
+- One interim rule, closed by `ref<T>` landing on the proposal branch: the host's component type selects the
+  spelling at a record-typed slot (a `TypeRef` takes a name, a record class a braced value).
+- The linker reads a name's slot type off the constructor's resolved fields along the path the read recorded,
+  never off the Java class.
 - `TypeInhabitance` and `DiscriminationClass` handle a `Data` body by their `default` arm, which is safe only while the
-  linker refuses any reference naming a DATA entry.
+  linker refuses any *type reference* naming a DATA entry. A value by name may name one: it is a value, not a type.
 - A meta-schema keeps a constructor this library cannot build a reader for, as an `ErrorReader`; it is never dropped.
 - `!!meta` merges nothing into the type-name namespace: shared vocabulary goes in a third ordinary schema.
 
@@ -57,6 +64,28 @@ which must sit at the schema layer because that is the only layer able to name r
   reference slot `type_ref` rather than `type_name` (§5.6's positional form keeps the author writing a bare
   name either way). §9's guidance for extension meta-schemas is the other half: a slot holding a type reference
   MUST be typed `type_ref`, which is what makes it participate in reference walking and identity.
+- **A value by name is recorded by the read, not declared by the host** (SPEC-FEEDBACK.md #13). A slot typed by a
+  constructor or a record (`request?: record`, `method: method`) whose component is a `TypeRef` reads an unquoted
+  qualified name (`orders.methods.place_order`) as written, into the `TypeRef`'s `name`, and the read records it with
+  the path it descended (`["methods", "place_order", "request"]`), which `SchemaResolver` keeps per entry in
+  `TsonSchema.valuesByName`. **One host shape for every reference** is the point: `type_ref`, a qualified name and the
+  coming `ref<T>` are each a reference that must resolve, and differ only in the judgement — one segment naming a type
+  at a `type_ref` slot (`type_ref` is `ref<type>`, types living only in the schema map), segments reaching a value
+  IS-A the slot's type here. With one Java type, a host declaring its by-name references would decide their judgement
+  by which list it put them in — `request: text` returned from `references()` would resolve as a type and pass — so
+  nothing asks it to: the read's record is judged against the slot whatever the class returns, and a by-name
+  reference it also returns from `references()` is recognised by identity and not resolved as a type
+  (`design/linking-and-compilation.md`). This walks no data body and interprets nothing; it records what the reader
+  itself produced at a vocabulary-typed slot. Under `ref<T>` the two lists merge into one judgement by slot type.
+- **Which slot reads a `TypeRef` by name is decided when the reader is built** (`BindTargets`): a slot read by a
+  record whose bare token is not positional. At `type_ref` the bare token fills `name` (§5.6) and is bound as it
+  always was; at an atom a token is a literal and a `TypeRef` is a `BindMismatchException`. The component holds a
+  reference and nothing else: a braced value at the slot is refused at the read, which is the binding's verdict —
+  a class wanting a record value inline declares that record's class instead. That the host decides is the interim
+  rule above.
+- **A segment reaches into a data body only as an interim.** `data` is opaque to the type system and is the host's
+  to interpret, so the linker selects a field of a bound body through the host's record components and nothing in
+  the schema walks the body's values. That hop is what the namespace kind replaces.
 - **§8.2 reaches a body's values at the read, not at the link.** The linker's name walk sees a bound `Data`
   body as an opaque object, so `SchemaResolver` reads a `data` constructor's payload under the registry's
   identifier policy and the readers judge it as they judge a data document: the keys of an identifier-keyed map
@@ -66,12 +95,15 @@ which must sit at the schema layer because that is the only layer able to name r
 - **The silent defaults are worth knowing.** `TypeInhabitance` calls a `Data` body inhabited and
   `DiscriminationClass` gives it none, both by their `default` arm. Neither matters while the linker refuses
   to let anything name such an entry as a type — which is what makes that refusal load-bearing rather than
-  a nicety.
-- **Resolved output is ordinary.** §8.1's `body` carries an instance of whichever constructor built the
-  entry, and a meta-schema's own constructor is not a special case: a DATA entry writes as
-  `body: !operation { ... }`, formally indistinguishable from `!record { ... }`. What makes that work is a
-  general `ltr8-bind` rule (`DataClassUnion`) — a non-sealed union branch stands for its own implementations,
-  which exact-class membership would never match.
+  a nicety. A value by name may reach a DATA entry (`orders.methods.place_order` starts at one), and that is
+  no exception: a slot holding a value is not a type position, so `response: orders` at a `type_ref` slot is
+  still §4.1's refusal and `request: orders` at a `record` slot is refused as no `record`.
+- **Resolved output is ordinary.** §8.1's `body` carries an instance of whichever constructor built the entry, and a
+  meta-schema's own constructor is not a special case: a DATA entry writes as `body: !operation { ... }`, formally
+  indistinguishable from `!record { ... }`. A value by name is a `TypeRef` and is written as any `TypeRef` is; the
+  name in it is the one written, as a reference chain is (§8.3). What makes that work is a general `ltr8-bind` rule
+  (`DataClassUnion`) — a non-sealed union branch stands for its own implementations, which exact-class membership
+  would never match.
 - **A meta-schema keeps a constructor this library cannot build a reader for**, its factory standing in as
   an `ErrorReader` carrying the real cause (`TsonCompiledMetaSchema`'s `unbuildable`). Dropping it would lose
   the constructor from the scoped vocabulary silently, so a governing meta would compile and register looking

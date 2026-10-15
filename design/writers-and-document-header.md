@@ -18,6 +18,10 @@ keeps the rest of the document. Current form only; history lives in git.
   will not read back.
 - `TsonDataEmitter.field` writes a name that is no identifier as a quoted string: a relaxed `name_type`
   (SPEC-FEEDBACK.md #10) admits `"@id"`, which written bare would not lex back.
+- `DataClassObjectWriter` writes a `type_ref` value (`schema.meta.TypeRef`) with no arguments as its bare name, as
+  [TSON-SCHEMA] §8.1 writes it positionally and as a value written by name has only that spelling
+  (SPEC-FEEDBACK.md #13); an application keeps the explicit `{ name: … arguments: [ … ] }` record. A name some
+  segment of which is no identifier is written as the record too, so it never comes back as text.
 - `TsonDocumentPeek` performs no second header scan and rewinds nothing; a continuing reader whose lexical
   policy (token policy, limits) disagrees with the peek's is refused.
 - A peek is total: a malformed header yields nothing rather than throwing, never a schema the document does

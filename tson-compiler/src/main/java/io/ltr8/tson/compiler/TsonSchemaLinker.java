@@ -73,7 +73,9 @@ import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.UuidType;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -91,8 +93,9 @@ import java.util.function.Function;
  * TypeDefinition.subtypes} (the reverse of {@code supertypes}, for *this schema's own merged view* of every
  * entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for why crediting a
  * subtype onto an imported entry's copy here never touches the imported schema's own separately-registered
- * original), derives choice disjointness, and checks that every reference anywhere in the schema actually
- * resolves. A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
+ * original), derives choice disjointness, checks that every reference anywhere in the schema actually
+ * resolves, and resolves and judges every value a {@code Data} body holds by name ({@code ValuesByName}). A
+ * {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
  * link a schema before registering it, same as any other caller. Identities are canonicalized through
@@ -667,7 +670,7 @@ public final class TsonSchemaLinker {
                 // `[some_typo]` is a form they can find in their source where `array_some_typo_95c9a10f` is
                 // a name §8.2 makes non-normative and nobody ever typed.
                 validateEntry(EntryDisplayName.of(entry.getKey(), entry.getValue(), merged), entry.getValue(),
-                        merged, structureNamespace);
+                        merged, structureNamespace, heldByName(entry.getKey(), schema, origins, loader));
             } catch (UnresolvedReference e) {
                 String author = heldDeclarationNaming(e.name(), entry.getValue(), merged);
                 if (author == null) { // the applier's own text, or a name no held body wrote: blame the entry
@@ -688,6 +691,7 @@ public final class TsonSchemaLinker {
             }
         }
 
+        checkValuesByName(schema, merged, origins, localNames, governingMeta, loader, receiver);
         checkEveryEntryIsInhabited(schema, merged, localNames, receiver);
         checkRecordExtension(schema, merged, localNames, origins, enumForms, receiver);
 
@@ -695,7 +699,54 @@ public final class TsonSchemaLinker {
         checkDisjointAssertions(schema, annotated, localNames, receiver);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
-                annotated, schema.bootstrap()), origins, enumForms, nameTypes);
+                annotated, schema.bootstrap(), schema.valuesByName()), origins, enumForms, nameTypes);
+    }
+
+    /**
+     * The values each local {@code Data} entry holds by name, as the resolver's read collected them
+     * ({@link TsonSchema#valuesByName()}), resolved in this schema's namespace and judged against the slots they
+     * fill (SPEC-FEEDBACK.md #13, {@link ValuesByName}). Each refused name is its own diagnostic, against the entry
+     * that holds it.
+     *
+     * <p><b>Local entries only</b>, as for inhabitance: an imported body's names were judged when its own schema
+     * linked, in its own namespace, and judging them again here would be judging them in the wrong one. Runs
+     * after {@link #validateEntry}, so a body's unresolved {@code type_ref} is reported first and on its own.
+     */
+    private static void checkValuesByName(TsonSchema schema, Map<String, TypeDefinition> merged,
+                                          Map<String, String> origins, Set<String> localNames,
+                                          Optional<TsonLinkedSchema> governingMeta, TsonSchemaLoader loader,
+                                          DiagnosticsReceiver receiver) {
+        if (governingMeta.isEmpty()) {
+            return; // only meta-kernel links without a registered meta, and it declares no Data entry
+        }
+        ValuesByName values = new ValuesByName(schema, merged, origins, governingMeta.get(), loader);
+        for (String name : localNames) {
+            TypeDefinition definition = merged.get(name);
+            List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
+            if (held != null && definition.body() instanceof Data) {
+                values.check(name, definition, held, refused ->
+                        reportOrThrow(receiver, schema, name, merged, refused.getMessage(), refused));
+            }
+        }
+    }
+
+    /**
+     * The references entry {@code name}'s body holds by name, as the read that bound it collected them -- this
+     * schema's own for a local entry, the declaring schema's for an imported one -- by identity, so the one
+     * {@code TypeRef} a body also returns from {@code references()} is recognised as the by-name reference it is.
+     */
+    private static Set<TypeRef> heldByName(String name, TsonSchema schema, Map<String, String> origins,
+                                           TsonSchemaLoader loader) {
+        List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
+        String origin = origins.get(name);
+        if (held == null && loader != null && origin != null && !origin.equals(localIdentity(schema))) {
+            held = loader.load(origin).map(declarer -> declarer.schema().valuesByName().get(name)).orElse(null);
+        }
+        Set<TypeRef> references = Collections.newSetFromMap(new IdentityHashMap<>());
+        if (held != null) {
+            held.forEach(value -> references.add(value.reference()));
+        }
+        return references;
     }
 
     /**
@@ -1136,7 +1187,7 @@ public final class TsonSchemaLinker {
     // ── Validation ───────────────────────────────────────────────────────
 
     private static void validateEntry(String name, TypeDefinition def, Map<String, TypeDefinition> namespace,
-                                       Map<String, TypeDefinition> structureNamespace) {
+                                       Map<String, TypeDefinition> structureNamespace, Set<TypeRef> heldByName) {
         checkOpenEntryUsesEveryParameter(name, def);
         if (def.source().isPresent()) {
             // Unlike every other reference below, `source` gets the structure-namespace fallback --
@@ -1182,11 +1233,17 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def.body(), namespace, structureNamespace, def.parameters());
+        validateBody(name, def.body(), namespace, structureNamespace, def.parameters(), heldByName);
     }
 
+    /**
+     * {@code heldByName} is the references the body holds by name, by identity: a {@code Data} body's own
+     * {@code references()} may return one of them too, and it is judged against its slot ({@link ValuesByName}), not
+     * resolved here as a type.
+     */
     private static void validateBody(String entryName, Top body, Map<String, TypeDefinition> namespace,
-                                      Map<String, TypeDefinition> structureNamespace, List<String> ownParameters) {
+                                      Map<String, TypeDefinition> structureNamespace, List<String> ownParameters,
+                                      Set<TypeRef> heldByName) {
         checkCoherent(body);
         switch (body) {
             case RecordBody r -> {
@@ -1328,6 +1385,9 @@ public final class TsonSchemaLinker {
                             + "omitted field as null and does not normalise it to an empty list");
                 }
                 for (TypeRef reference : references) {
+                    if (heldByName.contains(reference)) {
+                        continue; // a reference by name, which the class also listed: judged by its slot instead
+                    }
                     validateTypeRef(reference, namespace, ownParameters, entryName,
                             " (!" + TsonCompiledMetaSchema.typenameOf(data) + ")");
                 }

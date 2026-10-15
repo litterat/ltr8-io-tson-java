@@ -1046,3 +1046,262 @@ RecordField>` whose order `RecordBody.equals` compares. The resolver, the linker
 encodings' readers key fields by name; the corpus restates every explicit record and every resolved output in the
 map form and adds vectors for the explicit form, its duplicate key, and declaration order. Part 2's cached §13.2
 table is not re-stamped here.
+
+## 13. A value written by name: a qualified name at a product-typed position
+
+**Section:** [TSON-SCHEMA] §5.6 (the positional form "general over schema-backed data"), §5.10 ("a type slot cannot
+be bounded at a *field*"), §4.1 (`data`), §9 (extension meta-schemas); [TSON-DATA] §7.1 (`.` "reserved as a future
+identifier separator").
+
+**Kind:** proposal, running on the `qualified-name` branch of `r2026-38-proposal` as stated under "What runs" below.
+It is the first of the two
+directions the preamble carries open against Revision 38, a namespace as a value, cut to the part that needs no
+kernel change. The evidence is a consumer, the HTTP layer: its meta-schema declares an interface as a named set of
+methods, each a request record, a response type and the error records, and an HTTP binding that names the method
+it serves. Today the method's request is `type_ref`, so a `uuid` passes where a record is wanted, and the binding
+carries two bare identifiers, a method name and an interface name, that no resolver checks — the layer checks them
+itself at startup, which is the check this entry moves into the schema.
+
+**The problem.** A meta-schema can declare an interface today — `method => { request?: record  response?: type_ref }`
+and `interface => data & { methods: {method_name => method} }` resolve, link and compile on `r2026-38-proposal` as
+written — and a schema under it cannot write the one thing an interface is for. `request: place_order_request` is
+refused: §5.6's positional form, applied at every data position, reads the token as `{ fields: place_order_request }`
+and fails on `fields`. `request?: type_ref` accepts the name and checks nothing, so a `uuid` passes where a record is
+wanted. And a binding that names a method, `method: orders.methods.place_order`, has no spelling at all, because a
+method is a value inside an entry and nothing reaches in. The kernel keeps meeting the same gap under different
+names — the dependent slot of §5.10, a constant pool, the HTTP layer's bindings — and it is one gap: **a slot that
+holds a value declared elsewhere, written by its name.**
+
+**Proposed.** Two rules, both outside the kernel.
+
+*A bare name at a product-typed position in a schema document is a qualified name.* At a position inside a schema
+document — a constructor's binding record, a data entry's body — whose declared type is PRODUCT-kind — a
+constructor, or a record a schema declares — an unquoted token that is well-formed as a qualified name is one, and
+the position's value is the value it names. The name resolves to a store element whose declared type IS-A the
+position's type (§7.2), and is refused where nothing resolves or where what resolves is of another type: found
+first, judged after, never a choice among candidates. `request: place_order_request` resolves to an entry whose body
+is built by `record`; `request: user_id` resolves to an entry built by `uuid_type` and is refused for that reason,
+with no bound written anywhere. The rule is a schema document's alone: a name resolves in a schema's namespace, and
+a data document has none, so a data document reads every bare token as it does today. A token at an atom-typed
+position stays a literal, as `verb: GET` is, and §5.6's positional form keeps a bare token exactly where it would
+fill an **atom**-typed field — which is `type_ref`, whose `name` is `type_name`, so a type reference reads as it
+does today — and loses it where it would fill a product-typed one in a schema document, which no canonical output
+writes (`!record { fields: { p => x } }` for `p => { type: x }` is the one such spelling, and §8.1 writes the
+explicit record). The positional form stays a spelling rule for data values; by name is the spelling, in a schema,
+for a value that already has a name.
+
+*A qualified name is segments joined by `.`.* The first segment is a type name and resolves as a `type_ref` does,
+locally and through imports, alias hops followed (§8.3). Each further segment selects **in a value**: a field of a
+record value, then a key of a map value, so `orders.methods.place_order` is an entry, a field of its body, and a key
+of that field's map. Every hop is written; nothing is skipped and nothing is looked up lexically, so a name means the
+same wherever it is written in a document. A segment is an identifier, judged by the key type of the collection it
+selects in — the schema's type-name family, the record's name type, the map's key type — and a map whose keys are not
+spellable as identifiers (a path template, a text) cannot be entered. A type entry admits no further segment:
+projecting into a record type's fields (`order.sku`) is a different capability (a field is a declaration, and the
+store for it is the record's `fields`) and is left for the entry that brings `discriminators` and `scope` under this
+rule. [TSON-DATA] §7.1 reserved `.` for exactly this, and a dotted token already lexes as one unquoted token, so a
+qualified name is a parse of a token the lexer accepts today, performed by the position's type.
+
+**The two layers, and an example over the current schemas.** The slot's type is the meta-schema's to declare, and
+the name is the governed schema's to resolve: `request?: record` is written in the meta, where `record` resolves to
+the kernel's constructor, and `request: place_order_request` is written in a schema under that meta, where the name
+resolves as every other name in that document does — locally, then through its imports, never in the meta (§2.2.2).
+The judgement meets the two: the referent's constructor, found in the schema's chain, and the slot's type, found in
+the meta's, are one entry by canonical identity, or are not. The three documents below are the probe; the meta
+compiles today on `r2026-38-proposal`, and the two schemas are what this entry makes valid.
+
+```
+!!id:"https://example.com/meta-service.tn"
+!!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+!!import:"https://tson.io/2026/38/m/meta.tn"
+{
+  method_name => identifier
+  method      => { request?: record  response?: type_ref  errors?: [record] }
+  interface   => data & { methods: {method_name => method} }
+  http_verb   => !enum [GET POST]
+  binding     => data & { method: method  verb: http_verb  route: text }
+}
+```
+
+```
+!!id:"https://example.com/orders.tn"
+!!meta:"https://example.com/meta-service.tn"
+!!import:"https://tson.io/2026/38/m/core.tn"
+{
+  order               => { sku: text  quantity: int32 }
+  place_order_request => { order: order }
+  orders => !interface { methods: {
+    place_order => { request: place_order_request  response: order }
+  } }
+}
+```
+
+```
+!!id:"https://example.com/orders-api.tn"
+!!meta:"https://example.com/meta-service.tn"
+!!import:"https://example.com/orders.tn"
+{
+  post_orders => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }
+}
+```
+
+`request: place_order_request` resolves in `orders.tn` to an entry whose body is `!record { … }`; `record` is the
+slot's type; accepted. `method: orders.methods.place_order` resolves `orders` in `orders-api.tn`'s imports to a
+DATA entry, `methods` to a field of its body, `place_order` to a key of that map, whose declared type is `method`;
+accepted. Each refusal names its own step:
+
+| Written in a governed schema | Result |
+|---|---|
+| `request: order_ref`, `order_ref => { id: text }` | accepted: the referent's body is built by `record` |
+| `request: req`, `req => order_ref` | accepted: the alias hop is followed (§8.3) |
+| `request: order_v2`, `order_v2 => order & { note: text }` | accepted: a composition's body is built by `record` |
+| `request: user_id`, `user_id => uuid` | refused: the hop reaches a body built by `uuid_type`, no `record` |
+| `request: orders.methods.place_order` | refused: a `method`, where a `record` is wanted |
+| `method: place_order` | refused: no entry `place_order`; a member is reached through its entry |
+| `method: orders.place_order` | refused: `orders`'s body has no field `place_order`; the hop is `methods` |
+| `method: orders.methods.cancel_order` | refused: `methods` has no key `cancel_order` |
+| `method: place_order_request` | refused: a `record`, where a `method` is wanted |
+| `response: orders` | refused: a DATA entry where a type is expected (§4.1, unchanged) |
+| `request: { … }` | not decided here: a braced value at a constructor-typed slot is the later entry's (below) |
+
+The last row is deliberate. This entry admits the by-name spelling at a constructor-typed slot and says nothing
+about a braced value there: what it would mean, if anything, is exactly the question the two readings below answer
+differently — a reference type (`ref<record>`) refuses it, substitution has to say what a `record`-value written in
+place is — and settling it is more than this entry's PR. A slot typed by a record the meta declares is unaffected:
+`method: { response: order }` is plain data of that record, inline or by name.
+
+**The name, and what the standards do.** The dotted-names family, where each segment is a name and nothing is a
+position, is the *qualified name*: Java's (JLS §6.5), XML's QName, Python's dotted name, protobuf's fully-qualified
+name, TOML's dotted keys ([TOML v1.0.0](https://toml.io/en/v1.0.0): `site."google.com" = true`, a quoted segment
+carrying the dot). Google's field masks ([AIP-161](https://google.aip.dev/161)) are the same family and say the thing
+this entry says: a path may not address a repeated element by index — `authors.0` is invalid — because an element
+has no name. Indexing belongs to the address family: [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901) JSON Pointer
+(`/authors/0/name`, quoted, which this implementation's diagnostics already use) and
+[RFC 9535](https://www.rfc-editor.org/rfc/rfc9535) JSONPath (`$.authors[0].name`, a query language with wildcards and
+filters, whose Normalized Path is its one-node form). The two families answer different questions — *which named
+thing* against *which position* — and TSON has one of each already. So this entry's spelling is the **qualified
+name**, names only, and it adds no `[n]`: an element of a list is not a thing a schema declares, `[` is structural in
+the lexer (`x.y[0]` is a parse error today, two adjacent values), and a position wanted later is a JSON Pointer in
+a quoted string, not a widening of the name grammar. Nor does a segment admit quotes: `api."/path/x".request` is three
+adjacent values to the lexer, so admitting it would teach Part 1's data grammar a new value form in every document,
+where a qualified name is otherwise a parse of a token the lexer accepts today; and a text key is data, declared
+nowhere, so nothing under it was declared by name. TOML's quoted segment is the precedent to reach for if a map keyed
+by text ever needs entering; it is not taken here.
+
+**What the rule does not decide, and keeps open.** Resolved output writes the name back as written, as a reference
+chain is written (§8.3), so the two readings a later entry may give it stay available: substitution, where a name
+is replaced by its value at resolve and nothing downstream can tell the two spellings apart (the right reading for a
+shared profile or constant); and identity, where the slot is typed by a reference type — `ref<method>` in the HTTP
+layer's proposal — and the value *is* the name, with the referent's schema identity, entry and key as its identity,
+which is what a coverage check ("every method of `orders` is bound") reads. Neither is in this entry: it is the
+lookup, the judgement and the grammar, which both readings share, and a check that keys on how a value was spelled
+is not a rule this entry admits — a fact a check reads has to be in the value.
+
+**One shape for every reference, which is the proof point for `ref<T>`.** A by-name slot binds what a `type_ref`
+slot binds: a `type_ref` value whose `name` is the token as written, dotted or not. `type_ref`, `type_name`, a
+qualified name and the coming `ref<T>` are one thing — a reference that must resolve — and differ by slot only in
+the judgement: at a `type_ref` slot the name is one segment and must resolve to a type, exactly as today (a dotted
+name there is refused), and at a record-typed slot it may carry segments and must resolve to a value IS-A the slot's
+declared type. `type_ref` is `ref<type>`, one segment because types live only in the schema map; `ref<method>` takes
+segments because methods live in collections.
+
+**Interim, and what closes it.** One rule runs here as interim, closed by an entry that lands on this proposal
+branch before the branch goes to the reviewer: the host decides the spelling at a declared-record slot. An
+implementation binding the slot to a reference holds a name, one binding it to the record holds a braced value, so
+two hosts of one meta admit different documents; `ref<T>` closes it by making the spelling the slot's declaration.
+What the host declares does not decide what is checked: the read records every reference it produces by name, with
+its slot, and the linker judges that record, so a host that omits a name, or lists it among its type references,
+changes nothing — with one host shape for every reference, the list a host filed one in would otherwise decide its
+judgement. `data` is opaque to the type system, and its body is the host's to interpret, so a qualified name reaches
+into a data-kind entry's body — `orders.methods` — only as the interim the namespace kind replaces; recording what
+the read produced walks no body and interprets nothing.
+
+**Against the Revision 37 change log.** §5.10 (and the preamble) record "a type slot cannot be bounded at a field"
+as a deferral, and the bounded type slot at a field as withdrawn. This entry does not reinstate it: `request?:
+record` is not a type slot and carries no bound. It is an ordinary field whose declared type is a constructor and
+whose value is written by name, and "the referent must be a record" is §7.2's subsumption at that field, the same
+judgement any field makes of its value. It delivers what the withdrawn feature was for by a route that adds no
+syntax and no kernel entry. §4.1's refusal of a DATA entry where a type is expected is unchanged — `response: orders`
+is still refused — because a product-typed position is not a type position.
+
+**What runs.** The three documents above resolve and link, with a host class bound for `interface` and `binding`
+(a DATA instance reads only through one, `design/meta-layer-data-kind.md`), and every row of the table gives the
+result it states. The corpus carries them, with the cases around them, as `class2/link/`, `schema/` and `validate/`
+vectors over a `meta-service.tn` fixture: names as list elements and map values, alias chains, a value of a strict
+subtype of the slot's type, an enum-keyed map entered by a label, literals at atom-typed slots, the resolved output,
+and refusals of a quoted name, malformed segments, a dotted name at a `type_ref` slot, a text-keyed map, a framed
+name, the meta's own constructor named from a governed schema, an open entry, a segment through a list, and the
+withdrawn positional spelling `!record { fields: { p => x } }`; a `validate/` vector pins that a data document's
+positional fills, the product-typed one included, read as before. The pieces:
+
+- *The value.* A by-name slot is bound to the host's type reference (`TypeRef` in this implementation), the token as
+written in its `name`, the same shape a `type_ref` slot binds; nothing in the host model is specific to a qualified
+name.
+- *The read.* In a schema document — the resolver's replay of a binding record or a data body, which the read
+context marks — §5.6's positional form keeps a bare token where the record's one positional field is atom-typed and
+loses it where that field is a product or a sum; there an unquoted token is a name. A component bound to a type
+reference reads it as written; the record's own reader refuses it as no record (`TYPE_MISMATCH`). A quoted token is
+text, never a name. Data documents read as before, in tree and bind mode alike.
+- *The resolver* keeps the name as written, collects each by-name reference its read produced with its slot, and
+hands both to the linker; resolved output writes an argument-free type reference as its bare name, as §8.1 writes
+it, so a name reads back as written.
+- *The linker* parses each collected name into segments, each a [TSON-DATA] §7.7 identifier, resolves and judges it
+as the table says; each refusal is its own resolver error naming the step. A by-name reference the host also lists
+among its type references is judged by its slot and not resolved as a type; under `ref<T>` the two lists become one
+judgement by the slot's declared type.
+
+**Decided while building it**, each a place the proposal's prose admits more than one reading:
+
+1. *A positional fill typed by a sum* loses the bare token as a product-typed one does, following the suggested
+   §5.6 text ("unless the positional form would fill an atom-typed field"). The other reading, "only a product-typed
+   fill loses it", would keep a choice-typed fill positional; no kernel record has one, so nothing distinguishes them
+   today, and the suggested text is the simpler two-valued rule.
+2. *"A PRODUCT-kind position — a constructor, or a record a schema declares"* is read as a **record**-typed position.
+   An array-, map- or tuple-typed slot holds no value by name. The broader reading (every PRODUCT kind) would let a
+   name stand for a list, which the segment rules never reach (no `[n]`), so a slot of that kind could only name a
+   map or list entry by its key — a use the proposal does not make.
+3. *The rule does not reach a data document.* §5.12's store is a schema's namespace, and a data document has none,
+   so nothing there could resolve a name: a data document's bare token at a record position fills the positional
+   field whatever its type, `p: x` at a `record_field` position included, exactly as before. The other reading —
+   the rule over all schema-backed data, as §5.6's positional form is — would refuse in a data document a spelling
+   that reads today, for a name nothing there can look up. A host component bound to a type reference at a
+   record-typed slot still receives a name, unresolved, as it receives a type reference at a `type_ref` slot.
+4. *An entry's declared type* is its `source` where that names a constructor of the declaring schema's meta layer,
+   and otherwise the kernel constructor its body mirrors — so an enum built by a meta layer's `text_enum` is a
+   `text_enum`, not only an `enum`. "Its body's constructor" alone would lose that.
+5. *IS-A* is identity, or membership in the declared type's resolved `supertypes`, compared by canonical identity
+   (declaring schema and entry), each type named in the namespace of the meta governing the schema that declares it.
+6. *"A segment is an identifier, judged by the key type of the collection it selects in"*: a segment is judged by the
+   §7.7 grammar wherever it stands, when the name is resolved, and a map is entered only where its key type is an
+   identifier family or an enum; a key outside §7.7 under a wider key profile cannot be written as a segment.
+   Judging each segment by its own key type would make the grammar depend on what the walk has reached so far.
+7. *A framed name* (`@doc:"x" orders`, `!record x`) is refused: a name's type is its referent's, and an annotation on
+   it would have nowhere to go.
+8. *An imported entry's names* are judged once, when its own schema links, in its own namespace.
+9. *An open entry is no referent*: `request: box` with `box => <T> { v: T }` is refused, though the template's
+   `source` names `record`; a template denotes no value until it is applied. *A list has no named members*: a
+   segment after a list-typed field is refused rather than read as an index.
+10. *An empty segment cannot be written*: `orders..place_order` is three tokens under [TSON-DATA] §7.2's range rule,
+    so it fails to parse before the name grammar is asked. A trailing or leading `.` lexes as one token and is
+    refused by the segment grammar when the name is resolved.
+11. *Part 3* needs no sentence yet: there are no JSON schema documents (§1), and the JSON stack reads no `data`
+    body, so a qualified name has no JSON position. The suggestion's "a JSON string at the position" stands for when
+    one exists.
+
+**Breaking changes, against Revision 37:** in a schema document, the positional bare token at a product-typed fill is
+withdrawn (no bundled schema or corpus vector writes one); data documents are unchanged; no kernel entry, pin or
+resolved fixture changes.
+
+**Suggested resolution.**
+
+- [TSON-SCHEMA] §5.6, after "The positional form is general over schema-backed data": "A bare token at a position
+  whose declared type is PRODUCT-kind, in a schema document, is a qualified name (§5.12) unless the positional form
+  would fill an atom-typed field, in which case it fills it; there the explicit record is the only spelling of a
+  product-typed fill. A data document has no namespace to resolve a name in, and reads every bare token positionally."
+- [TSON-SCHEMA] new §5.12 "Values by name": the two rules above — the position, the store, the judgement, the segment
+  grammar, resolution "as written" in output — with `orders.methods.place_order` as the example and the refusal table.
+- [TSON-SCHEMA] §5.10: the sentence on a bound at a field notes that a product-typed field written by name needs none.
+- [TSON-SCHEMA] §9: a slot holding a value by name is typed by the value's type; `type_ref` remains the type slot.
+- [TSON-DATA] §7.1: `.` is the identifier separator of [TSON-SCHEMA] §5.12, no longer "future".
+
+**Status against Revision 37:** open; running on the `qualified-name` branch of `r2026-38-proposal`, as stated above.

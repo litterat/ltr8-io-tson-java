@@ -8,10 +8,10 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentPeek;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.suite.SuiteBindings;
 import io.ltr8.tson.suite.SuiteCheckout;
 import io.ltr8.tson.suite.Sidecar;
 import io.ltr8.tson.suite.Vectors;
@@ -86,13 +86,17 @@ class Class2ConformanceSuiteTest {
 
     private static Tson newTson() {
         // The schema.meta-resolving context, because a `schema/` vector binds a resolved-form document back
-        // into the value model to compare it. It changes nothing for the other two layers.
+        // into the value model to compare it. It changes nothing for the other two layers. Both it and the meta
+        // name binder add a host class for each `data` constructor a corpus fixture declares (SuiteBindings): an
+        // instance of one reads only into a class, when the resolver binds it and when its resolved output is
+        // read back.
         //
         // The source serves the corpus's own schemas beside the bundled ones, which is what lets a subject
         // `!!import` a fixture: the link layer's §2.2.3 vectors need a second schema document, and the
         // corpus publishes those under its own identity prefix rather than inventing a file convention.
         return Tson.of(ProcessorConfig.defaults()
-                .withDataBindContext(SchemaMetaNameBinder.defaultContext())
+                .withDataBindContext(SuiteBindings.context())
+                .withMetaNameBinder(SuiteBindings.names())
                 .withSchemaAccess(SchemaAccess.of(Class2ConformanceSuiteTest::fetchSuiteSchema)));
     }
 
@@ -131,8 +135,11 @@ class Class2ConformanceSuiteTest {
             case "valid" -> {
                 assertEquals(List.of(), problems, "a valid schema vector must load cleanly");
                 Map<String, TypeDefinition> ours = ResolvedForm.ownEntries(tson, identityOf(source));
-                Map<String, TypeDefinition> expected =
-                        ResolvedForm.readResolved(tson, fieldText(outcomePayload(sidecar), "resolved"));
+                // Under the subject's own meta, which a `data` constructor's instance needs (RUNNER.md).
+                Map<String, TypeDefinition> expected = ResolvedForm.readResolved(tson,
+                        fieldText(outcomePayload(sidecar), "resolved"),
+                        hasField(sidecar, "meta") ? Sidecar.resolveShortName(fieldText(sidecar, "meta"))
+                                : TsonBundledSchemas.META_ID);
                 assertEquals(new TreeSet<>(expected.keySet()), new TreeSet<>(ours.keySet()),
                         "the resolved schema does not declare the entries the vector states");
                 expected.forEach((name, definition) -> assertEquals(
