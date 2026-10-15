@@ -9,7 +9,7 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.schema.meta.QualifiedName;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TupleElement;
 
 import java.util.ArrayList;
@@ -35,12 +35,14 @@ import java.util.Optional;
  *       class needs the tuple's arity and somewhere for each voidable position's void value.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
  *       nothing is rebuilt.</li>
- *   <li><b>A {@link QualifiedName} target</b> holds the value by name (SPEC-FEEDBACK.md #13), as a {@code TypeRef}
- *       component holds a type reference, so the position's reader is set aside for a {@link QualifiedNameReader}.
- *       The position must be a record whose bare token is not positional
- *       ({@link RecordAbstractReader#bareTokenFillsPositionally}): at an atom, an array, a map or a tuple a name
- *       has no place, and at {@code type_ref} a bare token is a type reference. A record type no class is bound
- *       to still takes a name, which needs no class for the value it names.</li>
+ *   <li><b>A {@code TypeRef} target at a record-typed slot</b> holds a reference written by name (SPEC-FEEDBACK.md
+ *       #13), so the position's reader is set aside for a {@link ReferenceNameReader}: a slot whose record has no
+ *       positional bare token -- a constructor such as {@code record}, or a record a schema declares -- or one whose
+ *       record type no class is bound to, since a name needs no class for the value it names. At a {@code type_ref}
+ *       slot nothing changes: its bare token fills {@code name} positionally
+ *       ({@link RecordAbstractReader#bareTokenFillsPositionally}), and the record reader binds it as it always has.
+ *       One host shape serves both because both are references that must resolve; the linker judges each by its
+ *       slot.</li>
  * </ul>
  * The target's bridge, then its {@code Annotated} box, wrap whatever comes out. Anything else -- a dispatcher, a
  * choice, a gap -- is read as it is.
@@ -71,33 +73,33 @@ final class BindTargets {
     static TsonTypeReader<?> to(TsonTypeReader<?> reader, DataClass target, String what, String where, Site site,
                                 boolean top) {
         DataClass payload = target instanceof DataClassAnnotated boxed ? boxed.valueClass() : target;
-        TsonTypeReader<?> bound = payload.typeClass() == QualifiedName.class ? byName(reader, what, where, site)
-                : shaped(reader, payload, what, where, site, top);
+        TsonTypeReader<?> bound = payload.typeClass() == TypeRef.class && heldByName(reader)
+                ? new ReferenceNameReader(expectedAt(reader, what)) : shaped(reader, payload, what, where, site, top);
         return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
     }
 
     /**
-     * The reader for a position read by {@code reader} whose target holds a {@link QualifiedName}, recording a
-     * mismatch where that position holds no name.
+     * Whether a {@code TypeRef} target at the position {@code reader} reads holds a reference by name: a record whose
+     * bare token is not positional, or a record position this compile cannot see into (a dispatcher, a type with no
+     * bound class, a reader still being built). Every other position -- {@code type_ref} among them -- is bound as
+     * it always was.
      */
-    private static TsonTypeReader<?> byName(TsonTypeReader<?> reader, String what, String where, Site site) {
+    private static boolean heldByName(TsonTypeReader<?> reader) {
         TsonTypeReader<?> slot = RecordAbstractReader.unwrapped(reader);
-        String holds = where + " holds a " + QualifiedName.class.getSimpleName();
-        if (slot instanceof RecordAbstractReader<?> record) {
-            if (record.bareTokenFillsPositionally()) {
-                site.mismatches().add(what + " is typed '" + record.displayName + "', whose bare token fills its "
-                        + "one field positionally (§5.6), and " + holds + " -- a name stands only where a bare "
-                        + "token is not that field's value");
-            }
-            return new QualifiedNameReader("a '" + record.displayName + "' value");
-        }
-        if (slot instanceof ErrorReader || slot instanceof RecordTagDispatchReader
-                || slot instanceof RecordMemberDispatchReader || slot == null) {
-            return new QualifiedNameReader("a value for " + what);
-        }
-        site.mismatches().add(what + " is no record, and " + holds + " -- a value stands by name only at a "
-                + "record-typed position (a constructor, or a record a schema declares)");
-        return reader;
+        return switch (slot) {
+            case null -> true;
+            case RecordAbstractReader<?> record -> !record.bareTokenFillsPositionally();
+            case ErrorReader ignored -> true;
+            case RecordTagDispatchReader ignored -> true;
+            case RecordMemberDispatchReader ignored -> true;
+            default -> false;
+        };
+    }
+
+    /** What a position holding a reference by name expects, as its refusal says it: {@code a 'method' value}. */
+    private static String expectedAt(TsonTypeReader<?> reader, String what) {
+        return RecordAbstractReader.unwrapped(reader) instanceof RecordAbstractReader<?> record
+                ? "a '" + record.displayName + "' value" : "a value for " + what;
     }
 
     private static TsonTypeReader<?> shaped(TsonTypeReader<?> reader, DataClass target, String what, String where,

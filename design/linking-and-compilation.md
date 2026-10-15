@@ -329,6 +329,11 @@ through `Data.names()` with the slot it fills (`design/meta-layer-data-kind.md`)
 (`design/record-dispatch.md`); this is the lookup and the judgement, run by `checkValuesByName` over local entries
 after `validateEntry`, so a body's unresolved `type_ref` is reported first and on its own.
 
+- **The name is a `TypeRef`, and its grammar is judged here.** A value by name is held as every reference is, a
+  `TypeRef` whose `name` is the token as written; `ValuesByName.segments` splits it at each `.` and requires each
+  segment to be a [TSON-DATA] §7.7 identifier, none empty, and no arguments, refusing `orders.1x`, `.orders` and
+  `orders.` as no qualified name before anything is looked up. At a `type_ref` slot the same host shape is one
+  segment naming a type, judged by `validateTypeRef` as always: `type_ref` is `ref<type>`.
 - **The slot's type is the meta's, the name is the schema's.** The slot's declared type is read off the entry's
   constructor (its `source`, in the governing meta's namespace) by walking `Data.Named.slot` through the resolved
   fields: a field name at a record, any key at a map, any index at an array. A path the constructor does not declare
@@ -344,7 +349,12 @@ after `validateEntry`, so a body's unresolved `type_ref` is reported first and o
   no value until applied), and a list has no named members (`…errors.x` is refused: a segment never selects a
   position). A map is entered only where its key type is an
   identifier family or an enum, whose keys are names; a `text`-keyed map cannot be entered. A body whose class is no
-  Java record cannot be entered at all, which is this library's gap (`UnsupportedOperationException`).
+  Java record cannot be entered at all, which is this library's gap (`UnsupportedOperationException`). **Entering a
+  data body is interim**: `data` is opaque to the type system and the host's to interpret, so a segment selects in
+  the host's object and nothing in the schema walks the body's values; the namespace kind replaces the hop.
+- **What `names()` does not declare is not checked**, the same hole `references()` has: a body that omits a name hides
+  an unresolved or wrongly-typed one. Interim, closed when the namespace kind gives the schema its own account of a
+  body's members.
 - **The judgement is §7.2's IS-A between two types, by canonical identity.** An entry's declared type is the
   constructor that built its body — its `source` where that is a constructor of the *declaring* schema's meta (IS-A
   `top`), otherwise the kernel constructor its body's class mirrors (`@Typename`): a record declaration and a

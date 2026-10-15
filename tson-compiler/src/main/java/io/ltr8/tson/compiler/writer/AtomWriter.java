@@ -44,9 +44,6 @@ public final class AtomWriter {
                     case MULTI_LINE_QUOTED -> writer.multiLineString(t.text());
                 }
             }
-            // A value written by name is read from an unquoted token only (SPEC-FEEDBACK.md #13), so it is
-            // written as one: quoted, it would read back as text at the slot rather than as the name.
-            case io.ltr8.tson.schema.meta.QualifiedName name -> writer.unquotedToken(name.toString());
             default -> throw new DataBindException("don't know how to write a value of type " + value.getClass());
         }
     }

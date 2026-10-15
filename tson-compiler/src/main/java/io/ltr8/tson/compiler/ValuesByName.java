@@ -13,7 +13,8 @@ import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.QualifiedName;
+import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -29,8 +30,13 @@ import java.util.function.Consumer;
 
 /**
  * The values a {@link Data} body holds by name, resolved and judged (SPEC-FEEDBACK.md #13) -- the linker's half
- * of a slot whose declared type is a constructor or a record and whose value is written as a {@link
- * QualifiedName}.
+ * of a slot whose declared type is a constructor or a record and whose value is a reference written as a qualified
+ * name, held as a {@link TypeRef} whose {@code name} is the token as written.
+ *
+ * <p><b>The grammar is judged here, where the name is resolved.</b> The read keeps any unquoted token; this splits
+ * it at each {@code .} and requires each segment to be a [TSON-DATA] §7.7 identifier ({@link #segments}), so
+ * {@code orders.1x}, {@code .orders} and {@code orders.} are refused as no qualified name before anything is looked
+ * up. A reference carrying arguments is no value by name.
  *
  * <p><b>Two layers meet here.</b> The slot's type is the meta-schema's to declare, and is read off the
  * constructor's resolved fields by walking {@link Data.Named#slot()} in the governing meta's namespace. The name is
@@ -48,11 +54,14 @@ import java.util.function.Consumer;
  * looked up in the namespace of the meta layer that governs the schema declaring it, so an imported referent is
  * judged by its own meta's vocabulary and still compared by identity.
  *
- * <p><b>A selected value is reached through the body's record components</b>, named as binding names them (a
- * component's {@code @Field} rename, else its own name), an {@code Optional} unwrapped, and a map entered by key.
- * A map whose keys are not names -- its key type no identifier family or enum -- cannot be entered. A body whose
- * class is not a Java record cannot be entered at all, which is this library's gap rather than the schema's
- * ({@link UnsupportedOperationException}).
+ * <p><b>A selected value is reached through the body's record components -- an interim.</b> {@code data} is opaque
+ * to the type system and its body the host's to interpret, so the hop into one goes through the host's object, and
+ * nothing in the schema walks the body's values; the namespace kind replaces it. A component is named as binding
+ * names it (a component's {@code @Field} rename, else its own name), an {@code Optional} unwrapped, and a map
+ * entered by key. A map whose keys are not names -- its key type no identifier family or enum -- cannot be entered.
+ * A body whose class is not a Java record cannot be entered at all, which is this library's gap rather than the
+ * schema's ({@link UnsupportedOperationException}). What a body leaves out of {@link Data#names()} is checked by
+ * nothing, as for {@link Data#references()}: interim, closed by the same namespace kind.
  *
  * <p>Every refusal is a {@link SchemaValidationException} naming the step that failed; a body whose declared slots
  * do not fit its constructor is the reading application's mistake ({@link BindMismatchException}).
@@ -155,8 +164,32 @@ final class ValuesByName {
         return at;
     }
 
-    private void judge(String where, QualifiedName name, Typed slot) {
-        String head = name.head();
+    /**
+     * The segments of the qualified name {@code reference} writes: its {@code name} split at each {@code .}, each a
+     * §7.7 identifier. Refused where the name has an empty segment, a segment that is no identifier, or arguments.
+     */
+    static List<String> segments(String where, TypeRef reference) {
+        if (!reference.arguments().isEmpty()) {
+            throw new SchemaValidationException(where + " holds '" + reference.name() + "' with arguments, and a "
+                    + "value by name is a qualified name alone");
+        }
+        List<String> segments = List.of(reference.name().split("\\.", -1));
+        for (String segment : segments) {
+            Optional<String> violation = segment.isEmpty() ? Optional.of("a segment is empty")
+                    : IdentifierGrammar.validate(segment);
+            if (violation.isPresent()) {
+                throw new SchemaValidationException(where + " holds '" + reference.name() + "', which is no "
+                        + "qualified name: each segment between the dots is an identifier, and " + (segment.isEmpty()
+                        ? "one is empty" : "'" + segment + "' is not -- " + violation.get()));
+            }
+        }
+        return segments;
+    }
+
+    private void judge(String where, TypeRef reference, Typed slot) {
+        List<String> segments = segments(where, reference);
+        String name = reference.name();
+        String head = segments.getFirst();
         if (!merged.containsKey(head)) {
             throw new SchemaValidationException(where + " names '" + name + "', and '" + head + "' is no entry "
                     + "of this schema or its imports -- the first segment names the entry a value is reached "
@@ -175,7 +208,6 @@ final class ValuesByName {
         }
         TsonLinkedSchema declarersMeta = metaOf(terminal);
         Typed at = constructorOf(referent, declarersMeta);
-        List<String> segments = name.segments();
         if (segments.size() == 1) {
             if (!at.isA(slot)) {
                 throw new SchemaValidationException(where + " wants " + a(slot.name()) + ", and " + entry
@@ -231,7 +263,7 @@ final class ValuesByName {
                         + reached + "' is " + a(at.name()) + ", which has no member selected by name -- a "
                         + "segment selects a field of a record or a key of a map");
             }
-            reached = reached + QualifiedName.SEPARATOR + segment;
+            reached = reached + '.' + segment;
         }
         if (!at.isA(slot)) {
             throw new SchemaValidationException(where + " wants " + a(slot.name()) + ", and '" + name + "' is "

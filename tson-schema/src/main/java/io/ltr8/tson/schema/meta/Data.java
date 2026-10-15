@@ -35,9 +35,10 @@ import java.util.Objects;
  *
  * <p><b>Two declared channels reach the linker</b>, and a body declares each rather than having it found:
  * {@link #references()} for its type references, and {@link #names()} for the values it holds by name
- * (SPEC-FEEDBACK.md #13) -- a slot typed by a constructor or a record, whose component is a {@link
- * QualifiedName}. A reference is checked against the namespace; a name is resolved and its referent judged
- * against the slot's declared type, which is why a name travels with the slot it fills.
+ * (SPEC-FEEDBACK.md #13) -- a slot typed by a constructor or a record, whose component is a {@link TypeRef}
+ * carrying the qualified name as written. Both hold one host shape because both are references that must resolve:
+ * a type reference is one segment and must name a type; a value by name may carry segments and must reach a value
+ * whose declared type IS-A the slot's, which is why it travels with the slot it fills.
  */
 public non-sealed interface Data extends Top {
 
@@ -64,10 +65,14 @@ public non-sealed interface Data extends Top {
      * Every value this body holds by name, each with the slot it fills -- empty by default, as for
      * {@link #references()}, and declared rather than discovered for the same reason.
      *
-     * <p>The linker resolves each name in the governed schema's namespace and judges its referent's declared
-     * type against the slot's, which it reads off the constructor's resolved fields by walking {@link
-     * Named#slot()}. <b>Never {@code null}</b>, with the same {@code BindMismatchException} as
-     * {@link #references()} for a body that returns one.
+     * <p>The linker parses each name into its segments, resolves the first in the governed schema's namespace,
+     * and judges the referent's declared type against the slot's, which it reads off the constructor's resolved
+     * fields by walking {@link Named#slot()}. <b>Never {@code null}</b>, with the same {@code
+     * BindMismatchException} as {@link #references()} for a body that returns one.
+     *
+     * <p><b>Interim, with the same hole as {@link #references()}</b>: a body that leaves a name out has it checked by
+     * nothing. A reference type ({@code ref<T>}) makes the slot's declaration say what a {@code type_ref} slot says
+     * today, and the two channels merge into one -- both are references, judged against a slot's declared type.
      */
     default List<Named> names() {
         return List.of();
@@ -77,9 +82,10 @@ public non-sealed interface Data extends Top {
      * A value a body holds by name, and where: {@code slot} is the path from the body to the position the name
      * fills, one step per level of the constructor's declaration -- a field name at a record, a key at a map,
      * an index at an array -- so {@code ["methods", "place_order", "request"]} is the {@code request} field of
-     * the {@code place_order} entry of the body's {@code methods} map.
+     * the {@code place_order} entry of the body's {@code methods} map. {@code name} is the reference as written,
+     * its {@code name} the dotted token ({@code orders.methods.place_order}) and its arguments empty.
      */
-    record Named(List<String> slot, QualifiedName name) {
+    record Named(List<String> slot, TypeRef name) {
 
         public Named {
             slot = List.copyOf(slot);
@@ -90,7 +96,7 @@ public non-sealed interface Data extends Top {
         }
 
         /** {@code name} at the slot the given steps reach. */
-        public static Named at(QualifiedName name, String... slot) {
+        public static Named at(TypeRef name, String... slot) {
             return new Named(List.of(slot), name);
         }
     }

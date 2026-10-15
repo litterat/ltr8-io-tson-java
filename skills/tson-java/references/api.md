@@ -573,9 +573,9 @@ are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed 
 **`Data`**, which a consumer's own class implements: §4.1's fourth base kind, where an instance of a meta-schema's own
 constructor lives when the thing it describes is not a data type. A consumer registers such a class by carrying
 `@Typename` and being findable by the `metaNameBinder`; `Data.references()` is how its own type references reach the
-linker, and `Data.names()` how the values it holds by name do — a `QualifiedName` component at a slot typed by a
-constructor or a record (`request: place_order_request`, `method: orders.methods.place_order`), each with the slot it
-fills — both declared rather than discovered.
+linker, and `Data.names()` how the values it holds by name do — a `TypeRef` component at a slot typed by a
+constructor or a record, holding the qualified name as written (`request: place_order_request`,
+`method: orders.methods.place_order`), each with the slot it fills — both declared rather than discovered.
 
 ---
 

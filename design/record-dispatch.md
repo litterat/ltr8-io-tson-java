@@ -20,8 +20,8 @@ at a record position is: §5.6's positional form, or a value by name. Current fo
 - The pin table is keyed by `ValueIdentity`, and the selector scan is a `lookingAhead` that rewinds.
 - In a data document a bare token fills a record's one positional field (§5.6) whatever its type. In a schema
   document (`TsonReadContext.readsSchemaDocument()`) it does so only where that field is atom-typed; an unquoted
-  token well-formed as a qualified name is otherwise a value by name, read only by a `QualifiedName` component.
-  `QualifiedNameReader.nameIn` is the one statement of which tokens are names.
+  token is otherwise a value by name, read only by a `TypeRef` component at a record-typed slot.
+  `ReferenceNameReader.nameIn` is the one statement of which tokens are names; their segment grammar is the linker's.
 
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
@@ -104,23 +104,25 @@ constructor's binding record, a data entry's body — reaches the governing meta
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a
 bare value as that field — `type_ref`'s `name` is a `type_name`, which is how `request: search_request` at a
-`type_ref` slot stays a type reference — and where the field is a product or a sum, an unquoted token well-formed as
-a qualified name (`QualifiedNameReader.nameIn`: each `.`-separated segment a [TSON-DATA] §7.7 identifier) is a
-**value by name** the record reader does not read as the field: `!record { fields: { p => x } }` is "expected a
-record for 'record_field', found the name 'x'". A token that is no name (`42`) fills the field as it always did.
+`type_ref` slot stays a type reference — and where the field is a product or a sum, an unquoted token
+(`ReferenceNameReader.nameIn`) is a **value by name** the record reader does not read as the field:
+`!record { fields: { p => x } }` is "expected a record for 'record_field', found the name 'x'". Whether the token is
+a well-formed qualified name — each `.`-separated segment a [TSON-DATA] §7.7 identifier — is the linker's to judge,
+where the name is resolved (`ValuesByName.segments`).
 **Every data document reads as it did before the rule**, tree mode and bind mode alike: `p: x` at a `record_field`
 position fills `type`. Whether the positional field is atom-typed is read off the field's own compiled reader,
 captured before a bind reader rebinds it (`RecordAbstractReader.bareTokenFillsPositionally`), looking through a
 subsumption guard and a deferred reader; nothing about it is threaded into the record readers' constructors. JSON
 has no positional form, so the rule has no JSON side.
 
-**A value by name is read only where the bound component holds one.** A `QualifiedName` component at a
-record-typed slot gets a `QualifiedNameReader` in place of the type's own reader (`BindTargets`), as a `TypeRef`
-component gets a type reference: the consumer chose the host type. The slot is judged by the reader it would
-otherwise have — a record reader whose bare token is not positional, a dispatcher, or an `ErrorReader` for a record
-type no class is bound to, since a name needs no class for the value it names — and anything else is a
-`BindMismatchException`. The reader keeps the name as written and resolves nothing — the linker does
-(`design/linking-and-compilation.md`); a data document's read resolves it no more than it resolves a `type_ref`.
-At a `QualifiedName` slot a quoted token is text, and a framed (`@a x`, `!t x`) or braced value is refused as
-`expected the name of a 'method' value` — the component's verdict, since a class wanting the record inline declares
-the record's class.
+**A value by name is read only where the bound component is a `TypeRef` at a record-typed slot.** Every reference
+has one host shape: a `type_ref` slot binds a `TypeRef`, and so does a slot holding a value by name, whose
+`ReferenceNameReader` (set in place of the slot type's own reader by `BindTargets`) keeps the token as written in the
+`TypeRef`'s `name`. The slot is judged by the reader it would otherwise have — a record reader whose bare token is
+not positional, a dispatcher, or an `ErrorReader` for a record type no class is bound to, since a name needs no class
+for the value it names; at `type_ref`, whose bare token fills `name`, the component binds exactly as it always has.
+The reader resolves nothing — the linker does (`design/linking-and-compilation.md`); a data document's read
+resolves it no more than it resolves a `type_ref`. At such a slot a quoted token is text, and a framed (`@a x`,
+`!t x`) or braced value is refused as `expected the name of a 'method' value`. **That the host's component type
+selects the spelling is interim**: a `TypeRef` takes a name and a record class a braced value, so two hosts of one
+meta admit different documents until a reference type (`ref<T>`) makes the spelling the slot's declaration.

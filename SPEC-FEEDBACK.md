@@ -1197,6 +1197,24 @@ which is what a coverage check ("every method of `orders` is bound") reads. Neit
 lookup, the judgement and the grammar, which both readings share, and a check that keys on how a value was spelled
 is not a rule this entry admits — a fact a check reads has to be in the value.
 
+**One shape for every reference, which is the proof point for `ref<T>`.** A by-name slot binds what a `type_ref`
+slot binds: a `type_ref` value whose `name` is the token as written, dotted or not. `type_ref`, `type_name`, a
+qualified name and the coming `ref<T>` are one thing — a reference that must resolve — and differ by slot only in
+the judgement: at a `type_ref` slot the name is one segment and must resolve to a type, exactly as today (a dotted
+name there is refused), and at a record-typed slot it may carry segments and must resolve to a value IS-A the slot's
+declared type. `type_ref` is `ref<type>`, one segment because types live only in the schema map; `ref<method>` takes
+segments because methods live in collections.
+
+**Interim, and what closes each.** Two rules run here as interim, each closed by an entry that lands on this
+proposal branch before the branch goes to the reviewer. First, the host decides the spelling at a declared-record
+slot: an implementation binding the slot to a reference holds a name, one binding it to the record holds a braced
+value, so two hosts of one meta admit different documents; `ref<T>` closes it by making the spelling the slot's
+declaration. Second, a body's names reach the linker only as the host declares them, as its type references do, so a
+host that leaves one out hides an unresolved or wrongly-typed name; the namespace kind closes it, giving the schema
+its own account of a body's members. Beneath both: `data` is opaque to the type system, and its body is the host's
+to interpret, so a qualified name reaches into a data-kind entry's body — `orders.methods` — only as the interim the
+namespace kind replaces.
+
 **Against the Revision 37 change log.** §5.10 (and the preamble) record "a type slot cannot be bounded at a field"
 as a deferral, and the bounded type slot at a field as withdrawn. This entry does not reinstate it: `request?:
 record` is not a type slot and carries no bound. It is an ordinary field whose declared type is a constructor and
@@ -1215,19 +1233,20 @@ name, the meta's own constructor named from a governed schema, an open entry, a 
 withdrawn positional spelling `!record { fields: { p => x } }`; a `validate/` vector pins that a data document's
 positional fills, the product-typed one included, read as before. The pieces:
 
-- *The value.* `schema.meta.QualifiedName`, segments joined by `.`, beside `TypeRef` and not merged with it. A
-  consumer's `Data` class declares a slot holding a value by name as a `QualifiedName` component, the way it declares
-  a `type_ref` slot as `TypeRef`.
+- *The value.* A by-name slot is bound to the host's type reference (`TypeRef` in this implementation), the token as
+written in its `name`, the same shape a `type_ref` slot binds; nothing in the host model is specific to a qualified
+name.
 - *The read.* In a schema document — the resolver's replay of a binding record or a data body, which the read
-  context marks — §5.6's positional form keeps a bare token where the record's one positional field is atom-typed and
-  loses it where that field is a product or a sum; there an unquoted token whose segments are each a [TSON-DATA] §7.7
-  identifier is a name. A `QualifiedName` component reads it as written; the record's own reader refuses it as no
-  record (`TYPE_MISMATCH`). A quoted token is text, never a name. Data documents read as before, in tree and bind
-  mode alike.
-- *The resolver* keeps the name as written, and resolved output writes it back as the bare token it was read from.
-- *The linker* resolves each name a body declares through `Data.names()`, a sibling of `Data.references()` that
-  carries each name with its slot (the path of field names, map keys and indexes from the body), and judges as the
-  table says; each refusal is its own resolver error naming the step.
+context marks — §5.6's positional form keeps a bare token where the record's one positional field is atom-typed and
+loses it where that field is a product or a sum; there an unquoted token is a name. A component bound to a type
+reference reads it as written; the record's own reader refuses it as no record (`TYPE_MISMATCH`). A quoted token is
+text, never a name. Data documents read as before, in tree and bind mode alike.
+- *The resolver* keeps the name as written, and resolved output writes it as it writes any type reference.
+- *The linker* parses each name a body declares through `Data.names()` into segments, each a [TSON-DATA] §7.7
+identifier, resolves and judges it as the table says; each refusal is its own resolver error naming the step.
+`Data.names()` is a sibling of `Data.references()` that carries each reference with its slot (the path of field
+names, map keys and indexes from the body); under `ref<T>` the two merge, both being references judged against a
+slot's declared type.
 
 **Decided while building it**, each a place the proposal's prose admits more than one reading:
 
@@ -1243,17 +1262,17 @@ positional fills, the product-typed one included, read as before. The pieces:
    so nothing there could resolve a name: a data document's bare token at a record position fills the positional
    field whatever its type, `p: x` at a `record_field` position included, exactly as before. The other reading —
    the rule over all schema-backed data, as §5.6's positional form is — would refuse in a data document a spelling
-   that reads today, for a name nothing there can look up. A host class that declares a `QualifiedName` component
-   still receives a name, unresolved, as a `TypeRef` component receives a type reference.
+   that reads today, for a name nothing there can look up. A host component bound to a type reference at a
+   record-typed slot still receives a name, unresolved, as it receives a type reference at a `type_ref` slot.
 4. *An entry's declared type* is its `source` where that names a constructor of the declaring schema's meta layer,
    and otherwise the kernel constructor its body mirrors — so an enum built by a meta layer's `text_enum` is a
    `text_enum`, not only an `enum`. "Its body's constructor" alone would lose that.
 5. *IS-A* is identity, or membership in the declared type's resolved `supertypes`, compared by canonical identity
    (declaring schema and entry), each type named in the namespace of the meta governing the schema that declares it.
-6. *"A segment is an identifier, judged by the key type of the collection it selects in"*: a segment is read by the
-   §7.7 grammar wherever it stands, and a map is entered only where its key type is an identifier family or an enum;
-   a key outside §7.7 under a wider key profile cannot be written as a segment. Judging each segment by its own key
-   type would need the store at the read, which the read does not have.
+6. *"A segment is an identifier, judged by the key type of the collection it selects in"*: a segment is judged by the
+   §7.7 grammar wherever it stands, when the name is resolved, and a map is entered only where its key type is an
+   identifier family or an enum; a key outside §7.7 under a wider key profile cannot be written as a segment.
+   Judging each segment by its own key type would make the grammar depend on what the walk has reached so far.
 7. *A framed name* (`@doc:"x" orders`, `!record x`) is refused: a name's type is its referent's, and an annotation on
    it would have nowhere to go.
 8. *An imported entry's names* are judged once, when its own schema links, in its own namespace.
@@ -1262,7 +1281,7 @@ positional fills, the product-typed one included, read as before. The pieces:
    segment after a list-typed field is refused rather than read as an index.
 10. *An empty segment cannot be written*: `orders..place_order` is three tokens under [TSON-DATA] §7.2's range rule,
     so it fails to parse before the name grammar is asked. A trailing or leading `.` lexes as one token and is
-    refused by the segment grammar.
+    refused by the segment grammar when the name is resolved.
 11. *Part 3* needs no sentence yet: there are no JSON schema documents (§1), and the JSON stack reads no `data`
     body, so a qualified name has no JSON position. The suggestion's "a JSON string at the position" stands for when
     one exists.

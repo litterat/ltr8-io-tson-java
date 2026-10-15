@@ -18,7 +18,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.QualifiedName;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -82,16 +81,15 @@ import java.util.stream.Collectors;
  *
  * <p><b>In a schema document, a name is not a positional fill where the fill would be product-typed</b>
  * (SPEC-FEEDBACK.md #13). When the read is of a value inside a schema document ({@link
- * TsonReadContext#readsSchemaDocument()}), an unquoted token well-formed as a qualified name ({@link
- * QualifiedNameReader#nameIn}) at a record position is a value written by name, so the positional form keeps a
- * bare token only where its one field is <b>atom</b>-typed -- {@code type_ref}'s {@code name}, a {@code
- * type_name}, which is how a type reference keeps its bare spelling -- and loses it where the field is a product
- * or a sum: {@code !record { fields: { p => x } }} is refused. The record reader refuses a name it does not take
- * as no record, since a component that holds the name is read by {@link QualifiedNameReader} instead and never
- * reaches this class. A data document has no namespace to resolve a name in, so its reads are untouched: there
- * {@code p: x} at a {@code record_field} position still fills {@code type}. Whether the positional field is
- * atom-typed is read off its own compiled reader ({@link #bareTokenFillsPositionally}), the one this class was
- * built with.
+ * TsonReadContext#readsSchemaDocument()}), an unquoted token at a record position ({@link
+ * ReferenceNameReader#nameIn}) is a value written by name, so the positional form keeps a bare token only where its
+ * one field is <b>atom</b>-typed -- {@code type_ref}'s {@code name}, a {@code type_name}, which is how a type
+ * reference keeps its bare spelling -- and loses it where the field is a product or a sum: {@code !record { fields:
+ * { p => x } }} is refused. The record reader refuses a name it does not take as no record, since a component that
+ * holds the name is read by {@link ReferenceNameReader} instead and never reaches this class. A data document has no
+ * namespace to resolve a name in, so its reads are untouched: there {@code p: x} at a {@code record_field} position
+ * still fills {@code type}. Whether the positional field is atom-typed is read off its own compiled reader ({@link
+ * #bareTokenFillsPositionally}), the one this class was built with.
  */
 abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
@@ -283,7 +281,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             ctx.next();
             return new ShapeResult(Shape.EMPTY, anchor);
         }
-        Optional<QualifiedName> byName = ctx.readsSchemaDocument() ? QualifiedNameReader.nameIn(e) : Optional.empty();
+        Optional<String> byName = ctx.readsSchemaDocument() ? ReferenceNameReader.nameIn(e) : Optional.empty();
         if (positionalFieldIndex >= 0 && (byName.isEmpty() || bareTokenFillsPositionally())) {
             return new ShapeResult(Shape.POSITIONAL, anchor);
         }
@@ -297,7 +295,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * Whether a bare token at this record's position fills its one positional field (§5.6) in a schema document --
      * false where the record has none, and where that field is product- or sum-typed, so a token well-formed as a
      * qualified name there is a value by name (SPEC-FEEDBACK.md #13). {@link BindTargets} asks it before giving a
-     * slot of this type a {@link QualifiedNameReader}: a type whose bare token is positional holds no name.
+     * {@code TypeRef} component at a slot of this type a {@link ReferenceNameReader}: a type whose bare token is
+     * positional binds the reference through its own reader, as {@code type_ref} does.
      *
      * <p>Asked of the field's own reader rather than of its declaration, at the read rather than at construction:
      * a recursive schema hands this class a {@link DeferredTypeReader} for a field still being built, which can

@@ -8,7 +8,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.QualifiedName;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.suite.SuiteBindings;
 import io.ltr8.tson.suite.data.Binding;
@@ -24,7 +23,6 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -126,7 +124,7 @@ class ValuesByNameTest {
     void anInterfaceHoldsItsRequestByName() {
         TsonLinkedSchema linked = registry().resolveLinked("https://example.test/orders.tn");
         Interface orders = assertInstanceOf(Interface.class, linked.schema().entries().get("orders").body());
-        assertEquals(new Method(QualifiedName.of("place_order_request"), TypeRef.of("order"), null, null),
+        assertEquals(new Method(TypeRef.of("place_order_request"), TypeRef.of("order"), null, null),
                 orders.methods().get("place_order"));
     }
 
@@ -138,7 +136,7 @@ class ValuesByNameTest {
         assertEquals(List.of(), problems(id));
         Binding binding = assertInstanceOf(Binding.class,
                 registry().resolveLinked(id).schema().entries().get("post_orders").body());
-        assertEquals(new Binding(QualifiedName.of("orders", "methods", "place_order"), "POST", "/orders"), binding);
+        assertEquals(new Binding(TypeRef.of("orders.methods.place_order"), "POST", "/orders"), binding);
     }
 
     @Test
@@ -274,11 +272,21 @@ class ValuesByNameTest {
 
     // ── The binding's side ─────────────────────────────────────────────────────────────────────────
 
-    /** A component holding a name at a slot whose bare token is something else is the class's mistake. */
+    /** A reference component at an atom-typed slot is the class's mistake: there a token is a literal. */
     @Test
-    void aNameIsBoundOnlyWhereATokenIsNoPositionalFill() {
-        assertMisbound("name_at_text", "text", "is no record");
-        assertMisbound("name_at_type_ref", "type_ref", "fills its one field positionally");
+    void aReferenceIsNoAtomsComponent() {
+        assertMisbound("name_at_text", "text", "is an atom");
+    }
+
+    /** The grammar is the linker's: each segment between the dots is an identifier, none empty. */
+    @Test
+    void aMalformedNameIsRefusedWhereItIsResolved() {
+        refused(api("bad-segment", """
+                b => !binding { method: orders.1x  verb: POST  route: "/" }"""),
+                "'b' at /method holds 'orders.1x', which is no qualified name", "'1x' is not");
+        refused(api("leading-dot", """
+                b => !binding { method: .orders  verb: POST  route: "/" }"""),
+                "holds '.orders', which is no qualified name", "one is empty");
     }
 
     private static void assertMisbound(String constructor, String fieldType, String expected) {
@@ -300,27 +308,24 @@ class ValuesByNameTest {
 
     // ── Resolved output ─────────────────────────────────────────────────────────────────────────────
 
-    /** §8.1's output writes the name as written, a bare token, and it reads back to the same body. */
+    /**
+     * The resolver keeps the name as written, in the {@code TypeRef} every reference is held as, and resolved
+     * output writes it as it writes any {@code TypeRef}. §8's own spelling of it, the bare token, reads back to the
+     * same body.
+     */
     @Test
-    void resolvedOutputWritesTheNameAsWritten() {
+    void resolvedOutputKeepsTheNameAsWritten() {
         TsonCompiledMetaRegistry registry = registry();
         String id = api("written", """
                 post_orders => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }""");
         Object body = registry.resolveLinked(id).schema().entries().get("post_orders").body();
 
         String written = new TsonObjectWriter(SuiteBindings.context()).toTson(body).replaceAll("\\s+", " ");
-        assertTrue(written.contains("method: orders.methods.place_order"), written);
+        assertTrue(written.contains("method: { name: \"orders.methods.place_order\""), written);
 
         Object read = registry.loadMeta(META_SERVICE).compiledSchema().find("binding").orElseThrow()
-                .read(TestDocuments.document(written));
+                .read(TestDocuments.document(
+                        "!binding { method: orders.methods.place_order  verb: POST  route: \"/orders\" }"));
         assertEquals(body, read);
-
-        Object orders = registry.resolveLinked("https://example.test/orders.tn").schema().entries().get("orders")
-                .body();
-        String interfaceWritten = new TsonObjectWriter(SuiteBindings.context()).toTson(orders);
-        assertTrue(interfaceWritten.replaceAll("\\s+", " ").contains("request: place_order_request"),
-                interfaceWritten);
-        assertNotNull(registry.loadMeta(META_SERVICE).compiledSchema().find("interface").orElseThrow()
-                .read(TestDocuments.document(interfaceWritten)));
     }
 }

@@ -1,7 +1,6 @@
 package io.ltr8.tson.suite.data;
 
 import io.ltr8.tson.schema.meta.Data;
-import io.ltr8.tson.schema.meta.QualifiedName;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -11,12 +10,13 @@ import java.util.stream.Stream;
 
 /**
  * The host class for the corpus's {@code method} record: a request record, the error records and the reply records
- * by status, each held by name ({@link QualifiedName}), and a response type ({@link TypeRef}). Not a {@link Data}
- * body itself -- a method is a value inside an interface -- so it hands its names to the body that holds it, at the
- * slot given.
+ * by status, each held by name, and a response type. All four are {@link TypeRef}s, one host shape for every
+ * reference: {@code response} sits at a {@code type_ref} slot and names a type, the others at {@code record} slots
+ * and may carry segments. Not a {@link Data} body itself -- a method is a value inside an interface -- so it hands
+ * its names to the body that holds it, at the slot given.
  */
-public record Method(QualifiedName request, TypeRef response, List<QualifiedName> errors,
-                     Map<String, QualifiedName> replies) {
+public record Method(TypeRef request, TypeRef response, List<TypeRef> errors,
+                     Map<String, TypeRef> replies) {
 
     /** This method's names, at the slot {@code at} reaches from the enclosing body. */
     List<Data.Named> names(String... at) {
@@ -24,8 +24,8 @@ public record Method(QualifiedName request, TypeRef response, List<QualifiedName
     }
 
     /** The names a method-shaped value holds, shared with the records that compose {@code method}. */
-    static List<Data.Named> names(QualifiedName request, List<QualifiedName> errors,
-                                  Map<String, QualifiedName> replies, String... at) {
+    static List<Data.Named> names(TypeRef request, List<TypeRef> errors,
+                                  Map<String, TypeRef> replies, String... at) {
         List<Data.Named> names = new ArrayList<>();
         if (request != null) {
             names.add(Data.Named.at(request, slot(at, "request")));
