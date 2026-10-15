@@ -29,6 +29,8 @@ import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -249,23 +251,29 @@ public final class SchemaResolver {
         // name, verified later by the linker), so those are the only edges that create a resolution
         // dependency -- and the only recursion that cannot resolve.
         OnDemand namespaceGetter = new OnDemand(namespace, declarations, problems);
+        // Each body a read produced, with the references it read by name (SPEC-FEEDBACK.md #13), keyed by the body
+        // itself: the read hooks know the constructor and the value, not the entry, and the body is the one thing
+        // that reaches the entry unchanged.
+        Map<Object, List<TsonSchema.ValueByName>> heldByName = new IdentityHashMap<>();
         // One materialiser for the whole schema, created before the driving loop because resolution itself
         // closes applications on demand: a supertype or refinement source has to absorb the *closed* entry's
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
         // closing and a later batch closing of the same application land on one entry.
         TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put,
-                (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names)),
+                (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names),
+                        heldByName),
                 generated,
                 metaParser.schema().entries()::get, namespaceGetter::current);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
         DefinitionResolver resolver = new DefinitionResolver(
-                (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names)),
+                (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names),
+                        heldByName),
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary. Its value is
                 // as opaque to the linker as a data body, so it is read under the policy too.
-                (type, value) -> read(metaParser.get(type), value, names),
+                (type, value) -> read(metaParser.get(type), value, names, heldByName),
                 metaParser.schema().entries()::get, namespaceGetter, new ApplicationCloser() {
 
                     @Override
@@ -453,7 +461,14 @@ public final class SchemaResolver {
                 localOnly.put(name, definition);
             }
         });
-        return new TsonSchema(id, document.meta(), document.imports(), localOnly, false);
+        Map<String, List<TsonSchema.ValueByName>> valuesByName = new LinkedHashMap<>();
+        localOnly.forEach((name, definition) -> {
+            List<TsonSchema.ValueByName> held = heldByName.get(definition.body());
+            if (held != null) {
+                valuesByName.put(name, held);
+            }
+        });
+        return new TsonSchema(id, document.meta(), document.imports(), localOnly, false, valuesByName);
     }
 
     /**
@@ -882,11 +897,18 @@ public final class SchemaResolver {
     /**
      * One already-resolved {@code DataValue} replayed through a compiled reader, judging names under {@code names},
      * as a read of a schema document's value ({@link TsonReadContext#readsSchemaDocument()}): a bare name at a
-     * record position is a value by name here and nowhere else.
+     * record position is a value by name here and nowhere else. The references the read produced by name are put in
+     * {@code heldByName} under the body it returns, for the schema to carry to the linker.
      */
     private static Object read(TsonTypeReader<?> reader, io.ltr8.tson.compiler.ast.DataValue value,
-                               IdentifierPolicy names) {
-        return reader.read(TsonReadContext.schemaDocument(new ListEventSource(DataValueEvents.of(value)), names));
+                               IdentifierPolicy names, Map<Object, List<TsonSchema.ValueByName>> heldByName) {
+        List<TsonSchema.ValueByName> held = new ArrayList<>();
+        Object body = reader.read(TsonReadContext.schemaDocument(new ListEventSource(DataValueEvents.of(value)), names,
+                (slot, reference) -> held.add(new TsonSchema.ValueByName(slot, reference))));
+        if (!held.isEmpty() && body != null) {
+            heldByName.put(body, List.copyOf(held));
+        }
+        return body;
     }
 
     /**

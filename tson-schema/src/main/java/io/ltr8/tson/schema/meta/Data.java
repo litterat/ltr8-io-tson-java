@@ -1,7 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
 import java.util.List;
-import java.util.Objects;
 
 /**
  * A body that describes <b>something other than a data value</b> -- the base kind for vocabulary a
@@ -33,12 +32,13 @@ import java.util.Objects;
  * holding a type reference MUST be typed {@code type_ref}, which is what makes the slot participate in
  * flattening, {@code @alias} recording, and structural identity.
  *
- * <p><b>Two declared channels reach the linker</b>, and a body declares each rather than having it found:
- * {@link #references()} for its type references, and {@link #names()} for the values it holds by name
- * (SPEC-FEEDBACK.md #13) -- a slot typed by a constructor or a record, whose component is a {@link TypeRef}
- * carrying the qualified name as written. Both hold one host shape because both are references that must resolve:
- * a type reference is one segment and must name a type; a value by name may carry segments and must reach a value
- * whose declared type IS-A the slot's, which is why it travels with the slot it fills.
+ * <p><b>A body's references reach the linker two ways.</b> Its type references, at slots typed {@code type_ref},
+ * it declares through {@link #references()}. The values it holds by name (SPEC-FEEDBACK.md #13) -- at a slot typed
+ * by a constructor or a record, a {@link TypeRef} carrying the qualified name as written -- it does not declare:
+ * the resolver's read records each one it produces, with its slot, and the linker judges them from that record
+ * whatever the class returns, so a by-name reference returned from {@link #references()} too is harmless. Both are
+ * one host shape because both are references that must resolve; a reference type ({@code ref<T>}) folds the two
+ * into one judgement by the slot's declared type.
  */
 public non-sealed interface Data extends Top {
 
@@ -59,45 +59,5 @@ public non-sealed interface Data extends Top {
      */
     default List<TypeRef> references() {
         return List.of();
-    }
-
-    /**
-     * Every value this body holds by name, each with the slot it fills -- empty by default, as for
-     * {@link #references()}, and declared rather than discovered for the same reason.
-     *
-     * <p>The linker parses each name into its segments, resolves the first in the governed schema's namespace,
-     * and judges the referent's declared type against the slot's, which it reads off the constructor's resolved
-     * fields by walking {@link Named#slot()}. <b>Never {@code null}</b>, with the same {@code
-     * BindMismatchException} as {@link #references()} for a body that returns one.
-     *
-     * <p><b>Interim, with the same hole as {@link #references()}</b>: a body that leaves a name out has it checked by
-     * nothing. A reference type ({@code ref<T>}) makes the slot's declaration say what a {@code type_ref} slot says
-     * today, and the two channels merge into one -- both are references, judged against a slot's declared type.
-     */
-    default List<Named> names() {
-        return List.of();
-    }
-
-    /**
-     * A value a body holds by name, and where: {@code slot} is the path from the body to the position the name
-     * fills, one step per level of the constructor's declaration -- a field name at a record, a key at a map,
-     * an index at an array -- so {@code ["methods", "place_order", "request"]} is the {@code request} field of
-     * the {@code place_order} entry of the body's {@code methods} map. {@code name} is the reference as written,
-     * its {@code name} the dotted token ({@code orders.methods.place_order}) and its arguments empty.
-     */
-    record Named(List<String> slot, TypeRef name) {
-
-        public Named {
-            slot = List.copyOf(slot);
-            Objects.requireNonNull(name, "name");
-            if (slot.isEmpty()) {
-                throw new IllegalArgumentException("a name fills a slot of the body, so the path has a step");
-            }
-        }
-
-        /** {@code name} at the slot the given steps reach. */
-        public static Named at(TypeRef name, String... slot) {
-            return new Named(List.of(slot), name);
-        }
     }
 }

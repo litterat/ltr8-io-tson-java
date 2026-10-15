@@ -445,6 +445,6 @@ class MetaLayerDataConstructorTest {
         assertFalse(written.contains("kind:"), written);
         assertEquals(TypeKind.DATA, entry.kind(), "still derived, and still the resolver's own");
         assertTrue(written.contains("body: !operation { path: \"/search\" method: \"GET\""), written);
-        assertTrue(written.contains("request: { name: \"search_request\" arguments: [] }"), written);
+        assertTrue(written.contains("request: search_request response: search_response"), written);
     }
 }

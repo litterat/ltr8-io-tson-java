@@ -23,6 +23,10 @@ import java.util.Optional;
  * So nothing here parses segments: the linker splits the name and applies the identifier grammar to each segment,
  * where it also resolves them.
  *
+ * <p><b>Every name it reads is recorded</b> ({@link TsonReadContext#heldByName}): in a schema document the read
+ * collects each with its slot, and the linker judges that collection, so a by-name reference is checked whatever the
+ * host class declares of it.
+ *
  * <p><b>What a name is, stated once for both readers that ask</b> ({@link #nameIn}): an <b>unquoted</b> token. A
  * quoted token is text, never a name. {@link RecordAbstractReader} asks the same question to decide when §5.6's
  * positional form loses the token in a schema document, so the two cannot disagree about which tokens are names.
@@ -54,7 +58,9 @@ final class ReferenceNameReader implements TsonTypeReader<io.ltr8.tson.schema.me
         Optional<String> name = nameIn(event);
         if (name.isPresent()) {
             ctx.next();
-            return io.ltr8.tson.schema.meta.TypeRef.of(name.get());
+            io.ltr8.tson.schema.meta.TypeRef reference = io.ltr8.tson.schema.meta.TypeRef.of(name.get());
+            ctx.heldByName(reference);
+            return reference;
         }
         String found = found(event);
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the name of " + expected + ", found " + found

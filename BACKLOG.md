@@ -53,6 +53,22 @@ own prose (which had gone stale on it):
   family checks (no member minted at a use site) over the ingested map and its closure, and the §5.11 group
   declaration rules over every `field_group`. `ParameterTypes` already derives the type to check against.
 
+- [ ] **`ref<T>`: a reference type, so the slot declares how its value is spelled** (SPEC-FEEDBACK.md #13). Today the
+  host's component type decides whether a record-typed slot in a `data` body takes a value by name (`TypeRef`) or a
+  braced value (the record's class), so two hosts of one meta admit different documents. The slot's type declares
+  instead whether its value is by name only (`ref<T>`), inline only (a plain `T`), or either. `Data.references()`
+  and the read-collected by-name list (`TsonSchema.valuesByName`) then merge into one judgement by slot type, a
+  `type_ref` slot being `ref<type>`. The value Java receives becomes the resolved reference -- the declaring schema's
+  identity, the entry, and the member path (`originOf` plus the path) -- rather than the spelling, so a check over
+  references (every method of an interface bound, say) never walks a name again. Lands on `r2026-38-proposal` before
+  the branch goes to the reviewer.
+- [ ] **The namespace kind: a schema's own account of what a `data` body holds** (SPEC-FEEDBACK.md #13). A qualified
+  name reaches into a data-kind entry's body today only through the host's object (`ValuesByName` reflects over its
+  record components), `data` being opaque to the type system; the namespace kind replaces that hop with members the
+  schema declares. A segment is then judged by the key type of the namespace it lands in, rather than by §7.7
+  uniformly, and a key that is no identifier needs a spelling: `orders_api."/orders/{id}".GET` is not one token under
+  [TSON-DATA] §7.2. Lands on `r2026-38-proposal` before the branch goes to the reviewer.
+
 ## Checked annotations
 
 [TSON-SCHEMA] §6 defines the category and §5.4's `@disjoint` is the precedent both follow: an annotation with

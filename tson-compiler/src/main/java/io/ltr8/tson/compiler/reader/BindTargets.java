@@ -41,6 +41,7 @@ import java.util.Optional;
  *       record type no class is bound to, since a name needs no class for the value it names. At a {@code type_ref}
  *       slot nothing changes: its bare token fills {@code name} positionally
  *       ({@link RecordAbstractReader#bareTokenFillsPositionally}), and the record reader binds it as it always has.
+ *       At an atom a {@code TypeRef} is a mismatch: a token there is a literal, never a reference.
  *       One host shape serves both because both are references that must resolve; the linker judges each by its
  *       slot.</li>
  * </ul>
@@ -73,8 +74,17 @@ final class BindTargets {
     static TsonTypeReader<?> to(TsonTypeReader<?> reader, DataClass target, String what, String where, Site site,
                                 boolean top) {
         DataClass payload = target instanceof DataClassAnnotated boxed ? boxed.valueClass() : target;
-        TsonTypeReader<?> bound = payload.typeClass() == TypeRef.class && heldByName(reader)
-                ? new ReferenceNameReader(expectedAt(reader, what)) : shaped(reader, payload, what, where, site, top);
+        TsonTypeReader<?> bound;
+        if (payload.typeClass() == TypeRef.class && heldByName(reader)) {
+            bound = new ReferenceNameReader(expectedAt(reader, what));
+        } else if (payload.typeClass() == TypeRef.class && readsAnAtom(reader)) {
+            site.mismatches().add(what + " is an atom, and " + where + " holds a " + TypeRef.class.getSimpleName()
+                    + " -- at an atom-typed position a token is a literal, and a value stands by name only at a "
+                    + "record-typed position (a constructor, or a record a schema declares)");
+            bound = reader;
+        } else {
+            bound = shaped(reader, payload, what, where, site, top);
+        }
         return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
     }
 
@@ -94,6 +104,12 @@ final class BindTargets {
             case RecordMemberDispatchReader ignored -> true;
             default -> false;
         };
+    }
+
+    /** Whether {@code reader} reads an atom: a token there is a literal, which no reference can hold. */
+    private static boolean readsAnAtom(TsonTypeReader<?> reader) {
+        return RecordAbstractReader.unwrapped(reader) instanceof AtomTypeReader<?>
+                || RecordAbstractReader.unwrapped(reader) instanceof VoidReader;
     }
 
     /** What a position holding a reference by name expects, as its refusal says it: {@code a 'method' value}. */

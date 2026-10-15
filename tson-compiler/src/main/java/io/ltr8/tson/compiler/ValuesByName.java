@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -13,13 +14,12 @@ import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.RecordComponent;
@@ -33,13 +33,18 @@ import java.util.function.Consumer;
  * of a slot whose declared type is a constructor or a record and whose value is a reference written as a qualified
  * name, held as a {@link TypeRef} whose {@code name} is the token as written.
  *
+ * <p><b>Fed by the read, not by the host.</b> The references judged are the ones the resolver's read produced by
+ * name, each with its slot ({@link TsonSchema#valuesByName()}). The host class declares nothing for them, so none
+ * can be missed, and one it also returns from {@link Data#references()} is judged here by its slot and not resolved
+ * as a type there.
+ *
  * <p><b>The grammar is judged here, where the name is resolved.</b> The read keeps any unquoted token; this splits
  * it at each {@code .} and requires each segment to be a [TSON-DATA] §7.7 identifier ({@link #segments}), so
  * {@code orders.1x}, {@code .orders} and {@code orders.} are refused as no qualified name before anything is looked
  * up. A reference carrying arguments is no value by name.
  *
  * <p><b>Two layers meet here.</b> The slot's type is the meta-schema's to declare, and is read off the
- * constructor's resolved fields by walking {@link Data.Named#slot()} in the governing meta's namespace. The name is
+ * constructor's resolved fields by walking the slot's path in the governing meta's namespace. The name is
  * the governed schema's to resolve: its first segment through this schema's own entries and imports, alias hops
  * followed ([TSON-SCHEMA] §8.3), never through the meta's namespace (§3.3.2); each further segment selects in the
  * value reached -- a field of a record, then a key of a map, never a position in a list -- and a type entry admits
@@ -60,11 +65,10 @@ import java.util.function.Consumer;
  * names it (a component's {@code @Field} rename, else its own name), an {@code Optional} unwrapped, and a map
  * entered by key. A map whose keys are not names -- its key type no identifier family or enum -- cannot be entered.
  * A body whose class is not a Java record cannot be entered at all, which is this library's gap rather than the
- * schema's ({@link UnsupportedOperationException}). What a body leaves out of {@link Data#names()} is checked by
- * nothing, as for {@link Data#references()}: interim, closed by the same namespace kind.
+ * schema's ({@link UnsupportedOperationException}).
  *
- * <p>Every refusal is a {@link SchemaValidationException} naming the step that failed; a body whose declared slots
- * do not fit its constructor is the reading application's mistake ({@link BindMismatchException}).
+ * <p>Every refusal is a {@link SchemaValidationException} naming the step that failed; a host class whose components
+ * cannot be read to select a field is the reading application's mistake ({@link BindMismatchException}).
  */
 final class ValuesByName {
 
@@ -123,29 +127,29 @@ final class ValuesByName {
         }
     }
 
-    /** Resolves and judges every name {@code data}, the body of local entry {@code entryName}, declares. */
-    void check(String entryName, TypeDefinition definition, Data data, Consumer<SchemaValidationException> refused) {
-        List<Data.Named> names = data.names();
-        if (names == null) {
-            throw new BindMismatchException(data.getClass().getName() + " returned null from names() for '"
-                    + entryName + "' -- return List.of() for a body that holds no value by name");
-        }
-        if (names.isEmpty()) {
-            return;
-        }
+    /**
+     * Resolves and judges every reference by name the read collected from the body of local entry {@code entryName}
+     * ({@link TsonSchema#valuesByName()}).
+     */
+    void check(String entryName, TypeDefinition definition, List<TsonSchema.ValueByName> held,
+               Consumer<SchemaValidationException> refused) {
         Typed constructor = constructorOf(definition, governingMeta);
-        for (Data.Named named : names) {
-            Typed slot = slotType(entryName, data, constructor, named.slot());
+        for (TsonSchema.ValueByName value : held) {
+            String where = "'" + entryName + "' at " + pointer(value.slot());
             try {
-                judge("'" + entryName + "' at " + pointer(named.slot()), named.name(), slot);
+                judge(where, value.reference(), slotType(where, constructor, value.slot()));
             } catch (SchemaValidationException e) {
                 refused.accept(e);
             }
         }
     }
 
-    /** The declared type of the slot {@code steps} reach from the body of {@code constructor}. */
-    private static Typed slotType(String entryName, Data data, Typed constructor, List<String> steps) {
+    /**
+     * The declared type of the slot {@code steps} reach from the body of {@code constructor}: a field's type at a
+     * record, the value type at a map, the element type at an array -- the path the read descended, read against the
+     * declaration it descended through.
+     */
+    private static Typed slotType(String where, Typed constructor, List<String> steps) {
         Typed at = constructor;
         for (String step : steps) {
             TypeDefinition definition = at.definition();
@@ -155,10 +159,9 @@ final class ValuesByName {
                         at.of(record.fields().get(step).type().name());
                 case MapBody map -> at.of(map.valueType().name());
                 case ArrayBody array -> at.of(array.elementType().name());
-                case null, default -> throw new BindMismatchException(data.getClass().getName() + " declares a "
-                        + "name at " + pointer(steps) + " of '" + entryName + "', and '" + constructor.name()
-                        + "' declares no such slot -- names() states each slot as the path of field names, map "
-                        + "keys and array indexes from the body to the field the name fills");
+                case null, default -> throw new UnsupportedOperationException(where + ": a value by name read "
+                        + "through '" + at.name() + "' -- a slot is followed through records, maps and arrays, and "
+                        + "this library does not yet follow one through anything else");
             };
         }
         return at;

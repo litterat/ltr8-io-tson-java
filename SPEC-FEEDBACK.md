@@ -1205,15 +1205,16 @@ name there is refused), and at a record-typed slot it may carry segments and mus
 declared type. `type_ref` is `ref<type>`, one segment because types live only in the schema map; `ref<method>` takes
 segments because methods live in collections.
 
-**Interim, and what closes each.** Two rules run here as interim, each closed by an entry that lands on this
-proposal branch before the branch goes to the reviewer. First, the host decides the spelling at a declared-record
-slot: an implementation binding the slot to a reference holds a name, one binding it to the record holds a braced
-value, so two hosts of one meta admit different documents; `ref<T>` closes it by making the spelling the slot's
-declaration. Second, a body's names reach the linker only as the host declares them, as its type references do, so a
-host that leaves one out hides an unresolved or wrongly-typed name; the namespace kind closes it, giving the schema
-its own account of a body's members. Beneath both: `data` is opaque to the type system, and its body is the host's
-to interpret, so a qualified name reaches into a data-kind entry's body — `orders.methods` — only as the interim the
-namespace kind replaces.
+**Interim, and what closes it.** One rule runs here as interim, closed by an entry that lands on this proposal
+branch before the branch goes to the reviewer: the host decides the spelling at a declared-record slot. An
+implementation binding the slot to a reference holds a name, one binding it to the record holds a braced value, so
+two hosts of one meta admit different documents; `ref<T>` closes it by making the spelling the slot's declaration.
+What the host declares does not decide what is checked: the read records every reference it produces by name, with
+its slot, and the linker judges that record, so a host that omits a name, or lists it among its type references,
+changes nothing — with one host shape for every reference, the list a host filed one in would otherwise decide its
+judgement. `data` is opaque to the type system, and its body is the host's to interpret, so a qualified name reaches
+into a data-kind entry's body — `orders.methods` — only as the interim the namespace kind replaces; recording what
+the read produced walks no body and interprets nothing.
 
 **Against the Revision 37 change log.** §5.10 (and the preamble) record "a type slot cannot be bounded at a field"
 as a deferral, and the bounded type slot at a field as withdrawn. This entry does not reinstate it: `request?:
@@ -1241,12 +1242,13 @@ context marks — §5.6's positional form keeps a bare token where the record's 
 loses it where that field is a product or a sum; there an unquoted token is a name. A component bound to a type
 reference reads it as written; the record's own reader refuses it as no record (`TYPE_MISMATCH`). A quoted token is
 text, never a name. Data documents read as before, in tree and bind mode alike.
-- *The resolver* keeps the name as written, and resolved output writes it as it writes any type reference.
-- *The linker* parses each name a body declares through `Data.names()` into segments, each a [TSON-DATA] §7.7
-identifier, resolves and judges it as the table says; each refusal is its own resolver error naming the step.
-`Data.names()` is a sibling of `Data.references()` that carries each reference with its slot (the path of field
-names, map keys and indexes from the body); under `ref<T>` the two merge, both being references judged against a
-slot's declared type.
+- *The resolver* keeps the name as written, collects each by-name reference its read produced with its slot, and
+hands both to the linker; resolved output writes an argument-free type reference as its bare name, as §8.1 writes
+it, so a name reads back as written.
+- *The linker* parses each collected name into segments, each a [TSON-DATA] §7.7 identifier, resolves and judges it
+as the table says; each refusal is its own resolver error naming the step. A by-name reference the host also lists
+among its type references is judged by its slot and not resolved as a type; under `ref<T>` the two lists become one
+judgement by the slot's declared type.
 
 **Decided while building it**, each a place the proposal's prose admits more than one reading:
 

@@ -51,6 +51,8 @@ class ValuesByNameTest {
                   interface   => data & { methods: {method_name => method} }
                   http_verb   => !enum [GET POST]
                   binding     => data & { method: method  verb: http_verb  route: text }
+                  filed_in_references => data & { request: record  method?: method }
+                  filed_nowhere       => data & { request: record }
                 }
                 """);
         DOCUMENTS.put("https://example.test/orders.tn", orders("https://example.test/orders.tn", ""));
@@ -81,8 +83,12 @@ class ValuesByNameTest {
         throw new IllegalStateException("unexpected fetch: " + uri);
     };
 
+    /** The corpus's host classes and this test's own ({@code consumer}), composed onto the library's binder. */
+    private static final DataNameBinder HOSTS = new DataNameBinder.DefaultDataNameBinder(
+            Set.of("io.ltr8.tson.suite.data", "io.ltr8.tson.compiler.consumer"), Map.of());
+
     private static TsonCompiledMetaRegistry registry() {
-        return TsonCompiledMetaRegistry.withStandardLibrary(SuiteBindings.context(), SOURCE);
+        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.contextExtendedWith(HOSTS), SOURCE);
     }
 
     /** A schema under the meta above, importing orders.tn and core.tn, declaring {@code declarations}. */
@@ -309,23 +315,52 @@ class ValuesByNameTest {
     // ── Resolved output ─────────────────────────────────────────────────────────────────────────────
 
     /**
-     * The resolver keeps the name as written, in the {@code TypeRef} every reference is held as, and resolved
-     * output writes it as it writes any {@code TypeRef}. §8's own spelling of it, the bare token, reads back to the
+     * The resolver keeps the name as written, in the {@code TypeRef} every reference is held as, and resolved output
+     * writes an argument-free {@code TypeRef} as its bare name (§8.1), which reads back at the by-name slot to the
      * same body.
      */
     @Test
-    void resolvedOutputKeepsTheNameAsWritten() {
+    void resolvedOutputWritesTheNameAsWrittenAndReadsItBack() {
         TsonCompiledMetaRegistry registry = registry();
         String id = api("written", """
                 post_orders => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }""");
         Object body = registry.resolveLinked(id).schema().entries().get("post_orders").body();
 
-        String written = new TsonObjectWriter(SuiteBindings.context()).toTson(body).replaceAll("\\s+", " ");
-        assertTrue(written.contains("method: { name: \"orders.methods.place_order\""), written);
+        String written = new TsonObjectWriter(SuiteBindings.context()).toTson(body);
+        assertTrue(written.replaceAll("\\s+", " ").contains("method: orders.methods.place_order"), written);
 
         Object read = registry.loadMeta(META_SERVICE).compiledSchema().find("binding").orElseThrow()
-                .read(TestDocuments.document(
-                        "!binding { method: orders.methods.place_order  verb: POST  route: \"/orders\" }"));
+                .read(TestDocuments.document(written));
         assertEquals(body, read);
+    }
+
+    // ── Which list a host returns a reference from changes nothing ──────────────────────────────────
+
+    /**
+     * A by-name reference is judged against its slot from what the read collected, so returning it from
+     * {@code references()} -- where a {@code type_ref} slot's reference belongs -- neither excuses a wrong one nor
+     * refuses a right one.
+     */
+    @Test
+    void aReferenceByNameFiledInReferencesIsStillJudgedBySlot() {
+        refused(api("filed-text", """
+                a => !filed_in_references { request: text }"""), "'a' at /request", "built by 'text_type'");
+        refused(api("filed-alias", """
+                user_id => uuid
+                a => !filed_in_references { request: user_id }"""), "'a' at /request", "built by 'uuid_type'");
+        assertEquals(List.of(), problems(api("filed-right", """
+                a => !filed_in_references { request: order  method: orders.methods.place_order }""")));
+    }
+
+    /** A host that declares no reference at all has its by-name ones judged the same way. */
+    @Test
+    void aReferenceByNameDeclaredNowhereIsStillJudgedBySlot() {
+        refused(api("nowhere-text", """
+                a => !filed_nowhere { request: text }"""), "'a' at /request", "built by 'text_type'");
+        refused(api("nowhere-alias", """
+                user_id => uuid
+                a => !filed_nowhere { request: user_id }"""), "'a' at /request", "built by 'uuid_type'");
+        assertEquals(List.of(), problems(api("nowhere-right", """
+                a => !filed_nowhere { request: order }""")));
     }
 }

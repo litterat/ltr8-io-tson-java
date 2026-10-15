@@ -12,9 +12,10 @@ Current form only; history lives in git.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds.
 - A reference to a DATA-kinded entry is refused at every position a type-ref occupies.
-- A value by name (`Data.names()`) resolves its first segment in the schema's own merged namespace, alias hops followed,
-  never the meta's; each further segment selects in the bound value; the referent's declared type must IS-A the
-  slot's, compared by canonical identity. Local entries only, after `validateEntry`.
+- A value by name (`TsonSchema.valuesByName`, collected by the read) resolves its first segment in the schema's own
+  merged namespace, alias hops followed, never the meta's; each further segment selects in the bound value; the
+  referent's declared type must IS-A the slot's, compared by canonical identity. Local entries only, after
+  `validateEntry`, which skips a by-name reference a body also returns from `references()` (matched by identity).
 - `entryOrigins`, `enumForms` and `nameTypes` are on `TsonLinkedSchema`, never on `TsonSchema` or `TypeDefinition`.
 - An enum's and a record's `name_type` is an identifier family whose `normalization` implies NFC (`NONE` never;
   `ASCII_CASEFOLD` only over ASCII — `NameType.formRefusal`); their names are judged under its profile, never the
@@ -324,10 +325,13 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
 ## Values by name (`ValuesByName`, SPEC-FEEDBACK.md #13)
 
 A meta layer's `data` body may hold a value written by name — `request: place_order_request` at a `record`-typed
-slot, `method: orders.methods.place_order` at a slot typed by the meta's own `method` record — and declares each
-through `Data.names()` with the slot it fills (`design/meta-layer-data-kind.md`). The read keeps the name as written
-(`design/record-dispatch.md`); this is the lookup and the judgement, run by `checkValuesByName` over local entries
-after `validateEntry`, so a body's unresolved `type_ref` is reported first and on its own.
+slot, `method: orders.methods.place_order` at a slot typed by the meta's own `method` record. The read keeps the name
+as written and records it with the slot it fills (`design/record-dispatch.md`); `SchemaResolver` keeps that record
+per entry, `TsonSchema.valuesByName`, so what is judged is what was read and nothing the host class declares
+(`design/meta-layer-data-kind.md`). This is the lookup and the judgement, run by `checkValuesByName` over local
+entries after `validateEntry`, so a body's unresolved `type_ref` is reported first and on its own. A by-name
+reference the class also returns from `references()` is skipped there, matched by identity: it is judged by its slot
+here, never resolved as a type, so which list a host files it in changes nothing.
 
 - **The name is a `TypeRef`, and its grammar is judged here.** A value by name is held as every reference is, a
   `TypeRef` whose `name` is the token as written; `ValuesByName.segments` splits it at each `.` and requires each
@@ -335,13 +339,13 @@ after `validateEntry`, so a body's unresolved `type_ref` is reported first and o
   `orders.` as no qualified name before anything is looked up. At a `type_ref` slot the same host shape is one
   segment naming a type, judged by `validateTypeRef` as always: `type_ref` is `ref<type>`.
 - **The slot's type is the meta's, the name is the schema's.** The slot's declared type is read off the entry's
-  constructor (its `source`, in the governing meta's namespace) by walking `Data.Named.slot` through the resolved
-  fields: a field name at a record, any key at a map, any index at an array. A path the constructor does not declare
-  is the body's mistake (`BindMismatchException`). The name's first segment resolves in `merged` — the schema's own
-  entries and imports — with alias hops followed (§8.3, `ReferenceChain`), and never in the meta's namespace
-  (§3.3.2); a member is reached through its entry, so `method: place_order` is unresolved even though `orders` holds
-  a key of that name. Nothing is looked up lexically, and nothing is a choice among candidates: found first, judged
-  after.
+  constructor (its `source`, in the governing meta's namespace) by walking the recorded path through the resolved
+  fields: a field name at a record, any key at a map, any index at an array. A path through anything else (a choice)
+  is a gap this library has not filled (`UnsupportedOperationException`). The name's first segment resolves in
+  `merged` — the schema's own entries and imports — with alias hops followed (§8.3, `ReferenceChain`), and never in
+  the meta's namespace (§3.3.2); a member is reached through its entry, so `method: place_order` is unresolved even
+  though `orders` holds a key of that name. Nothing is looked up lexically, and nothing is a choice among candidates:
+  found first, judged after.
 - **Each further segment selects in the value reached**, never in a declaration: a field of a record (read through
   the bound body's record components, named as binding names them, `Optional` unwrapped), then a key of a map. A
   type entry admits no further segment (`order.sku` is refused; projecting into a record type's fields is a
@@ -352,9 +356,6 @@ after `validateEntry`, so a body's unresolved `type_ref` is reported first and o
   Java record cannot be entered at all, which is this library's gap (`UnsupportedOperationException`). **Entering a
   data body is interim**: `data` is opaque to the type system and the host's to interpret, so a segment selects in
   the host's object and nothing in the schema walks the body's values; the namespace kind replaces the hop.
-- **What `names()` does not declare is not checked**, the same hole `references()` has: a body that omits a name hides
-  an unresolved or wrongly-typed one. Interim, closed when the namespace kind gives the schema its own account of a
-  body's members.
 - **The judgement is §7.2's IS-A between two types, by canonical identity.** An entry's declared type is the
   constructor that built its body — its `source` where that is a constructor of the *declaring* schema's meta (IS-A
   `top`), otherwise the kernel constructor its body's class mirrors (`@Typename`): a record declaration and a

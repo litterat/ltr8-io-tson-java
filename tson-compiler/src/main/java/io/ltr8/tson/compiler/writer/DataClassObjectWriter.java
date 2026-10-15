@@ -16,11 +16,13 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.atom.VocabularyAtoms;
 import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.io.UncheckedIOException;
@@ -196,6 +198,8 @@ public final class DataClassObjectWriter {
         try {
             switch (dataClass) {
                 case DataClassAtom atom -> writeAtom(value, writer);
+                case DataClassRecord record when value instanceof TypeRef reference && bare(reference) ->
+                        writer.unquotedToken(reference.name());
                 case DataClassRecord record -> writeRecord(value, record, writer);
                 case DataClassArray array -> writeArray(value, array, writer);
                 case DataClassMap map -> writeMap(value, map, writer);
@@ -212,6 +216,24 @@ public final class DataClassObjectWriter {
         } catch (Throwable t) {
             throw new DataBindException("failed to write value of type " + dataClass.typeClass(), t);
         }
+    }
+
+    /**
+     * Whether {@code reference} writes as its bare name: no arguments, and a name every {@code .}-separated segment
+     * of which is an identifier, so the token reads back as written. [TSON-SCHEMA] §8.1 writes an argument-free
+     * {@code type_ref} positionally, and a value written by name (SPEC-FEEDBACK.md #13) has only that spelling; an
+     * application keeps the explicit record, which carries its arguments.
+     */
+    private static boolean bare(TypeRef reference) {
+        if (!reference.arguments().isEmpty()) {
+            return false;
+        }
+        for (String segment : reference.name().split("\\.", -1)) {
+            if (segment.isEmpty() || IdentifierGrammar.validate(segment).isPresent()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

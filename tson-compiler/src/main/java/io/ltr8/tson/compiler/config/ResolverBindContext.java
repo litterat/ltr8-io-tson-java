@@ -4,7 +4,6 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.Token;
 
 /**
  * {@link AtomContext}'s vocabulary plus the two registrations that cannot live beside it -- what binding

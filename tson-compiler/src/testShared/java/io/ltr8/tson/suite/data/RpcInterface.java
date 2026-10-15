@@ -4,7 +4,6 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.TypeRef;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,10 +17,4 @@ public record RpcInterface(Map<String, RpcMethod> methods) implements Data {
         return methods.values().stream().map(RpcMethod::response).filter(Objects::nonNull).toList();
     }
 
-    @Override
-    public List<Named> names() {
-        List<Named> names = new ArrayList<>();
-        methods.forEach((key, method) -> names.addAll(method.names("methods", key)));
-        return names;
-    }
 }

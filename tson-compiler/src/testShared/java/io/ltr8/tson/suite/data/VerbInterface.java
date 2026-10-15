@@ -20,8 +20,4 @@ public record VerbInterface(Map<String, Method> methods) implements Data {
         return methods.values().stream().map(Method::response).filter(Objects::nonNull).toList();
     }
 
-    @Override
-    public List<Named> names() {
-        return Method.namesOf("methods", methods);
-    }
 }
