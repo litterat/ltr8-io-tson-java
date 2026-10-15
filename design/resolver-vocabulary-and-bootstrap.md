@@ -17,7 +17,7 @@ that resolves meta-kernel itself. Current form only; history lives in git.
 - Resolved output states the reference chain as written; the chain collapses only where `TsonSchemaCompiler` compiles a
   `REFERENCE` entry. `ReferenceChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
 - `@synthetic` goes on the **key** of exactly the sugar-form entries (both channels), never on an instantiation entry
-  or a `TypeDefinition` value, and the linker re-attaches it (`withNameAnnotations`), imports included.
+  or an entry's value, and the linker re-attaches it (`withNameAnnotations`), imports included.
 - The bootstrap is three passes — ordinary declarations, instances, atom refinements — over a closed `instanceBody`
   switch and a hand-written `refinedBody` merge, with no compiled reader, and attaches no `@synthetic`.
 
@@ -154,9 +154,9 @@ meta the way an author-written annotation is: there is no author to resolve agai
   materialised entry from a declared one, which is what folding these entries back into the nested form the
   author wrote depends on.
 - **Key position, per §6.** An annotation before a declared name is metadata *about the declaration*, and a
-  resolved schema is a `{type_name => type_definition}` — so the marker lands on the map's key, which
+  resolved schema is a `{type_name => top}` — so the marker lands on the map's key, which
   `TsonSchema.entries()` keeps reachable through `AnnotatedMap.getAnnotations(name)`, never on the
-  `TypeDefinition` value. §6 forbids hoisting between the two positions and nothing here does.
+  entry's value. §6 forbids hoisting between the two positions and nothing here does.
 - **Marked: exactly the synthetic entries, from both channels.** The desugar lift produces them and
   `SchemaDesugarer.lifted` names them as the document's own set difference
   (`design/schema-grammar-and-desugaring.md`); materialisation produces more of the same kind when it closes an
@@ -166,9 +166,9 @@ meta the way an author-written annotation is: there is no author to resolve agai
 - **`SchemaResolver` attaches it where it assembles the entry map**, from those two mint sites — the desugar lift
   (`SchemaDesugarer.lifted`, the document's own set difference) and materialisation closing an open synthetic
   (`TemplateMaterialiser.syntheticNames`). It is the one derived marker (§8.1).
-- **Unmarked: instantiation entries.** §8.2 draws that line itself — "the two families are distinguishable
-  (an instantiation's `source` is an application; a synthetic's is a bare constructor), and only synthetics
-  are the fold-back-into-display case the marker serves." Marking too much would be as wrong as marking too
+- **Unmarked: instantiation entries.** §8.2 draws that line itself: only synthetics are the
+  fold-back-into-display case the marker serves; an instantiation is a type the author named by its
+  application. Marking too much would be as wrong as marking too
   little, so `SyntheticEntryMarkerTest` asserts both halves.
 - **It survives linking and the import merge**, which is where a key-side fact is easiest to lose: the linker
   rebuilds its entry map several times and re-attaches key annotations at the one point every entry passes

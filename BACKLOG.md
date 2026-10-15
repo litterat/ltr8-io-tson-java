@@ -47,7 +47,7 @@ own prose (which had gone stale on it):
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
-  so no path reads a resolved `type_definition` map and verifies it. §8.1's ingest verifies rather than
+  so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest verifies rather than
   recomputes what an author may have written into a derived fact: a recorded `template_param.type` or `bound`
   must be IS-A the type the held body derives, since a written narrowing lives nowhere else; it also re-runs the
   family checks (no member minted at a use site) over the ingested map and its closure, and the §5.11 group
@@ -193,7 +193,7 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   validate against is discoverable only by sending one and reading the failure. The facts that decide it are all
   available at link time — an undiscriminated `choice` in a JSON-facing position, and a position whose only admissible
   values are ones JSON cannot spell (a `REQUIRED_FIXED` field fixed to a based-integer or to `.nan`/`.inf`, a `bytes`
-  value) — so this is a report over the linked namespace or a property on `TypeDefinition`, not a new mechanism. What
+  value) — so this is a report over the linked namespace or a property of a linked entry, not a new mechanism. What
   needs deciding is whether it is a diagnostic, a queryable property, or both.
 
 - [ ] **The corpus has no way to state a fact about two encodings.** `class1/`/`class2/` are TSON-processor
@@ -267,7 +267,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
   `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
-  `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
+  `{type_name => top}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
   — the fixtures carry `@synthetic` on the keys the resolver minted and `@ordering`/`@bounded`/`@exact` on core's,
   and the bound side renders none of them, so the entries would compare equal for the wrong reason;
@@ -329,9 +329,9 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **A template application is named in a diagnostic by the construction it closes, in array spelling.**
   `tags: set<text>` given `[a a]` reports `'[text]' requires unique elements`, and `only: tuple1<text>` given `[]`
   reports `'[text]' has 1 positions, found only 0 elements` — so a set and a one-element tuple both read as the
-  array `[text]`, a type the author never wrote. The instantiation entry carries the application in its `source`
-  (`{ name: set  arguments: [text] }`), but its body is a reference to the synthetic construction it closes
-  (`!set_type { element_type: text }`, sourced from the bare constructor), and the reader that reports is the
+  array `[text]`, a type the author never wrote. The instantiation entry's facts record the application
+  (`set<text>`), but its body is a reference to the synthetic construction it closes
+  (`!set_type { element_type: text }`, built by the bare constructor), and the reader that reports is the
   synthetic's, which `EntryDisplayName` renders from its body. The fix is to keep the application as the display
   name across that hop, as `UseSite.named` already does for an alias; and where no application is in reach,
   `EntryDisplayName` should not render a `set_type` body or a one-position tuple as array sugar.

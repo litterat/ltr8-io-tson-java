@@ -183,7 +183,7 @@ letting one satisfy an error vector is how a corpus comes to pass on the strengt
 
 **No `class2/schema/` subject declares a template yet, and nothing stops one now.** An open entry's body is
 the kernel's `template` constructor carrying the application as text (`schema.meta.TemplateBody`), so it is a
-`type_definition` like any other and reads back as ordinary data — where §8.1's older shape wrote the
+schema-map value like any other and reads back as ordinary data — where §8.1's older shape wrote the
 application as though it were a value of the constructor's own vocabulary, which no reader could apply
 (§8.1). `ResolvedForm` compares an open entry's body by its *parsed* form, §5.10's one
 spelling being about the application and not the whitespace, so the layer needs no expectation format of its

@@ -37,8 +37,8 @@ Related: `design/readers-and-diagnostics.md`, `design/scope-push.md`, `design/re
   carries its own name token's position and a minted entry has none. So `tag_list => [text; 1..2]` keeps
   `tag_list` and the anonymous form inside it renders as `[order; 1..]`, a map as `{text => order}`, a tuple
   as `[text, int32]`, a choice as `(text | int32)`, and an instantiation entry as the application its
-  `source` records (`paged<order>`). Anything with no sugar spelling falls back to the entry name — honest
-  rather than invented.
+  facts record (`EntryFacts.application`, `paged<order>`). Anything with no sugar spelling falls back to the entry name
+  — honest rather than invented.
 - **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). A field
   declared `c: pct` over `pct => small` reads with `small`'s reader, that being the type at the end of the
   chain, and a message from it would otherwise name a declaration the author did write but did not write
@@ -52,8 +52,8 @@ Related: `design/readers-and-diagnostics.md`, `design/scope-push.md`, `design/re
   (`AllocationHarnessTest` is the guard).
     - **A materialised application is named the same way**, and it is why the mechanism sits on the entry
       rather than on the position. That entry's body is a `Reference`, so it compiles to its target's reader —
-      and `TsonSchemaCompiler` names it for the entry doing the referring, whose `source` is the application
-      (`b<10>`). Without it a violation against `b<10>` would read `'integer_type_10_100_786fbcfb': …`.
+      and `TsonSchemaCompiler` names it for the entry doing the referring, whose recorded application is
+      `b<10>`. Without it a violation against `b<10>` would read `'integer_type_10_100_786fbcfb': …`.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per
       read — and the variant that rejected the value is the informative name anyway.
@@ -142,9 +142,10 @@ schema being read against, which is what keeps that true for an imported declara
 is the single construction site, so there is nowhere else for a mismatched pair to come from.
 
 **`schemaPosition` descends with the pointer** — `/person/age` carries `age`'s own line and column, not the
-enclosing declaration's, because `RecordField` carries a position of its own beside `TypeDefinition`'s. Both
-are populated because `SchemaResolver.resolveSchema` threads `TsonSchemaParser.schemaPositions()` down to
-`DefinitionResolver` — one `SchemaPositions` carrier rather than a parameter per kind.
+enclosing declaration's, because `RecordField` carries a position of its own beside the entry's
+(`TsonSchema.EntryFacts.position`). Both are populated because `SchemaResolver.resolveSchema` threads
+`TsonSchemaParser.schemaPositions()` down to `DefinitionResolver` — one `SchemaPositions` carrier rather than a
+parameter per kind.
 
 **Inside a declaration's own body the position stays the declaration's, and that is the granularity, not a
 gap.** A choice variant and a supertype have no position of their own, so `'method' lists the variant 'card'
@@ -162,7 +163,7 @@ the offending token.
   `RecordField.withType`/`withState` exist: a rebuild naming components positionally silently drops the ones
   it does not mention, and **no test comparing resolved values can catch it**, since position is excluded
   from equality on `annotations`' own footing.
-- **`RecordField.position` is `@Unbound`**, on `TypeDefinition.position`'s precedent — §8.1's `record_field`
+- **`RecordField.position` is `@Unbound`** — §8.1's `record_field`
   declares no such field, so nothing fills it and strict binding would call it a mismatch. Deliberately not
   carried in the annotation channel, which is the opposite kind of thing: annotations are schema data, they
   resolve one hop against the governing meta (§6, and an unresolvable name is the author's error), and they
