@@ -18,7 +18,8 @@ import java.util.Optional;
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "date_type")
-public record DateType(Optional<LocalDate> min, @Field("exclusive_min") Optional<LocalDate> exclusiveMin,
+public record DateType(List<TypeRef> supertypes, List<String> subtypes,
+        Optional<LocalDate> min, @Field("exclusive_min") Optional<LocalDate> exclusiveMin,
                        Optional<LocalDate> max, @Field("exclusive_max") Optional<LocalDate> exclusiveMax)
         implements Atom {
 
@@ -31,12 +32,25 @@ public record DateType(Optional<LocalDate> min, @Field("exclusive_min") Optional
      */
     @Record
     public DateType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public DateType(Optional<LocalDate> min, Optional<LocalDate> exclusiveMin, Optional<LocalDate> max,
+            Optional<LocalDate> exclusiveMax) {
+        this(List.of(), List.of(), min, exclusiveMin, max, exclusiveMax);
+    }
+
+    @Override
+    public DateType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new DateType(supertypes, subtypes, min, exclusiveMin, max, exclusiveMax);
     }
 
     /** The inclusive bounds alone, for the callers that state no exclusive one. */

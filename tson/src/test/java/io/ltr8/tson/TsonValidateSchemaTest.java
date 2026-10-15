@@ -133,8 +133,8 @@ class TsonValidateSchemaTest {
      * unchanged, a closed body being the template's own with its parameters replaced.
      *
      * <p>The <b>alias</b> case is the one that decides how this is implemented. {@code half<text>} composes
-     * to {@code pair<no_such_type, text>} and mints an entry sourced on {@code pair} -- so walking a derived
-     * entry's lineage lands on {@code pair}, which is faultless. The offending <em>name</em> is the evidence
+     * to {@code pair<no_such_type, text>} and mints an instantiation of {@code pair} -- so walking a derived
+     * entry's derivation lands on {@code pair}, which is faultless. The offending <em>name</em> is the evidence
      * instead: {@code half} is the held body that mentions it.
      */
     @Test
@@ -225,7 +225,7 @@ class TsonValidateSchemaTest {
     @Test
     void anUnresolvedArgumentStaysWithTheApplier() {
         assertStaysWithTheApplier("box<some_typo>",
-                "'box<some_typo>' source has an unresolved reference 'some_typo'");
+                "'box<some_typo>' field 'v' has an unresolved reference 'some_typo'");
     }
 
     private static void assertStaysWithTheApplier(String application, String message) {

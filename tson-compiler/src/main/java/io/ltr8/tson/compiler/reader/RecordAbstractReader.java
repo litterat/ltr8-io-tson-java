@@ -346,7 +346,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     static TsonReadContext.FieldNameRule fieldNameRule(String name, RecordBody body, ValueReaderContext context) {
         return context.linked().nameType(name).map(type -> {
-            if (!(type.body() instanceof IdentifierType identifiers)) {
+            if (!(type instanceof IdentifierType identifiers)) {
                 throw new IllegalStateException("'" + name + "': name_type '" + body.nameTypeName() + "' reached a "
                         + "reader as no identifier family; the linker admits only one");
             }

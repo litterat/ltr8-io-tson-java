@@ -5,8 +5,9 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.Reference;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,12 +35,12 @@ class ReferenceChainTest {
         return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
     }
 
-    private static TypeRef fieldType(TypeDefinition definition, String field) {
-        return assertInstanceOf(RecordBody.class, definition.body()).fields().entrySet().stream()
+    private static TypeRef fieldType(Top definition, String field) {
+        return assertInstanceOf(RecordBody.class, definition).fields().entrySet().stream()
                 .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow().type();
     }
 
-    private static TypeDefinition kernelEntry(String name) {
+    private static Top kernelEntry(String name) {
         return tson().bindRegistry().core()
                 .resolveLinked(TsonBundledSchemas.META_KERNEL_ID).schema().entries().get(name);
     }
@@ -65,7 +66,7 @@ class ReferenceChainTest {
               b => a
               holder => { f: b }""";
 
-    private static TypeDefinition resolve(String body, String entry) {
+    private static Top resolve(String body, String entry) {
         return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()))
                 .resolve(schema(body)).schema().entries().get(entry);
     }
@@ -89,19 +90,19 @@ class ReferenceChainTest {
     @Test
     void aChainIsStatedAsWritten() {
         assertEquals("b", fieldType(resolve(CHAIN, "holder"), "f").name());
-        assertEquals(TypeRef.of("a"), assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
-                resolve(CHAIN, "b").body()).target());
-        assertInstanceOf(io.ltr8.tson.schema.meta.TextType.class, resolve(CHAIN, "a").body());
+        assertEquals(TypeRef.of("a"), assertInstanceOf(Reference.class,
+                resolve(CHAIN, "b")).target());
+        assertInstanceOf(io.ltr8.tson.schema.meta.TextType.class, resolve(CHAIN, "a"));
     }
 
     /** An argument list is no different -- a lifted synthetic's element type names what was written too. */
     @Test
     void aNestedArgumentNamesWhatWasWritten() {
-        TypeDefinition holder = resolve("  a => text\n  holder => { f: [a] }", "holder");
-        TypeDefinition injected = resolve("  a => text\n  holder => { f: [a] }",
+        Top holder = resolve("  a => text\n  holder => { f: [a] }", "holder");
+        Top injected = resolve("  a => text\n  holder => { f: [a] }",
                 fieldType(holder, "f").name());
         assertEquals("a", assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class,
-                injected.body()).elementType().name());
+                injected).elementType().name());
     }
 
     /**

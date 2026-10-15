@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 import io.ltr8.unicode.Normalization;
 
@@ -22,13 +23,34 @@ import java.util.Optional;
  * !iri_reference ^ { allow_relative: false }} to {@link #IRI}.
  */
 @Typename(name = "iri_type")
-public record IriType(String spec, @Field("min_length") Optional<Integer> minLength,
+public record IriType(List<TypeRef> supertypes, List<String> subtypes,
+        String spec, @Field("min_length") Optional<Integer> minLength,
                       @Field("max_length") Optional<Integer> maxLength,
                       Optional<Integer> length, Optional<String> pattern,
                       Optional<List<String>> members, Optional<List<String>> schemes,
                       @Field("allow_relative") boolean allowRelative,
                       @Field("allow_fragment") boolean allowFragment,
                       Normalization normalization) implements Atom, TextFamily {
+    /** The chain normalised: absent and empty are one list. */
+    @Record
+    public IriType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public IriType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+            Optional<String> pattern, Optional<List<String>> members, Optional<List<String>> schemes, boolean allowRelative,
+            boolean allowFragment, Normalization normalization) {
+        this(List.of(), List.of(), spec, minLength, maxLength, length, pattern, members, schemes, allowRelative,
+                allowFragment, normalization);
+    }
+
+    @Override
+    public IriType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new IriType(supertypes, subtypes, spec, minLength, maxLength, length, pattern, members, schemes,
+                allowRelative, allowFragment, normalization);
+    }
 
     /** RFC 3987, the one {@code spec} every {@code iri_type} carries. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc3987";

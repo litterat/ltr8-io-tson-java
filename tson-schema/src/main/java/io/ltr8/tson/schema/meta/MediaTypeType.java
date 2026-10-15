@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 import io.ltr8.net.MediaType;
 import io.ltr8.net.MediaTypeSyntaxException;
@@ -20,12 +21,28 @@ import java.util.Optional;
  * pinned to RFC 6838, flat and a bare {@link String}, as {@link Cidr4Type}'s is.
  */
 @Typename(name = "media_type_type")
-public record MediaTypeType(String spec, @Field("allow_parameters") boolean allowParameters,
+public record MediaTypeType(List<TypeRef> supertypes, List<String> subtypes,
+        String spec, @Field("allow_parameters") boolean allowParameters,
                             Optional<List<String>> types, Optional<List<String>> suffixes) implements Atom {
 
+    @Record
+
     public MediaTypeType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         types = types.map(List::copyOf);
         suffixes = suffixes.map(List::copyOf);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public MediaTypeType(String spec, boolean allowParameters, Optional<List<String>> types,
+            Optional<List<String>> suffixes) {
+        this(List.of(), List.of(), spec, allowParameters, types, suffixes);
+    }
+
+    @Override
+    public MediaTypeType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new MediaTypeType(supertypes, subtypes, spec, allowParameters, types, suffixes);
     }
 
     /** {@code media_type_type.spec}'s pinned value. */

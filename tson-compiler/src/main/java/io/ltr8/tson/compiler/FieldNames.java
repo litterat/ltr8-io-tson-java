@@ -8,7 +8,7 @@ import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,32 +40,30 @@ final class FieldNames {
      * default -- what {@link io.ltr8.tson.schema.TsonLinkedSchema#nameTypes} carries to its readers. Empty
      * for the default, which every reader applies without being told, and for a type that resolves to nothing.
      */
-    static Optional<TypeDefinition> readBy(TypeDefinition record, Map<String, TypeDefinition> merged,
-                                           Function<String, TypeDefinition> structure) {
-        if (record == null || !(record.body() instanceof RecordBody body)
-                || body.nameType().isEmpty()) {
+    static Optional<Top> readBy(Top record, Map<String, Top> merged,
+                                           Function<String, Top> structure) {
+        if (!(record instanceof RecordBody body) || body.nameType().isEmpty()) {
             return Optional.empty();
         }
-        return NameType.of(record, merged::get, structure).map(NameType.Resolved::definition);
+        return NameType.of(record, Optional.empty(), merged::get, structure).map(NameType.Resolved::definition);
     }
 
     /** Every violation among the records in {@code localNames}, in their order. */
-    static List<EnumLabels.Violation> check(Map<String, TypeDefinition> merged, Set<String> localNames,
-                                            Function<String, TypeDefinition> structure) {
+    static List<EnumLabels.Violation> check(Map<String, Top> merged, Set<String> localNames,
+                                            Function<String, Top> structure) {
         List<EnumLabels.Violation> violations = new ArrayList<>();
         for (String name : localNames) {
-            TypeDefinition definition = merged.get(name);
-            if (definition != null && definition.body() instanceof RecordBody body) {
-                check(name, definition, body, merged, structure).ifPresent(violations::add);
+            if (merged.get(name) instanceof RecordBody body) {
+                check(name, body, body, merged, structure).ifPresent(violations::add);
             }
         }
         return List.copyOf(violations);
     }
 
-    private static Optional<EnumLabels.Violation> check(String name, TypeDefinition definition, RecordBody body,
-                                                        Map<String, TypeDefinition> merged,
-                                                        Function<String, TypeDefinition> structure) {
-        Optional<NameType.Resolved> resolved = NameType.of(definition, merged::get, structure);
+    private static Optional<EnumLabels.Violation> check(String name, Top definition, RecordBody body,
+                                                        Map<String, Top> merged,
+                                                        Function<String, Top> structure) {
+        Optional<NameType.Resolved> resolved = NameType.of(definition, Optional.empty(), merged::get, structure);
         if (resolved.isEmpty() && body.nameType().isEmpty()) {
             // The default where no kernel is in scope to resolve it: the identifier grammar it stands for.
             for (String field : body.fields().keySet()) {
@@ -88,14 +86,14 @@ final class FieldNames {
                     + "from an atom-family instance whose constructor IS-A identifier_type; a key that is no name "
                     + "belongs in a map"));
         }
-        if (type.definition().body() instanceof IdentifierType identifiers) {
+        if (type.definition() instanceof IdentifierType identifiers) {
             Optional<String> form = NameType.formRefusal(identifiers);
             if (form.isPresent()) {
                 return Optional.of(new EnumLabels.Violation(name, "'" + name + "': its name_type '"
                         + body.nameTypeName() + "' cannot judge names -- " + form.get()));
             }
         }
-        Optional<AtomType<?>> parser = AtomParsers.forType(type.definition().body());
+        Optional<AtomType<?>> parser = AtomParsers.forType(type.definition());
         if (parser.isEmpty()) {
             return Optional.empty();
         }

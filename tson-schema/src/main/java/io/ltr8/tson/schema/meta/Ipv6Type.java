@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.List;
@@ -14,11 +15,26 @@ import java.util.List;
  * compact constructor.
  */
 @Typename(name = "ipv6_type")
-public record Ipv6Type(String spec, List<String> within, List<String> excluding) implements Atom {
+public record Ipv6Type(List<TypeRef> supertypes, List<String> subtypes,
+        String spec, List<String> within, List<String> excluding) implements Atom {
+
+    @Record
 
     public Ipv6Type {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         within = within != null ? List.copyOf(within) : List.of();
         excluding = excluding != null ? List.copyOf(excluding) : List.of();
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public Ipv6Type(String spec, List<String> within, List<String> excluding) {
+        this(List.of(), List.of(), spec, within, excluding);
+    }
+
+    @Override
+    public Ipv6Type withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new Ipv6Type(supertypes, subtypes, spec, within, excluding);
     }
 
     /** {@code ipv6 => !ipv6_type {}} -- the unconstrained IPv6 address, core.tn's own {@code !ipv6}. */

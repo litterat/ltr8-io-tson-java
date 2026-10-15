@@ -3,12 +3,14 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -49,7 +51,7 @@ class TemplateIsAFamilyBaseTest {
      * already named the same application.
      */
     private static String target(TsonLinkedSchema schema, String alias) {
-        return schema.schema().entries().get(alias).body() instanceof io.ltr8.tson.schema.meta.Reference ref
+        return schema.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
                 ? ref.target().name() : alias;
     }
 
@@ -74,12 +76,12 @@ class TemplateIsAFamilyBaseTest {
     // ── Gap 1: a marked template takes part in the IS-A chain ────────────
 
     /**
-     * A subtype template is a subtype of its base. The instantiations already index under the base through
-     * their own {@code supertypes}; what was missing is the template, which {@code computeSubtypes} skipped
-     * outright for having parameters.
+     * A subtype template's instantiations are subtypes of its base, and the template is not: an open body carries
+     * no IS-A chain (SPEC-FEEDBACK.md #14), so the base indexes the declared members its applications close to,
+     * each chain naming both the base and the template.
      */
     @Test
-    void aMarkedTemplateIsIndexedUnderItsBase() {
+    void aMarkedTemplatesMembersAreIndexedUnderItsBase() {
         TsonLinkedSchema schema = linked("f1", """
                   pet_base => abstract { type: text =? }
                   pet      => <T, V> pet_base & { type?: = T  value: V }
@@ -87,9 +89,9 @@ class TemplateIsAFamilyBaseTest {
                   dogpet   => pet<"dog", dog_type>
                 """);
 
-        assertTrue(schema.schema().entries().get("pet_base").subtypes().contains("pet"),
-                () -> "the template is a member of its base: "
-                        + schema.schema().entries().get("pet_base").subtypes());
+        List<String> members = Type.subtypesOf(schema.schema().entries().get("pet_base"));
+        assertTrue(members.contains(target(schema, "dogpet")), () -> "the member is indexed under the base: " + members);
+        assertFalse(members.contains("pet"), () -> "the template carries no chain of its own: " + members);
     }
 
     /** And it keeps its own instantiations, which is what #506 already gives it. */
@@ -98,7 +100,7 @@ class TemplateIsAFamilyBaseTest {
         TsonLinkedSchema schema = linked("f2", SEALED_FAMILY);
 
         assertEquals(List.of(target(schema, "dogpet"), target(schema, "catpet")),
-                schema.schema().entries().get("pet").subtypes());
+                Type.subtypesOf("pet", schema.schema().entries().get("pet"), schema.schema().entries()));
     }
 
     // ── Gap 2: abstract on a template is a claim with a subject ───────────
@@ -209,8 +211,8 @@ class TemplateIsAFamilyBaseTest {
                   holder => { any: box  k: box<text> }
                 """;
         TsonLinkedSchema schema = linked("f11", declarations);
-        assertEquals(List.of("bt"), schema.schema().entries().get("box").subtypes());
-        assertEquals(List.of("box"), schema.schema().entries().get("bt").supertypes());
+        assertEquals(List.of("bt"), Type.subtypesOf("box", schema.schema().entries().get("box"), schema.schema().entries()));
+        assertEquals(List.of("box"), Type.supertypesOf(schema.schema().entries().get("bt")));
 
         assertEquals(List.of(), read("f11", declarations, "!holder { any: !bt { v: 1 }  k: { v: x } }"));
         List<Diagnostic> untagged = read("f11", declarations, "!holder { any: { v: 1 }  k: { v: x } }");

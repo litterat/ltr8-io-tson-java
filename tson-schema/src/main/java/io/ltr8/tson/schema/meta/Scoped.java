@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.net.URI;
@@ -37,9 +38,14 @@ import java.util.Optional;
  * shape.
  */
 @Typename(name = "scoped")
-public record Scoped(List<ScopeKind> scope, Optional<Map<URI, List<String>>> schemas) implements Sum {
+public record Scoped(List<TypeRef> supertypes, List<String> subtypes,
+        List<ScopeKind> scope, Optional<Map<URI, List<String>>> schemas) implements Sum {
+
+    @Record
 
     public Scoped {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         scope = List.copyOf(scope);
         // An omitted inner list arrives as null -- the field is `[type_name; 1..]?` and the binder hands an
         // absent OPTIONAL field to the constructor as null -- so it is normalised here to the empty list this
@@ -50,6 +56,16 @@ public record Scoped(List<ScopeKind> scope, Optional<Map<URI, List<String>>> sch
             entries.forEach((schema, types) -> copy.put(schema, types == null ? List.of() : List.copyOf(types)));
             return Collections.unmodifiableMap(copy);
         });
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public Scoped(List<ScopeKind> scope, Optional<Map<URI, List<String>>> schemas) {
+        this(List.of(), List.of(), scope, schemas);
+    }
+
+    @Override
+    public Scoped withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new Scoped(supertypes, subtypes, scope, schemas);
     }
 
     /** Whether this position admits a value whose type comes from {@code cell}'s namespace. */

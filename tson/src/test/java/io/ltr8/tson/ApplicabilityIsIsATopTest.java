@@ -4,8 +4,9 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Reference;
 
 import java.util.List;
 import java.util.Map;
@@ -87,14 +88,14 @@ class ApplicabilityIsIsATopTest {
                 .resolve(source).schema().entries();
 
         for (String name : List.of("bare", "closed", "applied")) {
-            TypeDefinition definition = entries.get(name);
-            assertEquals(TypeKind.REFERENCE, definition.kind(), name);
-            assertEquals("int32", definition.source().orElseThrow().name(), name);
+            Top definition = entries.get(name);
+            assertEquals(TypeKind.REFERENCE, TypeKind.of(definition), name);
+            assertEquals("int32", ((Reference) definition).target().name(), name);
         }
         // The open one is a template until it closes, and its kind says so: a template is not a type
         // (§5.10), so it is TEMPLATE rather than the REFERENCE its closure produces. `applied` above is
         // where the REFERENCE appears -- the entry closing it mints.
-        assertEquals(TypeKind.TEMPLATE, entries.get("open").kind());
+        assertEquals(TypeKind.TEMPLATE, TypeKind.of(entries.get("open")));
     }
 
     /**

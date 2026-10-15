@@ -14,8 +14,8 @@ import java.util.Optional;
  * <em>unread</em> until materialisation substitutes the parameters away; {@link #parameters} are what it
  * binds, in order, each with the type an argument for it is read as ({@link TemplateParam}).
  *
- * <p><b>It holds in both directions</b>: a {@link TypeDefinition} whose body is one of these declares type
- * parameters, and every entry that declares them has one. §5.10's partial application is no exception --
+ * <p><b>It holds in both directions</b>: an entry whose value is one of these declares type parameters, and
+ * every entry that declares them has one. §5.10's partial application is no exception --
  * {@code <B> pair<uuid, B>} holds the {@code !reference { target: pair<uuid, B> }} §8.1 says it denotes.
  *
  * <p><b>Why the body is text, and not a value of the constructor's own vocabulary.</b> A parameter stands
@@ -89,6 +89,15 @@ public record TemplateBody(List<TemplateParam> parameters, String template,
     /** The parameter names, in order -- what substitution binds and what an application's arity is checked against. */
     public List<String> parameterNames() {
         return parameters.stream().map(TemplateParam::name).toList();
+    }
+
+    /**
+     * The type parameters an entry whose value is {@code value} declares -- {@code []} unless it is held
+     * ([TSON-SCHEMA] §5.10). A held body carries the list it binds, so "does this entry declare parameters?" and
+     * "what does its body hold?" are one question, and a closed entry has nowhere to put a parameter list.
+     */
+    public static List<String> parameterNamesOf(Top value) {
+        return value instanceof TemplateBody held ? held.parameterNames() : List.of();
     }
 
     /** The same body with each parameter replaced by {@code settled}'s entry for it, where there is one. */

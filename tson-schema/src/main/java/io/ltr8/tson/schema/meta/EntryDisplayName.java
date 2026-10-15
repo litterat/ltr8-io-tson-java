@@ -1,9 +1,11 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.schema.TsonSchema;
 
 import java.math.BigInteger;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -18,7 +20,8 @@ import java.util.stream.Collectors;
  * this project's own rule that a diagnostic never names what the author did not write, and now doubly so
  * where diagnostics travel to a reader who cannot open the schema at all.
  *
- * <p><b>A missing source position is what tells them apart</b>, and it is exact rather than a heuristic on
+ * <p><b>A missing source position is what tells them apart</b> ({@link TsonSchema.EntryFacts#position}), and it is exact
+ * rather than a heuristic on
  * the name's shape: a declaration parsed from a document carries the position of its own name token, and an
  * entry the resolver mints has nothing to carry. So {@code tag_list => [text; 1..2]} keeps {@code tag_list},
  * which is what its author would look for, while the anonymous form inside it renders as the form.
@@ -34,50 +37,61 @@ public final class EntryDisplayName {
     }
 
     /** {@code name} if the author wrote it, else the form that produced this entry. */
-    public static String of(String name, TypeDefinition definition) {
-        return of(name, definition, Map.of());
+    public static String of(String name, Top value, TsonSchema.EntryFacts facts) {
+        return of(name, value, facts, Map.of(), ignored -> TsonSchema.EntryFacts.NONE);
     }
 
     /**
-     * The same, resolving the names <em>inside</em> a form through {@code namespace} as well, so a form built
-     * over another derived entry renders whole -- {@code [tree<text>; 1..]} rather than
-     * {@code [tree_text_a7f070f6; 1..]}. A caller with no namespace to hand gets the one-level rendering,
-     * which is what a reader already has and enough for the value it is reporting on.
+     * The same, resolving the names <em>inside</em> a form through {@code schema} as well, so a form built over
+     * another derived entry renders whole -- {@code [tree<text>; 1..]} rather than {@code [tree_text_a7f070f6;
+     * 1..]}.
      */
-    public static String of(String name, TypeDefinition definition, Map<String, TypeDefinition> namespace) {
-        if (definition.position().isPresent()) {
+    public static String of(String name, TsonSchema schema) {
+        Top value = schema.entries().get(name);
+        return value == null ? name : of(name, value, schema.factsOf(name), schema.entries(), schema::factsOf);
+    }
+
+    /**
+     * The same over a namespace and its facts held apart -- the linker's merged view, which is no one schema. A
+     * caller with no namespace to hand gets the one-level rendering ({@link #of(String, Top,
+     * TsonSchema.EntryFacts)}), which is what a reader already has and enough for the value it is reporting on.
+     */
+    public static String of(String name, Top value, TsonSchema.EntryFacts facts, Map<String, ? extends Top> namespace,
+                            Function<String, TsonSchema.EntryFacts> factsOf) {
+        if (facts.position().isPresent()) {
             return name;
         }
-        return application(definition).orElseGet(() -> switch (definition.body()) {
-            case ArrayBody array -> "[" + shown(array.elementType(), namespace)
+        return application(facts).orElseGet(() -> switch (value) {
+            case ArrayBody array -> "[" + shown(array.elementType(), namespace, factsOf)
                     + size(array.minItems(), array.maxItems()) + "]";
-            case MapBody map -> "{" + shown(map.keyType(), namespace) + " => " + shown(map.valueType(), namespace)
-                    + size(map.minItems(), map.maxItems()) + "}";
+            case MapBody map -> "{" + shown(map.keyType(), namespace, factsOf) + " => "
+                    + shown(map.valueType(), namespace, factsOf) + size(map.minItems(), map.maxItems()) + "}";
             case TupleBody tuple -> tuple.elements().stream().map(TupleElement::elementType)
-                    .map(ref -> shown(ref, namespace)).collect(Collectors.joining(", ", "[", "]"));
-            case ChoiceBody choice -> choice.variants().stream().map(ref -> shown(ref, namespace))
+                    .map(ref -> shown(ref, namespace, factsOf)).collect(Collectors.joining(", ", "[", "]"));
+            case ChoiceBody choice -> choice.variants().stream().map(ref -> shown(ref, namespace, factsOf))
                     .collect(Collectors.joining(" | ", "(", ")"));
             default -> name;
         });
     }
 
     /** One name inside a form, itself display-rendered when the namespace knows it and it is derived. */
-    private static String shown(TypeRef ref, Map<String, TypeDefinition> namespace) {
-        TypeDefinition referenced = namespace.get(ref.name());
-        return referenced == null ? ref.name() : of(ref.name(), referenced, namespace);
+    private static String shown(TypeRef ref, Map<String, ? extends Top> namespace,
+                                Function<String, TsonSchema.EntryFacts> factsOf) {
+        Top referenced = namespace.get(ref.name());
+        return referenced == null ? ref.name()
+                : of(ref.name(), referenced, factsOf.apply(ref.name()), namespace, factsOf);
     }
 
     /**
-     * {@code head<arg, arg>} for an entry a template application materialised. An instantiation entry keys
-     * its identity on the application it closes (§8.2), so {@code source} holds exactly what the author
-     * wrote at the site; a construction's {@code source} is a bare constructor name and carries no
-     * arguments, which is what distinguishes the two here.
+     * {@code head<arg, arg>} for an entry a template application materialised: an instantiation entry keys its
+     * identity on the application it closes (§8.2), and its facts keep that application as the author wrote it
+     * at the site.
      */
-    private static Optional<String> application(TypeDefinition definition) {
-        return definition.source()
-                .filter(source -> !source.arguments().isEmpty())
-                .map(source -> source.name() + source.arguments().stream().map(EntryDisplayName::argument)
-                        .collect(Collectors.joining(", ", "<", ">")));
+    private static Optional<String> application(TsonSchema.EntryFacts facts) {
+        return facts.application()
+                .filter(application -> !application.arguments().isEmpty())
+                .map(application -> application.name() + application.arguments().stream()
+                        .map(EntryDisplayName::argument).collect(Collectors.joining(", ", "<", ">")));
     }
 
     private static String argument(TypeArgument argument) {

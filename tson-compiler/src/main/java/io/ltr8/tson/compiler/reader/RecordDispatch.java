@@ -34,10 +34,10 @@ final class RecordDispatch {
     /** {@code concrete} for an OPEN or FINAL record, a dispatcher for the two that select a member. */
     static ValueReaderFactory over(ValueReaderFactory concrete) {
         return (name, definition, context) -> {
-            if (!(definition.body() instanceof RecordBody body)) {
+            if (!(definition instanceof RecordBody body)) {
                 return concrete.create(name, definition, context);
             }
-            String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
+            String displayName = EntryDisplayName.of(name, context.schema());
             Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
             return switch (body.extension()) {
                 // ABSTRACT says the record has no values of its own; whether its members are placed by the
@@ -47,10 +47,10 @@ final class RecordDispatch {
                 // aliases (`deeper`).
                 case ABSTRACT -> FamilySelectors.dispatchesOnMembers(definition)
                         ? new RecordMemberDispatchReader(selfNames, displayName,
-                                FamilySelectors.of(definition, context.schema().entries()),
-                                Set.copyOf(definition.subtypes()), context, context.readers())
+                                FamilySelectors.of(name, definition, context.schema().entries()),
+                                Set.copyOf(context.subtypesOf(name, definition)), context, context.readers())
                         : new RecordTagDispatchReader(selfNames, displayName,
-                                Subsumption.admitting(definition.subtypes(), context.namesMeaning()),
+                                Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning()),
                                 context.readers());
                 case OPEN, FINAL -> concrete.create(name, definition, context);
             };

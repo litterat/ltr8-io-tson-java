@@ -3,8 +3,8 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
-import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.IdentifierProfile.Base;
+import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
 
 import java.util.ArrayList;
@@ -33,7 +33,7 @@ import java.util.Optional;
  * {@code IdentifierGrammar} builds the series' name grammar from it.
  */
 @Typename(name = "identifier_type")
-public record IdentifierType(
+public record IdentifierType(List<TypeRef> supertypes, List<String> subtypes,
         String spec,
         @Field("min_length") Optional<Integer> minLength,
         @Field("max_length") Optional<Integer> maxLength,
@@ -50,7 +50,24 @@ public record IdentifierType(
 
     @Record
     public IdentifierType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         members = members.map(List::copyOf);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public IdentifierType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+            Optional<String> pattern, Optional<List<String>> members, Base start, Base continueBase,
+            Optional<String> startAdd, Optional<String> continueAdd, Optional<String> medial, Optional<String> exclude,
+            Normalization normalization) {
+        this(List.of(), List.of(), spec, minLength, maxLength, length, pattern, members, start, continueBase, startAdd,
+                continueAdd, medial, exclude, normalization);
+    }
+
+    @Override
+    public IdentifierType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new IdentifierType(supertypes, subtypes, spec, minLength, maxLength, length, pattern, members, start,
+                continueBase, startAdd, continueAdd, medial, exclude, normalization);
     }
 
     /** {@code identifier_type.spec}'s pinned value. */

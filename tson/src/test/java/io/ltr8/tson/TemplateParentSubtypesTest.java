@@ -2,7 +2,8 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,8 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * An instantiation indexes under the parent its template has (§5.10), so a position
  * typed by the template knows its members.
  *
- * <p><b>The head comes from {@code source}</b>, which §8.2 makes an instantiation record as written. That is
- * the whole of the derivation: no second index, and nothing to keep in step with the entries themselves.
+ * <p><b>The head comes from the application an instantiation's facts record</b>, as written (§8.2), and the
+ * template's members are the entries whose chain names it: no second index, and nothing to keep in step with
+ * the entries themselves.
  *
  * <p><b>Only where the template has a parent.</b> A container, a constructor application and a reference
  * template are no types, so their applications index under nothing -- crediting them would put members under
@@ -40,13 +42,14 @@ class TemplateParentSubtypesTest {
      * already named the same application.
      */
     private static String target(TsonLinkedSchema schema, String alias) {
-        return schema.schema().entries().get(alias).body() instanceof io.ltr8.tson.schema.meta.Reference ref
+        return schema.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
                 ? ref.target().name() : alias;
     }
 
     private static List<String> subtypesOf(TsonLinkedSchema schema, String name) {
-        TypeDefinition definition = schema.schema().entries().get(name);
-        return definition == null ? List.of() : definition.subtypes();
+        Top definition = schema.schema().entries().get(name);
+        return definition == null ? List.of()
+                : Type.subtypesOf(name, definition, schema.schema().entries());
     }
 
     @Test

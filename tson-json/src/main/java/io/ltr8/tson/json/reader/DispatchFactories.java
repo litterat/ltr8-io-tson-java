@@ -8,7 +8,7 @@ import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.List;
 import java.util.Set;
@@ -41,27 +41,27 @@ final class DispatchFactories {
     /** {@code concrete} for a record with no subtypes, a dispatcher for every other record-family position. */
     static ValueReaderFactory over(ValueReaderFactory concrete) {
         return (name, definition, context) -> {
-            RecordBody body = (RecordBody) definition.body();
+            RecordBody body = (RecordBody) definition;
             return switch (body.extension()) {
                 // Linking refuses anything composed onto a FINAL record, so it has no subtype a tag could name.
                 case FINAL -> concrete.create(name, definition, context);
-                case OPEN -> definition.subtypes().isEmpty()
+                case OPEN -> context.subtypesOf(name, definition).isEmpty()
                         ? concrete.create(name, definition, context)
                         : new DispatchTagReader(name, displayName(name, definition, context),
-                                context.admitting(List.of(name)), context.admitting(definition.subtypes()),
+                                context.admitting(List.of(name)), context.admitting(context.subtypesOf(name, definition)),
                                 concrete.create(name, definition, context), context,
-                                context.locationOf(name, definition), rules(name, definition, body, context));
+                                context.locationOf(name), rules(name, definition, body, context));
                 case ABSTRACT -> family(name, displayName(name, definition, context), definition,
                         context, rules(name, definition, body, context));
             };
         };
     }
 
-    private static String displayName(String name, TypeDefinition definition, ValueReaderContext context) {
-        return EntryDisplayName.of(name, definition, context.schema().entries());
+    private static String displayName(String name, Top definition, ValueReaderContext context) {
+        return EntryDisplayName.of(name, context.schema());
     }
 
-    private static RecordDiagnostics rules(String name, TypeDefinition definition, RecordBody body,
+    private static RecordDiagnostics rules(String name, Top definition, RecordBody body,
                                            ValueReaderContext context) {
         return new RecordDiagnostics(displayName(name, definition, context),
                 String.join(" | ", body.fields().keySet()));
@@ -80,9 +80,9 @@ final class DispatchFactories {
      * unsubstituted text no reader could read, so it reaches {@link OpenTemplateReader} unexamined.
      */
     static final ValueReaderFactory TEMPLATE = (name, definition, context) -> {
-        TemplateBody held = (TemplateBody) definition.body();
+        TemplateBody held = (TemplateBody) definition;
         return held.extension().isEmpty()
-                ? new OpenTemplateReader(name, definition.parameters(), context.locationOf(name, definition))
+                ? new OpenTemplateReader(name, held.parameterNames(), context.locationOf(name))
                 : family(name, name, definition, context, new RecordDiagnostics(name, ""));
     };
 
@@ -90,17 +90,18 @@ final class DispatchFactories {
      * An ABSTRACT base, closed or a template: the family's dispatcher, with no concrete reading. Which
      * dispatcher is the body's own statement -- selectors named, or none and the tag decides.
      */
-    private static JsonTypeReader<?> family(String name, String displayName, TypeDefinition definition,
+    private static JsonTypeReader<?> family(String name, String displayName, Top definition,
                                             ValueReaderContext context, RecordDiagnostics rules) {
-        JsonSchemaLocation location = context.locationOf(name, definition);
+        JsonSchemaLocation location = context.locationOf(name);
         Set<String> selfNames = context.admitting(List.of(name));
         return FamilySelectors.dispatchesOnMembers(definition)
                 // The sealed reader takes its subtypes raw: it maps each member's pins to that member, so an
                 // alias is not a second member. Where it compares a written tag it admits aliases (`deeper`).
                 ? new DispatchMemberReader(selfNames, displayName,
-                        FamilySelectors.of(definition, context.schema().entries()),
-                        Set.copyOf(definition.subtypes()), context, location, rules)
-                : new DispatchTagReader(name, displayName, selfNames, context.admitting(definition.subtypes()),
+                        FamilySelectors.of(name, definition, context.schema().entries()),
+                        Set.copyOf(context.subtypesOf(name, definition)), context, location, rules)
+                : new DispatchTagReader(name, displayName, selfNames, context.admitting(context.subtypesOf(name,
+                        definition)),
                         null, context, location, rules);
     }
 }

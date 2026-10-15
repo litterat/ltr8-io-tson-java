@@ -5,7 +5,6 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.math.BigInteger;
-
 import java.time.OffsetTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +25,8 @@ import java.util.Optional;
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "time_type")
-public record TimeType(Optional<OffsetTime> min, @Field("exclusive_min") Optional<OffsetTime> exclusiveMin,
+public record TimeType(List<TypeRef> supertypes, List<String> subtypes,
+        Optional<OffsetTime> min, @Field("exclusive_min") Optional<OffsetTime> exclusiveMin,
                      Optional<OffsetTime> max, @Field("exclusive_max") Optional<OffsetTime> exclusiveMax,
                      Optional<BigInteger> precision) implements Atom {
 
@@ -36,12 +36,25 @@ public record TimeType(Optional<OffsetTime> min, @Field("exclusive_min") Optiona
      */
     @Record
     public TimeType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public TimeType(Optional<OffsetTime> min, Optional<OffsetTime> exclusiveMin, Optional<OffsetTime> max,
+            Optional<OffsetTime> exclusiveMax, Optional<BigInteger> precision) {
+        this(List.of(), List.of(), min, exclusiveMin, max, exclusiveMax, precision);
+    }
+
+    @Override
+    public TimeType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new TimeType(supertypes, subtypes, min, exclusiveMin, max, exclusiveMax, precision);
     }
 
     /** The inclusive bounds alone, for the many callers that set neither an exclusive bound nor a precision. */

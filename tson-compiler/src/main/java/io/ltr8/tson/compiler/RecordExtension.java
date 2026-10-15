@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
@@ -18,7 +19,8 @@ import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Type;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -79,31 +81,32 @@ final class RecordExtension {
      * schema's, reported against the schema itself ({@code ""}) and naming where each member came from. A
      * collision inside one import cannot reach here, since that import was refused when it linked.
      */
-    static List<Violation> check(Map<String, TypeDefinition> merged, Set<String> localNames,
+    static List<Violation> check(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
+                                 Set<String> localNames,
                                  Map<String, String> origins, Map<String, Normalization> enumForms) {
         List<Violation> violations = new ArrayList<>();
         for (String name : localNames) {
-            TypeDefinition def = merged.get(name);
-            if (def != null && isUndeclaredMember(def)) {
-                String base = def.supertypes().getFirst();
-                violations.add(new Violation(name, "'" + shown(name, merged) + "' composes onto '"
-                        + shown(base, merged) + "', so it is a member of that family, and a member is declared: "
+            Top def = merged.get(name);
+            if (def != null && isUndeclaredMember(name, def, facts)) {
+                String base = Type.supertypesOf(def).getFirst();
+                violations.add(new Violation(name, "'" + shown(name, merged, facts) + "' composes onto '"
+                        + shown(base, merged, facts) + "', so it is a member of that family, and a member is declared: "
                         + "a read reports the member it selects, a tag names it and a binding maps it, all by a "
                         + "name an application at a use site does not have (§3.3.4, §8.2). Declare it -- "
-                        + "'my_name => " + shown(name, merged) + "' -- and use that name in place of the "
+                        + "'my_name => " + shown(name, merged, facts) + "' -- and use that name in place of the "
                         + "application"));
                 continue;
             }
-            RecordBody record = def == null ? null : familyBodyOf(def, merged);
+            RecordBody record = def == null ? null : familyBodyOf(name, def, merged, facts);
             if (record != null) {
-                checkDeclaration(name, def, record, merged, violations);
+                checkDeclaration(name, def, record, merged, facts, violations);
             }
         }
-        for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
-            TypeDefinition def = entry.getValue();
-            RecordBody base = familyBodyOf(def, merged);
+        for (Map.Entry<String, Top> entry : merged.entrySet()) {
+            Top def = entry.getValue();
+            RecordBody base = familyBodyOf(entry.getKey(), def, merged, facts);
             if (base != null && FamilySelectors.dispatchesOnMembers(def)) {
-                checkFamily(entry.getKey(), def, merged, localNames, origins, enumForms, violations);
+                checkFamily(entry.getKey(), def, merged, facts, localNames, origins, enumForms, violations);
             }
         }
         return violations;
@@ -111,20 +114,22 @@ final class RecordExtension {
 
     /**
      * A record a use-site template application minted that composes onto another: a family member with no
-     * declared name. A minted entry has no source position, and an application's {@code source} carries its
-     * arguments; a constructor ({@code top} in its chain) is no member of anything.
+     * declared name. A minted entry has no source position, and its facts record the application it closes; a
+     * constructor ({@code top} in its chain) is no member of anything.
      */
-    private static boolean isUndeclaredMember(TypeDefinition def) {
-        return def.position().isEmpty() && def.body() instanceof RecordBody
-                && def.source().filter(source -> !source.arguments().isEmpty()).isPresent()
-                && !def.supertypes().isEmpty() && !def.supertypes().contains("top");
+    private static boolean isUndeclaredMember(String name, Top def, Map<String, TsonSchema.EntryFacts> facts) {
+        TsonSchema.EntryFacts known = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
+        return known.position().isEmpty() && def instanceof RecordBody record
+                && known.application().filter(application -> !application.arguments().isEmpty()).isPresent()
+                && !record.supertypes().isEmpty() && !record.supertypeNames().contains("top");
     }
 
     // ── The declaration's own obligations ────────────────────────────────
 
-    private static void checkDeclaration(String name, TypeDefinition def, RecordBody record,
-                                          Map<String, TypeDefinition> merged, List<Violation> violations) {
-        checkNothingComposesOntoFinal(name, def, merged, violations);
+    private static void checkDeclaration(String name, Top def, RecordBody record,
+                                          Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
+                                                  List<Violation> violations) {
+        checkNothingComposesOntoFinal(name, def, merged, facts, violations);
 
         // The *names* this declaration states, never fields resolved from its members: which fields a family
         // dispatches on is the base's own statement (§5.2), and a template nobody has applied yet has no
@@ -138,27 +143,26 @@ final class RecordExtension {
         for (String selector : declared) {
             RecordField field = record.fields().get(selector);
             if (field != null) {
-                checkDiscriminatorField(name, selector, field, record.groups(), merged, violations);
+                checkDiscriminatorField(name, selector, field, record.groups(), merged, facts, violations);
             }
         }
     }
 
     /**
-     * §5.9's subtraction is what makes this read {@code TypeDefinition.supertypes} rather than the body's own
-     * list: subtraction empties the contract index and leaves the body's authorial lineage in place, minting
-     * no IS-A edge, which is the only thing FINAL constrains. Reading {@code RecordBody.supertypes} instead
-     * would refuse the one operation §5.9 admits against a final type.
+     * §5.9's subtraction leaves the chain empty and mints no IS-A edge, which is the only thing FINAL
+     * constrains, so a subtracted record is not refused here: the one operation §5.9 admits against a final type
+     * names no parent at all.
      */
-    private static void checkNothingComposesOntoFinal(String name, TypeDefinition def,
-            Map<String, TypeDefinition> merged, List<Violation> violations) {
-        for (String supertype : def.supertypes()) {
-            TypeDefinition target = merged.get(ReferenceChain.terminal(supertype, merged));
-            if (target != null && target.body() instanceof RecordBody parent
+    private static void checkNothingComposesOntoFinal(String name, Top def,
+            Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts, List<Violation> violations) {
+        for (String supertype : Type.supertypesOf(def)) {
+            Top target = merged.get(ReferenceChain.terminal(supertype, merged));
+            if (target instanceof RecordBody parent
                     && parent.extension() == RecordExtensionType.FINAL) {
                 violations.add(new Violation(name, "'" + name + "' names '" + supertype + "' as a supertype, "
                         + "but '" + supertype + "' is final and admits none -- composition and refinement are "
                         + "both refused, in the declaring schema and in any that imports it. Subtraction is "
-                        + "not: §5.9 empties the contract index and mints no IS-A edge, which is the only "
+                        + "not: §5.9 empties the chain and mints no IS-A edge, which is the only "
                         + "thing final constrains (§5.2, §5.9)"));
             }
         }
@@ -171,7 +175,8 @@ final class RecordExtension {
      * selector is a record would be discovered only by the subtypes failing one at a time.
      */
     private static void checkDiscriminatorField(String name, String fieldName, RecordField field,
-            List<FieldGroup> groups, Map<String, TypeDefinition> merged, List<Violation> violations) {
+            List<FieldGroup> groups, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
+                    List<Violation> violations) {
         // Group membership is checked first and alone: §5.11 forces a member optional, so the state rule
         // would fire too and report the symptom beside the cause. One mistake, one verdict.
         if (groups.stream().anyMatch(group -> group.hasMember(fieldName))) {
@@ -185,7 +190,7 @@ final class RecordExtension {
                     + "with nothing to dispatch on, and a pinned or defaulted one fixes in the base what each "
                     + "subtype has to state differently (§5.2, §5.7)"));
         }
-        Optional<AtomType<?>> parser = parserFor(field, merged);
+        Optional<AtomType<?>> parser = parserFor(field, merged, facts);
         if (parser.isEmpty()) {
             violations.add(new Violation(name, "'" + name + "': discriminator field '" + fieldName
                     + "' is declared '" + field.type().name() + "', which is not an atom or an enum -- a "
@@ -196,24 +201,23 @@ final class RecordExtension {
 
     // ── The family's obligations, over the closure ───────────────────────
 
-    private static void checkFamily(String base, TypeDefinition def, Map<String, TypeDefinition> merged,
+    private static void checkFamily(String base, Top def, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
             Set<String> localNames, Map<String, String> origins, Map<String, Normalization> enumForms,
             List<Violation> violations) {
         // The same derivation the dispatchers read, never a second filter over the fields: a check that
         // decided "which fields select" differently from the read could pass a family no reader can place.
-        SequencedMap<String, RecordField> selectors = FamilySelectors.of(def, merged);
-        if (selectors.isEmpty() || selectors.values().stream().anyMatch(f -> parserFor(f, merged).isEmpty())) {
+        SequencedMap<String, RecordField> selectors = FamilySelectors.of(base, def, merged);
+        if (selectors.isEmpty() || selectors.values().stream().anyMatch(f -> parserFor(f, merged, facts).isEmpty())) {
             return; // already reported against the base, and a pin has nothing to be read at
         }
         Map<List<Object>, String> seen = new LinkedHashMap<>();
-        for (String subtype : new LinkedHashSet<>(def.subtypes())) {
-            TypeDefinition sub = merged.get(subtype);
+        for (String subtype : new LinkedHashSet<>(Type.subtypesOf(base, def, merged))) {
+            Top sub = merged.get(subtype);
             // An undeclared member is refused on its own, and judging its pins too would report one mistake twice.
-            if (sub == null || !(sub.body() instanceof RecordBody record) || !sub.parameters().isEmpty()
-                    || isUndeclaredMember(sub)) {
+            if (!(sub instanceof RecordBody record) || isUndeclaredMember(subtype, sub, facts)) {
                 continue;
             }
-            List<Object> pins = pinsOf(base, subtype, selectors, record, merged, localNames, enumForms, violations);
+            List<Object> pins = pinsOf(base, subtype, selectors, record, merged, facts, localNames, enumForms, violations);
             if (pins == null) {
                 continue;
             }
@@ -221,8 +225,8 @@ final class RecordExtension {
             if (collision != null) {
                 boolean merge = !localNames.contains(subtype) && !localNames.contains(collision);
                 String blamed = localNames.contains(subtype) ? subtype : localNames.contains(collision) ? collision : "";
-                violations.add(new Violation(blamed, "'" + shown(subtype, merged) + "' and '"
-                        + shown(collision, merged)
+                violations.add(new Violation(blamed, "'" + shown(subtype, merged, facts) + "' and '"
+                        + shown(collision, merged, facts)
                         + "' pin the discriminator" + (selectors.size() > 1 ? "s" : "") + " of '" + base
                         + "' to the same "
                         + describe(selectors, pins) + " -- two subtypes a value cannot tell apart, so the "
@@ -242,9 +246,11 @@ final class RecordExtension {
      * collides under names the resolver chose ({@code pet_of_cat_int32_1c52dc45}, §8.2), and those name
      * nothing an author can open.
      */
-    private static String shown(String name, Map<String, TypeDefinition> merged) {
-        TypeDefinition definition = merged.get(name);
-        return definition == null ? name : EntryDisplayName.of(name, definition, merged);
+    private static String shown(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts) {
+        Top definition = merged.get(name);
+        return definition == null ? name : EntryDisplayName.of(name, definition,
+                facts.getOrDefault(name, TsonSchema.EntryFacts.NONE), merged,
+                other -> facts.getOrDefault(other, TsonSchema.EntryFacts.NONE));
     }
 
     /**
@@ -256,7 +262,7 @@ final class RecordExtension {
      * terms a decoder will compare in. A subtype narrowing the field narrows a subset of that type.
      */
     private static List<Object> pinsOf(String base, String subtype, SequencedMap<String, RecordField> selectors,
-            RecordBody record, Map<String, TypeDefinition> merged, Set<String> localNames,
+            RecordBody record, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts, Set<String> localNames,
             Map<String, Normalization> enumForms,
             List<Violation> violations) {
         List<Object> pins = new ArrayList<>(selectors.size());
@@ -274,7 +280,7 @@ final class RecordExtension {
                 }
                 return null;
             }
-            Object value = decode(selector.getValue(), pinned.value().get(), merged, enumForms);
+            Object value = decode(selector.getValue(), pinned.value().get(), merged, facts, enumForms);
             if (value == null) {
                 return null; // the pin is not a value of the declared type -- checkFieldValue's verdict
             }
@@ -283,9 +289,10 @@ final class RecordExtension {
         return pins;
     }
 
-    private static Object decode(RecordField selector, Token pin, Map<String, TypeDefinition> merged,
+    private static Object decode(RecordField selector, Token pin, Map<String, Top> merged, Map<String,
+            TsonSchema.EntryFacts> facts,
                                  Map<String, Normalization> enumForms) {
-        Optional<AtomType<?>> parser = parserFor(selector, merged, enumForms);
+        Optional<AtomType<?>> parser = parserFor(selector, merged, facts, enumForms);
         try {
             return parser.get() instanceof io.ltr8.tson.compiler.atom.TokenAtomType<?> formSensitive
                     ? formSensitive.read(new TokenValue(pin.text(), TokenForm.valueOf(pin.form().name())))
@@ -296,22 +303,24 @@ final class RecordExtension {
     }
 
     /** The parser for a field's type at the end of its reference chain, empty where nothing reads a token. */
-    private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, TypeDefinition> merged) {
-        return parserFor(field, merged, Map.of());
+    private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, Top> merged, Map<String,
+            TsonSchema.EntryFacts> facts) {
+        return parserFor(field, merged, facts, Map.of());
     }
 
     /** {@link #parserFor(RecordField, Map)}, an enum selector matching in its name type's form. */
-    private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, TypeDefinition> merged,
+    private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, Top> merged, Map<String,
+            TsonSchema.EntryFacts> facts,
                                                    Map<String, Normalization> enumForms) {
         if (!field.type().arguments().isEmpty()) {
             return Optional.empty();
         }
         String terminal = ReferenceChain.terminal(field.type().name(), merged);
-        TypeDefinition target = merged.get(terminal);
-        if (target == null || !target.parameters().isEmpty() || target.body() instanceof Reference) {
+        Top target = merged.get(terminal);
+        if (target == null || target instanceof TemplateBody || target instanceof Reference) {
             return Optional.empty();
         }
-        return AtomParsers.forType(target.body(), enumForms.getOrDefault(terminal, Normalization.NONE));
+        return AtomParsers.forType(target, enumForms.getOrDefault(terminal, Normalization.NONE));
     }
 
     /**
@@ -331,16 +340,17 @@ final class RecordExtension {
      * <p>An <em>unmarked</em> template still has none: it is no type until applied (§5.10), nothing can
      * stand at it, and its instantiations are judged as the closed records they are.
      */
-    private static RecordBody familyBodyOf(TypeDefinition def, Map<String, TypeDefinition> merged) {
-        if (def.body() instanceof RecordBody record) {
-            return def.parameters().isEmpty() ? record : null;
+    private static RecordBody familyBodyOf(String name, Top def, Map<String, Top> merged,
+                                           Map<String, TsonSchema.EntryFacts> facts) {
+        if (def instanceof RecordBody record) {
+            return record;
         }
-        if (!(def.body() instanceof TemplateBody held) || held.extension().isEmpty()) {
+        if (!(def instanceof TemplateBody held) || held.extension().isEmpty()) {
             return null;
         }
         // The selectors come from `FamilySelectors`, the one derivation both encodings read -- never from
         // parsing the held text, which `tson-json` cannot do and §1.3 says no consumer should have to.
-        return new RecordBody(List.of(), FamilySelectors.of(def, merged), List.of(),
+        return new RecordBody(FamilySelectors.of(name, def, merged), List.of(),
                 held.extension().get(), held.discriminators(), java.util.Optional.empty());
     }
 

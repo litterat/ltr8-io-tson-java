@@ -40,7 +40,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     /**
      * <b>One factory for every atom family</b>, because the mapping from a resolved body to the parser that
      * reads it is {@link AtomParsers}' and there is no second opinion to have about it. A constant per family doing
-     * {@code new XParser((XType) definition.body())} would be a table restating {@code AtomParsers.forType}
+     * {@code new XParser((XType) definition)} would be a table restating {@code AtomParsers.forType}
      * entry for entry, and two tables are what lets a family be present in one and missing from the other.
      *
      * <p>{@link ValueReaderFactoryRegistry} registers it under each constructor name: what is shared is the
@@ -48,11 +48,11 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * fault rather than an author error -- the registry only routes here for names that are atoms.
      */
     static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
-            .forType(definition.body(), context.linked().enumForm(name))
+            .forType(definition, context.linked().enumForm(name))
             .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(name, parser,
-                    context.locationOf(name, definition), namesProfile(definition.body())))
+                    context.locationOf(name), namesProfile(definition)))
             .orElseThrow(() -> new IllegalStateException(
-                    "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
+                    "'" + name + "' is registered as an atom but its body has no parser: " + definition));
 
     /**
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean},
@@ -71,7 +71,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, context) -> "boolean".equals(name)
             ? AtomTypeReader.of(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
                     () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
-                    context.locationOf(name, definition))
+                    context.locationOf(name))
             : ATOM.create(name, definition, context);
     /**
      * {@code void_type}: not a scalar at all -- its contract admits only the void sentinel {@code _}, never a
@@ -79,7 +79,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * kernel's {@code void} and core's sibling read alike.
      */
     static final ValueReaderFactory VOID = (name, definition, context) ->
-            new VoidReader(context.locationOf(name, definition));
+            new VoidReader(context.locationOf(name));
 
     /**
      * {@code value_type}: decoded by [TSON-DATA] §4 base type resolution, whose §4.4 rule is that a quoted token
@@ -87,7 +87,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * {@code AtomParsers} declines it and {@link ValueParser} answers here.
      */
     static final ValueReaderFactory VALUE = (name, definition, context) ->
-            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition), null);
+            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name), null);
 
     /**
      * The schema entry's own declared name -- the <em>declaration's</em>, not the built-in it refines, so a

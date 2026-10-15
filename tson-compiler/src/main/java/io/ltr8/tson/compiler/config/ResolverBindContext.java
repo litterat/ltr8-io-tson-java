@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.meta.Token;
  *
  * <p>Neither could travel, and for the same kind of reason: {@link Token} is {@code tson-schema}'s, and
  * {@link SourcePosition}'s bridge names this module's own {@code Position}, the only concrete
- * implementation there is. Both are needed wherever a {@code schema.meta.TypeDefinition} is itself bound --
+ * implementation there is. Both are needed wherever a {@code schema.meta} value is itself bound --
  * schema resolution and the resolved-form round trip -- and nowhere a consumer's data goes: a user schema's
  * {@code !!meta} chain does not contribute the kernel's {@code value}, so no field a consumer declares can
  * be typed by the escape hatch {@code Token} carries.

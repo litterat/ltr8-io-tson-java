@@ -91,7 +91,7 @@ class RecordFieldsMapTest {
                   base => { zeta: text  alpha: int32 }
                   row => base & { mid?: text  beta: text }
                 }
-                """).schema().entries().get("row").body();
+                """).schema().entries().get("row");
         assertEquals(List.of("zeta", "alpha", "mid", "beta"), List.copyOf(row.fields().keySet()));
     }
 

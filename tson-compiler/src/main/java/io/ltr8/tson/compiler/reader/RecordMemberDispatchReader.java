@@ -22,7 +22,7 @@ import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -92,7 +92,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     RecordMemberDispatchReader(Set<String> selfNames, String displayName, SequencedMap<String, RecordField> selectorFields,
                                 Set<String> subtypes, ValueReaderContext context,
                                 TsonTypeReaderResolver readerFor) {
-        Map<String, TypeDefinition> entries = context.schema().entries();
+        Map<String, Top> entries = context.schema().entries();
         this.selfNames = Set.copyOf(selfNames);
         this.readerFor = readerFor;
         this.selectors = selectorFields.entrySet().stream()
@@ -106,8 +106,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            TypeDefinition definition = entries.get(subtype);
-            if (definition == null || !(definition.body() instanceof RecordBody record)) {
+            if (!(entries.get(subtype) instanceof RecordBody record)) {
                 continue;
             }
             List<Object> key = pinsOf(record);
@@ -116,7 +115,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             }
             Set<String> under = new LinkedHashSet<>();
             under.add(subtype);
-            under.addAll(definition.subtypes());
+            under.addAll(record.subtypes());
             deeper.put(subtype, Subsumption.admitting(under, context.namesMeaning()));
         }
         this.pinned = members.keySet().stream().map(RecordMemberDispatchReader::render)
@@ -124,11 +123,11 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
-    private static Selector selectorOf(String name, RecordField field, Map<String, TypeDefinition> entries,
+    private static Selector selectorOf(String name, RecordField field, Map<String, Top> entries,
                                        TsonLinkedSchema linked) {
         String terminal = ReferenceChain.terminal(field.type().name(), entries);
-        TypeDefinition target = entries.get(terminal);
-        AtomType<?> parser = AtomParsers.forType(target.body(), linked.enumForm(terminal)).orElseThrow(
+        Top target = entries.get(terminal);
+        AtomType<?> parser = AtomParsers.forType(target, linked.enumForm(terminal)).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
         return new Selector(Nfc.of(name), parser);

@@ -5,8 +5,11 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Type;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -58,8 +61,24 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      * position are the same document's -- an imported entry's line belongs to the schema that declared it,
      * never to the one importing it.
      */
-    public SchemaLocation locationOf(String name, TypeDefinition definition) {
-        return SchemaLocation.of(linked.originOf(name), name, definition.position());
+    public SchemaLocation locationOf(String name) {
+        return SchemaLocation.of(linked.originOf(name), name, schema().positionOf(name));
+    }
+
+    /**
+     * What a message calls entry {@code name}, whose value is {@code definition}: its own name where an author
+     * wrote it, and otherwise the form that produced it ({@link EntryDisplayName}).
+     */
+    public String displayName(String name, Top definition) {
+        return EntryDisplayName.of(name, definition, schema().factsOf(name));
+    }
+
+    /**
+     * The entries IS-A {@code name}, whose value is {@code definition}: a type's own {@code subtypes}, and a family
+     * base template's members, which its value has no slot for ({@link Type#subtypesOf(String, Top, Map)}).
+     */
+    public List<String> subtypesOf(String name, Top definition) {
+        return Type.subtypesOf(name, definition, schema().entries());
     }
 
     /**
@@ -69,10 +88,10 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      * compilation for the reason {@code namesMeaning} is: it is a property of the schema, not of the entry
      * being looked up.
      */
-    public static Map<String, List<String>> referrers(Map<String, TypeDefinition> entries) {
+    public static Map<String, List<String>> referrers(Map<String, ? extends Top> entries) {
         Map<String, List<String>> byTarget = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
-            if (definition.body() instanceof Reference reference) {
+            if (definition instanceof Reference reference) {
                 byTarget.computeIfAbsent(reference.target().name(), target -> new ArrayList<>()).add(name);
             }
         });
@@ -81,9 +100,9 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
         return Map.copyOf(fixed);
     }
 
-    /** {@link #bindingNamesFor(String, TypeDefinition)} for a name whose definition this looks up itself. */
+    /** {@link #bindingNamesFor(String, Top)} for a name whose definition this looks up itself. */
     public List<String> bindingNamesFor(String name) {
-        TypeDefinition definition = schema().entries().get(name);
+        Top definition = schema().entries().get(name);
         return definition == null ? List.of(name) : bindingNamesFor(name, definition);
     }
 
@@ -109,28 +128,47 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      * refining another may be bound to a narrower class, and falling back to its parent's would lose that
      * silently.
      */
-    public List<String> bindingNamesFor(String name, TypeDefinition definition) {
-        List<String> written = definition.position().isPresent()
+    public List<String> bindingNamesFor(String name, Top definition) {
+        List<String> written = schema().positionOf(name).isPresent()
                 ? List.of() : referrers.getOrDefault(name, List.of());
         List<String> candidates = new ArrayList<>(written);
         candidates.add(name);
-        for (TypeDefinition step = definition; tightensConstructor(step); ) {
-            String source = step.source().orElseThrow().name();
-            if (candidates.contains(source)) {
+        for (String tightened = tightenedBy(definition); tightened != null; ) {
+            if (candidates.contains(tightened)) {
                 break;
             }
-            candidates.add(source);
-            step = schema().entries().get(source);
-            if (step == null) {
-                break;
-            }
+            candidates.add(tightened);
+            Top step = schema().entries().get(tightened);
+            tightened = step == null ? null : tightenedBy(step);
         }
         return List.copyOf(candidates);
     }
 
-    /** A constructor ({@code top} in its chain) built by tightening its {@code source}, which it IS-A. */
-    private static boolean tightensConstructor(TypeDefinition definition) {
-        return definition.supertypes().contains("top") && definition.source().isPresent()
-                && definition.supertypes().contains(definition.source().get().name());
+    /**
+     * The constructor {@code definition} tightens, or {@code null}: a constructor ({@code top} in its chain) whose
+     * chain has one nearest member, itself a constructor, with exactly that member's fields -- §5.7's refinement,
+     * which restates fields and adds none. Read off the value, which records no provenance (SPEC-FEEDBACK.md #14):
+     * the nearest member is the one no other member of the chain IS-A, and a composition adds fields or names two.
+     */
+    private String tightenedBy(Top definition) {
+        if (!(definition instanceof RecordBody record) || !record.supertypeNames().contains("top")) {
+            return null;
+        }
+        List<String> chain = record.supertypeNames();
+        String nearest = null;
+        for (String member : chain) {
+            boolean beneath = chain.stream().anyMatch(other -> !other.equals(member)
+                    && schema().entries().get(other) instanceof Type above
+                    && above.supertypeNames().contains(member));
+            if (!beneath) {
+                if (nearest != null) {
+                    return null; // two direct parents: a composition, not a tightening
+                }
+                nearest = member;
+            }
+        }
+        return nearest != null && schema().entries().get(nearest) instanceof RecordBody source
+                && source.supertypeNames().contains("top")
+                && source.fields().keySet().equals(record.fields().keySet()) ? nearest : null;
     }
 }

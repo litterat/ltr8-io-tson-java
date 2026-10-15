@@ -129,7 +129,7 @@ class ValuesByNameTest {
     @Test
     void anInterfaceHoldsItsRequestByName() {
         TsonLinkedSchema linked = registry().resolveLinked("https://example.test/orders.tn");
-        Interface orders = assertInstanceOf(Interface.class, linked.schema().entries().get("orders").body());
+        Interface orders = assertInstanceOf(Interface.class, linked.schema().entries().get("orders"));
         assertEquals(new Method(TypeRef.of("place_order_request"), TypeRef.of("order"), null, null),
                 orders.methods().get("place_order"));
     }
@@ -141,7 +141,7 @@ class ValuesByNameTest {
                 post_orders => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }""");
         assertEquals(List.of(), problems(id));
         Binding binding = assertInstanceOf(Binding.class,
-                registry().resolveLinked(id).schema().entries().get("post_orders").body());
+                registry().resolveLinked(id).schema().entries().get("post_orders"));
         assertEquals(new Binding(TypeRef.of("orders.methods.place_order"), "POST", "/orders"), binding);
     }
 
@@ -324,7 +324,7 @@ class ValuesByNameTest {
         TsonCompiledMetaRegistry registry = registry();
         String id = api("written", """
                 post_orders => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }""");
-        Object body = registry.resolveLinked(id).schema().entries().get("post_orders").body();
+        Object body = registry.resolveLinked(id).schema().entries().get("post_orders");
 
         String written = new TsonObjectWriter(SuiteBindings.context()).toTson(body);
         assertTrue(written.replaceAll("\\s+", " ").contains("method: orders.methods.place_order"), written);

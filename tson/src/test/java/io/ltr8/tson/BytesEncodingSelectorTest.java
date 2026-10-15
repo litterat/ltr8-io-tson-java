@@ -136,7 +136,7 @@ class BytesEncodingSelectorTest {
     @Test
     void twoAlphabetsAreTwoTypes() {
         var entries = Tson.standard().resolve(SCHEMA).schema().entries();
-        assertNotEquals(entries.get("hexdigest").body(), entries.get("b32").body());
+        assertNotEquals(entries.get("hexdigest"), entries.get("b32"));
     }
 
     /**

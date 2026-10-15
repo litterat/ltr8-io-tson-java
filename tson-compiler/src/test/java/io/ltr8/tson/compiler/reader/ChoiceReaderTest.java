@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
@@ -33,15 +33,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ChoiceReaderTest {
 
     private static TsonCompiledSchema compiled() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), IntegerType.UNCONSTRAINED));
-        entries.put("email", TypeDefinition.product(
-                RecordBody.of(RecordBody.fieldMap(Map.entry("address", RecordField.required(TypeRef.of("integer")))))));
-        entries.put("phone", TypeDefinition.product(
-                RecordBody.of(RecordBody.fieldMap(Map.entry("number", RecordField.required(TypeRef.of("integer")))))));
-        entries.put("contact_method", TypeDefinition.product(
-                new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone")))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("integer", IntegerType.UNCONSTRAINED);
+        entries.put("email", RecordBody.of(RecordBody.fieldMap(Map.entry("address",
+                RecordField.required(TypeRef.of("integer"))))));
+        entries.put("phone", RecordBody.of(RecordBody.fieldMap(Map.entry("number",
+                RecordField.required(TypeRef.of("integer"))))));
+        entries.put("contact_method", new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone"))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);

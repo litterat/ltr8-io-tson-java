@@ -14,7 +14,7 @@ import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
@@ -39,16 +39,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class RecordTreeReaderTest {
 
-    private static TsonLinkedSchema pointSchema(TypeDefinition integerEntry,
+    private static TsonLinkedSchema pointSchema(Top integerEntry,
                                                 Map.Entry<String, RecordField> valueField) {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("integer", integerEntry);
-        entries.put("point", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(valueField))));
+        entries.put("point", RecordBody.of(RecordBody.fieldMap(valueField)));
         return new TsonLinkedSchema(new TsonSchema("test-schema", "test-meta", List.of(), entries));
     }
 
-    private static TypeDefinition atomEntry(IntegerType body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(), List.of(), body);
+    private static Top atomEntry(IntegerType body) {
+        return body;
     }
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {

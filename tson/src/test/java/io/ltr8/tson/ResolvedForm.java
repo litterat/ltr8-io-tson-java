@@ -12,8 +12,10 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeRef;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
@@ -47,10 +49,11 @@ final class ResolvedForm {
     /** The same, unanchored -- a synthetic's name appears inside a body as well as being an entry's own. */
     private static final Pattern SYNTHETIC_HASH_ANYWHERE = Pattern.compile("_[0-9a-f]{8}\\b");
 
+    /**
+     * A field's source position, which is this model's own ({@code RecordField.position} is {@code @Unbound}):
+     * a field read back from a fixture carries none, so it is normalised away rather than compared.
+     */
     private static final Pattern SOURCE_POSITION = Pattern.compile("position=Optional\\[Position\\[[^\\]]*\\]\\]");
-
-    /** {@code kind} is {@code @Unbound}: derived at resolution, absent from §8's output, so never compared. */
-    private static final Pattern KIND = Pattern.compile("kind=[A-Z_]+|kind=null");
 
     /** The placeholder both sides reduce a synthetic's content hash to. */
     static final String HASH_PLACEHOLDER = "_xxhash";
@@ -65,56 +68,45 @@ final class ResolvedForm {
     }
 
     /**
-     * {@code supertypes}/{@code subtypes} sorted. §8.2 calls both <b>name-level indexes,
-     * resolver-managed</b>: they are sets the representation happens to write as lists, so one side's
-     * alphabetical order and another's resolution order say the same thing. Nothing else is normalised; a
-     * difference anywhere else is a real one.
+     * A type's {@code supertypes}/{@code subtypes} sorted. Both are sets the representation happens to write as
+     * lists, so one side's alphabetical order and another's resolution order say the same thing. Nothing else is
+     * normalised; a difference anywhere else is a real one.
      *
      * <p><b>A set-typed field is compared as the ordered list it is written as</b>: [TSON-SCHEMA] §7.5 makes
      * source declaration order canonical in resolved output, for {@code enum.members},
      * {@code integer_type.members}, {@code decimal_type.members}, {@code text_type.members} and
      * {@code scoped.scope} alike, so two resolved documents are compared as §8 writes them.
      */
-    static TypeDefinition canonical(TypeDefinition definition) {
-        return new TypeDefinition(definition.source(), definition.kind(),
-                definition.supertypes().stream().sorted().toList(),
-                definition.subtypes().stream().sorted().toList(), definition.body(),
-                definition.position(), definition.annotations());
+    static Top canonical(Top value) {
+        return value instanceof Type type
+                ? type.withChain(type.supertypes().stream().sorted(Comparator.comparing(TypeRef::name)).toList(),
+                        type.subtypes().stream().sorted().toList())
+                : value;
     }
 
     /**
-     * A definition reduced to what a comparison is about: canonicalised, then with every synthetic's
-     * content hash replaced. Compared as text rather than through {@code equals} because a synthetic's name
-     * appears at any depth of a body -- as the type of a field, inside an argument list -- and normalising
-     * it in place would mean rebuilding every body shape here.
+     * A value reduced to what a comparison is about: canonicalised, then with every synthetic's content hash
+     * replaced. Compared as text rather than through {@code equals} because a synthetic's name appears at any
+     * depth of a body -- as the type of a field, inside an argument list -- and normalising it in place would
+     * mean rebuilding every body shape here.
      */
-    static String rendered(TypeDefinition definition) {
+    static String rendered(Top value) {
         // An open entry's body is text, and [TSON-SCHEMA] §5.10 compares the *parsed* form: one spelling is
         // required of the application, not of the whitespace around it. Both sides are reduced to their
         // parsed application here, so a held body compares like every other body and needs no side channel.
-        TypeDefinition compared = definition.body() instanceof TemplateBody held
-                ? new TypeDefinition(definition.source(), definition.kind(),
-                        definition.supertypes(), definition.subtypes(),
-                        parsedForComparison(held), definition.position(), definition.annotations())
-                : definition;
-        String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(compared)))
-                .replaceAll(HASH_PLACEHOLDER);
-        // `position` and `kind` are this model's own: @Unbound components §8's resolved form has no field
-        // for. `position` records where a declaration was written; `kind` is derived at resolution and kept
-        // for the resolver's own use, so a definition read back from a fixture carries none. Normalised away
-        // rather than compared, exactly as TypeDefinition's own equals leaves them out.
-        return KIND.matcher(SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty"))
-                .replaceAll("kind=DERIVED");
+        Top compared = value instanceof TemplateBody held ? parsedForComparison(held) : value;
+        String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(compared))).replaceAll(HASH_PLACEHOLDER);
+        return SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty");
     }
 
     /**
      * The entries a registered schema declares <em>itself</em>, hashes normalised -- what a resolver
      * produced for that document, before an import merged anything else into its namespace.
      */
-    static Map<String, TypeDefinition> ownEntries(Tson tson, String id) {
+    static Map<String, Top> ownEntries(Tson tson, String id) {
         var linked = tson.bindRegistry().core().resolveLinked(id);
         String canonical = CanonicalIdentity.canonicalize(id);
-        Map<String, TypeDefinition> own = new LinkedHashMap<>();
+        Map<String, Top> own = new LinkedHashMap<>();
         linked.schema().entries().forEach((name, definition) -> {
             if (linked.originOf(name).equals(canonical)) {
                 own.put(withoutHash(name), definition);
@@ -219,10 +211,55 @@ final class ResolvedForm {
     }
 
     /**
+     * Each entry's <em>value</em> annotations in a §8 resolved-schema document -- those written after {@code =>},
+     * {@code doc => @annotation !reference { ... }} -- as {@code @name} or {@code @name:value}, hashes normalised,
+     * read from the document's text parsed as data. An entry's value is its body, whose Java shape has no slot for
+     * them, so binding the document drops them as it drops a key's; the resolver keeps them among the entry's
+     * facts.
+     */
+    static Map<String, List<String>> fixtureValueAnnotations(String resolvedText) {
+        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseDocument().root().coreValue();
+        Map<String, List<String>> values = new TreeMap<>();
+        for (MapValue.MapEntry entry : map.entries()) {
+            String name = ((TokenValue) entry.key().coreValue()).text();
+            List<String> written = entry.value().value().annotations().stream()
+                    .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
+                    .map(annotation -> "@" + annotation.name() + annotation.value()
+                            .map(value -> ":" + ((TokenValue) value.coreValue()).text()).orElse(""))
+                    .sorted().toList();
+            if (!written.isEmpty()) {
+                values.put(withoutHash(name), written);
+            }
+        }
+        return values;
+    }
+
+    /** The same, from this resolver: the annotations each of the schema's own entries records on its value. */
+    static Map<String, List<String>> ourValueAnnotations(Tson tson, String id) {
+        var linked = tson.bindRegistry().core().resolveLinked(id);
+        String canonical = CanonicalIdentity.canonicalize(id);
+        Map<String, List<String>> values = new TreeMap<>();
+        linked.schema().entries().keySet().forEach(name -> {
+            if (!linked.originOf(name).equals(canonical)) {
+                return;
+            }
+            List<String> recorded = linked.schema().factsOf(name).annotations().values().stream()
+                    .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
+                    .map(annotation -> "@" + annotation.name()
+                            + annotation.value().map(value -> ":" + value).orElse(""))
+                    .sorted().toList();
+            if (!recorded.isEmpty()) {
+                values.put(withoutHash(name), recorded);
+            }
+        });
+        return values;
+    }
+
+    /**
      * A §8 resolved-schema document, bound back into the value model. The text names no governing schema of
      * its own -- meta.tn is what governs every one of these, and the reader says so.
      */
-    static Map<String, TypeDefinition> readResolved(Tson tson, String resolvedText) {
+    static Map<String, Top> readResolved(Tson tson, String resolvedText) {
         return readResolved(tson, resolvedText, TsonBundledSchemas.META_ID);
     }
 
@@ -233,8 +270,8 @@ final class ResolvedForm {
      * back only under it; for a subject governed by meta.tn the two are the same read.
      */
     @SuppressWarnings("unchecked")
-    static Map<String, TypeDefinition> readResolved(Tson tson, String resolvedText, String governingMeta) {
-        return (Map<String, TypeDefinition>) tson.objectReader()
+    static Map<String, Top> readResolved(Tson tson, String resolvedText, String governingMeta) {
+        return (Map<String, Top>) tson.objectReader()
                 .withSchema(governingMeta)
                 .readAs(resolvedText, "schema", Object.class);
     }

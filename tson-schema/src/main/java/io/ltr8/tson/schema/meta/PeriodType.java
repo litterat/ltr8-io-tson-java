@@ -27,7 +27,7 @@ import java.util.Optional;
  * goes through {@link #months}, which is the value this family is defined on.
  */
 @Typename(name = "period_type")
-public record PeriodType(
+public record PeriodType(List<TypeRef> supertypes, List<String> subtypes,
         Optional<Period> min,
         @Field("exclusive_min") Optional<Period> exclusiveMin,
         Optional<Period> max,
@@ -40,12 +40,25 @@ public record PeriodType(
 
     @Record
     public PeriodType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public PeriodType(Optional<Period> min, Optional<Period> exclusiveMin, Optional<Period> max,
+            Optional<Period> exclusiveMax, Optional<Period> multipleOf) {
+        this(List.of(), List.of(), min, exclusiveMin, max, exclusiveMax, multipleOf);
+    }
+
+    @Override
+    public PeriodType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new PeriodType(supertypes, subtypes, min, exclusiveMin, max, exclusiveMax, multipleOf);
     }
 
     /** The inclusive bounds alone. */

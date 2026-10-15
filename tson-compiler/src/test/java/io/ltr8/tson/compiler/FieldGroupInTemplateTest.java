@@ -45,7 +45,7 @@ class FieldGroupInTemplateTest {
     }
 
     private static List<FieldGroup> groupsOf(TsonCompiledSchema schema, String entry) {
-        return assertInstanceOf(RecordBody.class, schema.schema().entries().get(entry).body()).groups();
+        return assertInstanceOf(RecordBody.class, schema.schema().entries().get(entry)).groups();
     }
 
     @Test

@@ -29,7 +29,7 @@ import java.util.Optional;
  * unless one is explicitly marked.
  */
 @Typename(name = "integer_type")
-public record IntegerType(
+public record IntegerType(List<TypeRef> supertypes, List<String> subtypes,
         Optional<IntegerSize> size,
         Optional<BigInteger> min,
         @Field("exclusive_min") Optional<BigInteger> exclusiveMin,
@@ -45,6 +45,8 @@ public record IntegerType(
 
     @Record
     public IntegerType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         members = members.map(List::copyOf);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
@@ -52,6 +54,18 @@ public record IntegerType(
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public IntegerType(Optional<IntegerSize> size, Optional<BigInteger> min, Optional<BigInteger> exclusiveMin,
+            Optional<BigInteger> max, Optional<BigInteger> exclusiveMax, Optional<BigInteger> multipleOf,
+            Optional<List<BigInteger>> members) {
+        this(List.of(), List.of(), size, min, exclusiveMin, max, exclusiveMax, multipleOf, members);
+    }
+
+    @Override
+    public IntegerType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new IntegerType(supertypes, subtypes, size, min, exclusiveMin, max, exclusiveMax, multipleOf, members);
     }
 
     /**

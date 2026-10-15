@@ -1,7 +1,7 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.json.JsonTypeReader;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 /**
  * Builds the {@link JsonTypeReader} for one resolved schema entry -- the unit of work {@link
@@ -15,5 +15,5 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  */
 public interface ValueReaderFactory {
 
-    JsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context);
+    JsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context);
 }

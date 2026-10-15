@@ -48,11 +48,11 @@ final class DispatchScopedReader implements JsonTypeReader<Object> {
 
     /** One factory for every mode: the reader builds nothing of its own. */
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
-        if (!(definition.body() instanceof Scoped scoped)) {
-            throw new IllegalArgumentException("'" + name + "' is not scoped-shaped: " + definition.body());
+        if (!(definition instanceof Scoped scoped)) {
+            throw new IllegalArgumentException("'" + name + "' is not scoped-shaped: " + definition);
         }
-        return new DispatchScopedReader(EntryDisplayName.of(name, definition, context.schema().entries()), scoped,
-                context, context.locationOf(name, definition));
+        return new DispatchScopedReader(EntryDisplayName.of(name, context.schema()), scoped,
+                context, context.locationOf(name));
     };
 
     private static final String UNTYPED_EXPECTED = "an annotation object naming the value's type";

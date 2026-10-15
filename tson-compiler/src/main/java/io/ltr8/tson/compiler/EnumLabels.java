@@ -8,7 +8,10 @@ import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.ArrayList;
@@ -32,9 +35,9 @@ import java.util.function.Function;
  * place both are present.
  *
  * <p><b>An identifier family is an atom-family instance whose constructor IS-A {@code identifier_type}</b> -- one
- * hop through the instance's {@code source}, since construction transfers no supertypes and a family instance is
- * IS-A nothing. An enum's members are names under a naming vocabulary's equality, and carry §8.2's per-name rules
- * under its profile; a closed set of values on any other family, {@code text} included, is that family's own
+ * hop through the constructor the instance's body is, since construction transfers no supertypes and a family
+ * instance is IS-A nothing. An enum's members are names under a naming vocabulary's equality, and carry §8.2's
+ * per-name rules under its profile; a closed set of values on any other family, {@code text} included, is that family's own
  * {@code members} facet.
  */
 final class EnumLabels {
@@ -54,28 +57,28 @@ final class EnumLabels {
      * {@code NONE} for a body that is not an enum, a type that resolves to nothing, or one that is not a text
      * family -- each refused or reported on its own.
      */
-    static Normalization labelForm(TypeDefinition enumeration, Map<String, TypeDefinition> merged,
-                                   Function<String, TypeDefinition> structure) {
-        return NameType.form(enumeration, merged::get, structure);
+    static Normalization labelForm(Top enumeration, Optional<String> constructor, Map<String, Top> merged,
+                                   Function<String, Top> structure) {
+        return NameType.form(enumeration, constructor, merged::get, structure);
     }
 
     /** Every violation among {@code localNames}, in their order. */
-    static List<Violation> check(Map<String, TypeDefinition> merged, Set<String> localNames,
-                                 Function<String, TypeDefinition> structure) {
+    static List<Violation> check(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
+                                 Set<String> localNames, Function<String, Top> structure) {
         List<Violation> violations = new ArrayList<>();
         for (String name : localNames) {
-            TypeDefinition definition = merged.get(name);
-            if (definition != null && definition.body() instanceof EnumBody body) {
-                check(name, definition, body, merged, structure).ifPresent(violations::add);
+            if (merged.get(name) instanceof EnumBody body) {
+                check(name, body, TsonSchemaLinker.constructorOf(name, body, facts), merged, structure)
+                        .ifPresent(violations::add);
             }
         }
         return List.copyOf(violations);
     }
 
-    private static Optional<Violation> check(String name, TypeDefinition definition, EnumBody body,
-                                             Map<String, TypeDefinition> merged,
-                                             Function<String, TypeDefinition> structure) {
-        Optional<NameType.Resolved> resolved = NameType.of(definition, merged::get, structure);
+    private static Optional<Violation> check(String name, EnumBody body, Optional<String> constructor,
+                                             Map<String, Top> merged,
+                                             Function<String, Top> structure) {
+        Optional<NameType.Resolved> resolved = NameType.of(body, constructor, merged::get, structure);
         if (resolved.isEmpty()) {
             return Optional.of(new Violation(name, "'" + name + "': its name_type '" + body.nameType()
                     + "' names nothing in scope (§7.4)"));
@@ -88,14 +91,14 @@ final class EnumLabels {
                     + "family's own 'members' facet: '!text ^ { members: [...] }' or '!integer ^ { members: [80 443] }',"
                     + " not an enum"));
         }
-        if (label.definition().body() instanceof IdentifierType identifiers) {
+        if (label.definition() instanceof IdentifierType identifiers) {
             Optional<String> form = NameType.formRefusal(identifiers);
             if (form.isPresent()) {
                 return Optional.of(new Violation(name, "'" + name + "': its name_type '" + body.nameType() + "' "
                         + "cannot judge names -- " + form.get()));
             }
         }
-        Optional<AtomType<?>> parser = AtomParsers.forType(label.definition().body());
+        Optional<AtomType<?>> parser = AtomParsers.forType(label.definition());
         if (parser.isEmpty()) {
             return Optional.empty(); // a text family this library has no parser for: nothing to judge members by
         }
@@ -125,19 +128,19 @@ final class EnumLabels {
 
     /**
      * Whether {@code instance} is an atom-family instance built by {@code family} or by a constructor IS-A it --
-     * a refinement records its instance's constructor as its own {@code source}, so this answers for
-     * {@code !identifier ^ { ... }} as for {@code identifier}.
+     * read from the constructor its class is the body of, which every instance of the family shares, so this
+     * answers for {@code !identifier ^ { ... }} as for {@code identifier} and for a meta layer's tightening of
+     * the family as for the family.
      */
-    static boolean isFamily(TypeDefinition instance, String family, Function<String, TypeDefinition> lookup) {
-        if (instance == null || instance.kind() != TypeKind.ATOM || instance.supertypes().contains("top")
-                || instance.source().isEmpty()) {
+    static boolean isFamily(Top instance, String family, Function<String, Top> lookup) {
+        if (!(instance instanceof Atom) || Type.supertypesOf(instance).contains("top")) {
             return false;
         }
-        String constructor = instance.source().get().name();
+        String constructor = TsonSchema.constructorOf(instance);
         if (constructor.equals(family)) {
             return true;
         }
-        TypeDefinition built = lookup.apply(constructor);
-        return built != null && built.supertypes().contains(family);
+        Top built = lookup.apply(constructor);
+        return built != null && Type.supertypesOf(built).contains(family);
     }
 }

@@ -13,7 +13,6 @@ import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
@@ -35,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class ChoiceUntaggedRecoveryTest {
 
-    private final Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+    private final Map<String, Top> entries = new LinkedHashMap<>();
 
     /** Each variant's stub reader consumes its value and echoes the variant name it was dispatched to. */
     private final TsonTypeReaderResolver readers = new TsonTypeReaderResolver() {
@@ -50,14 +49,12 @@ class ChoiceUntaggedRecoveryTest {
     };
 
     private void variant(String name, TypeKind kind, Top body) {
-        entries.put(name, new TypeDefinition(Optional.empty(), kind, 
-                List.of(), List.of(), body));
+        entries.put(name, body);
     }
 
     private TsonTypeReader<?> choice(Optional<Boolean> disjoint, String... variants) {
         List<TypeRef> refs = List.of(variants).stream().map(TypeRef::of).toList();
-        TypeDefinition choiceDef = new TypeDefinition(Optional.empty(), TypeKind.SUM, 
-                List.of(), List.of(), new ChoiceBody(refs, disjoint));
+        Top choiceDef = new ChoiceBody(refs, disjoint);
         entries.put("contact", choiceDef);
         ValueReaderContext context = new ValueReaderContext(
                 new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), entries)), readers,

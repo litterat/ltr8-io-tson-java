@@ -5,7 +5,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -26,25 +26,23 @@ class AliasedConstructorDispatchTest {
         return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
     }
 
-    /** A {@code type_definition} whose body is written with {@code constructor}'s own name. */
-    private static TypeDefinition read(String body) {
-        return tson().objectReader().withSchema(TsonBundledSchemas.META_ID)
-                .readAs("!type_definition { body: " + body + " }",
-                        "type_definition", TypeDefinition.class);
+    /** An entry's value, written with {@code constructor}'s own name, read at a {@code top} position. */
+    private static Top read(String body) {
+        return tson().objectReader().withSchema(TsonBundledSchemas.META_ID).readAs(body, "top", Top.class);
     }
 
     /** The name the class carries itself still works -- the fallback passes are untouched. */
     @Test
     void aBodyNamedForItsOwnClassDispatches() {
-        assertInstanceOf(ArrayBody.class, read("!array { element_type: token }").body());
+        assertInstanceOf(ArrayBody.class, read("!array { element_type: token }"));
     }
 
     /** And the one that is only a name in the binder, which is the case that failed. */
     @Test
     void aBodyNamedByAnAliasOfItsClassDispatchesToo() {
-        TypeDefinition definition = read("!set_type { element_type: token }");
+        Top definition = read("!set_type { element_type: token }");
 
-        ArrayBody body = assertInstanceOf(ArrayBody.class, definition.body());
+        ArrayBody body = assertInstanceOf(ArrayBody.class, definition);
         assertEquals("token", body.elementType().name());
     }
 
@@ -53,13 +51,13 @@ class AliasedConstructorDispatchTest {
     void aNameNothingBindsIsStillRefused() {
         assertEquals(1, tson().validate("""
                 !!schema:"https://tson.io/2026/38/m/meta.tn"
-                !type_definition { body: !no_such_constructor { element_type: token } }""")
+                !schema { x => !no_such_constructor { element_type: token } }""")
                 .size());
     }
 
     /** A record body still dispatches to its own class, not to whatever the binder last resolved. */
     @Test
     void anUnaliasedBodyIsUnaffected() {
-        assertInstanceOf(RecordBody.class, read("!record { fields: {} }").body());
+        assertInstanceOf(RecordBody.class, read("!record { fields: {} }"));
     }
 }

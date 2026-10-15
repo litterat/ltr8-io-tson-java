@@ -19,7 +19,7 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.HashMap;
 import java.util.List;
@@ -93,11 +93,11 @@ final class RecordPlan {
     final RecordDiagnostics rules;
     private final SubsumptionDiagnostics subsumption;
 
-    RecordPlan(String name, TypeDefinition definition, ValueReaderContext context) {
-        RecordBody body = (RecordBody) definition.body();
+    RecordPlan(String name, Top definition, ValueReaderContext context) {
+        RecordBody body = (RecordBody) definition;
         this.name = name;
-        this.schemaLocation = context.locationOf(name, definition);
-        this.displayName = EntryDisplayName.of(name, definition, context.schema().entries());
+        this.schemaLocation = context.locationOf(name);
+        this.displayName = EntryDisplayName.of(name, context.schema());
         this.selfNames = Set.copyOf(context.admitting(List.of(name)));
         int count = body.fields().size();
         this.declaredNames = body.fields().keySet().toArray(String[]::new);
@@ -112,7 +112,7 @@ final class RecordPlan {
         this.nameForm = context.linked().nameForm(name);
         this.nameType = body.nameTypeName();
         IdentifierType identifiers = context.linked().nameType(name)
-                .map(type -> type.body() instanceof IdentifierType family ? family : null)
+                .map(type -> type instanceof IdentifierType family ? family : null)
                 .orElse(null);
         this.nameReader = identifiers == null ? null : AtomParsers.forType(identifiers).orElseThrow(() ->
                 new IllegalStateException("'" + name + "': name_type '" + nameType + "' has no reader of its own"));

@@ -1,6 +1,9 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
+
+import java.util.List;
 
 /**
  * meta.tn's {@code mac_type} constructor (EUI-48 MAC address, RFC 9542) -- deliberately bare
@@ -13,7 +16,24 @@ import io.ltr8.annotation.Typename;
  * Cidr4Type}'s own Javadoc for why.
  */
 @Typename(name = "mac_type")
-public record MacType(String spec) implements Atom {
+public record MacType(List<TypeRef> supertypes, List<String> subtypes,
+        String spec) implements Atom {
+    /** The chain normalised: absent and empty are one list. */
+    @Record
+    public MacType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public MacType(String spec) {
+        this(List.of(), List.of(), spec);
+    }
+
+    @Override
+    public MacType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new MacType(supertypes, subtypes, spec);
+    }
 
     /** {@code mac => !mac_type {}} -- the unconstrained MAC address, core.tn's own {@code !mac}. */
     public static final MacType UNCONSTRAINED = new MacType("https://www.rfc-editor.org/rfc/rfc9542");

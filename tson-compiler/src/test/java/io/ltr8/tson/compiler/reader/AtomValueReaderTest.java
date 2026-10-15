@@ -19,7 +19,6 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.IdentifierType;
@@ -47,12 +46,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class AtomValueReaderTest {
 
     private static Object readValue(Top atomBody, String source) {
-        TypeDefinition atomEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), atomBody);
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Top atomEntry = atomBody;
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("field", atomEntry);
-        entries.put("holder", TypeDefinition.product(
-                RecordBody.of(RecordBody.fieldMap(Map.entry("value", RecordField.required(TypeRef.of("field")))))));
+        entries.put("holder", RecordBody.of(RecordBody.fieldMap(Map.entry("value",
+                RecordField.required(TypeRef.of("field"))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
@@ -160,11 +158,11 @@ class AtomValueReaderTest {
         assertEquals("[a-z]+", result.get("value"));
     }
 
-    private static Map<String, Object> readAgainstRealEntry(String typeName, TypeDefinition realEntry, String source) {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+    private static Map<String, Object> readAgainstRealEntry(String typeName, Top realEntry, String source) {
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put(typeName, realEntry);
-        entries.put("holder", TypeDefinition.product(
-                RecordBody.of(RecordBody.fieldMap(Map.entry("value", RecordField.required(TypeRef.of(typeName)))))));
+        entries.put("holder", RecordBody.of(RecordBody.fieldMap(Map.entry("value",
+                RecordField.required(TypeRef.of(typeName))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);

@@ -3,9 +3,11 @@ package io.ltr8.tson.json.reader;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Type;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -39,7 +41,15 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
      * from {@code entryOrigins}, so a declaration flattened in by an {@code !!import} carries the schema that
      * actually declares it rather than the one that imported it.
      */
-    public JsonSchemaLocation locationOf(String name, TypeDefinition definition) {
-        return JsonSchemaLocation.of(linked.originOf(name), name, definition.position());
+    public JsonSchemaLocation locationOf(String name) {
+        return JsonSchemaLocation.of(linked.originOf(name), name, schema().positionOf(name));
+    }
+
+    /**
+     * The entries IS-A {@code name}, whose value is {@code definition}: a type's own {@code subtypes}, and a family
+     * base template's members, which its value has no slot for.
+     */
+    public List<String> subtypesOf(String name, Top definition) {
+        return Type.subtypesOf(name, definition, schema().entries());
     }
 }

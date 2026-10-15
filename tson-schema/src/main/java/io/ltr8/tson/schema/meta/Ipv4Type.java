@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.List;
@@ -16,11 +17,26 @@ import java.util.List;
  * bare {@code List<String>} with a defensive compact constructor.
  */
 @Typename(name = "ipv4_type")
-public record Ipv4Type(String spec, List<String> within, List<String> excluding) implements Atom {
+public record Ipv4Type(List<TypeRef> supertypes, List<String> subtypes,
+        String spec, List<String> within, List<String> excluding) implements Atom {
+
+    @Record
 
     public Ipv4Type {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         within = within != null ? List.copyOf(within) : List.of();
         excluding = excluding != null ? List.copyOf(excluding) : List.of();
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public Ipv4Type(String spec, List<String> within, List<String> excluding) {
+        this(List.of(), List.of(), spec, within, excluding);
+    }
+
+    @Override
+    public Ipv4Type withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new Ipv4Type(supertypes, subtypes, spec, within, excluding);
     }
 
     /** {@code ipv4 => !ipv4_type {}} -- the unconstrained IPv4 address, core.tn's own {@code !ipv4}. */

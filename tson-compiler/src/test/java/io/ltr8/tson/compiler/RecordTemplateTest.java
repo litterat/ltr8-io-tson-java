@@ -12,9 +12,11 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.Reference;
 
 import java.math.BigInteger;
 
@@ -67,14 +69,14 @@ class RecordTemplateTest {
 
     /** The entry a field's type names -- how every fixture here reaches the materialised instantiation. */
     private static String fieldType(TsonCompiledSchema compiled, String record, String field) {
-        RecordBody body = (RecordBody) compiled.schema().entries().get(record).body();
+        RecordBody body = (RecordBody) compiled.schema().entries().get(record);
         return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
                 .type().name();
     }
 
     private static RecordField fieldOf(TsonCompiledSchema compiled, String entry, String field) {
-        RecordBody body = (RecordBody) compiled.schema().entries().get(entry).body();
+        RecordBody body = (RecordBody) compiled.schema().entries().get(entry);
         return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
@@ -94,13 +96,13 @@ class RecordTemplateTest {
         assertEquals(1, made.size(), () -> "expected one instantiation, got " + made);
         assertEquals(made.get(0), fieldType(compiled, "holder", "b"), "the field references it by name");
 
-        TypeDefinition entry = compiled.schema().entries().get(made.get(0));
-        assertEquals(List.of(), entry.parameters(), "closed -- §5.10");
+        Top entry = compiled.schema().entries().get(made.get(0));
+        assertEquals(List.of(), TemplateBody.parameterNamesOf(entry), "closed -- §5.10");
         assertEquals(TypeRef.of("text"), fieldOf(compiled, made.get(0), "v").type(), "T := text");
     }
 
     /**
-     * §8.2 keys an instantiation on the flattened application recorded in {@code source}, which is what a
+     * §8.2 keys an instantiation on the flattened application its facts record, which is what a
      * consumer compares by -- never the internal name.
      */
     @Test
@@ -109,8 +111,8 @@ class RecordTemplateTest {
                   box => <T> { v: T }
                   holder => { b: box<text> }""");
 
-        TypeRef source = compiled.schema().entries().get(instantiationsOf(compiled, "box").get(0))
-                .source().orElseThrow();
+        TypeRef source = compiled.schema().factsOf(instantiationsOf(compiled, "box").get(0))
+                .application().orElseThrow();
         assertEquals("box", source.name());
         assertEquals(List.of(new TypeArgument.Ref(TypeRef.of("text"))), source.arguments());
     }
@@ -323,9 +325,9 @@ class RecordTemplateTest {
                       tmpl => <T> { a: %s }
                       use  => { u: tmpl<text> }""".formatted(field));
 
-            TypeDefinition closed = compiled.schema().entries()
+            Top closed = compiled.schema().entries()
                     .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a"));
-            assertEquals(List.of(), closed.parameters(), () -> field + " closes to a usable entry");
+            assertEquals(List.of(), TemplateBody.parameterNamesOf(closed), () -> field + " closes to a usable entry");
             assertNotNull(compiled.get(fieldType(compiled, "use", "u")), field);
         }
     }
@@ -374,7 +376,7 @@ class RecordTemplateTest {
                   holder => { t: tags<2> }""");
 
         ArrayBody closed = (ArrayBody) compiled.schema().entries()
-                .get(fieldType(compiled, fieldType(compiled, "holder", "t"), "xs")).body();
+                .get(fieldType(compiled, fieldType(compiled, "holder", "t"), "xs"));
 
         assertEquals(Optional.of(BigInteger.TWO), closed.minItems());
         assertEquals(Optional.of(BigInteger.TWO), closed.maxItems());
@@ -388,7 +390,7 @@ class RecordTemplateTest {
                   ids   => [order]""");
 
         assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class,
-                compiled.schema().entries().get("ids").body(), "the construction in place");
+                compiled.schema().entries().get("ids"), "the construction in place");
     }
 
     // ── The two field-absorbing positions (§5.7, §5.8) ───────────────────
@@ -577,7 +579,7 @@ class RecordTemplateTest {
                   uuid_pair => <B> pair<text, B>
                   holder    => { p: uuid_pair<int32>  q: pair<text, int32> }""");
 
-        assertEquals(List.of("B"), compiled.schema().entries().get("uuid_pair").parameters(),
+        assertEquals(List.of("B"), TemplateBody.parameterNamesOf(compiled.schema().entries().get("uuid_pair")),
                 "the alias is itself a template");
         assertEquals(1, instantiationsOf(compiled, "pair").size(), "one entry for the one closed pair");
         String closed = fieldType(compiled, "holder", "p");
@@ -628,10 +630,10 @@ class RecordTemplateTest {
         // one hop in, which references the closed array synthetic that closing it produced.
         String instantiation = fieldType(compiled, "holder", "r");
         assertTrue(instantiation.startsWith("rows_"), instantiation);
-        String synthetic = assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
-                compiled.schema().entries().get(instantiation).body()).target().name();
+        String synthetic = assertInstanceOf(Reference.class,
+                compiled.schema().entries().get(instantiation)).target().name();
         ArrayBody array = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(synthetic).body());
+                compiled.schema().entries().get(synthetic));
         assertEquals(TypeRef.of("int32"), array.elementType());
         assertEquals(Optional.of(BigInteger.valueOf(3)), array.minItems());
         assertEquals(Optional.of(BigInteger.valueOf(3)), array.maxItems());

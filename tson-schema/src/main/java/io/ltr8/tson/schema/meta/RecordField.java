@@ -39,8 +39,8 @@ import java.util.Optional;
  * simply states none. What the linker checks of a named field -- required, not voidable, no group member, an
  * atom or enum type, no value of its own, and every subtype pinning it distinctly -- is §5.2's and §5.7's.
  *
- * <p><b>{@code position} is {@code @Unbound}</b>, for the reason {@code TypeDefinition}'s own is: §8.1's
- * {@code record_field} declares no such field, so nothing fills it and the strict binding check would call
+ * <p><b>{@code position} is {@code @Unbound}</b>: §8.1's {@code record_field} declares no such field, so nothing fills it
+ * and the strict binding check would call
  * it a mismatch. It is this implementation's own, kept for diagnostics -- a read reporting against a field
  * locates the pointer at the field ({@code /person/age}) and, without this, could pair it only with the
  * enclosing declaration's line, so six broken fields of one record all pointed at the record. It is
@@ -49,7 +49,8 @@ import java.util.Optional;
  * source position.
  *
  * <p>Excluded from {@link #equals}/{@link #hashCode} on the same footing as {@code annotations}, and for
- * {@code TypeDefinition}'s stated reason: the resolver test suite compares hand-built expected values
+ * the same reason an entry's own position is kept apart from its value ({@code TsonSchema.EntryFacts}): the
+ * resolver test suite compares hand-built expected values
  * against really-resolved ones, and a position in equality would stop two representations of one logical
  * field comparing equal.
  */
@@ -169,7 +170,7 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
         return new RecordField(type, optional, voidable, role, value, annotations, position);
     }
 
-    /** Excludes {@code annotations}/{@code position} -- neither changes a field's identity, as on {@code TypeDefinition}. */
+    /** Excludes {@code annotations}/{@code position} -- neither changes a field's identity. */
     @Override
     public boolean equals(Object o) {
         return o instanceof RecordField other

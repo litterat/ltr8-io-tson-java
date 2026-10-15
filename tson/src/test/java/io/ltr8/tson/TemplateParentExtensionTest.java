@@ -4,7 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -36,18 +36,18 @@ class TemplateParentExtensionTest {
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static Optional<RecordExtensionType> parentOf(String id, String declarations, String entry) {
-        TypeDefinition definition = Tson.standard()
+        Top definition = Tson.standard()
                 .resolve(HEADER.formatted(id) + "{\n" + declarations + "}")
                 .schema().entries().get(entry);
-        return ((TemplateBody) definition.body()).extension();
+        return ((TemplateBody) definition).extension();
     }
 
     /** The selector names the same parent states -- what makes the family member-dispatched. */
     private static List<String> selectorsOf(String id, String declarations, String entry) {
-        TypeDefinition definition = Tson.standard()
+        Top definition = Tson.standard()
                 .resolve(HEADER.formatted(id) + "{\n" + declarations + "}")
                 .schema().entries().get(entry);
-        return ((TemplateBody) definition.body()).discriminators();
+        return ((TemplateBody) definition).discriminators();
     }
 
     private static String refusal(String id, String declarations) {

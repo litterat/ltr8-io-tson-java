@@ -20,7 +20,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -104,7 +104,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         this.schemaLocation = schemaLocation;
         this.rules = rules;
         TsonSchema schema = context.schema();
-        Map<String, TypeDefinition> entries = schema.entries();
+        Map<String, Top> entries = schema.entries();
         this.selectors = selectorFields.entrySet().stream()
                 .map(field -> selectorOf(field.getKey(), field.getValue(), context.linked())).toList();
         // The family's members compose the base, so they share its name type; a template base states none.
@@ -117,8 +117,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         Map<String, Set<String>> deeper = new LinkedHashMap<>();
         Map<String, Route> table = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            TypeDefinition definition = entries.get(subtype);
-            if (definition == null || !(definition.body() instanceof RecordBody record)) {
+            if (!(entries.get(subtype) instanceof RecordBody record)) {
                 continue;
             }
             List<Object> key = pinsOf(record);
@@ -127,7 +126,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
             }
             Set<String> under = new LinkedHashSet<>();
             under.add(subtype);
-            under.addAll(definition.subtypes());
+            under.addAll(record.subtypes());
             deeper.put(subtype, context.admitting(under));
             for (String written : deeper.get(subtype)) {
                 table.computeIfAbsent(written, ignored -> Route.to(context.readers().resolve(written)));
@@ -143,11 +142,11 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         ReferenceChain.Resolved target = ReferenceChain.terminal(linked.schema(), field.type().name()).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' names nothing this schema declares"));
-        AtomType<?> parser = AtomParsers.forType(target.definition().body(), linked.enumForm(target.name()))
+        AtomType<?> parser = AtomParsers.forType(target.definition(), linked.enumForm(target.name()))
                 .orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
-        return new Selector(Nfc.of(name), parser, AtomForm.of(target.definition().body()));
+        return new Selector(Nfc.of(name), parser, AtomForm.of(target.definition()));
     }
 
     /** One member's pins in the base's declaration order, or null where it does not pin them all. */

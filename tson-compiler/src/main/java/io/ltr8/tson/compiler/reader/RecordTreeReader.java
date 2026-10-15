@@ -10,7 +10,7 @@ import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonRecord;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.util.LinkedHashMap;
@@ -42,15 +42,15 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
     public static final class Factory implements ValueReaderFactory {
 
         @Override
-        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
-            if (!(typeDefinition.body() instanceof RecordBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not record-shaped: " + typeDefinition.body());
+            if (!(typeDefinition instanceof RecordBody body)) {
+                throw new IllegalArgumentException("'" + name + "' is not record-shaped: " + typeDefinition);
             }
-            RecordTreeReader ownParser = new RecordTreeReader(name, EntryDisplayName.of(name, typeDefinition),
-                    body, resolver, context.locationOf(name, typeDefinition),
+            RecordTreeReader ownParser = new RecordTreeReader(name, context.displayName(name, typeDefinition),
+                    body, resolver, context.locationOf(name),
                     AnnotationTypes.of(context), fieldNameRule(name, body, context));
-            if (typeDefinition.subtypes().isEmpty()) {
+            if (context.subtypesOf(name, typeDefinition).isEmpty()) {
                 return ownParser;
             }
             return Subsumption.dispatching(name, typeDefinition, ownParser, context.namesMeaning(), resolver);

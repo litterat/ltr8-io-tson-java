@@ -14,7 +14,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.SourcePosition;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The end-to-end stripe: a missing-required-field {@link ReadException} carries enough for a
  * caller to report both where the offending record sits in the <em>data</em> source and where the
  * field was <em>declared</em> in the <em>schema</em> source -- proving {@link
- * TsonSchemaParser#declarationPositions()}, {@link TypeDefinition#position()}, and every real
+ * TsonSchemaParser#declarationPositions()}, {@link Top#position()}, and every real
  * {@code TsonEvent}'s own {@code position()} (the data side -- there's no separate position
  * side-table on this path anymore, {@link TsonReadContext#position()} reflects whichever event the
  * stream most recently produced) genuinely connect end to end, not just that each piece compiles in
@@ -70,7 +70,7 @@ class PositionalReadErrorsTest {
         SchemaDocument schemaDocument = schemaParser.parseSchemaDocument();
         Map<SchemaMap.Declaration, Position> declarationPositions = schemaParser.declarationPositions();
 
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         DefinitionResolver resolver = new DefinitionResolver(
                 (type, value) -> { throw new UnsupportedOperationException("not exercised by this test"); },
                 name -> null, entries::get);
@@ -82,7 +82,9 @@ class PositionalReadErrorsTest {
         Position myRecordPosition = declarationPositions.get(myRecordDeclaration);
         entries.put("my_record", resolver.resolve(myRecordDeclaration, Optional.of(myRecordPosition)));
 
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(),
+                io.ltr8.annotation.AnnotatedMap.of(entries), false, Map.of(),
+                Map.of("my_record", resolver.factsOf("my_record")));
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
         String dataSource = "{}";

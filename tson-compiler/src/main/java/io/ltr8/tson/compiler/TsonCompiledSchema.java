@@ -163,7 +163,8 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
      */
     Optional<SchemaLocation> rootDeclaration(String typeName) {
         return Optional.ofNullable(schema().entries().get(typeName))
-                .map(entry -> SchemaLocation.of(linkedSchema.originOf(typeName), typeName, entry.position()));
+                .map(entry -> SchemaLocation.of(linkedSchema.originOf(typeName), typeName,
+                        schema().positionOf(typeName)));
     }
 
     /**

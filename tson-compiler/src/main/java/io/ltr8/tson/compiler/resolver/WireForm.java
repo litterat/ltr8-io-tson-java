@@ -210,8 +210,7 @@ final class WireForm {
     /**
      * The held body of an <b>open alias</b> -- {@code <B> !reference { target: pair<uuid, B> }}, the form
      * [TSON-SCHEMA] §8.1 says a partial application denotes. Spellable because {@code reference.target} is a
-     * {@code type_ref}, so an alias that still binds arguments states them in its own body and {@code source}
-     * is never asked to hold them (§8.1).
+     * {@code type_ref}, so an alias that still binds arguments states them in its own body (§8.1).
      *
      * <p>The target goes through {@link #refValue} like every other reference this package writes, so a
      * no-argument target is a bare token and only an application carries {@code arguments} -- the one
@@ -523,6 +522,28 @@ final class WireForm {
         CoreValue name = field(argument, NAME).orElseThrow();
         return new TypeArgument.Ref(name instanceof TokenValue token ? TypeRef.of(token.text())
                 : typeRefOf((RecordValue) name));
+    }
+
+    /**
+     * The parents a held {@code !record { supertypes: [...] ... }} writes, as references -- empty for a held body
+     * that is no record or writes none. Inside held text the slot is the parents as written ([TSON-SCHEMA]
+     * §5.10), a bare name or an application, which is what closing a held record completes into a chain.
+     */
+    static List<TypeRef> writtenParents(DataValue held) {
+        if (!(held.coreValue() instanceof RecordValue record)
+                || !(field(record, SUPERTYPES).orElse(null) instanceof ArrayValue parents)) {
+            return List.of();
+        }
+        List<TypeRef> written = new ArrayList<>();
+        for (ScopedValue parent : parents.elements()) {
+            switch (parent.value().coreValue()) {
+                case TokenValue token -> written.add(TypeRef.of(token.text()));
+                case RecordValue application when isApplication(application) -> written.add(typeRefOf(application));
+                default -> {
+                }
+            }
+        }
+        return List.copyOf(written);
     }
 
     static Optional<CoreValue> field(RecordValue record, String name) {

@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.math.BigDecimal;
@@ -19,7 +20,7 @@ import java.util.Optional;
  * #FLOAT32}/{@link #FLOAT64}.
  */
 @Typename(name = "float_type")
-public record FloatType(
+public record FloatType(List<TypeRef> supertypes, List<String> subtypes,
         Format format,
         Optional<BigDecimal> min,
         @Field("exclusive_min") Optional<BigDecimal> exclusiveMin,
@@ -89,13 +90,31 @@ public record FloatType(
         return List.copyOf(violations);
     }
 
+    @Record
+
     public FloatType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public FloatType(Format format, Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
+            Optional<BigDecimal> exclusiveMax, boolean allowNan, boolean allowInfinity, boolean allowSubnormal,
+            boolean allowNegativeZero) {
+        this(List.of(), List.of(), format, min, exclusiveMin, max, exclusiveMax, allowNan, allowInfinity, allowSubnormal,
+                allowNegativeZero);
+    }
+
+    @Override
+    public FloatType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new FloatType(supertypes, subtypes, format, min, exclusiveMin, max, exclusiveMax, allowNan, allowInfinity,
+                allowSubnormal, allowNegativeZero);
     }
 
     /**

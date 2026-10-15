@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
@@ -47,8 +47,8 @@ class ChoiceConstructionResolutionTest {
 
         TsonSchema resolved = resolver.resolveSchema(document);
 
-        TypeDefinition contact = resolved.entries().get("contact");
-        ChoiceBody body = assertInstanceOf(ChoiceBody.class, contact.body());
+        Top contact = resolved.entries().get("contact");
+        ChoiceBody body = assertInstanceOf(ChoiceBody.class, contact);
         assertEquals(List.of("text", "integer"), body.variants().stream().map(TypeRef::name).toList());
         // Each variant is a bare reference -- empty arguments (the null that used to be here was the NPE).
         assertTrue(body.variants().stream().allMatch(variant -> variant.arguments().isEmpty()));

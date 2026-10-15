@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -9,8 +10,9 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -39,28 +41,28 @@ class TsonSchemaLinkerDiagnosticsTest {
     private record Pos(int line, int column, int byteOffset) implements SourcePosition {
     }
 
-    private static TypeDefinition record(int line) {
-        return record(line, RecordBody.fieldMap());
+    private static Top record() {
+        return RecordBody.of(RecordBody.fieldMap());
     }
 
-    private static TypeDefinition record(int line, Map.Entry<String, RecordField> field) {
-        return record(line, RecordBody.fieldMap(field));
+    private static Top record(Map.Entry<String, RecordField> field) {
+        return RecordBody.of(RecordBody.fieldMap(field));
     }
 
-    private static TypeDefinition record(int line, SequencedMap<String, RecordField> fields) {
-        return new TypeDefinition(Optional.empty(), io.ltr8.tson.schema.meta.TypeKind.PRODUCT, 
-                List.of(), List.of(), RecordBody.of(fields),
-                Optional.of(new Pos(line, 3, line * 10)), io.ltr8.annotation.Annotations.empty());
+    /** Where an entry was declared: line {@code line}, as the facts a resolved schema records. */
+    private static TsonSchema.EntryFacts declaredAt(int line) {
+        return TsonSchema.EntryFacts.at(Optional.of(new Pos(line, 3, line * 10)));
     }
 
     /** Three entries, each with a field naming a type nothing declares -- three independent failures. */
     private static TsonSchema threeUnresolvedReferences() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("a", record(4, Map.entry("x", RecordField.required(TypeRef.of("no_such_type")))));
-        entries.put("b", record(5, Map.entry("y", RecordField.required(TypeRef.of("also_missing")))));
-        entries.put("c", record(6, Map.entry("z", RecordField.required(TypeRef.of("missing_too")))));
-        entries.put("fine", record(7));
-        return new TsonSchema(ID, "https://tson.io/2026/38/m/meta.tn", List.of(), entries);
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("a", record(Map.entry("x", RecordField.required(TypeRef.of("no_such_type")))));
+        entries.put("b", record(Map.entry("y", RecordField.required(TypeRef.of("also_missing")))));
+        entries.put("c", record(Map.entry("z", RecordField.required(TypeRef.of("missing_too")))));
+        entries.put("fine", record());
+        return new TsonSchema(ID, "https://tson.io/2026/38/m/meta.tn", List.of(), AnnotatedMap.of(entries), false,
+                Map.of(), Map.of("a", declaredAt(4), "b", declaredAt(5), "c", declaredAt(6), "fine", declaredAt(7)));
     }
 
     private static final TsonSchemaLoader NO_IMPORTS = uri -> Optional.empty();
@@ -105,13 +107,11 @@ class TsonSchemaLinkerDiagnosticsTest {
     /** An unresolved *supertype* is a separate check from an unresolved field type; both are collected. */
     @Test
     void unresolvedSupertypesAndFieldTypesAreBothCollected() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("bad_field", record(4, Map.entry("x", RecordField.required(TypeRef.of("no_such_type")))));
-        entries.put("bad_supertype", new TypeDefinition(Optional.empty(),
-                io.ltr8.tson.schema.meta.TypeKind.PRODUCT,  List.of("no_such_parent"),
-                List.of(), RecordBody.of(RecordBody.fieldMap()), Optional.of(new Pos(5, 3, 50)),
-                io.ltr8.annotation.Annotations.empty()));
-        entries.put("fine", record(6));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("bad_field", record(Map.entry("x", RecordField.required(TypeRef.of("no_such_type")))));
+        entries.put("bad_supertype",
+                ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("no_such_parent")));
+        entries.put("fine", record());
 
         List<Diagnostic> diagnostics = linkCollecting(
                 new TsonSchema(ID, "https://tson.io/2026/38/m/meta.tn", List.of(), entries));

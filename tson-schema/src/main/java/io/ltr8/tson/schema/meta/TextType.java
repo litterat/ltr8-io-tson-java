@@ -2,8 +2,8 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
-import io.ltr8.regex.IRegex;
 import io.ltr8.annotation.Typename;
+import io.ltr8.regex.IRegex;
 import io.ltr8.unicode.Nfc;
 import io.ltr8.unicode.Normalization;
 
@@ -41,7 +41,7 @@ import java.util.stream.Stream;
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "text_type")
-public record TextType(
+public record TextType(List<TypeRef> supertypes, List<String> subtypes,
         @Field("min_length") Optional<Integer> minLength,
         @Field("max_length") Optional<Integer> maxLength,
         Optional<Integer> length,
@@ -51,7 +51,20 @@ public record TextType(
 
     @Record
     public TextType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
         members = members.map(List::copyOf);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public TextType(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+            Optional<String> pattern, Optional<List<String>> members, Normalization normalization) {
+        this(List.of(), List.of(), minLength, maxLength, length, pattern, members, normalization);
+    }
+
+    @Override
+    public TextType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new TextType(supertypes, subtypes, minLength, maxLength, length, pattern, members, normalization);
     }
 
     /** These facets with no normalization: the value is the text as written. */

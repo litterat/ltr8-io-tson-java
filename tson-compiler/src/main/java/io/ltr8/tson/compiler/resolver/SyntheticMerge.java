@@ -7,7 +7,9 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.LinkedHashMap;
@@ -85,10 +87,27 @@ final class SyntheticMerge {
      * because the other channel already published it, is {@code SchemaResolver}'s to decide -- it is the one
      * holding both the local and the materialised map.
      */
-    static void rewrite(Map<String, TypeDefinition> entries, Map<String, String> renames) {
-        for (Map.Entry<String, TypeDefinition> entry : entries.entrySet()) {
+    static void rewrite(Map<String, Top> entries, Map<String, String> renames) {
+        for (Map.Entry<String, Top> entry : entries.entrySet()) {
             entry.setValue(MetaRefs.mapRefs(entry.getValue(), ref -> rename(ref, renames)));
         }
+    }
+
+    /**
+     * The applications {@code facts} records, rewritten the same way and at every depth: an instantiation's
+     * application is what a message shows and what §5.8's applied-parent edge is keyed on, and an argument naming
+     * the eager name would key it on a form that no longer exists.
+     */
+    static void rewriteFacts(Map<String, TsonSchema.EntryFacts> facts, Map<String, String> renames) {
+        facts.replaceAll((name, fact) -> fact.withApplication(fact.application().map(ref -> renamed(ref, renames))));
+    }
+
+    private static TypeRef renamed(TypeRef ref, Map<String, String> renames) {
+        List<TypeArgument> arguments = ref.arguments().stream()
+                .map(argument -> argument instanceof TypeArgument.Ref nested
+                        ? (TypeArgument) new TypeArgument.Ref(renamed(nested.ref(), renames)) : argument)
+                .toList();
+        return new TypeRef(renames.getOrDefault(ref.name(), ref.name()), arguments, ref.annotations());
     }
 
     /** One type-ref rewritten, its own arguments included -- an application may name a merged form. */

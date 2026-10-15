@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.List;
@@ -25,7 +26,24 @@ import java.util.List;
  * BytesType.Encoding} is the third of these plain nested enums and is mirrored the same way.
  */
 @Typename(name = "complex_type")
-public record ComplexType(Component component) implements Atom {
+public record ComplexType(List<TypeRef> supertypes, List<String> subtypes,
+        Component component) implements Atom {
+    /** The chain normalised: absent and empty are one list. */
+    @Record
+    public ComplexType {
+        supertypes = Chains.copy(supertypes);
+        subtypes = Chains.copy(subtypes);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public ComplexType(Component component) {
+        this(List.of(), List.of(), component);
+    }
+
+    @Override
+    public ComplexType withChain(List<TypeRef> supertypes, List<String> subtypes) {
+        return new ComplexType(supertypes, subtypes, component);
+    }
 
     public enum Component {
         INTEGER, NUMBER, RATIONAL, FLOAT32, FLOAT64;

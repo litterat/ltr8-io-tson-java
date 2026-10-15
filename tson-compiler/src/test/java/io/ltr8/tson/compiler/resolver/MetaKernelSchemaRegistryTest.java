@@ -13,7 +13,7 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
@@ -74,8 +74,8 @@ class MetaKernelSchemaRegistryTest {
                     "expected a synthetic entry with head '" + head + "', found: " + syntheticNames);
         }
 
-        TypeDefinition enumDef = linked.schema().entries().get("enum");
-        RecordBody enumBody = (RecordBody) enumDef.body();
+        Top enumDef = linked.schema().entries().get("enum");
+        RecordBody enumBody = (RecordBody) enumDef;
         RecordField membersField = enumBody.fields().entrySet().stream()
                 .filter(f -> f.getKey().equals("members"))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
@@ -115,8 +115,8 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.meta(), linked.schema().meta());
-        assertEquals(68, raw.entries().size());
-        assertEquals(68, linked.schema().entries().size());
+        assertEquals(67, raw.entries().size());
+        assertEquals(67, linked.schema().entries().size());
 
         assertThrows(SchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));
@@ -146,7 +146,7 @@ class MetaKernelSchemaRegistryTest {
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
-        assertEquals(68, registered.schema().entries().size());
+        assertEquals(67, registered.schema().entries().size());
         assertThrows(SchemaValidationException.class, () -> registry.register(registered));
     }
 }
