@@ -18,8 +18,9 @@ that runs before it. Current form only; history lives in git.
   into the namespace as it is built.
 - Which parents were applications is read off the **held** body's chain `parents`, not off the closed one, whose
   `supertypes` are bare names; a closed type that is no template keeps no `parents` once the fold has run.
-- An instantiation states the application it closes in its chain (`TypeChain.application`) — a `Reference` hop, which
-  carries no chain, in its facts — and that is what §8.2's identity and the applied-parent fold key on.
+- An instantiation of any kind — a record member, a DATA entry, a `Reference` hop — records the application it closes
+  in the map `SchemaResolver` shares with the materialiser, which writes it on the entry's key as `@application`; that
+  is what §8.2's identity and the applied-parent fold key on.
 - Kind is derived (`TypeKind.of`, judged by where each base kind is defined) and never written; an open entry is
   `TEMPLATE`. A closed record takes the base kind its chain reaches; every other closed entry takes the branch of `Top`
   its substituted body occupies.
@@ -43,7 +44,7 @@ recorded open form, and replacing the application with a reference to the entry 
   at a scalar position, refused one layer of application up. **Only a reference is dereferenced**; a refinement
   (`!uuid ^ {}`, IS-A `uuid`) and a fresh instance (`!uuid_type {}`, related to neither) are ordinary entries
   and keep their own applications, which is what makes those two spellings mean something. **Identity is
-  normalised, not provenance**: the canonical application is what the entry's chain records (`application`),
+  normalised, not provenance**: the canonical application is what the entry's key records (`@application`),
   and the name the author wrote survives at the use site, which states it as written — a division available because no
   pass rewrites use sites (§8.3). `AliasedArgumentIdentityTest` pins it. **Every reference is a pure rename**, which is what
   the rule rests on: nothing that changes how a value reads rides on a reference — a `bytes` alphabet is
@@ -52,18 +53,18 @@ recorded open form, and replacing the application with a reference to the entry 
   Two reasons. An application arrives here as a `schema.meta.TypeRef` carrying `arguments` — the one thing
   that shape means, since a closed form is always an entry named by a bare reference — so substitution is a
   walk over value types rather than a second AST rewrite. And the entry it mints records its application
-  in its chain (`TypeChain.application`), which is what §8.2 keys identity on; an injected
+  on its key (`@application`), which is what §8.2 keys identity on; an injected
   `SchemaMap.Declaration` has no channel for one, which is what rules out doing this in `SchemaDesugarer` alongside
   the sugar hoists. It also keeps that
   phase purely syntactic.
 - **Only a closed entry is scanned.** A template's own body is *open* — `chain<T>` inside `chain` awaits
   substitution and is not an application to close — so entries with a non-empty `parameters` list are
   skipped. Closing them would mint an entry per level, keyed on the literal parameter name.
-- **Identity is the flattened application** the entry's chain records (§8.2), written in resolved output so an
+- **Identity is the flattened application** the entry's key records (§8.2), written in resolved output so an
   ingested schema's applications unify with a later schema's, and the derived name is built from it, so two
   `box<text>` anywhere in the schema land on one entry for free.
 - **A declaration naming the application *is* that entry, and nothing is minted beside it**
-  (§8.2). `text_box => box<text>` resolves to the closed record itself, its chain
+  (§8.2). `text_box => box<text>` resolves to the closed record itself, its key
   recording the canonical application — not a `Reference` to a content-named entry sitting beside it.
   `DefinitionResolver` reaches `closeApplicationInto`, which builds the body **under the declared name**: it
   derives no internal name and claims none (`MintedNames.claim` is never called) and publishes nothing, so

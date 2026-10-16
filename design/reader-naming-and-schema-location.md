@@ -37,7 +37,7 @@ Related: `design/readers-and-diagnostics.md`, `design/scope-push.md`, `design/re
   carries its own name token's position and a minted entry has none. So `tag_list => [text; 1..2]` keeps
   `tag_list` and the anonymous form inside it renders as `[order; 1..]`, a map as `{text => order}`, a tuple
   as `[text, int32]`, a choice as `(text | int32)`, and an instantiation entry as the application it records
-  (`TypeChain.application`, or a hop's `EntryFacts.application`: `paged<order>`). Anything with no sugar spelling falls
+  (`@application` on its key, `TsonSchema.applicationOf`: `paged<order>`). Anything with no sugar spelling falls
   back to the entry name — honest rather than invented.
 - **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). A field
   declared `c: pct` over `pct => small` reads with `small`'s reader, that being the type at the end of the

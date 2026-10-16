@@ -20,10 +20,11 @@ git.
 - Refinement of a field is three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
   omission yields, so the order on it is checked on `RecordField.omitted`.
 - An entry is its value (SPEC-FEEDBACK.md #14): `schema => {type_name => top}`, and a type body or a template carries
-  its own chain, `chained`'s one field `chain`, a `type_chain` (`TypeChain`): `parents` as written, `supertypes`,
-  `subtypes`, and `application`. What no value holds — where the entry was declared, the annotations on its value, the
-  constructor tag, the entry a `^` names, the application a `Reference`-valued instantiation closes — is
-  `TsonSchema.EntryFacts`, never a field of any constructor and never written.
+  its own chain, `chained`'s one field `chain`, a `type_chain` (`TypeChain`): `parents` as written, `supertypes` and
+  `subtypes`. The application an entry is the instantiation of, of whatever kind, is the derived `@application` on its
+  key (`TsonSchema.applicationOf`). What no value holds and nothing writes — where the entry was declared, the
+  annotations on its value, the constructor tag, the entry a `^` names — is `TsonSchema.EntryFacts`, never a field of
+  any constructor.
 - `supertypes` is bare names, sorted, complete to a fixed point through applied parents
   (`SchemaResolver.appliedParentEdges`); `parents` is the one list holding applications, and a closed type that is no
   template keeps none (`closeChains`). A template keeps its written parents and is IS-A the closed entries they reach.
