@@ -24,7 +24,11 @@ Current form only; history lives in git.
   so its duplicate check is two spellings that are one value of the record's name type, and nothing else.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
-- `RecordExtension`'s FINAL check reads the entry's chain (`Type.supertypes`), which a §5.9 subtraction leaves empty.
+- `RecordExtension`'s FINAL check reads the entry's chain (`Chained.supertypes`), a template's included, which a §5.9
+  subtraction leaves empty.
+- Everything that asks what an entry IS-A asks `Chained` — `computeSubtypes` credits a template as it does a type,
+  and the constructor test (`TypeKind.isConstructor`) reads a template's chain as a closed one's, judging `top` by
+  its origin.
 - An enum's `name_type` resolves in the governing meta's namespace for the value its constructor pinned (traced through a
   template's held body), and otherwise in the schema's; the enum checks run before the name checks, and an enum they
   refuse is not judged by name again.
@@ -70,9 +74,9 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   one canonical identity, is redundant rather than an error. Because identities carry the spec revision, a
   closure reaching both `/2026/32/m/core.tn` and `/2026/38/m/core.tn` is rejected here rather than surfacing
   later as a field conflict between two identically-spelled types; (2) **populate `subtypes`**
-  (reverse of `supertypes`); (3) **derive `disjoint`** for every choice entry (`ChoiceDisjointness`, §5.4) —
-  total and two-valued, detailed in `design/choice-disjointness.md`, so a linked choice always
-  carries the fact;
+  (reverse of `supertypes`, over every chained value, a template's included); (3) **derive `disjoint`** for every choice
+  entry (`ChoiceDisjointness`, §5.4) — total and two-valued, detailed in `design/choice-disjointness.md`, so a linked
+  choice always carries the fact;
   (3a) **check what `record.extension` obliges** (`RecordExtension`, §5.2) — that nothing composes onto a
   FINAL record, that a sealed family's selectors are usable and its members pin them distinctly, and that
   every family member is declared;
@@ -228,9 +232,11 @@ rest of the closure agrees with it.
   which nothing populates until linking; and a selector's type has to be followed to the end of its
   reference chain. What is local — two definition marks on one declaration, a mark carrying a value, a mark
   on a non-record — the resolver already refused while lowering.
-- **The FINAL check reads the entry's chain.** §5.9's subtraction leaves it empty, minting no IS-A edge —
-  which is the only thing FINAL constrains — so subtracting from a final type is admitted. No *invalid* case
-  would show a regression there; the corpus carries a `valid` vector for exactly that reason.
+- **The FINAL check reads the entry's chain**, a template's as a closed type's: a template composing or refining a
+  final record is refused at its own declaration, whether or not anything applies it, since it is IS-A its parents
+  and so is every application. §5.9's subtraction leaves the chain empty, minting no IS-A edge — which is the
+  only thing FINAL constrains — so subtracting from a final type is admitted. No *invalid* case would show a
+  regression there; the corpus carries a `valid` vector for exactly that reason.
 - **A marked field is the declaration's own only if no sealed supertype declares it.** §5.8 flattens an
   inherited field whole, the mark included, so a subtype's copy of its base's selector is indistinguishable
   here from one the subtype wrote. Without the distinction every subtype of every sealed family would be read

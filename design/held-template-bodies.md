@@ -63,8 +63,8 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
   `ArrayBody`/`MapBody`/`RecordBody`.
   - **What differs between the shapes is only what the result *is*.** A **record** template's closure is the
     instantiation entry itself (`closeHeldRecord`): a substituted record is the type the author named by
-    writing the application, so there is nothing for an extra hop to record and the entry's facts carry
-    the application (`EntryFacts.application`) the way §8.2 keys every instantiation. Every other held form closes
+    writing the application, so there is nothing for an extra hop to record and the entry's chain carries
+    the application (`TypeChain.application`) the way §8.2 keys every instantiation. Every other held form closes
     to a **synthetic** named for the form, which the instantiation then references — a form has no
     author-written name for identity to key on. That is the whole of the divergence; everything before it is
     shared.
@@ -181,12 +181,12 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     — and would leave `[text]` written directly and `[T]` closed to `text` on two entries for one type. Both
     go through `DerivedName.ofBinding` over the same binding record, so the two channels dedupe
     against each other and the closing usually finds the entry desugaring already injected.
-  - **So the application gets a second entry**, a `Reference` to the form whose recorded application is the
-    application itself. One entry cannot carry two identities: the closure is a closed synthetic *and* an instantiation
-    of the template, and §8.2 keys those on different things. Without it nothing in resolver output records
-    that `grid<pixel, 3>` was written — the field would name the array and the template's name would vanish.
-    The record shape needs no second entry, since substituting a record yields a record, structurally
-    distinct from any synthetic.
+  - **So the application gets a second entry**, a `Reference` to the form, whose facts record the application
+    itself (a `Reference` composes `top` alone and carries no chain to state it in). One entry cannot carry two
+    identities: the closure is a closed synthetic *and* an instantiation of the template, and §8.2 keys those on
+    different things. Without it nothing in resolver output records that `grid<pixel, 3>` was written — the field would
+    name the array and the template's name would vanish. The record shape needs no second entry, since substituting a
+    record yields a record, structurally distinct from any synthetic.
     - **A generated head mints none.** Closing `array_p0_…<pixel, 3>` is an open synthetic closing its own
       intermediate form; nobody wrote that application, and an entry named for it would carry an internal
       name into identity. `SchemaResolver` tells the two apart by the plainest fact available — the

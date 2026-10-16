@@ -40,10 +40,11 @@ The bundled schemas and the spec agree on shape: `reference.target` is typed `ty
 `instance_template`/`template_argument`/`value_param` (§5.10's held bodies carry an open body); `map`'s `state`
 field sits behind `{K => V?}` (§5.3). An open entry's body is an instance of the kernel's `template`
 constructor — the parameter names and the application as text (§8.1). A schema map's entry is its value
-(`schema => {type_name => top}`): a type carries its own chain (`type => top & { supertypes?: [type_ref]
-subtypes?: [type_name] }`), and nothing carries `parameters` (they are the template body's), `disjoint`
+(`schema => {type_name => top}`): a type and a template carry their own chain (`chained => { chain?: type_chain }`,
+`type => abstract top & chained & {}`), and nothing carries `parameters` (they are the template body's), `disjoint`
 (derived over the choice body, §5.4) or `kind`: a kind is derived from an entry's own chain and body (§4.1,
-`TypeKind.of`), and the kernel declares no `type_kind`.
+`TypeKind.of`, judged by where each base kind is defined), and the kernel declares no `type_kind`. `top`, `type` and
+the four base kinds are `abstract` (SPEC-FEEDBACK.md #15).
 
 **Changing a bundled schema means re-stamping all three digests bottom-up**, moving the matching
 `*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the

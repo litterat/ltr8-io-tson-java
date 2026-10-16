@@ -206,6 +206,9 @@ it can't handle `boolean` preceding `enum`; this ordering lives here.
   to a type called `T`. Held bodies are the one thing the bootstrap shares with ordinary resolution.
 - **An atom refinement merges through `refinedBody`**, `instanceBody`'s twin and bounded the same way:
   meta-kernel refines exactly one family, so the merge handles that one and refuses any other by name.
+- **Every name the kernel holds is the kernel's own**, so the first pass's `DefinitionResolver` judges kinds and
+  constructors with a predicate that admits every name (`name -> true`); ordinary resolution judges by the origin
+  of each name in the merged namespace instead, and a name's origin is meta-kernel exactly when it is one of these.
 
 - **Constructor-application binding goes through a closed `instanceBody` switch, not the generic path.**
   Meta-kernel instantiates constructors in exactly three shapes — a bare `{}` (each target's
