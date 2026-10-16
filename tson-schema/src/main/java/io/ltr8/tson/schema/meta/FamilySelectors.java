@@ -54,7 +54,7 @@ public final class FamilySelectors {
         return switch (definition) {
             case RecordBody record -> declared(record);
             case TemplateBody held -> fromMembers(held.discriminators(),
-                    Type.subtypesOf(name, definition, entries), entries);
+                    held.subtypes(), entries);
             default -> Collections.emptyNavigableMap();
         };
     }

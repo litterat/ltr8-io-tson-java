@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -75,9 +76,9 @@ class MetaKernelBootstrapResolverTest {
                 "identifier", IdentifierType.IDENTIFIER);
         expected.forEach((name, body) -> {
             Top resolved = schema.entries().get(name);
-            assertEquals(TypeKind.ATOM, TypeKind.of(resolved));
+            assertEquals(TypeKind.ATOM, TypeKind.of(resolved, n -> true));
             assertEquals(body, resolved);
-            assertEquals(List.of(), Type.supertypesOf(resolved));
+            assertEquals(List.of(), Chained.supertypesOf(resolved));
             assertEquals(java.util.Optional.of(name + "_type"), schema.constructorOf(name));
         });
     }
@@ -87,7 +88,7 @@ class MetaKernelBootstrapResolverTest {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         Top integer = schema.entries().get("integer");
-        assertEquals(TypeKind.ATOM, TypeKind.of(integer));
+        assertEquals(TypeKind.ATOM, TypeKind.of(integer, n -> true));
         assertEquals(IntegerType.UNCONSTRAINED, integer);
     }
 
@@ -98,7 +99,7 @@ class MetaKernelBootstrapResolverTest {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         Top booleanDef = schema.entries().get("boolean");
-        assertEquals(TypeKind.ATOM, TypeKind.of(booleanDef));
+        assertEquals(TypeKind.ATOM, TypeKind.of(booleanDef, n -> true));
         assertEquals(new EnumBody(List.of("true", "false")), booleanDef);
     }
 
@@ -118,26 +119,26 @@ class MetaKernelBootstrapResolverTest {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         Top text = schema.entries().get("text");
-        assertEquals(TypeKind.ATOM, TypeKind.of(text));
+        assertEquals(TypeKind.ATOM, TypeKind.of(text, n -> true));
         assertEquals(TextType.UNCONSTRAINED, text);
 
         Top iri = schema.entries().get("iri");
-        assertEquals(TypeKind.ATOM, TypeKind.of(iri));
+        assertEquals(TypeKind.ATOM, TypeKind.of(iri, n -> true));
         assertEquals(IriType.IRI, iri);
 
         Top regex = schema.entries().get("regex");
-        assertEquals(TypeKind.ATOM, TypeKind.of(regex));
+        assertEquals(TypeKind.ATOM, TypeKind.of(regex, n -> true));
         assertEquals(RegexType.UNCONSTRAINED, regex);
 
         // The kernel's second identifier_type instance, told apart from `identifier` by its entry name.
         Top schemeName = schema.entries().get("scheme_name");
-        assertEquals(TypeKind.ATOM, TypeKind.of(schemeName));
+        assertEquals(TypeKind.ATOM, TypeKind.of(schemeName, n -> true));
         assertEquals(IdentifierType.SCHEME_NAME, schemeName);
     }
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is the 59 declarations the fixture writes plus one injected declaration per distinct sugar form
+     * output is the 61 declarations the fixture writes plus one injected declaration per distinct sugar form
      * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar. They are the same
      * entries the linker used to synthesize; producing them here is what leaves the linker with nothing to
      * materialize (see {@code MetaKernelSchemaRegistryTest}). {@code enum}'s member set is not among them:
@@ -149,7 +150,7 @@ class MetaKernelBootstrapResolverTest {
     void theFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(67, schema.entries().size());
+        assertEquals(69, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_text", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_template_param", "array_field_group")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),

@@ -32,7 +32,9 @@
   boolean => !enum { members: [true false] }
 
   @ordering:TOTAL @bounded:false @exact:true @numeric
-  integer => !integer_type { subtypes: [int128 int16 int256 int32 int64 int8 uint128 uint16 uint256 uint32 uint64 uint8] }
+  integer => !integer_type {
+    chain: { subtypes: [int128 int16 int256 int32 int64 int8 uint128 uint16 uint256 uint32 uint64 uint8] }
+  }
 
   @ordering:TOTAL @bounded:false @exact:true @numeric
   number => !decimal_type {}
@@ -44,40 +46,40 @@
   complex => !complex_type {}
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  int8 => !integer_type { supertypes: [integer]  size: { bits: 8  signed: true } }
+  int8 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 8  signed: true } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  int16 => !integer_type { supertypes: [integer]  size: { bits: 16  signed: true } }
+  int16 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 16  signed: true } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  int32 => !integer_type { supertypes: [integer]  size: { bits: 32  signed: true } }
+  int32 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 32  signed: true } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  int64 => !integer_type { supertypes: [integer]  size: { bits: 64  signed: true } }
+  int64 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 64  signed: true } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  int128 => !integer_type { supertypes: [integer]  size: { bits: 128  signed: true } }
+  int128 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 128  signed: true } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  int256 => !integer_type { supertypes: [integer]  size: { bits: 256  signed: true } }
+  int256 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 256  signed: true } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint8 => !integer_type { supertypes: [integer]  size: { bits: 8  signed: false } }
+  uint8 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 8  signed: false } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint16 => !integer_type { supertypes: [integer]  size: { bits: 16  signed: false } }
+  uint16 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 16  signed: false } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint32 => !integer_type { supertypes: [integer]  size: { bits: 32  signed: false } }
+  uint32 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 32  signed: false } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint64 => !integer_type { supertypes: [integer]  size: { bits: 64  signed: false } }
+  uint64 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 64  signed: false } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint128 => !integer_type { supertypes: [integer]  size: { bits: 128  signed: false } }
+  uint128 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 128  signed: false } }
 
   @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint256 => !integer_type { supertypes: [integer]  size: { bits: 256  signed: false } }
+  uint256 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 256  signed: false } }
 
   @ordering:PARTIAL @bounded:false @exact:false @numeric
   float32 => !float_type { format: BINARY32 }
@@ -92,16 +94,16 @@
   regex => !regex_type {}
 
   @ordering:NONE @bounded:false
-  uri_reference => !uri_type { subtypes: [uri] }
+  uri_reference => !uri_type { chain: { subtypes: [uri] } }
 
   @ordering:NONE @bounded:false
-  uri => !uri_type { supertypes: [uri_reference]  allow_relative: false }
+  uri => !uri_type { chain: { supertypes: [uri_reference] }  allow_relative: false }
 
   @ordering:NONE @bounded:false
-  iri_reference => !iri_type { subtypes: [iri] }
+  iri_reference => !iri_type { chain: { subtypes: [iri] } }
 
   @ordering:NONE @bounded:false
-  iri => !iri_type { supertypes: [iri_reference]  allow_relative: false }
+  iri => !iri_type { chain: { supertypes: [iri_reference] }  allow_relative: false }
 
   @ordering:NONE @bounded:false
   bytes => !bytes_type {}

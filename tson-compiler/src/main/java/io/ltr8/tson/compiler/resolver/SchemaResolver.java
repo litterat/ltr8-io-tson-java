@@ -16,6 +16,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -24,6 +25,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Type;
@@ -39,6 +41,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.SequencedSet;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.function.Function;
 
 /**
@@ -214,7 +217,12 @@ public final class SchemaResolver {
         // them -- one map the resolver and the materialiser both write, so a constructor's tag is found
         // wherever the entry came from.
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
-        Map<String, Top> namespace = mergeImports(document, nameAnnotations, facts);
+        // Which names denote the meta-kernel's own entries: a kind and a constructor are judged by where a base
+        // kind is defined, never by its spelling (§4.1), so a schema's own `data` stays an ordinary record.
+        Set<String> kernelNames = new LinkedHashSet<>();
+        Map<String, Top> namespace = mergeImports(document, nameAnnotations, facts, kernelNames);
+        boolean isKernel = TsonBundledSchemas.isMetaKernel(id);
+        Predicate<String> kernel = name -> isKernel || kernelNames.contains(name);
         Function<String, Optional<String>> localConstructors = name -> {
             Optional<String> recorded = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).constructor();
             if (recorded.isPresent()) {
@@ -312,7 +320,7 @@ public final class SchemaResolver {
                             io.ltr8.tson.schema.meta.TypeRef application) {
                         return materialiser.closeApplicationInto(declaredName, application);
                     }
-                }, positions, facts);
+                }, positions, facts, kernel, metaParser.compiledSchema()::isKernel);
         namespaceGetter.resolveWith(resolver);
 
         for (String name : declarations.keySet()) {
@@ -382,8 +390,8 @@ public final class SchemaResolver {
         Map<String, Top> instantiations = materialiser.materialise(resolvedLocals,
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
         republish(namespace, resolvedLocals, instantiations);
-        appliedParentEdges(namespace, resolvedLocals, instantiations, facts);
         familyBaseEdges(namespace, resolvedLocals, generated, facts);
+        appliedParentEdges(namespace, resolvedLocals, instantiations, facts);
         closeChains(namespace, resolvedLocals, instantiations);
 
         // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
@@ -560,47 +568,44 @@ public final class SchemaResolver {
 
     /**
      * §5.8's IS-A edge for a <b>parent written as an application</b>, derived once every declaration has
-     * resolved.
+     * resolved, and the chains made complete through it.
      *
-     * <p>Composition needs the operand's <em>fields</em> and nothing else, so a closed declaration's chain and a
-     * closed template's both keep the application exactly as written and mint no entry for it (§8.2). The edge
-     * is the half that has to wait: the entry an application denotes is whichever declaration names the same
-     * application, and asking that <em>during</em> materialisation would make the answer depend on declaration
-     * order -- {@code text_box} declared before the composition found, declared after it not. A closed chain is
-     * completed once every parent is a type, and this is that moment.
+     * <p>Composition needs the operand's <em>fields</em> and nothing else, so a closed declaration and a closed
+     * template both keep the application in their chain's {@code parents} and mint no entry for it (§8.2). The
+     * edge is the half that has to wait: the entry an application denotes is whichever declaration names the
+     * same application, and asking that <em>during</em> materialisation would make the answer depend on
+     * declaration order -- {@code text_box} declared before the composition found, declared after it not. A
+     * closed chain is completed once every parent is a type, and this is that moment.
      *
      * <p><b>Nothing is created here.</b> The pass derives an index over entries that already exist, keyed on
      * §8.2's canonical application so two spellings of one application agree -- the application each
-     * instantiation's facts record, an imported one's included. Where no declaration names the application
-     * there is no name to record, and that is the right answer rather than a gap: nobody declared that type,
-     * so nothing can be declared as it. {@link #closeChains} then drops every application left standing.
+     * instantiation records, an imported one's included. Where no declaration names the application there is no
+     * name to record, and that is the right answer rather than a gap: nobody declared that type, so nothing can
+     * be declared as it. {@link #closeChains} then drops every application left standing.
+     *
+     * <p><b>Complete means transitively closed</b> (TypeChain): an entry IS-A every entry its supertypes are
+     * IS-A, so a declaration composing {@code okt => ok<text>} reaches the edge {@code okt} gained here, though
+     * it holds no application of its own. The closure runs over every local chain, to a fixed point.
      *
      * <p><b>§5.9 needs no guard here.</b> A declaration carrying a removal keeps no parent at all, so a
-     * subtracted entry has no applied parent for this pass to find.
+     * subtracted entry has no applied parent for this pass to find and an empty chain for it to close.
      */
     private static void appliedParentEdges(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
                                            Map<String, Top> instantiations,
                                            Map<String, TsonSchema.EntryFacts> facts) {
         Map<String, String> byApplication = new LinkedHashMap<>();
-        namespace.forEach((entryName, definition) -> facts.getOrDefault(entryName, TsonSchema.EntryFacts.NONE)
-                .application()
+        namespace.forEach((entryName, definition) -> applicationOf(definition, facts.get(entryName))
                 .filter(application -> !application.arguments().isEmpty())
                 .ifPresent(application -> byApplication.putIfAbsent(
                         DerivedName.canonicalApplication(application.name(), application.arguments()),
                         entryName)));
-        if (byApplication.isEmpty()) {
-            return;
-        }
         // <b>To a fixed point</b>, because the edge is transitive and each pass can only see the chains the
         // previous one left. `great => <T> ok<T> & { … }` over `ok => <T> result<T> & { … }` needs `ok_of`'s own
-        // edge to `result_of` to exist before `great_of` can inherit it, and the two are derived here rather
-        // than at their declarations. Bounded by the entry count: each round adds at least one name to some
-        // chain or stops.
+        // edge to `result_of` to exist before `great_of` can inherit it. Bounded by the entry count: each round
+        // adds at least one name to some chain or stops.
         for (int round = 0; round <= namespace.size(); round++) {
             // Republished between the two folds as well as after them: an owner's chain grows in this same
-            // round, and `withAppliedParents` reads its ancestors out of the namespace -- so `great_of`
-            // inheriting from `ok_of` needs `ok_of`'s new edge visible before it is asked for, not one round
-            // later.
+            // round, and `completed` reads its ancestors out of the namespace.
             boolean changed = fold(resolvedLocals, byApplication, namespace);
             republish(namespace, resolvedLocals, instantiations);
             changed |= fold(instantiations, byApplication, namespace);
@@ -609,6 +614,13 @@ public final class SchemaResolver {
                 return;
             }
         }
+    }
+
+    /** The application {@code definition} is the instantiation of: its chain's, or its facts' for a hop. */
+    private static Optional<io.ltr8.tson.schema.meta.TypeRef> applicationOf(Top definition,
+                                                                           TsonSchema.EntryFacts facts) {
+        Optional<io.ltr8.tson.schema.meta.TypeRef> chained = Chained.applicationOf(definition);
+        return chained.isPresent() || facts == null ? chained : facts.application();
     }
 
     /**
@@ -628,18 +640,19 @@ public final class SchemaResolver {
             if (!(entry.getValue() instanceof Type member)) {
                 continue;
             }
-            String head = facts.getOrDefault(entry.getKey(), TsonSchema.EntryFacts.NONE).application()
+            String head = applicationOf(member, facts.get(entry.getKey()))
                     .filter(application -> !application.arguments().isEmpty())
                     .map(io.ltr8.tson.schema.meta.TypeRef::name).orElse(null);
-            if (head == null || generated.contains(entry.getKey()) || member.supertypeNames().contains(head)) {
+            if (head == null || generated.contains(entry.getKey()) || member.supertypes().contains(head)) {
                 continue;
             }
             if (!(namespace.get(head) instanceof TemplateBody held) || held.extension().isEmpty()) {
                 continue;
             }
-            List<io.ltr8.tson.schema.meta.TypeRef> chain = new ArrayList<>(member.supertypes());
-            chain.add(io.ltr8.tson.schema.meta.TypeRef.of(head));
-            Top joined = member.withChain(chain, member.subtypes());
+            List<String> chain = new ArrayList<>(member.supertypes());
+            chain.add(head);
+            chain.addAll(held.supertypes());
+            Top joined = member.withSupertypes(chain.stream().distinct().toList());
             entry.setValue(joined);
             namespace.put(entry.getKey(), joined);
         }
@@ -647,16 +660,14 @@ public final class SchemaResolver {
 
     /**
      * Every closed chain with the applications the fold left standing dropped: an application no declaration
-     * names denotes an entry nothing can be declared as, so it reaches no edge, and a closed body's chain holds
-     * bare names only (SPEC-FEEDBACK.md #14). A held body is no value and keeps its written parents.
+     * names denotes an entry nothing can be declared as, so it reaches no edge, and a closed type's parents are
+     * not part of it (SPEC-FEEDBACK.md #14). A template keeps its written parents.
      */
     private static void closeChains(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
                                     Map<String, Top> instantiations) {
         for (Map<String, Top> entries : List.of(resolvedLocals, instantiations)) {
-            entries.replaceAll((name, definition) -> definition instanceof Type type
-                    && type.supertypes().stream().anyMatch(parent -> !parent.arguments().isEmpty())
-                    ? type.withChain(type.supertypes().stream().filter(parent -> parent.arguments().isEmpty())
-                            .toList(), type.subtypes())
+            entries.replaceAll((name, definition) -> definition instanceof Type type && !type.parents().isEmpty()
+                    ? type.withChain(type.chain().withParents(List.of()))
                     : definition);
         }
         republish(namespace, resolvedLocals, instantiations);
@@ -669,11 +680,11 @@ public final class SchemaResolver {
         // <b>To a fixed point within the map, not merely across rounds.</b> A pass visits entries in map
         // order while mutating them, so `great_of` can be reached before `ok_of` has grown the edge it
         // inherits -- and both live in this same map, which an outer round cannot fix. Each inner pass
-        // republishes, because `withAppliedParents` reads an owner's ancestors out of the namespace.
+        // republishes, because `completed` reads an owner's ancestors out of the namespace.
         for (int pass = 0; pass <= entries.size(); pass++) {
             boolean changed = false;
             for (Map.Entry<String, Top> entry : entries.entrySet()) {
-                Top folded = withAppliedParents(entry.getValue(), byApplication, namespace);
+                Top folded = completed(entry.getValue(), byApplication, namespace);
                 if (folded != entry.getValue()) {
                     entry.setValue(folded);
                     namespace.put(entry.getKey(), folded);
@@ -689,36 +700,32 @@ public final class SchemaResolver {
     }
 
     /**
-     * One record with every applied parent's owning declaration, and that owner's own chain, folded into its
-     * chain. The application stays beside them until {@link #closeChains}, so a later round still finds it when
-     * the owner's chain has grown.
+     * One chain made complete: a type's every applied parent's owning declaration folded in, and for any chain
+     * every member's own supertypes. The application stays in {@code parents} until {@link #closeChains}, so a
+     * later round still finds it when the owner's chain has grown. {@code definition} itself where nothing
+     * grew.
      */
-    private static Top withAppliedParents(Top definition, Map<String, String> byApplication,
-                                          Map<String, Top> namespace) {
-        if (!(definition instanceof RecordBody record)) {
+    private static Top completed(Top definition, Map<String, String> byApplication, Map<String, Top> namespace) {
+        if (!(definition instanceof Chained chained)) {
             return definition;
         }
-        List<io.ltr8.tson.schema.meta.TypeRef> chain = new ArrayList<>(record.supertypes());
-        Set<String> seen = new LinkedHashSet<>(Ancestry.closedNames(record));
-        for (io.ltr8.tson.schema.meta.TypeRef parent : record.supertypes()) {
-            if (parent.arguments().isEmpty()) {
-                continue;
-            }
-            String owner = byApplication.get(DerivedName.canonicalApplication(parent.name(), parent.arguments()));
-            if (owner == null) {
-                continue;
-            }
-            List<String> reached = new ArrayList<>();
-            reached.add(owner);
-            reached.addAll(Ancestry.closedNames(namespace.get(owner)));
-            for (String name : reached) {
-                if (seen.add(name)) {
-                    chain.add(io.ltr8.tson.schema.meta.TypeRef.of(name));
+        Set<String> chain = new LinkedHashSet<>(chained.supertypes());
+        if (definition instanceof Type type) {
+            for (io.ltr8.tson.schema.meta.TypeRef parent : type.parents()) {
+                if (parent.arguments().isEmpty()) {
+                    continue;
+                }
+                String owner = byApplication.get(DerivedName.canonicalApplication(parent.name(), parent.arguments()));
+                if (owner != null) {
+                    chain.add(owner);
                 }
             }
         }
-        return chain.size() == record.supertypes().size() ? definition
-                : record.withChain(chain, record.subtypes());
+        for (String member : List.copyOf(chain)) {
+            chain.addAll(Ancestry.closedNames(namespace.get(member)));
+        }
+        return chain.size() == chained.supertypes().size() ? definition
+                : Chained.withChain(definition, chained.chain().withSupertypes(List.copyOf(chain)));
     }
 
     /**
@@ -959,8 +966,7 @@ public final class SchemaResolver {
      */
     private static IdentifierPolicy payloadNames(TsonCompiledMetaSchema meta, String constructor,
                                                  IdentifierPolicy names) {
-        Top definition = meta.schema().entries().get(constructor);
-        return definition != null && TypeKind.of(definition) == TypeKind.DATA ? names : IdentifierPolicy.none();
+        return meta.compiledSchema().kindOf(constructor) == TypeKind.DATA ? names : IdentifierPolicy.none();
     }
 
     /**
@@ -977,7 +983,8 @@ public final class SchemaResolver {
      * facts}, so the tag of a constructor's instance another schema declared is found here as a local one's is.
      */
     private Map<String, Top> mergeImports(SchemaDocument document,
-            Map<String, Annotations> importedNameAnnotations, Map<String, TsonSchema.EntryFacts> facts) {
+            Map<String, Annotations> importedNameAnnotations, Map<String, TsonSchema.EntryFacts> facts,
+            Set<String> kernelNames) {
         Map<String, Top> merged = new LinkedHashMap<>();
         Map<String, String> origins = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
@@ -1002,6 +1009,9 @@ public final class SchemaResolver {
                 }
                 merged.put(name, entry.getValue());
                 facts.put(name, imported.schema().factsOf(name));
+                if (imported.isKernel(name)) {
+                    kernelNames.add(name);
+                }
                 // §8.3's walk carries a dropped hop's declaration annotations to the use site, and an alias
                 // is as often imported as local -- so the key annotations travel with the entry rather than
                 // being dropped at the import boundary, where the hop would lose them for a second reason.

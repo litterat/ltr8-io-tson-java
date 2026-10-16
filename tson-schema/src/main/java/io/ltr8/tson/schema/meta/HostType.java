@@ -12,23 +12,22 @@ import java.util.List;
  * {@link String}, as {@link Cidr4Type}'s is.
  */
 @Typename(name = "host_type")
-public record HostType(List<TypeRef> supertypes, List<String> subtypes,
+public record HostType(TypeChain chain,
         String spec) implements Atom {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public HostType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public HostType(String spec) {
-        this(List.of(), List.of(), spec);
+        this(TypeChain.EMPTY, spec);
     }
 
     @Override
-    public HostType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new HostType(supertypes, subtypes, spec);
+    public HostType withChain(TypeChain chain) {
+        return new HostType(chain, spec);
     }
 
     /** {@code host_type.spec}'s pinned value. */

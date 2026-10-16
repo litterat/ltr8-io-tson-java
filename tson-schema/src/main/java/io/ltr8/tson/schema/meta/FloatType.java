@@ -20,7 +20,7 @@ import java.util.Optional;
  * #FLOAT32}/{@link #FLOAT64}.
  */
 @Typename(name = "float_type")
-public record FloatType(List<TypeRef> supertypes, List<String> subtypes,
+public record FloatType(TypeChain chain,
         Format format,
         Optional<BigDecimal> min,
         @Field("exclusive_min") Optional<BigDecimal> exclusiveMin,
@@ -93,8 +93,7 @@ public record FloatType(List<TypeRef> supertypes, List<String> subtypes,
     @Record
 
     public FloatType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
@@ -107,13 +106,13 @@ public record FloatType(List<TypeRef> supertypes, List<String> subtypes,
     public FloatType(Format format, Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
             Optional<BigDecimal> exclusiveMax, boolean allowNan, boolean allowInfinity, boolean allowSubnormal,
             boolean allowNegativeZero) {
-        this(List.of(), List.of(), format, min, exclusiveMin, max, exclusiveMax, allowNan, allowInfinity, allowSubnormal,
+        this(TypeChain.EMPTY, format, min, exclusiveMin, max, exclusiveMax, allowNan, allowInfinity, allowSubnormal,
                 allowNegativeZero);
     }
 
     @Override
-    public FloatType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new FloatType(supertypes, subtypes, format, min, exclusiveMin, max, exclusiveMax, allowNan, allowInfinity,
+    public FloatType withChain(TypeChain chain) {
+        return new FloatType(chain, format, min, exclusiveMin, max, exclusiveMax, allowNan, allowInfinity,
                 allowSubnormal, allowNegativeZero);
     }
 

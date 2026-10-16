@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -69,10 +70,11 @@ class ChoiceSugarResolutionTest {
         TsonSchema schema = resolve("  contact => (text | integer)");
 
         Top contact = schema.entries().get("contact");
-        assertEquals(TypeKind.SUM, TypeKind.of(contact));
+        assertEquals(TypeKind.SUM, TypeKind.of(contact, n -> true));
         assertEquals(List.of("text", "integer"), variantNames(contact));
         assertEquals(java.util.Optional.of("choice"), schema.constructorOf("contact"));
-        assertTrue(Type.supertypesOf(contact).isEmpty(), () -> "expected no supertypes, got " + Type.supertypesOf(contact));
+        assertTrue(Chained.supertypesOf(contact).isEmpty(), () -> "expected no supertypes, got "
+                + Chained.supertypesOf(contact));
     }
 
     /** More than two variants: §5.4 sets a floor of two, not a ceiling, and the array field takes them positionally. */

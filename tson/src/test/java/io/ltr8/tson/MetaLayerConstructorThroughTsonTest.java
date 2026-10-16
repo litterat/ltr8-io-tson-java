@@ -136,7 +136,7 @@ class MetaLayerConstructorThroughTsonTest {
         assertEquals("/search", search.path());
         assertEquals("GET", search.method());
         assertEquals(TypeRef.of("search_request"), search.request());
-        assertEquals(TypeKind.DATA, TypeKind.of(linked.schema().entries().get("search")));
+        assertEquals(TypeKind.DATA, TypeKind.of(linked.schema().entries().get("search"), n -> true));
     }
 
     /**

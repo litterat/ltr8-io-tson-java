@@ -98,9 +98,9 @@ class TinySchemaImportsCoreTn1Test {
         assertEquals(Set.of("my_int", "my_percentage", "my_record"), resolvedTiny.entries().keySet());
 
         Top myInt = resolvedTiny.entries().get("my_int");
-        assertEquals(TypeKind.REFERENCE, TypeKind.of(myInt));
+        assertEquals(TypeKind.REFERENCE, TypeKind.of(myInt, n -> true));
         Top myRecord = resolvedTiny.entries().get("my_record");
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(myRecord));
+        assertEquals(TypeKind.PRODUCT, TypeKind.of(myRecord, n -> true));
 
         // Links (merging core.tn's own entries in, via the shared schemaRegistry this time --
         // TsonSchemaLinker's own import-merge, a separate pass from resolveSchema's own above) and

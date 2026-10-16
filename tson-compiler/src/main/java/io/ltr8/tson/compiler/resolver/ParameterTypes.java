@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -448,12 +449,12 @@ final class ParameterTypes {
             if (definition == null) {
                 return false;
             }
-            if (Type.supertypesOf(definition).contains(b.type().name())) {
+            if (Chained.supertypesOf(definition).contains(b.type().name())) {
                 return true;
             }
             Top other = lookup(b, local, meta);
             return other != null && a.type().name().equals(b.type().name())
-                    && Type.withoutChain(definition).equals(Type.withoutChain(other));
+                    && Chained.withoutChain(definition).equals(Chained.withoutChain(other));
         }
 
         private static Top lookup(Use use, Function<String, Top> local,

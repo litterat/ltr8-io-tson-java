@@ -35,25 +35,24 @@ import java.util.Optional;
  * BytesParser} holds one of these and does the work, reading the alphabet off it.
  */
 @Typename(name = "bytes_type")
-public record BytesType(List<TypeRef> supertypes, List<String> subtypes,
+public record BytesType(TypeChain chain,
         Encoding encoding, Optional<Integer> length,
                          @Field("min_length") Optional<Integer> minLength,
                          @Field("max_length") Optional<Integer> maxLength) implements Atom {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public BytesType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public BytesType(Encoding encoding, Optional<Integer> length, Optional<Integer> minLength, Optional<Integer> maxLength) {
-        this(List.of(), List.of(), encoding, length, minLength, maxLength);
+        this(TypeChain.EMPTY, encoding, length, minLength, maxLength);
     }
 
     @Override
-    public BytesType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new BytesType(supertypes, subtypes, encoding, length, minLength, maxLength);
+    public BytesType withChain(TypeChain chain) {
+        return new BytesType(chain, encoding, length, minLength, maxLength);
     }
 
     /**

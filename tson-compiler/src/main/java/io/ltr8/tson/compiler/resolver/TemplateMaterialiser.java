@@ -12,6 +12,7 @@ import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
@@ -68,9 +69,9 @@ import java.util.function.Supplier;
  * an alias, and an error placeholder alike ({@code WireForm.heldEmptyRecord}). {@code record} closes
  * to the instantiation, {@code reference} to a name, everything else to a synthetic.
  *
- * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application, which its facts
- * record ({@code TsonSchema.EntryFacts#application}), so two {@code box<text>} anywhere in the schema land on one
- * entry. The derived name is
+ * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application, which its chain
+ * records ({@code TypeChain.application}; a hop's facts, its value carrying no chain), so two {@code box<text>}
+ * anywhere in the schema land on one entry. The derived name is
  * built by {@link DerivedName#ofApplication} from the application itself, which is what makes that dedup fall out of
  * naming rather than needing a second table.
  *
@@ -313,7 +314,7 @@ final class TemplateMaterialiser {
                 continue;
             }
             try {
-                entry.setValue(MetaRefs.mapRefsKeepingRecordSupertypes(entry.getValue(), pass::close));
+                entry.setValue(MetaRefs.mapRefsKeepingChain(entry.getValue(), pass::close));
             } catch (SchemaValidationException e) {
                 if (reporter == null) {
                     throw e;
@@ -396,11 +397,10 @@ final class TemplateMaterialiser {
         heads.add(head);
         try {
             Map<String, TypeArgument> bindings = bind(parameters, arguments);
-            note(declaredName, constructor, new TypeRef(head, arguments));
-            if (RECORD.equals(constructor)) {
-                return closeHeldRecord(head, template, open, bindings);
-            }
-            return closeHeld(head, template, open, bindings).body();
+            note(declaredName, constructor);
+            Top closed = RECORD.equals(constructor) ? closeHeldRecord(head, template, open, bindings)
+                    : closeHeld(head, template, open, bindings).body();
+            return instantiation(declaredName, closed, new TypeRef(head, arguments));
         } finally {
             heads.remove(heads.size() - 1);
         }
@@ -538,8 +538,10 @@ final class TemplateMaterialiser {
                 // A record template's closure is the instantiation itself, where every other held form closes
                 // to a synthetic the instantiation then references -- see closeHeldRecord.
                 if (RECORD.equals(constructor)) {
-                    note(name, RECORD, new TypeRef(head, arguments));
-                    Top instantiation = closeHeldRecord(head, template, open, bind(parameters, arguments));
+                    note(name, RECORD);
+                    Top instantiation = instantiation(name,
+                            closeHeldRecord(head, template, open, bind(parameters, arguments)),
+                            new TypeRef(head, arguments));
                     materialised.put(name, instantiation);
                     publish.accept(name, instantiation);
                     return name;
@@ -554,7 +556,8 @@ final class TemplateMaterialiser {
                 // application. The compiler collapses the hop, so it costs nothing at read time; what it buys
                 // is that §8.2's keying of an instantiation on its application holds of this shape too.
                 Top alias = new Reference(TypeRef.of(formName));
-                note(name, REFERENCE, new TypeRef(head, arguments));
+                note(name, REFERENCE);
+                alias = instantiation(name, alias, new TypeRef(head, arguments));
                 materialised.put(name, alias);
                 publish.accept(name, alias);
                 return name;
@@ -626,7 +629,7 @@ final class TemplateMaterialiser {
             return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
         }
         Top definition = closed.body();
-        note(formName, target, null);
+        note(formName, target);
         materialised.put(formName, definition);
         synthetics.add(formName);
         publish.accept(formName, definition);
@@ -684,23 +687,32 @@ final class TemplateMaterialiser {
     private Top closeHeldRecord(String head, Top template, HeldBody open, Map<String, TypeArgument> bindings) {
         Closed closed = closeHeld(head, template, open, bindings);
         Top body = fixRoutedValues(closed.body());
-        // A held body's `supertypes` is the parents as written, so closing it is where the chain is completed
-        // (Ancestry). A parent applied to the template's own parameter stays as written beside its template's
+        // A held body's chain is the parents as written, so closing it is where the chain is completed
+        // (Ancestry). A parent applied to the template's own parameter stays in `parents` beside its template's
         // ancestors, for SchemaResolver's fold to turn into the edge to the entry the closed application
         // denotes -- `ok<text>` IS-A `result<text>` and not `result<int32>`, whatever order the declarations
         // were written in. A declaration carrying a removal wrote no parent, its chain being empty (§5.9).
         return body instanceof RecordBody record
-                ? record.withChain(Ancestry.chainOf(record.supertypes(), namespace), List.of()) : body;
+                ? record.withChain(Ancestry.chainOf(record.parents(), namespace)) : body;
+    }
+
+    /** Records the constructor {@code name}'s value applies -- the tag resolved output writes. */
+    private void note(String name, String constructor) {
+        TsonSchema.EntryFacts known = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
+        facts.put(name, known.withConstructor(Optional.of(constructor)));
     }
 
     /**
-     * Records {@code name}'s facts as this pass learns them: the constructor its value applies and, for an
-     * instantiation, the application it closes ({@code null} for a synthetic, which closes none).
+     * {@code value} as the instantiation of {@code application} (§8.2): stated in its chain, and for a value that
+     * carries none -- the hop to the synthetic a non-record template closes to -- recorded among its facts.
      */
-    private void note(String name, String constructor, TypeRef application) {
+    private Top instantiation(String name, Top value, TypeRef application) {
+        if (value instanceof Chained chained) {
+            return Chained.withChain(value, chained.chain().withApplication(Optional.of(application)));
+        }
         TsonSchema.EntryFacts known = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
-        facts.put(name, known.withConstructor(Optional.of(constructor))
-                .withApplication(application == null ? known.application() : Optional.of(application)));
+        facts.put(name, known.withApplication(Optional.of(application)));
+        return value;
     }
 
     /** A held body substituted, its inner applications closed, and read back through its constructor. */
@@ -726,8 +738,8 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * The held body's applications closed -- <b>except the ones standing in its {@code supertypes}</b>, which
-     * are left exactly as written.
+     * The held body's applications closed -- <b>except the ones standing in its chain's {@code parents}</b>,
+     * which are left exactly as written.
      *
      * <p>A composition operand denotes no entry (§8.2, and {@code
      * DefinitionResolver}'s own supertype branch): composition needs the operand's <em>fields</em>, which
@@ -736,7 +748,7 @@ final class TemplateMaterialiser {
      * {@code box<text>} nothing named, beside the {@code text_box} a declaration may well have named.
      *
      * <p><b>The resolved-form walk exempts this channel too</b> ({@code
-     * MetaRefs.mapRefsKeepingRecordSupertypes}), and the two walks must agree: the operand is kept as written,
+     * MetaRefs.mapRefsKeepingChain}), and the two walks must agree: the operand is kept as written,
      * and resolving it to the entry it denotes belongs to {@code SchemaResolver}'s fold, which runs after every
      * declaration and so cannot make the answer depend on declaration order.
      */
@@ -745,7 +757,7 @@ final class TemplateMaterialiser {
             return closeApplications(value);
         }
         return new RecordValue(record.fields().stream()
-                .map(field -> WireForm.SUPERTYPES.equals(field.name()) ? field
+                .map(field -> WireForm.CHAIN.equals(field.name()) ? field
                         : new RecordValue.Field(field.name(), WireForm.rescope(field.value(),
                                 closeApplications(field.value().value().coreValue()))))
                 .toList());
@@ -774,7 +786,7 @@ final class TemplateMaterialiser {
         if (!(body instanceof RecordBody record)) {
             return body;
         }
-        return new RecordBody(record.supertypes(), record.subtypes(), record.mapFields(
+        return new RecordBody(record.chain(), record.mapFields(
                 field -> field.role() == FieldRole.FREE && field.value().isPresent()
                         ? field.withFacts(field.optional(), false, FieldRole.FIXED)
                         : field), record.groups(), closedExtension(record), java.util.List.of(), record.nameType());
@@ -937,7 +949,7 @@ final class TemplateMaterialiser {
         }
         // By name, so a core type and the kernel original it copies are one bound, as they are at the declaration.
         String boundTerminal = ReferenceChain.terminal(bound, this::lookup);
-        List<String> chain = Type.supertypesOf(target);
+        List<String> chain = Chained.supertypesOf(target);
         boolean admitted = terminal.equals(boundTerminal) || chain.contains(boundTerminal) || chain.contains(bound);
         if (!admitted) {
             throw new SchemaValidationException("'" + head + "<...>' binds '" + parameter.name() + "' to '"

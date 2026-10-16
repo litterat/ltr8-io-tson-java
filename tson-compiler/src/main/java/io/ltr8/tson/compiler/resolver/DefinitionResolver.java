@@ -43,6 +43,7 @@ import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeKind;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -54,6 +55,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Resolves one declaration from a {@link SchemaMap} (the grammar-layer AST) into the value its entry maps to
@@ -192,14 +194,12 @@ final class DefinitionResolver {
      */
     private static final String REFERENCE = "reference";
 
-    /** [TSON-SCHEMA] §4.1's structural root -- the name {@link #requireApplicable} tests IS-A against. */
-    private static final String TOP = "top";
-
     /** The kernel's open-entry body constructor -- resolver vocabulary, see {@link #requireAuthorable}. */
     private static final String TEMPLATE = "template";
 
     /** {@code type}'s two fields, which the resolver computes and no declaration writes (SPEC-FEEDBACK.md #14). */
-    private static final List<String> CHAIN_FIELDS = List.of("supertypes", "subtypes");
+    /** {@code chained}'s one field ([TSON-SCHEMA] §4.1): a type's IS-A chain, which no declaration writes. */
+    private static final String CHAIN = "chain";
 
     /** The {@code _} a bare annotation stands for (§6), read against the annotation's type like a written one. */
     private static final DataValue VOID = new DataValue(List.of(), Optional.empty(), new VoidValue());
@@ -215,6 +215,16 @@ final class DefinitionResolver {
     private final AnnotationValueReader annotationValueReader;
     private final DefinitionGetter metaDefinitions;
     private final DefinitionGetter namespaceDefinitions;
+
+    /**
+     * Whether a name in this namespace denotes the meta-kernel's own entry -- what a kind and a constructor are
+     * judged by ([TSON-SCHEMA] §4.1), so a schema's own {@code data} or {@code top} is an ordinary type whatever
+     * it is spelled.
+     */
+    private final Predicate<String> kernel;
+
+    /** {@link #kernel} for the structure namespace, where every construction head resolves (§3.3.1). */
+    private final Predicate<String> metaKernel;
 
     /**
      * Whether this resolver can bind annotation values at all -- false only for a caller with no compiled
@@ -260,13 +270,16 @@ final class DefinitionResolver {
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, DefinitionGetter metaDefinitions,
                         DefinitionGetter namespaceDefinitions) {
         this(definitionMetaReader, null, metaDefinitions, namespaceDefinitions, null,
-                SchemaPositions.none(), new LinkedHashMap<>());
+                SchemaPositions.none(), new LinkedHashMap<>(), name -> true, name -> true);
     }
 
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
                         DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions,
                         ApplicationCloser applicationCloser, SchemaPositions positions,
-                        Map<String, TsonSchema.EntryFacts> facts) {
+                        Map<String, TsonSchema.EntryFacts> facts, Predicate<String> kernel,
+                        Predicate<String> metaKernel) {
+        this.kernel = Objects.requireNonNull(kernel, "kernel");
+        this.metaKernel = Objects.requireNonNull(metaKernel, "metaKernel");
         this.positions = Objects.requireNonNull(positions, "positions");
         this.facts = Objects.requireNonNull(facts, "facts");
         this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
@@ -402,7 +415,8 @@ final class DefinitionResolver {
                     + " -- this entry's body applies '!" + held.application().typeRef().orElse("?")
                     + "' ([TSON-SCHEMA] §5.2)");
         }
-        return HeldBody.held(open.parameterNames(), WireForm.heldWithExtension(held.application(), extension));
+        return HeldBody.held(open.parameterNames(), WireForm.heldWithExtension(held.application(), extension))
+                .withChain(open.chain());
     }
 
     /**
@@ -558,22 +572,26 @@ final class DefinitionResolver {
      * source (§5.8's supertypes, §5.7's refinement source), and the form to hold is the <em>flattened</em>
      * one: a §5.7 tightening entry states a modifier and no type-ref, which is not a {@code record_field} at
      * all until the inherited field supplies one. So the rewrite has to happen where a namespace is in hand,
-     * which is here -- but the <em>spelling</em> stays {@code SchemaDesugarer}'s, through {@link WireForm#heldRecord}, because two spellings of the held form is the one thing this design cannot
-     * survive.
+     * which is here -- but the <em>spelling</em> stays {@code SchemaDesugarer}'s, through {@link
+     * WireForm#heldRecord}, because two spellings of the held form is the one thing this design cannot survive.
      *
      * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom
-     * body has no parameters to hold open. A template's body carries the parents as written in its {@code
-     * supertypes} slot, never a chain: a template composes {@code top} and is no type, and closing it is where
-     * its instantiations' chains are completed.
+     * body has no parameters to hold open. The held text writes the parents as written, in its chain's {@code
+     * parents}, and closing it is where each instantiation's chain is completed; the template's own chain holds
+     * the same parents and the closed entries they reach, a template being IS-A its parents as a record is.
      */
     private Top holdIfOpen(String name, List<String> parameters, Top resolved) {
         if (parameters.isEmpty() || !(resolved instanceof RecordBody record)) {
             return resolved;
         }
-        if (record.fields().isEmpty() && record.groups().isEmpty() && record.supertypes().isEmpty()) {
-            return HeldBody.held(parameters, WireForm.heldEmptyRecord());
+        // The template is IS-A what its parents reach, as any record is: its chain is the parents as written and
+        // the closed entries they reach, and closing completes each instantiation's from the same parents.
+        TypeChain chain = record.chain().withSubtypes(List.of());
+        if (record.fields().isEmpty() && record.groups().isEmpty() && record.parents().isEmpty()) {
+            return HeldBody.held(parameters, WireForm.heldEmptyRecord()).withChain(chain);
         }
-        return HeldBody.held(parameters, WireForm.heldRecord(record, value -> annotationWireValue(name, value)));
+        return HeldBody.held(parameters, WireForm.heldRecord(record, value -> annotationWireValue(name, value)))
+                .withChain(chain);
     }
 
     /**
@@ -593,8 +611,9 @@ final class DefinitionResolver {
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────
 
     /**
-     * Whether {@code !C { ... }} may apply {@code C} at all: <b>{@code C} IS-A {@code top}</b>
-     * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain.
+     * Whether {@code !C { ... }} may apply {@code C} at all: <b>{@code C} IS-A the kernel's {@code top}</b>
+     * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain ({@link TypeKind#isConstructor}, judged in the
+     * structure namespace every head resolves in, where {@code top} must be the kernel's own).
      *
      * <p><b>A wider and more exact question than whether {@code C} is marked a constructor.</b> §4.1 makes
      * every base kind IS-A {@code top} and every constructor transitively so, while IS-A stops at
@@ -607,8 +626,9 @@ final class DefinitionResolver {
      *   <li>{@code reference}, which describes no value and which the language nonetheless needs
      *   applicable, open and closed alike: {@code <T> !reference { target: T }} and
      *   {@code !reference { target: int32 }} are one construction and get one answer.</li>
-     *   <li>the four base kinds, which cost nothing: each is an abstract union whose own reader refuses a
-     *   direct application by naming the subtypes that would satisfy it.</li>
+     *   <li>{@code top}, {@code type} and the four base kinds, which cost nothing: each is abstract
+     *   (SPEC-FEEDBACK.md #15), so its reader refuses a direct application as any abstract record's does,
+     *   naming the subtypes that would satisfy it.</li>
      * </ul>
      *
      * <p>What it keeps out is the set that matters -- {@code record_field}, {@code type_ref}, {@code
@@ -618,8 +638,9 @@ final class DefinitionResolver {
      * but as a {@code ClassCastException} reported {@code NOT_IMPLEMENTED} -- a non-verdict, for an author
      * error.
      */
-    private static void requireApplicable(String name, String target, Top applied) {
-        if (Type.supertypesOf(applied).contains(TOP)) {
+    private void requireApplicable(String name, String target, Top applied) {
+        String terminal = ReferenceChain.terminal(target, metaDefinitions::definition);
+        if (TypeKind.isConstructor(terminal, applied, metaKernel)) {
             return;
         }
         throw new SchemaValidationException("'" + name + "': '!" + target + "' is not applicable -- it is "
@@ -706,10 +727,10 @@ final class DefinitionResolver {
     }
 
     /**
-     * Refuses a construction that writes {@code type}'s chain: {@code supertypes} and {@code subtypes} are the
-     * resolver's, computed from what composition and refinement say and from the whole schema map, so a value
-     * written for either is a claim no declaration can make -- as {@code choice.disjoint} is derived and never
-     * written (SPEC-FEEDBACK.md #14). Read off the binding record as written, before the constructor's reader
+     * Refuses a construction that writes {@code chained}'s {@code chain}: the IS-A chain is the resolver's,
+     * computed from what composition and refinement say and from the whole schema map, so a value written for it
+     * is a claim no declaration can make -- as {@code choice.disjoint} is derived and never written
+     * (SPEC-FEEDBACK.md #14). Read off the binding record as written, before the constructor's reader
      * binds it, so the refusal names the field rather than a value that bound.
      */
     private static void refuseWrittenChain(String name, String target, DataValue written) {
@@ -717,12 +738,30 @@ final class DefinitionResolver {
             return;
         }
         for (RecordValue.Field field : record.fields()) {
-            if (CHAIN_FIELDS.contains(field.name())) {
-                throw new SchemaValidationException("'" + name + "': '!" + target + "' states '" + field.name()
-                        + "', which a declaration never writes -- a type's supertypes and subtypes are its "
-                        + "IS-A chain, which the resolver computes from composition ('&') and refinement ('^') "
-                        + "and the linker inverts over the schema map (§4.1). Compose instead: '" + name
-                        + " => parent & { ... }'");
+            if (CHAIN.equals(field.name())) {
+                throw new SchemaValidationException("'" + name + "': '!" + target + "' states 'chain', which a "
+                        + "declaration never writes -- a type's chain is its IS-A order, which the resolver "
+                        + "computes from composition ('&') and refinement ('^') and the linker inverts over the "
+                        + "schema map (§4.1). Compose instead: '" + name + " => parent & { ... }'");
+            }
+        }
+    }
+
+    /**
+     * Refuses a constructor declaring a field named {@code chain}: a declaration composing the kernel's {@code
+     * chained} -- every type constructor, through {@code type} -- has that name already, and it is the IS-A chain
+     * the resolver computes (§4.1). Refused where it is declared, since what it collides with is a value no
+     * instance writes, and the collision would otherwise surface only at an instance that used the field.
+     */
+    private void refuseDeclaredChain(String name, List<RecordEntry> entries, List<String> chain) {
+        if (!chain.contains("chained") || !kernel.test("chained")) {
+            return;
+        }
+        for (RecordEntry entry : entries) {
+            if (entry instanceof FieldDef field && CHAIN.equals(field.name())) {
+                throw new SchemaValidationException("'" + name + "' declares a field 'chain', the name the kernel's "
+                        + "'chained' gives a type's IS-A chain (§4.1) -- '" + name + "' composes it, and a "
+                        + "constructor never declares that name. Name the field something else");
             }
         }
     }
@@ -894,10 +933,10 @@ final class DefinitionResolver {
             // than advice that would fail in turn.
             throw new SchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an "
                     + "atom-family instance to narrow (§5.5), and '" + sourceName + "' is "
-                    + (Type.supertypesOf(source).contains(TOP)
+                    + (TypeKind.isConstructor(sourceName, source, kernel)
                             ? "a constraint vocabulary -- '^' narrows one of its instances. Did you mean "
                                     + "constructor application ('!" + sourceName + " { ... }')?"
-                            : "kind=" + TypeKind.of(source) + ", which has no atom constraints to tighten"));
+                            : "kind=" + TypeKind.of(source, kernel) + ", which has no atom constraints to tighten"));
         }
         // The tag the source's value carries, and failing a recorded one the constructor its class is the body
         // of -- every resolved instance records its tag, and a hand-assembled one is the class's own.
@@ -969,7 +1008,7 @@ final class DefinitionResolver {
             for (RecordValue.Field field : sourceRecord.fields()) {
                 // The source's chain is where the source sits, not a facet the refinement inherits: the
                 // refinement's own chain is set once it is bound.
-                if (!CHAIN_FIELDS.contains(field.name())) {
+                if (!CHAIN.equals(field.name())) {
                     merged.put(field.name(), field);
                 }
             }
@@ -1399,6 +1438,7 @@ final class DefinitionResolver {
         }
 
         if (construction.body().isPresent()) {
+            refuseDeclaredChain(name, construction.body().get().entries(), transitiveSupertypes);
             for (RecordEntry entry : construction.body().get().entries()) {
                 resolveEntry(name, entry, fields, groups, seenFieldNames, inheritedFields, parameters);
             }
@@ -1415,18 +1455,15 @@ final class DefinitionResolver {
         // must be readable without scanning the parents' field sets. An author wanting partial IS-A subtracts
         // first and composes second. A subtracted record is a record with an empty chain.
         //
-        // A template's body holds the parents as written, which closing completes (Ancestry); a closed
-        // declaration's is the chain, with each closed application kept as written for SchemaResolver's fold.
-        List<io.ltr8.tson.schema.meta.TypeRef> chain = new ArrayList<>();
+        // A template keeps its parents as written, which closing completes (Ancestry); a closed declaration's
+        // parents hold only its closed applications, for SchemaResolver's fold to turn into edges and drop.
+        TypeChain chain = TypeChain.EMPTY;
         if (construction.removal().isEmpty()) {
-            if (parameters.isEmpty()) {
-                transitiveSupertypes.forEach(ancestor -> chain.add(io.ltr8.tson.schema.meta.TypeRef.of(ancestor)));
-                directSupertypes.stream().filter(parent -> !parent.arguments().isEmpty()).forEach(chain::add);
-            } else {
-                chain.addAll(directSupertypes);
-            }
+            chain = TypeChain.of(transitiveSupertypes).withParents(parameters.isEmpty()
+                    ? directSupertypes.stream().filter(parent -> !parent.arguments().isEmpty()).toList()
+                    : directSupertypes);
         }
-        return new RecordBody(chain, List.of(), fields, groups, RecordExtensionType.OPEN,
+        return new RecordBody(chain, fields, groups, RecordExtensionType.OPEN,
                 construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()),
                 nameType);
     }
@@ -1547,23 +1584,19 @@ final class DefinitionResolver {
     }
 
     /**
-     * §4.1: a type's kind is settled by which of the kernel's four fixed base-kind names --
-     * {@code atom}/{@code product}/{@code sum}/{@code data}, {@code top} never counts -- appear in its
-     * transitive supertype chain. This checks those exact literal names, not each ancestor's own
-     * resolved {@code kind} field: {@code atom} the entry is itself {@code kind: PRODUCT} (its own
-     * chain is just {@code [top]}), so "inherit the nearest ancestor's kind" would give the wrong
-     * answer even for {@code atom}'s own resolution.
+     * §4.1: a type's kind is settled by which of the kernel's four base kinds -- {@code atom}/{@code product}/
+     * {@code sum}/{@code data}, {@code top} never counts -- its transitive supertype chain reaches, each judged by
+     * where it is defined ({@link #kernel}), never by its spelling: a schema's own {@code data} is an ordinary
+     * record. The base kinds themselves and not each ancestor's own kind: the {@code atom} entry is itself a
+     * PRODUCT (its own chain is {@code [chained, top, type]}), so "inherit the nearest ancestor's kind" would
+     * give the wrong answer even for {@code atom}'s own subtypes.
      */
-    static TypeKind determineKind(String name, List<String> transitiveSupertypes) {
+    TypeKind determineKind(String name, List<String> transitiveSupertypes) {
         List<String> baseKindsFound = new ArrayList<>();
         for (String supertype : transitiveSupertypes) {
-            if (supertype.equals("atom") || supertype.equals("product") || supertype.equals("sum")
-                    || supertype.equals("data")) {
+            if (BASE_KINDS.contains(supertype) && kernel.test(supertype)) {
                 baseKindsFound.add(supertype);
             }
-        }
-        if (baseKindsFound.isEmpty()) {
-            return TypeKind.PRODUCT;
         }
         if (baseKindsFound.size() > 1) {
             // §4.1's base kinds are disjoint categories, not facets a type can hold several of, so a chain
@@ -1574,14 +1607,10 @@ final class DefinitionResolver {
                     + "gives a type exactly one, so nothing can be both. Compose or refine from sources that "
                     + "agree on their base kind");
         }
-        return switch (baseKindsFound.get(0)) {
-            case "atom" -> TypeKind.ATOM;
-            case "product" -> TypeKind.PRODUCT;
-            case "sum" -> TypeKind.SUM;
-            case "data" -> TypeKind.DATA;
-            default -> throw new IllegalStateException(baseKindsFound.get(0));
-        };
+        return TypeKind.ofChain(baseKindsFound, kernel);
     }
+
+    private static final Set<String> BASE_KINDS = Set.of("atom", "product", "sum", "data");
 
     // ── Refinement (§5.7): T ^ { ... } ─────────────────────────────────────
 
@@ -1669,6 +1698,7 @@ final class DefinitionResolver {
         SequencedMap<String, RecordField> fields = new LinkedHashMap<>(sourceBody.fields());
         List<FieldGroup> groups = new ArrayList<>(sourceBody.groups());
         Set<String> inheritedFields = Set.copyOf(sourceBody.fields().keySet());
+        refuseDeclaredChain(name, refined.body().entries(), transitiveSupertypes);
 
         for (RecordEntry entry : refined.body().entries()) {
             if (entry instanceof GroupDef groupDef) {
@@ -1691,10 +1721,15 @@ final class DefinitionResolver {
         }
 
         determineKind(name, transitiveSupertypes);
-        List<io.ltr8.tson.schema.meta.TypeRef> chain = parameters.isEmpty()
-                ? transitiveSupertypes.stream().map(io.ltr8.tson.schema.meta.TypeRef::of).toList()
-                : List.of(source);
-        return new RecordBody(chain, List.of(), fields, groups, RecordExtensionType.OPEN,
+        // §5.7's one written parent: a template keeps it in its chain, and a closed refinement records it as a
+        // fact, since its chain cannot tell `^` from a composition adding nothing (TsonSchema.EntryFacts).
+        TypeChain chain = TypeChain.of(transitiveSupertypes);
+        if (parameters.isEmpty()) {
+            facts.put(name, factsOf(name).withRefines(Optional.of(source.name())));
+        } else {
+            chain = chain.withParents(List.of(source));
+        }
+        return new RecordBody(chain, fields, groups, RecordExtensionType.OPEN,
                 markedNames(refined.body().entries()), sourceBody.nameType());
     }
 

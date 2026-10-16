@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -77,8 +78,8 @@ class ConstructorLevelDisciplineTest {
                 """;
         var entries = Tson.standard().resolve(source).schema().entries();
 
-        assertTrue(Type.supertypesOf(entries.get("c")).contains("top"), "the base-kind composition");
-        assertTrue(Type.supertypesOf(entries.get("composed")).contains("top"), "and everything deriving from it");
+        assertTrue(Chained.supertypesOf(entries.get("c")).contains("top"), "the base-kind composition");
+        assertTrue(Chained.supertypesOf(entries.get("composed")).contains("top"), "and everything deriving from it");
     }
 
     /**

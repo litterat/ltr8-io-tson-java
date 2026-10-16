@@ -37,7 +37,7 @@ import java.util.Optional;
  * constructor null-coalesces to {@link List#of()}.
  */
 @Typename(name = "cidr4_type")
-public record Cidr4Type(List<TypeRef> supertypes, List<String> subtypes,
+public record Cidr4Type(TypeChain chain,
         String spec, @Field("min_prefix") Optional<Integer> minPrefix,
                          @Field("max_prefix") Optional<Integer> maxPrefix,
                          List<String> within, List<String> excluding) implements Atom {
@@ -45,8 +45,7 @@ public record Cidr4Type(List<TypeRef> supertypes, List<String> subtypes,
     @Record
 
     public Cidr4Type {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         within = within != null ? List.copyOf(within) : List.of();
         excluding = excluding != null ? List.copyOf(excluding) : List.of();
     }
@@ -54,12 +53,12 @@ public record Cidr4Type(List<TypeRef> supertypes, List<String> subtypes,
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public Cidr4Type(String spec, Optional<Integer> minPrefix, Optional<Integer> maxPrefix, List<String> within,
             List<String> excluding) {
-        this(List.of(), List.of(), spec, minPrefix, maxPrefix, within, excluding);
+        this(TypeChain.EMPTY, spec, minPrefix, maxPrefix, within, excluding);
     }
 
     @Override
-    public Cidr4Type withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new Cidr4Type(supertypes, subtypes, spec, minPrefix, maxPrefix, within, excluding);
+    public Cidr4Type withChain(TypeChain chain) {
+        return new Cidr4Type(chain, spec, minPrefix, maxPrefix, within, excluding);
     }
 
     /** {@code cidr4 => !cidr4_type {}} -- the unconstrained IPv4 network, core.tn's own {@code !cidr4}. */

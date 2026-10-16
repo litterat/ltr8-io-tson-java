@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -143,9 +144,9 @@ class MetaLayerDataConstructorTest {
         Top operation =
                 core(consumerContext()).resolveLinked(META_HTTP).schema().entries().get("operation");
 
-        assertEquals(TypeKind.DATA, TypeKind.of(operation));
-        assertTrue(Type.supertypesOf(operation).contains("top"), "a constructor: IS-A top, via the base kind");
-        assertEquals(List.of("data", "top"), Type.supertypesOf(operation),
+        assertEquals(TypeKind.DATA, TypeKind.of(operation, n -> true));
+        assertTrue(Chained.supertypesOf(operation).contains("top"), "a constructor: IS-A top, via the base kind");
+        assertEquals(List.of("data", "top"), Chained.supertypesOf(operation),
                 "the transitive chain -- `data` is itself `top & {}` -- and IS-A `top` is what makes"
                         + " `!operation { ... }` applicable");
     }
@@ -200,7 +201,7 @@ class MetaLayerDataConstructorTest {
         TsonLinkedSchema schema = linked("retrieve", SEARCH);
 
         Top entry = schema.schema().entries().get("search");
-        assertEquals(TypeKind.DATA, TypeKind.of(entry));
+        assertEquals(TypeKind.DATA, TypeKind.of(entry, n -> true));
         assertEquals(Optional.of("operation"), schema.schema().constructorOf("search"),
                 "§8.2 records what built it");
 
@@ -323,8 +324,8 @@ class MetaLayerDataConstructorTest {
                     () -> "a declared application mints nothing, so no name of its own can be refused");
 
             Top order = resolved.schema().entries().get("getOrder");
-            assertEquals(TypeKind.DATA, TypeKind.of(order), "the declaration is the operation it denotes");
-            assertEquals("fetch", resolved.schema().factsOf("getOrder").application().orElseThrow().name(),
+            assertEquals(TypeKind.DATA, TypeKind.of(order, n -> true), "the declaration is the operation it denotes");
+            assertEquals("fetch", resolved.schema().applicationOf("getOrder").orElseThrow().name(),
                     "and records the application, which is what §8.2 keys its identity on");
 
             String own = CanonicalIdentity.canonicalize("https://example.test/api-" + label + ".tn");
@@ -443,7 +444,7 @@ class MetaLayerDataConstructorTest {
         // `kind` is not written: it is derived at resolution and §8's output has no field for it. What
         // identifies a DATA entry in output is its value -- the constructor's instance the entry is.
         assertFalse(written.contains("kind:"), written);
-        assertEquals(TypeKind.DATA, TypeKind.of(entry), "still derived, and still the resolver's own");
+        assertEquals(TypeKind.DATA, TypeKind.of(entry, n -> true), "still derived, and still the resolver's own");
         assertTrue(written.startsWith("{ path: \"/search\" method: \"GET\""), written);
         assertTrue(written.contains("request: search_request response: search_response"), written);
     }

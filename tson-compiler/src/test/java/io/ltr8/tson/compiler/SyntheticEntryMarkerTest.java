@@ -162,7 +162,8 @@ class SyntheticEntryMarkerTest {
 
         Set<String> instantiations = new TreeSet<>();
         localEntries().forEach((name, definition) -> {
-            boolean application = factsOf(ID, name).application()
+            boolean application = io.ltr8.tson.schema.meta.Chained.applicationOf(definition)
+                    .or(() -> factsOf(ID, name).application())
                     .map(source -> !source.arguments().isEmpty()).orElse(false);
             if (application) {
                 instantiations.add(name);

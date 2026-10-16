@@ -33,7 +33,7 @@ import java.util.Optional;
  * {@code IdentifierGrammar} builds the series' name grammar from it.
  */
 @Typename(name = "identifier_type")
-public record IdentifierType(List<TypeRef> supertypes, List<String> subtypes,
+public record IdentifierType(TypeChain chain,
         String spec,
         @Field("min_length") Optional<Integer> minLength,
         @Field("max_length") Optional<Integer> maxLength,
@@ -50,8 +50,7 @@ public record IdentifierType(List<TypeRef> supertypes, List<String> subtypes,
 
     @Record
     public IdentifierType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         members = members.map(List::copyOf);
     }
 
@@ -60,13 +59,13 @@ public record IdentifierType(List<TypeRef> supertypes, List<String> subtypes,
             Optional<String> pattern, Optional<List<String>> members, Base start, Base continueBase,
             Optional<String> startAdd, Optional<String> continueAdd, Optional<String> medial, Optional<String> exclude,
             Normalization normalization) {
-        this(List.of(), List.of(), spec, minLength, maxLength, length, pattern, members, start, continueBase, startAdd,
+        this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, start, continueBase, startAdd,
                 continueAdd, medial, exclude, normalization);
     }
 
     @Override
-    public IdentifierType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new IdentifierType(supertypes, subtypes, spec, minLength, maxLength, length, pattern, members, start,
+    public IdentifierType withChain(TypeChain chain) {
+        return new IdentifierType(chain, spec, minLength, maxLength, length, pattern, members, start,
                 continueBase, startAdd, continueAdd, medial, exclude, normalization);
     }
 

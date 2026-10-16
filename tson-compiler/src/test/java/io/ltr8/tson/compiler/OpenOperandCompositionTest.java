@@ -1,11 +1,13 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Type;
 
 import java.util.List;
@@ -77,13 +79,13 @@ class OpenOperandCompositionTest {
                         + compiled.schema().entries().keySet());
 
         Top c = compiled.schema().entries().get("c");
-        assertEquals(List.of("base", "box"), Type.supertypesOf(c),
+        assertEquals(List.of("base", "box"), Chained.supertypesOf(c),
                 "the ancestors arrive by value, and the edge runs to the family base the operand applies");
         assertEquals(List.of("tag", "item", "extra"),
                 ((RecordBody) c).fields().keySet().stream().toList(),
                 "the operand's fields flatten in, left to right, with the body's own appended");
-        assertTrue(((RecordBody) c).supertypes().stream().allMatch(parent -> parent.arguments().isEmpty()),
-                "a closed chain holds bare names: the application, which nothing names, reaches no edge");
+        assertEquals(List.of(), ((RecordBody) c).parents(),
+                "a closed type keeps no parents: the application, which nothing names, reaches no edge");
     }
 
     private static TsonCompiledSchema compile(String declarations) {
@@ -146,20 +148,20 @@ class OpenOperandCompositionTest {
     /**
      * The open operand contributes its ancestors and not itself. {@code base} is a type and its fields
      * arrived, so the IS-A edge is real; {@code box} is a template, and §5.10 makes a template no type. The
-     * template carries no chain of its own (SPEC-FEEDBACK.md #14) -- its held body writes the parents as
-     * written -- so the chain is read where it is completed, on the application that closes it.
+     * template's chain says so: its parents as written, and the closed entries they reach.
      */
     @Test
     void anOpenOperandContributesItsOwnSupertypesButNotItsOwnName() {
         TsonCompiledSchema compiled = compile(LATTICE);
 
-        List<String> chain = Type.supertypesOf(compiled.schema().entries().get(aliasTarget(compiled, "vip_text")));
+        Top vip = compiled.schema().entries().get("vip");
 
-        assertEquals(List.of("customer", "base"), chain.subList(0, 2),
-                () -> "customer directly, base through the open operand: " + chain);
-        assertFalse(chain.contains("box"), () -> "a template is not a type, so nothing is IS-A one: " + chain);
-        assertEquals(List.of(), Type.supertypesOf(compiled.schema().entries().get("vip")),
-                "the template itself carries no chain");
+        assertEquals(List.of("base", "customer"), Chained.supertypesOf(vip),
+                () -> "customer directly, base through the open operand: " + Chained.supertypesOf(vip));
+        assertFalse(Chained.supertypesOf(vip).contains("box"),
+                () -> "a template is not a type, so nothing is IS-A one: " + Chained.supertypesOf(vip));
+        assertEquals(List.of("customer", "box"), Chained.parentsOf(vip).stream().map(TypeRef::name).toList(),
+                "and it keeps its parents as written");
     }
 
     /** Rows one and two of the membership table, read off the index a schema-driven read actually consults. */
@@ -168,10 +170,10 @@ class OpenOperandCompositionTest {
         TsonCompiledSchema compiled = compile(LATTICE);
         String vipText = aliasTarget(compiled, "vip_text");
 
-        assertTrue(Type.subtypesOf(compiled.schema().entries().get("customer")).contains(vipText),
-                () -> "customer: " + Type.subtypesOf(compiled.schema().entries().get("customer")));
-        assertTrue(Type.subtypesOf(compiled.schema().entries().get("base")).contains(vipText),
-                () -> "base: " + Type.subtypesOf(compiled.schema().entries().get("base")));
+        assertTrue(Chained.subtypesOf(compiled.schema().entries().get("customer")).contains(vipText),
+                () -> "customer: " + Chained.subtypesOf(compiled.schema().entries().get("customer")));
+        assertTrue(Chained.subtypesOf(compiled.schema().entries().get("base")).contains(vipText),
+                () -> "base: " + Chained.subtypesOf(compiled.schema().entries().get("base")));
     }
 
     /**
@@ -186,10 +188,10 @@ class OpenOperandCompositionTest {
         String vipText = aliasTarget(compiled, "vip_text");
         String boxText = aliasTarget(compiled, "text_box");
 
-        assertTrue(Type.subtypesOf(compiled.schema().entries().get(boxText)).contains(vipText),
-                () -> boxText + ": " + Type.subtypesOf(compiled.schema().entries().get(boxText)));
-        assertTrue(Type.supertypesOf(compiled.schema().entries().get(vipText)).contains(boxText),
-                () -> vipText + ": " + Type.supertypesOf(compiled.schema().entries().get(vipText)));
+        assertTrue(Chained.subtypesOf(compiled.schema().entries().get(boxText)).contains(vipText),
+                () -> boxText + ": " + Chained.subtypesOf(compiled.schema().entries().get(boxText)));
+        assertTrue(Chained.supertypesOf(compiled.schema().entries().get(vipText)).contains(boxText),
+                () -> vipText + ": " + Chained.supertypesOf(compiled.schema().entries().get(vipText)));
     }
 
     /**
@@ -203,8 +205,8 @@ class OpenOperandCompositionTest {
         String vipText = aliasTarget(compiled, "vip_text");
         String intBox = aliasTarget(compiled, "int_box");
 
-        assertFalse(Type.subtypesOf(compiled.schema().entries().get(intBox)).contains(vipText),
-                () -> intBox + ": " + Type.subtypesOf(compiled.schema().entries().get(intBox)));
+        assertFalse(Chained.subtypesOf(compiled.schema().entries().get(intBox)).contains(vipText),
+                () -> intBox + ": " + Chained.subtypesOf(compiled.schema().entries().get(intBox)));
     }
 
     /** §5.7 against an open source: the same absorption, and the same two omissions. */
@@ -217,10 +219,10 @@ class OpenOperandCompositionTest {
                   use  => vip<text>
                 """);
 
-        List<String> chain = Type.supertypesOf(compiled.schema().entries().get(aliasTarget(compiled, "use")));
+        List<String> chain = Chained.supertypesOf(compiled.schema().entries().get(aliasTarget(compiled, "use")));
         assertTrue(chain.contains("base") && !chain.contains("box"),
                 () -> "box is not a type and contributes no name to the chain; its own base does: " + chain);
-        assertTrue(compiled.schema().factsOf("vip").application().isEmpty(),
+        assertTrue(compiled.schema().applicationOf("vip").isEmpty(),
                 () -> "an open source names no entry, so there is none to record: "
                         + compiled.schema().factsOf("vip"));
 

@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
@@ -16,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * The real proof this whole sketch works, not against small hand-built fragments: compiles the
@@ -65,32 +68,26 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(67, registered.entries().size());
+        assertEquals(69, registered.entries().size());
     }
 
+    /**
+     * {@code top => abstract {}} (SPEC-FEEDBACK.md #15): the root has no instances of its own, so a value at a
+     * {@code top}-typed position names the subtype it is -- an untagged one is refused, and so is a tag naming
+     * {@code top} itself, each naming the subtypes that would satisfy the position.
+     */
     @Test
-    void bareTopWithNoTypeRefReadsAgainstItsOwnEmptyBody() {
-        // top => top & {} -- an empty body, but also the (transitive) supertype of everything else
-        // in the schema. A value with no type annotation at a top-typed position is a real, valid
-        // "just a top" reading, not an error demanding one of its many subtypes be named.
+    void topIsAbstractSoAValueThereNamesItsSubtype() {
         TsonCompiledSchema compiled = compiled();
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("top")
-                .read(TestDocuments.document("{}")));
+        ReadException untagged = assertThrows(ReadException.class,
+                () -> compiled.get("top").read(TestDocuments.document("{}")));
+        ReadException self = assertThrows(ReadException.class,
+                () -> compiled.get("top").read(TestDocuments.document("!top {}")));
 
-        assertEquals(Map.of(), result);
-    }
-
-    @Test
-    void explicitTypeRefNamingTheDeclarationItselfAlsoUsesItsOwnBody() {
-        TsonCompiledSchema compiled = compiled();
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("top")
-                .read(TestDocuments.document("!top {}")));
-
-        assertEquals(Map.of(), result);
+        assertTrue(untagged.getMessage().contains("'top' is abstract"), untagged.getMessage());
+        assertTrue(self.getMessage().contains("a tag naming 'top' selects nothing"), self.getMessage());
+        assertTrue(self.getMessage().contains("record"), "the subtypes that would satisfy it: " + self.getMessage());
     }
 
     @Test

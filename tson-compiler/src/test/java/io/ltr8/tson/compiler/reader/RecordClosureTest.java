@@ -149,8 +149,7 @@ class RecordClosureTest {
         entries.put("normalization", new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
         entries.put("text_type", RecordBody.of(RecordBody.fieldMap(
-                KernelChainFields.chainField(entries, "supertypes"),
-                KernelChainFields.chainField(entries, "subtypes"),
+                KernelChainFields.chainField(entries),
                 Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
@@ -171,7 +170,7 @@ class RecordClosureTest {
         Diagnostic diagnostic = problems.diagnostics().getFirst();
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, diagnostic.code());
         assertEquals(Optional.of("/minLength"), diagnostic.path());
-        assertEquals("supertypes | subtypes | min_length | max_length | length | pattern | members | normalization",
+        assertEquals("chain | min_length | max_length | length | pattern | members | normalization",
                 diagnostic.expected());
         assertNull(bound);
 

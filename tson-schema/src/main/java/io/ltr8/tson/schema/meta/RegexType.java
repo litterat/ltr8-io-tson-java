@@ -37,7 +37,7 @@ import java.util.Optional;
  * is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "regex_type")
-public record RegexType(List<TypeRef> supertypes, List<String> subtypes,
+public record RegexType(TypeChain chain,
         String spec, @Field("min_length") Optional<Integer> minLength,
                         @Field("max_length") Optional<Integer> maxLength,
                         Optional<Integer> length, Optional<String> pattern,
@@ -45,19 +45,18 @@ public record RegexType(List<TypeRef> supertypes, List<String> subtypes,
     /** The chain normalised: absent and empty are one list. */
     @Record
     public RegexType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public RegexType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
             Optional<String> pattern, Optional<List<String>> members, Normalization normalization) {
-        this(List.of(), List.of(), spec, minLength, maxLength, length, pattern, members, normalization);
+        this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, normalization);
     }
 
     @Override
-    public RegexType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new RegexType(supertypes, subtypes, spec, minLength, maxLength, length, pattern, members, normalization);
+    public RegexType withChain(TypeChain chain) {
+        return new RegexType(chain, spec, minLength, maxLength, length, pattern, members, normalization);
     }
 
     /** {@code regex => !regex_type {}} -- the unconstrained regex type. */

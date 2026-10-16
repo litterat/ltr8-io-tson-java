@@ -12,22 +12,21 @@ import java.util.List;
  * body rather than by either name.
  */
 @Typename(name = "void_type")
-public record VoidType(List<TypeRef> supertypes, List<String> subtypes) implements Atom {
+public record VoidType(TypeChain chain) implements Atom {
 
     /** The chain normalised: absent and empty are one list. */
     @Record
     public VoidType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public VoidType() {
-        this(List.of(), List.of());
+        this(TypeChain.EMPTY);
     }
 
     @Override
-    public VoidType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new VoidType(supertypes, subtypes);
+    public VoidType withChain(TypeChain chain) {
+        return new VoidType(chain);
     }
 }

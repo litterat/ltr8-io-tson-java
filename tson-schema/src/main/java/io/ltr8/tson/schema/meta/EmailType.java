@@ -20,7 +20,7 @@ import java.util.Optional;
  * spec} is fixed to.
  */
 @Typename(name = "email_type")
-public record EmailType(List<TypeRef> supertypes, List<String> subtypes,
+public record EmailType(TypeChain chain,
         String spec, @Field("min_length") Optional<Integer> minLength,
                          @Field("max_length") Optional<Integer> maxLength,
                          Optional<Integer> length, Optional<String> pattern,
@@ -28,19 +28,18 @@ public record EmailType(List<TypeRef> supertypes, List<String> subtypes,
     /** The chain normalised: absent and empty are one list. */
     @Record
     public EmailType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public EmailType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
             Optional<String> pattern, Optional<List<String>> members, Normalization normalization) {
-        this(List.of(), List.of(), spec, minLength, maxLength, length, pattern, members, normalization);
+        this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, normalization);
     }
 
     @Override
-    public EmailType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new EmailType(supertypes, subtypes, spec, minLength, maxLength, length, pattern, members, normalization);
+    public EmailType withChain(TypeChain chain) {
+        return new EmailType(chain, spec, minLength, maxLength, length, pattern, members, normalization);
     }
 
     /** {@code email => !email_type {}} -- the unconstrained email address, core.tn's own {@code !email}. */

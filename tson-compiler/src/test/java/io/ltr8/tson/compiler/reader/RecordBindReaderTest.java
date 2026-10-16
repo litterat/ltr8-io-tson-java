@@ -108,8 +108,7 @@ class RecordBindReaderTest {
         entries.put("normalization", new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
         entries.put("text_type", RecordBody.of(RecordBody.fieldMap(
-                KernelChainFields.chainField(entries, "supertypes"),
-                KernelChainFields.chainField(entries, "subtypes"),
+                KernelChainFields.chainField(entries),
                 Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
@@ -144,8 +143,7 @@ class RecordBindReaderTest {
         entries.put("normalization", new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
         entries.put("text_type", RecordBody.of(RecordBody.fieldMap(
-                KernelChainFields.chainField(entries, "supertypes"),
-                KernelChainFields.chainField(entries, "subtypes"),
+                KernelChainFields.chainField(entries),
                 Map.entry("min_length", RecordField.fixed(TypeRef.of("integer"), new io.ltr8.tson.schema.meta.Token("3",
                         io.ltr8.tson.schema.meta.Token.Form.UNQUOTED))),
                 Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
@@ -206,7 +204,7 @@ class RecordBindReaderTest {
         for (String name : linked.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(67, linked.schema().entries().size());
+        assertEquals(69, linked.schema().entries().size());
     }
 
     @Test
@@ -224,8 +222,7 @@ class RecordBindReaderTest {
         entries.put("normalization", new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
         entries.put("text_type", ((Type) (RecordBody.of(RecordBody.fieldMap(
-                        KernelChainFields.chainField(entries, "supertypes"),
-                        KernelChainFields.chainField(entries, "subtypes"),
+                        KernelChainFields.chainField(entries),
                         Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                         Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                         Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
@@ -238,8 +235,7 @@ class RecordBindReaderTest {
         // compile and silently bind null into the components it left out; the binding check refuses it now,
         // which is the same trap CLAUDE.md records against UriType/RegexType, caught at the fixture instead.
         entries.put("email_type", ((Type) (RecordBody.of(RecordBody.fieldMap(
-                        KernelChainFields.chainField(entries, "supertypes"),
-                        KernelChainFields.chainField(entries, "subtypes"),
+                        KernelChainFields.chainField(entries),
                         Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                         Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                         Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),

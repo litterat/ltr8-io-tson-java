@@ -4,6 +4,7 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.reader.ErrorReader;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
@@ -120,7 +121,7 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
             // reaches this table. Wider than `constructor`, by the base kinds and `reference`; narrower
             // than the whole namespace, by every component record (`record_field`, `type_ref`, …), which
             // is a part of a type and not one.
-            if (!Type.supertypesOf(entry.getValue()).contains("top")) {
+            if (!compiledSchema.linkedSchema().isConstructor(entry.getKey(), entry.getValue())) {
                 continue;
             }
             String name = entry.getKey();

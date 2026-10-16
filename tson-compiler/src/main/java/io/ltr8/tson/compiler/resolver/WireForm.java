@@ -86,7 +86,8 @@ final class WireForm {
     static final String OPTIONAL_MEMBERS = "optional_members";
     static final String VOIDABLE = "voidable";
     static final String ROLE = "role";
-    static final String SUPERTYPES = "supertypes";
+    static final String CHAIN = "chain";
+    static final String PARENTS = "parents";
 
     /**
      * {@code record.discriminators} -- the fields a sealed family dispatches on (§5.2), in the order their
@@ -274,11 +275,13 @@ final class WireForm {
             groups.add(group(group, List.of()));
         }
         List<RecordValue.Field> binding = new ArrayList<>();
-        if (!body.supertypes().isEmpty()) {
-            // Through refValue like every other reference: a closed parent is a bare token and only a parent
-            // still applied to a parameter carries `arguments`, which is what lets substitution close it.
-            binding.add(new RecordValue.Field(SUPERTYPES, scoped(new ArrayValue(body.supertypes().stream()
-                    .map(supertype -> scoped(refValue(supertype))).toList()))));
+        if (!body.parents().isEmpty()) {
+            // Held text's one chain slot, the parents as written (TypeChain.parents). Through refValue like every
+            // other reference: a closed parent is a bare token and only a parent still applied to a parameter
+            // carries `arguments`, which is what lets substitution close it.
+            binding.add(new RecordValue.Field(CHAIN, scoped(new RecordValue(List.of(new RecordValue.Field(PARENTS,
+                    scoped(new ArrayValue(body.parents().stream().map(parent -> scoped(refValue(parent)))
+                            .toList()))))))));
         }
         body.nameType().ifPresent(stated -> binding.add(nameField(NAME_TYPE, stated)));
         binding.add(new RecordValue.Field(FIELDS, scoped(fieldMap(fields))));
@@ -525,13 +528,14 @@ final class WireForm {
     }
 
     /**
-     * The parents a held {@code !record { supertypes: [...] ... }} writes, as references -- empty for a held body
-     * that is no record or writes none. Inside held text the slot is the parents as written ([TSON-SCHEMA]
+     * The parents a held {@code !record { chain: { parents: [...] } ... }} writes, as references -- empty for a
+     * held body that is no record or writes none. Inside held text they are the parents as written ([TSON-SCHEMA]
      * §5.10), a bare name or an application, which is what closing a held record completes into a chain.
      */
     static List<TypeRef> writtenParents(DataValue held) {
         if (!(held.coreValue() instanceof RecordValue record)
-                || !(field(record, SUPERTYPES).orElse(null) instanceof ArrayValue parents)) {
+                || !(field(record, CHAIN).orElse(null) instanceof RecordValue chain)
+                || !(field(chain, PARENTS).orElse(null) instanceof ArrayValue parents)) {
             return List.of();
         }
         List<TypeRef> written = new ArrayList<>();

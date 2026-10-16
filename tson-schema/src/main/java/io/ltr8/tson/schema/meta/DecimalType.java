@@ -21,7 +21,7 @@ import java.util.Optional;
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "decimal_type")
-public record DecimalType(List<TypeRef> supertypes, List<String> subtypes,
+public record DecimalType(TypeChain chain,
         Optional<BigDecimal> min,
         @Field("exclusive_min") Optional<BigDecimal> exclusiveMin,
         Optional<BigDecimal> max,
@@ -48,8 +48,7 @@ public record DecimalType(List<TypeRef> supertypes, List<String> subtypes,
 
     @Record
     public DecimalType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         members = members.map(DecimalType::readMembers);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
@@ -63,12 +62,12 @@ public record DecimalType(List<TypeRef> supertypes, List<String> subtypes,
     public DecimalType(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
             Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf, Optional<Integer> totalDigits,
             Optional<Integer> fractionDigits, Optional<List<BigDecimal>> members) {
-        this(List.of(), List.of(), min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits, members);
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits, members);
     }
 
     @Override
-    public DecimalType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new DecimalType(supertypes, subtypes, min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits,
+    public DecimalType withChain(TypeChain chain) {
+        return new DecimalType(chain, min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits,
                 fractionDigits, members);
     }
 

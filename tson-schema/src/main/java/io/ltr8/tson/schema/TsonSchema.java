@@ -4,6 +4,7 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -23,12 +24,13 @@ import java.util.Optional;
  *
  * <p><b>An entry is its value</b> (SPEC-FEEDBACK.md #14): a name maps to the body it resolves to -- a {@code
  * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@code Data} -- and a
- * type body carries its own IS-A chain ({@code Type}). The entry's kind is its value's ({@code TypeKind.of}).
+ * type body or a template carries its own IS-A chain ({@code Chained}). The entry's kind is its value's ({@code
+ * TypeKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
  *
  * <p><b>{@link #facts} holds what a value's Java shape cannot</b>, per entry ({@link EntryFacts}): where it was
- * declared, the annotations written on its value, the constructor its value applies, and the application an
- * instantiation closes. None of it is a field of any constructor, so binding a value never fills it; an entry with
- * no facts has none of the four.
+ * declared, the annotations written on its value, the constructor its value applies, the entry a refinement
+ * names, and the application an instantiation whose value carries no chain closes. None of it is a field of any
+ * constructor, so binding a value never fills it, and none of it is written.
  *
  * <p><b>{@code id} is required, not {@code Optional}</b> -- the grammar itself marks {@code !!id} optional (a raw
  * parsed {@code SchemaDocument} can genuinely lack one), but a {@code TsonSchema} value -- the *resolved*,
@@ -84,44 +86,54 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
      * {@code =>}, on the value (§6): the value's own Java shape has no slot for them, and the ones written before
      * the name are the key's ({@link #entries}' {@link AnnotatedMap}). {@code constructor} is the constructor
      * the value applies -- the tag resolved output writes, {@code !integer_type}, {@code !enum}, {@code
-     * !set_type} -- which binding erases into a class that several constructors share. {@code application} is
-     * the template application an instantiation entry closes, kept for the two readers of it: a diagnostic, which
-     * shows {@code box<text>} rather than a name nobody wrote, and §5.8's applied-parent edge, keyed on it. It
-     * is provenance and never written ([TSON-SCHEMA] §8.1).
+     * !set_type} -- which binding erases into a class that several constructors share. {@code refines} is the
+     * entry a {@code ^} declaration's head names, as written: §5.7's refinement restates fields and adds none,
+     * which is what lets a tightened constructor bind as the one it tightens, and the chain cannot tell it from a
+     * composition adding nothing. {@code application} is the template application an instantiation closes where
+     * its value carries no chain to state it in ({@code TypeChain.application}) -- a {@code Reference} to the
+     * synthetic a non-record template closes to -- kept for a diagnostic, which shows {@code b<10>} rather than a
+     * name nobody wrote. All of it is provenance, and none of it is written ([TSON-SCHEMA] §8.1).
      */
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
-                             Optional<String> constructor, Optional<TypeRef> application) {
+                             Optional<String> constructor, Optional<String> refines,
+                             Optional<TypeRef> application) {
 
-        /** An entry with none of the four. */
-        public static final EntryFacts NONE =
-                new EntryFacts(Optional.empty(), Annotations.empty(), Optional.empty(), Optional.empty());
+        /** An entry with none of the five. */
+        public static final EntryFacts NONE = new EntryFacts(Optional.empty(), Annotations.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty());
 
         public EntryFacts {
             position = position == null ? Optional.empty() : position;
             annotations = annotations == null ? Annotations.empty() : annotations;
             constructor = constructor == null ? Optional.empty() : constructor;
+            refines = refines == null ? Optional.empty() : refines;
             application = application == null ? Optional.empty() : application;
         }
 
         /** Whether this holds nothing at all -- the facts a schema need not record. */
         public boolean isEmpty() {
-            return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty() && application.isEmpty();
+            return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty() && refines.isEmpty()
+                    && application.isEmpty();
         }
 
         public EntryFacts withPosition(Optional<SourcePosition> position) {
-            return new EntryFacts(position, annotations, constructor, application);
+            return new EntryFacts(position, annotations, constructor, refines, application);
         }
 
         public EntryFacts withAnnotations(Annotations annotations) {
-            return new EntryFacts(position, annotations, constructor, application);
+            return new EntryFacts(position, annotations, constructor, refines, application);
         }
 
         public EntryFacts withConstructor(Optional<String> constructor) {
-            return new EntryFacts(position, annotations, constructor, application);
+            return new EntryFacts(position, annotations, constructor, refines, application);
+        }
+
+        public EntryFacts withRefines(Optional<String> refines) {
+            return new EntryFacts(position, annotations, constructor, refines, application);
         }
 
         public EntryFacts withApplication(Optional<TypeRef> application) {
-            return new EntryFacts(position, annotations, constructor, application);
+            return new EntryFacts(position, annotations, constructor, refines, application);
         }
 
         /** An entry declared at {@code position}. */
@@ -205,6 +217,16 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
     /** Where {@code name} was declared -- absent for an entry the resolver minted. */
     public Optional<SourcePosition> positionOf(String name) {
         return factsOf(name).position();
+    }
+
+    /**
+     * The application {@code name} is the instantiation of ([TSON-SCHEMA] §8.2): its chain's, or for a value that
+     * carries no chain the one its facts record. Empty for an entry that closes none.
+     */
+    public Optional<TypeRef> applicationOf(String name) {
+        Top value = entries.get(name);
+        Optional<TypeRef> chained = value == null ? Optional.empty() : Chained.applicationOf(value);
+        return chained.isPresent() ? chained : factsOf(name).application();
     }
 
     /**

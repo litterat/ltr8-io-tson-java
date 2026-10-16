@@ -61,7 +61,7 @@ public final class EntryDisplayName {
         if (facts.position().isPresent()) {
             return name;
         }
-        return application(facts).orElseGet(() -> switch (value) {
+        return application(value, facts).orElseGet(() -> switch (value) {
             case ArrayBody array -> "[" + shown(array.elementType(), namespace, factsOf)
                     + size(array.minItems(), array.maxItems()) + "]";
             case MapBody map -> "{" + shown(map.keyType(), namespace, factsOf) + " => "
@@ -84,11 +84,11 @@ public final class EntryDisplayName {
 
     /**
      * {@code head<arg, arg>} for an entry a template application materialised: an instantiation entry keys its
-     * identity on the application it closes (§8.2), and its facts keep that application as the author wrote it
-     * at the site.
+     * identity on the application it closes (§8.2) -- its chain's, or for a value carrying no chain its facts'.
      */
-    private static Optional<String> application(TsonSchema.EntryFacts facts) {
-        return facts.application()
+    private static Optional<String> application(Top value, TsonSchema.EntryFacts facts) {
+        Optional<TypeRef> chained = Chained.applicationOf(value);
+        return (chained.isPresent() ? chained : facts.application())
                 .filter(application -> !application.arguments().isEmpty())
                 .map(application -> application.name() + application.arguments().stream()
                         .map(EntryDisplayName::argument).collect(Collectors.joining(", ", "<", ">")));

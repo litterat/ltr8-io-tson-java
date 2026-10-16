@@ -18,12 +18,12 @@ import java.util.function.UnaryOperator;
  * access_pattern}/{@code size_type} are fixed by the constructor itself ({@code NAMED}/{@code FIXED}) and
  * never appear in output; {@code groups} and {@code discriminators} are empty for a record with none.
  *
- * <p><b>{@code supertypes} and {@code subtypes} are {@code type}'s</b> (see {@link Type}): the complete IS-A chain
- * and its inverse, computed by the resolver and the linker. A fresh record and a subtracted one ([TSON-SCHEMA]
- * §5.9) have an empty chain, and a composition's chain names every operand and each operand's own chain. Inside
- * held template text the slot holds the parents as written, one of which may be an application ({@code <T>
- * result<T> & { ... }}); substitution reaches it with every other reference the body holds, so {@code ok<text>}
- * reaches an edge to {@code result<text>} and not to {@code result<int32>}.
+ * <p><b>{@code chain} is {@code chained}'s</b> (see {@link TypeChain}): the complete IS-A chain and its inverse,
+ * computed by the resolver and the linker. A fresh record and a subtracted one ([TSON-SCHEMA] §5.9) have an empty
+ * chain, and a composition's chain names every operand and each operand's own chain. Inside held template text
+ * the parents are written, one of which may be an application ({@code <T> result<T> & { ... }}); substitution
+ * reaches it with every other reference the body holds, so {@code ok<text>} reaches an edge to {@code
+ * result<text>} and not to {@code result<int32>}.
  *
  * <p><b>{@code fields} is an ordered map from a field's name to its facts</b> ({@code field_map}, the kernel's
  * {@code !map { key_type: text  value_type: record_field  ordered: true }}), flattened: a composition's fields
@@ -45,7 +45,7 @@ import java.util.function.UnaryOperator;
  * {@code java.lang.Record} (the very language feature every type in this model is built from).
  */
 @Typename(name = "record")
-public record RecordBody(List<TypeRef> supertypes, List<String> subtypes, SequencedMap<String, RecordField> fields,
+public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fields,
                           List<FieldGroup> groups, RecordExtensionType extension, List<String> discriminators,
                           @Field("name_type") Optional<String> nameType) implements Product {
 
@@ -58,19 +58,17 @@ public record RecordBody(List<TypeRef> supertypes, List<String> subtypes, Sequen
     public static final String FIELD_NAME = "field_name";
 
     /**
-     * <b>Absent and empty are the same list</b> for the four the kernel makes optional ({@code supertypes},
-     * {@code subtypes}, {@code groups} and {@code discriminators}): a body resolved from source arrives with an
-     * empty
-     * list where one bound from a resolved-form document that omits the field arrives with {@code null},
-     * and no rule distinguishes "no supertypes stated" from "an empty supertypes list". {@code fields} is
+     * <b>Absent and empty are the same value</b> for the three the kernel makes optional ({@code chain}, {@code
+     * groups} and {@code discriminators}): a body resolved from source arrives with an empty one where one bound
+     * from a resolved-form document that omits the field arrives with {@code null}, and no rule distinguishes
+     * "nothing stated" from "an empty list". {@code fields} is
      * required and is deliberately not guarded -- an absent required field is a violation the reader
      * reports and abandons the construction over, so it never reaches here, and swallowing a {@code null}
      * would only turn some other defect into an empty record.
      */
     @Record
     public RecordBody {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         fields = Collections.unmodifiableSequencedMap(new LinkedHashMap<>(fields));
         groups = groups == null ? List.of() : List.copyOf(groups);
         discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
@@ -102,8 +100,7 @@ public record RecordBody(List<TypeRef> supertypes, List<String> subtypes, Sequen
     @Override
     public boolean equals(Object o) {
         return o instanceof RecordBody other
-                && supertypes.equals(other.supertypes)
-                && subtypes.equals(other.subtypes)
+                && chain.equals(other.chain)
                 && List.copyOf(fields.sequencedEntrySet()).equals(List.copyOf(other.fields.sequencedEntrySet()))
                 && groups.equals(other.groups)
                 && extension == other.extension
@@ -114,7 +111,7 @@ public record RecordBody(List<TypeRef> supertypes, List<String> subtypes, Sequen
     /** Consistent with {@link #equals}: {@link #fields} contributes in declaration order. */
     @Override
     public int hashCode() {
-        return Objects.hash(supertypes, subtypes, List.copyOf(fields.sequencedEntrySet()), groups, extension,
+        return Objects.hash(chain, List.copyOf(fields.sequencedEntrySet()), groups, extension,
                 discriminators, nameType);
     }
 
@@ -133,7 +130,7 @@ public record RecordBody(List<TypeRef> supertypes, List<String> subtypes, Sequen
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public RecordBody(SequencedMap<String, RecordField> fields, List<FieldGroup> groups, RecordExtensionType extension,
                        List<String> discriminators, Optional<String> nameType) {
-        this(List.of(), List.of(), fields, groups, extension, discriminators, nameType);
+        this(TypeChain.EMPTY, fields, groups, extension, discriminators, nameType);
     }
 
     /** The same body with an empty chain, {@code discriminators} unstated and the default field name type. */
@@ -148,22 +145,22 @@ public record RecordBody(List<TypeRef> supertypes, List<String> subtypes, Sequen
     }
 
     @Override
-    public RecordBody withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new RecordBody(supertypes, subtypes, fields, groups, extension, discriminators, nameType);
+    public RecordBody withChain(TypeChain chain) {
+        return new RecordBody(chain, fields, groups, extension, discriminators, nameType);
     }
 
     @Override
     public RecordBody withSupertypes(List<String> supertypes) {
-        return withChain(supertypes.stream().map(TypeRef::of).toList(), subtypes);
+        return withChain(chain.withSupertypes(supertypes));
     }
 
     /** This body with {@code extension} replaced -- every other facet, the chain included, unchanged. */
     public RecordBody withExtension(RecordExtensionType extension) {
-        return new RecordBody(supertypes, subtypes, fields, groups, extension, discriminators, nameType);
+        return new RecordBody(chain, fields, groups, extension, discriminators, nameType);
     }
 
     /** This body with {@code fields} replaced -- every other facet, the chain included, unchanged. */
     public RecordBody withFields(SequencedMap<String, RecordField> fields) {
-        return new RecordBody(supertypes, subtypes, fields, groups, extension, discriminators, nameType);
+        return new RecordBody(chain, fields, groups, extension, discriminators, nameType);
     }
 }

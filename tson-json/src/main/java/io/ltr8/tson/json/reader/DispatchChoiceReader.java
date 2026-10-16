@@ -7,6 +7,7 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -82,7 +83,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         for (TypeRef variant : body.variants()) {
             JsonTypeReader<?> reader = context.readers().resolve(variant.name());
             ReferenceChain.terminal(context.schema(), variant.name())
-                    .ifPresent(resolved -> context.admitting(Type.subtypesOf(resolved.definition()))
+                    .ifPresent(resolved -> context.admitting(Chained.subtypesOf(resolved.definition()))
                             .forEach(subtype -> table.putIfAbsent(subtype, routeBelow(reader, subtype))));
         }
         this.routes = Map.copyOf(table);

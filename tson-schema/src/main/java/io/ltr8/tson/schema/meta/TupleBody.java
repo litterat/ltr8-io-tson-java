@@ -13,24 +13,23 @@ import java.util.List;
  * every {@link Type} carries.
  */
 @Typename(name = "tuple")
-public record TupleBody(List<TypeRef> supertypes, List<String> subtypes,
+public record TupleBody(TypeChain chain,
         List<TupleElement> elements) implements Product {
 
     @Record
 
     public TupleBody {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         elements = List.copyOf(elements);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public TupleBody(List<TupleElement> elements) {
-        this(List.of(), List.of(), elements);
+        this(TypeChain.EMPTY, elements);
     }
 
     @Override
-    public TupleBody withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new TupleBody(supertypes, subtypes, elements);
+    public TupleBody withChain(TypeChain chain) {
+        return new TupleBody(chain, elements);
     }
 }

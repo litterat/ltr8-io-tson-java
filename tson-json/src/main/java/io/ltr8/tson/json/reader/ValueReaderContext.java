@@ -3,6 +3,7 @@ package io.ltr8.tson.json.reader;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
 
@@ -46,10 +47,10 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
     }
 
     /**
-     * The entries IS-A {@code name}, whose value is {@code definition}: a type's own {@code subtypes}, and a family
-     * base template's members, which its value has no slot for.
+     * The entries IS-A {@code name}, whose value is {@code definition}: its chain's {@code subtypes} -- a type's,
+     * and a family base template's, whose subtypes are its members.
      */
     public List<String> subtypesOf(String name, Top definition) {
-        return Type.subtypesOf(name, definition, schema().entries());
+        return Chained.subtypesOf(definition);
     }
 }

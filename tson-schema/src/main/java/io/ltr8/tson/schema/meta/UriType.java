@@ -39,7 +39,7 @@ import java.util.Optional;
  * !uri_reference ^ { allow_relative: false }} to {@link #URI}.
  */
 @Typename(name = "uri_type")
-public record UriType(List<TypeRef> supertypes, List<String> subtypes,
+public record UriType(TypeChain chain,
         String spec, @Field("min_length") Optional<Integer> minLength,
                       @Field("max_length") Optional<Integer> maxLength,
                       Optional<Integer> length, Optional<String> pattern,
@@ -50,21 +50,20 @@ public record UriType(List<TypeRef> supertypes, List<String> subtypes,
     /** The chain normalised: absent and empty are one list. */
     @Record
     public UriType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public UriType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
             Optional<String> pattern, Optional<List<String>> members, Optional<List<String>> schemes, boolean allowRelative,
             boolean allowFragment, Normalization normalization) {
-        this(List.of(), List.of(), spec, minLength, maxLength, length, pattern, members, schemes, allowRelative,
+        this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, schemes, allowRelative,
                 allowFragment, normalization);
     }
 
     @Override
-    public UriType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new UriType(supertypes, subtypes, spec, minLength, maxLength, length, pattern, members, schemes,
+    public UriType withChain(TypeChain chain) {
+        return new UriType(chain, spec, minLength, maxLength, length, pattern, members, schemes,
                 allowRelative, allowFragment, normalization);
     }
 

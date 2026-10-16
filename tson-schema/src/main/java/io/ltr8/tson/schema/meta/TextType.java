@@ -41,7 +41,7 @@ import java.util.stream.Stream;
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "text_type")
-public record TextType(List<TypeRef> supertypes, List<String> subtypes,
+public record TextType(TypeChain chain,
         @Field("min_length") Optional<Integer> minLength,
         @Field("max_length") Optional<Integer> maxLength,
         Optional<Integer> length,
@@ -51,20 +51,19 @@ public record TextType(List<TypeRef> supertypes, List<String> subtypes,
 
     @Record
     public TextType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         members = members.map(List::copyOf);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public TextType(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
             Optional<String> pattern, Optional<List<String>> members, Normalization normalization) {
-        this(List.of(), List.of(), minLength, maxLength, length, pattern, members, normalization);
+        this(TypeChain.EMPTY, minLength, maxLength, length, pattern, members, normalization);
     }
 
     @Override
-    public TextType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new TextType(supertypes, subtypes, minLength, maxLength, length, pattern, members, normalization);
+    public TextType withChain(TypeChain chain) {
+        return new TextType(chain, minLength, maxLength, length, pattern, members, normalization);
     }
 
     /** These facets with no normalization: the value is the text as written. */

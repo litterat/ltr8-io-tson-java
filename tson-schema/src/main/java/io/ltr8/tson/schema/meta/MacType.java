@@ -16,23 +16,22 @@ import java.util.List;
  * Cidr4Type}'s own Javadoc for why.
  */
 @Typename(name = "mac_type")
-public record MacType(List<TypeRef> supertypes, List<String> subtypes,
+public record MacType(TypeChain chain,
         String spec) implements Atom {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public MacType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public MacType(String spec) {
-        this(List.of(), List.of(), spec);
+        this(TypeChain.EMPTY, spec);
     }
 
     @Override
-    public MacType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new MacType(supertypes, subtypes, spec);
+    public MacType withChain(TypeChain chain) {
+        return new MacType(chain, spec);
     }
 
     /** {@code mac => !mac_type {}} -- the unconstrained MAC address, core.tn's own {@code !mac}. */

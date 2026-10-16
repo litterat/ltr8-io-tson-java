@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -62,7 +63,7 @@ class DirectApplicationDeclarationTest {
                 """);
 
         Top bx = linked.schema().entries().get("bx");
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(bx), "the declaration is the instantiation, not a hop to one");
+        assertEquals(TypeKind.PRODUCT, TypeKind.of(bx, n -> true), "the declaration is the instantiation, not a hop to one");
         RecordBody body = assertInstanceOf(RecordBody.class, bx, "its body is the closed record");
         assertEquals(List.of("item"), body.fields().keySet().stream().toList());
     }
@@ -70,14 +71,14 @@ class DirectApplicationDeclarationTest {
     /** §8.2 keys an instantiation's identity on the application, which its facts record as written. */
     @Test
     void theDeclarationRecordsTheApplication() {
-        var facts = resolve("dad2", """
+        var application = resolve("dad2", """
                   box => <V> { item: V }
                   bx  => box<text>
-                """).schema().factsOf("bx");
+                """).schema().applicationOf("bx");
 
-        assertEquals("box", facts.application().orElseThrow().name());
-        assertEquals(1, facts.application().orElseThrow().arguments().size(),
-                () -> "the canonical application, arguments included: " + facts.application());
+        assertEquals("box", application.orElseThrow().name());
+        assertEquals(1, application.orElseThrow().arguments().size(),
+                () -> "the canonical application, arguments included: " + application);
     }
 
     /** Nothing is minted beside it: an entry with no referent and no reader is not an entry. */
@@ -122,12 +123,11 @@ class DirectApplicationDeclarationTest {
                   by  => box<text>
                 """);
 
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(linked.schema().entries().get("bx")));
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(linked.schema().entries().get("by")));
-        assertEquals("box", linked.schema().factsOf("bx").application().orElseThrow().name());
-        assertEquals("box", linked.schema().factsOf("by").application().orElseThrow().name());
-        assertEquals(java.util.List.of("bx", "by"), Type.subtypesOf("box", linked.schema().entries().get("box"),
-                linked.schema().entries()),
+        assertEquals(TypeKind.PRODUCT, TypeKind.of(linked.schema().entries().get("bx"), n -> true));
+        assertEquals(TypeKind.PRODUCT, TypeKind.of(linked.schema().entries().get("by"), n -> true));
+        assertEquals("box", linked.schema().applicationOf("bx").orElseThrow().name());
+        assertEquals("box", linked.schema().applicationOf("by").orElseThrow().name());
+        assertEquals(java.util.List.of("bx", "by"), Chained.subtypesOf(linked.schema().entries().get("box")),
                 "both are members of the template they close");
     }
 
@@ -147,8 +147,7 @@ class DirectApplicationDeclarationTest {
     void theFamilyBaseIndexesTheDeclaredMemberNames() {
         TsonLinkedSchema linked = resolve("dad6", FAMILY);
 
-        assertEquals(List.of("dogs", "cats"), Type.subtypesOf("pet", linked.schema().entries().get("pet"),
-                linked.schema().entries()),
+        assertEquals(List.of("dogs", "cats"), Chained.subtypesOf(linked.schema().entries().get("pet")),
                 "the members are the declarations, not content-derived names");
     }
 

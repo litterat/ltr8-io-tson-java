@@ -72,7 +72,7 @@ class AliasedArgumentIdentityTest {
      * {@code box<uuid>} agree there even though each declaration keeps its own name.
      */
     private static String applicationOf(TsonLinkedSchema linked, String alias) {
-        return linked.schema().factsOf(alias).application().orElseThrow().toString();
+        return linked.schema().applicationOf(alias).orElseThrow().toString();
     }
 
     /** The rule: an application of a rename is an application of the name it renames. */

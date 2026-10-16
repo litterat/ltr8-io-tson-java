@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.tree.TsonValue;
@@ -64,11 +65,10 @@ class ClosedOperandFamilyTest {
     void theMemberIsIndexedUnderTheFamilyBaseItComposes() {
         TsonLinkedSchema linked = Tson.standard().resolve(schema("cof1", SEALED));
 
-        assertEquals(java.util.List.of("dog", "cat"), Type.subtypesOf("pet", linked.schema().entries().get("pet"),
-                linked.schema().entries()),
+        assertEquals(java.util.List.of("dog", "cat"), Chained.subtypesOf(linked.schema().entries().get("pet")),
                 "the base's members are the declarations that compose it");
-        assertTrue(Type.supertypesOf(linked.schema().entries().get("dog")).contains("pet"),
-                () -> "dog IS-A pet: " + Type.supertypesOf(linked.schema().entries().get("dog")));
+        assertTrue(Chained.supertypesOf(linked.schema().entries().get("dog")).contains("pet"),
+                () -> "dog IS-A pet: " + Chained.supertypesOf(linked.schema().entries().get("dog")));
     }
 
     /** The operand mints nothing: the only entries are the four the author wrote. */

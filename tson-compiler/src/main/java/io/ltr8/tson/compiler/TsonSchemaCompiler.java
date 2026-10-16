@@ -4,6 +4,7 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.reader.*;
 import io.ltr8.tson.compiler.reader.DeferredTypeReader;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -83,7 +84,7 @@ public final class TsonSchemaCompiler {
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonCompiledMetaSchema governingMeta) {
         TsonSchema schema = linkedSchema.schema();
-        return compileWith(linkedSchema, name -> governedFactory(name, schema, governingMeta),
+        return compileWith(linkedSchema, name -> governedFactory(name, linkedSchema, governingMeta),
                 ForeignSchemas.none());
     }
 
@@ -96,7 +97,7 @@ public final class TsonSchemaCompiler {
      * an {@link ErrorReader}, same as any other unbuildable entry -- the schema still compiles, only
      * reading a value against that one entry fails.
      */
-    private static ValueReaderFactory governedFactory(String constructorName, TsonSchema schema,
+    private static ValueReaderFactory governedFactory(String constructorName, TsonLinkedSchema schema,
                                                       TsonCompiledMetaSchema governingMeta) {
         ValueReaderFactory inherited = governingMeta.constructor(constructorName);
         if (inherited != null) {
@@ -105,8 +106,8 @@ public final class TsonSchemaCompiler {
         // Applicable is IS-A `top` (§4.1) -- the same predicate the resolver's own gate and the meta-schema's
         // head table ask, so a construction that resolved reaches a factory lookup here rather than falling
         // through to "out of scope" on a narrower question.
-        Top own = schema.entries().get(constructorName);
-        if (own != null && Type.supertypesOf(own).contains("top")) {
+        Top own = schema.schema().entries().get(constructorName);
+        if (own != null && schema.isConstructor(constructorName, own)) {
             return governingMeta.globalResolver().resolve(constructorName);
         }
         throw new IllegalStateException("constructor '" + constructorName + "' is out of scope: not in the "

@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLoader;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.EnumBody;
@@ -124,7 +125,7 @@ final class ValuesByName {
                 return true;
             }
             Top definition = definition();
-            return definition != null && Type.supertypesOf(definition).stream()
+            return definition != null && Chained.supertypesOf(definition).stream()
                     .anyMatch(supertype -> of(supertype).identity().equals(target));
         }
     }
@@ -294,7 +295,7 @@ final class ValuesByName {
     private static Typed constructorOf(String tag, Top definition, TsonLinkedSchema meta) {
         Typed source = new Typed(meta, tag);
         Top constructor = source.definition();
-        if (constructor != null && Type.supertypesOf(constructor).contains("top")) {
+        if (constructor != null && meta.isConstructor(tag, constructor)) {
             return source;
         }
         return new Typed(meta, TsonCompiledMetaSchema.typenameOf(definition));

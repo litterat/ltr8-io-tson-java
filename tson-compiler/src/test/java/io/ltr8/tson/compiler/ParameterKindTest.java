@@ -102,7 +102,7 @@ class ParameterKindTest {
         // to a *synthetic* named for the form, which the instantiation references, and a synthetic's source
         // is the bare constructor with no arguments at all.
         String instantiation = "use";
-        TypeArgument argument = compiled.schema().factsOf(instantiation).application().orElseThrow()
+        TypeArgument argument = compiled.schema().applicationOf(instantiation).orElseThrow()
                 .arguments().getFirst();
 
         assertEquals("c", assertInstanceOf(TypeArgument.Value.class, argument).value().text());
@@ -120,7 +120,7 @@ class ParameterKindTest {
         // to a *synthetic* named for the form, which the instantiation references, and a synthetic's source
         // is the bare constructor with no arguments at all.
         String instantiation = "use";
-        TypeArgument argument = compiled.schema().factsOf(instantiation).application().orElseThrow()
+        TypeArgument argument = compiled.schema().applicationOf(instantiation).orElseThrow()
                 .arguments().getFirst();
 
         assertEquals("int32", assertInstanceOf(TypeArgument.Ref.class, argument).ref().name());
@@ -176,7 +176,7 @@ class ParameterKindTest {
 
         String instantiation = ((RecordBody) compiled.schema().entries().get("use"))
                 .fields().sequencedValues().getFirst().type().name();
-        TypeArgument argument = compiled.schema().factsOf(instantiation).application().orElseThrow()
+        TypeArgument argument = compiled.schema().applicationOf(instantiation).orElseThrow()
                 .arguments().getFirst();
 
         assertEquals("text", assertInstanceOf(TypeArgument.Ref.class, argument).ref().name());

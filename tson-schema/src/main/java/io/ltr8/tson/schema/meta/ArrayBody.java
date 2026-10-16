@@ -25,7 +25,7 @@ import java.util.Optional;
  * ([TSON-SCHEMA] §7.5).
  */
 @Typename(name = "array")
-public record ArrayBody(List<TypeRef> supertypes, List<String> subtypes,
+public record ArrayBody(TypeChain chain,
         @Field("element_type") TypeRef elementType, boolean voidable, boolean ordered,
                          @Field("unique_items") boolean uniqueItems,
                          @Field("min_items") Optional<BigInteger> minItems,
@@ -33,19 +33,18 @@ public record ArrayBody(List<TypeRef> supertypes, List<String> subtypes,
     /** The chain normalised: absent and empty are one list. */
     @Record
     public ArrayBody {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public ArrayBody(TypeRef elementType, boolean voidable, boolean ordered, boolean uniqueItems,
             Optional<BigInteger> minItems, Optional<BigInteger> maxItems) {
-        this(List.of(), List.of(), elementType, voidable, ordered, uniqueItems, minItems, maxItems);
+        this(TypeChain.EMPTY, elementType, voidable, ordered, uniqueItems, minItems, maxItems);
     }
 
     @Override
-    public ArrayBody withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new ArrayBody(supertypes, subtypes, elementType, voidable, ordered, uniqueItems, minItems, maxItems);
+    public ArrayBody withChain(TypeChain chain) {
+        return new ArrayBody(chain, elementType, voidable, ordered, uniqueItems, minItems, maxItems);
     }
 
     /**

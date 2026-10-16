@@ -142,8 +142,9 @@ public final class MetaKernelBootstrapResolver {
         // by the sugar forms (§5.3), so the phase consults no governing meta -- which for meta-kernel would
         // have been the very entries this method is in the middle of producing.
         document = SchemaDesugarer.desugar(document, Set.of());
+        // Every name the kernel holds is its own, so every base kind it names is the kernel's.
         DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, null, EMPTY_META_DEFINITIONS,
-                entries::get, null, SchemaPositions.none(), facts);
+                entries::get, null, SchemaPositions.none(), facts, name -> true, name -> true);
         List<SchemaMap.Declaration> instances = new ArrayList<>();
         List<SchemaMap.Declaration> refinements = new ArrayList<>();
 

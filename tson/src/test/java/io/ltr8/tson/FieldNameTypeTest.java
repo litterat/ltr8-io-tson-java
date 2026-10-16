@@ -332,9 +332,9 @@ class FieldNameTypeTest {
                 () -> Tson.standard().resolve(schema("written", """
                       json_name => !identifier_type { start_add: "@" }
                       json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
-                      n => !record { supertypes: [json_record]  fields: { "@id" => { type: text } } }
+                      n => !record { chain: { supertypes: [json_record] }  fields: { "@id" => { type: text } } }
                     """)));
-        assertTrue(thrown.getMessage().contains("states 'supertypes', which a declaration never writes"),
+        assertTrue(thrown.getMessage().contains("states 'chain', which a declaration never writes"),
                 thrown.getMessage());
     }
 

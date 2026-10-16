@@ -34,7 +34,7 @@ import java.util.Optional;
  * checked against the ceiling by {@link #coherenceCheck}, which is what keeps that true.
  */
 @Typename(name = "duration_type")
-public record DurationType(List<TypeRef> supertypes, List<String> subtypes,
+public record DurationType(TypeChain chain,
         Optional<Duration> min,
         @Field("exclusive_min") Optional<Duration> exclusiveMin,
         Optional<Duration> max,
@@ -48,8 +48,7 @@ public record DurationType(List<TypeRef> supertypes, List<String> subtypes,
 
     @Record
     public DurationType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
@@ -61,12 +60,12 @@ public record DurationType(List<TypeRef> supertypes, List<String> subtypes,
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public DurationType(Optional<Duration> min, Optional<Duration> exclusiveMin, Optional<Duration> max,
             Optional<Duration> exclusiveMax, Optional<BigInteger> precision, Optional<Duration> multipleOf) {
-        this(List.of(), List.of(), min, exclusiveMin, max, exclusiveMax, precision, multipleOf);
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, precision, multipleOf);
     }
 
     @Override
-    public DurationType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new DurationType(supertypes, subtypes, min, exclusiveMin, max, exclusiveMax, precision, multipleOf);
+    public DurationType withChain(TypeChain chain) {
+        return new DurationType(chain, min, exclusiveMin, max, exclusiveMax, precision, multipleOf);
     }
 
     /** The inclusive bounds alone, for the callers that state neither an exclusive bound nor a step. */

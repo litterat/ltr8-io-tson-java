@@ -15,23 +15,22 @@ import java.util.Optional;
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "uuid_type")
-public record UuidType(List<TypeRef> supertypes, List<String> subtypes,
+public record UuidType(TypeChain chain,
         Optional<Integer> version) implements Atom {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public UuidType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public UuidType(Optional<Integer> version) {
-        this(List.of(), List.of(), version);
+        this(TypeChain.EMPTY, version);
     }
 
     @Override
-    public UuidType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new UuidType(supertypes, subtypes, version);
+    public UuidType withChain(TypeChain chain) {
+        return new UuidType(chain, version);
     }
 
     /** {@code uuid => !uuid_type {}} -- the unconstrained UUID, §5.5's {@code !uuid}. */

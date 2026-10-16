@@ -232,7 +232,7 @@ class ApplicationInContainerPositionTest {
 
         Top instantiation = compiled.schema().entries().get(fieldType(compiled, "a", "g"));
         assertInstanceOf(Reference.class, instantiation);
-        assertEquals("grid", compiled.schema().factsOf(fieldType(compiled, "a", "g")).application().orElseThrow()
+        assertEquals("grid", compiled.schema().applicationOf(fieldType(compiled, "a", "g")).orElseThrow()
                 .name(), "the application, recorded");
 
         Top form = formBehind(compiled, "a", "g");

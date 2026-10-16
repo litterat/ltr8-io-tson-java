@@ -111,8 +111,7 @@ class RecordTemplateTest {
                   box => <T> { v: T }
                   holder => { b: box<text> }""");
 
-        TypeRef source = compiled.schema().factsOf(instantiationsOf(compiled, "box").get(0))
-                .application().orElseThrow();
+        TypeRef source = compiled.schema().applicationOf(instantiationsOf(compiled, "box").get(0)).orElseThrow();
         assertEquals("box", source.name());
         assertEquals(List.of(new TypeArgument.Ref(TypeRef.of("text"))), source.arguments());
     }

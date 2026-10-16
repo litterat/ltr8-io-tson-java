@@ -12,22 +12,21 @@ import java.util.List;
  * constructor alone is what tells {@code value} apart from every other atom.
  */
 @Typename(name = "value_type")
-public record ValueType(List<TypeRef> supertypes, List<String> subtypes) implements Atom {
+public record ValueType(TypeChain chain) implements Atom {
 
     /** The chain normalised: absent and empty are one list. */
     @Record
     public ValueType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public ValueType() {
-        this(List.of(), List.of());
+        this(TypeChain.EMPTY);
     }
 
     @Override
-    public ValueType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new ValueType(supertypes, subtypes);
+    public ValueType withChain(TypeChain chain) {
+        return new ValueType(chain);
     }
 }

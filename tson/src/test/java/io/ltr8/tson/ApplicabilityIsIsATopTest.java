@@ -89,13 +89,13 @@ class ApplicabilityIsIsATopTest {
 
         for (String name : List.of("bare", "closed", "applied")) {
             Top definition = entries.get(name);
-            assertEquals(TypeKind.REFERENCE, TypeKind.of(definition), name);
+            assertEquals(TypeKind.REFERENCE, TypeKind.of(definition, n -> true), name);
             assertEquals("int32", ((Reference) definition).target().name(), name);
         }
         // The open one is a template until it closes, and its kind says so: a template is not a type
         // (§5.10), so it is TEMPLATE rather than the REFERENCE its closure produces. `applied` above is
         // where the REFERENCE appears -- the entry closing it mints.
-        assertEquals(TypeKind.TEMPLATE, TypeKind.of(entries.get("open")));
+        assertEquals(TypeKind.TEMPLATE, TypeKind.of(entries.get("open"), n -> true));
     }
 
     /**
@@ -159,15 +159,17 @@ class ApplicabilityIsIsATopTest {
     }
 
     /**
-     * A base kind is admitted by the predicate and refused by its own reader, which is the better answer:
-     * it names the subtypes that would satisfy the position instead of saying the head was the wrong kind
-     * of thing.
+     * A base kind is admitted by the predicate and refused as abstract (SPEC-FEEDBACK.md #15), which is the
+     * better answer: it names the subtypes that would satisfy the position instead of saying the head was the
+     * wrong kind of thing.
      */
     @Test
     void aBaseKindIsAdmittedAndThenRefusesItself() {
         List<Diagnostic> problems = problems("  bad => !product {}");
 
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("has no data of its own to bind"), problems::toString);
+        assertTrue(problems.getFirst().message().contains("it is abstract and has no direct instances"),
+                problems::toString);
+        assertTrue(problems.getFirst().message().contains("record | array"), problems::toString);
     }
 }

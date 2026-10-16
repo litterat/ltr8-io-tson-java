@@ -6,6 +6,7 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.NameType;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.TsonSchema;
@@ -133,7 +134,7 @@ final class EnumLabels {
      * the family as for the family.
      */
     static boolean isFamily(Top instance, String family, Function<String, Top> lookup) {
-        if (!(instance instanceof Atom) || Type.supertypesOf(instance).contains("top")) {
+        if (!(instance instanceof Atom) || Chained.supertypesOf(instance).contains("top")) {
             return false;
         }
         String constructor = TsonSchema.constructorOf(instance);
@@ -141,6 +142,6 @@ final class EnumLabels {
             return true;
         }
         Top built = lookup.apply(constructor);
-        return built != null && Type.supertypesOf(built).contains(family);
+        return built != null && Chained.supertypesOf(built).contains(family);
     }
 }

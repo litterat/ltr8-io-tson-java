@@ -23,8 +23,10 @@ import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.ConfusableNames;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.BytesType;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -85,6 +87,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link TsonLinkedSchema} -- pass 2, which a schema
@@ -140,7 +143,7 @@ public final class TsonSchemaLinker {
     private static final String DISJOINT = "disjoint";
 
     /** [TSON-SCHEMA] §4.1's structural root -- what an entry IS-A when it is a constructor. */
-    private static final String TOP = "top";
+
 
     private TsonSchemaLinker() {
     }
@@ -609,6 +612,8 @@ public final class TsonSchemaLinker {
                 .<Map<String, Top>>map(linked -> linked.schema().entries()).orElse(Map.of());
 
         Set<String> localNames = new LinkedHashSet<>();
+        // A constructor is judged by where `top` is defined, never by its spelling (§4.1).
+        Predicate<String> kernel = name -> TsonBundledSchemas.isMetaKernel(origins.get(name));
 
         Boolean constructorsAllowed = null;
         for (Map.Entry<String, Top> entry : schema.entries().entrySet()) {
@@ -635,7 +640,7 @@ public final class TsonSchemaLinker {
             // §2.2.2's meta-programming case, asked of the type system rather than of a marker: a constructor
             // is an entry that IS-A `top` (§4.1), which is to say one composing, transitively, with a base
             // kind. Only a schema chaining directly to the meta-kernel may declare one.
-            if (Type.supertypesOf(def).contains(TOP)) {
+            if (TypeKind.isConstructor(entry.getKey(), def, kernel)) {
                 if (constructorsAllowed == null) {
                     constructorsAllowed = isMetaKernelGoverned(schema);
                 }
@@ -1047,16 +1052,17 @@ public final class TsonSchemaLinker {
      * imported schema, examined on its own, correctly doesn't know about it. {@link #withAddedSubtypes} unions
      * with whatever subtypes the target already had rather than replacing them.
      *
-     * <p><b>Only a type is credited.</b> A family base -- a record-bodied template -- composes {@code top} and
-     * has no slot (SPEC-FEEDBACK.md #14); its members are the entries whose chain names it, which a reader
-     * finds by asking ({@code Type.subtypesOf(String, Top, Map)}). A reference is a hop, not a type of its own.
+     * <p><b>Every chained value is credited, and nothing else</b> ({@link Chained}): a type, and a family base --
+     * a record-bodied template, the ABSTRACT base its members are IS-A, whose {@code subtypes} are its members.
+     * Both sides are asked of the chain, so a template IS-A its own parents as any record is. A reference is a
+     * hop, not a type of its own.
      */
     private static Map<String, Top> computeSubtypes(Map<String, Top> merged, Set<String> localNames) {
         Map<String, Set<String>> newSubtypesByName = new LinkedHashMap<>();
         for (String localName : localNames) {
             Top local = merged.get(localName);
-            for (String supertype : Type.supertypesOf(local)) {
-                if (merged.get(supertype) instanceof Type) {
+            for (String supertype : Chained.supertypesOf(local)) {
+                if (merged.get(supertype) instanceof Chained) {
                     newSubtypesByName.computeIfAbsent(supertype, ignored -> new LinkedHashSet<>()).add(localName);
                 }
             }
@@ -1074,15 +1080,15 @@ public final class TsonSchemaLinker {
 
     /**
      * {@code def} plus {@code newSubtypes}, unioned with whatever subtypes it already had -- a new value, {@code
-     * def} itself untouched. A value that is no type carries no subtypes and comes back unchanged.
+     * def} itself untouched. A value that carries no chain carries no subtypes and comes back unchanged.
      */
     private static Top withAddedSubtypes(Top def, Set<String> newSubtypes) {
-        if (!(def instanceof Type type)) {
+        if (!(def instanceof Chained chained)) {
             return def;
         }
-        Set<String> combined = new LinkedHashSet<>(type.subtypes());
+        Set<String> combined = new LinkedHashSet<>(chained.subtypes());
         combined.addAll(newSubtypes);
-        return type.withSubtypes(List.copyOf(combined));
+        return Chained.withChain(def, chained.chain().withSubtypes(List.copyOf(combined)));
     }
 
     /**
@@ -1099,7 +1105,7 @@ public final class TsonSchemaLinker {
         Map<String, Top> result = new LinkedHashMap<>(merged);
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             if (entry.getValue() instanceof ChoiceBody choice) {
-                result.put(entry.getKey(), new ChoiceBody(choice.supertypes(), choice.subtypes(), choice.variants(),
+                result.put(entry.getKey(), new ChoiceBody(choice.chain(), choice.variants(),
                         Optional.of(ChoiceDisjointness.derive(choice, merged))));
             }
         }
@@ -1182,10 +1188,10 @@ public final class TsonSchemaLinker {
      * route could see the other's.
      */
     private static Top unified(Top incumbent, Top arriving) {
-        if (Type.subtypesOf(incumbent).containsAll(Type.subtypesOf(arriving))) {
+        if (Chained.subtypesOf(incumbent).containsAll(Chained.subtypesOf(arriving))) {
             return incumbent;
         }
-        return withAddedSubtypes(incumbent, new LinkedHashSet<>(Type.subtypesOf(arriving)));
+        return withAddedSubtypes(incumbent, new LinkedHashSet<>(Chained.subtypesOf(arriving)));
     }
 
     // ── Validation ───────────────────────────────────────────────────────
@@ -1200,12 +1206,12 @@ public final class TsonSchemaLinker {
         // whenever a refinement derives from one -- meta-kernel's own `set_type => array ^ {...}` resolves with
         // [array, product, top, type]. The fallback is defensive rather than load-bearing: a refinement source
         // resolves through the type-name namespace alone, so a schema deriving from `array` already names it.
-        for (String supertype : Type.supertypesOf(def)) {
+        for (String supertype : Chained.supertypesOf(def)) {
             if (!namespace.containsKey(supertype) && !structureNamespace.containsKey(supertype)) {
                 throw new SchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");
             }
         }
-        for (String subtype : Type.subtypesOf(def)) {
+        for (String subtype : Chained.subtypesOf(def)) {
             if (!namespace.containsKey(subtype)) {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }

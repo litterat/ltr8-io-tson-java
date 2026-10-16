@@ -16,23 +16,22 @@ import java.util.List;
  * spelling. {@code spec} is pinned to RFC 5890, flat and a bare {@link String}, as {@link Cidr4Type}'s is.
  */
 @Typename(name = "hostname_type")
-public record HostnameType(List<TypeRef> supertypes, List<String> subtypes,
+public record HostnameType(TypeChain chain,
         String spec, @Field("allow_idn") boolean allowIdn) implements Atom {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public HostnameType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public HostnameType(String spec, boolean allowIdn) {
-        this(List.of(), List.of(), spec, allowIdn);
+        this(TypeChain.EMPTY, spec, allowIdn);
     }
 
     @Override
-    public HostnameType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new HostnameType(supertypes, subtypes, spec, allowIdn);
+    public HostnameType withChain(TypeChain chain) {
+        return new HostnameType(chain, spec, allowIdn);
     }
 
     /** {@code hostname_type.spec}'s pinned value. */

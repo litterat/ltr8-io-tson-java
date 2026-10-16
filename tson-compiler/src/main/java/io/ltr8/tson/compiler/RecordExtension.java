@@ -8,7 +8,9 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -21,6 +23,7 @@ import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * What each {@code record.extension} member obliges, checked over the linked closure ([TSON-SCHEMA] §5.2, §5.7,
@@ -85,10 +89,11 @@ final class RecordExtension {
                                  Set<String> localNames,
                                  Map<String, String> origins, Map<String, Normalization> enumForms) {
         List<Violation> violations = new ArrayList<>();
+        Predicate<String> kernel = name -> TsonBundledSchemas.isMetaKernel(origins.get(name));
         for (String name : localNames) {
             Top def = merged.get(name);
-            if (def != null && isUndeclaredMember(name, def, facts)) {
-                String base = Type.supertypesOf(def).getFirst();
+            if (def != null && isUndeclaredMember(name, def, facts, kernel)) {
+                String base = nearest(Chained.supertypesOf(def), merged);
                 violations.add(new Violation(name, "'" + shown(name, merged, facts) + "' composes onto '"
                         + shown(base, merged, facts) + "', so it is a member of that family, and a member is declared: "
                         + "a read reports the member it selects, a tag names it and a binding maps it, all by a "
@@ -114,15 +119,29 @@ final class RecordExtension {
 
     /**
      * A record a use-site template application minted that composes onto another: a family member with no
-     * declared name. A minted entry has no source position, and its facts record the application it closes; a
-     * constructor ({@code top} in its chain) is no member of anything.
+     * declared name. A minted entry has no source position, and its chain records the application it closes; a
+     * constructor (IS-A the kernel's {@code top}) is no member of anything.
      */
-    private static boolean isUndeclaredMember(String name, Top def, Map<String, TsonSchema.EntryFacts> facts) {
+    private static boolean isUndeclaredMember(String name, Top def, Map<String, TsonSchema.EntryFacts> facts,
+                                              Predicate<String> kernel) {
         TsonSchema.EntryFacts known = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
         return known.position().isEmpty() && def instanceof RecordBody record
-                && known.application().filter(application -> !application.arguments().isEmpty()).isPresent()
-                && !record.supertypes().isEmpty() && !record.supertypeNames().contains("top");
+                && record.application().filter(application -> !application.arguments().isEmpty()).isPresent()
+                && !record.supertypes().isEmpty() && !TypeKind.isConstructor(name, record, kernel);
     }
+
+    /**
+     * The nearest of {@code chain}'s members -- the first that no other member IS-A, which is a parent the
+     * declaration wrote or reached through one hop -- for a message that names what an entry composes onto.
+     */
+    private static String nearest(List<String> chain, Map<String, Top> merged) {
+        return chain.stream()
+                .filter(member -> chain.stream().noneMatch(other -> !other.equals(member)
+                        && Chained.supertypesOf(merged.get(other)).contains(member)))
+                .findFirst().orElse(chain.getFirst());
+    }
+
+
 
     // ── The declaration's own obligations ────────────────────────────────
 
@@ -155,7 +174,7 @@ final class RecordExtension {
      */
     private static void checkNothingComposesOntoFinal(String name, Top def,
             Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts, List<Violation> violations) {
-        for (String supertype : Type.supertypesOf(def)) {
+        for (String supertype : Chained.supertypesOf(def)) {
             Top target = merged.get(ReferenceChain.terminal(supertype, merged));
             if (target instanceof RecordBody parent
                     && parent.extension() == RecordExtensionType.FINAL) {
@@ -211,10 +230,11 @@ final class RecordExtension {
             return; // already reported against the base, and a pin has nothing to be read at
         }
         Map<List<Object>, String> seen = new LinkedHashMap<>();
-        for (String subtype : new LinkedHashSet<>(Type.subtypesOf(base, def, merged))) {
+        for (String subtype : new LinkedHashSet<>(Chained.subtypesOf(def))) {
             Top sub = merged.get(subtype);
             // An undeclared member is refused on its own, and judging its pins too would report one mistake twice.
-            if (!(sub instanceof RecordBody record) || isUndeclaredMember(subtype, sub, facts)) {
+            if (!(sub instanceof RecordBody record) || isUndeclaredMember(subtype, sub, facts,
+                    name -> TsonBundledSchemas.isMetaKernel(origins.get(name)))) {
                 continue;
             }
             List<Object> pins = pinsOf(base, subtype, selectors, record, merged, facts, localNames, enumForms, violations);

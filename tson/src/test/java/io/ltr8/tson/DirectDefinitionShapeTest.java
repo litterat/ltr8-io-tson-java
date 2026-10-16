@@ -53,7 +53,8 @@ class DirectDefinitionShapeTest {
         var schema = resolve("dd1", "  text_list => [text]\n").schema();
         Top textList = schema.entries().get("text_list");
 
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(textList), "the declaration is the array entry, not a hop to one");
+        assertEquals(TypeKind.PRODUCT, TypeKind.of(textList, n -> true),
+                "the declaration is the array entry, not a hop to one");
         assertEquals(java.util.Optional.of("array"), schema.constructorOf("text_list"));
     }
 
@@ -68,7 +69,7 @@ class DirectDefinitionShapeTest {
                   holder    => { f: [text] }
                 """);
 
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(linked.schema().entries().get("text_list")));
+        assertEquals(TypeKind.PRODUCT, TypeKind.of(linked.schema().entries().get("text_list"), n -> true));
         assertEquals(1, minted(linked, "array_").size(),
                 () -> "the use site mints its own: " + minted(linked, "array_"));
     }

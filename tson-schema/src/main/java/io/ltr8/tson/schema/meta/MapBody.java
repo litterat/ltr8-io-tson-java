@@ -25,7 +25,7 @@ import java.util.Optional;
  * a JSON object's is; output keeps the order written either way ([TSON-SCHEMA] §7.5).
  */
 @Typename(name = "map")
-public record MapBody(List<TypeRef> supertypes, List<String> subtypes,
+public record MapBody(TypeChain chain,
         @Field("key_type") TypeRef keyType, @Field("value_type") TypeRef valueType,
                        @Field("voidable") boolean voidable, @Field("ordered") boolean ordered,
                        @Field("min_items") Optional<BigInteger> minItems,
@@ -33,19 +33,18 @@ public record MapBody(List<TypeRef> supertypes, List<String> subtypes,
     /** The chain normalised: absent and empty are one list. */
     @Record
     public MapBody {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public MapBody(TypeRef keyType, TypeRef valueType, boolean voidable, boolean ordered, Optional<BigInteger> minItems,
             Optional<BigInteger> maxItems) {
-        this(List.of(), List.of(), keyType, valueType, voidable, ordered, minItems, maxItems);
+        this(TypeChain.EMPTY, keyType, valueType, voidable, ordered, minItems, maxItems);
     }
 
     @Override
-    public MapBody withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new MapBody(supertypes, subtypes, keyType, valueType, voidable, ordered, minItems, maxItems);
+    public MapBody withChain(TypeChain chain) {
+        return new MapBody(chain, keyType, valueType, voidable, ordered, minItems, maxItems);
     }
 
     /** An unconstrained map: values never void, unordered, no size bounds. */

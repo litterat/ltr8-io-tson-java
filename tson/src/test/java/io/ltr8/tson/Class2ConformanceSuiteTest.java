@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -279,7 +280,7 @@ class Class2ConformanceSuiteTest {
                 Top definition = definitionOf(entries, name);
                 assertEquals(new TreeSet<>(fieldTextArray(claim, "subtypes").stream()
                                 .map(ResolvedForm::withoutHash).toList()),
-                        new TreeSet<>(Type.subtypesOf(name, definition, entries).stream()
+                        new TreeSet<>(Chained.subtypesOf(definition).stream()
                                 .map(ResolvedForm::withoutHash).toList()),
                         "§8.2 subtypes index of " + name);
             }

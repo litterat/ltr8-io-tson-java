@@ -11,6 +11,7 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -68,7 +69,7 @@ final class ResolvedForm {
     }
 
     /**
-     * A type's {@code supertypes}/{@code subtypes} sorted. Both are sets the representation happens to write as
+     * A chain's {@code supertypes}/{@code subtypes} sorted. Both are sets the representation happens to write as
      * lists, so one side's alphabetical order and another's resolution order say the same thing. Nothing else is
      * normalised; a difference anywhere else is a real one.
      *
@@ -78,9 +79,9 @@ final class ResolvedForm {
      * {@code scoped.scope} alike, so two resolved documents are compared as §8 writes them.
      */
     static Top canonical(Top value) {
-        return value instanceof Type type
-                ? type.withChain(type.supertypes().stream().sorted(Comparator.comparing(TypeRef::name)).toList(),
-                        type.subtypes().stream().sorted().toList())
+        return value instanceof Chained chained
+                ? Chained.withChain(value, chained.chain().withSupertypes(chained.supertypes().stream().sorted()
+                        .toList()).withSubtypes(chained.subtypes().stream().sorted().toList()))
                 : value;
     }
 

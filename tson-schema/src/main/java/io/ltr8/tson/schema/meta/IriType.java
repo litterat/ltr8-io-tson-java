@@ -23,7 +23,7 @@ import java.util.Optional;
  * !iri_reference ^ { allow_relative: false }} to {@link #IRI}.
  */
 @Typename(name = "iri_type")
-public record IriType(List<TypeRef> supertypes, List<String> subtypes,
+public record IriType(TypeChain chain,
         String spec, @Field("min_length") Optional<Integer> minLength,
                       @Field("max_length") Optional<Integer> maxLength,
                       Optional<Integer> length, Optional<String> pattern,
@@ -34,21 +34,20 @@ public record IriType(List<TypeRef> supertypes, List<String> subtypes,
     /** The chain normalised: absent and empty are one list. */
     @Record
     public IriType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public IriType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
             Optional<String> pattern, Optional<List<String>> members, Optional<List<String>> schemes, boolean allowRelative,
             boolean allowFragment, Normalization normalization) {
-        this(List.of(), List.of(), spec, minLength, maxLength, length, pattern, members, schemes, allowRelative,
+        this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, schemes, allowRelative,
                 allowFragment, normalization);
     }
 
     @Override
-    public IriType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new IriType(supertypes, subtypes, spec, minLength, maxLength, length, pattern, members, schemes,
+    public IriType withChain(TypeChain chain) {
+        return new IriType(chain, spec, minLength, maxLength, length, pattern, members, schemes,
                 allowRelative, allowFragment, normalization);
     }
 

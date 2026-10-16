@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -17,13 +18,13 @@ import java.util.Set;
  * <p><b>A closed parent</b> contributes itself, the end of its reference chain (§8.3: the terminal is the same
  * type under another name, so IS-A reaches it) and that entry's own chain. <b>An application</b> denotes no entry
  * at the position that writes it -- its fields are absorbed by value -- so it contributes its template's
- * ancestors, read from the template's held text, and nothing for the template, which §5.10 makes no type. The
- * edge to the entry a closed application denotes is {@code SchemaResolver}'s to fold, once every declaration has
- * resolved.
+ * ancestors, and nothing for the template, which §5.10 makes no type. The edge to the entry a closed application
+ * denotes is {@code SchemaResolver}'s to fold, once every declaration has resolved; until then the application is
+ * kept in the chain's {@code parents}, the one list that holds applications.
  *
- * <p><b>Read from the held text, not stored beside it.</b> A template composes {@code top} and carries no chain of
- * its own (SPEC-FEEDBACK.md #14); its {@code supertypes} slot is the parents as written, so an imported template
- * yields its ancestors the same way a local one does.
+ * <p><b>A template's ancestors are its own chain's {@code supertypes}</b>: the closed entries its written parents
+ * reach, computed when it was declared ({@code TypeChain}), so an imported template yields them as a local one
+ * does.
  */
 final class Ancestry {
 
@@ -42,15 +43,9 @@ final class Ancestry {
         return names;
     }
 
-    /**
-     * The bare names in {@code value}'s chain -- all of it once resolution is done, and during it the part that
-     * already names entries: a parent still written as an application is waiting for {@code SchemaResolver}'s
-     * fold and names no entry yet, its head being a template, which nothing is IS-A.
-     */
+    /** The names {@code value}'s chain already holds -- all of it once resolution is done. */
     static List<String> closedNames(Top value) {
-        return value instanceof Type type
-                ? type.supertypes().stream().filter(parent -> parent.arguments().isEmpty()).map(TypeRef::name).toList()
-                : List.of();
+        return value == null ? List.of() : Chained.supertypesOf(value);
     }
 
     /**
@@ -58,45 +53,24 @@ final class Ancestry {
      * and nothing for the template itself. Empty for a head that is no template.
      */
     static List<String> ofTemplate(String head, DefinitionGetter namespace) {
-        return ofTemplate(head, namespace, new LinkedHashSet<>());
-    }
-
-    private static List<String> ofTemplate(String head, DefinitionGetter namespace, Set<String> visiting) {
-        if (!visiting.add(head) || !(namespace.definition(head) instanceof TemplateBody held)) {
-            return List.of();
-        }
-        List<String> ancestors = new ArrayList<>();
-        for (TypeRef parent : WireForm.writtenParents(HeldBody.of(held).application())) {
-            if (!parent.arguments().isEmpty()) {
-                ancestors.addAll(ofTemplate(parent.name(), namespace, visiting));
-            } else if (!held.parameterNames().contains(parent.name())) {
-                ancestors.addAll(ofParent(parent.name(), namespace));
-            }
-        }
-        return ancestors;
+        return namespace.definition(head) instanceof TemplateBody held ? held.supertypes() : List.of();
     }
 
     /**
      * The chain a closed record's written parents reach: every closed parent's contribution and every
-     * application's, deduplicated in order, with each application kept as written for the fold.
+     * application's, deduplicated, with each application kept in {@code parents} for the fold.
      */
-    static List<TypeRef> chainOf(List<TypeRef> written, DefinitionGetter namespace) {
-        List<TypeRef> chain = new ArrayList<>();
-        Set<String> seen = new LinkedHashSet<>();
+    static TypeChain chainOf(List<TypeRef> written, DefinitionGetter namespace) {
+        List<TypeRef> applied = new ArrayList<>();
+        Set<String> names = new LinkedHashSet<>();
         for (TypeRef parent : written) {
             if (!parent.arguments().isEmpty()) {
-                ofTemplate(parent.name(), namespace).forEach(name -> add(chain, seen, name));
-                chain.add(parent);
+                names.addAll(ofTemplate(parent.name(), namespace));
+                applied.add(parent);
                 continue;
             }
-            ofParent(parent.name(), namespace).forEach(name -> add(chain, seen, name));
+            names.addAll(ofParent(parent.name(), namespace));
         }
-        return List.copyOf(chain);
-    }
-
-    private static void add(List<TypeRef> chain, Set<String> seen, String name) {
-        if (seen.add(name)) {
-            chain.add(TypeRef.of(name));
-        }
+        return TypeChain.of(List.copyOf(names)).withParents(applied);
     }
 }

@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -101,7 +102,7 @@ class MintedEntryUnificationTest {
         Map<String, TsonLinkedSchema> schemas = both();
         String name = mintedName(schemas.get("right"));
 
-        assertEquals(List.of(), Type.subtypesOf(schemas.get("right").schema().entries().get(name)),
+        assertEquals(List.of(), Chained.subtypesOf(schemas.get("right").schema().entries().get(name)),
                 "a closed record has no subtypes of its own here");
     }
 
@@ -113,7 +114,7 @@ class MintedEntryUnificationTest {
     void theTemplateDoesNotIndexAMintedInstantiation() {
         Map<String, TsonLinkedSchema> schemas = both();
         schemas.forEach((which, schema) -> assertFalse(
-                Type.subtypesOf(schema.schema().entries().get("box")).contains(mintedName(schema)),
-                () -> which + ": " + Type.subtypesOf(schema.schema().entries().get("box"))));
+                Chained.subtypesOf(schema.schema().entries().get("box")).contains(mintedName(schema)),
+                () -> which + ": " + Chained.subtypesOf(schema.schema().entries().get("box"))));
     }
 }

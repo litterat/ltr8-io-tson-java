@@ -23,7 +23,7 @@ import java.util.Objects;
  * over its field names.
  */
 @Typename(name = "enum")
-public record EnumBody(List<TypeRef> supertypes, List<String> subtypes,
+public record EnumBody(TypeChain chain,
         @Field("name_type") String nameType, List<String> members) implements Atom {
 
     /** The name type {@code enum} pins: an enumeration of identifiers. */
@@ -31,20 +31,19 @@ public record EnumBody(List<TypeRef> supertypes, List<String> subtypes,
 
     @Record
     public EnumBody {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         Objects.requireNonNull(nameType, "nameType");
         members = List.copyOf(members);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public EnumBody(String nameType, List<String> members) {
-        this(List.of(), List.of(), nameType, members);
+        this(TypeChain.EMPTY, nameType, members);
     }
 
     @Override
-    public EnumBody withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new EnumBody(supertypes, subtypes, nameType, members);
+    public EnumBody withChain(TypeChain chain) {
+        return new EnumBody(chain, nameType, members);
     }
 
     /** An enumeration of identifiers -- {@code !enum [...]} -- for the callers that build one and say nothing else. */

@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -69,7 +70,7 @@ class OperandFollowsReferenceChainTest {
                   sub => ali & { extra: text }
                 """);
 
-        List<String> supertypes = Type.supertypesOf(linked.schema().entries().get("sub"));
+        List<String> supertypes = Chained.supertypesOf(linked.schema().entries().get("sub"));
         assertTrue(supertypes.contains("ali"), () -> "the name the author wrote: " + supertypes);
         assertTrue(supertypes.contains("rec"), () -> "and the type at the end of its chain: " + supertypes);
     }
@@ -84,9 +85,9 @@ class OperandFollowsReferenceChainTest {
                   sub => a2 & { extra: text }
                 """);
 
-        assertTrue(Type.supertypesOf(linked.schema().entries().get("sub")).contains("rec"),
+        assertTrue(Chained.supertypesOf(linked.schema().entries().get("sub")).contains("rec"),
                 () -> "the terminal is reached through both hops: "
-                        + Type.supertypesOf(linked.schema().entries().get("sub")));
+                        + Chained.supertypesOf(linked.schema().entries().get("sub")));
     }
 
     @Test
@@ -97,10 +98,10 @@ class OperandFollowsReferenceChainTest {
                   sub => ali ^ { x?: int32 = 1 }
                 """);
 
-        assertEquals(1, Type.supertypesOf(linked.schema().entries().get("sub")).stream()
+        assertEquals(1, Chained.supertypesOf(linked.schema().entries().get("sub")).stream()
                         .filter(name -> name.equals("rec")).count(),
                 () -> "refinement reaches the same terminal: "
-                        + Type.supertypesOf(linked.schema().entries().get("sub")));
+                        + Chained.supertypesOf(linked.schema().entries().get("sub")));
     }
 
     /** §5.9 still leaves the chain empty -- what changes is only that the operand resolves at all. */
@@ -112,7 +113,7 @@ class OperandFollowsReferenceChainTest {
                   sub => ali - { y }
                 """);
 
-        assertEquals(List.of(), Type.supertypesOf(linked.schema().entries().get("sub")),
+        assertEquals(List.of(), Chained.supertypesOf(linked.schema().entries().get("sub")),
                 "subtraction revokes IS-A for every parent (§5.9)");
     }
 
@@ -134,8 +135,8 @@ class OperandFollowsReferenceChainTest {
 
         assertEquals(List.of("item", "extra"), fieldNames(linked, "sub"),
                 "the operand's own field, then the composition's");
-        assertTrue(Type.supertypesOf(linked.schema().entries().get("sub")).contains("bx"),
-                () -> "and IS-A the operand: " + Type.supertypesOf(linked.schema().entries().get("sub")));
+        assertTrue(Chained.supertypesOf(linked.schema().entries().get("sub")).contains("bx"),
+                () -> "and IS-A the operand: " + Chained.supertypesOf(linked.schema().entries().get("sub")));
     }
 
     /** The refinement half: a vocabulary to tighten is a vocabulary however the entry came by it. */
@@ -148,8 +149,8 @@ class OperandFollowsReferenceChainTest {
                 """);
 
         assertEquals(List.of("item"), fieldNames(linked, "sub"), "refinement adds no field (§5.7)");
-        assertTrue(Type.supertypesOf(linked.schema().entries().get("sub")).contains("bx"),
-                () -> "and preserves IS-A: " + Type.supertypesOf(linked.schema().entries().get("sub")));
+        assertTrue(Chained.supertypesOf(linked.schema().entries().get("sub")).contains("bx"),
+                () -> "and preserves IS-A: " + Chained.supertypesOf(linked.schema().entries().get("sub")));
     }
 
     // ── Refused: the chain ends at a body with no fields ─────────────────

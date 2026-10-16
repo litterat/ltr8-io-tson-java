@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Top;
@@ -49,7 +50,7 @@ class TemplateParentSubtypesTest {
     private static List<String> subtypesOf(TsonLinkedSchema schema, String name) {
         Top definition = schema.schema().entries().get(name);
         return definition == null ? List.of()
-                : Type.subtypesOf(name, definition, schema.schema().entries());
+                : Chained.subtypesOf(definition);
     }
 
     @Test

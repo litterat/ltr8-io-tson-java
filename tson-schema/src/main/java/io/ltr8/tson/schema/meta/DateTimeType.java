@@ -24,7 +24,7 @@ import java.util.Optional;
  * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "datetime_type")
-public record DateTimeType(List<TypeRef> supertypes, List<String> subtypes,
+public record DateTimeType(TypeChain chain,
         Optional<OffsetDateTime> min, @Field("exclusive_min") Optional<OffsetDateTime> exclusiveMin,
                      Optional<OffsetDateTime> max, @Field("exclusive_max") Optional<OffsetDateTime> exclusiveMax,
                      Optional<BigInteger> precision) implements Atom {
@@ -35,8 +35,7 @@ public record DateTimeType(List<TypeRef> supertypes, List<String> subtypes,
      */
     @Record
     public DateTimeType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
@@ -48,12 +47,12 @@ public record DateTimeType(List<TypeRef> supertypes, List<String> subtypes,
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> exclusiveMin, Optional<OffsetDateTime> max,
             Optional<OffsetDateTime> exclusiveMax, Optional<BigInteger> precision) {
-        this(List.of(), List.of(), min, exclusiveMin, max, exclusiveMax, precision);
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, precision);
     }
 
     @Override
-    public DateTimeType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new DateTimeType(supertypes, subtypes, min, exclusiveMin, max, exclusiveMax, precision);
+    public DateTimeType withChain(TypeChain chain) {
+        return new DateTimeType(chain, min, exclusiveMin, max, exclusiveMax, precision);
     }
 
     /** The inclusive bounds alone, for the many callers that set neither an exclusive bound nor a precision. */

@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.Diagnostic;
@@ -298,14 +299,14 @@ class OpenEntryResolvedFormTest {
                     open++;
                 }
                 closed++;
-                if (!Type.supertypesOf(definition).contains("top") && !(definition instanceof Reference)
+                if (!Chained.supertypesOf(definition).contains("top") && !(definition instanceof Reference)
                         && !(definition instanceof TemplateBody)
                         && !perSchema.get(id).containsKey(headOf(definition))) {
                     neededTheGoverningMeta++;
                 }
                 TypeKind derived = derive(definition, universe);
-                if (derived != TypeKind.of(definition)) {
-                    mismatches.add(id + "#" + entry.getKey() + ": states " + TypeKind.of(definition)
+                if (derived != TypeKind.of(definition, n -> true)) {
+                    mismatches.add(id + "#" + entry.getKey() + ": states " + TypeKind.of(definition, n -> true)
                             + " but derives " + derived);
                 }
             }
@@ -333,10 +334,10 @@ class OpenEntryResolvedFormTest {
             // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.
             return TypeKind.REFERENCE;
         }
-        if (Type.supertypesOf(definition).contains("top")) {
+        if (Chained.supertypesOf(definition).contains("top")) {
             // A constructor: its kind states what its *instances* will be, not what its own body is --
             // `integer_type => atom & { ... }` has a !record body and kind ATOM.
-            for (String supertype : Type.supertypesOf(definition)) {
+            for (String supertype : Chained.supertypesOf(definition)) {
                 switch (supertype) {
                     case "atom" -> { return TypeKind.ATOM; }
                     case "sum" -> { return TypeKind.SUM; }
@@ -348,7 +349,7 @@ class OpenEntryResolvedFormTest {
         }
         Top constructor = universe.get(headOf(definition));
         assertNotNull(constructor, "no entry for the body's constructor head " + headOf(definition));
-        return TypeKind.of(constructor);
+        return TypeKind.of(constructor, n -> true);
     }
 
     /** The constructor name a body identifies as -- the {@code !head} a resolved document writes on it. */

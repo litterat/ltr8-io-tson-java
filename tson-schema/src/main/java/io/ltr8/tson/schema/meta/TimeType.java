@@ -25,7 +25,7 @@ import java.util.Optional;
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "time_type")
-public record TimeType(List<TypeRef> supertypes, List<String> subtypes,
+public record TimeType(TypeChain chain,
         Optional<OffsetTime> min, @Field("exclusive_min") Optional<OffsetTime> exclusiveMin,
                      Optional<OffsetTime> max, @Field("exclusive_max") Optional<OffsetTime> exclusiveMax,
                      Optional<BigInteger> precision) implements Atom {
@@ -36,8 +36,7 @@ public record TimeType(List<TypeRef> supertypes, List<String> subtypes,
      */
     @Record
     public TimeType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
@@ -49,12 +48,12 @@ public record TimeType(List<TypeRef> supertypes, List<String> subtypes,
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public TimeType(Optional<OffsetTime> min, Optional<OffsetTime> exclusiveMin, Optional<OffsetTime> max,
             Optional<OffsetTime> exclusiveMax, Optional<BigInteger> precision) {
-        this(List.of(), List.of(), min, exclusiveMin, max, exclusiveMax, precision);
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, precision);
     }
 
     @Override
-    public TimeType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new TimeType(supertypes, subtypes, min, exclusiveMin, max, exclusiveMax, precision);
+    public TimeType withChain(TypeChain chain) {
+        return new TimeType(chain, min, exclusiveMin, max, exclusiveMax, precision);
     }
 
     /** The inclusive bounds alone, for the many callers that set neither an exclusive bound nor a precision. */

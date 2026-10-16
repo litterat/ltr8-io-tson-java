@@ -19,7 +19,7 @@ import java.util.Optional;
  * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "rational_type")
-public record RationalType(List<TypeRef> supertypes, List<String> subtypes,
+public record RationalType(TypeChain chain,
         Optional<Rational> min,
         @Field("exclusive_min") Optional<Rational> exclusiveMin,
         Optional<Rational> max,
@@ -33,8 +33,7 @@ public record RationalType(List<TypeRef> supertypes, List<String> subtypes,
     @Record
 
     public RationalType {
-        supertypes = Chains.copy(supertypes);
-        subtypes = Chains.copy(subtypes);
+        chain = TypeChain.orEmpty(chain);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
@@ -46,12 +45,12 @@ public record RationalType(List<TypeRef> supertypes, List<String> subtypes,
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public RationalType(Optional<Rational> min, Optional<Rational> exclusiveMin, Optional<Rational> max,
             Optional<Rational> exclusiveMax, Optional<Rational> multipleOf) {
-        this(List.of(), List.of(), min, exclusiveMin, max, exclusiveMax, multipleOf);
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, multipleOf);
     }
 
     @Override
-    public RationalType withChain(List<TypeRef> supertypes, List<String> subtypes) {
-        return new RationalType(supertypes, subtypes, min, exclusiveMin, max, exclusiveMax, multipleOf);
+    public RationalType withChain(TypeChain chain) {
+        return new RationalType(chain, min, exclusiveMin, max, exclusiveMax, multipleOf);
     }
 
     /**
