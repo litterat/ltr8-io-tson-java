@@ -79,7 +79,7 @@ class TsonSchemaLinkerTest {
                 List.of(), entries);
     }
 
-    /** The same, each entry's facts -- its position, its value's annotations, its application -- given. */
+    /** The same, each entry's facts -- its position, its value's annotations -- given. */
     private static TsonSchema schemaOf(Map<String, Top> entries, Map<String, TsonSchema.EntryFacts> facts) {
         return new TsonSchema("https://example.test/s.tn", TsonBundledSchemas.META_KERNEL_ID,
                 List.of(), AnnotatedMap.of(entries), false, Map.of(), facts);
@@ -167,7 +167,7 @@ class TsonSchemaLinkerTest {
      * {@code ArrayBody}/placeholder entries a materialisation pass would -- is covered in {@code
      * SchemaDesugarerTest}, one phase earlier.
      *
-     * <p><b>The argument is a real entry, and it has to be.</b> An instantiation's facts record the
+     * <p><b>The argument is a real entry, and it has to be.</b> An instantiation's key records the
      * application it closes, closed; a partial application states the arguments it binds in its own {@code
      * reference.target} (§8.1's alias paragraph). Neither puts a parameter here.
      */
@@ -179,8 +179,11 @@ class TsonSchemaLinkerTest {
         TypeRef otherOfToken = new TypeRef("other", List.of(new TypeArgument.Ref(TypeRef.of("token"))));
         entries.put("generic", RecordBody.of(RecordBody.fieldMap()));
 
-        TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries,
-                Map.of("generic", TsonSchema.EntryFacts.NONE.withApplication(Optional.of(otherOfToken)))), null);
+        AnnotatedMap<String, Top> annotated = AnnotatedMap.of(entries)
+                .withAnnotations("generic", TsonSchema.withApplication(io.ltr8.annotation.Annotations.empty(),
+                        otherOfToken));
+        TsonLinkedSchema result = TsonSchemaLinker.link(new TsonSchema("https://example.test/s.tn",
+                TsonBundledSchemas.META_KERNEL_ID, List.of(), annotated, false, Map.of(), Map.of()), null);
 
         assertEquals(otherOfToken, result.schema().applicationOf("generic").orElseThrow());
         assertEquals(3, result.schema().entries().size(),

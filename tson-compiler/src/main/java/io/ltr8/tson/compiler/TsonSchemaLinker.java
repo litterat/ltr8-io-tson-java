@@ -392,9 +392,12 @@ public final class TsonSchemaLinker {
     }
 
     /** What a message calls {@code name} -- its author's own name, or the form that produced it. */
-    private static String displayName(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts) {
+    private static String displayName(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
+                                      Map<String, TypeRef> applications) {
         return EntryDisplayName.of(name, merged.get(name), facts.getOrDefault(name, TsonSchema.EntryFacts.NONE),
-                merged, other -> facts.getOrDefault(other, TsonSchema.EntryFacts.NONE));
+                Optional.ofNullable(applications.get(name)), merged,
+                other -> facts.getOrDefault(other, TsonSchema.EntryFacts.NONE),
+                other -> Optional.ofNullable(applications.get(other)));
     }
 
     /** Where {@code name} was declared, from the merged facts -- absent for an entry the resolver minted. */
@@ -594,7 +597,13 @@ public final class TsonSchemaLinker {
         Map<String, Normalization> enumForms = new LinkedHashMap<>();
         Map<String, Top> nameTypes = new LinkedHashMap<>();
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
-        Map<String, Top> merged = mergeImports(schema.imports(), loader, origins, enumForms, nameTypes, facts);
+        // The application each instantiation closes (§8.2), off its key: an import's as its schema states it, a
+        // local one's as this schema's resolution wrote it. What a message shows in place of a minted name.
+        Map<String, TypeRef> applications = new LinkedHashMap<>();
+        Map<String, Top> merged = mergeImports(schema.imports(), loader, origins, enumForms, nameTypes, facts,
+                applications);
+        schema.entries().keySet().forEach(name -> schema.applicationOf(name)
+                .ifPresent(application -> applications.put(name, application)));
 
         // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
         // merges another schema's entries into *this* schema's own returned entries()). !!meta only says
@@ -698,7 +707,7 @@ public final class TsonSchemaLinker {
                 // Named by what the author wrote, not by the content-derived name a derived entry carries:
                 // `[some_typo]` is a form they can find in their source where `array_some_typo_95c9a10f` is
                 // a name §8.2 makes non-normative and nobody ever typed.
-                validateEntry(displayName(entry.getKey(), merged, facts), entry.getValue(),
+                validateEntry(displayName(entry.getKey(), merged, facts, applications), entry.getValue(),
                         merged, structureNamespace, heldByName(entry.getKey(), schema, origins, loader),
                         constructors);
             } catch (UnresolvedReference e) {
@@ -722,8 +731,8 @@ public final class TsonSchemaLinker {
         }
 
         checkValuesByName(schema, merged, facts, origins, localNames, governingMeta, loader, receiver);
-        checkEveryEntryIsInhabited(schema, merged, facts, localNames, receiver);
-        checkRecordExtension(schema, merged, facts, localNames, origins, enumForms, receiver);
+        checkEveryEntryIsInhabited(schema, merged, facts, applications, localNames, receiver);
+        checkRecordExtension(schema, merged, facts, applications, localNames, origins, enumForms, receiver);
 
         AnnotatedMap<String, Top> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
@@ -796,6 +805,7 @@ public final class TsonSchemaLinker {
      */
     private static void checkEveryEntryIsInhabited(TsonSchema schema, Map<String, Top> merged,
                                                     Map<String, TsonSchema.EntryFacts> facts,
+                                                    Map<String, TypeRef> applications,
                                                     Set<String> localNames, DiagnosticsReceiver receiver) {
         Set<String> inhabited = TypeInhabitance.derive(merged);
         for (String name : localNames) {
@@ -807,7 +817,7 @@ public final class TsonSchemaLinker {
             // `tree_text_a7f070f6 needs array_tree_text_a7f070f6_1_f3d1a035` names two entries the author
             // never wrote, about a recursion they did.
             List<String> chain = TypeInhabitance.cycleThrough(name, merged, inhabited).stream()
-                    .map(entry -> displayName(entry, merged, facts)).toList();
+                    .map(entry -> displayName(entry, merged, facts, applications)).toList();
             report(receiver, schema, name, at(facts, name), "'" + name + "' can never be satisfied by any "
                     + "document: " + String.join(" needs ", chain)
                     + ", and nothing in that chain can be left out or left empty (§5.10.1). A recursion "
@@ -867,10 +877,11 @@ public final class TsonSchemaLinker {
      */
     private static void checkRecordExtension(TsonSchema schema, Map<String, Top> merged,
                                               Map<String, TsonSchema.EntryFacts> facts,
+                                              Map<String, TypeRef> applications,
                                               Set<String> localNames, Map<String, String> origins,
                                               Map<String, Normalization> enumForms, DiagnosticsReceiver receiver) {
         for (RecordExtension.Violation violation
-                : RecordExtension.check(merged, facts, localNames, origins, enumForms)) {
+                : RecordExtension.check(merged, facts, applications, localNames, origins, enumForms)) {
             String against = reportedAgainst(violation.entry(), merged, facts);
             report(receiver, schema, against, at(facts, against), violation.message());
         }
@@ -1137,7 +1148,8 @@ public final class TsonSchemaLinker {
                                                  Map<String, String> origins,
                                                  Map<String, Normalization> enumForms,
                                                  Map<String, Top> nameTypes,
-                                                 Map<String, TsonSchema.EntryFacts> facts) {
+                                                 Map<String, TsonSchema.EntryFacts> facts,
+                                                 Map<String, TypeRef> applications) {
         Map<String, Top> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : imports) {
@@ -1168,6 +1180,7 @@ public final class TsonSchemaLinker {
                 }
                 merged.put(name, entry.getValue());
                 facts.put(name, imported.schema().factsOf(name));
+                imported.schema().applicationOf(name).ifPresent(application -> applications.put(name, application));
                 origins.put(name, origin);
                 Normalization form = imported.enumForms().get(name);
                 if (form != null) {

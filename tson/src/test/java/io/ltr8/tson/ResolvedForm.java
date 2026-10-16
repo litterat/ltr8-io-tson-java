@@ -168,7 +168,74 @@ final class ResolvedForm {
      * a fixture leaves out of its entries, being compared rather than read, and {@code synthetic}, which
      * {@link #markedSynthetics} compares on its own terms.
      */
-    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", "synthetic");
+    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", "synthetic", "application");
+
+    /**
+     * Each schema-map key's {@code @application} in a §8 resolved-schema document, rendered {@code head<arg, ...>},
+     * hashes normalised -- the instantiation each entry is (§8.2), read from the text parsed as data, a key
+     * annotation being dropped when the document is bound. A record value, so compared on its own terms rather
+     * than among {@link #fixtureKeyAnnotations}' tokens.
+     */
+    static Map<String, String> markedApplications(String resolvedText) {
+        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseDocument().root().coreValue();
+        Map<String, String> marked = new TreeMap<>();
+        for (MapValue.MapEntry entry : map.entries()) {
+            String name = ((TokenValue) entry.key().coreValue()).text();
+            entry.key().annotations().stream()
+                    .filter(annotation -> annotation.name().equals("application"))
+                    .forEach(annotation -> marked.put(withoutHash(name),
+                            withoutHash(writtenApplication(annotation.value().orElseThrow().coreValue()))));
+        }
+        return marked;
+    }
+
+    /** The same, from this resolver: the {@code @application} on the keys of the schema's own entries. */
+    static Map<String, String> ourApplications(Tson tson, String id) {
+        var linked = tson.bindRegistry().core().resolveLinked(id);
+        String canonical = CanonicalIdentity.canonicalize(id);
+        Map<String, String> marked = new TreeMap<>();
+        linked.schema().entries().keySet().forEach(name -> {
+            if (linked.originOf(name).equals(canonical)) {
+                linked.schema().applicationOf(name).ifPresent(application ->
+                        marked.put(withoutHash(name), withoutHash(application(application))));
+            }
+        });
+        return marked;
+    }
+
+    /** A written {@code type_ref}, positional or in record form, as {@code head<arg, ...>}. */
+    private static String writtenApplication(CoreValue value) {
+        if (value instanceof TokenValue token) {
+            return token.text();
+        }
+        RecordValue record = (RecordValue) value;
+        String head = null;
+        List<String> arguments = new java.util.ArrayList<>();
+        for (RecordValue.Field field : record.fields()) {
+            CoreValue held = field.value().value().coreValue();
+            if (field.name().equals("name")) {
+                head = writtenApplication(held);
+            } else if (field.name().equals("arguments")) {
+                for (var element : ((ArrayValue) held).elements()) {
+                    RecordValue argument = (RecordValue) element.value().coreValue();
+                    RecordValue.Field only = argument.fields().getFirst();
+                    arguments.add(writtenApplication(only.value().value().coreValue()));
+                }
+            }
+        }
+        return arguments.isEmpty() ? head : head + "<" + String.join(", ", arguments) + ">";
+    }
+
+    /** A bound application as {@code head<arg, ...>}, on the same terms. */
+    private static String application(TypeRef ref) {
+        if (ref.arguments().isEmpty()) {
+            return ref.name();
+        }
+        return ref.name() + ref.arguments().stream().map(argument -> switch (argument) {
+            case io.ltr8.tson.schema.meta.TypeArgument.Ref nested -> application(nested.ref());
+            case io.ltr8.tson.schema.meta.TypeArgument.Value literal -> literal.value().text();
+        }).collect(java.util.stream.Collectors.joining(", ", "<", ">"));
+    }
 
     /**
      * Each schema-map key's annotations in a §8 resolved-schema document, as {@code @name} or {@code

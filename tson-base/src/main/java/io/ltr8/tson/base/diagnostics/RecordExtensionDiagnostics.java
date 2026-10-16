@@ -85,6 +85,12 @@ public record RecordExtensionDiagnostics(String typeName, String members) {
      * not <em>wrong</em> about the position, it is just not an answer.
      */
     public Refusal tagNamesTheBase(String tagSpelling) {
+        if (members.isEmpty()) {
+            return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
+                    "a tag naming '%s' selects nothing -- it is abstract and has no direct instances, and no schema "
+                            .formatted(typeName) + "in this closure declares a subtype of it to name instead",
+                    "a subtype of '" + typeName + "'", tagSpelling + " " + typeName);
+        }
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 "a tag naming '%s' selects nothing -- it is abstract and has no direct instances. Name the "
                         .formatted(typeName) + "member this value is, one of (%s), or omit the tag"

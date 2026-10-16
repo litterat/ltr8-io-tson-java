@@ -71,7 +71,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      * wrote it, and otherwise the form that produced it ({@link EntryDisplayName}).
      */
     public String displayName(String name, Top definition) {
-        return EntryDisplayName.of(name, definition, schema().factsOf(name));
+        return EntryDisplayName.of(name, definition, schema().factsOf(name), schema().applicationOf(name));
     }
 
     /**
@@ -80,6 +80,23 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      */
     public List<String> subtypesOf(String name, Top definition) {
         return Chained.subtypesOf(definition);
+    }
+
+    /**
+     * The entries IS-A {@code name} that have instances of their own -- {@link #subtypesOf}, less every abstract
+     * record and every family-base template, neither of which a value can be directly. What a refusal at an
+     * abstract position names as satisfying it: naming an abstract subtype would only refuse in turn.
+     */
+    public List<String> instantiableSubtypesOf(String name, Top definition) {
+        return subtypesOf(name, definition).stream()
+                .filter(subtype -> switch (schema().entries().get(subtype)) {
+                    case io.ltr8.tson.schema.meta.RecordBody record ->
+                            record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
+                    case io.ltr8.tson.schema.meta.TemplateBody ignored -> false;
+                    case null -> false;
+                    default -> true;
+                })
+                .toList();
     }
 
     /**

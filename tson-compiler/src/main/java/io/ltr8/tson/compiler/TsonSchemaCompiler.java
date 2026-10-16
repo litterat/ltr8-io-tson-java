@@ -272,7 +272,8 @@ public final class TsonSchemaCompiler {
                 // site naming `pct` over `pct => small` needs, and what knows that `b<10>` was written where
                 // `integer_type_10_100_786fbcfb` will be read.
                 return UseSite.named(resolve(r.target().name()),
-                        EntryDisplayName.of(name, definition, linked.schema().factsOf(name)));
+                        EntryDisplayName.of(name, definition, linked.schema().factsOf(name),
+                                linked.schema().applicationOf(name)));
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
             TsonTypeReader<?> built = factory.create(name, definition,

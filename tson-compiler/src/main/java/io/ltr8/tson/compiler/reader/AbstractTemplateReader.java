@@ -63,7 +63,8 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
                         FamilySelectors.of(name, definition, context.schema().entries()),
                         Set.copyOf(context.subtypesOf(name, definition)), context, readers)
                 : new RecordTagDispatchReader(selfNames, name,
-                        Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning()), readers));
+                        Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning()),
+                        context.instantiableSubtypesOf(name, definition), readers));
     }
 
     @Override

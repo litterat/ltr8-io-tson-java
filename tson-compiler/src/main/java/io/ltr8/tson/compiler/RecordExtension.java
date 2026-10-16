@@ -23,6 +23,7 @@ import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.ArrayList;
@@ -86,20 +87,20 @@ final class RecordExtension {
      * collision inside one import cannot reach here, since that import was refused when it linked.
      */
     static List<Violation> check(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                 Set<String> localNames,
+                                 Map<String, TypeRef> applications, Set<String> localNames,
                                  Map<String, String> origins, Map<String, Normalization> enumForms) {
         List<Violation> violations = new ArrayList<>();
         Predicate<String> kernel = name -> TsonBundledSchemas.isMetaKernel(origins.get(name));
         for (String name : localNames) {
             Top def = merged.get(name);
-            if (def != null && isUndeclaredMember(name, def, facts, kernel)) {
+            if (def != null && isUndeclaredMember(name, def, facts, applications, kernel)) {
                 String base = nearest(Chained.supertypesOf(def), merged);
-                violations.add(new Violation(name, "'" + shown(name, merged, facts) + "' composes onto '"
-                        + shown(base, merged, facts) + "', so it is a member of that family, and a member is declared: "
-                        + "a read reports the member it selects, a tag names it and a binding maps it, all by a "
-                        + "name an application at a use site does not have (§3.3.4, §8.2). Declare it -- "
-                        + "'my_name => " + shown(name, merged, facts) + "' -- and use that name in place of the "
-                        + "application"));
+                String shownName = shown(name, merged, facts, applications);
+                violations.add(new Violation(name, "'" + shownName + "' composes onto '"
+                        + shown(base, merged, facts, applications) + "', so it is a member of that family, and a "
+                        + "member is declared: a read reports the member it selects, a tag names it and a binding maps "
+                        + "it, all by a name an application at a use site does not have (§3.3.4, §8.2). Declare it -- "
+                        + "'my_name => " + shownName + "' -- and use that name in place of the application"));
                 continue;
             }
             RecordBody record = def == null ? null : familyBodyOf(name, def, merged, facts);
@@ -111,7 +112,7 @@ final class RecordExtension {
             Top def = entry.getValue();
             RecordBody base = familyBodyOf(entry.getKey(), def, merged, facts);
             if (base != null && FamilySelectors.dispatchesOnMembers(def)) {
-                checkFamily(entry.getKey(), def, merged, facts, localNames, origins, enumForms, violations);
+                checkFamily(entry.getKey(), def, merged, facts, applications, localNames, origins, enumForms, violations);
             }
         }
         return violations;
@@ -123,10 +124,11 @@ final class RecordExtension {
      * constructor (IS-A the kernel's {@code top}) is no member of anything.
      */
     private static boolean isUndeclaredMember(String name, Top def, Map<String, TsonSchema.EntryFacts> facts,
-                                              Predicate<String> kernel) {
+                                              Map<String, TypeRef> applications, Predicate<String> kernel) {
         TsonSchema.EntryFacts known = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
+        TypeRef application = applications.get(name);
         return known.position().isEmpty() && def instanceof RecordBody record
-                && record.application().filter(application -> !application.arguments().isEmpty()).isPresent()
+                && application != null && !application.arguments().isEmpty()
                 && !record.supertypes().isEmpty() && !TypeKind.isConstructor(name, record, kernel);
     }
 
@@ -221,8 +223,8 @@ final class RecordExtension {
     // ── The family's obligations, over the closure ───────────────────────
 
     private static void checkFamily(String base, Top def, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-            Set<String> localNames, Map<String, String> origins, Map<String, Normalization> enumForms,
-            List<Violation> violations) {
+            Map<String, TypeRef> applications, Set<String> localNames, Map<String, String> origins,
+            Map<String, Normalization> enumForms, List<Violation> violations) {
         // The same derivation the dispatchers read, never a second filter over the fields: a check that
         // decided "which fields select" differently from the read could pass a family no reader can place.
         SequencedMap<String, RecordField> selectors = FamilySelectors.of(base, def, merged);
@@ -233,7 +235,7 @@ final class RecordExtension {
         for (String subtype : new LinkedHashSet<>(Chained.subtypesOf(def))) {
             Top sub = merged.get(subtype);
             // An undeclared member is refused on its own, and judging its pins too would report one mistake twice.
-            if (!(sub instanceof RecordBody record) || isUndeclaredMember(subtype, sub, facts,
+            if (!(sub instanceof RecordBody record) || isUndeclaredMember(subtype, sub, facts, applications,
                     name -> TsonBundledSchemas.isMetaKernel(origins.get(name)))) {
                 continue;
             }
@@ -245,8 +247,8 @@ final class RecordExtension {
             if (collision != null) {
                 boolean merge = !localNames.contains(subtype) && !localNames.contains(collision);
                 String blamed = localNames.contains(subtype) ? subtype : localNames.contains(collision) ? collision : "";
-                violations.add(new Violation(blamed, "'" + shown(subtype, merged, facts) + "' and '"
-                        + shown(collision, merged, facts)
+                violations.add(new Violation(blamed, "'" + shown(subtype, merged, facts, applications) + "' and '"
+                        + shown(collision, merged, facts, applications)
                         + "' pin the discriminator" + (selectors.size() > 1 ? "s" : "") + " of '" + base
                         + "' to the same "
                         + describe(selectors, pins) + " -- two subtypes a value cannot tell apart, so the "
@@ -266,11 +268,13 @@ final class RecordExtension {
      * collides under names the resolver chose ({@code pet_of_cat_int32_1c52dc45}, §8.2), and those name
      * nothing an author can open.
      */
-    private static String shown(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts) {
+    private static String shown(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
+                                Map<String, TypeRef> applications) {
         Top definition = merged.get(name);
         return definition == null ? name : EntryDisplayName.of(name, definition,
-                facts.getOrDefault(name, TsonSchema.EntryFacts.NONE), merged,
-                other -> facts.getOrDefault(other, TsonSchema.EntryFacts.NONE));
+                facts.getOrDefault(name, TsonSchema.EntryFacts.NONE), Optional.ofNullable(applications.get(name)),
+                merged, other -> facts.getOrDefault(other, TsonSchema.EntryFacts.NONE),
+                other -> Optional.ofNullable(applications.get(other)));
     }
 
     /**

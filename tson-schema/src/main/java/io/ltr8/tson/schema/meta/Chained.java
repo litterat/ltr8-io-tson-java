@@ -1,7 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * The meta-kernel's {@code chained => { chain?: type_chain }} ([TSON-SCHEMA] §4.1, SPEC-FEEDBACK.md #14): a value
@@ -36,11 +35,6 @@ public sealed interface Chained permits Type, TemplateBody {
         return chain().subtypes();
     }
 
-    /** The application this entry is the instantiation of (§8.2). */
-    default Optional<TypeRef> application() {
-        return chain().application();
-    }
-
     default Chained withSupertypes(List<String> supertypes) {
         return withChain(chain().withSupertypes(supertypes));
     }
@@ -67,11 +61,6 @@ public sealed interface Chained permits Type, TemplateBody {
     /** {@code value}'s written parents, empty for a value that carries no chain. */
     static List<TypeRef> parentsOf(Top value) {
         return chainOf(value).parents();
-    }
-
-    /** The application {@code value} is the instantiation of, if it records one. */
-    static Optional<TypeRef> applicationOf(Top value) {
-        return chainOf(value).application();
     }
 
     /** {@code value} with {@code chain} in place of its own; a value that carries none is returned as it is. */

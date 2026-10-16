@@ -51,7 +51,7 @@ final class RecordDispatch {
                                 Set.copyOf(context.subtypesOf(name, definition)), context, context.readers())
                         : new RecordTagDispatchReader(selfNames, displayName,
                                 Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning()),
-                                context.readers());
+                                context.instantiableSubtypesOf(name, definition), context.readers());
                 case OPEN, FINAL -> concrete.create(name, definition, context);
             };
         };

@@ -49,7 +49,8 @@ final class DispatchFactories {
                         ? concrete.create(name, definition, context)
                         : new DispatchTagReader(name, displayName(name, definition, context),
                                 context.admitting(List.of(name)), context.admitting(context.subtypesOf(name, definition)),
-                                concrete.create(name, definition, context), context,
+                                context.instantiableSubtypesOf(name, definition), concrete.create(name, definition, context),
+                                context,
                                 context.locationOf(name), rules(name, definition, body, context));
                 case ABSTRACT -> family(name, displayName(name, definition, context), definition,
                         context, rules(name, definition, body, context));
@@ -101,7 +102,7 @@ final class DispatchFactories {
                         FamilySelectors.of(name, definition, context.schema().entries()),
                         Set.copyOf(context.subtypesOf(name, definition)), context, location, rules)
                 : new DispatchTagReader(name, displayName, selfNames, context.admitting(context.subtypesOf(name,
-                        definition)),
+                        definition)), context.instantiableSubtypesOf(name, definition),
                         null, context, location, rules);
     }
 }

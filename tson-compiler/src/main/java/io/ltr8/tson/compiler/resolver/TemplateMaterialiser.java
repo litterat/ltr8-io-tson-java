@@ -69,9 +69,9 @@ import java.util.function.Supplier;
  * an alias, and an error placeholder alike ({@code WireForm.heldEmptyRecord}). {@code record} closes
  * to the instantiation, {@code reference} to a name, everything else to a synthetic.
  *
- * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application, which its chain
- * records ({@code TypeChain.application}; a hop's facts, its value carrying no chain), so two {@code box<text>}
- * anywhere in the schema land on one entry. The derived name is
+ * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application, which its key
+ * records ({@code @application}, whatever the entry's kind), so two {@code box<text>} anywhere in the schema land
+ * on one entry. The derived name is
  * built by {@link DerivedName#ofApplication} from the application itself, which is what makes that dedup fall out of
  * naming rather than needing a second table.
  *
@@ -109,6 +109,12 @@ final class TemplateMaterialiser {
      * and the application it closes. {@code SchemaResolver}'s own map, shared so a minted entry's facts are
      * there the moment it is published.
      */
+    /**
+     * The application each instantiation this pass closed is the instantiation of, by entry name (§8.2) -- shared
+     * with {@code SchemaResolver}, which keys the applied-parent fold on it and writes it on the entry's key.
+     */
+    private final Map<String, TypeRef> applications;
+
     private final Map<String, TsonSchema.EntryFacts> facts;
 
     /** The constructor an entry's value applies, through the schema's facts and then its own class. */
@@ -251,10 +257,11 @@ final class TemplateMaterialiser {
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, Top> publish,
             DefinitionMetaReader metaReader, Set<String> generated,
             Function<String, Top> metaTypes, Supplier<String> resolving,
-            Map<String, TsonSchema.EntryFacts> facts, Function<String, Optional<String>> localConstructors,
-            Function<String, Optional<String>> metaConstructors) {
+            Map<String, TsonSchema.EntryFacts> facts, Map<String, TypeRef> applications,
+            Function<String, Optional<String>> localConstructors, Function<String, Optional<String>> metaConstructors) {
         this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.facts = Objects.requireNonNull(facts, "facts");
+        this.applications = Objects.requireNonNull(applications, "applications");
         this.localConstructors = Objects.requireNonNull(localConstructors, "localConstructors");
         this.metaConstructors = Objects.requireNonNull(metaConstructors, "metaConstructors");
         this.publish = Objects.requireNonNull(publish, "publish");
@@ -703,15 +710,12 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * {@code value} as the instantiation of {@code application} (§8.2): stated in its chain, and for a value that
-     * carries none -- the hop to the synthetic a non-record template closes to -- recorded among its facts.
+     * {@code value} as the instantiation of {@code application} (§8.2), whatever kind of entry it is: a record
+     * template's member, a DATA entry, the hop to the synthetic a non-record template closes to. Recorded in
+     * {@link #applications}, which {@code SchemaResolver} writes onto the entry's key as {@code @application}.
      */
     private Top instantiation(String name, Top value, TypeRef application) {
-        if (value instanceof Chained chained) {
-            return Chained.withChain(value, chained.chain().withApplication(Optional.of(application)));
-        }
-        TsonSchema.EntryFacts known = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
-        facts.put(name, known.withApplication(Optional.of(application)));
+        applications.put(name, application);
         return value;
     }
 

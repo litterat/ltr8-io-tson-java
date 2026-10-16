@@ -33,9 +33,8 @@ final class MetaRefs {
     }
 
     /**
-     * Every {@link TypeRef} an entry's value holds, mapped -- its chain included ({@link TypeChain}): the parents,
-     * the application, and the names of the supertypes and subtypes, which a rename reaches like any other
-     * reference.
+     * Every {@link TypeRef} an entry's value holds, mapped -- its chain included ({@link TypeChain}): the parents
+     * and the names of the supertypes and subtypes, which a rename reaches like any other reference.
      */
     static Top mapRefs(Top definition, UnaryOperator<TypeRef> map) {
         return mapBodyRefs(definition, map, true);
@@ -46,8 +45,7 @@ final class MetaRefs {
      *
      * <p>{@code TemplateMaterialiser} is the caller, and a composition operand is why: an application there
      * denotes no entry -- its fields are absorbed by value -- so {@code parents} keeps it as written until {@code
-     * SchemaResolver} folds the chain, and closing it would mint the entry that path exists to avoid. The
-     * chain's {@code application} is the entry's identity, which closing the entry is what established.
+     * SchemaResolver} folds the chain, and closing it would mint the entry that path exists to avoid.
      *
      * <p><b>Skipping the call is the point, not discarding its result.</b> Closing an application publishes
      * the entry as a side effect, so a walk that maps this channel has already minted whatever the caller
@@ -100,7 +98,6 @@ final class MetaRefs {
     private static TypeChain mapChain(TypeChain chain, UnaryOperator<TypeRef> map) {
         UnaryOperator<String> name = written -> map.apply(TypeRef.of(written)).name();
         return new TypeChain(chain.parents().stream().map(map).toList(),
-                chain.supertypes().stream().map(name).toList(), chain.subtypes().stream().map(name).toList(),
-                chain.application().map(map));
+                chain.supertypes().stream().map(name).toList(), chain.subtypes().stream().map(name).toList());
     }
 }

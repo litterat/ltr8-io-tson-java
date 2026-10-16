@@ -52,6 +52,14 @@ own prose (which had gone stale on it):
   must be IS-A the type the held body derives, since a written narrowing lives nowhere else; it also re-runs the
   family checks (no member minted at a use site) over the ingested map and its closure, and the §5.11 group
   declaration rules over every `field_group`. `ParameterTypes` already derives the type to check against.
+- [ ] **An application is not yet unified with an imported library's entry for it** (SPEC-FEEDBACK.md #14, §8.2). A
+  library declaring `int_box => box<int32>` writes `@application:{ name: box  arguments: [{ name: int32 }] }` on that
+  key, and a schema importing it that writes `box<int32>` still closes the application to an entry of its own rather
+  than resolving to `int_box`. The lookup runs application to entry, so it needs an index over imported keys keyed by
+  `DerivedName.canonicalApplication`; `TemplateMaterialiser.ownedBy` is that index for local declarations and
+  `SchemaResolver` already reads every import's `@application` into the map the applied-parent fold uses, so the
+  index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
+  application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
 - [ ] **`ref<T>`: a reference type, so the slot declares how its value is spelled** (SPEC-FEEDBACK.md #13). Today the
   host's component type decides whether a record-typed slot in a `data` body takes a value by name (`TypeRef`) or a
@@ -68,6 +76,21 @@ own prose (which had gone stale on it):
   schema declares. A segment is then judged by the key type of the namespace it lands in, rather than by §7.7
   uniformly, and a key that is no identifier needs a spelling: `orders_api."/orders/{id}".GET` is not one token under
   [TSON-DATA] §7.2. Lands on `r2026-38-proposal` before the branch goes to the reviewer.
+- [ ] **A record-bodied template is a `record` with `parameters`** (SPEC-FEEDBACK.md #14, Status). §5.10 makes a
+  record-bodied template the one template that is a type, the ABSTRACT base its declared applications are members of,
+  and the kernel carries that by giving every `template` a chain, `extension` and `discriminators` that only record
+  templates fill, and `TypeKind.TEMPLATE` plus "a `Type`, or a template with `extension`" checks beside it. Resolve it
+  as `!record { parameters: [...]  fields: {...}  chain: {...} }` instead: kind PRODUCT, IS-A `type`, open by
+  `parameters` being present, erasure visible as the fields naming no parameter, no held text and no two-level
+  `extension`; `template` keeps `parameters` and `template` text alone, loses `chained`, and the chain is `type`'s
+  again. Needs `record_field`'s pin and default split into a literal or a parameter reference, as `type_argument`
+  already is, and refuses a parameter at a record's own facets (`optional: B`, `extension: E`, `name_type: N`), which
+  held text admits today -- check the corpus for a vector that depends on that before the kernel edit, and decide
+  whether `final <T> { ... }` means each application is FINAL or stays refused. In Java, `RecordBody` gains
+  `parameters`, `TemplateBody` loses the family-base fields and `Chained`, the linker and compiler iterate one closed-
+  entries view in place of skipping `TemplateBody`, and the materialiser substitutes into a value for records rather
+  than re-reading text. Every record template's resolved output changes; no data verdict does. After #725's chain
+  record and before the namespace kind, both having to say what is looked up lexically.
 
 ## Checked annotations
 
@@ -329,7 +352,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **A template application is named in a diagnostic by the construction it closes, in array spelling.**
   `tags: set<text>` given `[a a]` reports `'[text]' requires unique elements`, and `only: tuple1<text>` given `[]`
   reports `'[text]' has 1 positions, found only 0 elements` — so a set and a one-element tuple both read as the
-  array `[text]`, a type the author never wrote. The instantiation entry's facts record the application
+  array `[text]`, a type the author never wrote. The instantiation entry's key records the application
   (`set<text>`), but its body is a reference to the synthetic construction it closes
   (`!set_type { element_type: text }`, built by the bare constructor), and the reader that reports is the
   synthetic's, which `EntryDisplayName` renders from its body. The fix is to keep the application as the display

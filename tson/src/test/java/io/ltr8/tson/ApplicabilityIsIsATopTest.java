@@ -14,6 +14,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -160,16 +161,39 @@ class ApplicabilityIsIsATopTest {
 
     /**
      * A base kind is admitted by the predicate and refused as abstract (SPEC-FEEDBACK.md #15), which is the
-     * better answer: it names the subtypes that would satisfy the position instead of saying the head was the
-     * wrong kind of thing.
+     * better answer: it names the instantiable subtypes that would satisfy the position instead of saying the head
+     * was the wrong kind of thing.
      */
     @Test
     void aBaseKindIsAdmittedAndThenRefusesItself() {
         List<Diagnostic> problems = problems("  bad => !product {}");
 
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("it is abstract and has no direct instances"),
+        assertTrue(problems.getFirst().message().contains("'!product' names an abstract entry"), problems::toString);
+        assertTrue(problems.getFirst().message().contains("(record | array | set_type | map | tuple)"),
                 problems::toString);
-        assertTrue(problems.getFirst().message().contains("record | array"), problems::toString);
+        assertFalse(problems.getFirst().message().contains("constraint vocabulary"),
+                "one sentence, not the applicability clause beside the abstract one: " + problems);
+    }
+
+    /** {@code top}'s refusal names only what can be constructed: {@code type} and the base kinds are abstract too. */
+    @Test
+    void topNamesOnlyItsInstantiableSubtypes() {
+        String message = problems("  bad => !top {}").getFirst().message();
+
+        assertTrue(message.contains("record"), message);
+        for (String abstractKind : List.of("type", "atom", "product", "sum", "data", "template")) {
+            assertFalse(message.matches("(?s).*[(| ]" + abstractKind + "[ |)].*"),
+                    () -> abstractKind + " is no answer: " + message);
+        }
+    }
+
+    /** With nothing in scope composing it, {@code data}'s refusal says so rather than naming an empty list. */
+    @Test
+    void dataWithNothingComposingItSaysSo() {
+        String message = problems("  bad => !data {}").getFirst().message();
+
+        assertTrue(message.contains("no constructor in scope composes 'data'"), message);
+        assertFalse(message.contains("()"), message);
     }
 }

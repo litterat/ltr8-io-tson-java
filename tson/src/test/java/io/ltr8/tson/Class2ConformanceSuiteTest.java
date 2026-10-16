@@ -155,6 +155,10 @@ class Class2ConformanceSuiteTest {
                 assertEquals(ResolvedForm.markedSynthetics(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourSynthetics(tson, identityOf(source)),
                         "the entries marked @synthetic are not the ones the vector marks");
+                // §8.2's second key annotation: each instantiation states, on its key, the application it is.
+                assertEquals(ResolvedForm.markedApplications(fieldText(outcomePayload(sidecar), "resolved")),
+                        ResolvedForm.ourApplications(tson, identityOf(source)),
+                        "the entries' @application are not the ones the vector states");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
             case "refused" -> assertRefused(sidecar, problems, "schema");

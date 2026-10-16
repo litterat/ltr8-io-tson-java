@@ -94,12 +94,12 @@ final class SyntheticMerge {
     }
 
     /**
-     * The applications {@code facts} records, rewritten the same way and at every depth: an instantiation's
-     * application is what a message shows and what §5.8's applied-parent edge is keyed on, and an argument naming
-     * the eager name would key it on a form that no longer exists.
+     * The {@code applications} each instantiation records, rewritten the same way and at every depth: an
+     * instantiation's application is its identity, what a message shows and what §5.8's applied-parent edge is
+     * keyed on, and an argument naming the eager name would key it on a form that no longer exists.
      */
-    static void rewriteFacts(Map<String, TsonSchema.EntryFacts> facts, Map<String, String> renames) {
-        facts.replaceAll((name, fact) -> fact.withApplication(fact.application().map(ref -> renamed(ref, renames))));
+    static void rewriteApplications(Map<String, TypeRef> applications, Map<String, String> renames) {
+        applications.replaceAll((name, application) -> renamed(application, renames));
     }
 
     private static TypeRef renamed(TypeRef ref, Map<String, String> renames) {

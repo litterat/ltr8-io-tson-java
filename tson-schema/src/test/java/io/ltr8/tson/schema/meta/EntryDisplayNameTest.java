@@ -32,7 +32,7 @@ class EntryDisplayNameTest {
 
     /** An entry the resolver minted, rendered: no position, because there is no declaration to have one. */
     private static String minted(String name, Top value) {
-        return EntryDisplayName.of(name, value, TsonSchema.EntryFacts.NONE);
+        return EntryDisplayName.of(name, value, TsonSchema.EntryFacts.NONE, Optional.empty());
     }
 
     private static ArrayBody array(Optional<BigInteger> min, Optional<BigInteger> max) {
@@ -44,7 +44,7 @@ class EntryDisplayNameTest {
         Top declared = array(Optional.of(BigInteger.ONE), Optional.empty());
 
         assertEquals("tag_list", EntryDisplayName.of("tag_list", declared,
-                TsonSchema.EntryFacts.at(Optional.of(SOMEWHERE))));
+                TsonSchema.EntryFacts.at(Optional.of(SOMEWHERE)), Optional.empty()));
     }
 
     @Test
@@ -76,7 +76,7 @@ class EntryDisplayNameTest {
     }
 
     /**
-     * An instantiation entry renders as the application it closes, from its facts -- which is what §8.2 keys
+     * An instantiation entry renders as the application it closes, from its key -- which is what §8.2 keys
      * its identity on, so it is exactly what the author wrote at the site.
      */
     @Test
@@ -85,14 +85,14 @@ class EntryDisplayNameTest {
                 new TypeArgument.Value(new Token("3", Token.Form.UNQUOTED))));
 
         assertEquals("paged<order, 3>", EntryDisplayName.of("paged_order_3_abc", RecordBody.of(RecordBody.fieldMap()),
-                TsonSchema.EntryFacts.NONE.withApplication(Optional.of(application))));
+                TsonSchema.EntryFacts.NONE, Optional.of(application)));
     }
 
     /** A construction's tag is a bare constructor name, which is not an application and renders as the body. */
     @Test
     void aConstructionIsNotAnApplication() {
         assertEquals("[order]", EntryDisplayName.of("x", array(Optional.empty(), Optional.empty()),
-                TsonSchema.EntryFacts.constructedBy("array")));
+                TsonSchema.EntryFacts.constructedBy("array"), Optional.empty()));
     }
 
     /** No sugar spelling and no application: the name, honestly, rather than something invented. */

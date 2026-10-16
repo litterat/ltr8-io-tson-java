@@ -36,9 +36,13 @@ public final class EntryDisplayName {
     private EntryDisplayName() {
     }
 
-    /** {@code name} if the author wrote it, else the form that produced this entry. */
-    public static String of(String name, Top value, TsonSchema.EntryFacts facts) {
-        return of(name, value, facts, Map.of(), ignored -> TsonSchema.EntryFacts.NONE);
+    /**
+     * {@code name} if the author wrote it, else the form that produced this entry -- {@code application} being the
+     * one its key carries ({@link TsonSchema#applicationOf(String)}).
+     */
+    public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<TypeRef> application) {
+        return of(name, value, facts, application, Map.of(), ignored -> TsonSchema.EntryFacts.NONE,
+                ignored -> Optional.empty());
     }
 
     /**
@@ -48,49 +52,58 @@ public final class EntryDisplayName {
      */
     public static String of(String name, TsonSchema schema) {
         Top value = schema.entries().get(name);
-        return value == null ? name : of(name, value, schema.factsOf(name), schema.entries(), schema::factsOf);
+        return value == null ? name : of(name, value, schema.factsOf(name), schema.applicationOf(name),
+                schema.entries(), schema::factsOf, schema::applicationOf);
     }
 
     /**
-     * The same over a namespace and its facts held apart -- the linker's merged view, which is no one schema. A
-     * caller with no namespace to hand gets the one-level rendering ({@link #of(String, Top,
-     * TsonSchema.EntryFacts)}), which is what a reader already has and enough for the value it is reporting on.
+     * The same over a namespace, its facts and its applications held apart -- the linker's merged view, which is
+     * no one schema. A caller with no namespace to hand gets the one-level rendering ({@link #of(String, Top,
+     * TsonSchema.EntryFacts, Optional)}), which is what a reader already has and enough for the value it is
+     * reporting on.
      */
-    public static String of(String name, Top value, TsonSchema.EntryFacts facts, Map<String, ? extends Top> namespace,
-                            Function<String, TsonSchema.EntryFacts> factsOf) {
+    public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<TypeRef> application,
+                            Map<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
+                            Function<String, Optional<TypeRef>> applicationOf) {
         if (facts.position().isPresent()) {
             return name;
         }
-        return application(value, facts).orElseGet(() -> switch (value) {
-            case ArrayBody array -> "[" + shown(array.elementType(), namespace, factsOf)
+        Lookup lookup = new Lookup(namespace, factsOf, applicationOf);
+        return applied(application).orElseGet(() -> switch (value) {
+            case ArrayBody array -> "[" + shown(array.elementType(), lookup)
                     + size(array.minItems(), array.maxItems()) + "]";
-            case MapBody map -> "{" + shown(map.keyType(), namespace, factsOf) + " => "
-                    + shown(map.valueType(), namespace, factsOf) + size(map.minItems(), map.maxItems()) + "}";
+            case MapBody map -> "{" + shown(map.keyType(), lookup) + " => "
+                    + shown(map.valueType(), lookup) + size(map.minItems(), map.maxItems()) + "}";
             case TupleBody tuple -> tuple.elements().stream().map(TupleElement::elementType)
-                    .map(ref -> shown(ref, namespace, factsOf)).collect(Collectors.joining(", ", "[", "]"));
-            case ChoiceBody choice -> choice.variants().stream().map(ref -> shown(ref, namespace, factsOf))
+                    .map(ref -> shown(ref, lookup)).collect(Collectors.joining(", ", "[", "]"));
+            case ChoiceBody choice -> choice.variants().stream().map(ref -> shown(ref, lookup))
                     .collect(Collectors.joining(" | ", "(", ")"));
             default -> name;
         });
     }
 
+    /** The three views a rendering resolves an inner name through. */
+    private record Lookup(Map<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
+                          Function<String, Optional<TypeRef>> applicationOf) {
+    }
+
     /** One name inside a form, itself display-rendered when the namespace knows it and it is derived. */
-    private static String shown(TypeRef ref, Map<String, ? extends Top> namespace,
-                                Function<String, TsonSchema.EntryFacts> factsOf) {
-        Top referenced = namespace.get(ref.name());
+    private static String shown(TypeRef ref, Lookup lookup) {
+        Top referenced = lookup.namespace().get(ref.name());
         return referenced == null ? ref.name()
-                : of(ref.name(), referenced, factsOf.apply(ref.name()), namespace, factsOf);
+                : of(ref.name(), referenced, lookup.factsOf().apply(ref.name()),
+                        lookup.applicationOf().apply(ref.name()), lookup.namespace(), lookup.factsOf(),
+                        lookup.applicationOf());
     }
 
     /**
      * {@code head<arg, arg>} for an entry a template application materialised: an instantiation entry keys its
-     * identity on the application it closes (§8.2) -- its chain's, or for a value carrying no chain its facts'.
+     * identity on the application it closes (§8.2), which its key carries.
      */
-    private static Optional<String> application(Top value, TsonSchema.EntryFacts facts) {
-        Optional<TypeRef> chained = Chained.applicationOf(value);
-        return (chained.isPresent() ? chained : facts.application())
-                .filter(application -> !application.arguments().isEmpty())
-                .map(application -> application.name() + application.arguments().stream()
+    private static Optional<String> applied(Optional<TypeRef> application) {
+        return application
+                .filter(applied -> !applied.arguments().isEmpty())
+                .map(applied -> applied.name() + applied.arguments().stream()
                         .map(EntryDisplayName::argument).collect(Collectors.joining(", ", "<", ">")));
     }
 

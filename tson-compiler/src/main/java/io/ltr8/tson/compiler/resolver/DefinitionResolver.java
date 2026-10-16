@@ -44,6 +44,7 @@ import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.TypeKind;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -457,6 +458,7 @@ final class DefinitionResolver {
             if (annotationsResolve && metaDefinitions.definition(annotation.name()) == null) {
                 throw unresolvedAnnotation(name, annotation.name());
             }
+            refuseWrittenApplication(name, annotation.name());
             if (annotation.value().isEmpty()) {
                 bindAnnotationValue(name, annotation.name(), VOID);
             }
@@ -650,6 +652,35 @@ final class DefinitionResolver {
     }
 
     /**
+     * Refuses a construction whose head is abstract -- {@code top}, {@code type}, a base kind (SPEC-FEEDBACK.md
+     * #15), or a meta layer's own abstract record: it has no direct instances (§5.2), so {@code !C { ... }} builds
+     * nothing. One sentence, naming what would satisfy it: the instantiable entries IS-A the head in the structure
+     * namespace, every abstract one among them left out, since naming one would refuse in turn, and {@code
+     * template}, which no declaration constructs ({@link #requireAuthorable}).
+     */
+    private void refuseAbstractHead(String name, String target, Top head) {
+        if (!(head instanceof RecordBody record) || record.extension() != RecordExtensionType.ABSTRACT) {
+            return;
+        }
+        List<String> instantiable = Chained.subtypesOf(head).stream()
+                .filter(subtype -> !TEMPLATE.equals(subtype) && isInstantiable(metaDefinitions.definition(subtype)))
+                .toList();
+        String terminal = ReferenceChain.terminal(target, metaDefinitions::definition);
+        throw new SchemaValidationException("'" + name + "': '!" + target + "' names an abstract entry, which has no "
+                + "direct instances (§5.2), so there is nothing for '!" + target + " { ... }' to build -- "
+                + (instantiable.isEmpty()
+                        ? "and no constructor in scope composes '" + terminal + "'"
+                        : "construct one of its instantiable subtypes instead: (" + String.join(" | ", instantiable)
+                                + ")"));
+    }
+
+    /** Whether a construction may apply {@code definition} directly: a closed entry that is not abstract. */
+    private static boolean isInstantiable(Top definition) {
+        return definition != null && !(definition instanceof TemplateBody)
+                && !(definition instanceof RecordBody record && record.extension() == RecordExtensionType.ABSTRACT);
+    }
+
+    /**
      * Refuses {@code template} as a construction head, closed or open: it is resolver vocabulary (§8.1).
      * An open entry's body is derived from a declaration's parameter list, and nothing is ever typed by it, so
      * a source declaration applying it directly is a resolver error. It passes {@link #requireApplicable} --
@@ -706,6 +737,7 @@ final class DefinitionResolver {
                     + "vocabulary (§4.2), which is a different operation and needs a closed constructor");
         }
         requireApplicable(name, target, constructor);
+        refuseAbstractHead(name, target, constructor);
         refuseWrittenChain(name, target, instance.value());
         // No check that the head's own body is a record: the two above leave nothing else. A chain reaching
         // `top` is built only by composition and refinement, both of which build a `RecordBody` -- except where
@@ -763,6 +795,22 @@ final class DefinitionResolver {
                         + "'chained' gives a type's IS-A chain (§4.1) -- '" + name + "' composes it, and a "
                         + "constructor never declares that name. Name the field something else");
             }
+        }
+    }
+
+    /**
+     * Refuses an author-written {@code @application}: the kernel's annotation is the resolver's, stating on an
+     * entry's key the application it is the instantiation of (§8.2), as {@code chain} states where it sits -- so
+     * a declaration writing it makes a claim no declaration can make. Judged by where the name is defined, so a
+     * meta layer's own annotation of that name is its own.
+     */
+    private void refuseWrittenApplication(String name, String annotation) {
+        if (TsonSchema.APPLICATION.equals(annotation) && metaDefinitions.definition(annotation) != null
+                && metaKernel.test(annotation)) {
+            throw new SchemaValidationException("'" + name + "': '@application' is written, which a declaration "
+                    + "never writes -- it is the application an entry is the instantiation of, which the resolver "
+                    + "states on the key of every entry that closes one (§8.2). Write the application itself: '"
+                    + name + " => template<arguments>'");
         }
     }
 
@@ -839,6 +887,7 @@ final class DefinitionResolver {
         // more -- every open entry is TEMPLATE whatever constructor its held body applies, so the alias form
         // stopped being the one shape whose kind had to be read off the head.
         requireApplicable(name, target, constructor);
+        refuseAbstractHead(name, target, constructor);
         refuseWrittenChain(name, target, template.value());
         if (!(constructor instanceof RecordBody vocabulary)) {
             throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "

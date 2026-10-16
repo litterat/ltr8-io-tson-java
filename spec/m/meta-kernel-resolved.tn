@@ -18,8 +18,7 @@
     parents; `subtypes` is its inverse over the entries of this map
     only (inverse edges from schemas that import this one are not
     represented here); `parents` is held text's and a family-base
-    template's, the parents as written; `application` is the
-    instantiation an entry is. Both name lists are written lexically
+    template's, the parents as written. Both name lists are written lexically
     sorted; a resolver's native ordering is implementation-defined,
     so comparison tools canonicalise both lists before comparing.
     Set-typed fields are compared as written, in source declaration
@@ -72,8 +71,10 @@
     substitutes the parameters away. A held record's `chain` holds
     only `parents`, as written, one of which may be an application;
     closing it completes the chain. Instantiation entries are
-    internally named (implementation-chosen, non-normative); none
-    appear here, as nothing in this schema applies a
+    internally named (implementation-chosen, non-normative), and each
+    carries the derived `@application` at its schema-map key, the
+    application it is the instantiation of, read as stated on ingest;
+    none appear here, as nothing in this schema applies a
     non-constructor template.
   - Synthetic entries — the closed forms the sugar lifts to (Part 2
     Section 5.3) — are instances of the constructor they build, are
@@ -100,10 +101,9 @@
   }
 
   type_chain => !record { fields: {
-    parents     => !record_field { type: array_type_ref_xxhash  optional: true }
-    supertypes  => !record_field { type: array_type_name_xxhash  optional: true }
-    subtypes    => !record_field { type: array_type_name_xxhash  optional: true }
-    application => !record_field { type: type_ref  optional: true }
+    parents    => !record_field { type: array_type_ref_xxhash  optional: true }
+    supertypes => !record_field { type: array_type_name_xxhash  optional: true }
+    subtypes   => !record_field { type: array_type_name_xxhash  optional: true }
   } }
 
   chained => !record {
@@ -311,6 +311,8 @@
   doc => @annotation !reference { target: text }
 
   synthetic => @annotation !reference { target: void }
+
+  application => @annotation !reference { target: type_ref }
 
   record_field => !record { fields: {
     type     => !record_field { type: type_ref }

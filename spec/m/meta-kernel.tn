@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=624ab597d26f08681ca464b71e732f5f0b2f09270f36f6f6a37ded5cb72bd306"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=670ce4dae260ac420be5bb1a1db1ec39fd1ea2e2273fe632e200b0158a1f4481"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -28,23 +28,19 @@
   top       => abstract {}
 
   @doc:"""
-    Where an entry sits in the IS-A order, and which application it is the
-    instantiation of. `parents` is what was written: the parents of held
-    template text, one of which may be an application (`<T> result<T> & { ...
-    }`), and of a family-base template after it closes; it is the only list
-    that ever holds an application. `supertypes` is the closed chain: every
-    entry this one IS-A, complete to a fixed point through applied parents
-    ([TSON-SCHEMA] §5.8), each a bare name, sorted, and empty for a fresh
-    record, an instance and a subtracted record alike. `subtypes` is the
+    Where an entry sits in the IS-A order. `parents` is what was written: the
+    parents of held template text, one of which may be an application (`<T>
+    result<T> & { ... }`), and of a family-base template after it closes; it is
+    the only list that ever holds an application. `supertypes` is the closed
+    chain: every entry this one IS-A, complete to a fixed point through applied
+    parents ([TSON-SCHEMA] §5.8), each a bare name, sorted, and empty for a
+    fresh record, an instance and a subtracted record alike. `subtypes` is the
     inverse, over the entries of this map only ([TSON-SCHEMA] §3.3.4).
-    `application` is the entry's identity as an instantiation ([TSON-SCHEMA]
-    §8.2), written wherever a declaration or a materialised entry closes one.
     """
   type_chain => {
-    parents?:     [type_ref]
-    supertypes?:  [type_name]
-    subtypes?:    [type_name]
-    application?: type_ref
+    parents?:    [type_ref]
+    supertypes?: [type_name]
+    subtypes?:   [type_name]
   }
 
   @doc:"""
@@ -604,6 +600,20 @@
     at its schema-map key (§8.2).
     """
   synthetic => @annotation void
+
+  @doc:"""
+    Resolver-attached and derived: on an entry's schema-map key, the
+    application the entry is the instantiation of ([TSON-SCHEMA] §8.2). An
+    entry of any kind can be one, so it is a fact about the entry and not
+    about a type: the resolver writes it wherever an entry closes an
+    application — a record-bodied template's member, a DATA entry, the alias a
+    non-record template's application closes to. On ingest it is read as
+    stated, unlike `synthetic`, which is recomputed: it is the one fact the
+    entry's value does not state, and what lets an imported schema's
+    instantiations unify with a later schema's. A declaration never writes
+    it, as it never writes `chain`.
+    """
+  application => @annotation type_ref
 
   @doc:"""
     Supporting records. A record field is the four facts a reader consults:

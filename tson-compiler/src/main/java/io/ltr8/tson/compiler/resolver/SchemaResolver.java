@@ -220,7 +220,13 @@ public final class SchemaResolver {
         // Which names denote the meta-kernel's own entries: a kind and a constructor are judged by where a base
         // kind is defined, never by its spelling (§4.1), so a schema's own `data` stays an ordinary record.
         Set<String> kernelNames = new LinkedHashSet<>();
+        // Which application each entry is the instantiation of (§8.2): an import's as its key states it, a local
+        // one's as materialisation closes it. Keyed on the entry, whatever its kind; written on the local keys as
+        // `@application` where the entry map is assembled.
+        Map<String, io.ltr8.tson.schema.meta.TypeRef> applications = new LinkedHashMap<>();
         Map<String, Top> namespace = mergeImports(document, nameAnnotations, facts, kernelNames);
+        nameAnnotations.forEach((name, annotations) -> TsonSchema.applicationOf(annotations)
+                .ifPresent(application -> applications.put(name, application)));
         boolean isKernel = TsonBundledSchemas.isMetaKernel(id);
         Predicate<String> kernel = name -> isKernel || kernelNames.contains(name);
         Function<String, Optional<String>> localConstructors = name -> {
@@ -283,8 +289,8 @@ public final class SchemaResolver {
                 (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names),
                         heldByName),
                 generated,
-                metaParser.schema().entries()::get, namespaceGetter::current, facts, localConstructors,
-                metaParser.schema()::constructorOf);
+                metaParser.schema().entries()::get, namespaceGetter::current, facts, applications,
+                localConstructors, metaParser.schema()::constructorOf);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
@@ -390,8 +396,8 @@ public final class SchemaResolver {
         Map<String, Top> instantiations = materialiser.materialise(resolvedLocals,
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
         republish(namespace, resolvedLocals, instantiations);
-        familyBaseEdges(namespace, resolvedLocals, generated, facts);
-        appliedParentEdges(namespace, resolvedLocals, instantiations, facts);
+        familyBaseEdges(namespace, resolvedLocals, generated, applications);
+        appliedParentEdges(namespace, resolvedLocals, instantiations, applications);
         closeChains(namespace, resolvedLocals, instantiations);
 
         // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
@@ -402,7 +408,7 @@ public final class SchemaResolver {
         if (!merged.isEmpty()) {
             SyntheticMerge.rewrite(resolvedLocals, merged);
             SyntheticMerge.rewrite(instantiations, merged);
-            SyntheticMerge.rewriteFacts(facts, merged);
+            SyntheticMerge.rewriteApplications(applications, merged);
             merged.forEach((from, to) -> {
                 // Dropped where the other channel already published the form, moved where it did not: the
                 // eager name was this schema's only one for it, and an entry nothing names is not an entry.
@@ -486,6 +492,17 @@ public final class SchemaResolver {
                 localOnly.put(name, definition);
             }
         });
+        // §8.2's second derived key annotation: every entry that closes an application, whatever its kind -- a
+        // record template's member, a DATA entry, the hop a non-record template's application closes to --
+        // carries `@application` on its key, which is where resolved output states an instantiation's identity
+        // and where ingest reads it back as stated.
+        for (String name : List.copyOf(localOnly.keySet())) {
+            io.ltr8.tson.schema.meta.TypeRef application = applications.get(name);
+            if (application != null) {
+                localOnly.put(name, localOnly.get(name),
+                        TsonSchema.withApplication(localOnly.getAnnotations(name), application));
+            }
+        }
         Map<String, List<TsonSchema.ValueByName>> valuesByName = new LinkedHashMap<>();
         Map<String, TsonSchema.EntryFacts> localFacts = new LinkedHashMap<>();
         localOnly.forEach((name, definition) -> {
@@ -592,9 +609,9 @@ public final class SchemaResolver {
      */
     private static void appliedParentEdges(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
                                            Map<String, Top> instantiations,
-                                           Map<String, TsonSchema.EntryFacts> facts) {
+                                           Map<String, io.ltr8.tson.schema.meta.TypeRef> applications) {
         Map<String, String> byApplication = new LinkedHashMap<>();
-        namespace.forEach((entryName, definition) -> applicationOf(definition, facts.get(entryName))
+        namespace.keySet().forEach(entryName -> Optional.ofNullable(applications.get(entryName))
                 .filter(application -> !application.arguments().isEmpty())
                 .ifPresent(application -> byApplication.putIfAbsent(
                         DerivedName.canonicalApplication(application.name(), application.arguments()),
@@ -616,13 +633,6 @@ public final class SchemaResolver {
         }
     }
 
-    /** The application {@code definition} is the instantiation of: its chain's, or its facts' for a hop. */
-    private static Optional<io.ltr8.tson.schema.meta.TypeRef> applicationOf(Top definition,
-                                                                           TsonSchema.EntryFacts facts) {
-        Optional<io.ltr8.tson.schema.meta.TypeRef> chained = Chained.applicationOf(definition);
-        return chained.isPresent() || facts == null ? chained : facts.application();
-    }
-
     /**
      * §5.10's membership: a <b>declared</b> application of a family base -- {@code bt => box<int32>} over
      * {@code box => <T> { v: T }} -- is a member, so its chain names the template (§8.2's entry shape) and the
@@ -635,12 +645,13 @@ public final class SchemaResolver {
      * <p>A lifted synthetic is never a member either: it was named by no declaration, which is the whole test.
      */
     private static void familyBaseEdges(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
-                                        Set<String> generated, Map<String, TsonSchema.EntryFacts> facts) {
+                                        Set<String> generated,
+                                        Map<String, io.ltr8.tson.schema.meta.TypeRef> applications) {
         for (Map.Entry<String, Top> entry : resolvedLocals.entrySet()) {
             if (!(entry.getValue() instanceof Type member)) {
                 continue;
             }
-            String head = applicationOf(member, facts.get(entry.getKey()))
+            String head = Optional.ofNullable(applications.get(entry.getKey()))
                     .filter(application -> !application.arguments().isEmpty())
                     .map(io.ltr8.tson.schema.meta.TypeRef::name).orElse(null);
             if (head == null || generated.contains(entry.getKey()) || member.supertypes().contains(head)) {
