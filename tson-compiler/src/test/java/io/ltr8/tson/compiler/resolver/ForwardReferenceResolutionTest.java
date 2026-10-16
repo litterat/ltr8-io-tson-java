@@ -1,11 +1,13 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -35,10 +37,10 @@ class ForwardReferenceResolutionTest {
         // employee is declared *before* person, the supertype it composes -- fails under strict source order.
         TsonSchema resolved = resolve("  employee => person & { }\n  person => { }");
 
-        TypeDefinition employee = resolved.entries().get("employee");
+        Top employee = resolved.entries().get("employee");
         assertNotNull(employee);
-        assertTrue(employee.supertypes().contains("person"),
-                () -> "employee should compose person; supertypes=" + employee.supertypes());
+        assertTrue(Chained.supertypesOf(employee).contains("person"),
+                () -> "employee should compose person; supertypes=" + Chained.supertypesOf(employee));
     }
 
     @Test

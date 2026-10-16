@@ -3,9 +3,11 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Product;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Type;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -17,7 +19,7 @@ import java.util.Set;
 /**
  * [TSON-SCHEMA] §7.2's rule that a value's own type annotation must be admitted by the position it stands in:
  * "at a position whose declared type is {@code T}, a value annotated {@code !S} is valid if and only if
- * ... {@code S} is {@code T} or {@code T} appears in {@code S}'s transitive {@code type_definition.supertypes}".
+ * ... {@code S} is {@code T} or {@code T} appears in {@code S}'s transitive {@code supertypes}".
  *
  * <p>{@link VariantSchemaReader} already decides exactly that -- no type-ref or the entry's own name reads
  * through the entry's reader, a subtype dispatches to the subtype's, and anything else is {@code
@@ -31,9 +33,7 @@ import java.util.Set;
  * and an {@code extern} "by the foreign schema's namespace (§7.8)", each its own relation with its own
  * dispatcher, and subsumption would refuse the very variant tags those positions exist to take. A
  * {@code Reference} body takes no guard either, and needs none: a reference entry compiles to its target's
- * reader, which carries the guard, and the alias is among the names that reader admits. Reading the body
- * rather than {@code kind()} is deliberate: a hand-built entry can carry a {@code ChoiceBody} under
- * {@code PRODUCT}, and what decides how a value is read is the body.
+ * reader, which carries the guard, and the alias is among the names that reader admits.
  */
 public final class Subsumption {
 
@@ -59,9 +59,9 @@ public final class Subsumption {
      * already applies it -- a record with subtypes arrives already wrapped by its own factory, and wrapping
      * twice would report the same refusal from two places.
      */
-    public static TsonTypeReader<?> guard(String name, TypeDefinition definition, TsonTypeReader<?> reader,
+    public static TsonTypeReader<?> guard(String name, Top definition, TsonTypeReader<?> reader,
                                           Map<String, Set<String>> namesMeaning, TsonTypeReaderResolver resolver) {
-        if (!(definition.body() instanceof Atom || definition.body() instanceof Product)) {
+        if (!(definition instanceof Atom || definition instanceof Product)) {
             return reader;
         }
         if (reader instanceof Applied) {
@@ -80,12 +80,12 @@ public final class Subsumption {
      * was admitted at a leaf record and refused at one that happened to have a subtype -- the same schema,
      * the same rule, two answers decided by which construction site the entry reached.
      */
-    public static TsonTypeReader<?> dispatching(String name, TypeDefinition definition,
+    public static TsonTypeReader<?> dispatching(String name, Top definition,
                                                 TsonTypeReader<?> ownParser,
                                                 Map<String, Set<String>> namesMeaning,
                                                 TsonTypeReaderResolver resolver) {
         return new VariantSchemaReader(name, admitting(List.of(name), namesMeaning), ownParser,
-                admitting(definition.subtypes(), namesMeaning), resolver);
+                admitting(Chained.subtypesOf(definition), namesMeaning), resolver);
     }
 
     /**
@@ -97,7 +97,7 @@ public final class Subsumption {
      * <p>An entry with no aliases is absent rather than present-and-singleton: the overwhelming majority,
      * and {@link #admitting} adds the name itself anyway.
      */
-    public static Map<String, Set<String>> namesMeaning(Map<String, TypeDefinition> entries) {
+    public static Map<String, Set<String>> namesMeaning(Map<String, ? extends Top> entries) {
         Map<String, Set<String>> index = new LinkedHashMap<>();
         entries.forEach((written, definition) -> {
             String terminal = ReferenceChain.terminal(written, entries);

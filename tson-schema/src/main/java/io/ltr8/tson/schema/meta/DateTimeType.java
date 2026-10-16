@@ -5,7 +5,6 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.math.BigInteger;
-
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +24,8 @@ import java.util.Optional;
  * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "datetime_type")
-public record DateTimeType(Optional<OffsetDateTime> min, @Field("exclusive_min") Optional<OffsetDateTime> exclusiveMin,
+public record DateTimeType(TypeChain chain,
+        Optional<OffsetDateTime> min, @Field("exclusive_min") Optional<OffsetDateTime> exclusiveMin,
                      Optional<OffsetDateTime> max, @Field("exclusive_max") Optional<OffsetDateTime> exclusiveMax,
                      Optional<BigInteger> precision) implements Atom {
 
@@ -35,12 +35,24 @@ public record DateTimeType(Optional<OffsetDateTime> min, @Field("exclusive_min")
      */
     @Record
     public DateTimeType {
+        chain = TypeChain.orEmpty(chain);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> exclusiveMin, Optional<OffsetDateTime> max,
+            Optional<OffsetDateTime> exclusiveMax, Optional<BigInteger> precision) {
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, precision);
+    }
+
+    @Override
+    public DateTimeType withChain(TypeChain chain) {
+        return new DateTimeType(chain, min, exclusiveMin, max, exclusiveMax, precision);
     }
 
     /** The inclusive bounds alone, for the many callers that set neither an exclusive bound nor a precision. */

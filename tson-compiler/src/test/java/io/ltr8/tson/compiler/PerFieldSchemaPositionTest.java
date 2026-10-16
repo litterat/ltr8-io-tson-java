@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * own line. An author fixing them was pointed at one line six times and an editor had one place
  * to jump to, while the pointer beside it had already said which field.
  *
- * <p>{@code RecordField.position} is {@code @Unbound}, on {@code TypeDefinition.position}'s precedent:
+ * <p>{@code RecordField.position} is {@code @Unbound}, on {@code Top.position}'s precedent:
  * §8.1's {@code record_field} declares no such field, so nothing fills it and strict binding would call it a
  * mismatch. It is not carried in the annotation channel, which is schema data -- it resolves one hop against
  * the governing meta (§6) and round-trips into resolver output, none of which is true of a source position.
@@ -140,7 +140,7 @@ class PerFieldSchemaPositionTest {
     }
 
     /**
-     * <b>Position stays out of identity</b>, on {@code annotations}' footing and for {@code TypeDefinition}'s
+     * <b>Position stays out of identity</b>, on {@code annotations}' footing and for {@code Top}'s
      * stated reason: the resolver test suite compares hand-built expected values against really-resolved
      * ones, and a position in equality would stop two representations of one logical field comparing equal.
      */

@@ -12,7 +12,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
 
@@ -112,7 +112,7 @@ class MetaSchemaImportTest {
         // The four constructor-application (!enum [...]) declarations previously excluded now
         // resolve too, bound generically via TsonObjectReader against Atom.class.
         assertEquals(new EnumBody(List.of("BASE64", "BASE64URL", "BASE32", "HEX")),
-                registered.schema().entries().get("bytes_encoding").body());
+                registered.schema().entries().get("bytes_encoding"));
         // ...and the three declarations that reference one of those four as a field type now
         // register successfully as well, since their dependency is present in the same schema.
         assertTrue(registered.schema().entries().containsKey("bytes_type"));
@@ -125,7 +125,7 @@ class MetaSchemaImportTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
         TsonSchema meta = parseMetaTn1(registry);
-        TypeDefinition floatType = meta.entries().get("float_type");
+        Top floatType = meta.entries().get("float_type");
 
         // float_type's `format` is typed by ieee_format, which this schema deliberately leaves out.
         TsonSchema withFloatOnly =

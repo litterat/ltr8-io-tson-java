@@ -16,7 +16,7 @@ Current form only; history lives in git.
   merged namespace, alias hops followed, never the meta's; each further segment selects in the bound value; the
   referent's declared type must IS-A the slot's, compared by canonical identity. Local entries only, after
   `validateEntry`, which skips a by-name reference a body also returns from `references()` (matched by identity).
-- `entryOrigins`, `enumForms` and `nameTypes` are on `TsonLinkedSchema`, never on `TsonSchema` or `TypeDefinition`.
+- `entryOrigins`, `enumForms` and `nameTypes` are on `TsonLinkedSchema`, never on `TsonSchema` or an entry's value.
 - An enum's and a record's `name_type` is an identifier family whose `normalization` implies NFC (`NONE` never;
   `ASCII_CASEFOLD` only over ASCII — `NameType.formRefusal`); their names are judged under its profile, never the
   kernel's identifier's.
@@ -24,7 +24,11 @@ Current form only; history lives in git.
   so its duplicate check is two spellings that are one value of the record's name type, and nothing else.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
-- `RecordExtension`'s FINAL check reads `TypeDefinition.supertypes`, never `RecordBody.supertypes`.
+- `RecordExtension`'s FINAL check reads the entry's chain (`Chained.supertypes`), a template's included, which a §5.9
+  subtraction leaves empty.
+- Everything that asks what an entry IS-A asks `Chained` — `computeSubtypes` credits a template as it does a type,
+  and the constructor test (`TypeKind.isConstructor`) reads a template's chain as a closed one's, judging `top` by
+  its origin.
 - An enum's `name_type` resolves in the governing meta's namespace for the value its constructor pinned (traced through a
   template's held body), and otherwise in the schema's; the enum checks run before the name checks, and an enum they
   refuse is not judged by name again.
@@ -70,9 +74,9 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   one canonical identity, is redundant rather than an error. Because identities carry the spec revision, a
   closure reaching both `/2026/32/m/core.tn` and `/2026/38/m/core.tn` is rejected here rather than surfacing
   later as a field conflict between two identically-spelled types; (2) **populate `subtypes`**
-  (reverse of `supertypes`); (3) **derive `disjoint`** for every choice entry (`ChoiceDisjointness`, §5.4) —
-  total and two-valued, detailed in `design/choice-disjointness.md`, so a linked choice always
-  carries the fact;
+  (reverse of `supertypes`, over every chained value, a template's included); (3) **derive `disjoint`** for every choice
+  entry (`ChoiceDisjointness`, §5.4) — total and two-valued, detailed in `design/choice-disjointness.md`, so a linked
+  choice always carries the fact;
   (3a) **check what `record.extension` obliges** (`RecordExtension`, §5.2) — that nothing composes onto a
   FINAL record, that a sealed family's selectors are usable and its members pin them distinctly, and that
   every family member is declared;
@@ -81,7 +85,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   `withNameAnnotations` → the `@disjoint` check;
   (4) **validate** every reference
   resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter);
-  **a reference to a DATA-kinded entry is refused** — §8.1's schema map holds only type definitions, so an
+  **a reference to a DATA-kinded entry is refused** — every schema-map entry is a name a type-ref can reach, so an
   entry describing something other than a data value has no way to say "declare me, but let nothing name me
   as a type"; the `Data` body *is* that way, and the check applies at every position a type-ref occupies (a
   field type, a choice variant, an array element, a map value). Without it the misuse resolves, links **and**
@@ -118,18 +122,12 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   resolve against it) and raises the linker's own `TsonSchemaLinker.notAMetaSchema` — one wording, one module,
   and a **`SchemaValidationException` rather than an `IllegalStateException`**
   because a wrong `!!meta` is an authoring error, not a library fault (which is what lets the CLI keep exit 1
-  and exit 70 apart). `source`
-  validation additionally falls back to the governing meta's namespace (a `source` naming a constructor is
-  one of §3.3.1's constructor roles); no other reference does — **and not a `source` carrying arguments**,
-  which is the one shape the fallback would reach past its own justification. Desugar rewrites every
-  constructor application long before resolution, so arguments surviving into a `source` mean a §5.10
-  user-template head, which §3.3.1 resolves in the type-name namespace only. Without the exclusion
-  `x => tmpl<text>` against a `tmpl` its governing meta declares would find the template through the fallback
-  and then fault it on *arity* — telling the author to supply arguments they had written, or that they had
-  written the wrong number of them, when the real answer is the one every other reference form gives: the
-  name is not in scope. Its other half is in `TemplateMaterialiser` (`design/template-materialisation.md`): an
-  application that cannot be closed keeps its argument list rather than collapsing to its bare head, so what
-  the linker judges is what the author wrote. **The linker does not materialize anything** —
+  and exit 70 apart). A chain's names additionally fall back to the governing meta's namespace: a chain is the
+  residue of a constructor role (§3.3.1) rather than an author-written reference, and a refinement of a kernel
+  constructor reaches one (`set_type => array ^ {...}` carries `[array, product, top, type]`). No other reference
+  does. An application whose head names nothing in scope keeps its argument list rather than collapsing to its
+  bare head (`design/template-materialisation.md`), so what the linker judges is what the author wrote.
+  **The linker does not materialize anything** —
   `SchemaDesugarer` already turned every sugar form into a real declaration, one phase earlier and in the
   module that can bind a constructor generically. The only argument-bearing `type_ref` it ever sees is inside
   a template declaration, which the desugar phase passes through whole (`box<T>` in `box`'s own body), and
@@ -163,7 +161,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
       failure than a late verdict. So that half runs on the entry materialisation mints, and an unapplied
       template gets no verdict — the open form's own position (§5.10: "an unapplied template is checked no
       further and receives no verdict"), not a shortfall.
-  - **`entryOrigins` is on `TsonLinkedSchema`, not on `TsonSchema` or `TypeDefinition`**, because it is a
+  - **`entryOrigins` is on `TsonLinkedSchema`, not on `TsonSchema` or an entry's value**, because it is a
     fact *linking* establishes rather than part of the resolved schema value §9 defines — and because
     `schema.meta` is a bind target with a hand-written `equals` and the `@Record` constructor-selection trap,
     which a new component would walk straight into. It keeps a declaration's identity and its line answerable
@@ -234,11 +232,11 @@ rest of the closure agrees with it.
   which nothing populates until linking; and a selector's type has to be followed to the end of its
   reference chain. What is local — two definition marks on one declaration, a mark carrying a value, a mark
   on a non-record — the resolver already refused while lowering.
-- **The FINAL check reads `TypeDefinition.supertypes`, never `RecordBody.supertypes`.** §5.9's subtraction
-  empties the contract index and leaves the body's authorial lineage in place, minting no IS-A edge — which
-  is the only thing FINAL constrains. Reading the body's list instead refuses the one operation §5.9 admits
-  against a final type, and no *invalid* case would show it; the corpus carries a `valid` vector for exactly
-  that reason.
+- **The FINAL check reads the entry's chain**, a template's as a closed type's: a template composing or refining a
+  final record is refused at its own declaration, whether or not anything applies it, since it is IS-A its parents
+  and so is every application. §5.9's subtraction leaves the chain empty, minting no IS-A edge — which is the
+  only thing FINAL constrains — so subtracting from a final type is admitted. No *invalid* case would show a
+  regression there; the corpus carries a `valid` vector for exactly that reason.
 - **A marked field is the declaration's own only if no sealed supertype declares it.** §5.8 flattens an
   inherited field whole, the mark included, so a subtype's copy of its base's selector is indistinguishable
   here from one the subtype wrote. Without the distinction every subtype of every sealed family would be read
@@ -268,7 +266,8 @@ rest of the closure agrees with it.
 An enum is an instance of `enum_type` or a tightening of it (`enum` pins `name_type: identifier`), and `EnumBody` holds
 `name_type` as a name beside members held as text. What the name denotes — which family, which parser, which equality,
 which profile — lives in a namespace the body cannot see, so the checks are the linker's: `name_type` names an
-identifier family (an atom-family instance whose constructor IS-A `identifier_type`, one hop through `source`), every
+identifier family (an atom-family instance whose constructor IS-A `identifier_type`, one hop through the constructor its body
+applies), every
 member parses as a value of it (`AtomParsers`), and no two members are one value (`ValueIdentity`). `checkNames` then
 judges the members by §8.2's per-name rules under that type's profile (`NameType.profile`), whose added characters —
 a `medial: " "` among them — are its own. A closed set of text that is no name is `text_type`'s `members` facet, an
@@ -278,8 +277,9 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
   ordinary schema enumerates a vocabulary it declares (`!enum_type { name_type: kebab … }`). A value the constructor pinned
   was written in the governing meta and resolves there **first**, so `!enum [A B]` names the kernel's `identifier`
   whatever the schema declares — a schema's own `identifier` is a different type and does not displace it (core
-  declares none, leaving the name free). Pinned is found through `source`, and through a template's held body to
-  the constructor it applies: `named => names<c>` records `names` as its source, not `enum`.
+  declares none, leaving the name free). Pinned is found through the constructor the entry's value applies (its recorded
+  tag, `TsonSchemaLinker.constructorOf`), and through a template's held body to the constructor it applies:
+  `named => names<c>` is built by `names`, not `enum`.
 - **Before the name checks, and one verdict.** A member that is not a value of `name_type` is the more basic error, and
   the per-name rules would otherwise report it as a restricted character; an enum refused here is not judged by name.
 - **An unresolved `name_type`** is judged under the kernel's identifier profile — the stricter reading — and is
@@ -304,8 +304,8 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
   A record with supertypes takes their one type — the default is a type like any other, set where a record is declared —
   refuses two that disagree, and refuses a stated type that is not theirs — two being one when their reference chains
   end at one entry (`sameNameType`), so an alias is its target and `field_name` is `identifier`; a refinement keeps its
-  source's. The rule is the record constructor's, applied on `&` (`resolveComposition`) and on the explicit `!record {
-  supertypes: … }` alike (`withSupertypesNameType`), which is why the kernel's `name_type` has no `~` default. That rule
+  source's. The rule is composition's (`resolveComposition`) — a declaration never writes a chain (§8.1), so an explicit
+  `!record { … }` has no supertypes to take one from — which is why the kernel's `name_type` has no `~` default. That rule
   is also how a brace form states one: a fieldless ABSTRACT base carries the type, and the records that compose it take
   it; there is no brace-form syntax for it. A schema's own references to a field — a group member, a refinement's or
   removal's restated field, a discriminator — match its declared spelling exactly, under a folding type too; only a
@@ -339,13 +339,13 @@ here, never resolved as a type, so which list a host files it in changes nothing
   `orders.` as no qualified name before anything is looked up. At a `type_ref` slot the same host shape is one
   segment naming a type, judged by `validateTypeRef` as always: `type_ref` is `ref<type>`.
 - **The slot's type is the meta's, the name is the schema's.** The slot's declared type is read off the entry's
-  constructor (its `source`, in the governing meta's namespace) by walking the recorded path through the resolved
-  fields: a field name at a record, any key at a map, any index at an array. A path through anything else (a choice)
-  is a gap this library has not filled (`UnsupportedOperationException`). The name's first segment resolves in
-  `merged` — the schema's own entries and imports — with alias hops followed (§8.3, `ReferenceChain`), and never in
-  the meta's namespace (§3.3.2); a member is reached through its entry, so `method: place_order` is unresolved even
-  though `orders` holds a key of that name. Nothing is looked up lexically, and nothing is a choice among candidates:
-  found first, judged after.
+  constructor (`TsonSchemaLinker.constructorOf`, in the governing meta's namespace) by walking the recorded path
+  through the resolved fields: a field name at a record, any key at a map, any index at an array. A path through
+  anything else (a choice) is a gap this library has not filled (`UnsupportedOperationException`). The name's first
+  segment resolves in `merged` — the schema's own entries and imports — with alias hops followed (§8.3,
+  `ReferenceChain`), and never in the meta's namespace (§3.3.2); a member is reached through its entry, so `method:
+  place_order` is unresolved even though `orders` holds a key of that name. Nothing is looked up lexically, and nothing
+  is a choice among candidates: found first, judged after.
 - **Each further segment selects in the value reached**, never in a declaration: a field of a record (read through
   the bound body's record components, named as binding names them, `Optional` unwrapped), then a key of a map. A
   type entry admits no further segment (`order.sku` is refused; projecting into a record type's fields is a
@@ -357,11 +357,11 @@ here, never resolved as a type, so which list a host files it in changes nothing
   data body is interim**: `data` is opaque to the type system and the host's to interpret, so a segment selects in
   the host's object and nothing in the schema walks the body's values; the namespace kind replaces the hop.
 - **The judgement is §7.2's IS-A between two types, by canonical identity.** An entry's declared type is the
-  constructor that built its body — its `source` where that is a constructor of the *declaring* schema's meta (IS-A
-  `top`), otherwise the kernel constructor its body's class mirrors (`@Typename`): a record declaration and a
-  composition are built by `record`, `uuid` by `uuid_type`. A field's declared type is its `type`, a map value's the
-  map's `value_type`. Each type is named in the namespace of the meta layer that governs the schema declaring it —
-  for an imported referent, the import's own meta, found through the loader — and two types are one when their
+  constructor that built its body — its recorded constructor tag where that is a constructor of the *declaring*
+  schema's meta (IS-A `top`), otherwise the kernel constructor its body's class mirrors (`@Typename`): a record
+  declaration and a composition are built by `record`, `uuid` by `uuid_type`. A field's declared type is its `type`, a
+  map value's the map's `value_type`. Each type is named in the namespace of the meta layer that governs the schema
+  declaring it — for an imported referent, the import's own meta, found through the loader — and two types are one when their
   terminal entries share origin and name; a type IS-A another when it is that one or lists it among its resolved
   `supertypes`. So `record` written in the meta and the `record` that built `place_order_request` meet as one kernel
   entry, and `uuid_type` meets nothing a `record` slot accepts.

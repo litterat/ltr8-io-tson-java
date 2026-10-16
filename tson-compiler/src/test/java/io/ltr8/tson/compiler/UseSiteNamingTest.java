@@ -87,8 +87,8 @@ class UseSiteNamingTest {
 
     /**
      * <b>A materialised application names the application.</b> No {@code @alias} exists here -- §8.3's walk
-     * stops at an instantiation -- so the name comes from the other carrier: the instantiation entry's own
-     * {@code source} is {@code b<10>}, and the entry that refers is what names the reader it refers to.
+     * stops at an instantiation -- so the name comes from the other carrier: the instantiation entry closes
+     * {@code b<10>}, and the entry that refers is what names the reader it refers to.
      */
     @Test
     void aMaterialisedApplicationNamesTheApplicationTheAuthorWrote() {

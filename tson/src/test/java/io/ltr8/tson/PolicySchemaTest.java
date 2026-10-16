@@ -20,7 +20,7 @@ class PolicySchemaTest {
     @Test
     void restrictionLevelMirrorsScriptPolicyLevel() {
         EnumBody declared = assertInstanceOf(EnumBody.class, Tson.standard().bindRegistry().core()
-                .resolveLinked(TsonBundledSchemas.POLICY_ID).schema().entries().get("restriction_level").body());
+                .resolveLinked(TsonBundledSchemas.POLICY_ID).schema().entries().get("restriction_level"));
 
         assertEquals(Arrays.stream(RestrictionLevel.values()).map(Enum::name).toList(), declared.members());
     }

@@ -127,7 +127,7 @@ class BindStrictnessTest {
      * {@code fields().length} remains the only notion of size any caller needs.
      *
      * <p>Without the split, an unbound component reaches the writer indistinguishable from a bound one and
-     * is emitted -- which for {@code schema.meta.TypeDefinition} meant this library could not produce
+     * is emitted -- which for {@code schema.meta.Top} meant this library could not produce
      * resolved output that validates against its own meta-kernel ([TSON-SCHEMA] §1.3, §7.2's closed record).
      */
     @Test

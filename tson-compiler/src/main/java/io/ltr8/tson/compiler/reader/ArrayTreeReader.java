@@ -8,7 +8,7 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.util.ArrayList;
@@ -36,13 +36,13 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
     public static final class Factory implements ValueReaderFactory {
 
         @Override
-        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
-            if (!(typeDefinition.body() instanceof ArrayBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition.body());
+            if (!(typeDefinition instanceof ArrayBody body)) {
+                throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition);
             }
-            return new ArrayTreeReader(name, EntryDisplayName.of(name, typeDefinition), body, resolver,
-                    context.locationOf(name, typeDefinition),
+            return new ArrayTreeReader(name, context.displayName(name, typeDefinition), body, resolver,
+                    context.locationOf(name),
                     AnnotationTypes.of(context), elementsAreNames(body, context));
         }
     }

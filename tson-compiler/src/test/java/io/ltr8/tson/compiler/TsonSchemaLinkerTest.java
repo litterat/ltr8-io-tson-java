@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.*;
@@ -17,11 +18,12 @@ import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
+import io.ltr8.tson.schema.meta.Type;
 
 import org.junit.jupiter.api.Test;
 
@@ -47,21 +49,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TsonSchemaLinkerTest {
 
-    private static TypeDefinition valueEntry() {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new ValueType());
+    private static Top valueEntry() {
+        return new ValueType();
     }
 
-    private static TypeDefinition voidEntry() {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new VoidType());
+    private static Top voidEntry() {
+        return new VoidType();
     }
 
-    private static TypeDefinition emptyRecord() {
-        return TypeDefinition.product(RecordBody.of(RecordBody.fieldMap()));
+    private static Top emptyRecord() {
+        return RecordBody.of(RecordBody.fieldMap());
     }
 
     /** A declared choice -- what {@code (A | B)} resolves to. {@code disjoint} is the linker's to derive. */
-    private static TypeDefinition choiceEntry(ChoiceBody body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.SUM,  List.of(), List.of(), body);
+    private static Top choiceEntry(ChoiceBody body) {
+        return body;
     }
 
     /**
@@ -72,13 +74,24 @@ class TsonSchemaLinkerTest {
      * {@code TsonSchemaLinker}'s own "only the meta-kernel may declare constructors" check, which
      * compares against that exact identity, not merely "is this schema self-referencing."
      */
-    private static TsonSchema schemaOf(Map<String, TypeDefinition> entries) {
+    private static TsonSchema schemaOf(Map<String, Top> entries) {
         return new TsonSchema("https://example.test/s.tn", TsonBundledSchemas.META_KERNEL_ID,
                 List.of(), entries);
     }
 
+    /** The same, each entry's facts -- its position, its value's annotations -- given. */
+    private static TsonSchema schemaOf(Map<String, Top> entries, Map<String, TsonSchema.EntryFacts> facts) {
+        return new TsonSchema("https://example.test/s.tn", TsonBundledSchemas.META_KERNEL_ID,
+                List.of(), AnnotatedMap.of(entries), false, Map.of(), facts);
+    }
+
+    /** {@code @disjoint} written after {@code =>}, on {@code name}'s value -- the entry's facts. */
+    private static Map<String, TsonSchema.EntryFacts> disjointOn(String name) {
+        return Map.of(name, TsonSchema.EntryFacts.NONE.withAnnotations(disjointMarker()));
+    }
+
     /** A schema with its own identity and imports, for the origin-tracking chain below. */
-    private static TsonSchema schemaOf(String id, List<String> imports, Map<String, TypeDefinition> entries) {
+    private static TsonSchema schemaOf(String id, List<String> imports, Map<String, Top> entries) {
         return new TsonSchema(id, TsonBundledSchemas.META_KERNEL_ID, imports, entries);
     }
 
@@ -127,11 +140,11 @@ class TsonSchemaLinkerTest {
      */
     @Test
     void anArgumentBearingFieldTypeAgainstANonTemplateIsRejected() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
         entries.put("set", emptyRecord());
-        entries.put("container", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(Map.entry("members",
-                RecordField.required(new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token"))))))))));
+        entries.put("container", RecordBody.of(RecordBody.fieldMap(Map.entry("members",
+                RecordField.required(new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
@@ -142,9 +155,8 @@ class TsonSchemaLinkerTest {
      * A one-parameter template. Its body is <b>held</b> ([TSON-SCHEMA] §5.10) and a held body is text, so a
      * test states one directly rather than assembling the tree it denotes.
      */
-    private static TypeDefinition template(String parameter, String body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(),
-                new TemplateBody(List.of(TemplateParam.typeParameter(parameter)), body, Optional.empty()));
+    private static Top template(String parameter, String body) {
+        return new TemplateBody(List.of(TemplateParam.typeParameter(parameter)), body, Optional.empty());
     }
 
     /**
@@ -155,53 +167,35 @@ class TsonSchemaLinkerTest {
      * {@code ArrayBody}/placeholder entries a materialisation pass would -- is covered in {@code
      * SchemaDesugarerTest}, one phase earlier.
      *
-     * <p><b>The argument is a real entry, and it has to be.</b> {@code source} records the constructor an
-     * open entry's held body applies, and a partial application states the arguments it binds in its own
-     * {@code reference.target}; neither puts a parameter here (§8.1's alias paragraph, {@code
-     * §8.1). A parameter reaching this position is therefore an unresolved reference, which
-     * the test below pins.
+     * <p><b>The argument is a real entry, and it has to be.</b> An instantiation's key records the
+     * application it closes, closed; a partial application states the arguments it binds in its own {@code
+     * reference.target} (§8.1's alias paragraph). Neither puts a parameter here.
      */
     @Test
-    void anArgumentBearingSourceIsCarriedThroughWithoutMaterialising() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+    void anArgumentBearingApplicationIsCarriedThroughWithoutMaterialising() {
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
         entries.put("other", template("U", "!record { fields: { v => { type: U } } }"));
         TypeRef otherOfToken = new TypeRef("other", List.of(new TypeArgument.Ref(TypeRef.of("token"))));
-        entries.put("generic", new TypeDefinition(Optional.of(otherOfToken), TypeKind.PRODUCT,
-                List.of(), List.of(), RecordBody.of(RecordBody.fieldMap())));
+        entries.put("generic", RecordBody.of(RecordBody.fieldMap()));
 
-        TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
+        AnnotatedMap<String, Top> annotated = AnnotatedMap.of(entries)
+                .withAnnotations("generic", TsonSchema.withApplication(io.ltr8.annotation.Annotations.empty(),
+                        otherOfToken));
+        TsonLinkedSchema result = TsonSchemaLinker.link(new TsonSchema("https://example.test/s.tn",
+                TsonBundledSchemas.META_KERNEL_ID, List.of(), annotated, false, Map.of(), Map.of()), null);
 
-        assertEquals(otherOfToken, result.schema().entries().get("generic").source().orElseThrow());
+        assertEquals(otherOfToken, result.schema().applicationOf("generic").orElseThrow());
         assertEquals(3, result.schema().entries().size(),
-                "no synthetic entry created for an application standing in source");
-    }
-
-    /**
-     * <b>And a parameter standing in {@code source} is an unresolved reference.</b> §8.1 is explicit that an
-     * open entry's {@code source} is the constructor its held body applies and that "a parameter reference
-     * appears nowhere outside the held text", so nothing here consults a parameter list and a name that
-     * resolves to nothing gets the ordinary verdict.
-     */
-    @Test
-    void aParameterStandingInSourceIsUnresolved() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("other", template("U", "!record { fields: { v => { type: U } } }"));
-        entries.put("generic", new TypeDefinition(
-                Optional.of(new TypeRef("other", List.of(new TypeArgument.Ref(TypeRef.of("T"))))),
-                TypeKind.PRODUCT, List.of(), List.of(), RecordBody.of(RecordBody.fieldMap())));
-
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> TsonSchemaLinker.link(schemaOf(entries), null));
-        assertTrue(thrown.getMessage().contains("'T'"), thrown.getMessage());
+                "no synthetic entry created for an application an instantiation records");
     }
 
     /** The same body under a declared parameter is a template, which is exactly what may route one. */
     @Test
     void rejectsAFieldReferencingAnUndeclaredType() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("container", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
-                Map.entry("field", RecordField.required(TypeRef.of("no_such_type")))))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("container", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("field", RecordField.required(TypeRef.of("no_such_type"))))));
 
         SchemaValidationException ex = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
@@ -211,7 +205,7 @@ class TsonSchemaLinkerTest {
     /** §5.4's distinct-variant rule at its plainest: the same name written twice. */
     @Test
     void rejectsAChoiceListingOneVariantTwice() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
         entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("token")))));
 
@@ -226,9 +220,9 @@ class TsonSchemaLinkerTest {
      */
     @Test
     void rejectsTwoVariantsThatFlattenToOneType() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
-        entries.put("nickname", TypeDefinition.reference("token"));
+        entries.put("nickname", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("token")));
         entries.put("contact", choiceEntry(
                 new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("nickname")))));
 
@@ -240,10 +234,10 @@ class TsonSchemaLinkerTest {
     /** Two aliases of *different* types stay distinct -- flattening must not collapse what it merely renames. */
     @Test
     void acceptsAliasedVariantsThatFlattenToDifferentTypes() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
         entries.put("other", emptyRecord());
-        entries.put("nickname", TypeDefinition.reference("token"));
+        entries.put("nickname", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("token")));
         entries.put("contact", choiceEntry(
                 new ChoiceBody(List.of(TypeRef.of("nickname"), TypeRef.of("other")))));
 
@@ -259,9 +253,9 @@ class TsonSchemaLinkerTest {
      */
     @Test
     void aReferenceCycleAmongVariantsIsUninhabited() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("a", TypeDefinition.reference("b"));
-        entries.put("b", TypeDefinition.reference("a"));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("a", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("b")));
+        entries.put("b", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("a")));
         entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("a"), TypeRef.of("b")))));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -272,12 +266,11 @@ class TsonSchemaLinkerTest {
     }
 
     /** An IS-A pair: `positive` is an `integer`, so no value of one excludes the other (§5.4's own example). */
-    private static Map<String, TypeDefinition> nonDisjointChoice() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), new IntegerType(new IntegerSize(32, true))));
-        entries.put("positive", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of("integer"), List.of(), new IntegerType(new IntegerSize(32, true))));
+    private static Map<String, Top> nonDisjointChoice() {
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("integer", new IntegerType(new IntegerSize(32, true)));
+        entries.put("positive", ((Type) (new IntegerType(new IntegerSize(32,
+                true)))).withSupertypes(List.of("integer")));
         entries.put("contact", choiceEntry(
                 new ChoiceBody(List.of(TypeRef.of("positive"), TypeRef.of("integer")))));
         return entries;
@@ -289,22 +282,21 @@ class TsonSchemaLinkerTest {
 
     /**
      * §5.4's `@disjoint` assertion refuted: the author asserts disjointness the resolver can disprove.
-     * Written after {@code =>}, so the marker rides on the definition.
+     * Written after {@code =>}, so the marker rides on the value, among the entry's facts.
      */
     @Test
     void rejectsADisjointAssertionTheDerivedFactRefutes() {
-        Map<String, TypeDefinition> entries = nonDisjointChoice();
-        entries.computeIfPresent("contact", (n, def) -> def.withAnnotations(disjointMarker()));
+        Map<String, Top> entries = nonDisjointChoice();
 
         SchemaValidationException ex = assertThrows(SchemaValidationException.class,
-                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+                () -> TsonSchemaLinker.link(schemaOf(entries, disjointOn("contact")), null));
         assertTrue(ex.getMessage().contains("are not disjoint"), ex.getMessage());
     }
 
     /** §6 lets the same marker precede the name, where it lands on the map key -- equally an assertion. */
     @Test
     void rejectsADisjointAssertionWrittenBeforeTheName() {
-        AnnotatedMap<String, TypeDefinition> entries = AnnotatedMap.of(nonDisjointChoice());
+        AnnotatedMap<String, Top> entries = AnnotatedMap.of(nonDisjointChoice());
         entries = entries.withAnnotations("contact", disjointMarker());
 
         TsonSchema schema = new TsonSchema("https://example.test/s.tn", TsonBundledSchemas.META_KERNEL_ID,
@@ -317,22 +309,19 @@ class TsonSchemaLinkerTest {
     void acceptsANonDisjointChoiceThatAssertsNothing() {
         TsonLinkedSchema linked = TsonSchemaLinker.link(schemaOf(nonDisjointChoice()), null);
 
-        assertEquals(Optional.of(false), linked.schema().entries().get("contact").disjoint());
+        assertEquals(Optional.of(false), ((ChoiceBody) linked.schema().entries().get("contact")).disjoint());
     }
 
     /** A verified assertion is silent -- distinct discrimination classes, so the derivation returns true. */
     @Test
     void acceptsADisjointAssertionTheDerivedFactProves() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("label", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), TextType.UNCONSTRAINED));
-        entries.put("count", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), new IntegerType(new IntegerSize(32, true))));
-        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("label"), TypeRef.of("count"))))
-                .withAnnotations(disjointMarker()));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("label", TextType.UNCONSTRAINED);
+        entries.put("count", new IntegerType(new IntegerSize(32, true)));
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("label"), TypeRef.of("count")))));
 
-        TsonLinkedSchema linked = TsonSchemaLinker.link(schemaOf(entries), null); // no exception
-        assertEquals(Optional.of(true), linked.schema().entries().get("contact").disjoint());
+        TsonLinkedSchema linked = TsonSchemaLinker.link(schemaOf(entries, disjointOn("contact")), null);
+        assertEquals(Optional.of(true), ((ChoiceBody) linked.schema().entries().get("contact")).disjoint());
     }
 
     /**
@@ -343,27 +332,24 @@ class TsonSchemaLinkerTest {
      */
     @Test
     void rejectsADisjointAssertionOnSameClassVariants() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), IntegerType.UNCONSTRAINED));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("integer", IntegerType.UNCONSTRAINED);
         entries.put("even", integerEntry(new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(BigInteger.TWO))));
         entries.put("small", integerEntry(new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(BigInteger.TEN), Optional.empty(), Optional.empty())));
-        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("even"), TypeRef.of("small"))))
-                .withAnnotations(disjointMarker()));
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("even"), TypeRef.of("small")))));
 
         SchemaValidationException ex = assertThrows(SchemaValidationException.class,
-                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+                () -> TsonSchemaLinker.link(schemaOf(entries, disjointOn("contact")), null));
         assertTrue(ex.getMessage().contains("are not disjoint"), ex.getMessage());
     }
 
     /** The same choice without the assertion is legal -- §5.4 only ever reports the assertion. */
     @Test
     void acceptsASameClassChoiceThatAssertsNothing() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), IntegerType.UNCONSTRAINED));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("integer", IntegerType.UNCONSTRAINED);
         entries.put("even", integerEntry(new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(BigInteger.TWO))));
         entries.put("small", integerEntry(new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(),
@@ -371,16 +357,15 @@ class TsonSchemaLinkerTest {
         entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("even"), TypeRef.of("small")))));
 
         TsonLinkedSchema linked = TsonSchemaLinker.link(schemaOf(entries), null); // no exception
-        assertEquals(Optional.of(false), linked.schema().entries().get("contact").disjoint());
+        assertEquals(Optional.of(false), ((ChoiceBody) linked.schema().entries().get("contact")).disjoint());
     }
 
     /** §5.4: a variant MUST NOT resolve to {@code void} -- {@code (T | void)} spells optionality as a choice. */
     @Test
     void rejectsAVoidChoiceVariant() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("void", voidEntry());
-        entries.put("label", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), TextType.UNCONSTRAINED));
+        entries.put("label", TextType.UNCONSTRAINED);
         entries.put("maybe_label", choiceEntry(
                 new ChoiceBody(List.of(TypeRef.of("label"), TypeRef.of("void")))));
 
@@ -392,11 +377,10 @@ class TsonSchemaLinkerTest {
     /** Judged after §8.3 flattening, so an alias of {@code void} is caught under the author's own name. */
     @Test
     void rejectsAVoidVariantReachedThroughAnAlias() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("void", voidEntry());
-        entries.put("nothing", TypeDefinition.reference("void"));
-        entries.put("label", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), TextType.UNCONSTRAINED));
+        entries.put("nothing", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("void")));
+        entries.put("label", TextType.UNCONSTRAINED);
         entries.put("maybe_label", choiceEntry(
                 new ChoiceBody(List.of(TypeRef.of("label"), TypeRef.of("nothing")))));
 
@@ -405,49 +389,49 @@ class TsonSchemaLinkerTest {
         assertTrue(ex.getMessage().contains("'nothing'"), ex.getMessage());
     }
 
-    private static TypeDefinition integerEntry(IntegerType body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of("integer"), List.of(), body);
+    private static Top integerEntry(IntegerType body) {
+        return ((Type) (body)).withSupertypes(List.of("integer"));
     }
 
     /**
-     * The subtypes pass rebuilds every entry that gains one, and a rebuild that forgets a component blanks
-     * it for the whole schema. {@code position} locates every diagnostic reported against the entry and
-     * {@code annotations} carries §6 metadata written after {@code =>} -- neither is recoverable afterwards,
-     * and nothing else would notice them missing.
+     * The subtypes pass rebuilds every entry that gains one, and a linked schema that dropped an entry's facts
+     * would blank them for the whole schema. {@code position} locates every diagnostic reported against the
+     * entry and {@code annotations} carries §6 metadata written after {@code =>} -- neither is recoverable
+     * afterwards, and nothing else would notice them missing.
      */
     @Test
     void anEntryGainingSubtypesKeepsItsPositionAndAnnotations() {
         Annotations doc = Annotations.of(List.of(Annotation.of("doc", "the parent")));
         Optional<SourcePosition> position = Optional.of(new Position(7, 3, 42));
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("parent", emptyRecord().withPosition(position).withAnnotations(doc));
-        entries.put("child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("parent"), List.of(), RecordBody.of(RecordBody.fieldMap())));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("parent", emptyRecord());
+        entries.put("child",
+                ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("parent")));
 
-        TypeDefinition parent = TsonSchemaLinker.link(schemaOf(entries), null).schema().entries().get("parent");
+        TsonSchema linked = TsonSchemaLinker.link(schemaOf(entries,
+                Map.of("parent", TsonSchema.EntryFacts.at(position).withAnnotations(doc))), null).schema();
 
-        assertEquals(List.of("child"), parent.subtypes());
-        assertEquals(position, parent.position());
-        assertEquals(doc, parent.annotations());
+        assertEquals(List.of("child"), Chained.subtypesOf(linked.entries().get("parent")));
+        assertEquals(position, linked.positionOf("parent"));
+        assertEquals(doc, linked.factsOf("parent").annotations());
     }
 
     @Test
     void rejectsAnUnresolvedSupertype() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("no_such_supertype"), List.of(), RecordBody.of(RecordBody.fieldMap())));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("child",
+                ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("no_such_supertype")));
 
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(schemaOf(entries), null));
     }
 
     @Test
     void rejectsAFieldGroupReferencingAnUnknownField() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("thing", TypeDefinition.product(new RecordBody(List.of(),
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("thing", new RecordBody(
                 RecordBody.fieldMap(Map.entry("a", RecordField.required(TypeRef.of("thing")))),
                 List.of(FieldGroup.ofSingles(List.of("not_a_real_field"), true)),
-                io.ltr8.tson.schema.meta.RecordExtensionType.OPEN)));
+                io.ltr8.tson.schema.meta.RecordExtensionType.OPEN));
 
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(schemaOf(entries), null));
     }
@@ -459,9 +443,9 @@ class TsonSchemaLinkerTest {
                 Map.of(CanonicalIdentity.canonicalize("https://example.test/import.tn"), imported);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
-        Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
-        localEntries.put("local_a", TypeDefinition.product(
-                RecordBody.of(RecordBody.fieldMap(Map.entry("field", RecordField.required(TypeRef.of("imported_a")))))));
+        Map<String, Top> localEntries = new LinkedHashMap<>();
+        localEntries.put("local_a", RecordBody.of(RecordBody.fieldMap(Map.entry("field",
+                RecordField.required(TypeRef.of("imported_a"))))));
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
                 "https://example.test/meta.tn", List.of("https://example.test/import.tn"), localEntries);
 
@@ -499,7 +483,7 @@ class TsonSchemaLinkerTest {
     }
 
     /** Links a schema declaring {@code name} locally against an import declaring the same name. */
-    private static TsonLinkedSchema link(String name, TypeDefinition importedEntry, TypeDefinition localEntry) {
+    private static TsonLinkedSchema link(String name, Top importedEntry, Top localEntry) {
         TsonLinkedSchema imported = new TsonLinkedSchema(schemaOf(Map.of(name, importedEntry)));
         Map<String, TsonLinkedSchema> byIdentity =
                 Map.of(CanonicalIdentity.canonicalize("https://example.test/import.tn"), imported);
@@ -566,59 +550,57 @@ class TsonSchemaLinkerTest {
 
     @Test
     void populatesSubtypesAsTheReverseOfSupertypes() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("response", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap(
-                Map.entry("status", RecordField.required(TypeRef.of("token")))))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("response", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("status", RecordField.required(TypeRef.of("token"))))));
         entries.put("token", valueEntry());
-        entries.put("success_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("response"), List.of(),
-                RecordBody.of(RecordBody.fieldMap(Map.entry("data", RecordField.required(TypeRef.of("token")))))));
-        entries.put("failure_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("response"), List.of(),
-                RecordBody.of(RecordBody.fieldMap(Map.entry("error", RecordField.required(TypeRef.of("token")))))));
+        entries.put("success_response", ((Type) (RecordBody.of(RecordBody.fieldMap(Map.entry("data",
+                RecordField.required(TypeRef.of("token"))))))).withSupertypes(List.of("response")));
+        entries.put("failure_response", ((Type) (RecordBody.of(RecordBody.fieldMap(Map.entry("error",
+                RecordField.required(TypeRef.of("token"))))))).withSupertypes(List.of("response")));
 
         TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
 
         assertEquals(Set.of("success_response", "failure_response"),
-                Set.copyOf(result.schema().entries().get("response").subtypes()));
-        assertTrue(result.schema().entries().get("success_response").subtypes().isEmpty());
-        assertTrue(result.schema().entries().get("token").subtypes().isEmpty());
+                Set.copyOf(Chained.subtypesOf(result.schema().entries().get("response"))));
+        assertTrue(Chained.subtypesOf(result.schema().entries().get("success_response")).isEmpty());
+        assertTrue(Chained.subtypesOf(result.schema().entries().get("token")).isEmpty());
     }
 
     @Test
     void subtypesPropagateTransitivelyThroughAnAlreadyTransitiveSupertypeChain() {
         // supertypes is already the full transitive chain by the time this runs (DefinitionResolver's
         // own induction), so the reverse index falls out the same way with no extra closure step.
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("top", emptyRecord());
-        entries.put("mid", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("top"), List.of(), RecordBody.of(RecordBody.fieldMap())));
-        entries.put("leaf", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("mid", "top"), List.of(), RecordBody.of(RecordBody.fieldMap())));
+        entries.put("mid",
+                ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("top")));
+        entries.put("leaf", ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("mid",
+                "top")).withSubtypes(List.of()));
 
         TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
 
-        assertEquals(Set.of("mid", "leaf"), Set.copyOf(result.schema().entries().get("top").subtypes()));
-        assertEquals(Set.of("leaf"), Set.copyOf(result.schema().entries().get("mid").subtypes()));
+        assertEquals(Set.of("mid", "leaf"), Set.copyOf(Chained.subtypesOf(result.schema().entries().get("top"))));
+        assertEquals(Set.of("leaf"), Set.copyOf(Chained.subtypesOf(result.schema().entries().get("mid"))));
     }
 
     @Test
     void importedSupertypesGainLocalSubtypesInThisSchemasOwnViewButTheOriginalRegistrationIsUntouched() {
         // imported_base already has "imported_child" as a subtype from its own home schema's
         // registration -- computeSubtypes must union with that, not replace it.
-        Map<String, TypeDefinition> importedEntries = new LinkedHashMap<>();
-        importedEntries.put("imported_base", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of(), List.of("imported_child"), RecordBody.of(RecordBody.fieldMap())));
-        importedEntries.put("imported_child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("imported_base"), List.of(), RecordBody.of(RecordBody.fieldMap())));
+        Map<String, Top> importedEntries = new LinkedHashMap<>();
+        importedEntries.put("imported_base",
+                ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSubtypes(List.of("imported_child")));
+        importedEntries.put("imported_child",
+                ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("imported_base")));
         TsonSchema imported = schemaOf(importedEntries);
         Map<String, TsonLinkedSchema> byIdentity = Map.of(
                 CanonicalIdentity.canonicalize("https://example.test/import.tn"), new TsonLinkedSchema(imported));
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
-        Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
-        localEntries.put("local_child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("imported_base"), List.of(), RecordBody.of(RecordBody.fieldMap())));
+        Map<String, Top> localEntries = new LinkedHashMap<>();
+        localEntries.put("local_child",
+                ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("imported_base")));
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
                 "https://example.test/meta.tn", List.of("https://example.test/import.tn"), localEntries);
 
@@ -626,10 +608,10 @@ class TsonSchemaLinkerTest {
 
         // This importer's own merged view: the pre-existing subtype plus the newly-local one.
         assertEquals(Set.of("imported_child", "local_child"),
-                Set.copyOf(result.schema().entries().get("imported_base").subtypes()));
+                Set.copyOf(Chained.subtypesOf(result.schema().entries().get("imported_base"))));
 
         // The originally-registered "imported" schema itself is untouched -- it never learns of local_child.
-        assertEquals(Set.of("imported_child"), Set.copyOf(imported.entries().get("imported_base").subtypes()));
+        assertEquals(Set.of("imported_child"), Set.copyOf(Chained.subtypesOf(imported.entries().get("imported_base"))));
     }
 
     @Test

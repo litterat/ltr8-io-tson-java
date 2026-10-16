@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.ArrayList;
@@ -15,7 +16,23 @@ import java.util.List;
  * spelling. {@code spec} is pinned to RFC 5890, flat and a bare {@link String}, as {@link Cidr4Type}'s is.
  */
 @Typename(name = "hostname_type")
-public record HostnameType(String spec, @Field("allow_idn") boolean allowIdn) implements Atom {
+public record HostnameType(TypeChain chain,
+        String spec, @Field("allow_idn") boolean allowIdn) implements Atom {
+    /** The chain normalised: absent and empty are one list. */
+    @Record
+    public HostnameType {
+        chain = TypeChain.orEmpty(chain);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public HostnameType(String spec, boolean allowIdn) {
+        this(TypeChain.EMPTY, spec, allowIdn);
+    }
+
+    @Override
+    public HostnameType withChain(TypeChain chain) {
+        return new HostnameType(chain, spec, allowIdn);
+    }
 
     /** {@code hostname_type.spec}'s pinned value. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc5890";

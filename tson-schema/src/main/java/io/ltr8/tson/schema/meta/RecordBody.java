@@ -16,29 +16,23 @@ import java.util.function.UnaryOperator;
 /**
  * The kernel's {@code record} constructor's own vocabulary, resolved (Part 2 §5.2, §8.1): {@code
  * access_pattern}/{@code size_type} are fixed by the constructor itself ({@code NAMED}/{@code FIXED}) and
- * never appear in output; {@code supertypes} is populated only when the source composed with {@code &}
- * (e.g. {@code atom => top & {}}) -- empty here ideally means a fresh record with no listed supertypes, omitted
- * from output the same way; {@code groups} similarly for a record with no field groups. In
- * practice, bound through plain {@code TsonObjectWriter.toTson} rather than a hand-written writer (see
- * {@code TypeDefinition}'s own Javadoc), both currently render as {@code []} rather than being
- * omitted when empty -- {@code ltr8-bind} doesn't support {@code Optional<List<T>>} record
- * components yet (only a bare, always-present {@code List} does), so there's no wrapper available
- * to opt into the omit-when-absent behavior non-list optional fields already get for free.
+ * never appear in output; {@code groups} and {@code discriminators} are empty for a record with none.
+ *
+ * <p><b>{@code chain} is {@code chained}'s</b> (see {@link TypeChain}): the complete IS-A chain and its inverse,
+ * computed by the resolver and the linker. A fresh record and a subtracted one ([TSON-SCHEMA] §5.9) have an empty
+ * chain, and a composition's chain names every operand and each operand's own chain. Inside held template text
+ * the parents are written, one of which may be an application ({@code <T> result<T> & { ... }}); substitution
+ * reaches it with every other reference the body holds, so {@code ok<text>} reaches an edge to {@code
+ * result<text>} and not to {@code result<int32>}.
  *
  * <p><b>{@code fields} is an ordered map from a field's name to its facts</b> ({@code field_map}, the kernel's
- * {@code !map { key_type: text  value_type: record_field  ordered: true }}). The name is the key and nowhere
- * else, so the map's own key uniqueness refuses a name written twice by its spelling; two spellings that are one
- * name under the record's {@code name_type} are the linker's to refuse, since only it can resolve the type.
- * Declaration order is part of the value, and every reader, writer and message follows it. The key is {@code
- * text} rather than {@code field_name} because {@code name_type} decides which names a record may declare.
- *
- * <p><b>{@code supertypes} is typed {@code [type_ref]}, not {@code [type_name]}</b>, because a supertype may
- * be written as an application. Inside a held template body a parent may still be open -- {@code <T> result<T>
- * & { ... }} -- and a name cannot carry the arguments that say which instantiation is meant. Being a reference
- * puts it on the channel {@code MetaRefs} already walks, so substitution and closing reach it with everything
- * else the body holds. A closed supertype carries no arguments and writes as a bare token, which is the
- * spelling a name had. The derived index {@code TypeDefinition.supertypes} stays a name list: it is computed
- * once every parent is a type, and a template never is (§5.10).
+ * {@code !map { key_type: text  value_type: record_field  ordered: true }}), flattened: a composition's fields
+ * are its operands' and its own, merged, so a consumer reading values against it never repeats the merge. The
+ * name is the key and nowhere else, so the map's own key uniqueness refuses a name written twice by its
+ * spelling; two spellings that are one name under the record's {@code name_type} are the linker's to refuse,
+ * since only it can resolve the type. Declaration order is part of the value, and every reader, writer and
+ * message follows it. The key is {@code text} rather than {@code field_name} because {@code name_type} decides
+ * which names a record may declare.
  *
  * <p><b>{@code extension} states how the record may be realised</b> ({@link RecordExtensionType}) and is
  * {@link RecordExtensionType#OPEN} unless the record says otherwise. It is a kernel field rather than a
@@ -51,8 +45,8 @@ import java.util.function.UnaryOperator;
  * {@code java.lang.Record} (the very language feature every type in this model is built from).
  */
 @Typename(name = "record")
-public record RecordBody(List<TypeRef> supertypes, SequencedMap<String, RecordField> fields, List<FieldGroup> groups,
-                          RecordExtensionType extension, List<String> discriminators,
+public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fields,
+                          List<FieldGroup> groups, RecordExtensionType extension, List<String> discriminators,
                           @Field("name_type") Optional<String> nameType) implements Product {
 
     /**
@@ -64,18 +58,17 @@ public record RecordBody(List<TypeRef> supertypes, SequencedMap<String, RecordFi
     public static final String FIELD_NAME = "field_name";
 
     /**
-     * <b>Absent and empty are the same list</b> for the three the kernel makes optional ({@code supertypes:
-     * [type_ref]?}, {@code groups: [field_group]?}, {@code discriminators: [field_name]?}): a body resolved
-     * from source arrives with an empty
-     * list where one bound from a resolved-form document that omits the field arrives with {@code null},
-     * and no rule distinguishes "no supertypes stated" from "an empty supertypes list". {@code fields} is
+     * <b>Absent and empty are the same value</b> for the three the kernel makes optional ({@code chain}, {@code
+     * groups} and {@code discriminators}): a body resolved from source arrives with an empty one where one bound
+     * from a resolved-form document that omits the field arrives with {@code null}, and no rule distinguishes
+     * "nothing stated" from "an empty list". {@code fields} is
      * required and is deliberately not guarded -- an absent required field is a violation the reader
      * reports and abandons the construction over, so it never reaches here, and swallowing a {@code null}
      * would only turn some other defect into an empty record.
      */
     @Record
     public RecordBody {
-        supertypes = supertypes == null ? List.of() : List.copyOf(supertypes);
+        chain = TypeChain.orEmpty(chain);
         fields = Collections.unmodifiableSequencedMap(new LinkedHashMap<>(fields));
         groups = groups == null ? List.of() : List.copyOf(groups);
         discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
@@ -107,7 +100,7 @@ public record RecordBody(List<TypeRef> supertypes, SequencedMap<String, RecordFi
     @Override
     public boolean equals(Object o) {
         return o instanceof RecordBody other
-                && supertypes.equals(other.supertypes)
+                && chain.equals(other.chain)
                 && List.copyOf(fields.sequencedEntrySet()).equals(List.copyOf(other.fields.sequencedEntrySet()))
                 && groups.equals(other.groups)
                 && extension == other.extension
@@ -118,7 +111,7 @@ public record RecordBody(List<TypeRef> supertypes, SequencedMap<String, RecordFi
     /** Consistent with {@link #equals}: {@link #fields} contributes in declaration order. */
     @Override
     public int hashCode() {
-        return Objects.hash(supertypes, List.copyOf(fields.sequencedEntrySet()), groups, extension,
+        return Objects.hash(chain, List.copyOf(fields.sequencedEntrySet()), groups, extension,
                 discriminators, nameType);
     }
 
@@ -134,17 +127,40 @@ public record RecordBody(List<TypeRef> supertypes, SequencedMap<String, RecordFi
         return nameType.orElse(FIELD_NAME);
     }
 
-    /**
-     * The same body with {@code discriminators} unstated and the default field name type -- every construction
-     * that has no family to dispatch, which while the per-field mark is still the live carrier is all of them.
-     */
-    public RecordBody(List<TypeRef> supertypes, SequencedMap<String, RecordField> fields, List<FieldGroup> groups,
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public RecordBody(SequencedMap<String, RecordField> fields, List<FieldGroup> groups, RecordExtensionType extension,
+                       List<String> discriminators, Optional<String> nameType) {
+        this(TypeChain.EMPTY, fields, groups, extension, discriminators, nameType);
+    }
+
+    /** The same body with an empty chain, {@code discriminators} unstated and the default field name type. */
+    public RecordBody(SequencedMap<String, RecordField> fields, List<FieldGroup> groups,
                        RecordExtensionType extension) {
-        this(supertypes, fields, groups, extension, List.of(), Optional.empty());
+        this(fields, groups, extension, List.of(), Optional.empty());
     }
 
     /** A fresh record body: no supertypes, no field groups, just plain fields, extensible. */
     public static RecordBody of(SequencedMap<String, RecordField> fields) {
-        return new RecordBody(List.of(), fields, List.of(), RecordExtensionType.OPEN, List.of(), Optional.empty());
+        return new RecordBody(fields, List.of(), RecordExtensionType.OPEN);
+    }
+
+    @Override
+    public RecordBody withChain(TypeChain chain) {
+        return new RecordBody(chain, fields, groups, extension, discriminators, nameType);
+    }
+
+    @Override
+    public RecordBody withSupertypes(List<String> supertypes) {
+        return withChain(chain.withSupertypes(supertypes));
+    }
+
+    /** This body with {@code extension} replaced -- every other facet, the chain included, unchanged. */
+    public RecordBody withExtension(RecordExtensionType extension) {
+        return new RecordBody(chain, fields, groups, extension, discriminators, nameType);
+    }
+
+    /** This body with {@code fields} replaced -- every other facet, the chain included, unchanged. */
+    public RecordBody withFields(SequencedMap<String, RecordField> fields) {
+        return new RecordBody(chain, fields, groups, extension, discriminators, nameType);
     }
 }

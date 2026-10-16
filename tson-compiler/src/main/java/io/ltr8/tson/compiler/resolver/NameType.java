@@ -9,7 +9,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TextFamily;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.HashSet;
 import java.util.List;
@@ -35,18 +35,19 @@ public final class NameType {
     private NameType() {
     }
 
-    /** The name type's definition, and the namespace its own names resolve in. */
-    public record Resolved(TypeDefinition definition, Function<String, TypeDefinition> lookup) {
+    /** The name type's value, and the namespace its own names resolve in. */
+    public record Resolved(Top definition, Function<String, Top> lookup) {
     }
 
     /**
-     * {@code entry}'s name type, given the schema's own namespace and the governing meta's. Empty for a body that is
-     * neither an enum nor a record, and for a {@code name_type} that resolves in neither namespace.
+     * {@code entry}'s name type, given the constructor its value applies (an enum's decides whether its {@code
+     * name_type} is the constructor's pin), the schema's own namespace and the governing meta's. Empty for a body
+     * that is neither an enum nor a record, and for a {@code name_type} that resolves in neither namespace.
      */
-    public static Optional<Resolved> of(TypeDefinition entry, Function<String, TypeDefinition> local,
-                                        Function<String, TypeDefinition> structure) {
-        return switch (entry.body()) {
-            case EnumBody body -> ofEnum(entry, body, local, structure);
+    public static Optional<Resolved> of(Top entry, Optional<String> constructor, Function<String, Top> local,
+                                        Function<String, Top> structure) {
+        return switch (entry) {
+            case EnumBody body -> ofEnum(constructor, body, local, structure);
             case RecordBody body -> ofRecord(body, local, structure);
             default -> Optional.empty();
         };
@@ -57,10 +58,10 @@ public final class NameType {
      * added characters -- a {@code start_add}, a {@code continue_add}, a {@code medial} -- are the profile's own.
      * Empty where the type resolves to nothing or is no identifier family, each refused on its own.
      */
-    public static Optional<IdentifierProfile> profile(TypeDefinition entry, Function<String, TypeDefinition> local,
-                                                      Function<String, TypeDefinition> structure) {
-        return of(entry, local, structure)
-                .map(type -> type.definition() == null ? null : type.definition().body())
+    public static Optional<IdentifierProfile> profile(Top entry, Optional<String> constructor,
+                                                      Function<String, Top> local, Function<String, Top> structure) {
+        return of(entry, constructor, local, structure)
+                .map(Resolved::definition)
                 .filter(IdentifierType.class::isInstance)
                 .map(body -> ((IdentifierType) body).profile());
     }
@@ -70,13 +71,13 @@ public final class NameType {
      * ([TSON-SCHEMA] §5.5). {@code NONE} for a body that is not an enum, a type that resolves to nothing, or one
      * that is no identifier family -- each refused or reported on its own.
      */
-    public static Normalization form(TypeDefinition enumeration, Function<String, TypeDefinition> local,
-                                     Function<String, TypeDefinition> structure) {
-        if (!(enumeration.body() instanceof EnumBody)) {
+    public static Normalization form(Top enumeration, Optional<String> constructor, Function<String, Top> local,
+                                     Function<String, Top> structure) {
+        if (!(enumeration instanceof EnumBody)) {
             return Normalization.NONE;
         }
-        return of(enumeration, local, structure)
-                .map(type -> type.definition() != null && type.definition().body() instanceof TextFamily family
+        return of(enumeration, constructor, local, structure)
+                .map(type -> type.definition() instanceof TextFamily family
                         ? family.normalization()
                         : Normalization.NONE)
                 .orElse(Normalization.NONE);
@@ -86,7 +87,7 @@ public final class NameType {
      * Whether {@code type} is the kernel's {@code identifier} -- an enum's default, and through {@code field_name} a
      * record's -- whose names a refusal calls identifiers, where it names any other type, the author's own.
      */
-    public static boolean isIdentifier(Resolved type, Function<String, TypeDefinition> structure) {
+    public static boolean isIdentifier(Resolved type, Function<String, Top> structure) {
         return type.definition() != null
                 && type.definition() == structure.apply(ReferenceChain.terminal(EnumBody.IDENTIFIER, structure));
     }
@@ -121,10 +122,10 @@ public final class NameType {
         return base == IdentifierProfile.Base.ASCII || base == IdentifierProfile.Base.NONE;
     }
 
-    private static Optional<Resolved> ofEnum(TypeDefinition enumeration, EnumBody body,
-                                             Function<String, TypeDefinition> local,
-                                             Function<String, TypeDefinition> structure) {
-        if (pinned(enumeration, body, fallingBackTo(local, structure)) && structure.apply(body.nameType()) != null) {
+    private static Optional<Resolved> ofEnum(Optional<String> constructor, EnumBody body,
+                                             Function<String, Top> local,
+                                             Function<String, Top> structure) {
+        if (pinned(constructor, body, fallingBackTo(local, structure)) && structure.apply(body.nameType()) != null) {
             return Optional.of(new Resolved(structure.apply(ReferenceChain.terminal(body.nameType(), structure)),
                     structure));
         }
@@ -139,14 +140,14 @@ public final class NameType {
      * A name type the record states was written by its author, so it resolves in the schema's own namespace first,
      * as an enum's does; the absent default is the kernel's {@code field_name}, resolved in the structure first.
      */
-    private static Optional<Resolved> ofRecord(RecordBody body, Function<String, TypeDefinition> local,
-                                               Function<String, TypeDefinition> structure) {
+    private static Optional<Resolved> ofRecord(RecordBody body, Function<String, Top> local,
+                                               Function<String, Top> structure) {
         String name = body.nameTypeName();
-        Function<String, TypeDefinition> first = body.nameType().isEmpty() ? structure : local;
-        Function<String, TypeDefinition> second = first == structure ? local : structure;
-        for (Function<String, TypeDefinition> namespace : List.of(first, second)) {
+        Function<String, Top> first = body.nameType().isEmpty() ? structure : local;
+        Function<String, Top> second = first == structure ? local : structure;
+        for (Function<String, Top> namespace : List.of(first, second)) {
             if (namespace.apply(name) != null) {
-                Function<String, TypeDefinition> other = namespace == first ? second : first;
+                Function<String, Top> other = namespace == first ? second : first;
                 return Optional.of(new Resolved(namespace.apply(ReferenceChain.terminal(name, namespace)),
                         fallingBackTo(namespace, other)));
             }
@@ -155,20 +156,19 @@ public final class NameType {
     }
 
     /**
-     * Whether {@code name_type} is the value {@code enumeration}'s constructor pins -- found through its
-     * {@code source}, and through a template's held body to the constructor it applies, since an entry instantiating
-     * {@code names => <M> !enum [a b M]} records the template as its source and not {@code enum}.
+     * Whether {@code name_type} is the value the enum's {@code constructor} pins -- through a template's held body
+     * to the constructor it applies, where the name given is a template's.
      */
-    private static boolean pinned(TypeDefinition enumeration, EnumBody body, Function<String, TypeDefinition> lookup) {
-        Optional<String> head = enumeration.source().map(source -> source.name());
+    private static boolean pinned(Optional<String> constructor, EnumBody body, Function<String, Top> lookup) {
+        Optional<String> head = constructor;
         Set<String> seen = new HashSet<>();
         while (head.isPresent() && seen.add(head.get())) {
-            TypeDefinition constructor = lookup.apply(head.get());
-            if (constructor != null && constructor.body() instanceof TemplateBody held) {
+            Top applied = lookup.apply(head.get());
+            if (applied instanceof TemplateBody held) {
                 head = HeldBody.of(held).application().typeRef();
                 continue;
             }
-            return constructor != null && constructor.body() instanceof RecordBody record
+            return applied instanceof RecordBody record
                     && Optional.ofNullable(record.fields().get(NAME_TYPE))
                             .filter(field -> field.role() == FieldRole.FIXED)
                             .flatMap(RecordField::value)
@@ -177,10 +177,10 @@ public final class NameType {
         return false;
     }
 
-    private static Function<String, TypeDefinition> fallingBackTo(Function<String, TypeDefinition> primary,
-                                                                  Function<String, TypeDefinition> fallback) {
+    private static Function<String, Top> fallingBackTo(Function<String, Top> primary,
+                                                                  Function<String, Top> fallback) {
         return name -> {
-            TypeDefinition found = primary.apply(name);
+            Top found = primary.apply(name);
             return found != null ? found : fallback.apply(name);
         };
     }

@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.Optional;
 
@@ -43,8 +43,8 @@ enum DiscriminationClass {
         return ReferenceChain.terminal(linked.schema(), name).flatMap(resolved -> classify(resolved.definition()));
     }
 
-    private static Optional<DiscriminationClass> classify(TypeDefinition definition) {
-        return switch (definition.body()) {
+    private static Optional<DiscriminationClass> classify(Top definition) {
+        return switch (definition) {
             case IntegerType ignored -> Optional.of(NUMBER);
             case DecimalType ignored -> Optional.of(NUMBER);
             case FloatType ignored -> Optional.of(NUMBER);
@@ -137,7 +137,7 @@ enum DiscriminationClass {
      * the object kind. A type with no class is not unstable -- it is unreachable by the untagged route either way.
      */
     static boolean stable(TsonSchema schema, String name) {
-        return ReferenceChain.terminal(schema, name).map(resolved -> switch (resolved.definition().body()) {
+        return ReferenceChain.terminal(schema, name).map(resolved -> switch (resolved.definition()) {
             case FloatType floats -> !floats.allowNan() && !floats.allowInfinity();
             case MapBody map -> MapPlan.isObjectForm(schema, map);
             default -> true;

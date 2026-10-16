@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.EnumMap;
@@ -40,8 +40,8 @@ final class ChoiceReader {
      * everywhere else. There is nothing left here for a mode to differ about.
      */
     static final ValueReaderFactory FACTORY = (name, typeDefinition, context) -> {
-        if (!(typeDefinition.body() instanceof ChoiceBody body)) {
-            throw new IllegalArgumentException("'" + name + "' is not choice-shaped: " + typeDefinition.body());
+        if (!(typeDefinition instanceof ChoiceBody body)) {
+            throw new IllegalArgumentException("'" + name + "' is not choice-shaped: " + typeDefinition);
         }
         if (body.variants().isEmpty()) {
             throw new IllegalStateException("'" + name + "' declares no variants -- nothing compilable here");
@@ -52,7 +52,7 @@ final class ChoiceReader {
         }
         // NamedDispatchReader's positionName is message-only, so the display name goes straight in:
         // a choice lifted from `(a | b)` sugar has an internal name nobody wrote.
-        return new NamedDispatchReader(EntryDisplayName.of(name, typeDefinition),
+        return new NamedDispatchReader(context.displayName(name, typeDefinition),
                 "is a choice -- a value at this position requires an explicit type annotation (!typeName) "
                         + "naming one of its declared variants to disambiguate",
                 "declared variant", variantNames, context.readers(),
@@ -66,9 +66,9 @@ final class ChoiceReader {
      * {@code true} over variants the classes contradict, and the safe reading of that disagreement is no
      * recovery.
      */
-    private static Map<DiscriminationClass, String> untaggedRecovery(TypeDefinition def, ChoiceBody body,
+    private static Map<DiscriminationClass, String> untaggedRecovery(Top def, ChoiceBody body,
             TsonLinkedSchema linked) {
-        if (!def.disjoint().equals(Optional.of(true))) {
+        if (!body.disjoint().equals(Optional.of(true))) {
             return Map.of();
         }
         Map<DiscriminationClass, String> byClass = new EnumMap<>(DiscriminationClass.class);

@@ -10,7 +10,6 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import org.junit.jupiter.api.Test;
 
@@ -26,28 +25,26 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * The properties the held-body split is chosen for. [TSON-SCHEMA] §5.10 makes an open entry's body the
  * constructor application <em>as written</em>, so {@link TemplateBody} carries it as text and this package's
  * {@link HeldBody} parses that text for the phases that need a tree. Neither half is visible from its own
- * declaration: one is a module-boundary arrangement, one is a decision about {@link TypeDefinition}'s
+ * declaration: one is a module-boundary arrangement, one is a decision about {@link Top}'s
  * equality that goes the opposite way from the component beside it, and one is a round trip that has to hold
  * or two entries that should be equal are not.
  */
 class HeldBodyTest {
 
     /** {@code box => <T> !<head> {}} -- the smallest held application that differs by its constructor. */
-    private static TypeDefinition template(String head) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(),
-                List.of(),
-                HeldBody.held(List.of("T"), new DataValue(List.of(), Optional.of(head),
-                        new RecordValue(List.of()))));
+    private static Top template(String head) {
+        return HeldBody.held(List.of("T"), new DataValue(List.of(), Optional.of(head),
+                        new RecordValue(List.of())));
     }
 
     /**
      * The point of carrying the body as text: {@code tson-schema} states an open entry's body without naming
-     * a {@code tson-compiler} type, so {@link Top} stays sealed, {@code TypeDefinition.body} stays REQUIRED,
+     * a {@code tson-compiler} type, so {@link Top} stays sealed, {@code Top.body} stays REQUIRED,
      * and a template needs no second body component.
      */
     @Test
     void aHeldApplicationIsABodyTheValueModelCanCarry() {
-        Top body = template("record").body();
+        Top body = template("record");
 
         TemplateBody held = assertInstanceOf(TemplateBody.class, body);
         assertEquals(List.of("T"), held.parameterNames());

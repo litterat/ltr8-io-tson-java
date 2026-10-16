@@ -85,10 +85,10 @@ final class ScopedReader implements TsonTypeReader<Object> {
 
     private static ValueReaderFactory factory(BiFunction<String, Object, Object> inScope) {
         return (name, definition, context) -> {
-            if (!(definition.body() instanceof Scoped scoped)) {
-                throw new IllegalArgumentException("'" + name + "' is not scoped-shaped: " + definition.body());
+            if (!(definition instanceof Scoped scoped)) {
+                throw new IllegalArgumentException("'" + name + "' is not scoped-shaped: " + definition);
             }
-            return new ScopedReader(EntryDisplayName.of(name, definition), scoped,
+            return new ScopedReader(context.displayName(name, definition), scoped,
                     context.schema().entries().keySet(), context.readers(), context.foreign(), inScope);
         };
     }

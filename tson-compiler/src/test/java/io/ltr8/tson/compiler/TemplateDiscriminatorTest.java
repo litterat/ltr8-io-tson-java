@@ -56,12 +56,12 @@ class TemplateDiscriminatorTest {
      * already named the same application.
      */
     private static String target(TsonCompiledSchema compiled, String alias) {
-        return compiled.schema().entries().get(alias).body() instanceof io.ltr8.tson.schema.meta.Reference ref
+        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
                 ? ref.target().name() : alias;
     }
 
     private static RecordBody bodyOf(TsonCompiledSchema compiled, String entry) {
-        return (RecordBody) compiled.schema().entries().get(entry).body();
+        return (RecordBody) compiled.schema().entries().get(entry);
     }
 
     private static RecordField fieldOf(TsonCompiledSchema compiled, String entry, String field) {
@@ -85,7 +85,7 @@ class TemplateDiscriminatorTest {
     void theHeldBodyNamesTheSelector() {
         TsonCompiledSchema compiled = compile(FAMILY);
 
-        TemplateBody held = (TemplateBody) compiled.schema().entries().get("pet").body();
+        TemplateBody held = (TemplateBody) compiled.schema().entries().get("pet");
 
         assertEquals(List.of("type"), held.discriminators(),
                 () -> "the field the author marked survives into the held body: " + held.template());

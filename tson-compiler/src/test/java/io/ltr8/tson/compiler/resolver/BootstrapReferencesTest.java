@@ -3,7 +3,8 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Reference;
 
 import org.junit.jupiter.api.Test;
 
@@ -28,8 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class BootstrapReferencesTest {
 
-    private static RecordField field(TypeDefinition definition, String name) {
-        return assertInstanceOf(RecordBody.class, definition.body()).fields().entrySet().stream()
+    private static RecordField field(Top definition, String name) {
+        return assertInstanceOf(RecordBody.class, definition).fields().entrySet().stream()
                 .filter(f -> f.getKey().equals(name)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
@@ -48,7 +49,7 @@ class BootstrapReferencesTest {
     /** And a position naming something that is not a reference is unaffected here as well. */
     @Test
     void aNonReferenceIsUnaffectedOnTheBootstrapRoute() {
-        TypeDefinition recordField = MetaKernelBootstrapResolver.getMetaKernelSchema()
+        Top recordField = MetaKernelBootstrapResolver.getMetaKernelSchema()
                 .entries().get("record_field");
 
         assertEquals("type_ref", field(recordField, "type").type().name());
@@ -58,9 +59,9 @@ class BootstrapReferencesTest {
     /** The chain stays walkable through the entries, which is what a reader collapses it by. */
     @Test
     void aReferenceEntryKeepsItsHopOnTheBootstrapRoute() {
-        TypeDefinition typeName = MetaKernelBootstrapResolver.getMetaKernelSchema().entries().get("type_name");
+        Top typeName = MetaKernelBootstrapResolver.getMetaKernelSchema().entries().get("type_name");
 
         assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("identifier"),
-                assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class, typeName.body()).target());
+                assertInstanceOf(Reference.class, typeName).target());
     }
 }

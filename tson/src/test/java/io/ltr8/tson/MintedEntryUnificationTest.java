@@ -1,11 +1,13 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -83,8 +85,8 @@ class MintedEntryUnificationTest {
         String name = mintedName(schemas.get("left"));
         assertEquals(name, mintedName(schemas.get("right")), "one content-addressed name");
 
-        TypeDefinition fromLeft = schemas.get("left").schema().entries().get(name);
-        TypeDefinition fromRight = schemas.get("right").schema().entries().get(name);
+        Top fromLeft = schemas.get("left").schema().entries().get(name);
+        Top fromRight = schemas.get("right").schema().entries().get(name);
         assertEquals(fromLeft, fromRight,
                 () -> "an entry shaped by which schema closed it is not a function of the form:\n  left:  "
                         + fromLeft + "\n  right: " + fromRight);
@@ -100,7 +102,7 @@ class MintedEntryUnificationTest {
         Map<String, TsonLinkedSchema> schemas = both();
         String name = mintedName(schemas.get("right"));
 
-        assertEquals(List.of(), schemas.get("right").schema().entries().get(name).subtypes(),
+        assertEquals(List.of(), Chained.subtypesOf(schemas.get("right").schema().entries().get(name)),
                 "a closed record has no subtypes of its own here");
     }
 
@@ -112,7 +114,7 @@ class MintedEntryUnificationTest {
     void theTemplateDoesNotIndexAMintedInstantiation() {
         Map<String, TsonLinkedSchema> schemas = both();
         schemas.forEach((which, schema) -> assertFalse(
-                schema.schema().entries().get("box").subtypes().contains(mintedName(schema)),
-                () -> which + ": " + schema.schema().entries().get("box").subtypes()));
+                Chained.subtypesOf(schema.schema().entries().get("box")).contains(mintedName(schema)),
+                () -> which + ": " + Chained.subtypesOf(schema.schema().entries().get("box"))));
     }
 }

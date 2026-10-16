@@ -12,7 +12,6 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 
 /**
  * A field's schema-stated value, resolved once at compile time: the host value it denotes, and the JSON node
@@ -41,15 +40,15 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
         String name = fieldTypeName;
         Top body = null;
         for (int hops = 0; hops < MAX_REFERENCE_HOPS; hops++) {
-            TypeDefinition definition = schema.entries().get(name);
+            Top definition = schema.entries().get(name);
             if (definition == null) {
                 throw new IllegalStateException("'" + name + "' is not declared -- linking should have refused this");
             }
-            if (definition.body() instanceof Reference reference) {
+            if (definition instanceof Reference reference) {
                 name = reference.target().name();
                 continue;
             }
-            body = definition.body();
+            body = definition;
             break;
         }
         if (!(body instanceof Atom atom)) {

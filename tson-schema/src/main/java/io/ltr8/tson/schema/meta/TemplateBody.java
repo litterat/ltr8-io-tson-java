@@ -14,8 +14,8 @@ import java.util.Optional;
  * <em>unread</em> until materialisation substitutes the parameters away; {@link #parameters} are what it
  * binds, in order, each with the type an argument for it is read as ({@link TemplateParam}).
  *
- * <p><b>It holds in both directions</b>: a {@link TypeDefinition} whose body is one of these declares type
- * parameters, and every entry that declares them has one. §5.10's partial application is no exception --
+ * <p><b>It holds in both directions</b>: an entry whose value is one of these declares type parameters, and
+ * every entry that declares them has one. §5.10's partial application is no exception --
  * {@code <B> pair<uuid, B>} holds the {@code !reference { target: pair<uuid, B> }} §8.1 says it denotes.
  *
  * <p><b>Why the body is text, and not a value of the constructor's own vocabulary.</b> A parameter stands
@@ -38,8 +38,11 @@ import java.util.Optional;
  * here instead would put a grammar type in the value model and, since {@code DataValue} lives one module up,
  * could not be done at all without inverting the dependency this package deliberately keeps.
  *
- * <p><b>Composes with {@code top} directly</b>, like {@link Reference} and {@link Data}: it describes no
- * value's shape, and nothing is ever typed by it.
+ * <p><b>Composes {@code top} and {@code chained}</b> ({@link Chained}): it describes no value's shape and
+ * nothing is typed by it as a whole, but a record-bodied template is the ABSTRACT base its members are IS-A,
+ * so it carries a chain like any type. {@link TypeChain#parents} are its parents as written, kept after it
+ * closes; {@link TypeChain#supertypes} the closed entries those parents reach, a template parent contributing
+ * its own ancestors and not itself; {@link TypeChain#subtypes} its members and the entries IS-A it.
  *
  * <p><b>{@link #extension} is the parent's, and only a record-bodied template has one.</b> Absent means this
  * template is no type, so naming it at a type position is an error; present, it is ABSTRACT or SEALED and
@@ -54,9 +57,9 @@ import java.util.Optional;
  * mean parsing the held text -- the one thing §1.3 promises a resolved-output consumer never has to do.
  */
 @Typename(name = "template")
-public record TemplateBody(List<TemplateParam> parameters, String template,
+public record TemplateBody(TypeChain chain, List<TemplateParam> parameters, String template,
                             Optional<RecordExtensionType> extension,
-                            List<String> discriminators) implements Top {
+                            List<String> discriminators) implements Top, Chained {
 
     /**
      * <b>{@link #discriminators} names the fields a SEALED family base dispatches on</b>, in the order their
@@ -69,6 +72,7 @@ public record TemplateBody(List<TemplateParam> parameters, String template,
      */
     @Record
     public TemplateBody {
+        chain = TypeChain.orEmpty(chain);
         Objects.requireNonNull(parameters, "parameters");
         Objects.requireNonNull(template, "template");
         Objects.requireNonNull(extension, "extension");
@@ -80,10 +84,31 @@ public record TemplateBody(List<TemplateParam> parameters, String template,
         discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
     }
 
+    /** A held body no resolver has placed in the IS-A order yet: an empty chain. */
+    public TemplateBody(List<TemplateParam> parameters, String template,
+                         Optional<RecordExtensionType> extension, List<String> discriminators) {
+        this(TypeChain.EMPTY, parameters, template, extension, discriminators);
+    }
+
     /** The same body with {@code discriminators} unstated -- every producer, until they are wired. */
     public TemplateBody(List<TemplateParam> parameters, String template,
                          Optional<RecordExtensionType> extension) {
         this(parameters, template, extension, List.of());
+    }
+
+    @Override
+    public TemplateBody withChain(TypeChain chain) {
+        return new TemplateBody(chain, parameters, template, extension, discriminators);
+    }
+
+    @Override
+    public TemplateBody withSupertypes(List<String> supertypes) {
+        return withChain(chain.withSupertypes(supertypes));
+    }
+
+    @Override
+    public TemplateBody withSubtypes(List<String> subtypes) {
+        return withChain(chain.withSubtypes(subtypes));
     }
 
     /** The parameter names, in order -- what substitution binds and what an application's arity is checked against. */
@@ -91,9 +116,18 @@ public record TemplateBody(List<TemplateParam> parameters, String template,
         return parameters.stream().map(TemplateParam::name).toList();
     }
 
+    /**
+     * The type parameters an entry whose value is {@code value} declares -- {@code []} unless it is held
+     * ([TSON-SCHEMA] §5.10). A held body carries the list it binds, so "does this entry declare parameters?" and
+     * "what does its body hold?" are one question, and a closed entry has nowhere to put a parameter list.
+     */
+    public static List<String> parameterNamesOf(Top value) {
+        return value instanceof TemplateBody held ? held.parameterNames() : List.of();
+    }
+
     /** The same body with each parameter replaced by {@code settled}'s entry for it, where there is one. */
     public TemplateBody withParameters(Map<String, TemplateParam> settled) {
-        return new TemplateBody(parameters.stream().map(p -> settled.getOrDefault(p.name(), p)).toList(),
+        return new TemplateBody(chain, parameters.stream().map(p -> settled.getOrDefault(p.name(), p)).toList(),
                 template, extension, discriminators);
     }
 }

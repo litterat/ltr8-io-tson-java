@@ -526,13 +526,24 @@ public record TsonDocument(Optional<String> id, Optional<String> schema, TsonVal
 
 ```java
 public record TsonSchema(String id, String meta, List<String> imports,
-                         AnnotatedMap<String, TypeDefinition> entries, boolean bootstrap) {}
+                         AnnotatedMap<String, Top> entries, boolean bootstrap,
+                         Map<String, List<ValueByName>> valuesByName, Map<String, EntryFacts> facts) {
+    public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
+                             Optional<String> constructor, Optional<String> refines) {}
+    public EntryFacts factsOf(String name);              // NONE for a name with no facts
+    public Optional<SourcePosition> positionOf(String name); // absent for an entry the resolver minted
+    public Optional<String> constructorOf(String name);  // the constructor tag the entry's value applies
+    public Optional<TypeRef> applicationOf(String name); // the @application on its key (§8.2)
+}
 
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
-                               Map<String, Normalization> enumForms, Map<String, TypeDefinition> nameTypes) {
+                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
     public String originOf(String entryName);       // which document declared it, transitively
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
-    public Optional<TypeDefinition> nameType(String entryName); // a record's name_type, where not field_name
+    public Optional<Top> nameType(String entryName); // a record's name_type, where not field_name
+    public boolean isKernel(String entryName);      // the meta-kernel's own entry, judged by origin
+    public TypeKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
+    public boolean isConstructor(String name, Top value); // IS-A the kernel's top
 }
 
 public final class TsonSchemaRegistry implements TsonSchemaLoader {
@@ -568,7 +579,12 @@ its URI spelling and NFC; `validate(id)` requires a document's own `!!id` to be 
 `/local/orders.tn`, `file:/local/orders.tn` and `file:///local/orders.tn` are one identity.
 
 The module exports two packages: `io.ltr8.tson.schema` (the above) and `io.ltr8.tson.schema.meta`, the resolved-schema
-value model — pure records, sealed interfaces and enums, §8's `TypeDefinition` et al. The host values the atoms read to
+value model — pure records, sealed interfaces and enums, §8's `Top` and its bodies. A schema map's entry is its value:
+a `Type` or a `TemplateBody` carries its own chain (`Chained.chain()`, a `TypeChain` of `parents`, `supertypes` and
+`subtypes`, with accessors for each on `Chained`); the application an entry is the instantiation of is the derived
+`@application` on its key (`TsonSchema.applicationOf`); and what is not part of the value — where it was declared, its
+value annotations, its constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The
+host values the atoms read to
 are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed except for its one deliberately open branch,
 **`Data`**, which a consumer's own class implements: §4.1's fourth base kind, where an instance of a meta-schema's own
 constructor lives when the thing it describes is not a data type. A consumer registers such a class by carrying

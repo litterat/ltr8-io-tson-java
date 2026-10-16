@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Record-subtype dispatcher bounded by the schema's own {@code TypeDefinition.subtypes()} (a plain
+ * Record-subtype dispatcher bounded by the schema's own {@code Top.subtypes()} (a plain
  * {@code Set<String>} of schema names) rather than any Java type -- unlike {@link VariantBindReader}'s
  * {@code DataClassUnion}-bounded version, there's no Java union to validate membership against here,
  * only the schema's own subtype list. Used wherever a real, reachable "own data" reader exists for

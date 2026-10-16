@@ -15,8 +15,8 @@ import io.ltr8.tson.base.ParseException;
  * ({@link TsonDataParser}/{@link TsonSchemaParser}/{@link TsonTypeReader}); {@code lexer} itself
  * (the scanner, its tokens) is internal machinery a consumer never names directly.
  *
- * <p>Implements {@link SourcePosition} directly (no adapter class) so a resolved {@code
- * schema.meta.TypeDefinition} can carry a real position without {@code tson-schema} ever depending
+ * <p>Implements {@link SourcePosition} directly (no adapter class) so a resolved schema's entry facts
+ * ({@code TsonSchema.EntryFacts}) can carry a real position without {@code tson-schema} ever depending
  * on this module -- {@code tson-compiler} already depends on {@code tson-schema}, so implementing
  * the dependency's own interface here is the standard direction for this kind of thing.
  */

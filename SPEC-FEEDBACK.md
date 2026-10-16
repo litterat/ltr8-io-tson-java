@@ -1305,3 +1305,204 @@ resolved fixture changes.
 - [TSON-DATA] §7.1: `.` is the identifier separator of [TSON-SCHEMA] §5.12, no longer "future".
 
 **Status against Revision 37:** open; running on the `qualified-name` branch of `r2026-38-proposal`, as stated above.
+
+---
+
+## 14. `type_definition` goes: a schema map's entry is its value, and a type carries its own chain
+
+**Section:** [TSON-SCHEMA] §8.1 ("Output Records: `type_definition`, `type_ref`, `type_argument`"), §8 (resolver
+output as a data document of `schema`), §4.1 (`type`, #9), §5.5 (an instance's `source` "is always the base
+constructor"), §5.7 and §5.8 (`source` "records the refinement origin"), §5.9 (lineage in `record.supertypes`),
+§7.2 (subsumption reads "the contract index only"), §10.1 (ingest of resolved values); `meta-kernel.tn`'s
+`type_definition`, `record.supertypes` and `schema` entries.
+
+**Kind:** proposal — a kernel simplification with no change to any verdict. Running (Status, below); sequenced before
+the namespace kind and `ref<T>` (#13, "Interim, and what closes each"), which it simplifies, because it is a mechanical
+change to the output shape and the host model and those two entries are written against that shape.
+
+**The problem.** Resolver output wraps every entry of a schema map in a record that source never writes:
+`person => !type_definition { source: record  supertypes: […]  subtypes: […]  body: !record { … } }`. The wrapper
+exists to hang four facts on, and with `type` in the kernel (#9) each has a home of its own, three of them already
+stated elsewhere in the same entry:
+
+- `body: top` is the entry's value. `schema => {type_name => top}`.
+- `supertypes` and `subtypes` are a fact about a type, so fields of `type`. Every type kind composes `type`, so
+  every `!record`, `!integer_type`, `!array` and `!choice` body has the slots; `data`, `reference` and `template`
+  compose `top` and have none — a value, a hop and an open body carry no IS-A, which is the rule now.
+- `source`, for a construction, is the body's tag: `source: record  body: !record { … }` states one fact twice.
+- `source`, for a refinement: §5.5 already makes an instance's `source` the base constructor, so the tag again; the
+  refined-from entry is the chain's nearest member.
+- `source`, for a template application, is the entry's identity under another name: §8.2 keys the instantiation
+  entry on it, so that `int_box => box<int32>` and a later `box<int32>` are one entry, across an import as within
+  one schema, and §5.8's edge from `ok<text>` to `result<text>` is found through it. It is the one fact the wrapper
+  holds that nothing else states, and it moves rather than goes.
+- `source`, for an open entry, is the constructor the held text applies. Under the one-spelling rule (§8.1) it is
+  the text's first token, and §1.3's consumer never reads the held body.
+
+`record.supertypes` is the same shape of duplication inside the body: §5.9 keeps it as "lineage" so that a
+subtracted record names the parent it is no longer IS-A, and §7.2 says in the same breath that no check reads it.
+Direct parents are the chain's minimal members, operand order is in the flattened `fields`, and `&` against `^` has
+no consequence once the body is flat. Its one live use is not in output at all: inside a held template body a
+parent may be an application, `<T> result<T> & { … }`, substituted at materialisation.
+
+**Proposed.** `type_definition` and `record.supertypes` are removed; a type and a template carry their own chain in
+one record; a schema map is a map from name to value.
+
+```
+type_chain => {
+  parents?:     [type_ref]       -- the parents as written; held text only, one may be an application
+  supertypes?:  [type_name]      -- closed: every entry this one IS-A, complete
+  subtypes?:    [type_name]      -- the inverse, over this map only (§3.3.4)
+}
+chained     => { chain?: type_chain }
+application => @annotation type_ref   -- on an entry's key: the application it is the instantiation of (§8.2)
+type     => top & chained & {}
+template => top & chained & { parameters  template  extension?  discriminators? }
+record   => product & { access_pattern? size_type? fields groups? extension? discriminators? profile? }
+schema   => {type_name => top}
+```
+
+- **An entry resolves to its value.** `person => !record { fields: { … } }`,
+  `integer => !integer_type {}`, `age => !integer_type { min: 0  chain: { supertypes: [integer] } }`,
+  `type_name => !reference { target: identifier }`, `vec => <T> !template { … }`, and a DATA entry
+  `my_op => !operation { … }`. Resolved output and source are one grammar: output is source with sugar expanded,
+  bodies flattened and chains computed, and an entry written as a constructor application resolves to itself.
+- **An entry's kind is its value's type's kind** (§5.5's transfer, unchanged): a body whose constructor IS-A
+  `type` is a type entry; one whose constructor composes `data` is DATA; `!reference` is REFERENCE; `!template` is
+  open. `type_ref` is a name in `schema` whose value is a type, and the DATA-at-a-type-position rule (§4.1) is
+  "the value is not a type", with no wrapper to consult.
+- **One record, three states named.** `parents` is what was written, and is the only list that ever holds an
+  application; it is held text's slot, and a family-base template keeps it after closing, since its parents are
+  closed entries and a FINAL parent is refused there as anywhere (§5.2). `supertypes` is the closed chain, complete
+  to a fixed point through applied parents (§5.8), every element a bare name, lexically sorted by the fixtures'
+  convention; a fresh record's is empty, as §4.1 says. `subtypes` is unchanged: the entries of this map only.
+  The record is a mixin because a template needs it too: a record-bodied template is the ABSTRACT base its
+  members are IS-A, and it stands in its own parents' `subtypes` as any record does.
+- **An entry's application is an annotation on its key.** `application` is the entry's identity as an
+  instantiation (§8.2), and an entry of any kind can be one: a record-bodied template's member, a DATA entry
+  closed from a templated instance, the alias a non-record template's application closes to. It is a fact about
+  the entry, not about a type, so it lives beside the entry as `@synthetic` does (§8.2): the resolver writes
+  `@application:{ name: box  arguments: [{ name: int32 }] }` on the key wherever an entry closes an application,
+  and reads it as stated on ingest, so an imported schema's instantiations unify with a later schema's. It is
+  derived, as `@synthetic` is, and never written by a declaration: an author's `@application` is a resolver
+  error, as `chain` is. Unlike `@synthetic` it is not recomputed on ingest, being the one fact the entry's value
+  does not state.
+- **A declaration never writes `chain`, and a constructor never declares it.** `!record { chain: { … } }` in
+  source is a resolver error, as writing `choice.disjoint` is, and a meta-schema's `widget => atom & { chain?: … }`
+  is refused where it is declared, the name being `chained`'s. On ingest the chain is read as stated, never
+  recomputed, because a flat body and its chain cannot be recomputed from each other. That is §10.1's reading of
+  resolved output already, and the record fixtures' `fields` stay flattened for the reason §1.3 gives: the field
+  set is the type, and a consumer that reads values against it must not repeat the merge.
+- **Provenance is not recorded.** Subtraction's lineage and a refinement's operator are what was written, nothing
+  reads them after resolution, and the source document has them. §5.9's lineage sentences and its rule 10 (an open
+  application dropped from lineage) go with `record.supertypes`; a subtracted record is a record with an empty
+  `supertypes`. The application is not provenance, above.
+- **Kind is judged by origin, not spelling.** A body's kind is read off the chain by which entry of the kernel it
+  reaches, so a schema's own `data => { … }` composed into `payload => data & { … }` is PRODUCT: a value conforms
+  to where it is defined.
+- **The profile rule (#10) reads unchanged.** "Absent, it is its supertypes' one name type": every member of the
+  chain agrees, each having inherited its own.
+
+**What it costs.** The output shape of every entry, so every `*-resolved.tn` fixture, the corpus vectors that carry
+resolved output, the bundled digests, and §8.1 rewritten around `type` rather than a wrapper. In the host model,
+`schema.meta.TypeDefinition` goes, `TsonSchema` maps a name to a `Top`, and every type body record gains the two
+chain components, because a body's components mirror its constructor's flattened shape. Mechanical throughout:
+no data-document verdict changes, no diagnostic changes, and the read-side shape (`TsonCompiledSchema`) is a
+different shape today and stays one.
+
+**Breaking changes, against Revision 37:** the resolved-output format — every entry, every fixture. No source
+schema changes; no verdict on a data document changes.
+
+**Suggested resolution.**
+
+- [TSON-SCHEMA] §4.1: `type_chain` and `chained` as above, `type` and `template` composing it, with the sentence
+  "a type carries its IS-A chain; a declaration never writes it, and a constructor never declares its name";
+  `application` declared with `synthetic` among the kernel's annotations, derived and never author-written.
+- [TSON-SCHEMA] §8.1: retitled to `type_ref` and `type_argument`; an entry resolves to its value; the kind of an
+  entry is its value's type's kind; `source` and `type_definition` deleted, the `source` sentences of §5.5, §5.7,
+  §5.8 and §5.10 ("an open entry's `source` is the constructor the held body applies") rewritten to the tag, and
+  §8.2's instantiation entry keyed on its `@application`.
+- [TSON-SCHEMA] §5.9: the lineage sentences and rule 10 deleted; "`record.supertypes` (authorial lineage)" in its
+  resolution paragraph becomes "the chain is empty".
+- [TSON-SCHEMA] §7.2: "never the body's lineage `record.supertypes`" deleted, there being none.
+- [TSON-SCHEMA] §13.2 and `meta-kernel.tn`: `type_definition` removed, `record.supertypes` removed, `type` as
+  above, `schema => {type_name => top}`.
+
+**Status against Revision 37:** open; running on the `entry-is-value` branch of `r2026-38-proposal`. `meta-kernel.tn`
+declares `type_chain`, `chained`, `type` and `template` composing it, `record` without `supertypes`, and `schema =>
+{type_name => top}`, with no `type_definition`; the resolved fixtures carry the nested chain (`ResolvedFixtureTest`), and
+the bundled schemas are restamped. The Java model mirrors it: `schema.meta.TypeDefinition` is gone, `TsonSchema` maps a
+name to a `Top`, and every type body record and `TemplateBody` carries one `TypeChain chain` component, behind a
+`Chained` interface whose accessors every IS-A question goes through. `supertypes` is sorted and closed to a fixed
+point over every local chain, so an entry IS-A everything its supertypes are, an atom refinement of a refinement
+included (`small => !int32 ^ { … }` carries `[int32 integer]`). A closed type that is no template keeps no `parents`;
+a template keeps its written ones, is IS-A the closed entries they reach and stands in their `subtypes`, so a template
+composing or refining a final record is refused at its own declaration. `application` is a key annotation, written
+wherever an entry closes one — a member of a record-bodied template, a DATA entry, the alias a non-record template's
+application closes to — and read through `TsonSchema.applicationOf`. Kind and constructor-hood are judged by where
+`top` and the base kinds are defined. Writing `chain` is a resolver error on an explicit construction, a held
+construction and an atom refinement alike, and so is a constructor declaring a field named `chain`. Beyond the
+proposal as written: what a closed refinement's one written parent was is kept as an in-memory fact for one reader, a
+tightened constructor binding as the one it tightens (`set_type => array ^ { … }`), since a closed type keeps no
+`parents` and the chain cannot tell `^` from a composition adding nothing; and a later schema's application is not yet
+unified with an imported library's declared one, ingest of resolved output being unimplemented. Two observable
+differences from "no diagnostic changes" above: a template application with an unresolvable argument reports the field
+holding it (`'box<some_typo>' field 'v' has an unresolved reference 'some_typo'`), and a resolved atom refinement's
+chain is complete. The corpus restates every resolved output in the nested form and adds vectors for the refusals, an
+emptied chain under subtraction, a complete chain, a chain completed through an applied parent, a template refused
+against a final parent, and a schema's own `data`. Part 2's cached §13.2 table is not re-stamped here. `template`
+composing `chained` is the running form; the direction proposed in `BACKLOG.md` resolves a record-bodied template as a
+`record` with `parameters`, which returns the chain to `type` alone and leaves `template` to the open bodies that are
+no type. ---
+
+## 15. `top`, `type` and the base kinds are `abstract`
+
+**Section:** [TSON-SCHEMA] §3.3.1 ("a base kind's own reader refuses a direct application by naming what would
+satisfy it"), §4.1 (the base kinds), §5.2 and §12.1 (ABSTRACT: "no direct instances", "a tag naming the base itself
+is refused", "a position typed by it admits exactly its subtypes"), §8 (resolved output as a value of `schema`).
+
+**Kind:** proposal — one special sentence replaced by a mark the kernel already has. Sequenced with #14, which it
+shares fixtures with.
+
+**The problem.** §3.3.1 carries a rule of its own for six entries: `!top {}`, `!type {}`, `!atom {}`, `!product {}`,
+`!sum {}` and `!data {}` are refused by "the base kind's own reader". That is ABSTRACT's definition in §12.1 stated
+without the word. And under #14 a schema map is `{type_name => top}`, so every entry's value is a tagged value at a
+`top`-typed position; the rule that reads it — dispatch by tag among the subtypes of a base that has no instances
+of its own, the family open across schemas (§3.3.4) — is the rule every abstract record without discriminators
+already has.
+
+**Proposed.** The six are marked, each for itself since extensibility is never inherited (§5.2):
+
+```
+top     => abstract {}
+type    => abstract top & chained & {}
+atom    => abstract type & {}
+product => abstract type & { access_pattern: product_access_type  size_type: product_size_type }
+sum     => abstract type & {}
+data    => abstract top & {}
+```
+
+- A direct application of any of the six is refused by the abstract rule, with the diagnostic naming the subtypes
+  that would satisfy it, as the special sentence does today.
+- Constructors stay OPEN: `!record { … }` and `!integer_type {}` are direct instances. `reference` and `template`
+  have direct instances and stay OPEN. The supporting records (`record_field`, `type_ref`, `atom_specification`) are
+  values everywhere and are not applicable for a different reason, not being IS-A `top`.
+- `schema => {type_name => top}` reads each entry by its tag among `top`'s subtypes, `!operation { … }` from a
+  meta-schema admitted through `data`'s chain. No verdict changes: nothing was ever read against a base kind.
+
+**Breaking changes, against Revision 37:** none in behaviour; `extension: ABSTRACT` appears on the six entries in
+resolved output.
+
+**Suggested resolution.** [TSON-SCHEMA] §3.3.1: the "base kind's own reader" sentence deleted. §4.1: the six
+declarations as above, with "the base kinds have no instances of their own: each is `abstract`, and a direct
+application is refused as any abstract record's is (§12.1)". §12.1's abstract rows gain the six.
+
+**Status against Revision 37:** open; running on the `entry-is-value` branch of `r2026-38-proposal`, with #14.
+`meta-kernel.tn` marks the six `abstract` and the resolved fixture states `extension: ABSTRACT` on each. A construction
+naming one passes the applicability gate — `top` answering for itself — and is refused as abstract in one sentence,
+naming only the instantiable subtypes that would satisfy the position (`'!atom' names an abstract entry, which has no
+direct instances (§5.2), so there is nothing for '!atom { ... }' to build -- construct one of its instantiable subtypes
+instead: (value_type | void_type | integer_type | …)`); a `data` that nothing in scope composes says so. One verdict
+moves: an annotation typed by a base kind (`@data:_`) was a bind mismatch,
+the type having no class to build, and is now a schema error, a value at an abstract position naming no subtype. The
+corpus carries a refusal vector for each of the six and a valid vector for `!record { … }` and `!integer_type { … }`.

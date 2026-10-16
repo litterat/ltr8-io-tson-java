@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.math.BigInteger;
@@ -11,8 +12,8 @@ import java.util.Optional;
 /**
  * The meta-kernel's {@code map} constructor's own vocabulary, resolved (Part 2 §4.2, §8.1) --
  * {@code access_pattern}/{@code size_type} are fixed ({@code NAMED}/{@code VARIABLE}) and never
- * appear in output. Also backs the kernel's own {@code schema} type ({@code map<type_name,
- * type_definition>}). {@code @Field} renames each component to the kernel's own snake_case wire
+ * appear in output. Also backs the kernel's own {@code schema} type (<code>{type_name =&gt; top}</code>).
+ * {@code @Field} renames each component to the kernel's own snake_case wire
  * name -- {@code ltr8-bind} otherwise writes the bare Java component name verbatim (camelCase).
  *
  * <p>{@code voidable} governs the <b>value</b> and only the value, spelled {@code {K => V?}} -- a key can
@@ -24,10 +25,27 @@ import java.util.Optional;
  * a JSON object's is; output keeps the order written either way ([TSON-SCHEMA] §7.5).
  */
 @Typename(name = "map")
-public record MapBody(@Field("key_type") TypeRef keyType, @Field("value_type") TypeRef valueType,
+public record MapBody(TypeChain chain,
+        @Field("key_type") TypeRef keyType, @Field("value_type") TypeRef valueType,
                        @Field("voidable") boolean voidable, @Field("ordered") boolean ordered,
                        @Field("min_items") Optional<BigInteger> minItems,
                        @Field("max_items") Optional<BigInteger> maxItems) implements Product {
+    /** The chain normalised: absent and empty are one list. */
+    @Record
+    public MapBody {
+        chain = TypeChain.orEmpty(chain);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public MapBody(TypeRef keyType, TypeRef valueType, boolean voidable, boolean ordered, Optional<BigInteger> minItems,
+            Optional<BigInteger> maxItems) {
+        this(TypeChain.EMPTY, keyType, valueType, voidable, ordered, minItems, maxItems);
+    }
+
+    @Override
+    public MapBody withChain(TypeChain chain) {
+        return new MapBody(chain, keyType, valueType, voidable, ordered, minItems, maxItems);
+    }
 
     /** An unconstrained map: values never void, unordered, no size bounds. */
     public static MapBody of(TypeRef keyType, TypeRef valueType) {

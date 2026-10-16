@@ -1,7 +1,8 @@
 package io.ltr8.tson.schema;
 
 import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.unicode.Normalization;
 
 import java.util.Map;
@@ -38,9 +39,9 @@ import java.util.Optional;
  * reached through two levels of import keeps its original author, not the intermediary).
  *
  * <p>It lives here rather than on {@link TsonSchema} because it is not part of the resolved schema value the
- * spec defines -- §9's {@code type_definition} has no such field, and {@code schema.meta} is a bind target
- * with a hand-written {@code equals} and the {@code @Record} constructor-selection trap. It lives here rather
- * than on the compiled schema because linking is the only phase that still knows it.
+ * spec defines -- no constructor's record has such a field, and {@link TsonSchema#facts} holds what one entry is,
+ * not where a merge found it. It lives here rather than on the compiled schema because linking is the only
+ * phase that still knows it.
  *
  * <p><b>{@code enumForms} is the second</b>: each enum whose name type's {@code normalization} is not {@code NONE}
  * ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's {@code identifier} is
@@ -50,12 +51,12 @@ import java.util.Optional;
  * Like {@code entryOrigins} it is carried through {@code !!import}, each enum judged in the schema that declared it.
  *
  * <p><b>{@code nameTypes} is the third</b>, for the same reason: each record whose {@code
- * name_type} is not the kernel's {@code field_name} (SPEC-FEEDBACK.md #10), with the definition that type
+ * name_type} is not the kernel's {@code field_name} (SPEC-FEEDBACK.md #10), with the value that type
  * resolves to, by which its readers judge the field names a document writes. A record not listed has
  * identifiers for field names.
  */
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
-                               Map<String, Normalization> enumForms, Map<String, TypeDefinition> nameTypes) {
+                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
 
     public TsonLinkedSchema {
         Objects.requireNonNull(schema, "schema");
@@ -89,7 +90,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     }
 
     /** What record {@code entryName}'s field names are judged by -- empty for one {@link #nameTypes} omits. */
-    public Optional<TypeDefinition> nameType(String entryName) {
+    public Optional<Top> nameType(String entryName) {
         return Optional.ofNullable(nameTypes.get(entryName));
     }
 
@@ -100,7 +101,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      * omits, the kernel's {@code field_name} being NFC; no form compares lower than NFC.
      */
     public Normalization nameForm(String entryName) {
-        return nameType(entryName).map(TypeDefinition::body)
+        return nameType(entryName)
                 .filter(IdentifierType.class::isInstance)
                 .map(body -> ((IdentifierType) body).normalization())
                 .filter(form -> form != Normalization.NONE)
@@ -115,4 +116,26 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     public String originOf(String entryName) {
         return entryOrigins.getOrDefault(entryName, schema.id());
     }
+
+    /**
+     * Whether {@code entryName} denotes the meta-kernel's own entry of that name: declared by meta-kernel.tn, or
+     * merged in from it. What a kind and a constructor are judged by ([TSON-SCHEMA] §4.1), so a schema's own
+     * {@code data} or {@code top} is an ordinary declaration whatever it is spelled.
+     */
+    public boolean isKernel(String entryName) {
+        return schema.entries().containsKey(entryName) && TsonBundledSchemas.isMetaKernel(originOf(entryName));
+    }
+
+    /** {@code entryName}'s kind ({@link TypeKind#of}), judged by origin; {@code null} for a name it lacks. */
+    public TypeKind kindOf(String entryName) {
+        Top value = schema.entries().get(entryName);
+        return value == null ? null : TypeKind.of(value, this::isKernel);
+    }
+
+    /** Whether entry {@code name}, whose value is {@code value}, IS-A the kernel's {@code top} ({@link
+     * TypeKind#isConstructor}). */
+    public boolean isConstructor(String name, Top value) {
+        return TypeKind.isConstructor(name, value, this::isKernel);
+    }
+
 }

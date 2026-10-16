@@ -5,7 +5,7 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 /**
  * What a tuple's schema fixes, resolved once when the schema compiles: [TSON-JSON] §6.4's half that does not
@@ -16,8 +16,8 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 record TuplePlan(String displayName, JsonSchemaLocation schemaLocation, boolean[] voidable,
                  JsonTypeReader<?>[] schemaSlots, TupleDiagnostics rules) {
 
-    static TuplePlan of(String name, TypeDefinition definition, ValueReaderContext context) {
-        TupleBody body = (TupleBody) definition.body();
+    static TuplePlan of(String name, Top definition, ValueReaderContext context) {
+        TupleBody body = (TupleBody) definition;
         int arity = body.elements().size();
         boolean[] voidable = new boolean[arity];
         JsonTypeReader<?>[] slots = new JsonTypeReader<?>[arity];
@@ -25,8 +25,8 @@ record TuplePlan(String displayName, JsonSchemaLocation schemaLocation, boolean[
             voidable[i] = body.elements().get(i).voidable();
             slots[i] = context.readers().resolve(body.elements().get(i).elementType().name());
         }
-        String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
-        return new TuplePlan(displayName, context.locationOf(name, definition), voidable, slots,
+        String displayName = EntryDisplayName.of(name, context.schema());
+        return new TuplePlan(displayName, context.locationOf(name), voidable, slots,
                 new TupleDiagnostics(displayName, arity));
     }
 

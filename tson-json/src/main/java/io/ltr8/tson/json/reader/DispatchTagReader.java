@@ -11,6 +11,7 @@ import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -62,9 +63,11 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
     /**
      * @param untagged the OPEN record's own concrete reader, or null for an ABSTRACT base
      * @param subtypes every name of the family below the base, aliases included
+     * @param named    what a refusal names as satisfying the position: the subtypes that have instances of their
+     *                 own, an abstract one being no answer
      */
     DispatchTagReader(String name, String displayName, Set<String> selfNames, Set<String> subtypes,
-                            JsonTypeReader<?> untagged, ValueReaderContext context,
+                            List<String> named, JsonTypeReader<?> untagged, ValueReaderContext context,
                             JsonSchemaLocation schemaLocation, RecordDiagnostics rules) {
         this.name = name;
         this.displayName = displayName;
@@ -73,7 +76,7 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
         this.untagged = untagged;
         this.schemaLocation = schemaLocation;
         this.rules = rules;
-        this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
+        this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", named));
         this.subsumption = new SubsumptionDiagnostics(displayName);
         Map<String, Route> table = new LinkedHashMap<>();
         if (untagged != null) {

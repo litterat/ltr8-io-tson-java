@@ -1,10 +1,12 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -29,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * cannot decide it. Every other instantiation is refused by that same body test, having no fields of its own.
  *
  * <p><b>Subtraction shares the composition operand path</b>, so it is governed by the same walk; §5.9 then
- * empties the contract index as it does for any subtraction.
+ * leaves the chain empty as it does for any subtraction.
  */
 class OperandFollowsReferenceChainTest {
 
@@ -68,7 +70,7 @@ class OperandFollowsReferenceChainTest {
                   sub => ali & { extra: text }
                 """);
 
-        List<String> supertypes = linked.schema().entries().get("sub").supertypes();
+        List<String> supertypes = Chained.supertypesOf(linked.schema().entries().get("sub"));
         assertTrue(supertypes.contains("ali"), () -> "the name the author wrote: " + supertypes);
         assertTrue(supertypes.contains("rec"), () -> "and the type at the end of its chain: " + supertypes);
     }
@@ -83,9 +85,9 @@ class OperandFollowsReferenceChainTest {
                   sub => a2 & { extra: text }
                 """);
 
-        assertTrue(linked.schema().entries().get("sub").supertypes().contains("rec"),
+        assertTrue(Chained.supertypesOf(linked.schema().entries().get("sub")).contains("rec"),
                 () -> "the terminal is reached through both hops: "
-                        + linked.schema().entries().get("sub").supertypes());
+                        + Chained.supertypesOf(linked.schema().entries().get("sub")));
     }
 
     @Test
@@ -96,13 +98,13 @@ class OperandFollowsReferenceChainTest {
                   sub => ali ^ { x?: int32 = 1 }
                 """);
 
-        assertEquals(1, linked.schema().entries().get("sub").supertypes().stream()
+        assertEquals(1, Chained.supertypesOf(linked.schema().entries().get("sub")).stream()
                         .filter(name -> name.equals("rec")).count(),
                 () -> "refinement reaches the same terminal: "
-                        + linked.schema().entries().get("sub").supertypes());
+                        + Chained.supertypesOf(linked.schema().entries().get("sub")));
     }
 
-    /** §5.9 still empties the contract index -- what changes is only that the operand resolves at all. */
+    /** §5.9 still leaves the chain empty -- what changes is only that the operand resolves at all. */
     @Test
     void aSubtractionThroughAnAliasToARecordIsAdmitted() {
         TsonLinkedSchema linked = resolve("ofc4", """
@@ -111,7 +113,7 @@ class OperandFollowsReferenceChainTest {
                   sub => ali - { y }
                 """);
 
-        assertEquals(List.of(), linked.schema().entries().get("sub").supertypes(),
+        assertEquals(List.of(), Chained.supertypesOf(linked.schema().entries().get("sub")),
                 "subtraction revokes IS-A for every parent (§5.9)");
     }
 
@@ -133,8 +135,8 @@ class OperandFollowsReferenceChainTest {
 
         assertEquals(List.of("item", "extra"), fieldNames(linked, "sub"),
                 "the operand's own field, then the composition's");
-        assertTrue(linked.schema().entries().get("sub").supertypes().contains("bx"),
-                () -> "and IS-A the operand: " + linked.schema().entries().get("sub").supertypes());
+        assertTrue(Chained.supertypesOf(linked.schema().entries().get("sub")).contains("bx"),
+                () -> "and IS-A the operand: " + Chained.supertypesOf(linked.schema().entries().get("sub")));
     }
 
     /** The refinement half: a vocabulary to tighten is a vocabulary however the entry came by it. */
@@ -147,8 +149,8 @@ class OperandFollowsReferenceChainTest {
                 """);
 
         assertEquals(List.of("item"), fieldNames(linked, "sub"), "refinement adds no field (§5.7)");
-        assertTrue(linked.schema().entries().get("sub").supertypes().contains("bx"),
-                () -> "and preserves IS-A: " + linked.schema().entries().get("sub").supertypes());
+        assertTrue(Chained.supertypesOf(linked.schema().entries().get("sub")).contains("bx"),
+                () -> "and preserves IS-A: " + Chained.supertypesOf(linked.schema().entries().get("sub")));
     }
 
     // ── Refused: the chain ends at a body with no fields ─────────────────
@@ -189,7 +191,7 @@ class OperandFollowsReferenceChainTest {
 
     /** The field names of an entry's record body, in declaration order. */
     private static List<String> fieldNames(TsonLinkedSchema linked, String entry) {
-        return ((RecordBody) linked.schema().entries().get(entry).body()).fields().keySet().stream()
+        return ((RecordBody) linked.schema().entries().get(entry)).fields().keySet().stream()
                 .toList();
     }
 }

@@ -21,7 +21,7 @@ import java.util.Optional;
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "decimal_type")
-public record DecimalType(
+public record DecimalType(TypeChain chain,
         Optional<BigDecimal> min,
         @Field("exclusive_min") Optional<BigDecimal> exclusiveMin,
         Optional<BigDecimal> max,
@@ -48,6 +48,7 @@ public record DecimalType(
 
     @Record
     public DecimalType {
+        chain = TypeChain.orEmpty(chain);
         members = members.map(DecimalType::readMembers);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
@@ -55,6 +56,19 @@ public record DecimalType(
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public DecimalType(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
+            Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf, Optional<Integer> totalDigits,
+            Optional<Integer> fractionDigits, Optional<List<BigDecimal>> members) {
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits, members);
+    }
+
+    @Override
+    public DecimalType withChain(TypeChain chain) {
+        return new DecimalType(chain, min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits,
+                fractionDigits, members);
     }
 
     /**

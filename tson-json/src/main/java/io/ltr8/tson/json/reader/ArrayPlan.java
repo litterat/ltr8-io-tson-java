@@ -6,7 +6,7 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.math.BigInteger;
 import java.util.Optional;
@@ -30,14 +30,14 @@ record ArrayPlan(String displayName, JsonSchemaLocation schemaLocation, boolean 
                  Optional<BigInteger> minItems, Optional<BigInteger> maxItems, JsonTypeReader<?> schemaElement,
                  ArrayDiagnostics rules, boolean elementsAreNames) {
 
-    static ArrayPlan of(String name, TypeDefinition definition, ValueReaderContext context) {
-        ArrayBody body = (ArrayBody) definition.body();
-        String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
-        return new ArrayPlan(displayName, context.locationOf(name, definition),
+    static ArrayPlan of(String name, Top definition, ValueReaderContext context) {
+        ArrayBody body = (ArrayBody) definition;
+        String displayName = EntryDisplayName.of(name, context.schema());
+        return new ArrayPlan(displayName, context.locationOf(name),
                 body.voidable(), body.uniqueItems(), body.minItems(), body.maxItems(),
                 context.readers().resolve(body.elementType().name()), new ArrayDiagnostics(displayName),
                 body.uniqueItems() && ReferenceChain.terminal(context.schema(), body.elementType().name())
-                        .map(terminal -> terminal.definition().body() instanceof IdentifierType)
+                        .map(terminal -> terminal.definition() instanceof IdentifierType)
                         .orElse(false));
     }
 }

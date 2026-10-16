@@ -43,7 +43,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` → `ScopedValue` →
   `DataValue`), which is what lets a held template body be written at all.
 - **`tson-schema`** — `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
-  records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
+  records/sealed interfaces/enums, §8's `Top` and its bodies, `TsonSchema`; `Top` is sealed except for its one
   deliberately open branch, `Data`, which a consumer's own class implements — see below). **The host value
   types are not here**: `Rational` and `Complex` are `base.atom`'s and the `CidrNetwork` pair `ltr8-net`'s, because
   *what do I get back from `!rational`?* is a question about the type system rather than about §8's model,

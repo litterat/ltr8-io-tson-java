@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
@@ -34,7 +34,7 @@ interface ApplicationCloser {
      * resolvers built without a materialiser -- the meta-kernel bootstrap, and unit tests over hand-built
      * namespaces -- pass a lambda, and an operand there classifies as §12.1 spelled it.
      */
-    default List<TypeArgument> byParameterKind(String head, TypeDefinition template,
+    default List<TypeArgument> byParameterKind(String head, Top template,
             List<String> parameters, List<TypeArgument> arguments) {
         return arguments;
     }
@@ -60,7 +60,7 @@ interface ApplicationCloser {
      * meta-kernel bootstrap and the tests over hand-built namespaces keep passing a lambda and keep the
      * reference shape.
      */
-    default TypeDefinition closeApplicationInto(String declaredName, TypeRef application) {
+    default Top closeApplicationInto(String declaredName, TypeRef application) {
         return null;
     }
 }

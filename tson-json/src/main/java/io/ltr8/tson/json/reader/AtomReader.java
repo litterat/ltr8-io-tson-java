@@ -13,7 +13,7 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.Optional;
 
@@ -50,16 +50,16 @@ final class AtomReader<T> implements JsonTypeReader<T> {
     static final ValueReaderFactory ENUM = (name, definition, context) -> "boolean".equals(name)
             ? new AtomReader<>(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
                     () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
-                    AtomForm.BOOLEAN, context.locationOf(name, definition), null)
+                    AtomForm.BOOLEAN, context.locationOf(name), null)
             : of(name, definition, context);
 
     /** {@code void_type}: the void sentinel and nothing else, read as [TSON-JSON] §5.7 states for JSON. */
     static final ValueReaderFactory VOID = (name, definition, context) ->
-            new VoidReader(name, context.locationOf(name, definition));
+            new VoidReader(name, context.locationOf(name));
 
     /** {@code value_type}: read by [TSON-JSON] §5.7's own base-type rule, which is the encoding's, not the vocabulary's. */
     static final ValueReaderFactory VALUE = (name, definition, context) ->
-            new ValuePositionReader(name, context.locationOf(name, definition));
+            new ValuePositionReader(name, context.locationOf(name));
 
     private final String name;
     private final AtomType<T> parser;
@@ -81,12 +81,12 @@ final class AtomReader<T> implements JsonTypeReader<T> {
         this.names = names;
     }
 
-    private static JsonTypeReader<?> of(String name, TypeDefinition definition, ValueReaderContext context) {
-        AtomType<?> parser = AtomParsers.forType(definition.body(), context.linked().enumForm(name)).orElseThrow(
+    private static JsonTypeReader<?> of(String name, Top definition, ValueReaderContext context) {
+        AtomType<?> parser = AtomParsers.forType(definition, context.linked().enumForm(name)).orElseThrow(
                 () -> new IllegalStateException(
-                "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
-        IdentifierProfile names = definition.body() instanceof IdentifierType identifier ? identifier.profile() : null;
-        return new AtomReader<>(name, parser, AtomForm.of(definition.body()), context.locationOf(name, definition),
+                "'" + name + "' is registered as an atom but its body has no parser: " + definition));
+        IdentifierProfile names = definition instanceof IdentifierType identifier ? identifier.profile() : null;
+        return new AtomReader<>(name, parser, AtomForm.of(definition), context.locationOf(name),
                 names);
     }
 

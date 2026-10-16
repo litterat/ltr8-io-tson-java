@@ -11,10 +11,11 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -40,26 +41,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VariantTreeReaderTest {
 
     private static TsonSchema compileableSchema() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), IntegerType.UNCONSTRAINED));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("integer", IntegerType.UNCONSTRAINED);
         // No type parameter: this fixture is about subtypes dispatch, and the `T` it used to carry was
         // incidental -- a declared parameter the body never references is now a §5.10 error.
-        entries.put("response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of(), List.of(), RecordBody.of(RecordBody.fieldMap())));
-        entries.put("success_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("response"), List.of(),
-                RecordBody.of(RecordBody.fieldMap(Map.entry("value", RecordField.required(TypeRef.of("integer")))))));
-        entries.put("failure_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("response"), List.of(),
-                RecordBody.of(RecordBody.fieldMap(Map.entry("error_code", RecordField.required(TypeRef.of("integer")))))));
+        entries.put("response", RecordBody.of(RecordBody.fieldMap()));
+        entries.put("success_response", ((Type) (RecordBody.of(RecordBody.fieldMap(Map.entry("value",
+                RecordField.required(TypeRef.of("integer"))))))).withSupertypes(List.of("response")));
+        entries.put("failure_response", ((Type) (RecordBody.of(RecordBody.fieldMap(Map.entry("error_code",
+                RecordField.required(TypeRef.of("integer"))))))).withSupertypes(List.of("response")));
         // A second, unrelated subtypes-bearing type whose OWN body has a real required field, to
         // prove the "no type-ref -> own body" fallback still enforces that body's own requirements.
-        entries.put("shape", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of(), List.of(),
-                RecordBody.of(RecordBody.fieldMap(Map.entry("sides", RecordField.required(TypeRef.of("integer")))))));
-        entries.put("triangle", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of("shape"), List.of(), RecordBody.of(RecordBody.fieldMap())));
+        entries.put("shape", RecordBody.of(RecordBody.fieldMap(Map.entry("sides",
+                RecordField.required(TypeRef.of("integer"))))));
+        entries.put("triangle",
+                ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("shape")));
         return new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn",
                 List.of(), entries);
     }

@@ -57,9 +57,9 @@ including records, record groups, enums and some in-built types. The `2026/38` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/38/getting-started/person.tn?sha256=c183f557e5d55ec0146e39133e96c413566e105233281e133e60b5e64aab1250"
-!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=671343036a537d33bee73aed27815b2e8adf6c9d53016d39826aaea5eadebc1a"
-!!import:"https://tson.io/2026/38/m/core.tn?sha256=f7c7f08e0a72945a071c759c2e46b99afe3cd9f79808c541074ece76cac16122"
+!!id:"https://example.com/2026/38/getting-started/person.tn?sha256=18589da11b4b08b54fa4c0b53fe2cfa0922e1435c9c9e6fd4a4f7371ad49755c"
+!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=8314d3b16f0592270893e41352d317c3dee2912d2b142819015de56267a2da3a"
+!!import:"https://tson.io/2026/38/m/core.tn?sha256=830d5c10683a29c7516b7c8aa286a3b2c19e9b93e7cc1bdaa0dd69dba181663b"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]
@@ -542,7 +542,7 @@ vocabulary — parse → resolve → link → register → compile → read:
    declaration's own position the form simply *is* that application; anywhere else it becomes an injected
    declaration plus a bare reference to it, so identical forms anywhere in the document share one entry.
 3. **Resolve** (`TsonSchemaResolver`) — one declaration at a time, the AST becomes a concrete
-   `TypeDefinition`: composition induces supertypes and flattens fields, refinement tightens an
+   value (`Top`): composition induces supertypes and flattens fields, refinement tightens an
    inherited field against a state-transition table, a constructor application (`!C value`) transfers
    its constructor's own kind, and so on. A reference to another declaration is still a bare, unverified
    name at this point.
@@ -554,7 +554,7 @@ vocabulary — parse → resolve → link → register → compile → read:
    ever accepts a `TsonLinkedSchema` — there's no way to register something that skipped linking), so a
    later schema can find it via its own `!!import`/`!!meta`. Once registered, a schema is locked: never
    mutated or removed.
-6. **Compile** (`TsonSchemaCompiler`) — turns a registered schema's `Map<String, TypeDefinition>` into
+6. **Compile** (`TsonSchemaCompiler`) — turns a registered schema's `Map<String, Top>` into
    a `TsonCompiledSchema`: real Java object references between per-type parsers rather than further
    name lookups, built once, reused for every document read against it.
 7. **Read** (`TsonTypeReader`) — the compiled schema validates and binds actual TSON *data* documents

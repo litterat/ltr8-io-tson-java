@@ -22,7 +22,7 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
@@ -57,7 +57,7 @@ final class BindRecordBuilder implements RecordBuilder {
         return (name, definition, context) -> {
             DataClass boundClass = boundClass(name, context, binding);
             if (boundClass instanceof DataClassUnion union) {
-                if (!definition.subtypes().isEmpty()) {
+                if (!context.subtypesOf(name, definition).isEmpty()) {
                     return ownDataOfUnion(name, definition, context, binding, union);
                 }
                 return BindGroupUnionBuilder.reader(name, definition, context, binding, union);
@@ -188,24 +188,24 @@ final class BindRecordBuilder implements RecordBuilder {
      * tag the dispatcher follows always lands on a class the position can hold. A subtype with no bound class is
      * left to the read that reaches it, which defers it on the usual terms.
      */
-    private static JsonTypeReader<?> ownDataOfUnion(String name, TypeDefinition definition,
+    private static JsonTypeReader<?> ownDataOfUnion(String name, Top definition,
                                                     ValueReaderContext context, DataBindContext binding,
                                                     DataClassUnion union) {
         List<String> outside = new ArrayList<>();
-        for (String subtype : definition.subtypes()) {
+        for (String subtype : context.subtypesOf(name, definition)) {
             DataClass member = boundClassOrNull(subtype, context, binding);
             if (member != null && !union.isMemberType(member.typeClass())) {
                 outside.add("subtype '" + subtype + "' binds " + member.typeClass().getName()
                         + ", which is not a member");
             }
         }
-        String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
+        String displayName = EntryDisplayName.of(name, context.schema());
         if (!outside.isEmpty()) {
             throw new BindMismatchException("'" + displayName + "' and " + union.typeClass().getName()
                     + " do not agree: " + String.join("; ", outside));
         }
-        return new NoDataOfItsOwn(displayName, union.typeClass(), String.join(" | ", definition.subtypes()),
-                context.locationOf(name, definition));
+        return new NoDataOfItsOwn(displayName, union.typeClass(), String.join(" | ", context.subtypesOf(name, definition)),
+                context.locationOf(name));
     }
 
     /**

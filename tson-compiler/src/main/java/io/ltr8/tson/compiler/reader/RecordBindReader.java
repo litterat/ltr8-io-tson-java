@@ -339,7 +339,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * every entry a given compiled schema binds, the same way a {@link Factory} instance gets
      * created once and reused across a whole compile, not once per entry.
      *
-     * <p><b>Three real shapes, not two.</b> When {@code typeDefinition.subtypes()} is empty, {@code
+     * <p><b>Three real shapes, not two.</b> When {@code context.subtypesOf(name, typeDefinition)} is empty, {@code
      * name} must resolve to a {@link DataClassRecord} -- the ordinary case, no dispatch wrapper at
      * all. When it's non-empty, two further shapes exist, told apart by what {@code name} itself
      * resolves to: a {@link DataClassUnion} is the real fixture's own shape for a pure marker root
@@ -364,32 +364,33 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
 
         @Override
-        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
-            if (!(typeDefinition.body() instanceof RecordBody body)) {
+            if (!(typeDefinition instanceof RecordBody body)) {
                 throw new IllegalArgumentException(
-                        "'" + name + "' is not record-shaped: " + typeDefinition.body());
+                        "'" + name + "' is not record-shaped: " + typeDefinition);
             }
             DataClass dataClass = descriptorFor(name, typeDefinition, context);
 
-            if (typeDefinition.subtypes().isEmpty()) {
+            if (context.subtypesOf(name, typeDefinition).isEmpty()) {
                 Map<String, DataClassRecord> labelled = labelledChoice(body, dataClass);
                 if (labelled != null) {
-                    SchemaLocation location = context.locationOf(name, typeDefinition);
-                    return new GroupUnionBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
+                    SchemaLocation location = context.locationOf(name);
+                    return new GroupUnionBindReader(name, context.displayName(name, typeDefinition), body,
                             labelled, resolver, location, fieldNameRule(name, body, context));
                 }
-                return new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
+                return new RecordBindReader(name, context.displayName(name, typeDefinition), body,
                         requireRecord(name, dataClass), resolver, context,
-                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
+                        context.locationOf(name), AnnotationTypes.of(context));
             }
 
             if (dataClass instanceof DataClassUnion union) {
                 TsonTypeReader<?> noOwnData = ctx -> {
                     ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                             "'" + name + "' has no data of its own to bind -- provide an explicit type annotation "
-                                    + "(!typeName) naming one of its subtypes " + typeDefinition.subtypes(),
-                            "an explicit type annotation naming one of " + typeDefinition.subtypes(), "(none)");
+                                    + "(!typeName) naming one of its subtypes " + context.subtypesOf(name, typeDefinition),
+                            "an explicit type annotation naming one of " + context.subtypesOf(name, typeDefinition),
+                                    "(none)");
                     return null;
                 };
                 // Membership is decided through this context's own binder, which is the only thing that
@@ -400,9 +401,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             }
 
             if (dataClass instanceof DataClassRecord record) {
-                RecordBindReader ownParser = new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition),
+                RecordBindReader ownParser = new RecordBindReader(name, context.displayName(name, typeDefinition),
                         body, record, resolver, context,
-                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
+                        context.locationOf(name), AnnotationTypes.of(context));
                 return Subsumption.dispatching(name, typeDefinition, ownParser, context.namesMeaning(), resolver);
             }
 
@@ -482,7 +483,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * never mapped the type that this library cannot do the job, and that reading travels: a downstream
          * service turns it into a 501.
          */
-        private DataClass descriptorFor(String name, TypeDefinition definition, ValueReaderContext vctx) {
+        private DataClass descriptorFor(String name, Top definition, ValueReaderContext vctx) {
             DataBindException first = null;
             StringBuilder tried = new StringBuilder();
             for (String candidate : vctx.bindingNamesFor(name, definition)) {

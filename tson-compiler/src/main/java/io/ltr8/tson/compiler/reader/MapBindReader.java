@@ -14,7 +14,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.lang.reflect.Type;
 import java.util.LinkedHashMap;
@@ -129,10 +129,10 @@ final class MapBindReader extends MapAbstractReader<Object> {
         }
 
         @Override
-        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
-            if (!(typeDefinition.body() instanceof MapBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition.body());
+            if (!(typeDefinition instanceof MapBody body)) {
+                throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition);
             }
             Type keyType = resolveType(body.keyType().name());
             Type valueType = resolveType(body.valueType().name());
@@ -142,8 +142,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't map-shaped -- can't bind '" + name + "' as one");
             }
-            return new MapBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
-                    context.locationOf(name, typeDefinition), AnnotationTypes.of(context),
+            return new MapBindReader(name, context.displayName(name, typeDefinition), body, descriptor, resolver,
+                    context.locationOf(name), AnnotationTypes.of(context),
                     keysAreNames(body, context));
         }
 

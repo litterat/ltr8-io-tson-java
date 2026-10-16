@@ -86,7 +86,7 @@ class TsonTest {
      * Every resolved definition carries where it was declared. {@code PositionalReadErrorsTest} proves the
      * pieces connect by handing {@code DefinitionResolver} a position itself; this is the production path,
      * where {@code Tson.resolve} passes {@code TsonSchemaParser.declarationPositions()} through. Without
-     * that hop {@code TypeDefinition.position()} is empty for every entry, and so is the {@code
+     * that hop {@code Top.position()} is empty for every entry, and so is the {@code
      * schemaPosition} on every read diagnostic derived from it.
      */
     @Test
@@ -94,8 +94,8 @@ class TsonTest {
         TsonLinkedSchema linked = Tson.standard().resolve(TINY_DOCUMENT);
 
         // Declared on lines 5 and 6 of TINY_DOCUMENT (1-based, counting the three header lines and `{`).
-        assertEquals(5, linked.schema().entries().get("my_int").position().orElseThrow().line());
-        assertEquals(6, linked.schema().entries().get("my_percentage").position().orElseThrow().line());
+        assertEquals(5, linked.schema().positionOf("my_int").orElseThrow().line());
+        assertEquals(6, linked.schema().positionOf("my_percentage").orElseThrow().line());
     }
 
     /** An imported entry keeps its *own* schema's position, not one relative to the importer. */
@@ -104,7 +104,7 @@ class TsonTest {
         TsonLinkedSchema linked = Tson.standard().resolve(TINY_DOCUMENT);
 
         // int32 comes from core.tn, which declares it far below this three-line document could reach.
-        int int32Line = linked.schema().entries().get("int32").position().orElseThrow().line();
+        int int32Line = linked.schema().positionOf("int32").orElseThrow().line();
         assertTrue(int32Line > 10, "expected core.tn's own line for int32, got " + int32Line);
     }
 

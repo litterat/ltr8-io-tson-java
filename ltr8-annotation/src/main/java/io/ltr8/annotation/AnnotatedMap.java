@@ -33,8 +33,8 @@ import java.util.Set;
  * plain key type and keeps the annotations reachable beside it:
  *
  * <pre>{@code
- * AnnotatedMap<String, TypeDefinition> entries = schema.entries();
- * TypeDefinition person = entries.get("person");                 // as before
+ * AnnotatedMap<String, Top> entries = schema.entries();
+ * Top person = entries.get("person");                            // as before
  * Annotations about  = entries.getAnnotations("person");         // and its own metadata
  * }</pre>
  *

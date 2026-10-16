@@ -30,15 +30,18 @@ Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `d
 
 §2.2.2 calls the meta layer the format's sanctioned extension point, and a meta-schema may declare constructors of its
 own. The question that needs an answer is where an *instance* of such a constructor lands when the thing it describes
-is not a data type — `schema => {type_name => type_definition}` makes every schema-map entry a type definition. `data
-=> top & {}` is the fourth base kind that lets one say otherwise, and `TypeKind.DATA` is what it resolves to. The
-kernel names the other side: `type => top & {}`, which `atom`, `product` and `sum` compose with (SPEC-FEEDBACK.md #9),
-so an entry is a type exactly when it IS-A `type`, and `data` IS-A `top` alone. `type` is not a base kind — kind
-derivation reads `atom`, `sum` and `data` off the chain and skips `type` as it skips `top` — so adding it moved every
-type's complete supertype list and no kind. The Java model mirrors it: `schema.meta.Type` is the sealed interface
-`Atom`, `Product` and `Sum` extend, between them and `Top`, so a body is a type exactly when it is an `instanceof
-Type`; `Data`, `Reference` and `TemplateBody` implement `Top` directly. The motivating case is an HTTP operation,
-which must sit at the schema layer because that is the only layer able to name request and response types *by name*.
+is not a data type — `schema => {type_name => top}` admits any value, and an entry is a type exactly when its value
+is one. `data => abstract top & {}` is the fourth base kind that lets one say otherwise, and `TypeKind.DATA` is what it
+resolves to. The kernel names the other side: `type => abstract top & chained & {}`, which `atom`, `product` and `sum`
+compose with (SPEC-FEEDBACK.md #9), so an entry is a type exactly when it IS-A `type`, and `data` IS-A `top` alone.
+`type` is not a base kind — kind derivation reads `atom`, `sum` and `data` off the chain and skips `type` as it skips
+`top`, each counted only as the kernel's own entry, so a schema's own `data` is an ordinary record. All six are
+abstract (SPEC-FEEDBACK.md #15): a `data`-typed position admits only a meta layer's own data constructors' instances.
+The Java model mirrors it: `schema.meta.Type` is the sealed interface `Atom`, `Product` and `Sum` extend, between them
+and `Top`, so a body is a type exactly when it is an `instanceof Type`; `Data` and `Reference` implement `Top`
+directly, and `TemplateBody` implements `Top` and `Chained`, carrying a chain as a type does. The motivating case is an
+HTTP operation, which must sit at the schema layer because that is the only layer able to name request and response
+types *by name*.
 
 - **`Data` is the one open branch of `Top`.** Every other branch is sealed all the way down: each leaf
   mirrors one kernel constructor, so a body's kind is decidable by inspection and each switch over them is
@@ -123,5 +126,6 @@ which must sit at the schema layer because that is the only layer able to name r
   layer chaining to meta-kernel imports meta.tn, which imports meta-kernel, and imports are transitive here
   (§2.2.3), so meta-kernel's `void` arrives alongside core.tn's and collides — correctly, and
   with a diagnostic naming both origins. The constraint is real and worth stating; what is not acceptable is
-  discovering it through a message about the wrong thing, which is why the `source` fallback excludes a
-  `source` carrying arguments (`design/linking-and-compilation.md`).
+  discovering it through a message about the wrong thing, which is why an application's head resolves in the
+  type-name namespace only (§3.3.1) and an unresolvable one is reported as written
+  (`design/template-materialisation.md`).

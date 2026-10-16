@@ -1,7 +1,7 @@
 package io.ltr8.tson.base;
 
 /**
- * Where in some original source text a {@code TypeDefinition} (or other resolved value) was
+ * Where in some original source text a resolved schema entry (or other resolved value) was
  * declared -- line, column, and byte offset, mirroring {@code tson-compiler}'s own {@code Position}
  * shape exactly. Declared here, as an interface rather than a value class, specifically so {@code
  * tson-compiler}'s own {@code Position} can implement it directly: {@code schema.meta} has no
