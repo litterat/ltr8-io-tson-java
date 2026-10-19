@@ -1453,7 +1453,8 @@ emptied chain under subtraction, a complete chain, a chain completed through an 
 against a final parent, and a schema's own `data`. Part 2's cached §13.2 table is not re-stamped here. `template`
 composing `chained` is the running form; the direction proposed in `BACKLOG.md` resolves a record-bodied template as a
 `record` with `parameters`, which returns the chain to `type` alone and leaves `template` to the open bodies that are
-no type. ---
+no type.
+---
 
 ## 15. `top`, `type` and the base kinds are `abstract`
 
