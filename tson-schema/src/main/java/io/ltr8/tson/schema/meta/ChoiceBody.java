@@ -12,12 +12,24 @@ import java.util.Optional;
  * (`contact_method => (email | phone | address)` and similar).
  */
 @Typename(name = "choice")
-public record ChoiceBody(List<TypeRef> variants, Optional<Boolean> disjoint) implements Sum {
+public record ChoiceBody(TypeChain chain,
+        List<TypeRef> variants, Optional<Boolean> disjoint) implements Sum {
 
     @Record
     public ChoiceBody {
+        chain = TypeChain.orEmpty(chain);
         variants = List.copyOf(variants);
         disjoint = disjoint == null ? Optional.empty() : disjoint;
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public ChoiceBody(List<TypeRef> variants, Optional<Boolean> disjoint) {
+        this(TypeChain.EMPTY, variants, disjoint);
+    }
+
+    @Override
+    public ChoiceBody withChain(TypeChain chain) {
+        return new ChoiceBody(chain, variants, disjoint);
     }
 
     /** A choice as an author declares it -- the resolver derives {@link #disjoint} at link time. */

@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.VoidType;
 
 import java.util.LinkedHashSet;
@@ -46,7 +46,7 @@ public final class ReferenceChain {
      * The name at the end of {@code name}'s reference chain -- {@code name} itself when it starts one, and
      * the name the walk stopped at when it cannot reach a type (see this class's own note).
      */
-    public static String terminal(String name, Map<String, TypeDefinition> entries) {
+    public static String terminal(String name, Map<String, ? extends Top> entries) {
         return terminal(name, entries::get);
     }
 
@@ -54,37 +54,37 @@ public final class ReferenceChain {
      * The same walk over a namespace still being built, which has a lookup rather than a finished map --
      * {@code TemplateMaterialiser} normalises an application's arguments through this while resolution runs.
      */
-    public static String terminal(String name, Function<String, TypeDefinition> entries) {
+    public static String terminal(String name, Function<String, ? extends Top> entries) {
         return walk(name, entries).name();
     }
 
     /** The entry at the end of {@code name}'s chain, or empty where the walk reaches no type. */
-    public static Optional<TypeDefinition> terminalDefinition(String name, Map<String, TypeDefinition> entries) {
+    public static Optional<Top> terminalDefinition(String name, Map<String, ? extends Top> entries) {
         Stop stop = walk(name, entries::get);
-        return stop.reached() ? Optional.ofNullable(entries.get(stop.name())) : Optional.empty();
+        return stop.reached() ? Optional.<Top>ofNullable(entries.get(stop.name())) : Optional.empty();
     }
 
     /**
      * Whether {@code name}'s chain ends at a {@code void} -- the kernel's, core's sibling, or any other {@code
      * !void_type} -- told by the body's constructor rather than by the name the chain ends at.
      */
-    public static boolean resolvesToVoid(String name, Map<String, TypeDefinition> entries) {
-        return terminalDefinition(name, entries).map(d -> d.body() instanceof VoidType).orElse(false);
+    public static boolean resolvesToVoid(String name, Map<String, ? extends Top> entries) {
+        return terminalDefinition(name, entries).map(d -> d instanceof VoidType).orElse(false);
     }
 
     /** Where the walk stopped, and whether it stopped on a type rather than on nothing or on itself. */
     private record Stop(String name, boolean reached) {
     }
 
-    private static Stop walk(String name, Function<String, TypeDefinition> entries) {
+    private static Stop walk(String name, Function<String, ? extends Top> entries) {
         Set<String> walked = new LinkedHashSet<>();
         String current = name;
         while (walked.add(current)) {
-            TypeDefinition definition = entries.apply(current);
+            Top definition = entries.apply(current);
             if (definition == null) {
                 return new Stop(current, false);
             }
-            if (definition.body() instanceof Reference reference && reference.target().arguments().isEmpty()) {
+            if (definition instanceof Reference reference && reference.target().arguments().isEmpty()) {
                 current = reference.target().name();
                 continue;
             }

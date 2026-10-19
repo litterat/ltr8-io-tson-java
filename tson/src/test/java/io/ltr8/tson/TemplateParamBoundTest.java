@@ -44,7 +44,7 @@ class TemplateParamBoundTest {
     private static Map<String, List<TemplateParam>> parameters() {
         Map<String, List<TemplateParam>> parameters = new LinkedHashMap<>();
         Tson.standard().resolve(SCHEMA).schema().entries().forEach((name, definition) -> {
-            if (definition.body() instanceof TemplateBody held) {
+            if (definition instanceof TemplateBody held) {
                 parameters.put(name, held.parameters());
             }
         });

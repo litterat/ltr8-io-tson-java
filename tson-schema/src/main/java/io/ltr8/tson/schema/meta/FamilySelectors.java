@@ -46,13 +46,15 @@ public final class FamilySelectors {
      * The selector fields {@code definition} dispatches on, keyed by their declared names, in the order {@code
      * discriminators} states -- which is the order their pins are compared as a tuple.
      *
+     * @param name the base's own name, which a template base's members' chains name
      * @param entries the closure this base's members are looked up in, for a template base
      */
-    public static SequencedMap<String, RecordField> of(TypeDefinition definition,
-                                                       Map<String, TypeDefinition> entries) {
-        return switch (definition.body()) {
+    public static SequencedMap<String, RecordField> of(String name, Top definition,
+                                                       Map<String, ? extends Top> entries) {
+        return switch (definition) {
             case RecordBody record -> declared(record);
-            case TemplateBody held -> fromMembers(held.discriminators(), definition.subtypes(), entries);
+            case TemplateBody held -> fromMembers(held.discriminators(),
+                    held.subtypes(), entries);
             default -> Collections.emptyNavigableMap();
         };
     }
@@ -62,14 +64,14 @@ public final class FamilySelectors {
      * rather than by its tag: ABSTRACT with at least one selector. The two facts are read together and
      * nowhere stated as one, so a base cannot claim a dispatch its body does not carry.
      */
-    public static boolean dispatchesOnMembers(TypeDefinition definition) {
+    public static boolean dispatchesOnMembers(Top definition) {
         return extensionOf(definition).filter(RecordExtensionType.ABSTRACT::equals).isPresent()
                 && !namesOf(definition).isEmpty();
     }
 
     /** The {@code extension} a base states, whichever kind of body holds it. */
-    public static Optional<RecordExtensionType> extensionOf(TypeDefinition definition) {
-        return switch (definition.body()) {
+    public static Optional<RecordExtensionType> extensionOf(Top definition) {
+        return switch (definition) {
             case RecordBody record -> Optional.of(record.extension());
             case TemplateBody held -> held.extension();
             default -> Optional.empty();
@@ -77,8 +79,8 @@ public final class FamilySelectors {
     }
 
     /** The names a base states, whatever kind of base it is -- empty where it dispatches by tag or not at all. */
-    public static List<String> namesOf(TypeDefinition definition) {
-        return switch (definition.body()) {
+    public static List<String> namesOf(Top definition) {
+        return switch (definition) {
             case RecordBody record -> record.discriminators();
             case TemplateBody held -> held.discriminators();
             default -> List.of();
@@ -107,12 +109,11 @@ public final class FamilySelectors {
      * say a selector is already decided, which is the opposite of what it is for.
      */
     private static SequencedMap<String, RecordField> fromMembers(List<String> names, List<String> members,
-                                                                 Map<String, TypeDefinition> entries) {
+                                                                 Map<String, ? extends Top> entries) {
         SequencedMap<String, RecordField> selectors = new LinkedHashMap<>();
         for (String name : names) {
             for (String member : members) {
-                TypeDefinition definition = entries.get(member);
-                if (definition == null || !(definition.body() instanceof RecordBody record)) {
+                if (!(entries.get(member) instanceof RecordBody record)) {
                     continue;
                 }
                 Optional<Map.Entry<String, RecordField>> found = field(record, name);

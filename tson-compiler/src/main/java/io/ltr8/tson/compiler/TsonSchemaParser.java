@@ -61,7 +61,7 @@ import java.util.Optional;
  *
  * <p>This is a grammar-only compiler: it builds the AST of {@link io.ltr8.tson.compiler.ast.schema}
  * faithfully from source text and does not resolve, validate, or desugar anything (no namespace
- * lookups, no {@code type_definition} materialisation, no IS-A computation -- all §8 concerns).
+ * lookups, no resolved entries, no IS-A computation -- all §8 concerns).
  * "Building the schema" here means the grammar layer only.
  */
 public final class TsonSchemaParser extends TsonDataParser {

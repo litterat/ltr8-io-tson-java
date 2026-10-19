@@ -2,7 +2,7 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -36,7 +36,7 @@ final class ReferenceChain {
      * <p>The <b>name</b> is part of the answer and not a convenience: {@link #namesMeaning} indexes aliases by
      * the entry their chain lands on, which is a name and not a body.
      */
-    record Resolved(String name, TypeDefinition definition) {
+    record Resolved(String name, Top definition) {
     }
 
     /**
@@ -86,11 +86,11 @@ final class ReferenceChain {
     static Optional<Resolved> terminal(TsonSchema schema, String name) {
         String at = name;
         for (int hop = 0; hop < MAX_HOPS; hop++) {
-            TypeDefinition definition = schema.entries().get(at);
+            Top definition = schema.entries().get(at);
             if (definition == null) {
                 return Optional.empty();
             }
-            if (!(definition.body() instanceof Reference reference)) {
+            if (!(definition instanceof Reference reference)) {
                 return Optional.of(new Resolved(at, definition));
             }
             at = reference.target().name();

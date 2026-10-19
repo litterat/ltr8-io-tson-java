@@ -38,7 +38,7 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
   is a record over `parameters` and `template`, the application as written — so `set` resolves to
   `body: !template { parameters: [T]  template: "!set_type { element_type: T }" }`. It is an ordinary body of
   the value model: `Top` is sealed over it, the binder finds it by the same `template` → `template_body` alias
-  `record` → `record_body` already uses, and `type_definition.body` is a `top` with no exception.
+  `record` → `record_body` already uses, and a schema map's value is a `top` with no exception.
   - **Why text and not a value of the constructor's own vocabulary.** A parameter stands wherever a token
     stands — `element_type: T` in a type slot, `min_items: N` in a value slot, `variants: [T error]` inside a
     collection — so a body carrying one is typed by no constructor's record shape until it closes. Writing it
@@ -63,8 +63,8 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
   `ArrayBody`/`MapBody`/`RecordBody`.
   - **What differs between the shapes is only what the result *is*.** A **record** template's closure is the
     instantiation entry itself (`closeHeldRecord`): a substituted record is the type the author named by
-    writing the application, so there is nothing for an extra hop to record and the entry carries the
-    application in its own `source` the way §8.2 says every instantiation does. Every other held form closes
+    writing the application, so there is nothing for an extra hop to record and the entry's chain carries
+    the application on its key (`@application`) the way §8.2 keys every instantiation. Every other held form closes
     to a **synthetic** named for the form, which the instantiation then references — a form has no
     author-written name for identity to key on. That is the whole of the divergence; everything before it is
     shared.
@@ -181,12 +181,12 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     — and would leave `[text]` written directly and `[T]` closed to `text` on two entries for one type. Both
     go through `DerivedName.ofBinding` over the same binding record, so the two channels dedupe
     against each other and the closing usually finds the entry desugaring already injected.
-  - **So the application gets a second entry**, a `Reference` to the form whose `source` is the application
-    itself. One entry cannot carry two identities: the closure is a closed synthetic *and* an instantiation
-    of the template, and §8.2 keys those on different things. Without it nothing in resolver output records
-    that `grid<pixel, 3>` was written — the field would name the array and the template's name would vanish.
-    The record shape needs no second entry, since substituting a record yields a record, structurally
-    distinct from any synthetic.
+  - **So the application gets a second entry**, a `Reference` to the form, whose key records the application
+    itself (`@application`, which any kind of entry carries). One entry cannot carry two
+    identities: the closure is a closed synthetic *and* an instantiation of the template, and §8.2 keys those on
+    different things. Without it nothing in resolver output records that `grid<pixel, 3>` was written — the field would
+    name the array and the template's name would vanish. The record shape needs no second entry, since substituting a
+    record yields a record, structurally distinct from any synthetic.
     - **A generated head mints none.** Closing `array_p0_…<pixel, 3>` is an open synthetic closing its own
       intermediate form; nobody wrote that application, and an entry named for it would carry an internal
       name into identity. `SchemaResolver` tells the two apart by the plainest fact available — the
@@ -207,13 +207,13 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     apart by the constructor head: the body shape does not distinguish them, every open entry's being held.
   - **`reference`'s kind is not a base kind**, so `DefinitionResolver`
     dispatches the head instead of judging it by the generic `!C value` rule: §4.1 gives an alias
-    `kind: REFERENCE`, a derived kind (`TypeDefinition.kind`, this resolver's `@Unbound` component — the
+    `kind: REFERENCE`, a derived kind (`TypeKind.of`; the
     kernel declares no `type_kind`) with nothing in the supertype chain to supply it, because `reference`
     describes no value. The
     binding check still runs — `reference`'s vocabulary is a record like any other. §5.10 is explicit that this mints no
   intermediate entry per
-  alias hop, so a chain of aliases collapses and the origin survives only in the composed entry's own
-  `source`. The degenerate spelling closes the same way: `ident => <T> T` applied to `text` is `text`.
+  alias hop, so a chain of aliases collapses and the origin survives only in the composed entry's
+  recorded application. The degenerate spelling closes the same way: `ident => <T> T` applied to `text` is `text`.
   - **A self-applying alias is the author's error, not a knot.** The knot-tying memo answers a recursive
     application with the name of the entry under construction, and this path constructs none — so
     `loop => <T> loop<T>`, applied, would hand a field a name nothing ever defines. A second set tracks

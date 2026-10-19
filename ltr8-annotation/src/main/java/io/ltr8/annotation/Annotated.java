@@ -36,8 +36,8 @@ import java.util.Objects;
  * nothing where it is not used; a position typed {@code String} still binds to a plain {@code String}.
  *
  * <p><b>Equality and hash proxy to {@code value}</b>, deliberately. Annotations are metadata, and metadata
- * does not change what a value *is* -- the same rule that keeps them, and source positions, out of {@code
- * TypeDefinition}'s equality. So a list of boxed elements compares equal to one whose elements carry
+ * does not change what a value *is* -- the same rule that keeps them, and source positions, out of a resolved
+ * schema value's equality. So a list of boxed elements compares equal to one whose elements carry
  * different documentation, and {@code contains} finds a boxed value by an unannotated one. It also means a
  * box and its bare value are *not* equal, since {@code equals} is necessarily symmetric -- unwrap with
  * {@link #value()} to compare across the boundary.

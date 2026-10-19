@@ -43,7 +43,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   `DefinitionResolver.requireIdentifier` applies the contract to the ones a declaration actually binds.
   §12.1's `type-name = identifier` states it, and its note carries the field-name half.
 - **`SchemaMap.declarations` is a `Map<String, Declaration>`** (a `LinkedHashMap`, insertion order
-  preserved) — §3.4.1's Pass 1 shape and the schema's own `{type_name => type_definition}`. A duplicate
+  preserved) — §3.4.1's Pass 1 shape and the schema's own `{type_name => top}`. A duplicate
   name overwrites, same "grammar layer doesn't dedupe" treatment the data grammar gives duplicate fields.
 - **No production of the schema grammar takes the full `data-value`**, which §12.1 states.
   `instance`'s payload is a `core-value` (`Instance` wraps a `DataValue` with `typeRef` pre-set, no separate

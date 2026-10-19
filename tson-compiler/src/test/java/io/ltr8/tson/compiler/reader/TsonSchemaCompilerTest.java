@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
@@ -47,9 +47,9 @@ class TsonSchemaCompilerTest {
         // DeferredTypeReader exists for.
         RecordBody bodyA = RecordBody.of(RecordBody.fieldMap(Map.entry("b", RecordField.required(TypeRef.of("B")))));
         RecordBody bodyB = RecordBody.of(RecordBody.fieldMap(Map.entry("a", RecordField.required(TypeRef.of("A")))));
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("A", TypeDefinition.product(bodyA));
-        entries.put("B", TypeDefinition.product(bodyB));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("A", bodyA);
+        entries.put("B", bodyB);
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
@@ -64,8 +64,8 @@ class TsonSchemaCompilerTest {
     void directSelfReferenceCompilesWithoutStackOverflow() {
         RecordBody selfReferencing =
                 RecordBody.of(RecordBody.fieldMap(Map.entry("child", RecordField.required(TypeRef.of("Node")))));
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("Node", TypeDefinition.product(selfReferencing));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("Node", selfReferencing);
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
@@ -82,9 +82,9 @@ class TsonSchemaCompilerTest {
         // including "orphan" itself (get("orphan") succeeds, unlike the old lazy behavior where it never got
         // attempted at all until asked for); "used" (which never references "orphan") reads normally either
         // way.
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("used", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap())));
-        entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.DATA,  List.of(), List.of(), new EndpointBody("/search")));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("used", RecordBody.of(RecordBody.fieldMap()));
+        entries.put("orphan", new EndpointBody("/search"));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
@@ -117,9 +117,9 @@ class TsonSchemaCompilerTest {
 
     @Test
     void getOnAnUnknownNameEnumeratesTheTypesTheSchemaDoesDeclare() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("first", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap())));
-        entries.put("second", TypeDefinition.product(RecordBody.of(RecordBody.fieldMap())));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("first", RecordBody.of(RecordBody.fieldMap()));
+        entries.put("second", RecordBody.of(RecordBody.fieldMap()));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 

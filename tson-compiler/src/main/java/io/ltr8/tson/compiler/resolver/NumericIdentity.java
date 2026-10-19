@@ -7,7 +7,7 @@ import io.ltr8.tson.atom.number.NumberGrammar;
 /**
  * [TSON-DATA] §4.3's numeric equivalence, applied where an entry's identity is derived.
  *
- * <p>[TSON-SCHEMA] §8.2 keys an instantiation on the flattened application recorded in {@code source}, and a
+ * <p>[TSON-SCHEMA] §8.2 keys an instantiation on the flattened application it closes, and a
  * lifted sugar form on the binding record it writes. Both are derived from what the author spelled, so
  * without this {@code vector<float32, 255>} and {@code vector<float32, 0xFF>} are two entries for one type
  * -- §4.3 making the two one number, and their bodies coming out byte-identical because the slot decodes

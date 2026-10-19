@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -17,7 +18,7 @@ import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -113,15 +114,15 @@ final class ParameterTypes {
      * template's form. A type parameter's bound is the schema's either way: its argument names a schema type, the
      * way {@code set<T>} captures a local name into the meta's {@code element_type}.
      */
-    static boolean readsInStructure(TypeDefinition template, Function<String, TypeDefinition> entries) {
-        TypeDefinition current = template;
-        for (int hop = 0; hop < 64 && current != null; hop++) {
-            String head = current.source().map(TypeRef::name).orElse(null);
+    static boolean readsInStructure(Top template, Function<String, Top> entries) {
+        Top current = template;
+        for (int hop = 0; hop < 64 && current instanceof TemplateBody held; hop++) {
+            String head = HeldBody.of(held).application().typeRef().orElse(null);
             if (head == null || head.equals("record")) {
                 return false;
             }
-            TypeDefinition applied = entries.apply(head);
-            if (applied == null || !(applied.body() instanceof TemplateBody)) {
+            Top applied = entries.apply(head);
+            if (!(applied instanceof TemplateBody)) {
                 return true;
             }
             current = applied;
@@ -137,14 +138,14 @@ final class ParameterTypes {
      * produced: those are walked, and the only names a failure is reported against, since an imported entry
      * resolved in its own schema. {@code written} is what each local declaration's parameter list wrote.
      */
-    static Map<String, Map<String, TemplateParam>> inferAll(Map<String, TypeDefinition> entries, Set<String> local,
+    static Map<String, Map<String, TemplateParam>> inferAll(Map<String, Top> entries, Set<String> local,
                                                              Map<String, Map<String, TypeRef>> written,
-                                                             Function<String, TypeDefinition> meta,
+                                                             Function<String, Top> meta,
                                                              FailureReporter reporter) {
         Map<String, Occurrences> observed = new LinkedHashMap<>();
         Map<String, Map<String, TemplateParam>> recorded = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
-            if (!(definition.body() instanceof TemplateBody held)) {
+            if (!(definition instanceof TemplateBody held)) {
                 return;
             }
             if (!local.contains(name)) {
@@ -187,8 +188,8 @@ final class ParameterTypes {
      * left undetermined. A body that will not classify yields nothing here and is reported by the batch pass,
      * which is the one that knows which declarations this schema wrote.
      */
-    static Map<String, Kind> inferOne(TypeDefinition template, Function<String, TypeDefinition> meta) {
-        if (!(template.body() instanceof TemplateBody held)) {
+    static Map<String, Kind> inferOne(Top template, Function<String, Top> meta) {
+        if (!(template instanceof TemplateBody held)) {
             return Map.of();
         }
         Occurrences occurrences = new Occurrences(held.parameterNames(), Map.of(), false);
@@ -228,8 +229,8 @@ final class ParameterTypes {
      * a parameter ungrounded, which is an unbounded type parameter.
      */
     private static Map<String, Map<String, TemplateParam>> settle(Map<String, Occurrences> observed,
-            Map<String, Map<String, TemplateParam>> recorded, Map<String, TypeDefinition> entries,
-            FailureReporter reporter, Function<String, TypeDefinition> local, Function<String, TypeDefinition> meta) {
+            Map<String, Map<String, TemplateParam>> recorded, Map<String, Top> entries,
+            FailureReporter reporter, Function<String, Top> local, Function<String, Top> meta) {
         boolean moved = true;
         while (moved) {
             moved = false;
@@ -238,11 +239,10 @@ final class ParameterTypes {
                     if (occurrences.settled.contains(deferred)) {
                         continue;
                     }
-                    TypeDefinition callee = entries.get(deferred.head());
-                    if (callee == null) {
+                    if (!(entries.get(deferred.head()) instanceof TemplateBody callee)) {
                         continue;
                     }
-                    List<String> calleeParameters = callee.parameters();
+                    List<String> calleeParameters = callee.parameterNames();
                     if (deferred.index() >= calleeParameters.size()) {
                         occurrences.settled.add(deferred);
                         continue; // an arity error, which the materialiser reports where it is applied
@@ -320,8 +320,8 @@ final class ParameterTypes {
         }
 
         /** One parameter as far as the fixed point has got, or {@code null} while nothing grounds it. */
-        TemplateParam current(String parameter, Function<String, TypeDefinition> local,
-                              Function<String, TypeDefinition> meta) {
+        TemplateParam current(String parameter, Function<String, Top> local,
+                              Function<String, Top> meta) {
             if (!uses.containsKey(parameter) && !written.containsKey(parameter)) {
                 return null;
             }
@@ -333,8 +333,8 @@ final class ParameterTypes {
         }
 
         /** Every parameter, settled. */
-        Map<String, TemplateParam> parameters(Function<String, TypeDefinition> local,
-                                              Function<String, TypeDefinition> meta) {
+        Map<String, TemplateParam> parameters(Function<String, Top> local,
+                                              Function<String, Top> meta) {
             Map<String, TemplateParam> result = new LinkedHashMap<>();
             for (String parameter : parameters) {
                 result.put(parameter, parameter(parameter, local, meta));
@@ -347,8 +347,8 @@ final class ParameterTypes {
          * declaration wrote, which must narrow that further. With no use at all it is a type parameter, bounded
          * by what was written if anything was.
          */
-        private TemplateParam parameter(String parameter, Function<String, TypeDefinition> local,
-                                        Function<String, TypeDefinition> meta) {
+        private TemplateParam parameter(String parameter, Function<String, Top> local,
+                                        Function<String, Top> meta) {
             List<Use> all = uses.getOrDefault(parameter, List.of());
             Optional<TypeRef> declared = Optional.ofNullable(written.get(parameter));
             Set<Kind> kinds = new HashSet<>();
@@ -404,8 +404,8 @@ final class ParameterTypes {
          * (§3.3.1): a bound naming one would admit no argument, since a type argument names a type, and the
          * lookup that falls back to the meta for a slot's declared type must not reach it here.
          */
-        private static void requireType(TypeRef bound, Function<String, TypeDefinition> local,
-                                        Function<String, TypeDefinition> meta) {
+        private static void requireType(TypeRef bound, Function<String, Top> local,
+                                        Function<String, Top> meta) {
             String name = bound.name();
             if (local.apply(name) != null) {
                 return;
@@ -420,7 +420,7 @@ final class ParameterTypes {
 
         /** The use every other use is a supertype of, or a resolver error where no such use exists. */
         private static Use narrowest(String parameter, String verb, List<Use> uses,
-                                     Function<String, TypeDefinition> local, Function<String, TypeDefinition> meta) {
+                                     Function<String, Top> local, Function<String, Top> meta) {
             for (Use candidate : uses) {
                 if (uses.stream().allMatch(other -> isA(candidate, other, local, meta))) {
                     return candidate;
@@ -438,29 +438,29 @@ final class ParameterTypes {
          * Whether {@code a}'s type IS-A {@code b}'s: equal, {@code b} among the supertypes {@code a} records, or
          * the same name for two entries with the same body -- a core type and the kernel original it copies.
          */
-        static boolean isA(Use a, Use b, Function<String, TypeDefinition> local, Function<String, TypeDefinition> meta) {
+        static boolean isA(Use a, Use b, Function<String, Top> local, Function<String, Top> meta) {
             if (a.type().equals(b.type())) {
                 return true;
             }
             if (!a.type().arguments().isEmpty() || !b.type().arguments().isEmpty()) {
                 return false;
             }
-            TypeDefinition definition = lookup(a, local, meta);
+            Top definition = lookup(a, local, meta);
             if (definition == null) {
                 return false;
             }
-            if (definition.supertypes().contains(b.type().name())) {
+            if (Chained.supertypesOf(definition).contains(b.type().name())) {
                 return true;
             }
-            TypeDefinition other = lookup(b, local, meta);
+            Top other = lookup(b, local, meta);
             return other != null && a.type().name().equals(b.type().name())
-                    && definition.body().equals(other.body());
+                    && Chained.withoutChain(definition).equals(Chained.withoutChain(other));
         }
 
-        private static TypeDefinition lookup(Use use, Function<String, TypeDefinition> local,
-                                             Function<String, TypeDefinition> meta) {
+        private static Top lookup(Use use, Function<String, Top> local,
+                                             Function<String, Top> meta) {
             String name = use.type().name();
-            TypeDefinition first = (use.local() ? local : meta).apply(name);
+            Top first = (use.local() ? local : meta).apply(name);
             return first != null ? first : (use.local() ? meta : local).apply(name);
         }
     }
@@ -483,7 +483,7 @@ final class ParameterTypes {
     // ── The walk ─────────────────────────────────────────────────────────────────────────────────
 
     /** One held body walked against the vocabulary of the constructor it applies. */
-    private record Walk(Occurrences occurrences, Function<String, TypeDefinition> meta) {
+    private record Walk(Occurrences occurrences, Function<String, Top> meta) {
 
         void body(HeldBody held) {
             String head = held.application().typeRef().orElse(null);
@@ -637,12 +637,11 @@ final class ParameterTypes {
 
         /** A name's resolved body, reference chains followed -- the slot type a written value faces. */
         private Top resolve(String name) {
-            TypeDefinition definition = meta.apply(name);
-            for (int hops = 0; definition != null && definition.body() instanceof Reference reference
-                    && hops < 32; hops++) {
+            Top definition = meta.apply(name);
+            for (int hops = 0; definition instanceof Reference reference && hops < 32; hops++) {
                 definition = meta.apply(reference.target().name());
             }
-            return definition == null ? null : definition.body();
+            return definition;
         }
     }
 }

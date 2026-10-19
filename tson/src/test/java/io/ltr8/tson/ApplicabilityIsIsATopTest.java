@@ -4,8 +4,9 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Reference;
 
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -87,14 +89,14 @@ class ApplicabilityIsIsATopTest {
                 .resolve(source).schema().entries();
 
         for (String name : List.of("bare", "closed", "applied")) {
-            TypeDefinition definition = entries.get(name);
-            assertEquals(TypeKind.REFERENCE, definition.kind(), name);
-            assertEquals("int32", definition.source().orElseThrow().name(), name);
+            Top definition = entries.get(name);
+            assertEquals(TypeKind.REFERENCE, TypeKind.of(definition, n -> true), name);
+            assertEquals("int32", ((Reference) definition).target().name(), name);
         }
         // The open one is a template until it closes, and its kind says so: a template is not a type
         // (§5.10), so it is TEMPLATE rather than the REFERENCE its closure produces. `applied` above is
         // where the REFERENCE appears -- the entry closing it mints.
-        assertEquals(TypeKind.TEMPLATE, entries.get("open").kind());
+        assertEquals(TypeKind.TEMPLATE, TypeKind.of(entries.get("open"), n -> true));
     }
 
     /**
@@ -158,15 +160,40 @@ class ApplicabilityIsIsATopTest {
     }
 
     /**
-     * A base kind is admitted by the predicate and refused by its own reader, which is the better answer:
-     * it names the subtypes that would satisfy the position instead of saying the head was the wrong kind
-     * of thing.
+     * A base kind is admitted by the predicate and refused as abstract (SPEC-FEEDBACK.md #15), which is the
+     * better answer: it names the instantiable subtypes that would satisfy the position instead of saying the head
+     * was the wrong kind of thing.
      */
     @Test
     void aBaseKindIsAdmittedAndThenRefusesItself() {
         List<Diagnostic> problems = problems("  bad => !product {}");
 
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("has no data of its own to bind"), problems::toString);
+        assertTrue(problems.getFirst().message().contains("'!product' names an abstract entry"), problems::toString);
+        assertTrue(problems.getFirst().message().contains("(record | array | set_type | map | tuple)"),
+                problems::toString);
+        assertFalse(problems.getFirst().message().contains("constraint vocabulary"),
+                "one sentence, not the applicability clause beside the abstract one: " + problems);
+    }
+
+    /** {@code top}'s refusal names only what can be constructed: {@code type} and the base kinds are abstract too. */
+    @Test
+    void topNamesOnlyItsInstantiableSubtypes() {
+        String message = problems("  bad => !top {}").getFirst().message();
+
+        assertTrue(message.contains("record"), message);
+        for (String abstractKind : List.of("type", "atom", "product", "sum", "data", "template")) {
+            assertFalse(message.matches("(?s).*[(| ]" + abstractKind + "[ |)].*"),
+                    () -> abstractKind + " is no answer: " + message);
+        }
+    }
+
+    /** With nothing in scope composing it, {@code data}'s refusal says so rather than naming an empty list. */
+    @Test
+    void dataWithNothingComposingItSaysSo() {
+        String message = problems("  bad => !data {}").getFirst().message();
+
+        assertTrue(message.contains("no constructor in scope composes 'data'"), message);
+        assertFalse(message.contains("()"), message);
     }
 }

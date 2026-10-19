@@ -10,7 +10,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.base.SchemaValidationException;
 
@@ -240,11 +240,11 @@ class TypeInhabitanceTest {
     @Test
     void everyUninhabitedEntryIsReportedNotJustTheFirst() {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("x", TypeDefinition.product(RecordBody.of(
-                RecordBody.fieldMap(Map.entry("y", RecordField.required(TypeRef.of("y")))))));
-        entries.put("y", TypeDefinition.product(RecordBody.of(
-                RecordBody.fieldMap(Map.entry("x", RecordField.required(TypeRef.of("x")))))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("x", RecordBody.of(
+                RecordBody.fieldMap(Map.entry("y", RecordField.required(TypeRef.of("y"))))));
+        entries.put("y", RecordBody.of(
+                RecordBody.fieldMap(Map.entry("x", RecordField.required(TypeRef.of("x"))))));
 
         TsonSchemaLinker.link(new TsonSchema("https://example.test/two.tn",
                 TsonBundledSchemas.META_KERNEL_ID, List.of(), entries), null, problems);

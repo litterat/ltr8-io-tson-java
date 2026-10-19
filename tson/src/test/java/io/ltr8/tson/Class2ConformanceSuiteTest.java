@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -10,7 +11,9 @@ import io.ltr8.tson.compiler.TsonDocumentPeek;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.suite.SuiteBindings;
 import io.ltr8.tson.suite.SuiteCheckout;
 import io.ltr8.tson.suite.Sidecar;
@@ -134,9 +137,9 @@ class Class2ConformanceSuiteTest {
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 assertEquals(List.of(), problems, "a valid schema vector must load cleanly");
-                Map<String, TypeDefinition> ours = ResolvedForm.ownEntries(tson, identityOf(source));
+                Map<String, Top> ours = ResolvedForm.ownEntries(tson, identityOf(source));
                 // Under the subject's own meta, which a `data` constructor's instance needs (RUNNER.md).
-                Map<String, TypeDefinition> expected = ResolvedForm.readResolved(tson,
+                Map<String, Top> expected = ResolvedForm.readResolved(tson,
                         fieldText(outcomePayload(sidecar), "resolved"),
                         hasField(sidecar, "meta") ? Sidecar.resolveShortName(fieldText(sidecar, "meta"))
                                 : TsonBundledSchemas.META_ID);
@@ -152,6 +155,10 @@ class Class2ConformanceSuiteTest {
                 assertEquals(ResolvedForm.markedSynthetics(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourSynthetics(tson, identityOf(source)),
                         "the entries marked @synthetic are not the ones the vector marks");
+                // §8.2's second key annotation: each instantiation states, on its key, the application it is.
+                assertEquals(ResolvedForm.markedApplications(fieldText(outcomePayload(sidecar), "resolved")),
+                        ResolvedForm.ourApplications(tson, identityOf(source)),
+                        "the entries' @application are not the ones the vector states");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
             case "refused" -> assertRefused(sidecar, problems, "schema");
@@ -260,9 +267,9 @@ class Class2ConformanceSuiteTest {
         if (hasField(expected, "disjoint")) {
             for (RecordValue claim : Sidecar.fieldRecordArray(expected, "disjoint")) {
                 String name = fieldText(claim, "name");
-                TypeDefinition definition = definitionOf(entries, name);
+                Top definition = definitionOf(entries, name);
                 assertEquals(Boolean.parseBoolean(fieldText(claim, "value")),
-                        definition.disjoint().orElseThrow(() ->
+                        ((ChoiceBody) definition).disjoint().orElseThrow(() ->
                                 new AssertionError(name + " has no derived disjointness at all")),
                         "§5.4 disjointness of " + name);
             }
@@ -272,18 +279,20 @@ class Class2ConformanceSuiteTest {
                 String name = fieldText(claim, "name");
                 // Normalised on both sides, and on both ends of the claim: a subtype family over template
                 // instantiations names minted entries at the index *and* inside it (RUNNER.md rule 6, which
-                // reaches "a list of names a sidecar states").
+                // reaches "a list of names a sidecar states"). A family base template carries no slot of its
+                // own, so its index is the entries whose chain names it.
+                Top definition = definitionOf(entries, name);
                 assertEquals(new TreeSet<>(fieldTextArray(claim, "subtypes").stream()
                                 .map(ResolvedForm::withoutHash).toList()),
-                        new TreeSet<>(definitionOf(entries, name).subtypes().stream()
+                        new TreeSet<>(Chained.subtypesOf(definition).stream()
                                 .map(ResolvedForm::withoutHash).toList()),
                         "§8.2 subtypes index of " + name);
             }
         }
     }
 
-    private static TypeDefinition definitionOf(Map<String, TypeDefinition> entries, String name) {
-        TypeDefinition definition = entries.get(name);
+    private static Top definitionOf(Map<String, Top> entries, String name) {
+        Top definition = entries.get(name);
         if (definition != null) {
             return definition;
         }

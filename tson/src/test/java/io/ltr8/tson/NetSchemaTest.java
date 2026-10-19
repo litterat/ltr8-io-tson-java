@@ -161,8 +161,8 @@ class NetSchemaTest {
     @Test
     void theSchemalessNamesAreNetTnsOwn() {
         var net = Tson.standard().bindRegistry().core().resolveLinked(TsonBundledSchemas.NET_ID).schema().entries();
-        assertEquals(HostnameType.UNCONSTRAINED, net.get("hostname").body());
-        assertEquals(HostType.UNCONSTRAINED, net.get("host").body());
+        assertEquals(HostnameType.UNCONSTRAINED, net.get("hostname"));
+        assertEquals(HostType.UNCONSTRAINED, net.get("host"));
         assertTrue(BuiltinTypeVocabulary.lookup("hostname").isPresent());
         assertTrue(BuiltinTypeVocabulary.lookup("host").isPresent());
     }

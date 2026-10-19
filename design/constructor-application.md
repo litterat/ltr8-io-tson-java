@@ -8,7 +8,7 @@ What `!C { … }` may apply, how its head resolves, and why a template is never 
 - A template closes by application (`C<...>`), never by construction (`!C { ... }`); naming one at a construction site
   is an author error (`SchemaValidationException`), never an `IllegalStateException`.
 - A construction head resolves through its reference chain first (`resolveConstructorTarget`): every question is asked
-  of the entry at the end, while `source` records the name the author wrote.
+  of the entry at the end, while the entry's facts record the name the author wrote as its constructor.
 - What `!C { … }` may apply is IS-A `top` (§4.1) — there is no constructor marker — and
   `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so a head the gate admits has a reader.
 - `template` is resolver vocabulary (§8.1): IS-A `top`, yet a source declaration applying it, closed or open, is an
@@ -43,29 +43,30 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `array`, and every question the head is then asked — is it a template, is it applicable, what kind does
   construction transfer, whose vocabulary reads the payload — is a question about the entry at the end.
   Asking the alias would answer all four from an empty supertype chain and a `REFERENCE` kind, which is what
-  a hop looks like rather than what it points at. The author's spelling survives where it is visible: `source` records the
-  name they
-  wrote, so the chain stays walkable from resolved output.
+  a hop looks like rather than what it points at. The author's spelling survives where it is visible: the tag resolved output
+  writes (`EntryFacts.constructor`) is the name they wrote, so the chain stays walkable from resolved output.
 - **What `!C { … }` may apply is IS-A `top` (§4.1)** (`requireApplicable`), asked of that terminal entry. §4.1 makes
   every base kind IS-A `top` and every constructor transitively so, while IS-A stops at construction — an
   instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond
   them, exactly the entries describing *a type* rather than a part of one. Over the bundled schemas that is
-  every vocabulary constructor plus the four base kinds and `reference`.
+  every vocabulary constructor plus `top`, `type`, the four base kinds, `reference` and `template` — judged by where
+  `top` is defined (`TypeKind.isConstructor`, one predicate the resolver's gate, the linker's §2.2.2 eligibility,
+  the meta's reader table and the governed compile all ask), and over a template's chain as over a closed one's.
   **A per-entry constructor marker would be both too narrow and inconsistent.** `reference` describes no
   value, so it would go unmarked, and the language needs it applicable — which takes a by-name exception that
   the open and closed paths must then both remember, or `<T> !reference { target: T }` resolves while
   `!reference { target: int32 }` does not, one construction with two answers. IS-A `top` needs no exception.
-  A base kind is admitted and refuses itself through its own reader, naming the subtypes that would satisfy the position,
-  which is the
-  better message. What stays out is the component set — `record_field`, `type_ref`, `type_argument`,
-  `tuple_element`, `field_group`, `integer_size`, `atom_specification`, `type_definition` — record-bodied
-  with empty chains; without a check those fail anyway on `Top` being sealed, but as a `ClassCastException`
-  surfaced as `NOT_IMPLEMENTED`, a non-verdict for an author error. `TsonCompiledMetaSchema.buildConstructors`
-  filters on the same predicate, so a head the gate admits has a reader.
+  `top`, `type` and the base kinds are admitted and then refused as abstract (SPEC-FEEDBACK.md #15): each is
+  `extension: ABSTRACT`, so its reader is the abstract dispatch every abstract record has, and a tag naming the
+  base itself is refused naming the subtypes that would satisfy the position, which is the better message. What stays
+  out is the component set — `record_field`, `type_ref`, `type_argument`, `tuple_element`, `field_group`,
+  `integer_size`, `atom_specification` — record-bodied with empty chains; without a check those fail anyway on `Top`
+  being sealed, but as a `ClassCastException` surfaced as `NOT_IMPLEMENTED`, a non-verdict for an author error.
+  `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so a head the gate admits has a reader.
   **Admitting `reference` closed means giving it the alias's own entry**, not just letting it through:
-  `!reference { target: X }` resolves to `kind: REFERENCE` with `X` as source and body, the same entry
-  `name => X` denotes (§8.3), where a construction of any other head takes the head's kind and names the head
-  as its source. The closed path dispatches on the *body* being a `Reference`, having already read it;
+  `!reference { target: X }` resolves to `kind: REFERENCE` with `X` as its body, the same entry
+  `name => X` denotes (§8.3), where a construction of any other head takes the head's kind and records the head
+  as its constructor. The closed path dispatches on the *body* being a `Reference`, having already read it;
   `resolveInstanceTemplate` holds its body unread and so goes by the head's name.
   **`template` is admitted by the predicate and refused by name** (`requireAuthorable`, on both paths). It is IS-A
   `top` because resolved output is typed by it, but it is resolver vocabulary (§8.1): an open entry's body, derived
@@ -84,7 +85,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   hint in the refusal rides on the same applicability question, so `!top ^ { … }` gets the plain answer rather
   than advice that would fail in turn. And the governed-compile factory lookup asks IS-A `top`, so a
   construction that resolved reaches a factory rather than failing "out of scope" on a narrower test.
-  **There is no marker.** §12.1's grammar has no constructor sigil and §8.1's `type_definition` no
+  **There is no marker.** §12.1's grammar has no constructor sigil and §8.1's `type` no
   `constructor` field: what makes an entry a constructor is that it IS-A `top`, which its supertype chain
   records. **§2.2.2 eligibility** — who may declare one —
   asks the linker whether the entry IS-A `top`, so an ordinary type library cannot reach constructor

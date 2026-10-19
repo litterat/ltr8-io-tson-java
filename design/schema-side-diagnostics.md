@@ -117,8 +117,8 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
   `box => <T> { v: T  w: no_such_type }` would be reported against `holder => { b: box<text> }` — a line that is
   not wrong and does not contain the name — once per applier, each naming a different application. Deferred
   checking is what holding buys, and it is survivable only if the author is sent to the line they can edit.
-    - **The offending name is the evidence, not the entry.** Walking a derived entry's own lineage cannot
-      answer this: a sugar lift's `source` is the bare constructor it applies, and an alias composes its
+    - **The offending name is the evidence, not the entry.** Walking a derived entry's own provenance cannot
+      answer this: a sugar lift records only the bare constructor it applies, and an alias composes its
       argument into someone else's application (`half => <B> pair<no_such_type, B>` closes to a `pair`
       instantiation, and `pair` is faultless). Asking which *held body mentions the name* reaches `half`
       directly — and reaches nothing when the name came from the argument list, so `box<3>` and
@@ -189,7 +189,7 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       read with no component to declare a class is built as a `LinkedHashMap` when it is ordered.
     - The converse — a component no field fills — is refused at compile too: it reaches the constructor as
       `null` on every document. `@Unbound` is how a class says a component is its own and not the wire's,
-      needed exactly once here (`TypeDefinition.position`, this implementation's own addition for
+      needed exactly once here (`RecordField.position`, this implementation's own addition for
       diagnostics).
     - **The check is raised at bind-mode compile — startup, not first read — except for a type with no class to
       build.** That is the `MissingBindingException` subclass, deferred to the first read of that type, since a

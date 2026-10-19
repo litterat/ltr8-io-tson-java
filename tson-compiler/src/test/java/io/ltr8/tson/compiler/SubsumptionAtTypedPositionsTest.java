@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * [TSON-SCHEMA] §7.2: "at a position whose declared type is {@code T}, a value annotated {@code !S} is valid
  * if and only if, after reference flattening of both (§8.3), {@code S} is {@code T} or {@code T} appears in
- * {@code S}'s transitive {@code type_definition.supertypes}".
+ * {@code S}'s transitive {@code supertypes}".
  *
  * <p>The rule was enforced only where {@code T} was a record with a non-empty {@code subtypes()} -- the one
  * case that got a dispatcher wrapped around it (issue #235). Everywhere else the type-ref was consumed and

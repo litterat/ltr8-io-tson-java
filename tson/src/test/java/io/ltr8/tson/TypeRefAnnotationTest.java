@@ -5,7 +5,7 @@ import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,23 +22,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TypeRefAnnotationTest {
 
-    private static TypeDefinition read(String document) {
+    private static Top read(String document) {
         return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()))
                 .objectReader().withSchema(TsonBundledSchemas.META_ID)
-                .readAs(document, "type_definition", TypeDefinition.class);
+                .readAs(document, "top", Top.class);
     }
 
-    private static TypeRef fieldType(TypeDefinition definition) {
-        return assertInstanceOf(RecordBody.class, definition.body()).fields().sequencedValues().getFirst().type();
+    private static TypeRef fieldType(Top definition) {
+        return assertInstanceOf(RecordBody.class, definition).fields().sequencedValues().getFirst().type();
     }
 
     /** An annotation written on the reference itself, read off a document. */
     @Test
     void anAnnotationOnATypeRefIsKept() {
         TypeRef type = fieldType(read("""
-                !type_definition { body: !record { fields: {
+                !record { fields: {
                   n => !record_field { type: @doc:"the token itself" token }
-                } } }"""));
+                } }"""));
 
         assertEquals("token", type.name());
         assertEquals("the token itself", type.annotations().get("doc").orElseThrow().value().orElseThrow());
@@ -48,18 +48,18 @@ class TypeRefAnnotationTest {
     @Test
     void anUnannotatedTypeRefCarriesNothing() {
         assertTrue(fieldType(read("""
-                !type_definition { body: !record { fields: {
+                !record { fields: {
                   n => !record_field { type: token }
-                } } }""")).annotations().values().isEmpty());
+                } }""")).annotations().values().isEmpty());
     }
 
     /** And it writes back out, so a resolved-form round trip does not quietly drop it. */
     @Test
     void anAnnotatedTypeRefWritesBackAsOne() {
         TypeRef type = fieldType(read("""
-                !type_definition { body: !record { fields: {
+                !record { fields: {
                   n => !record_field { type: @doc:"the token itself" token }
-                } } }"""));
+                } }"""));
 
         String written = new TsonObjectWriter(SchemaMetaNameBinder.defaultContext()).toTson(type);
 

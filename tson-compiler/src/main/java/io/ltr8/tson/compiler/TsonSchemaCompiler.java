@@ -4,6 +4,7 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.reader.*;
 import io.ltr8.tson.compiler.reader.DeferredTypeReader;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -11,7 +12,7 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.compiler.reader.Subsumption;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.LinkedHashMap;
@@ -83,7 +84,7 @@ public final class TsonSchemaCompiler {
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonCompiledMetaSchema governingMeta) {
         TsonSchema schema = linkedSchema.schema();
-        return compileWith(linkedSchema, name -> governedFactory(name, schema, governingMeta),
+        return compileWith(linkedSchema, name -> governedFactory(name, linkedSchema, governingMeta),
                 ForeignSchemas.none());
     }
 
@@ -96,7 +97,7 @@ public final class TsonSchemaCompiler {
      * an {@link ErrorReader}, same as any other unbuildable entry -- the schema still compiles, only
      * reading a value against that one entry fails.
      */
-    private static ValueReaderFactory governedFactory(String constructorName, TsonSchema schema,
+    private static ValueReaderFactory governedFactory(String constructorName, TsonLinkedSchema schema,
                                                       TsonCompiledMetaSchema governingMeta) {
         ValueReaderFactory inherited = governingMeta.constructor(constructorName);
         if (inherited != null) {
@@ -105,8 +106,8 @@ public final class TsonSchemaCompiler {
         // Applicable is IS-A `top` (§4.1) -- the same predicate the resolver's own gate and the meta-schema's
         // head table ask, so a construction that resolved reaches a factory lookup here rather than falling
         // through to "out of scope" on a narrower question.
-        TypeDefinition own = schema.entries().get(constructorName);
-        if (own != null && own.supertypes().contains("top")) {
+        Top own = schema.schema().entries().get(constructorName);
+        if (own != null && schema.isConstructor(constructorName, own)) {
             return governingMeta.globalResolver().resolve(constructorName);
         }
         throw new IllegalStateException("constructor '" + constructorName + "' is out of scope: not in the "
@@ -219,7 +220,7 @@ public final class TsonSchemaCompiler {
                 return new DeferredTypeReader<>(name, finished);
             }
             try {
-                TypeDefinition definition = schema.entries().get(name);
+                Top definition = schema.entries().get(name);
                 if (definition == null) {
                     throw new IllegalStateException("'" + name + "' is referenced but not present in the schema -- "
                             + "TsonSchemaLinker should already have rejected this before compilation ever started");
@@ -249,30 +250,30 @@ public final class TsonSchemaCompiler {
             }
         }
 
-        private TsonTypeReader<?> build(String name, TypeDefinition definition) {
-            if (definition.kind() == TypeKind.TEMPLATE) {
+        private TsonTypeReader<?> build(String name, Top definition) {
+            if (definition instanceof TemplateBody held) {
                 ValueReaderContext context =
                         new ValueReaderContext(linked, readers, foreign, namesMeaning, referrers);
-                if (definition.body() instanceof TemplateBody held && held.extension().isPresent()) {
+                if (held.extension().isPresent()) {
                     // A *family base* -- a template carrying `extension` (§5.10). No
                     // value is read against it: one of its instantiations is, selected by a tag or by the
                     // discriminators, so it dispatches exactly as a closed abstract or sealed record does.
                     return new AbstractTemplateReader(name, definition, context, readers);
                 }
-                // Every other template is not a type ([TSON-SCHEMA] §5.10), and its kind says so -- the same
-                // field every other entry is dispatched on. See OpenTemplateReader for why the refusal is the
-                // entry's own reader rather than a check at the root.
-                return new OpenTemplateReader(name, definition.parameters(),
-                        context.locationOf(name, definition));
+                // Every other template is not a type ([TSON-SCHEMA] §5.10). See OpenTemplateReader for why the
+                // refusal is the entry's own reader rather than a check at the root.
+                return new OpenTemplateReader(name, held.parameterNames(), context.locationOf(name));
             }
-            Top body = definition.body();
+            Top body = definition;
             if (body instanceof Reference r) {
                 // A reference is a hop, and this is where the chain is collapsed: after linking, once per
                 // entry, at the moment a reader is built. Resolved output states the chain the author wrote,
                 // so the target's reader is named for the entry doing the referring -- which is what a use
                 // site naming `pct` over `pct => small` needs, and what knows that `b<10>` was written where
                 // `integer_type_10_100_786fbcfb` will be read.
-                return UseSite.named(resolve(r.target().name()), EntryDisplayName.of(name, definition));
+                return UseSite.named(resolve(r.target().name()),
+                        EntryDisplayName.of(name, definition, linked.schema().factsOf(name),
+                                linked.schema().applicationOf(name)));
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
             TsonTypeReader<?> built = factory.create(name, definition,

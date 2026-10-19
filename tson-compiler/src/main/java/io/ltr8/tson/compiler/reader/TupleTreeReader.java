@@ -9,7 +9,7 @@ import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.tree.TsonTuple;
 import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,13 +37,13 @@ final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
     public static final class Factory implements ValueReaderFactory {
 
         @Override
-        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
-            if (!(typeDefinition.body() instanceof TupleBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
+            if (!(typeDefinition instanceof TupleBody body)) {
+                throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition);
             }
-            return new TupleTreeReader(name, EntryDisplayName.of(name, typeDefinition), body, resolver,
-                    context.locationOf(name, typeDefinition),
+            return new TupleTreeReader(name, context.displayName(name, typeDefinition), body, resolver,
+                    context.locationOf(name),
                     AnnotationTypes.of(context));
         }
     }

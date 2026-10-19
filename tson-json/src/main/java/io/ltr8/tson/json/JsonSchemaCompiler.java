@@ -9,7 +9,6 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -99,7 +98,7 @@ public final class JsonSchemaCompiler {
                 return new DeferredTypeReader(name, finished);
             }
             try {
-                TypeDefinition definition = schema.entries().get(name);
+                Top definition = schema.entries().get(name);
                 if (definition == null) {
                     throw new IllegalStateException("'" + name + "' is referenced but not present in the schema -- "
                             + "linking should already have rejected this before compilation ever started");
@@ -126,9 +125,9 @@ public final class JsonSchemaCompiler {
             }
         }
 
-        private JsonTypeReader<?> build(String name, TypeDefinition definition) {
+        private JsonTypeReader<?> build(String name, Top definition) {
             ValueReaderContext context = new ValueReaderContext(linked, readers, foreign);
-            Top body = definition.body();
+            Top body = definition;
             if (body instanceof Reference reference) {
                 // [TSON-SCHEMA] §8.3: a processor MAY collapse a reference chain when it compiles for
                 // reading, and this is that moment -- the reader is its target's, reached once here rather

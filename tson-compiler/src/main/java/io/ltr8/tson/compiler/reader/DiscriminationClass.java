@@ -30,7 +30,7 @@ import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
@@ -70,14 +70,14 @@ public enum DiscriminationClass {
      * the enclosing choice non-disjoint and blocks untagged recovery -- the conservative side, the tag
      * stays required.
      */
-    public static Optional<DiscriminationClass> of(String name, Map<String, TypeDefinition> namespace) {
+    public static Optional<DiscriminationClass> of(String name, Map<String, ? extends Top> namespace) {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
         return ReferenceChain.terminalDefinition(name, namespace).flatMap(DiscriminationClass::classify);
     }
 
-    private static Optional<DiscriminationClass> classify(TypeDefinition def) {
-        return switch (def.body()) {
+    private static Optional<DiscriminationClass> classify(Top def) {
+        return switch (def) {
             case IntegerType ignored -> Optional.of(NUMBER);
             case DecimalType ignored -> Optional.of(NUMBER);
             case FloatType ignored -> Optional.of(NUMBER);

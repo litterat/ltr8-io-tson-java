@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -11,10 +12,11 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Data;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.schema.meta.Type;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -139,12 +141,12 @@ class MetaLayerDataConstructorTest {
     /** {@code ~data & { ... }} resolves to a constructor whose instances are DATA-kinded. */
     @Test
     void theMetaSchemaDeclaresOperationAsADataConstructor() {
-        TypeDefinition operation =
+        Top operation =
                 core(consumerContext()).resolveLinked(META_HTTP).schema().entries().get("operation");
 
-        assertEquals(TypeKind.DATA, operation.kind());
-        assertTrue(operation.supertypes().contains("top"), "a constructor: IS-A top, via the base kind");
-        assertEquals(List.of("data", "top"), operation.supertypes(),
+        assertEquals(TypeKind.DATA, TypeKind.of(operation, n -> true));
+        assertTrue(Chained.supertypesOf(operation).contains("top"), "a constructor: IS-A top, via the base kind");
+        assertEquals(List.of("data", "top"), Chained.supertypesOf(operation),
                 "the transitive chain -- `data` is itself `top & {}` -- and IS-A `top` is what makes"
                         + " `!operation { ... }` applicable");
     }
@@ -198,11 +200,12 @@ class MetaLayerDataConstructorTest {
     void anOperationValueIsRetrievedFromTheLinkedSchema() {
         TsonLinkedSchema schema = linked("retrieve", SEARCH);
 
-        TypeDefinition entry = schema.schema().entries().get("search");
-        assertEquals(TypeKind.DATA, entry.kind());
-        assertEquals(Optional.of(TypeRef.of("operation")), entry.source(), "§8.2 records what built it");
+        Top entry = schema.schema().entries().get("search");
+        assertEquals(TypeKind.DATA, TypeKind.of(entry, n -> true));
+        assertEquals(Optional.of("operation"), schema.schema().constructorOf("search"),
+                "§8.2 records what built it");
 
-        Operation operation = assertInstanceOf(Operation.class, entry.body());
+        Operation operation = assertInstanceOf(Operation.class, entry);
         assertEquals("/search", operation.path());
         assertEquals("GET", operation.method());
         assertEquals(TypeRef.of("search_request"), operation.request());
@@ -224,7 +227,7 @@ class MetaLayerDataConstructorTest {
 
         Map<String, Operation> operations = new LinkedHashMap<>();
         schema.schema().entries().forEach((name, entry) -> {
-            if (entry.body() instanceof Operation operation) {
+            if (entry instanceof Operation operation) {
                 operations.put(name, operation);
             }
         });
@@ -299,7 +302,7 @@ class MetaLayerDataConstructorTest {
      *
      * <p><b>Both are now unreachable for this shape rather than handled.</b> {@code getOrder =>
      * fetch<search_request>} <em>is</em> the entry the application denotes (§8.2),
-     * carrying the application in its own {@code source} -- so the author's punctuation and the author's
+     * its facts recording the application -- so the author's punctuation and the author's
      * Cyrillic never reach a derived name, because no name is derived. The schema loads.
      *
      * <p><b>What still mints, and is still judged, is a name nobody wrote</b>: a sugar lift, or an
@@ -320,9 +323,9 @@ class MetaLayerDataConstructorTest {
                     getOrder => fetch<search_request>""".formatted(path)),
                     () -> "a declared application mints nothing, so no name of its own can be refused");
 
-            TypeDefinition order = resolved.schema().entries().get("getOrder");
-            assertEquals(TypeKind.DATA, order.kind(), "the declaration is the operation it denotes");
-            assertEquals("fetch", order.source().orElseThrow().name(),
+            Top order = resolved.schema().entries().get("getOrder");
+            assertEquals(TypeKind.DATA, TypeKind.of(order, n -> true), "the declaration is the operation it denotes");
+            assertEquals("fetch", resolved.schema().applicationOf("getOrder").orElseThrow().name(),
                     "and records the application, which is what §8.2 keys its identity on");
 
             String own = CanonicalIdentity.canonicalize("https://example.test/api-" + label + ".tn");
@@ -396,11 +399,9 @@ class MetaLayerDataConstructorTest {
      * schema's constructors come from; it merges nothing into the type-name namespace (§3.3.2), so a name the
      * meta layer declares -- atom, record, or template -- is simply unresolved in a schema it governs.
      *
-     * <p>The applied row is the one that used to disagree. An application this schema cannot close reached
-     * {@code source}, the one slot whose lookup falls back to the governing meta's structure namespace, found
-     * the template there, and reported it as taking arguments the author had in fact written -- sending them
-     * to check the argument list, which was never the problem. Two lookup paths disagreeing about what is in
-     * scope is the defect; the arity complaint was only how it surfaced.
+     * <p>The applied row is the one a second lookup path would get wrong: an application this schema cannot close
+     * is unresolved like any other reference, never found in the governing meta's structure namespace and
+     * faulted for arguments the author had in fact written.
      */
     @Test
     void aMetaLayerNameIsUnresolvedInAGovernedSchemaWhetherOrNotItIsApplied() {
@@ -436,15 +437,15 @@ class MetaLayerDataConstructorTest {
     /** §8.1's resolved output carries the body under the constructor that built it, like any other. */
     @Test
     void resolvedOutputCarriesTheOperationBody() {
-        TypeDefinition entry = linked("write", SEARCH).schema().entries().get("search");
+        Top entry = linked("write", SEARCH).schema().entries().get("search");
 
         String written = new TsonObjectWriter(consumerContext()).toTson(entry).replaceAll("\\s+", " ");
 
         // `kind` is not written: it is derived at resolution and §8's output has no field for it. What
-        // identifies a DATA entry in output is its body -- the constructor that built it.
+        // identifies a DATA entry in output is its value -- the constructor's instance the entry is.
         assertFalse(written.contains("kind:"), written);
-        assertEquals(TypeKind.DATA, entry.kind(), "still derived, and still the resolver's own");
-        assertTrue(written.contains("body: !operation { path: \"/search\" method: \"GET\""), written);
+        assertEquals(TypeKind.DATA, TypeKind.of(entry, n -> true), "still derived, and still the resolver's own");
+        assertTrue(written.startsWith("{ path: \"/search\" method: \"GET\""), written);
         assertTrue(written.contains("request: search_request response: search_response"), written);
     }
 }

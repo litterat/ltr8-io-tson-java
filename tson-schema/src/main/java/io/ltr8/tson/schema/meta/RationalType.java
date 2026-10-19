@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.atom.Rational;
 
@@ -18,7 +19,7 @@ import java.util.Optional;
  * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "rational_type")
-public record RationalType(
+public record RationalType(TypeChain chain,
         Optional<Rational> min,
         @Field("exclusive_min") Optional<Rational> exclusiveMin,
         Optional<Rational> max,
@@ -29,13 +30,27 @@ public record RationalType(
     public static final RationalType UNCONSTRAINED = new RationalType(
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
+    @Record
+
     public RationalType {
+        chain = TypeChain.orEmpty(chain);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public RationalType(Optional<Rational> min, Optional<Rational> exclusiveMin, Optional<Rational> max,
+            Optional<Rational> exclusiveMax, Optional<Rational> multipleOf) {
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, multipleOf);
+    }
+
+    @Override
+    public RationalType withChain(TypeChain chain) {
+        return new RationalType(chain, min, exclusiveMin, max, exclusiveMax, multipleOf);
     }
 
     /**

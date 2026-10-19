@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -28,11 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ReferenceChainWalkTest {
 
-    private static final Map<String, TypeDefinition> ENTRIES = entries();
+    private static final Map<String, Top> ENTRIES = entries();
 
-    private static Map<String, TypeDefinition> entries() {
-        Map<String, TypeDefinition> map = new LinkedHashMap<>();
-        map.put("text", TypeDefinition.product(TextType.UNCONSTRAINED));
+    private static Map<String, Top> entries() {
+        Map<String, Top> map = new LinkedHashMap<>();
+        map.put("text", TextType.UNCONSTRAINED);
         map.put("hop", reference(TypeRef.of("text")));
         map.put("alias", reference(TypeRef.of("hop")));
         map.put("applied", reference(new TypeRef("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
@@ -41,9 +41,8 @@ class ReferenceChainWalkTest {
         return map;
     }
 
-    private static TypeDefinition reference(TypeRef target) {
-        return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, 
-                List.of(), List.of(), new Reference(target));
+    private static Top reference(TypeRef target) {
+        return new Reference(target);
     }
 
     /** The ordinary case, and the one that has to be transitive: two hops reach the type at the end. */

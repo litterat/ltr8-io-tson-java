@@ -2,7 +2,8 @@ package io.ltr8.tson.schema.meta;
 
 /**
  * The meta-kernel's structural root, {@code top => {}} (Part 2 §4.1) -- every body in the schema
- * IS-A this, and it is {@link TypeDefinition#body}'s own declared type. A marker interface, not a
+ * IS-A this, and a schema map's entries are values of it: {@code schema => {type_name => top}}, an entry being
+ * its value (SPEC-FEEDBACK.md #14). A marker interface, not a
  * class (Java records can't extend a class, only implement interfaces), added purely to replicate
  * the kernel's own composition chain as real Java subtyping: {@code type => top & {}} becomes
  * {@link Type}, and {@code atom => type & {}}, {@code product => type & { ... }} and

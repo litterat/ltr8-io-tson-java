@@ -3,7 +3,7 @@ package io.ltr8.tson.cli;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -36,8 +36,8 @@ class DiagnosticsSchemaTest {
      * resolution that produces them.
      */
     private static List<String> declared(String entryName) {
-        TypeDefinition entry = DiagnosticsSchema.compiled().schema().entries().get(entryName);
-        return assertInstanceOf(EnumBody.class, entry.body(), entryName + " is an enum").members();
+        Top entry = DiagnosticsSchema.compiled().schema().entries().get(entryName);
+        return assertInstanceOf(EnumBody.class, entry, entryName + " is an enum").members();
     }
 
     /** Both copies, against the enum each one copies -- the same three checks, so neither drifts alone. */

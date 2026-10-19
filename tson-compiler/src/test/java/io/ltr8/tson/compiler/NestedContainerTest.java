@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonArray;
@@ -72,8 +72,8 @@ class NestedContainerTest {
     }
 
     /** The entry a name resolves to in the compiled schema -- an injected one included. */
-    private static TypeDefinition entry(TsonCompiledSchema compiled, String name) {
-        TypeDefinition definition = compiled.schema().entries().get(name);
+    private static Top entry(TsonCompiledSchema compiled, String name) {
+        Top definition = compiled.schema().entries().get(name);
         assertNotNull(definition, () -> "no entry '" + name + "' among " + compiled.schema().entries().keySet());
         return definition;
     }
@@ -87,12 +87,12 @@ class NestedContainerTest {
     void aTuplePositionHoldingASizedArrayResolvesCompilesAndReads() {
         TsonCompiledSchema compiled = compile("  grid => [[integer; 2], text]");
 
-        TupleBody outer = assertInstanceOf(TupleBody.class, entry(compiled, "grid").body());
+        TupleBody outer = assertInstanceOf(TupleBody.class, entry(compiled, "grid"));
         assertFalse(outer.elements().get(0).voidable());
         assertEquals(TypeRef.of("text"), outer.elements().get(1).elementType());
 
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
-                entry(compiled, outer.elements().get(0).elementType().name()).body());
+                entry(compiled, outer.elements().get(0).elementType().name()));
         assertEquals(TypeRef.of("integer"), inner.elementType());
         assertEquals(Optional.of(BigInteger.TWO), inner.minItems());
         assertEquals(Optional.of(BigInteger.TWO), inner.maxItems());
@@ -118,9 +118,9 @@ class NestedContainerTest {
     void aSizedArrayOverANestedArrayResolvesCompilesAndReads() {
         TsonCompiledSchema compiled = compile("  rows => [[integer]; 3]");
 
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "rows").body());
+        ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "rows"));
         assertEquals(Optional.of(new BigInteger("3")), outer.minItems());
-        ArrayBody inner = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().name()).body());
+        ArrayBody inner = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().name()));
         assertEquals(TypeRef.of("integer"), inner.elementType());
         assertEquals(Optional.empty(), inner.maxItems(), "the inner array is unconstrained");
 
@@ -143,7 +143,7 @@ class NestedContainerTest {
                   flat     => [integer]
                   holder   => { r: rows  cells: [integer] }""");
 
-        ArrayBody rows = assertInstanceOf(ArrayBody.class, entry(compiled, "rows").body());
+        ArrayBody rows = assertInstanceOf(ArrayBody.class, entry(compiled, "rows"));
         List<String> arrayEntries = compiled.schema().entries().keySet().stream()
                 .filter(name -> name.startsWith("array_integer_")).toList();
         assertEquals(List.of(rows.elementType().name()), arrayEntries,
@@ -162,7 +162,7 @@ class NestedContainerTest {
                   triple => [integer?; 3]
                   strict => [integer; 3]""");
 
-        ArrayBody body = assertInstanceOf(ArrayBody.class, entry(compiled, "triple").body());
+        ArrayBody body = assertInstanceOf(ArrayBody.class, entry(compiled, "triple"));
         assertTrue(body.voidable());
         assertEquals(Optional.of(new BigInteger("3")), body.minItems());
 
@@ -172,7 +172,7 @@ class NestedContainerTest {
                 () -> compiled.get("triple").read(TestDocuments.document("[1 _]")))
                 .getMessage().contains("minimum 3"), "an absent element occupies a slot, it does not vacate one");
 
-        assertFalse(assertInstanceOf(ArrayBody.class, entry(compiled, "strict").body()).voidable(),
+        assertFalse(assertInstanceOf(ArrayBody.class, entry(compiled, "strict")).voidable(),
                 "the unmarked form keeps the vocabulary's own default, not voidable");
         assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("strict").read(TestDocuments.document("[1 _ 3]")))
@@ -194,9 +194,9 @@ class NestedContainerTest {
     void aThreeDeepNestingResolvesCompilesAndReads() {
         TsonCompiledSchema compiled = compile("  deep => [[[integer]]]");
 
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "deep").body());
-        ArrayBody middle = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().name()).body());
-        ArrayBody innermost = assertInstanceOf(ArrayBody.class, entry(compiled, middle.elementType().name()).body());
+        ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "deep"));
+        ArrayBody middle = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().name()));
+        ArrayBody innermost = assertInstanceOf(ArrayBody.class, entry(compiled, middle.elementType().name()));
         assertEquals(TypeRef.of("integer"), innermost.elementType());
 
         assertNotNull((TsonValue) compiled.get("deep").read(TestDocuments.document("[ [ [1 2] [3] ] [] ]")));

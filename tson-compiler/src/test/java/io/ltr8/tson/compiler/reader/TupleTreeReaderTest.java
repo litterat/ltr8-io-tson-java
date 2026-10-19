@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
@@ -30,12 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class TupleTreeReaderTest {
 
     private static TsonCompiledSchema compile(TupleBody body) {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), IntegerType.UNCONSTRAINED));
-        entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), TextType.UNCONSTRAINED));
-        entries.put("pair", TypeDefinition.product(body));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("integer", IntegerType.UNCONSTRAINED);
+        entries.put("text", TextType.UNCONSTRAINED);
+        entries.put("pair", body);
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);

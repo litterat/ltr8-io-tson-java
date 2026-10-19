@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.ArrayList;
@@ -29,20 +30,35 @@ import java.util.Optional;
  * <p>{@code within}/{@code excluding} are the schema's own {@code [value]?} (an optional array of
  * the kernel's untyped {@code value}) -- modeled as a bare, always-present {@code List<String>}
  * (never {@code Optional<List<T>>}, which {@code ltr8-bind} doesn't support -- the same reason
- * {@code TypeDefinition.supertypes}/{@code parameters} are bare lists too), carrying each CIDR-text
+ * every body's {@code supertypes}/{@code subtypes} are bare lists too), carrying each CIDR-text
  * network exactly as written, uninterpreted. Needs a defensive compact constructor -- confirmed
  * empirically, not assumed: a bare {@code List} field left absent from the wire data binds as Java
  * {@code null} (`ltr8-bind` has no auto-defaulting for a missing collection field), so the
  * constructor null-coalesces to {@link List#of()}.
  */
 @Typename(name = "cidr4_type")
-public record Cidr4Type(String spec, @Field("min_prefix") Optional<Integer> minPrefix,
+public record Cidr4Type(TypeChain chain,
+        String spec, @Field("min_prefix") Optional<Integer> minPrefix,
                          @Field("max_prefix") Optional<Integer> maxPrefix,
                          List<String> within, List<String> excluding) implements Atom {
 
+    @Record
+
     public Cidr4Type {
+        chain = TypeChain.orEmpty(chain);
         within = within != null ? List.copyOf(within) : List.of();
         excluding = excluding != null ? List.copyOf(excluding) : List.of();
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public Cidr4Type(String spec, Optional<Integer> minPrefix, Optional<Integer> maxPrefix, List<String> within,
+            List<String> excluding) {
+        this(TypeChain.EMPTY, spec, minPrefix, maxPrefix, within, excluding);
+    }
+
+    @Override
+    public Cidr4Type withChain(TypeChain chain) {
+        return new Cidr4Type(chain, spec, minPrefix, maxPrefix, within, excluding);
     }
 
     /** {@code cidr4 => !cidr4_type {}} -- the unconstrained IPv4 network, core.tn's own {@code !cidr4}. */

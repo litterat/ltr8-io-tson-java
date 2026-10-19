@@ -8,7 +8,7 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.util.ArrayList;
@@ -35,13 +35,13 @@ final class MapTreeReader extends MapAbstractReader<TsonValue> {
     public static final class Factory implements ValueReaderFactory {
 
         @Override
-        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
-            if (!(typeDefinition.body() instanceof MapBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition.body());
+            if (!(typeDefinition instanceof MapBody body)) {
+                throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition);
             }
-            return new MapTreeReader(name, EntryDisplayName.of(name, typeDefinition), body, resolver,
-                    context.locationOf(name, typeDefinition), AnnotationTypes.of(context),
+            return new MapTreeReader(name, context.displayName(name, typeDefinition), body, resolver,
+                    context.locationOf(name), AnnotationTypes.of(context),
                     keysAreNames(body, context));
         }
     }

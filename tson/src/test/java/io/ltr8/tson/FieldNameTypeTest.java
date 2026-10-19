@@ -265,9 +265,9 @@ class FieldNameTypeTest {
               labelled => node & { label: text }
               tightened => node ^ { "$ref": text }
             """));
-        assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) schema.schema().entries().get("labelled").body())
+        assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) schema.schema().entries().get("labelled"))
                 .nameTypeName());
-        assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) schema.schema().entries().get("tightened").body())
+        assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) schema.schema().entries().get("tightened"))
                 .nameTypeName());
     }
 
@@ -315,32 +315,27 @@ class FieldNameTypeTest {
     }
 
     /**
-     * The name type's inheritance is the record constructor's, not the {@code &} sugar's: the explicit
-     * {@code !record { supertypes: [...] }} takes its supertypes' type when it states none and is refused when it
-     * states another, and a template composing a base closes to the record its hand-written spelling is.
+     * A template composing a base closes to the record its hand-written spelling is, the base's name type
+     * included; and the chain is the resolver's, so the explicit {@code !record} cannot state one
+     * (SPEC-FEEDBACK.md #14) -- a record takes a name type from supertypes only through {@code &}.
      */
     @Test
-    void theRecordConstructorTakesItsSupertypesNameType() {
+    void aClosedTemplateTakesItsBasesNameTypeAndADeclarationWritesNoChain() {
         String explicit = schema("explicit", """
-                  json_name => !identifier_type { start_add: "@" }
-                  other => !identifier_type { start_add: "$" }
-                  json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
-                  n => !record { supertypes: [json_record]  fields: { "@id" => { type: text } } }
                   folded => !identifier_type { normalization: NFKC_CASEFOLD }
                   fbase => !record { name_type: folded  extension: ABSTRACT  fields: {} }
                   box => <T> fbase & { name: T }
                   b => box<text>
                 """);
-        assertEquals(List.of(), read(explicit, "explicit", "!n { \"@id\": \"x\" }"));
         assertEquals(List.of(), read(explicit, "explicit", "!b { NAME: \"x\" }"));
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
-                () -> Tson.standard().resolve(schema("restated", """
+                () -> Tson.standard().resolve(schema("written", """
                       json_name => !identifier_type { start_add: "@" }
-                      other => !identifier_type { start_add: "$" }
                       json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
-                      n => !record { name_type: other  supertypes: [json_record]  fields: {} }
+                      n => !record { chain: { supertypes: [json_record] }  fields: { "@id" => { type: text } } }
                     """)));
-        assertTrue(thrown.getMessage().contains("is not its supertypes' 'json_name'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("states 'chain', which a declaration never writes"),
+                thrown.getMessage());
     }
 
     /**

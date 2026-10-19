@@ -4,9 +4,10 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.reader.ErrorReader;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Type;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -114,13 +115,13 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
     private static Map<String, ReaderResolver> buildConstructors(
             TsonCompiledSchema compiledSchema, ValueReaderFactoryResolver resolver) {
         Map<String, ReaderResolver> constructors = new HashMap<>();
-        for (Map.Entry<String, TypeDefinition> entry : compiledSchema.schema().entries().entrySet()) {
+        for (Map.Entry<String, Top> entry : compiledSchema.schema().entries().entrySet()) {
             // Applicability is IS-A `top` ([TSON-SCHEMA] §4.1), the same predicate `DefinitionResolver`'s
             // own gate asks -- so a head that gate admits has a reader here, and one it refuses never
             // reaches this table. Wider than `constructor`, by the base kinds and `reference`; narrower
             // than the whole namespace, by every component record (`record_field`, `type_ref`, …), which
             // is a part of a type and not one.
-            if (!entry.getValue().supertypes().contains("top")) {
+            if (!compiledSchema.linkedSchema().isConstructor(entry.getKey(), entry.getValue())) {
                 continue;
             }
             String name = entry.getKey();

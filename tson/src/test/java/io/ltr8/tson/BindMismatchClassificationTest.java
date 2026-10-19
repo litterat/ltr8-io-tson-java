@@ -71,23 +71,22 @@ class BindMismatchClassificationTest {
     }
 
     /**
-     * {@code @data} names the kernel's own {@code data} base kind, which
-     * {@code MissingBindingException}'s Javadoc gives as an example of a type a consumer legitimately
-     * never binds -- mapped to a marker interface nothing can build. §6 puts an annotation written before the
-     * name on the <em>name</em> and one after the arrow on the <em>definition</em>, and both are one problem.
+     * {@code @data} names the kernel's own {@code data} base kind, which is abstract (SPEC-FEEDBACK.md #15): a
+     * value there names the subtype it is, so an untagged one is the author's error rather than a wiring
+     * problem -- a type nothing can build is never reached. §6 puts an annotation written before the name on
+     * the <em>name</em> and one after the arrow on the <em>definition</em>, and both are one problem.
      */
     @Test
-    void anUnboundAnnotationTypeIsAWiringProblemInEitherPosition() {
+    void anAnnotationTypedByAnAbstractBaseKindIsTheSameProblemInEitherPosition() {
         Diagnostic beforeTheName = only(ORDINARY_HEADER + "{\n@data:_ foo => text\n}\n");
         Diagnostic afterTheArrow = only(ORDINARY_HEADER + "{\nfoo => @data:_ text\n}\n");
 
-        assertEquals(Diagnostic.Code.BIND_MISMATCH, beforeTheName.code());
-        assertEquals(Diagnostic.Code.BIND_MISMATCH, afterTheArrow.code());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, beforeTheName.code(), beforeTheName::message);
         assertEquals(beforeTheName.code(), afterTheArrow.code(),
                 "the same annotation, moved across the arrow, is the same problem");
         for (Diagnostic d : List.of(beforeTheName, afterTheArrow)) {
             assertEquals("/foo", d.schemaPointer().orElseThrow(), "located at the declaration");
-            assertTrue(d.message().contains("'data' binds io.ltr8.tson.schema.meta.Data, which cannot be analysed"),
+            assertTrue(d.message().contains("no schema in this closure declares a subtype of 'data', and it is abstract"),
                     d::message);
         }
     }

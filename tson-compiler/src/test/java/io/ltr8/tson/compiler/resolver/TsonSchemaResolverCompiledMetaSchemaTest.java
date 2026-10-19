@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
@@ -17,8 +18,9 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.VoidType;
+import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -215,8 +217,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // turn carries meta-kernel's own entries, merged in via meta.tn's real !!import).
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
-        TypeDefinition voidDef = resolved.entries().get("void");
-        assertEquals(new VoidType(), voidDef.body());
+        Top voidDef = resolved.entries().get("void");
+        assertEquals(new VoidType(), voidDef);
     }
 
     @Test
@@ -247,11 +249,11 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonSchema resolved = resolver.resolveSchema(new TsonSchemaParser(KERNEL_GOVERNED_MARKS)
                 .parseSchemaDocument());
 
-        RecordBody pet = assertInstanceOf(RecordBody.class, resolved.entries().get("pet").body());
+        RecordBody pet = assertInstanceOf(RecordBody.class, resolved.entries().get("pet"));
         assertEquals(RecordExtensionType.ABSTRACT, pet.extension());
         assertEquals(List.of("pet_type"), pet.discriminators());
         assertEquals(List.of("pet_type"), pet.discriminators());
-        assertTrue(resolved.entries().get("pet").annotations().isEmpty(), "consumed, not preserved");
+        assertTrue(resolved.factsOf("pet").annotations().isEmpty(), "consumed, not preserved");
     }
 
     /** The check the marks bypass, shown still firing for a name that is not one. */
@@ -367,7 +369,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
         // Transitive, per SchemaResolver's own induction: direct supertype + its own supertype chain.
-        assertEquals(List.of("atom", "type", "top"), resolved.entries().get("my_type").supertypes());
+        assertEquals(List.of("atom", "chained", "top", "type"), Chained.supertypesOf(resolved.entries().get("my_type")));
         // Imported entries are visible during resolution but never part of the result itself.
         assertEquals(Set.of("my_type"), resolved.entries().keySet());
     }
@@ -438,7 +440,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         // The same entry set a genuinely registered meta-kernel has: the bootstrap desugars its own document,
         // so TsonSchemaLinker.linkBootstrap has nothing left to add. Never cached (see the next test).
-        assertEquals(68, compiled.schema().entries().size());
+        assertEquals(70, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
         assertNotNull(compiled.compiledSchema().get("integer_size")

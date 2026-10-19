@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.math.BigInteger;
@@ -24,10 +25,27 @@ import java.util.Optional;
  * ([TSON-SCHEMA] §7.5).
  */
 @Typename(name = "array")
-public record ArrayBody(@Field("element_type") TypeRef elementType, boolean voidable, boolean ordered,
+public record ArrayBody(TypeChain chain,
+        @Field("element_type") TypeRef elementType, boolean voidable, boolean ordered,
                          @Field("unique_items") boolean uniqueItems,
                          @Field("min_items") Optional<BigInteger> minItems,
                          @Field("max_items") Optional<BigInteger> maxItems) implements Product {
+    /** The chain normalised: absent and empty are one list. */
+    @Record
+    public ArrayBody {
+        chain = TypeChain.orEmpty(chain);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public ArrayBody(TypeRef elementType, boolean voidable, boolean ordered, boolean uniqueItems,
+            Optional<BigInteger> minItems, Optional<BigInteger> maxItems) {
+        this(TypeChain.EMPTY, elementType, voidable, ordered, uniqueItems, minItems, maxItems);
+    }
+
+    @Override
+    public ArrayBody withChain(TypeChain chain) {
+        return new ArrayBody(chain, elementType, voidable, ordered, uniqueItems, minItems, maxItems);
+    }
 
     /**
      * The unconstrained shape every built-in array uses before size refinement: not voidable, ordered, non-unique,

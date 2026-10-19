@@ -59,10 +59,10 @@ class ValueParamFixedFieldTest {
     /** The field of the entry {@code created} resolves to, following its alias hop to the instantiation. */
     private static RecordField statusOf(TsonLinkedSchema linked, String entry) {
         var definition = linked.schema().entries().get(entry);
-        if (definition.body() instanceof Reference alias) {
+        if (definition instanceof Reference alias) {
             definition = linked.schema().entries().get(alias.target().name());
         }
-        return ((RecordBody) definition.body()).fields().entrySet().stream()
+        return ((RecordBody) definition).fields().entrySet().stream()
                 .filter(field -> field.getKey().equals("status"))
                         .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
@@ -87,7 +87,7 @@ class ValueParamFixedFieldTest {
         TsonLinkedSchema linked = tson().resolve(SCHEMA);
 
         TemplateBody held = assertInstanceOf(TemplateBody.class,
-                linked.schema().entries().get("response").body());
+                linked.schema().entries().get("response"));
 
         assertEquals(List.of("T", "S"), held.parameterNames(), "the entry's own parameter list, as declared");
         assertEquals(List.of(TemplateParam.typeParameter("T"), new TemplateParam("S", TypeRef.of("int32"))),

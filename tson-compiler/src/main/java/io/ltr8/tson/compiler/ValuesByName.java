@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLoader;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.EnumBody;
@@ -18,7 +19,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.lang.reflect.InvocationTargetException;
@@ -53,11 +54,11 @@ import java.util.function.Consumer;
  * declared type is the constructor that built its body, a field's is its type, and a map value's is the map's value
  * type. Found first, judged after, never a choice among candidates.
  *
- * <p><b>An entry's constructor</b> is its {@code source} where that names a constructor of the declaring schema's
- * meta layer, and otherwise the kernel constructor its body mirrors ({@code @Typename}): a record declaration or a
- * composition is built by {@code record}, and {@code uuid => !uuid_type {}} by {@code uuid_type}. Each type is
- * looked up in the namespace of the meta layer that governs the schema declaring it, so an imported referent is
- * judged by its own meta's vocabulary and still compared by identity.
+ * <p><b>An entry's constructor</b> is its value's tag, as its facts record it, where that names a constructor of the
+ * declaring schema's meta layer, and otherwise the kernel constructor its body mirrors ({@code @Typename}): a record
+ * declaration or a composition is built by {@code record}, and {@code uuid => !uuid_type {}} by {@code uuid_type}.
+ * Each type is looked up in the namespace of the meta layer that governs the schema declaring it, so an imported
+ * referent is judged by its own meta's vocabulary and still compared by identity.
  *
  * <p><b>A selected value is reached through the body's record components -- an interim.</b> {@code data} is opaque
  * to the type system and its body the host's to interpret, so the hop into one goes through the host's object, and
@@ -72,15 +73,17 @@ import java.util.function.Consumer;
  */
 final class ValuesByName {
 
-    private final Map<String, TypeDefinition> merged;
+    private final Map<String, Top> merged;
+    private final Map<String, TsonSchema.EntryFacts> facts;
     private final Map<String, String> origins;
     private final String ownIdentity;
     private final TsonLinkedSchema governingMeta;
     private final TsonSchemaLoader loader;
 
-    ValuesByName(TsonSchema schema, Map<String, TypeDefinition> merged, Map<String, String> origins,
-                 TsonLinkedSchema governingMeta, TsonSchemaLoader loader) {
+    ValuesByName(TsonSchema schema, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
+                 Map<String, String> origins, TsonLinkedSchema governingMeta, TsonSchemaLoader loader) {
         this.merged = merged;
+        this.facts = facts;
         this.origins = origins;
         this.ownIdentity = CanonicalIdentity.canonicalize(schema.id());
         this.governingMeta = governingMeta;
@@ -90,7 +93,7 @@ final class ValuesByName {
     /** A type named in one meta layer's namespace: where its name is looked up, and the name. */
     private record Typed(TsonLinkedSchema space, String name) {
 
-        private Map<String, TypeDefinition> entries() {
+        private Map<String, Top> entries() {
             return space.schema().entries();
         }
 
@@ -98,7 +101,7 @@ final class ValuesByName {
             return ReferenceChain.terminal(name, entries());
         }
 
-        TypeDefinition definition() {
+        Top definition() {
             return entries().get(terminal());
         }
 
@@ -121,8 +124,8 @@ final class ValuesByName {
             if (identity().equals(target)) {
                 return true;
             }
-            TypeDefinition definition = definition();
-            return definition != null && definition.supertypes().stream()
+            Top definition = definition();
+            return definition != null && Chained.supertypesOf(definition).stream()
                     .anyMatch(supertype -> of(supertype).identity().equals(target));
         }
     }
@@ -131,9 +134,10 @@ final class ValuesByName {
      * Resolves and judges every reference by name the read collected from the body of local entry {@code entryName}
      * ({@link TsonSchema#valuesByName()}).
      */
-    void check(String entryName, TypeDefinition definition, List<TsonSchema.ValueByName> held,
+    void check(String entryName, Top definition, List<TsonSchema.ValueByName> held,
                Consumer<SchemaValidationException> refused) {
-        Typed constructor = constructorOf(definition, governingMeta);
+        Typed constructor = constructorOf(TsonSchemaLinker.constructorOf(entryName, definition, facts).orElseThrow(),
+                definition, governingMeta);
         for (TsonSchema.ValueByName value : held) {
             String where = "'" + entryName + "' at " + pointer(value.slot());
             try {
@@ -152,8 +156,7 @@ final class ValuesByName {
     private static Typed slotType(String where, Typed constructor, List<String> steps) {
         Typed at = constructor;
         for (String step : steps) {
-            TypeDefinition definition = at.definition();
-            Top body = definition == null ? null : definition.body();
+            Top body = at.definition();
             at = switch (body) {
                 case RecordBody record when record.fields().containsKey(step) ->
                         at.of(record.fields().get(step).type().name());
@@ -199,18 +202,19 @@ final class ValuesByName {
                     + "through, and a member is reached through its entry");
         }
         String terminal = ReferenceChain.terminal(head, merged);
-        TypeDefinition referent = merged.get(terminal);
+        Top referent = merged.get(terminal);
         if (referent == null) {
             throw new SchemaValidationException(where + " names '" + name + "', and the alias '" + head
                     + "' reaches no entry");
         }
         String entry = terminal.equals(head) ? "'" + head + "'" : "'" + head + "' (an alias of '" + terminal + "')";
-        if (referent.body() instanceof TemplateBody) {
+        if (referent instanceof TemplateBody) {
             throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is an open "
                     + "entry: a template denotes no value until it is applied (§5.10), so nothing is there to name");
         }
         TsonLinkedSchema declarersMeta = metaOf(terminal);
-        Typed at = constructorOf(referent, declarersMeta);
+        Typed at = constructorOf(TsonSchemaLinker.constructorOf(terminal, referent, facts).orElseThrow(), referent,
+                declarersMeta);
         if (segments.size() == 1) {
             if (!at.isA(slot)) {
                 throw new SchemaValidationException(where + " wants " + a(slot.name()) + ", and " + entry
@@ -219,15 +223,14 @@ final class ValuesByName {
             }
             return;
         }
-        if (!(referent.body() instanceof Data held)) {
+        if (!(referent instanceof Data held)) {
             throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a type: a "
                     + "type entry admits no further segment, so '" + segments.get(1) + "' selects in no value");
         }
         Object value = held;
         String reached = head;
         for (String segment : segments.subList(1, segments.size())) {
-            TypeDefinition definition = at.definition();
-            Top body = definition == null ? null : definition.body();
+            Top body = at.definition();
             switch (body) {
                 case RecordBody record -> {
                     RecordField field = record.fields().get(segment);
@@ -244,8 +247,8 @@ final class ValuesByName {
                     at = at.of(field.type().name());
                 }
                 case MapBody map -> {
-                    TypeDefinition keys = at.of(map.keyType().name()).definition();
-                    if (keys == null || !(keys.body() instanceof IdentifierType || keys.body() instanceof EnumBody)) {
+                    Top keys = at.of(map.keyType().name()).definition();
+                    if (!(keys instanceof IdentifierType || keys instanceof EnumBody)) {
                         throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
                                 + "' is a map keyed by '" + map.keyType().name() + "', whose keys are not names, "
                                 + "so it cannot be entered by name");
@@ -286,18 +289,16 @@ final class ValuesByName {
     }
 
     /**
-     * The constructor that built {@code definition}'s body: its {@code source} where that names a constructor in
-     * {@code meta}'s namespace, and otherwise the kernel constructor the body's class mirrors.
+     * The constructor that built {@code definition}'s body: its tag where that names a constructor in {@code meta}'s
+     * namespace, and otherwise the kernel constructor the body's class mirrors.
      */
-    private static Typed constructorOf(TypeDefinition definition, TsonLinkedSchema meta) {
-        if (definition.source().isPresent() && definition.source().get().arguments().isEmpty()) {
-            Typed source = new Typed(meta, definition.source().get().name());
-            TypeDefinition constructor = source.definition();
-            if (constructor != null && constructor.supertypes().contains("top")) {
-                return source;
-            }
+    private static Typed constructorOf(String tag, Top definition, TsonLinkedSchema meta) {
+        Typed source = new Typed(meta, tag);
+        Top constructor = source.definition();
+        if (constructor != null && meta.isConstructor(tag, constructor)) {
+            return source;
         }
-        return new Typed(meta, TsonCompiledMetaSchema.typenameOf(definition.body()));
+        return new Typed(meta, TsonCompiledMetaSchema.typenameOf(definition));
     }
 
     /** The value of field {@code name} of {@code value}, through its record component; {@code null} if absent. */

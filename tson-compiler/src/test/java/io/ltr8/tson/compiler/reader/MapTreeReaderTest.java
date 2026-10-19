@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonVoid;
@@ -33,14 +33,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** End-to-end proof of {@link MapTreeReader} against real TSON data source text. */
 class MapTreeReaderTest {
 
-    private static TypeDefinition integerEntry() {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(), List.of(), IntegerType.UNCONSTRAINED);
+    private static Top integerEntry() {
+        return IntegerType.UNCONSTRAINED;
     }
 
     private static TsonCompiledSchema compile(MapBody body) {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("integer", integerEntry());
-        entries.put("scores", TypeDefinition.product(body));
+        entries.put("scores", body);
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);

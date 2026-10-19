@@ -13,9 +13,8 @@ import java.util.Objects;
  * name_type} its members are drawn from, an identifier family, and the {@code members} it lists. Backs {@code
  * boolean} ({@code [true false]}), the kernel's own internal enumerations ({@code product_access_type}, {@code
  * field_role}, ...), and every {@code !enum [...]} and {@code !enum_type { ... }} instance, including those of a
- * meta layer's own {@code enum_type} tightenings. Kept as an ordered {@code List}, matching how {@link
- * TypeDefinition#supertypes} represents a conceptual set -- member order is preserved for deterministic output,
- * not semantically significant.
+ * meta layer's own {@code enum_type} tightenings. Kept as an ordered {@code List}, as the IS-A chain every {@link
+ * Type} carries is -- member order is preserved for deterministic output, not semantically significant.
  *
  * <p><b>Members are held as text whatever {@code name_type} is</b>, so every enum is this one shape. What it
  * decides -- that each member is a value of it, distinct under its equality, and the profile its members are
@@ -24,15 +23,27 @@ import java.util.Objects;
  * over its field names.
  */
 @Typename(name = "enum")
-public record EnumBody(@Field("name_type") String nameType, List<String> members) implements Atom {
+public record EnumBody(TypeChain chain,
+        @Field("name_type") String nameType, List<String> members) implements Atom {
 
     /** The name type {@code enum} pins: an enumeration of identifiers. */
     public static final String IDENTIFIER = "identifier";
 
     @Record
     public EnumBody {
+        chain = TypeChain.orEmpty(chain);
         Objects.requireNonNull(nameType, "nameType");
         members = List.copyOf(members);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public EnumBody(String nameType, List<String> members) {
+        this(TypeChain.EMPTY, nameType, members);
+    }
+
+    @Override
+    public EnumBody withChain(TypeChain chain) {
+        return new EnumBody(chain, nameType, members);
     }
 
     /** An enumeration of identifiers -- {@code !enum [...]} -- for the callers that build one and say nothing else. */

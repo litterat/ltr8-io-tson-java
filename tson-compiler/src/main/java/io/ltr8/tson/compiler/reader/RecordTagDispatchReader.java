@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.EventSkip;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -47,12 +48,17 @@ final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumpti
     private final TsonTypeReaderResolver readerFor;
     private final RecordExtensionDiagnostics extension;
 
-    RecordTagDispatchReader(Set<String> selfNames, String displayName, Set<String> subtypes,
+    /**
+     * @param subtypes every name a tag may spell to select a member, aliases included
+     * @param named    what a refusal names as satisfying the position: the subtypes that have instances of their
+     *                 own, an abstract one being no answer
+     */
+    RecordTagDispatchReader(Set<String> selfNames, String displayName, Set<String> subtypes, List<String> named,
                              TsonTypeReaderResolver readerFor) {
         this.selfNames = Set.copyOf(selfNames);
         this.subtypes = subtypes;
         this.readerFor = readerFor;
-        this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
+        this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", named));
     }
 
     @Override

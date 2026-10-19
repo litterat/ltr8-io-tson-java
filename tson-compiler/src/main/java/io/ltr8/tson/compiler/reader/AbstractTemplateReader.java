@@ -5,7 +5,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.List;
 import java.util.Set;
@@ -44,16 +44,14 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
     private final TsonTypeReader<Object> dispatcher;
 
     @SuppressWarnings("unchecked")
-    public AbstractTemplateReader(String name, TypeDefinition definition, ValueReaderContext context,
+    public AbstractTemplateReader(String name, Top definition, ValueReaderContext context,
                                    TsonTypeReaderResolver readers) {
-        TemplateBody held = (TemplateBody) definition.body();
+        TemplateBody held = (TemplateBody) definition;
         held.extension().orElseThrow(() -> new IllegalStateException(
                 "'" + name + "' is not a family base: only a template carrying `extension` dispatches, and "
                         + "OpenTemplateReader is what every other template compiles to (§5.10)"));
-        // Reported under the template's own name, never the application its `source` records: a marked
-        // template keeps the `source` of whatever it composed, and EntryDisplayName renders that in
-        // preference to a name it takes for derived. The author wrote this one, which is the whole point of
-        // the template being the base -- naming `pet_base<…>` would name something the schema never declares.
+        // Reported under the template's own name: the author wrote this one, which is the whole point of the
+        // template being the base -- naming `pet_base<…>` would name something the schema never declares.
         Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
 
         this.dispatcher = (TsonTypeReader<Object>) (FamilySelectors.dispatchesOnMembers(definition)
@@ -62,10 +60,11 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
                 // from any member, and handed to the same dispatcher a closed base uses: one dispatch, two
                 // sources for its inputs.
                 ? new RecordMemberDispatchReader(selfNames, name,
-                        FamilySelectors.of(definition, context.schema().entries()),
-                        Set.copyOf(definition.subtypes()), context, readers)
+                        FamilySelectors.of(name, definition, context.schema().entries()),
+                        Set.copyOf(context.subtypesOf(name, definition)), context, readers)
                 : new RecordTagDispatchReader(selfNames, name,
-                        Subsumption.admitting(definition.subtypes(), context.namesMeaning()), readers));
+                        Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning()),
+                        context.instantiableSubtypesOf(name, definition), readers));
     }
 
     @Override

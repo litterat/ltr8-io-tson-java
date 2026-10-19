@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=97a563ace4f0d2ae6303c84d050b527cf28db4ea5b7255e1149f723875157c01"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=670ce4dae260ac420be5bb1a1db1ec39fd1ea2e2273fe632e200b0158a1f4481"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -15,39 +15,73 @@
   """
 {
   @doc:"""
-    The structural root. Every constructor transitively IS-A `atom`, `product`,
-    `sum` or `data`, except `reference` and `template`, which compose with
-    `top` directly. `atom`, `product` and `sum` IS-A `type`, which IS-A `top`;
-    `data` IS-A `top` alone. Construction transfers kind, not IS-A, so
-    instances and fresh records sit under the kinds without supertypes.
+    The structural root, and what a schema map's entries are: `schema` maps a
+    name to a `top`, an entry being its value. Every constructor transitively
+    IS-A `atom`, `product`, `sum` or `data`, except `reference` and `template`,
+    which compose with `top` directly. `atom`, `product` and `sum` IS-A `type`,
+    which IS-A `top`; `data` IS-A `top` alone. Construction transfers kind, not
+    IS-A, so instances and fresh records sit under the kinds with empty chains.
+    `top` and the five kinds beneath it are abstract: none has instances of
+    its own, so a direct application of one is refused as any abstract
+    record's is, naming the subtypes that would satisfy it.
     """
-  top       => {}
+  top       => abstract {}
+
+  @doc:"""
+    Where an entry sits in the IS-A order. `parents` is what was written: the
+    parents of held template text, one of which may be an application (`<T>
+    result<T> & { ... }`), and of a family-base template after it closes; it is
+    the only list that ever holds an application. `supertypes` is the closed
+    chain: every entry this one IS-A, complete to a fixed point through applied
+    parents ([TSON-SCHEMA] §5.8), each a bare name, sorted, and empty for a
+    fresh record, an instance and a subtracted record alike. `subtypes` is the
+    inverse, over the entries of this map only ([TSON-SCHEMA] §3.3.4).
+    """
+  type_chain => {
+    parents?:    [type_ref]
+    supertypes?: [type_name]
+    subtypes?:   [type_name]
+  }
+
+  @doc:"""
+    A value that carries an IS-A chain: `type` and `template` compose it. A
+    declaration never writes `chain`, and a constructor never declares a field
+    of that name: the resolver computes the chain from composition and
+    refinement and the linker inverts it. On ingest it is read as stated and
+    never recomputed, because a flat body and its chain cannot be recomputed
+    from each other.
+    """
+  chained => {
+    chain?: type_chain
+  }
 
   @doc:"""
     The kind of kinds that describe the shape of a data value: `atom`,
     `product` and `sum` IS-A `type`, and nothing else does. An entry whose
-    body IS-A `type` is a type; one whose body IS-A `data` is not.
+    value is a body whose constructor IS-A `type` is a type; one whose
+    constructor composes `data` is not, and neither is a `reference` or a
+    `template`, which compose `top`. A type carries its IS-A chain.
     """
-  type      => top & {}
+  type      => abstract top & chained & {}
 
   @doc:"""
     The kind of a scalar: a value written as one token, which its atom family
     reads into a value.
     """
-  atom      => type & {}
+  atom      => abstract type & {}
 
   @doc:"""
     The kind of a compound value of parts: a record, an array, a map or a tuple.
     `access_pattern` says whether a part is reached by position or by name, and
     `size_type` whether the number of parts is fixed by the type.
     """
-  product   => type & {
+  product   => abstract type & {
     access_pattern: product_access_type
     size_type:      product_size_type
   }
 
   @doc:"The kind of a value that is one of several types: a choice or a scope."
-  sum       => type & {}
+  sum       => abstract type & {}
 
   @doc:"""
     The body of an entry that describes something other than an atom, product,
@@ -58,7 +92,7 @@
     An entry whose body IS-A data is declared by its schema but is not a type:
     naming one where a type is expected is a resolver error.
     """
-  data      => top & {}
+  data      => abstract top & {}
 
   @doc:"""
     Aliasing body — the entry `target` names. `target` is a type_ref, so a
@@ -116,13 +150,17 @@
     `min_items: N` as readily as `element_type: T` — so a body carrying one is
     not typed by any constructor's own record shape until it closes.
 
-    An open entry's body is this, and `type_definition.body` is a `top` with no
-    exception. What is compared is the parsed form and never the text: an open
+    An open entry's value is this, a `top` like every other entry's. What is
+    compared is the parsed form and never the text: an open
     synthetic's identity is derived from its held binding record, so two
     spellings of one form must reduce to one entry, and whitespace is free.
 
-    Composes with `top` directly, like `reference` and `data`: it describes no
-    value's shape, and nothing is ever typed by it.
+    Composes `top` and `chained`: it describes no value's shape and nothing is
+    typed by it as a whole, but a record template is the ABSTRACT base its
+    members are IS-A, so it carries a chain. Its `parents` are written and kept
+    after it closes; its `supertypes` are the closed entries those parents
+    reach, a template parent contributing its own ancestors and not itself; its
+    `subtypes` are its members and the entries IS-A it.
 
     `extension` is the **parent's**, and only a record-bodied template has one:
     absent means this template is no type, so naming it at a type position is an
@@ -138,7 +176,7 @@
     by the tag where it is not. Its names are text, as `record.discriminators`'
     are, each a value of the base's name type.
     """
-  template => top & {
+  template => top & chained & {
     parameters:      [template_param]
     template:        text
     extension?:      record_extension_type
@@ -457,18 +495,18 @@
 
     Every application denotes an entry ([TSON-SCHEMA] §8.2): a sugar form lifts
     to a synthetic entry, closed or open per the lift rule ([TSON-SCHEMA] §5.3),
-    and a fully-bound application of a template denotes an instantiation entry —
-    the applied form recorded in its `source`, the substituted binding record
-    its body, headed by the applied constructor. A declaration whose body is
+    and a fully-bound application of a template denotes an instantiation entry,
+    whose value is the substituted binding record, headed by the applied
+    constructor. A declaration whose body is
     that application *is* the entry, closed in place under the author's name,
     and a use site resolves to it where one exists; only an application no
     declaration names mints an internally named entry, and a declared name is
     the one a consumer keys on ([TSON-SCHEMA] §8.2). An application standing at
     a composition operand is subsumed there and mints nothing ([TSON-SCHEMA]
     §5.8). A use site holds a bare reference to its entry, so `arguments`
-    appears only where an application is still open — inside template bodies, in
-    an alias's `reference.target`, and in `source` provenance — and means "an
-    application", nothing else. Minted entry names are internal —
+    appears only where an application is still open — inside template bodies and
+    in an alias's `reference.target` — and means "an application", nothing
+    else. Minted entry names are internal —
     implementation-chosen and non-normative, since a minted entry's identity is
     its canonical content ([TSON-SCHEMA] §8.2). A closed entry — one whose body
     is not a `!template` — contains no parameter references at any depth
@@ -515,8 +553,8 @@
     onto or refined. ABSTRACT has no instances of its own, so a value at a
     position typed by it is a value of some subtype. FINAL has instances and
     admits no subtype: no composition or refinement may name it as a source.
-    Subtraction stays admissible against a FINAL record — §5.9 empties
-    `supertypes` and mints no IS-A edge, which is the only thing FINAL
+    Subtraction stays admissible against a FINAL record — a subtracted record's
+    chain is empty, so it mints no IS-A edge, which is the only thing FINAL
     constrains.
 
     **How a subtype is selected is no part of this enum.** An ABSTRACT record
@@ -562,6 +600,20 @@
     at its schema-map key (§8.2).
     """
   synthetic => @annotation void
+
+  @doc:"""
+    Resolver-attached and derived: on an entry's schema-map key, the
+    application the entry is the instantiation of ([TSON-SCHEMA] §8.2). An
+    entry of any kind can be one, so it is a fact about the entry and not
+    about a type: the resolver writes it wherever an entry closes an
+    application — a record-bodied template's member, a DATA entry, the alias a
+    non-record template's application closes to. On ingest it is read as
+    stated, unlike `synthetic`, which is recomputed: it is the one fact the
+    entry's value does not state, and what lets an imported schema's
+    instantiations unify with a later schema's. A declaration never writes
+    it, as it never writes `chain`.
+    """
+  application => @annotation type_ref
 
   @doc:"""
     Supporting records. A record field is the four facts a reader consults:
@@ -660,16 +712,15 @@
     record-bodied template carries the parent's, always ABSTRACT, as `template`
     says.
 
-    `supertypes` holds type_ref: a supertype may be written as an application,
-    and inside a held template body a parent may still be open —
-    `<T> result<T> & { ... }`. It is substituted and closed with every other
-    reference the body holds, so `ok<text>` reaches an IS-A edge to
-    `result<text>` and not to `result<int32>`. A closed supertype carries no
-    arguments and is written as a bare token. The derived index
-    `type_definition.supertypes` is type_name: it is computed once every parent
-    is closed and names an entry. A record-bodied template is such an entry, the
-    ABSTRACT family base its members are IS-A; a template with no `extension`
-    is not a type and never stands there ([TSON-SCHEMA] §5.10).
+    Its chain is `type`'s. Inside a held template body a parent may still be
+    open — `<T> result<T> & { ... }` — and it is substituted and closed with
+    every other reference the body holds, so `ok<text>` reaches an IS-A edge to
+    `result<text>` and not to `result<int32>`. A record-bodied template is the
+    ABSTRACT family base its members are IS-A, each member's chain naming it; a
+    template with no `extension` is not a type and never stands there
+    ([TSON-SCHEMA] §5.10). `fields` is flattened: a composition's fields are its
+    operands' and its own, merged, so a consumer that reads values against it
+    never repeats the merge.
 
     `discriminators` names the fields this record's members are selected by, in
     the order their pins are compared as a tuple, and its presence is what makes
@@ -695,7 +746,6 @@
     fields:          field_map
     groups?:         [field_group]
     extension?:      record_extension_type ~ OPEN
-    supertypes?:     [type_ref]
     discriminators?: [text; 1..]
     name_type?:      type_name
   }
@@ -819,14 +869,10 @@
   }
 
   @doc:"""
-    Resolver output — what every entry of a schema map resolves to.
+    Resolver output: a schema map, from each name to the value its entry
+    resolves to. Resolved output and source are one grammar — output is source
+    with sugar expanded, bodies flattened and chains computed, and an entry
+    written as a constructor application resolves to itself.
     """
-  type_definition => {
-    source?:      type_ref
-    supertypes?:  [type_name]
-    subtypes?:    [type_name]
-    body:         top
-  }
-
-  schema => {type_name => type_definition}
+  schema => {type_name => top}
 }

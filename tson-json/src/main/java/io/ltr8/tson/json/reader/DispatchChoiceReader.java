@@ -7,9 +7,11 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.Type;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,9 +45,9 @@ import java.util.Optional;
 final class DispatchChoiceReader implements JsonTypeReader<Object> {
 
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
-        ChoiceBody body = (ChoiceBody) definition.body();
-        return new DispatchChoiceReader(EntryDisplayName.of(name, definition, context.schema().entries()), body,
-                context, context.locationOf(name, definition));
+        ChoiceBody body = (ChoiceBody) definition;
+        return new DispatchChoiceReader(EntryDisplayName.of(name, context.schema()), body,
+                context, context.locationOf(name));
     };
 
     private final String name;
@@ -81,7 +83,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         for (TypeRef variant : body.variants()) {
             JsonTypeReader<?> reader = context.readers().resolve(variant.name());
             ReferenceChain.terminal(context.schema(), variant.name())
-                    .ifPresent(resolved -> context.admitting(resolved.definition().subtypes())
+                    .ifPresent(resolved -> context.admitting(Chained.subtypesOf(resolved.definition()))
                             .forEach(subtype -> table.putIfAbsent(subtype, routeBelow(reader, subtype))));
         }
         this.routes = Map.copyOf(table);

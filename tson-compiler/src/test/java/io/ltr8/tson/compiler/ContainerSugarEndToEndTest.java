@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.ParseException;
@@ -13,10 +14,11 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TemplateBody;
 
 import java.math.BigInteger;
 
@@ -71,8 +73,8 @@ class ContainerSugarEndToEndTest {
     }
 
     /** The entry a field's type names, which every fixture here reaches the injected declaration through. */
-    private static TypeDefinition fieldTypeEntry(TsonCompiledSchema compiled, String record, String field) {
-        RecordBody body = (RecordBody) compiled.schema().entries().get(record).body();
+    private static Top fieldTypeEntry(TsonCompiledSchema compiled, String record, String field) {
+        RecordBody body = (RecordBody) compiled.schema().entries().get(record);
         String name = body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
                 .type().name();
@@ -85,9 +87,9 @@ class ContainerSugarEndToEndTest {
      * denotes should not also be asserting on the length of the chain to it.
      */
     private static Top bodyOf(TsonCompiledSchema compiled, String name) {
-        Top body = compiled.schema().entries().get(name).body();
+        Top body = compiled.schema().entries().get(name);
         while (body instanceof Reference reference) {
-            body = compiled.schema().entries().get(reference.target().name()).body();
+            body = compiled.schema().entries().get(reference.target().name());
         }
         return body;
     }
@@ -97,7 +99,7 @@ class ContainerSugarEndToEndTest {
     void aMapTypedFieldReadsRealData() {
         TsonCompiledSchema compiled = compile("  holder => { entries: {text => text} }");
 
-        MapBody body = assertInstanceOf(MapBody.class, fieldTypeEntry(compiled, "holder", "entries").body());
+        MapBody body = assertInstanceOf(MapBody.class, fieldTypeEntry(compiled, "holder", "entries"));
         assertEquals(TypeRef.of("text"), body.keyType());
         assertEquals(TypeRef.of("text"), body.valueType());
 
@@ -123,12 +125,12 @@ class ContainerSugarEndToEndTest {
                   box => <T> { v: T }
                   u   => ( box<text> | int32 )""");
 
-        ChoiceBody choice = assertInstanceOf(ChoiceBody.class, compiled.schema().entries().get("u").body());
+        ChoiceBody choice = assertInstanceOf(ChoiceBody.class, compiled.schema().entries().get("u"));
         String variant = choice.variants().getFirst().name();
         assertTrue(variant.startsWith("box_text_"), () -> "names the instantiation, not 'box': " + variant);
         assertEquals(List.of(), choice.variants().getFirst().arguments(),
                 "and names it as a closed reference, the application having been rewritten");
-        assertInstanceOf(RecordBody.class, compiled.schema().entries().get(variant).body());
+        assertInstanceOf(RecordBody.class, compiled.schema().entries().get(variant));
     }
 
     /** The tuple half of the same rule: {@code elements} is a collection of {@code tuple_element} records. */
@@ -138,7 +140,7 @@ class ContainerSugarEndToEndTest {
                   box => <T> { v: T }
                   t   => [text, box<text>]""");
 
-        TupleBody tuple = assertInstanceOf(TupleBody.class, compiled.schema().entries().get("t").body());
+        TupleBody tuple = assertInstanceOf(TupleBody.class, compiled.schema().entries().get("t"));
         assertEquals(TypeRef.of("text"), tuple.elements().getFirst().elementType());
         String second = tuple.elements().get(1).elementType().name();
         assertTrue(second.startsWith("box_text_"), () -> "names the instantiation: " + second);
@@ -215,12 +217,12 @@ class ContainerSugarEndToEndTest {
     @Test
     void aSetCarriesItsOwnTightenedDefaultsNotArrays() {
         ArrayBody asSet = assertInstanceOf(ArrayBody.class,
-                compile("  xs => !set_type { element_type: text }").schema().entries().get("xs").body());
+                compile("  xs => !set_type { element_type: text }").schema().entries().get("xs"));
         assertFalse(asSet.ordered());
         assertTrue(asSet.uniqueItems());
 
         ArrayBody asArray = assertInstanceOf(ArrayBody.class,
-                compile("  xs => [text]").schema().entries().get("xs").body());
+                compile("  xs => [text]").schema().entries().get("xs"));
         assertTrue(asArray.ordered());
         assertFalse(asArray.uniqueItems());
     }
@@ -237,16 +239,17 @@ class ContainerSugarEndToEndTest {
                   tag_list => [text; 1..2]
                   holder => { tags: tag_list }""");
 
-        TypeDefinition entry = compiled.schema().entries().get("tag_list");
-        assertEquals(TypeKind.PRODUCT, entry.kind(), "the constructor's kind");
-        assertEquals(List.of(), entry.parameters(), "closed -- §5.10");
-        assertEquals(List.of(), entry.supertypes(),
+        Top entry = compiled.schema().entries().get("tag_list");
+        assertEquals(TypeKind.PRODUCT, TypeKind.of(entry, n -> true), "the constructor's kind");
+        assertEquals(List.of(), TemplateBody.parameterNamesOf(entry), "closed -- §5.10");
+        assertEquals(List.of(), Chained.supertypesOf(entry),
                 "empty: this is a construction of `array`, and a constructor is not a supertype");
-        assertEquals(TypeRef.of("array"), entry.source().orElseThrow(), "the constructor the sugar names");
+        assertEquals(Optional.of("array"), compiled.schema().constructorOf("tag_list"),
+                "the constructor the sugar names");
 
         // !array { element_type: text  min_items: 1  max_items: 2 } -- only the fields the form binds; the
         // vocabulary's own defaults (state/ordered/unique_items) stay out of the binding record (§5.6).
-        ArrayBody body = assertInstanceOf(ArrayBody.class, entry.body());
+        ArrayBody body = assertInstanceOf(ArrayBody.class, entry);
         assertEquals(TypeRef.of("text"), body.elementType());
         assertEquals(Optional.of(BigInteger.ONE), body.minItems());
         assertEquals(Optional.of(BigInteger.TWO), body.maxItems());
@@ -255,10 +258,11 @@ class ContainerSugarEndToEndTest {
     /** The map tier takes the same specifier, binding the same two fields on {@code map} instead. */
     @Test
     void aSizedMapBindsTheSameTwoFields() {
-        TypeDefinition entry = compile("  index => {text => text; 1..2}").schema().entries().get("index");
+        TsonCompiledSchema compiled = compile("  index => {text => text; 1..2}");
+        Top entry = compiled.schema().entries().get("index");
 
-        assertEquals(TypeRef.of("map"), entry.source().orElseThrow());
-        MapBody body = assertInstanceOf(MapBody.class, entry.body());
+        assertEquals(Optional.of("map"), compiled.schema().constructorOf("index"));
+        MapBody body = assertInstanceOf(MapBody.class, entry);
         assertEquals(Optional.of(BigInteger.ONE), body.minItems());
         assertEquals(Optional.of(BigInteger.TWO), body.maxItems());
     }
@@ -276,9 +280,9 @@ class ContainerSugarEndToEndTest {
                   triple => [text; 3]""");
 
         for (String name : List.of("id_list", "tag_list", "triple")) {
-            TypeDefinition entry = compiled.schema().entries().get(name);
-            assertInstanceOf(ArrayBody.class, entry.body(), name);
-            assertEquals(List.of(), entry.supertypes(), name);
+            Top entry = compiled.schema().entries().get(name);
+            assertInstanceOf(ArrayBody.class, entry, name);
+            assertEquals(List.of(), Chained.supertypesOf(entry), name);
         }
     }
 
@@ -430,9 +434,9 @@ class ContainerSugarEndToEndTest {
                   box => <T> { v: [T] }
                   holder => { b: box<text> }""");
 
-        RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b").body());
+        RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b"));
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(box.fields().values().stream().toList().get(0).type().name()).body());
+                .get(box.fields().values().stream().toList().get(0).type().name()));
 
         assertEquals(TypeRef.of("text"), array.elementType());
     }
@@ -449,8 +453,8 @@ class ContainerSugarEndToEndTest {
                   box    => <T> { v: [T] }
                   holder => { b: box<text>  direct: [text] }""");
 
-        RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b").body());
-        RecordBody holder = (RecordBody) compiled.schema().entries().get("holder").body();
+        RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b"));
+        RecordBody holder = (RecordBody) compiled.schema().entries().get("holder");
 
         assertEquals(holder.fields().values().stream().toList().get(1).type().name(),
                 box.fields().values().stream().toList().get(0).type().name());
@@ -479,7 +483,7 @@ class ContainerSugarEndToEndTest {
                   use    => outer<text>
                   direct => { d: [box<text>] }""");
 
-        String direct = ((RecordBody) compiled.schema().entries().get("direct").body())
+        String direct = ((RecordBody) compiled.schema().entries().get("direct"))
                 .fields().sequencedValues().getFirst().type().name();
         String closed = ((RecordBody) bodyOf(compiled, "use")).fields().sequencedValues().getFirst().type().name();
 
@@ -504,9 +508,9 @@ class ContainerSugarEndToEndTest {
                   box    => <T> { v: T }
                   direct => { d: [box<text>] }""");
 
-        String array = ((RecordBody) compiled.schema().entries().get("direct").body())
+        String array = ((RecordBody) compiled.schema().entries().get("direct"))
                 .fields().sequencedValues().getFirst().type().name();
-        String element = ((ArrayBody) compiled.schema().entries().get(array).body()).elementType().name();
+        String element = ((ArrayBody) compiled.schema().entries().get(array)).elementType().name();
 
         assertTrue(array.contains(element),
                 () -> "'" + array + "' should be derived from its element entry '" + element + "'");
@@ -527,8 +531,8 @@ class ContainerSugarEndToEndTest {
             // The closure is a real body of the constructor the sugar names, not a deferred anything -- and
             // it is `use` itself, a declaration naming an application being that instantiation (#15).
             RecordBody closed = assertInstanceOf(RecordBody.class,
-                    compiled.schema().entries().get("use").body(), body);
-            Top variant = compiled.schema().entries().get(closed.fields().sequencedValues().getFirst().type().name()).body();
+                    compiled.schema().entries().get("use"), body);
+            Top variant = compiled.schema().entries().get(closed.fields().sequencedValues().getFirst().type().name());
             assertTrue(variant instanceof ChoiceBody || variant instanceof TupleBody,
                     () -> body + " closed to " + variant);
         }
