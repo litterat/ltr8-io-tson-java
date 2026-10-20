@@ -248,7 +248,9 @@ rest of the closure agrees with it.
   reach here: that import was refused when it linked, so judging the whole closure never re-reports one.
 - **Extending a family is a declaration.** A record a use-site template application minted that composes onto
   another (`k: dog_of<text>`, or `dog_of<T>` in a template body) is refused, reported at the declaration that
-  wrote it (`reportedAgainst`). A member is what a read reports, a tag names and a binding maps, all by name,
+  wrote it. An expansion is refused where it is minted (`TemplateMaterialiser.refuseMintedMember`), since it
+  records no application to name it by; the instantiation entry a self-reaching expansion keeps is refused here
+  (`reportedAgainst`). A member is what a read reports, a tag names and a binding maps, all by name,
   and a minted name is unwritable (§8.2). It is also what keeps the content-derived duplicates of §8.2 harmless:
   two schemas minting one form hold two entries no value can tell apart, and with members declared, no duplicate
   is ever a family member, so none can collide. A minted member is skipped by the collision check, so one

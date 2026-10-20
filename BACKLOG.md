@@ -200,9 +200,9 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   exactly that when compiling for reading), and the target's reader carries the target's name — so a refusal at
   `day => date` says `date`. The schema *location* is already right, because the entry point seeds the root
   declaration (`JsonCompiledSchema.rootDeclaration`), but the name in the message is not. `tson-compiler` solves
-  it with `UseSite.named` over `EntryDisplayName`, which also renders a minted entry as the sugar or application
-  that produced it; this stack has no counterpart. Owed with the facade, which is what will seed the root for a
-  real read rather than a test doing it.
+  it with `UseSite.named` over `EntryDisplayName`, which also renders a minted entry as the sugar, the record body
+  or the application that produced it; this stack has no counterpart. Owed with the facade, which is what will seed
+  the root for a real read rather than a test doing it.
 
 - [ ] **No "can this type receive JSON" answer for a schema author.** Which of an author's types a JSON document can
   validate against is discoverable only by sending one and reading the failure. The facts that decide it are all
@@ -331,15 +331,15 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
   `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
   `NOT_IMPLEMENTED` diagnostic carries. `resolveTypeRef`'s, for a sugar form that reaches resolution unlifted, offers two
-  causes -- the desugar phase was skipped, "or a position inside it is an application, which has no entry to name until
-  it is materialised" -- and the second is not one: a container position holding an application (`[box<text>]`) lifts,
-  its slot written in `type_ref`'s record form and rewritten to the instantiation entry at materialisation. The comment
-  above the throw says the same. `resolveTypeDef`'s fall-through lists what is "resolved so far" -- six shapes, where the
-  method dispatches on everything §12.1's `type-def` produces -- so it reads as a feature gap where the only way to
-  reach it is a `TypeDef` subclass the dispatch was never taught, an internal fault. What constrains the fix is the
+  causes -- the desugar phase was skipped, "or a position inside it is an application, which has no entry to name until it is
+  materialised" -- and the second is not one: a container position holding an application (`[box<text>]`) lifts, its slot
+  written in `type_ref`'s record form and rewritten to the entry its expansion lands on at materialisation. The comment above
+  the throw says the same. `resolveTypeDef`'s fall-through lists what is "resolved so far" -- six shapes, where the method
+  dispatches on everything §12.1's `type-def` produces -- so it reads as a feature gap where the only way to reach it is a
+  `TypeDef` subclass the dispatch was never taught, an internal fault. What constrains the fix is the
   exception-classification policy: deciding what each site *is* (the first is reachable only by a caller that skipped a
-  phase) decides whether it stays `UnsupportedOperationException` or becomes `IllegalStateException`, and with it exit
-  70's two halves. `DefinitionResolver`'s class Javadoc lists both sites and moves with them.
+  phase) decides whether it stays `UnsupportedOperationException` or becomes `IllegalStateException`, and with it exit 70's
+  two halves. `DefinitionResolver`'s class Javadoc lists both sites and moves with them.
 
 - [ ] **A one-position tuple is named in a diagnostic in array spelling.** `only: tuple1<text>` given `[]` reports
   `'[text]' has 1 positions, found only 0 elements`: `tuple1<text>` expands to a tuple no author named, and

@@ -81,8 +81,18 @@ class RecordTemplateTest {
     }
 
     /** Entry names that look materialised -- derived from {@code head} rather than declared. */
+    /**
+     * The records this schema minted for applications of {@code head}: an application nothing declares is its
+     * expansion, a synthetic record (§5.10), and one whose expansion names itself keeps an instantiation entry
+     * recording {@code head}. The fixtures apply one record template each, so every synthetic record is one.
+     */
     private static List<String> instantiationsOf(TsonCompiledSchema compiled, String head) {
-        return compiled.schema().entries().keySet().stream().filter(n -> n.startsWith(head + "_")).sorted().toList();
+        var schema = compiled.schema();
+        return schema.entries().keySet().stream()
+                .filter(n -> schema.entries().get(n) instanceof RecordBody && schema.positionOf(n).isEmpty()
+                        && (schema.factsOf(n).synthetic()
+                        || schema.applicationOf(n).filter(applied -> applied.name().equals(head)).isPresent()))
+                .sorted().toList();
     }
 
     @Test
@@ -101,18 +111,48 @@ class RecordTemplateTest {
     }
 
     /**
-     * §8.2 keys an instantiation on the flattened application its facts record, which is what a
-     * consumer compares by -- never the internal name.
+     * An application nothing declares is its expansion (§5.10): a synthetic record that records no
+     * application. A declaration naming the application records it, flattened, on its key (§8.2).
      */
     @Test
-    void anInstantiationRecordsTheFlattenedApplicationAsItsSource() {
+    void aMintedRecordIsItsExpansionAndADeclaredOneRecordsItsApplication() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
-                  holder => { b: box<text> }""");
+                  holder => { b: box<int32> }
+                  tb     => box<text>""");
 
-        TypeRef source = compiled.schema().applicationOf(instantiationsOf(compiled, "box").get(0)).orElseThrow();
+        String minted = instantiationsOf(compiled, "box").get(0);
+        assertTrue(compiled.schema().factsOf(minted).synthetic(), minted);
+        assertTrue(compiled.schema().applicationOf(minted).isEmpty(), "a minted expansion records no application");
+        TypeRef source = compiled.schema().applicationOf("tb").orElseThrow();
         assertEquals("box", source.name());
         assertEquals(List.of(new TypeArgument.Ref(TypeRef.of("text"))), source.arguments());
+    }
+
+    /**
+     * A minted record is a member of nothing, so composing an application only a use site mints gives it no edge
+     * to refuse: {@code vip<text>} beside a use site's {@code box<text>} loads, IS-A neither.
+     */
+    @Test
+    void aMintedRecordComposingAMintedApplicationIsAMemberOfNothing() {
+        TsonCompiledSchema compiled = compile("""
+                  box    => <T> { v: T }
+                  vip    => <T> box<T> & { extra: text }
+                  holder => { u: vip<text>  w: box<text> }""");
+
+        RecordBody vip = (RecordBody) compiled.schema().entries().get(fieldType(compiled, "holder", "u"));
+        assertEquals(List.of(), vip.supertypes());
+    }
+
+    /** Two record templates with one field list expand to one record: the application is its expansion. */
+    @Test
+    void twoTemplatesExpandingToOneRecordShareOneEntry() {
+        TsonCompiledSchema compiled = compile("""
+                  box    => <T> { v: T }
+                  crate  => <T> { v: T }
+                  holder => { a: box<int32>  b: crate<int32> }""");
+
+        assertEquals(fieldType(compiled, "holder", "a"), fieldType(compiled, "holder", "b"));
     }
 
     /** Two applications with the same arguments are one entry, wherever in the schema they appear (§8.2). */
@@ -598,8 +638,9 @@ class RecordTemplateTest {
                   keyed2 => <C> keyed<C>
                   holder => { p: keyed2<int32> }""");
 
-        assertEquals(List.of(), instantiationsOf(compiled, "keyed"), "the alias hops mint nothing");
-        assertEquals(List.of(), instantiationsOf(compiled, "keyed2"));
+        assertTrue(compiled.schema().entries().keySet().stream()
+                        .noneMatch(n -> n.startsWith("keyed") && compiled.schema().positionOf(n).isEmpty()),
+                "the alias hops mint nothing");
         assertEquals(1, instantiationsOf(compiled, "pair").size());
         assertEquals(instantiationsOf(compiled, "pair").get(0), fieldType(compiled, "holder", "p"));
     }

@@ -119,7 +119,7 @@ public final class HeldBody {
     }
 
     /** A field annotation's bound value back in wire form, for {@link WireForm#heldRecord}. */
-    private static DataValue annotationValue(Object value) {
+    static DataValue annotationValue(Object value) {
         return new TsonDataParser(WRITER.toTson(value)).parseDocument().root();
     }
 
