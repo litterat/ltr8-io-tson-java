@@ -165,6 +165,14 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       source close during resolution's driving loop, before the batch pass can run; the template in hand has
       resolved by then, which is all the walk needs, so only a parameter awaiting the cross-template fixed
       point is left undetermined there.
+    - **A record template confines its parameters to three places** (SPEC-FEEDBACK.md #16): a field's type, a
+      field's default or fixed value, and an argument of an application. The walk carries the slot it is in as
+      `constructor.field`, and in a body headed `record` a whole-token parameter anywhere but `record_field.type`
+      is refused, naming the slot (`parameter 'K' stands at a key of record.fields`) -- a field name, a group
+      member, `optional`, `voidable`, `role`, `extension`, `name_type`, `discriminators`, a bare parent. Each would
+      leave the family base without a shape its applications share. The general kind check runs first, so
+      `<T> !record { fields: T }` keeps its "neither a type reference nor a scalar" verdict. A template over any
+      other constructor keeps every scalar slot (`<V> !tuple { … voidable: V }`).
     - **The slot types are the constructor's own vocabulary.** `array.element_type` is typed `type_ref`,
       `enum.members` a set of `identifier`, `record_field.value` a `value` — so a `type_ref` slot gives a TYPE
       parameter, one resolving to an `Atom` a VALUE parameter, and anything else (a parameter standing for a whole
