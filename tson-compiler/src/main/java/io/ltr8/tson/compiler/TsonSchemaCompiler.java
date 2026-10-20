@@ -8,8 +8,8 @@ import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.compiler.reader.Subsumption;
 import io.ltr8.tson.schema.meta.Type;
@@ -251,10 +251,10 @@ public final class TsonSchemaCompiler {
         }
 
         private TsonTypeReader<?> build(String name, Top definition) {
-            if (definition instanceof TemplateBody held) {
+            if (OpenEntry.isOpen(definition)) {
                 ValueReaderContext context =
                         new ValueReaderContext(linked, readers, foreign, namesMeaning, referrers);
-                if (held.extension().isPresent()) {
+                if (OpenEntry.isFamilyBase(definition)) {
                     // A *family base* -- a template carrying `extension` (§5.10). No
                     // value is read against it: one of its instantiations is, selected by a tag or by the
                     // discriminators, so it dispatches exactly as a closed abstract or sealed record does.
@@ -262,7 +262,7 @@ public final class TsonSchemaCompiler {
                 }
                 // Every other template is not a type ([TSON-SCHEMA] §5.10). See OpenTemplateReader for why the
                 // refusal is the entry's own reader rather than a check at the root.
-                return new OpenTemplateReader(name, held.parameterNames(), context.locationOf(name));
+                return new OpenTemplateReader(name, OpenEntry.parameterNames(definition), context.locationOf(name));
             }
             Top body = definition;
             if (body instanceof Reference r) {

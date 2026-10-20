@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.meta.Chained;
-import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -53,7 +53,8 @@ final class Ancestry {
      * and nothing for the template itself. Empty for a head that is no template.
      */
     static List<String> ofTemplate(String head, DefinitionGetter namespace) {
-        return namespace.definition(head) instanceof TemplateBody held ? held.supertypes() : List.of();
+        Top template = namespace.definition(head);
+        return OpenEntry.isOpen(template) ? Chained.supertypesOf(template) : List.of();
     }
 
     /**

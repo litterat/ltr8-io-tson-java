@@ -7,7 +7,9 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.LinkedHashMap;
@@ -139,11 +141,15 @@ public final class JsonSchemaCompiler {
         }
     }
 
-    /** Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries. */
+    /**
+     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries. An open entry
+     * reads as a template ([TSON-SCHEMA] §5.10) whichever kernel shape holds it, so it takes the template's reader.
+     */
     private static String constructorOf(Top body) {
-        Typename typename = body.getClass().getAnnotation(Typename.class);
+        Class<?> leaf = OpenEntry.isOpen(body) ? TemplateBody.class : body.getClass();
+        Typename typename = leaf.getAnnotation(Typename.class);
         if (typename == null) {
-            throw new IllegalStateException(body.getClass() + " has no @Typename -- every Top leaf must carry one");
+            throw new IllegalStateException(leaf + " has no @Typename -- every Top leaf must carry one");
         }
         return typename.name();
     }

@@ -36,6 +36,9 @@ public enum TypeKind {
      *               composed into {@code payload => data & { ... }} leaves {@code payload} a PRODUCT
      */
     public static TypeKind of(Top value, Predicate<String> kernel) {
+        if (OpenEntry.isOpen(value)) {
+            return TEMPLATE;
+        }
         return switch (value) {
             case RecordBody record -> ofChain(record.supertypes(), kernel);
             case Atom ignored -> ATOM;
@@ -43,7 +46,7 @@ public enum TypeKind {
             case Sum ignored -> SUM;
             case Reference ignored -> REFERENCE;
             case Data ignored -> DATA;
-            case TemplateBody ignored -> TEMPLATE;
+            case TemplateBody ignored -> TEMPLATE; // open, answered above
         };
     }
 

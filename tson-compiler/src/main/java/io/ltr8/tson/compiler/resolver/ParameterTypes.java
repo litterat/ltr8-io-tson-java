@@ -10,10 +10,10 @@ import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
@@ -129,13 +129,13 @@ final class ParameterTypes {
      */
     static boolean readsInStructure(Top template, Function<String, Top> entries) {
         Top current = template;
-        for (int hop = 0; hop < 64 && current instanceof TemplateBody held; hop++) {
-            String head = HeldBody.of(held).application().typeRef().orElse(null);
+        for (int hop = 0; hop < 64 && OpenEntry.isOpen(current); hop++) {
+            String head = HeldBody.of(current).application().typeRef().orElse(null);
             if (head == null || head.equals("record")) {
                 return false;
             }
             Top applied = entries.apply(head);
-            if (!(applied instanceof TemplateBody)) {
+            if (!OpenEntry.isOpen(applied)) {
                 return true;
             }
             current = applied;
@@ -158,19 +158,20 @@ final class ParameterTypes {
         Map<String, Occurrences> observed = new LinkedHashMap<>();
         Map<String, Map<String, TemplateParam>> recorded = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
-            if (!(definition instanceof TemplateBody held)) {
+            if (!OpenEntry.isOpen(definition)) {
                 return;
             }
             if (!local.contains(name)) {
                 Map<String, TemplateParam> params = new LinkedHashMap<>();
-                held.parameters().forEach(p -> params.put(p.name(), p));
+                OpenEntry.parameters(definition).forEach(p -> params.put(p.name(), p));
                 recorded.put(name, params);
                 return;
             }
-            Occurrences occurrences = new Occurrences(held.parameterNames(), written.getOrDefault(name, Map.of()),
+            Occurrences occurrences = new Occurrences(OpenEntry.parameterNames(definition),
+                    written.getOrDefault(name, Map.of()),
                     readsInStructure(definition, entries::get));
             try {
-                Walk.over(HeldBody.of(held), occurrences, meta);
+                Walk.over(HeldBody.of(definition), occurrences, meta);
             } catch (SchemaValidationException e) {
                 reporter.report(name, e);
                 return;
@@ -202,12 +203,12 @@ final class ParameterTypes {
      * which is the one that knows which declarations this schema wrote.
      */
     static Map<String, Kind> inferOne(Top template, Function<String, Top> meta) {
-        if (!(template instanceof TemplateBody held)) {
+        if (!OpenEntry.isOpen(template)) {
             return Map.of();
         }
-        Occurrences occurrences = new Occurrences(held.parameterNames(), Map.of(), false);
+        Occurrences occurrences = new Occurrences(OpenEntry.parameterNames(template), Map.of(), false);
         try {
-            Walk.over(HeldBody.of(held), occurrences, meta);
+            Walk.over(HeldBody.of(template), occurrences, meta);
         } catch (SchemaValidationException e) {
             return Map.of();
         }
@@ -252,10 +253,11 @@ final class ParameterTypes {
                     if (occurrences.settled.contains(deferred)) {
                         continue;
                     }
-                    if (!(entries.get(deferred.head()) instanceof TemplateBody callee)) {
+                    Top callee = entries.get(deferred.head());
+                    if (!OpenEntry.isOpen(callee)) {
                         continue;
                     }
-                    List<String> calleeParameters = callee.parameterNames();
+                    List<String> calleeParameters = OpenEntry.parameterNames(callee);
                     if (deferred.index() >= calleeParameters.size()) {
                         occurrences.settled.add(deferred);
                         continue; // an arity error, which the materialiser reports where it is applied

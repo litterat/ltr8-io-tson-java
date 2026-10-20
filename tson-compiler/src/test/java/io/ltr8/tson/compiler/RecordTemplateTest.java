@@ -9,13 +9,13 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Reference;
 
 import java.math.BigInteger;
@@ -97,7 +97,7 @@ class RecordTemplateTest {
         assertEquals(made.get(0), fieldType(compiled, "holder", "b"), "the field references it by name");
 
         Top entry = compiled.schema().entries().get(made.get(0));
-        assertEquals(List.of(), TemplateBody.parameterNamesOf(entry), "closed -- §5.10");
+        assertEquals(List.of(), OpenEntry.parameterNames(entry), "closed -- §5.10");
         assertEquals(TypeRef.of("text"), fieldOf(compiled, made.get(0), "v").type(), "T := text");
     }
 
@@ -326,7 +326,7 @@ class RecordTemplateTest {
 
             Top closed = compiled.schema().entries()
                     .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a"));
-            assertEquals(List.of(), TemplateBody.parameterNamesOf(closed), () -> field + " closes to a usable entry");
+            assertEquals(List.of(), OpenEntry.parameterNames(closed), () -> field + " closes to a usable entry");
             assertNotNull(compiled.get(fieldType(compiled, "use", "u")), field);
         }
     }
@@ -578,7 +578,7 @@ class RecordTemplateTest {
                   uuid_pair => <B> pair<text, B>
                   holder    => { p: uuid_pair<int32>  q: pair<text, int32> }""");
 
-        assertEquals(List.of("B"), TemplateBody.parameterNamesOf(compiled.schema().entries().get("uuid_pair")),
+        assertEquals(List.of("B"), OpenEntry.parameterNames(compiled.schema().entries().get("uuid_pair")),
                 "the alias is itself a template");
         assertEquals(1, instantiationsOf(compiled, "pair").size(), "one entry for the one closed pair");
         String closed = fieldType(compiled, "holder", "p");

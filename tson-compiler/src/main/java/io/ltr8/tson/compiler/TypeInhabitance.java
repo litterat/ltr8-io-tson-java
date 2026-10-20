@@ -5,6 +5,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
@@ -87,6 +88,14 @@ final class TypeInhabitance {
      */
     private static boolean isInhabited(Top definition, Map<String, Top> namespace,
             Set<String> inhabited) {
+        // A held body is not walked: its element type and bounds are tokens that mean nothing until
+        // substitution supplies the arguments, so a template is inhabited here and the closure that does
+        // supply them is judged on its own -- it is an ordinary entry in this map by the time linking
+        // runs, materialisation having minted it. A template nobody applies is judged nowhere, which is
+        // the same answer §5.10's deferred checking gives everywhere else.
+        if (OpenEntry.isOpen(definition)) {
+            return true;
+        }
         return switch (definition) {
             case RecordBody record -> recordInhabited(record, namespace, inhabited);
             case ArrayBody array -> array.voidable()
@@ -102,12 +111,7 @@ final class TypeInhabitance {
             case ChoiceBody choice -> choice.variants().stream()
                     .anyMatch(variant -> refInhabited(variant, namespace, inhabited));
             case Reference reference -> refInhabited(reference.target(), namespace, inhabited);
-            // A held body is not walked: its element type and bounds are tokens that mean nothing until
-            // substitution supplies the arguments, so a template is inhabited here and the closure that does
-            // supply them is judged on its own -- it is an ordinary entry in this map by the time linking
-            // runs, materialisation having minted it. A template nobody applies is judged nowhere, which is
-            // the same answer §5.10's deferred checking gives everywhere else.
-            case TemplateBody ignored -> true;
+            case TemplateBody ignored -> true; // open, answered above
             default -> true; // an atom's own satisfiability is its family's question, not this one
         };
     }

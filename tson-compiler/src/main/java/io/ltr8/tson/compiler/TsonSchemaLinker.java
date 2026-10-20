@@ -23,6 +23,7 @@ import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.ConfusableNames;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.BytesType;
@@ -290,7 +291,7 @@ public final class TsonSchemaLinker {
             // enum members applies to it unchanged, and `<T, Т>` otherwise declares two parameters that read
             // identically: a body referencing `T` binds one of them and a reviewer cannot see which, which
             // is the substitution hazard §8.2 exists to refuse.
-            checkScope(receiver, schema, name, position, TemplateBody.parameterNamesOf(definition), "parameters",
+            checkScope(receiver, schema, name, position, OpenEntry.parameterNames(definition), "parameters",
                     identifiers);
         });
     }
@@ -539,8 +540,8 @@ public final class TsonSchemaLinker {
             return null; // the author's own declaration: it already names the line they wrote
         }
         for (Map.Entry<String, Top> candidate : entries.entrySet()) {
-            if (at(facts, candidate.getKey()).isPresent() && candidate.getValue() instanceof TemplateBody held
-                    && HeldBody.of(held).names().contains(name)) {
+            if (at(facts, candidate.getKey()).isPresent() && OpenEntry.isOpen(candidate.getValue())
+                    && HeldBody.of(candidate.getValue()).names().contains(name)) {
                 return candidate.getKey();
             }
         }
@@ -1229,7 +1230,7 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def, namespace, structureNamespace, TemplateBody.parameterNamesOf(def), heldByName,
+        validateBody(name, def, namespace, structureNamespace, OpenEntry.parameterNames(def), heldByName,
                 constructors);
     }
 
@@ -1241,6 +1242,19 @@ public final class TsonSchemaLinker {
     private static void validateBody(String entryName, Top body, Map<String, Top> namespace,
                                       Map<String, Top> structureNamespace, List<String> ownParameters,
                                       Set<TypeRef> heldByName, Function<String, Optional<String>> constructors) {
+        if (OpenEntry.isOpen(body)) {
+            // A held body is opaque to everything that needs to know what a reference *resolves to*: that
+            // cannot be settled until substitution supplies the arguments, so type-kind validation and
+            // inhabitance apply to it at materialisation instead, where the whole body resolves at once.
+            // Checking it here by substituting stand-in arguments would report errors on templates that are
+            // correct for every argument anyone passes (`<N> !integer ^ { min: N max: 3 }`).
+            //
+            // Arity is the exception, and it is decidable: it asks how many parameters the *referenced*
+            // entry declares, which no argument changes. See checkHeldArity for why that has to be asked
+            // here rather than left to an application that may never happen.
+            checkHeldArity(entryName, body, namespace, ownParameters);
+            return;
+        }
         checkCoherent(body);
         switch (body) {
             case RecordBody r -> {
@@ -1286,16 +1300,7 @@ public final class TsonSchemaLinker {
                 checkVariantsAreDistinct(entryName, c, namespace);
                 checkVariantsAreNotVoid(entryName, c, namespace);
             }
-            // A held body is opaque to everything that needs to know what a reference *resolves to*: that
-            // cannot be settled until substitution supplies the arguments, so type-kind validation and
-            // inhabitance apply to it at materialisation instead, where the whole body resolves at once.
-            // Checking it here by substituting stand-in arguments would report errors on templates that are
-            // correct for every argument anyone passes (`<N> !integer ^ { min: N max: 3 }`).
-            //
-            // Arity is the exception, and it is decidable: it asks how many parameters the *referenced*
-            // entry declares, which no argument changes. See checkHeldArity for why that has to be asked
-            // here rather than left to an application that may never happen.
-            case TemplateBody held -> checkHeldArity(entryName, held, namespace, ownParameters);
+            case TemplateBody ignored -> { } // open, answered above
             case ValueType ignored -> {
             }
             case VoidType ignored -> {
@@ -1471,7 +1476,7 @@ public final class TsonSchemaLinker {
      * participate in comparing two open entries.
      */
     private static void checkOpenEntryUsesEveryParameter(String entryName, Top def) {
-        List<String> parameters = TemplateBody.parameterNamesOf(def);
+        List<String> parameters = OpenEntry.parameterNames(def);
         if (parameters.isEmpty()) {
             return;
         }
@@ -1488,6 +1493,13 @@ public final class TsonSchemaLinker {
 
     /** Every name an entry's body mentions, for {@link #checkOpenEntryUsesEveryParameter}. */
     private static void collectBodyNames(Top body, Set<String> into) {
+        if (OpenEntry.isOpen(body)) {
+            // The one question a held body answers without being resolved, and it answers it about tokens
+            // rather than about references -- which is the same rule substitution follows when it decides
+            // what to rewrite.
+            into.addAll(HeldBody.of(body).names());
+            return;
+        }
         switch (body) {
             case RecordBody record -> record.fields().values().forEach(field -> {
                 collectNames(field.type(), into);
@@ -1503,10 +1515,7 @@ public final class TsonSchemaLinker {
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Reference reference -> collectNames(reference.target(), into);
-            // The one question a held body answers without being resolved, and it answers it about tokens
-            // rather than about references -- which is the same rule substitution follows when it decides
-            // what to rewrite.
-            case TemplateBody held -> into.addAll(HeldBody.of(held).names());
+            case TemplateBody ignored -> { } // open, answered above
             default -> { } // an atom body names no type
         }
     }
@@ -1595,7 +1604,7 @@ public final class TsonSchemaLinker {
         // application of one) has no single body to check against until materialisation closes it. A body
         // still a Reference means the walk stopped on a cycle or an argument-bearing target, neither of
         // which has one either.
-        if (target == null || target instanceof TemplateBody || !field.type().arguments().isEmpty()
+        if (target == null || OpenEntry.isOpen(target) || !field.type().arguments().isEmpty()
                 || target instanceof Reference) {
             return;
         }
@@ -1722,7 +1731,7 @@ public final class TsonSchemaLinker {
      * position rather than a shortfall (§5.10: "an unapplied template is checked no further and receives no
      * verdict").
      */
-    private static void checkHeldArity(String entryName, TemplateBody held,
+    private static void checkHeldArity(String entryName, Top held,
             Map<String, Top> namespace, List<String> ownParameters) {
         for (TypeRef application : HeldBody.of(held).applications()) {
             checkArity(application, namespace, ownParameters, "'" + entryName + "'");
@@ -1772,7 +1781,7 @@ public final class TsonSchemaLinker {
         if (referenced == null) {
             return; // reached only through the structure-namespace fallback, which the caller already allowed
         }
-        List<String> parameters = TemplateBody.parameterNamesOf(referenced);
+        List<String> parameters = OpenEntry.parameterNames(referenced);
         int declared = parameters.size();
         int supplied = ref.arguments().size();
         if (declared == supplied) {
@@ -1784,7 +1793,7 @@ public final class TsonSchemaLinker {
                     + "none (§5.10); drop the argument list");
         }
         if (supplied == 0) {
-            if (referenced instanceof TemplateBody held && held.extension().isPresent()) {
+            if (OpenEntry.isFamilyBase(referenced)) {
                 // A record-bodied template has a parent, and naming it here names that parent
                 // (§5.10). Nothing is ever read *against* it: a value at the position
                 // is a value of some member, selected by a tag or by the discriminators, and every member is

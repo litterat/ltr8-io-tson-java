@@ -15,11 +15,11 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
@@ -341,7 +341,7 @@ final class RecordExtension {
         }
         String terminal = ReferenceChain.terminal(field.type().name(), merged);
         Top target = merged.get(terminal);
-        if (target == null || target instanceof TemplateBody || target instanceof Reference) {
+        if (target == null || OpenEntry.isOpen(target) || target instanceof Reference) {
             return Optional.empty();
         }
         return AtomParsers.forType(target, enumForms.getOrDefault(terminal, Normalization.NONE));
@@ -366,16 +366,13 @@ final class RecordExtension {
      */
     private static RecordBody familyBodyOf(String name, Top def, Map<String, Top> merged,
                                            Map<String, TsonSchema.EntryFacts> facts) {
-        if (def instanceof RecordBody record) {
-            return record;
-        }
-        if (!(def instanceof TemplateBody held) || held.extension().isEmpty()) {
-            return null;
+        if (!OpenEntry.isFamilyBase(def)) {
+            return def instanceof RecordBody record && !OpenEntry.isOpen(def) ? record : null;
         }
         // The selectors come from `FamilySelectors`, the one derivation both encodings read -- never from
         // parsing the held text, which `tson-json` cannot do and §1.3 says no consumer should have to.
         return new RecordBody(FamilySelectors.of(name, def, merged), List.of(),
-                held.extension().get(), held.discriminators(), java.util.Optional.empty());
+                FamilySelectors.extensionOf(def).orElseThrow(), FamilySelectors.namesOf(def), java.util.Optional.empty());
     }
 
     /** The colliding pin, named the way an author reads it: one value, or the tuple the selectors form. */

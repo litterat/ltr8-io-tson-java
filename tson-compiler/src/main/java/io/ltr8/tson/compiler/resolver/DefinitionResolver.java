@@ -30,6 +30,7 @@ import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.Sum;
@@ -676,7 +677,7 @@ final class DefinitionResolver {
 
     /** Whether a construction may apply {@code definition} directly: a closed entry that is not abstract. */
     private static boolean isInstantiable(Top definition) {
-        return definition != null && !(definition instanceof TemplateBody)
+        return definition != null && !OpenEntry.isOpen(definition)
                 && !(definition instanceof RecordBody record && record.extension() == RecordExtensionType.ABSTRACT);
     }
 
@@ -727,7 +728,7 @@ final class DefinitionResolver {
         ConstructorHead head = resolveConstructorTarget(name, target);
         requireAuthorable(name, target, head);
         Top constructor = head.definition();
-        List<String> constructorParameters = TemplateBody.parameterNamesOf(constructor);
+        List<String> constructorParameters = OpenEntry.parameterNames(constructor);
         if (!constructorParameters.isEmpty()) {
             int declared = constructorParameters.size();
             throw new SchemaValidationException("'" + name + "': '" + target + "' is a template taking "
@@ -1390,8 +1391,7 @@ final class DefinitionResolver {
                 // itself rather than to an instantiation nothing mints: `dog => pet<"dog"> & { … }` IS-A
                 // `pet`, which is what puts `dog` in `pet.subtypes` and lets a `pet` position dispatch.
                 if (parameters.isEmpty()
-                        && namespaceDefinitions.definition(generic.name()) instanceof TemplateBody heldBase
-                        && heldBase.extension().isPresent()) {
+                        && OpenEntry.isFamilyBase(namespaceDefinitions.definition(generic.name()))) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, generic.name());
                 }
                 // The application itself goes into the chain, arguments and all. It names no entry yet --
@@ -1891,13 +1891,13 @@ final class DefinitionResolver {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' names no type this schema declares or imports");
         }
-        if (!(template instanceof TemplateBody open)) {
+        if (!OpenEntry.isOpen(template)) {
             // Applied to this declaration's own parameter, so the author wrote arguments; the head takes none.
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' declares no type parameters, so it cannot be applied to '"
                     + String.join(", ", typeParams) + "' (§5.10)");
         }
-        List<String> templateParameters = open.parameterNames();
+        List<String> templateParameters = OpenEntry.parameterNames(template);
         if (templateParameters.size() != application.args().size()) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head + "' declares "
                     + templateParameters.size() + " type parameter(s) and is applied to "
@@ -1920,7 +1920,7 @@ final class DefinitionResolver {
         for (int i = 0; i < templateParameters.size(); i++) {
             bindings.put(templateParameters.get(i), classified.get(i));
         }
-        DataValue body = HeldBody.of(open).application();
+        DataValue body = HeldBody.of(template).application();
         CoreValue substituted = WireForm.substitute(body.coreValue(), head,
                 templateParameters, bindings);
         Top absorbed = bindAtomInstance(name, new DataValue(body.annotations(), body.typeRef(), substituted));

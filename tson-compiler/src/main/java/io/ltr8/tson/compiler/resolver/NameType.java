@@ -5,9 +5,9 @@ import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TextFamily;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -164,8 +164,8 @@ public final class NameType {
         Set<String> seen = new HashSet<>();
         while (head.isPresent() && seen.add(head.get())) {
             Top applied = lookup.apply(head.get());
-            if (applied instanceof TemplateBody held) {
-                head = HeldBody.of(held).application().typeRef();
+            if (OpenEntry.isOpen(applied)) {
+                head = HeldBody.of(applied).application().typeRef();
                 continue;
             }
             return applied instanceof RecordBody record

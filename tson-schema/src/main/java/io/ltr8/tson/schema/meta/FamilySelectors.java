@@ -51,12 +51,11 @@ public final class FamilySelectors {
      */
     public static SequencedMap<String, RecordField> of(String name, Top definition,
                                                        Map<String, ? extends Top> entries) {
-        return switch (definition) {
-            case RecordBody record -> declared(record);
-            case TemplateBody held -> fromMembers(held.discriminators(),
-                    held.subtypes(), entries);
-            default -> Collections.emptyNavigableMap();
-        };
+        if (OpenEntry.isFamilyBase(definition)) {
+            return fromMembers(namesOf(definition), Chained.subtypesOf(definition), entries);
+        }
+        return definition instanceof RecordBody record && !OpenEntry.isOpen(definition)
+                ? declared(record) : Collections.emptyNavigableMap();
     }
 
     /**
@@ -71,11 +70,11 @@ public final class FamilySelectors {
 
     /** The {@code extension} a base states, whichever kind of body holds it. */
     public static Optional<RecordExtensionType> extensionOf(Top definition) {
-        return switch (definition) {
-            case RecordBody record -> Optional.of(record.extension());
-            case TemplateBody held -> held.extension();
-            default -> Optional.empty();
-        };
+        if (OpenEntry.isOpen(definition)) {
+            // A family base is ABSTRACT by construction (§5.10); any other open entry is no type at all.
+            return OpenEntry.isFamilyBase(definition) ? Optional.of(RecordExtensionType.ABSTRACT) : Optional.empty();
+        }
+        return definition instanceof RecordBody record ? Optional.of(record.extension()) : Optional.empty();
     }
 
     /** The names a base states, whatever kind of base it is -- empty where it dispatches by tag or not at all. */

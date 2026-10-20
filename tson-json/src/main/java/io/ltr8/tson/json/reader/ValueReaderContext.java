@@ -61,12 +61,13 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
      */
     public List<String> instantiableSubtypesOf(String name, Top definition) {
         return subtypesOf(name, definition).stream()
-                .filter(subtype -> switch (schema().entries().get(subtype)) {
-                    case io.ltr8.tson.schema.meta.RecordBody record ->
-                            record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
-                    case io.ltr8.tson.schema.meta.TemplateBody ignored -> false;
-                    case null -> false;
-                    default -> true;
+                .filter(subtype -> {
+                    io.ltr8.tson.schema.meta.Top entry = schema().entries().get(subtype);
+                    if (entry == null || io.ltr8.tson.schema.meta.OpenEntry.isOpen(entry)) {
+                        return false;
+                    }
+                    return !(entry instanceof io.ltr8.tson.schema.meta.RecordBody record)
+                            || record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
                 })
                 .toList();
     }

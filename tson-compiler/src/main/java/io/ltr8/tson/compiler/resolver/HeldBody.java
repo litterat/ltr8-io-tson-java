@@ -9,8 +9,10 @@ import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -36,10 +38,8 @@ import java.util.Set;
  * could not carry one without inverting that direction. It also makes the text authoritative, which is what
  * §8.1's ingest rule already assumes: an open entry's held body is re-resolved as source.
  *
- * <p><b>Memoised, because the questions are asked repeatedly and the answer cannot change.</b> A
- * {@link TemplateBody} is an immutable value and parsing is a pure function of its text, so one entry is
- * parsed once however many phases ask. The cache is keyed on the record itself and bounded by the number of
- * open entries a process loads -- schema-load work, never read-path work.
+ * <p><b>Parsed per call, never cached.</b> Parsing is a pure function of the text and schema-load work, never
+ * read-path work, and a caller that needs the tree twice parses once into a local.
  *
  * <p><b>The two questions are not interchangeable, and a check must pick the right one.</b>
  * {@link #applications()} returns a distinguishable shape; {@link #names()} returns every token the body
@@ -52,11 +52,11 @@ public final class HeldBody {
     /** Vocabulary-free, because a held application is written as the tree it is and read against nothing. */
     private static final DataClassObjectWriter WRITER = new DataClassObjectWriter();
 
-    private final TemplateBody body;
+    private final List<String> parameters;
     private final DataValue application;
 
-    private HeldBody(TemplateBody body, DataValue application) {
-        this.body = body;
+    private HeldBody(List<String> parameters, DataValue application) {
+        this.parameters = parameters;
         this.application = application;
     }
 
@@ -82,17 +82,24 @@ public final class HeldBody {
     }
 
     /**
-     * {@code body}'s text parsed, from the cache when it has been asked before.
+     * The held application of {@code open}, an open entry's value ({@link OpenEntry#isOpen}) -- the one door
+     * every phase asking a question of an open body goes through, so which kernel shape carries one is answered
+     * here and nowhere else.
      *
      * <p>The text is a {@code core-value} rather than a whole document, so it parses through the data
      * grammar and is complete when the value ends. A failure here is an internal fault and not an author
      * error: every held body in circulation was written by {@link WireForm} from a tree this resolver built,
      * so text that will not parse means the writer and the parser disagree.
      */
-    public static HeldBody of(TemplateBody body) {
-        Objects.requireNonNull(body, "body");
+    public static HeldBody of(Top open) {
+        Objects.requireNonNull(open, "open");
+        if (!(open instanceof TemplateBody body)) {
+            throw new IllegalStateException("only an open entry has a held body, and this one is closed: "
+                    + open.getClass().getSimpleName());
+        }
         try {
-            return new HeldBody(body, new TsonDataParser(body.template()).parseDocument().root());
+            return new HeldBody(body.parameterNames(),
+                    new TsonDataParser(body.template()).parseDocument().root());
         } catch (RuntimeException e) {
             throw new IllegalStateException("an open entry's held body did not parse back: "
                     + body.template() + " -- a held body is written by WireForm and read here, so the "
@@ -102,7 +109,7 @@ public final class HeldBody {
 
     /** The entry's own parameter names, in declaration order. */
     public List<String> parameters() {
-        return body.parameterNames();
+        return parameters;
     }
 
     /** The held application as a value tree -- what substitution rewrites and what identity is derived from. */

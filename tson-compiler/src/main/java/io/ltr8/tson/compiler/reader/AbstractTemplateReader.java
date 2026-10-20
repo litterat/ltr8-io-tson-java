@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.FamilySelectors;
-import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.List;
@@ -46,10 +46,10 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
     @SuppressWarnings("unchecked")
     public AbstractTemplateReader(String name, Top definition, ValueReaderContext context,
                                    TsonTypeReaderResolver readers) {
-        TemplateBody held = (TemplateBody) definition;
-        held.extension().orElseThrow(() -> new IllegalStateException(
-                "'" + name + "' is not a family base: only a template carrying `extension` dispatches, and "
-                        + "OpenTemplateReader is what every other template compiles to (§5.10)"));
+        if (!OpenEntry.isFamilyBase(definition)) {
+            throw new IllegalStateException("'" + name + "' is not a family base: only a record template "
+                    + "dispatches, and OpenTemplateReader is what every other template compiles to (§5.10)");
+        }
         // Reported under the template's own name: the author wrote this one, which is the whole point of the
         // template being the base -- naming `pet_base<…>` would name something the schema never declares.
         Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
