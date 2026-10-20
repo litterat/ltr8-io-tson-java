@@ -41,7 +41,7 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
             if (!(typeDefinition instanceof ArrayBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition);
             }
-            return new ArrayTreeReader(name, context.displayName(name, typeDefinition), body, resolver,
+            return new ArrayTreeReader(name, context.authoredName(name, typeDefinition), body, resolver,
                     context.locationOf(name),
                     AnnotationTypes.of(context), elementsAreNames(body, context));
         }

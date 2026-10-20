@@ -49,7 +49,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
             .forType(definition, context.linked().enumForm(name))
-            .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(name, parser,
+            .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(context.authoredName(name, definition), parser,
                     context.locationOf(name), namesProfile(definition)))
             .orElseThrow(() -> new IllegalStateException(
                     "'" + name + "' is registered as an atom but its body has no parser: " + definition));
@@ -95,6 +95,10 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * my_percentage}, which is what its author wrote and can act on. There is no name on {@link AtomType} to
      * use instead (one {@code IntegerParser} serves {@code int8}..{@code int256} and every refinement of
      * them), so it has to come from the entry, which every {@link ValueReaderFactory} is handed anyway.
+     *
+     * <p><b>{@code null} for a form no author named</b> -- an application nothing declares, expanded to an atom
+     * instance ({@link ValueReaderContext#authoredName}). The family's own sentence then stands alone, and the
+     * position the diagnostic carries says where.
      *
      * <p><b>It is not what a constraint violation reports as {@code expected}.</b> Naming the type there
      * says strictly less than the message already does -- a consumer wanting the bound has to recover it by
@@ -194,8 +198,9 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
         if (!(e instanceof TokenEvent token)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for '" + name + "', found "
-                    + TypeRefCheck.describe(e), "a token for " + name, TypeRefCheck.describe(e));
+            String expected = name == null ? "a token" : "a token for " + name;
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected " + (name == null ? "a token" : "a token for '"
+                    + name + "'") + ", found " + TypeRefCheck.describe(e), expected, TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -218,7 +223,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             // The entry's own name leads the sentence -- see `name` above -- and AtomRefusal decides the
             // code: §8.1 files a contract rejection apart from a range violation, and this reader is not a
             // second opinion about which is which.
-            AtomRefusal refusal = AtomRefusal.of(ex, token.text(), Object.class).named(name);
+            AtomRefusal refusal = AtomRefusal.of(ex, token.text(), Object.class);
+            refusal = name == null ? refusal : refusal.named(name);
             ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
             return null;
         }

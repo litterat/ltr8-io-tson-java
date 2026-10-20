@@ -77,9 +77,11 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     instantiation entry itself (`closeHeldRecord`): a substituted record is the type the author named by
     writing the application, so there is nothing for an extra hop to record and the entry's chain carries
     the application on its key (`@application`) the way §8.2 keys every instantiation. Every other held form closes
-    to a **synthetic** named for the form, which the instantiation then references — a form has no
-    author-written name for identity to key on. That is the whole of the divergence; everything before it is
-    shared.
+    to a **synthetic** named for the form, and an application nothing declares *is* that synthetic: the use site
+    names it, and no instantiation entry is minted. The one exception is an expansion that names its own
+    application (`nested => <T> ( T | [nested<T>] )`), whose content cannot be written without a name: the knot is
+    tied on the application-derived name, so that application keeps an instantiation entry, a `Reference` to the
+    synthetic. That is the whole of the divergence; everything before it is shared.
   - **There is no other body shape.** Every open entry has a held tree — an *error placeholder* included, which is
     an open empty record, so it closes by the same process as any record template. `close` is total over held
     trees, with any other shape an `IllegalStateException` naming the invariant.

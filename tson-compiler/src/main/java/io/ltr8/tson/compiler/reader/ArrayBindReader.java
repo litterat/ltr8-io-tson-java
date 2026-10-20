@@ -194,7 +194,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't array-shaped -- can't bind '" + name + "' as one");
             }
-            return new ArrayBindReader(name, context.displayName(name, typeDefinition), body, descriptor, resolver,
+            return new ArrayBindReader(name, context.authoredName(name, typeDefinition), body, descriptor, resolver,
                     context.locationOf(name),
                     AnnotationTypes.of(context), elementsAreNames(body, context));
         }

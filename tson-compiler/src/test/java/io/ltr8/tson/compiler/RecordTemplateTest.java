@@ -16,7 +16,6 @@ import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
-import io.ltr8.tson.schema.meta.Reference;
 
 import java.math.BigInteger;
 
@@ -625,12 +624,9 @@ class RecordTemplateTest {
                   triple => <T> rows<T, 3>
                   holder => { r: triple<int32> }""");
 
-        // `triple` itself mints nothing; the entry the field names is `rows<int32, 3>`, the open instance
-        // one hop in, which references the closed array synthetic that closing it produced.
-        String instantiation = fieldType(compiled, "holder", "r");
-        assertTrue(instantiation.startsWith("rows_"), instantiation);
-        String synthetic = assertInstanceOf(Reference.class,
-                compiled.schema().entries().get(instantiation)).target().name();
+        // `triple` itself mints nothing, and neither does `rows<int32, 3>`, the open instance one hop in: the
+        // field names the closed array synthetic that closing it produced, the application being its expansion.
+        String synthetic = fieldType(compiled, "holder", "r");
         ArrayBody array = assertInstanceOf(ArrayBody.class,
                 compiled.schema().entries().get(synthetic));
         assertEquals(TypeRef.of("int32"), array.elementType());

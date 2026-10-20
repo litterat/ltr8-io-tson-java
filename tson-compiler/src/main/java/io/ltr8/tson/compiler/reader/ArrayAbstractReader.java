@@ -47,9 +47,10 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
     final String name;
 
     /**
-     * What to call this entry in a message -- {@link #name} where the author wrote it, and the form they
-     * wrote where they did not (see {@link EntryDisplayName}). Separate from {@code name}, which stays the
-     * entry's real name: that is what a type-ref resolves against and what a tree node carries.
+     * What to call this entry in a message -- {@link #name} where the author wrote it, the form they wrote
+     * where they did not, and {@code null} for a form with no spelling, such as a set an application expanded
+     * to (see {@link EntryDisplayName#authored}). Separate from {@code name}, which stays the entry's real name:
+     * that is what a type-ref resolves against and what a tree node carries.
      */
     final String displayName;
 

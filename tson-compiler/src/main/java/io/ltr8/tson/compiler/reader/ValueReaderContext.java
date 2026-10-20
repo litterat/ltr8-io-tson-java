@@ -75,6 +75,16 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
+     * What the author wrote that names entry {@code name}, or {@code null} for a form with no spelling -- an
+     * application nothing declares, expanded to an atom instance -- whose message is the family's own, located
+     * by its position ({@link EntryDisplayName#authored}).
+     */
+    public String authoredName(String name, Top definition) {
+        return EntryDisplayName.authored(name, definition, schema().factsOf(name), schema().applicationOf(name))
+                .orElse(null);
+    }
+
+    /**
      * The entries IS-A {@code name}, whose value is {@code definition}: its chain's {@code subtypes} -- a type's,
      * and a family base template's, whose subtypes are its members ({@link Chained}).
      */
