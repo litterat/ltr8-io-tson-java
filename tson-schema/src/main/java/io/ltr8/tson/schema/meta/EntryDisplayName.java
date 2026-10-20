@@ -27,9 +27,12 @@ import java.util.stream.Collectors;
  * which is what its author would look for, while the anonymous form inside it renders as the form.
  *
  * <p>The rendering is the sugar the author would have written, not a description of it: {@code
- * [order; 1..]}, <code>{text =&gt; order}</code>, {@code [text, int32]}, {@code (text | int32)},
- * {@code paged&lt;order&gt;}. Anything with no sugar spelling falls back to the entry name -- honest rather
- * than invented, and unreachable in practice, since a form with no spelling is a form nobody wrote.
+ * [order; 1..]}, <code>{text =&gt; order}</code>, {@code [text, int32]}, {@code (text | int32)}, and {@code
+ * paged&lt;order&gt;} for an application that keeps an entry of its own. <b>A form with no sugar spelling has
+ * no authored name</b> ({@link #authored}): an application nothing declares is its expansion (§5.10), so
+ * {@code b<10>} over {@code b => <N> !integer_type { min: N  max: 100 }} is an atom instance no author named,
+ * and a message about it is the family's own, located by its position. {@link #of} falls back to the entry
+ * name for a caller that must name something.
  */
 public final class EntryDisplayName {
 
@@ -65,21 +68,38 @@ public final class EntryDisplayName {
     public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<TypeRef> application,
                             Map<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
                             Function<String, Optional<TypeRef>> applicationOf) {
+        return authored(name, value, facts, application, new Lookup(namespace, factsOf, applicationOf))
+                .orElse(name);
+    }
+
+    /**
+     * What the author wrote that names entry {@code name}: its own name, the sugar form, or the application it
+     * records -- or empty for a form with no spelling, which a message leaves unnamed. One level deep, as {@link
+     * #of(String, Top, TsonSchema.EntryFacts, Optional)} is.
+     */
+    public static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
+                                            Optional<TypeRef> application) {
+        return authored(name, value, facts, application,
+                new Lookup(Map.of(), ignored -> TsonSchema.EntryFacts.NONE, ignored -> Optional.empty()));
+    }
+
+    private static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
+                                             Optional<TypeRef> application, Lookup lookup) {
         if (facts.position().isPresent()) {
-            return name;
+            return Optional.of(name);
         }
-        Lookup lookup = new Lookup(namespace, factsOf, applicationOf);
-        return applied(application).orElseGet(() -> switch (value) {
-            case ArrayBody array -> "[" + shown(array.elementType(), lookup)
-                    + size(array.minItems(), array.maxItems()) + "]";
+        return applied(application).or(() -> Optional.ofNullable(switch (value) {
+            // `[T]` is an ordered array that admits repeats; a set is the same body with neither, and has no sugar.
+            case ArrayBody array when array.ordered() && !array.uniqueItems() -> "["
+                    + shown(array.elementType(), lookup) + size(array.minItems(), array.maxItems()) + "]";
             case MapBody map -> "{" + shown(map.keyType(), lookup) + " => "
                     + shown(map.valueType(), lookup) + size(map.minItems(), map.maxItems()) + "}";
             case TupleBody tuple -> tuple.elements().stream().map(TupleElement::elementType)
                     .map(ref -> shown(ref, lookup)).collect(Collectors.joining(", ", "[", "]"));
             case ChoiceBody choice -> choice.variants().stream().map(ref -> shown(ref, lookup))
                     .collect(Collectors.joining(" | ", "(", ")"));
-            default -> name;
-        });
+            default -> null;
+        }));
     }
 
     /** The three views a rendering resolves an inner name through. */

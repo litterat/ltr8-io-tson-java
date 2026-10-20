@@ -71,9 +71,9 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * The entry a field's type resolves to, following the instantiation entry's hop. A closure whose body is a
-     * synthetic is named by <em>two</em> entries -- the form, and the instantiation that records the
-     * application -- so a fixture asking about the shape has to step past the second to reach the first.
+     * The entry a field's type resolves to, following an instantiation entry's hop. Only an expansion that names
+     * its own application has one -- every other application names its synthetic directly -- so for most
+     * fixtures this is the field's own type.
      */
     private static Top formBehind(TsonCompiledSchema compiled, String record, String field) {
         Top entry = compiled.schema().entries().get(fieldType(compiled, record, field));
@@ -215,32 +215,41 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * The <b>whole-body</b> spelling records the application too, and needs <em>two</em> entries to do it.
-     * Its closure is a closed synthetic, an instance of the constructor it builds -- keying
-     * it on the application would tie identity to the internal name of the open synthetic that produced it,
-     * and would split {@code [text]} written directly from {@code [T]} closed to {@code text}. So the
-     * instantiation is a separate reference entry pointing at the form.
-     *
-     * <p>The record spelling needs only one, because substituting a record yields a record -- structurally
-     * distinct from any synthetic, so it can be the instantiation itself.
+     * The <b>whole-body</b> spelling is its expansion: an application nothing declares names the closed
+     * synthetic its closing produced, so {@code grid<pixel, 3>} and {@code [[pixel; 3]; 3]} written out are one
+     * entry, and no entry records the application.
      */
     @Test
-    void theWholeBodySpellingRecordsTheApplicationInAReferenceEntry() {
+    void theWholeBodySpellingIsItsExpansion() {
         TsonCompiledSchema compiled = compile("""
-                  pixel => { r: int32 }
-                  grid  => <T, N> [[T; N]; N]
-                  a     => { g: grid<pixel, 3> }""");
+                  pixel  => { r: int32 }
+                  grid   => <T, N> [[T; N]; N]
+                  a      => { g: grid<pixel, 3> }
+                  direct => { d: [[pixel; 3]; 3] }""");
 
-        Top instantiation = compiled.schema().entries().get(fieldType(compiled, "a", "g"));
-        assertInstanceOf(Reference.class, instantiation);
-        assertEquals("grid", compiled.schema().applicationOf(fieldType(compiled, "a", "g")).orElseThrow()
-                .name(), "the application, recorded");
-
-        Top form = formBehind(compiled, "a", "g");
-        assertInstanceOf(ArrayBody.class, form);
-        assertEquals(Optional.of("array"),
-                compiled.schema().constructorOf(((Reference) instantiation).target().name()),
+        String form = fieldType(compiled, "a", "g");
+        assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(form));
+        assertEquals(Optional.of("array"), compiled.schema().constructorOf(form),
                 "the form stays an instance of the constructor it builds");
+        assertEquals(form, fieldType(compiled, "direct", "d"), "the grid is the form written out");
+        assertTrue(compiled.schema().applicationOf(form).isEmpty(), "no entry records the application");
+    }
+
+    /**
+     * An expansion that names its own application cannot be written without a name, so the application keeps
+     * an entry of its own: a reference to the synthetic, recording the application, which is what the knot is
+     * tied on.
+     */
+    @Test
+    void aSelfReachingExpansionIsNamedByItsApplication() {
+        TsonCompiledSchema compiled = compile("""
+                  nested => <T> ( T | [nested<T>] )
+                  use    => { n: nested<text> }""");
+
+        String instantiation = fieldType(compiled, "use", "n");
+        Reference hop = assertInstanceOf(Reference.class, compiled.schema().entries().get(instantiation));
+        assertEquals("nested", compiled.schema().applicationOf(instantiation).orElseThrow().name());
+        assertEquals(Optional.of("choice"), compiled.schema().constructorOf(hop.target().name()));
     }
 
     /**
@@ -255,9 +264,8 @@ class ApplicationInContainerPositionTest {
                   grid  => <T, N> [[T; N]; N]
                   a     => { g: grid<pixel, 3> }""");
 
-        assertEquals(1, derived(compiled).stream()
-                .filter(n -> compiled.schema().entries().get(n) instanceof Reference).count(),
-                () -> "one instantiation, for the one application written: " + derived(compiled));
+        assertTrue(derived(compiled).stream().noneMatch(n -> compiled.schema().applicationOf(n).isPresent()),
+                () -> "no instantiation, the application being its expansion: " + derived(compiled));
         assertTrue(derived(compiled).stream().noneMatch(n -> n.contains("06c4e11f_")),
                 () -> "no entry named after a generated head: " + derived(compiled));
     }
@@ -341,8 +349,8 @@ class ApplicationInContainerPositionTest {
         assertInstanceOf(TemplateBody.class, compiled.schema().entries().get("grid"));
         assertEquals(1, openSynthetics(compiled),
                 () -> "one open synthetic, shared by both closures: " + derived(compiled));
-        assertEquals(6, closedDerived(compiled),
-                () -> "two closed arrays and one instantiation per closure: " + derived(compiled));
+        assertEquals(4, closedDerived(compiled),
+                () -> "two closed arrays per closure: " + derived(compiled));
     }
 
     /**

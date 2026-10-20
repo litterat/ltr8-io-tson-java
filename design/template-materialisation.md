@@ -19,9 +19,12 @@ that runs before it. Current form only; history lives in git.
 - Which parents were applications is read off the **held** tree's chain `parents`, not off the closed one, whose
   `supertypes` are bare names; a closed type keeps no `parents` once the fold has run, and an open record keeps its
   parents as written.
-- An instantiation of any kind — a record member, a DATA entry, a `Reference` hop — records the application it closes
-  in the map `SchemaResolver` shares with the materialiser, which writes it on the entry's key as `@application`; that
-  is what §8.2's identity and the applied-parent fold key on.
+- An application of a non-record template that nothing declares is its expansion: the use site names the synthetic
+  closing produced, and no instantiation entry is minted — unless the expansion names its own application (the knot
+  was tied on it, `TemplateMaterialiser.tied`), which then keeps a `Reference` entry to the synthetic.
+- An instantiation of any kind — a record member, a DATA entry, a self-reaching `Reference` hop — records the
+  application it closes in the map `SchemaResolver` shares with the materialiser, which writes it on the entry's key
+  as `@application`; that is what §8.2's identity and the applied-parent fold key on.
 - Kind is derived (`TypeKind.of`, judged by where each base kind is defined) and never written; a held template is
   `TEMPLATE`. A record, open or closed, takes the base kind its chain reaches; every other entry takes the branch of
   `Top` its body occupies.

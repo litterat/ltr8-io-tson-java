@@ -341,15 +341,11 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   phase) decides whether it stays `UnsupportedOperationException` or becomes `IllegalStateException`, and with it exit
   70's two halves. `DefinitionResolver`'s class Javadoc lists both sites and moves with them.
 
-- [ ] **A template application is named in a diagnostic by the construction it closes, in array spelling.**
-  `tags: set<text>` given `[a a]` reports `'[text]' requires unique elements`, and `only: tuple1<text>` given `[]`
-  reports `'[text]' has 1 positions, found only 0 elements` — so a set and a one-element tuple both read as the
-  array `[text]`, a type the author never wrote. The instantiation entry's key records the application
-  (`set<text>`), but its body is a reference to the synthetic construction it closes
-  (`!set_type { element_type: text }`, built by the bare constructor), and the reader that reports is the
-  synthetic's, which `EntryDisplayName` renders from its body. The fix is to keep the application as the display
-  name across that hop, as `UseSite.named` already does for an alias; and where no application is in reach,
-  `EntryDisplayName` should not render a `set_type` body or a one-position tuple as array sugar.
+- [ ] **A one-position tuple is named in a diagnostic in array spelling.** `only: tuple1<text>` given `[]` reports
+  `'[text]' has 1 positions, found only 0 elements`: `tuple1<text>` expands to a tuple no author named, and
+  `EntryDisplayName` renders a one-element `TupleBody` as `[text]`, which is the array. Render no name for it, as a set
+  gets none (`EntryDisplayName.authored`), and let `TupleDiagnostics` state the rule alone where it has no name, as
+  `ArrayDiagnostics` does.
 
 - [ ] **A tuple refused a scalar prints the event record.** `only: tuple1<text>` given `a` reports
   `expected a tuple (array-shaped) for '[text]', found TokenEvent[text=a, form=UNQUOTED, position=…]`:

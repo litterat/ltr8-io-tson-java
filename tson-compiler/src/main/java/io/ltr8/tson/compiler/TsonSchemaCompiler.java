@@ -269,8 +269,8 @@ public final class TsonSchemaCompiler {
                 // A reference is a hop, and this is where the chain is collapsed: after linking, once per
                 // entry, at the moment a reader is built. Resolved output states the chain the author wrote,
                 // so the target's reader is named for the entry doing the referring -- which is what a use
-                // site naming `pct` over `pct => small` needs, and what knows that `b<10>` was written where
-                // `integer_type_10_100_786fbcfb` will be read.
+                // site naming `pct` over `pct => small` needs, and what names a self-reaching instantiation by
+                // the application it records rather than by its synthetic's content-derived key.
                 return UseSite.named(resolve(r.target().name()),
                         EntryDisplayName.of(name, definition, linked.schema().factsOf(name),
                                 linked.schema().applicationOf(name)));

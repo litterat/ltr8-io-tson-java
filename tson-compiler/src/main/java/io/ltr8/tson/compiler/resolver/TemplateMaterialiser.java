@@ -171,6 +171,20 @@ final class TemplateMaterialiser {
     private final Map<String, String> ownedBy = new LinkedHashMap<>();
 
     /**
+     * The entry each minted application of a non-record template denotes, by its application-derived name: the
+     * synthetic its closing produced. An application nothing declares is its expansion, so a later sight of it
+     * names the same synthetic rather than closing it again.
+     */
+    private final Map<String, String> expansions = new LinkedHashMap<>();
+
+    /**
+     * The applications whose closing reached themselves -- the knot tied on the application-derived name while
+     * the entry was under construction. Such an expansion names itself, so its content cannot be written without
+     * a name, and the application keeps an entry of its own.
+     */
+    private final Set<String> tied = new LinkedHashSet<>();
+
+    /**
      * How deep the closing chain may go before materialisation is abandoned -- a <b>backstop</b>, not the
      * rule.
      *
@@ -500,6 +514,10 @@ final class TemplateMaterialiser {
             return owner;
         }
         String name = DerivedName.ofApplication(head, arguments);
+        String expansion = expansions.get(name);
+        if (expansion != null) {
+            return expansion;
+        }
         if (aliasClosing.contains(name)) {
             throw new SchemaValidationException("'" + head + "<...>' is a reference template whose own "
                     + "body applies it again, so composing it never reaches a type with a body (§5.10). The "
@@ -509,6 +527,9 @@ final class TemplateMaterialiser {
         if (materialised.containsKey(name) || !closing.add(name)) {
             // Already built, or under construction -- the knot-tying case. Either way it must be *this*
             // application, not another that derived the same name.
+            if (!materialised.containsKey(name)) {
+                tied.add(name);
+            }
             minted.claim(name, DerivedName.canonicalApplication(head, arguments));
             return name;
         }
@@ -543,7 +564,7 @@ final class TemplateMaterialiser {
                     return closeHeldAlias(head, template, open, bind(parameters, arguments));
                 }
                 // A record template's closure is the instantiation itself, where every other held form closes
-                // to a synthetic the instantiation then references -- see closeHeldRecord.
+                // to a synthetic -- see closeHeldRecord.
                 if (RECORD.equals(constructor)) {
                     note(name, RECORD);
                     Top instantiation = instantiation(name,
@@ -559,9 +580,13 @@ final class TemplateMaterialiser {
                     // an instantiation naming this head would carry an internal name into identity.
                     return formName;
                 }
-                // The instantiation of a form whose closure is a synthetic: a reference to it, closing the
-                // application. The compiler collapses the hop, so it costs nothing at read time; what it buys
-                // is that §8.2's keying of an instantiation on its application holds of this shape too.
+                if (!tied.contains(name)) {
+                    // An application nothing declares is its expansion: the use site names the synthetic.
+                    expansions.put(name, formName);
+                    return formName;
+                }
+                // The expansion names this application, so it is named by the application: a reference to
+                // the synthetic, which the compiler collapses, so it costs nothing at read time.
                 Top alias = new Reference(TypeRef.of(formName));
                 note(name, REFERENCE);
                 alias = instantiation(name, alias, new TypeRef(head, arguments));
@@ -606,18 +631,12 @@ final class TemplateMaterialiser {
      * is no longer a template at all: it is the constructor body those bindings always described, so it is
      * bound through that constructor's own reader and the entry carries an ordinary body.
      *
-     * <p><b>Two entries come out of it, because one cannot carry two identities.</b> The body itself is a
-     * closed <em>synthetic</em>, named for the form and built by its constructor (§8.2) -- an
-     * open synthetic's own name is internal, so keying it on the application would make identity depend on an
-     * unstable name, and would leave {@code [text]} written directly and {@code [T]} closed to {@code text}
-     * on two entries for one type. But the same closure is also an <em>instantiation</em> of the template,
-     * and §8.2 keys that on the flattened application. So this publishes the synthetic and returns a
-     * reference entry pointing at it, which closes the application.
-     *
-     * <p>Without the second entry nothing in resolver output records that {@code grid<pixel, 3>} was ever
-     * written: the field would name the array directly, and the template's name would vanish. The record
-     * template shape gets this for free, since substituting a record yields a record -- structurally distinct
-     * from any synthetic, so it can be the instantiation itself.
+     * <p><b>The closure is a closed <em>synthetic</em></b>, named for the form and built by its constructor
+     * (§8.2), so {@code [text]} written directly and {@code [T]} closed to {@code text} are one entry. An
+     * application nothing declares is that expansion, and the use site names the synthetic. The one exception
+     * is an expansion that names its own application -- {@code nested => <T> ( T | [nested<T>] )} -- whose
+     * content cannot be written without a name: {@link #instantiate} then keeps a reference entry under the
+     * application-derived name, which the knot was tied on.
      */
     private String closeHeldTemplate(String head, Top template, HeldBody open,
             Map<String, TypeArgument> bindings) {

@@ -50,10 +50,13 @@ Related: `design/readers-and-diagnostics.md`, `design/scope-push.md`, `design/re
   reader **wires its children**, which is compile time: a position naming an alias gets a copy differing only
   in its name, every other position gets the shared reader back unchanged and allocates nothing
   (`AllocationHarnessTest` is the guard).
-    - **A materialised application is named the same way**, and it is why the mechanism sits on the entry
-      rather than on the position. That entry's body is a `Reference`, so it compiles to its target's reader —
-      and `TsonSchemaCompiler` names it for the entry doing the referring, whose recorded application is
-      `b<10>`. Without it a violation against `b<10>` would read `'integer_type_10_100_786fbcfb': …`.
+    - **An application nothing declares has no authored name.** It is its expansion (§5.10): the position names
+      the synthetic directly, so `e: b<10>` over `b => <N> !integer_type { min: N  max: 100 }` reads an atom
+      instance no author named. `EntryDisplayName.authored` is empty for a form with no sugar spelling, and the
+      atom reader then leads with no name at all — the family's own sentence (`'5' is less than the minimum
+      10`), located by the diagnostic's position, never the entry's content-derived key. An expansion that
+      names its own application keeps an instantiation entry (a `Reference` to the synthetic, recording the
+      application), and that one is named like any other hop.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per
       read — and the variant that rejected the value is the informative name anyway.

@@ -6,9 +6,9 @@ import io.ltr8.annotation.Typename;
  * The meta-kernel's {@code reference} constructor's own vocabulary, resolved (Part 2 §4.1, §8.1):
  * a {@code kind: REFERENCE} entry's body, {@code !reference { target: E }} -- the kernel's aliasing
  * shape, used by {@code type_name}/{@code field_name}/{@code param_name} (aliasing {@code identifier}), the
- * annotation markers {@code annotation}/{@code doc}/{@code synthetic}, and materialised template
- * instantiations (§5.10, §8.2). It composes {@code top} directly and so carries no IS-A chain: a hop is not a type
- * of its own.
+ * annotation markers {@code annotation}/{@code doc}/{@code synthetic}, and the instantiation entry of a
+ * non-record template application whose expansion names itself (§5.10, §8.2). It composes {@code top} directly
+ * and so carries no IS-A chain: a hop is not a type of its own.
  *
  * <p><b>{@code target} is a {@link TypeRef}, so an alias to an application states its own arguments.</b>
  * [TSON-SCHEMA] §5.10's partial application, {@code uuid_pair => <B> pair<uuid, B>}, is an alias whose target
