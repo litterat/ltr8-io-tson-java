@@ -33,10 +33,10 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   (§5.10); `!C { ... }` fills a *constructor's* own vocabulary (§4.2). Different operations, and the check
   is on being a template — having parameters — so any §5.10 template gets the
   same advice instead of the "did you mean atom refinement?" hint, which cannot help when what is missing is
-  the argument list. **This check is what makes the `RecordBody` check below it genuinely unreachable**: an
-  *open* declaration holds its body (`holdIfOpen`) and a parameterised declaration is exactly one, so without
-  it `!my_set { … }` would reach an `IllegalStateException` — this project's spelling of *an internal
-  invariant broke* — and the CLI would report an author's schema mistake as a library fault at exit 70.
+  the argument list. **This check is what keeps the `RecordBody` check below it sound**: a parameterised
+  declaration is either held (a `TemplateBody`) or an open record, so without it `!my_set { … }` would reach an
+  `IllegalStateException` — this project's spelling of *an internal invariant broke*, which the CLI reports as a
+  library fault at exit 70 — and `!box { … }` over a record template would apply a template as a constructor.
   `TemplateClosesByApplicationTest` pins all of it.
 - **A construction head resolves through its reference chain first** (§8.3, `resolveConstructorTarget`).
   A reference is a hop, not a rewrite, so `alias_array => array` makes `!alias_array { … }` an application of

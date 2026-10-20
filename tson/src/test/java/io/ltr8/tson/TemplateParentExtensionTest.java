@@ -2,8 +2,8 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +39,7 @@ class TemplateParentExtensionTest {
         Top definition = Tson.standard()
                 .resolve(HEADER.formatted(id) + "{\n" + declarations + "}")
                 .schema().entries().get(entry);
-        return ((TemplateBody) definition).extension();
+        return FamilySelectors.extensionOf(definition);
     }
 
     /** The selector names the same parent states -- what makes the family member-dispatched. */
@@ -47,7 +47,7 @@ class TemplateParentExtensionTest {
         Top definition = Tson.standard()
                 .resolve(HEADER.formatted(id) + "{\n" + declarations + "}")
                 .schema().entries().get(entry);
-        return ((TemplateBody) definition).discriminators();
+        return FamilySelectors.namesOf(definition);
     }
 
     private static String refusal(String id, String declarations) {

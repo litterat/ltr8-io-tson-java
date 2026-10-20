@@ -507,8 +507,8 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * The declaration a <b>deferred</b> defect belongs to: the open declaration whose held text wrote the
-     * name, when the entry that failed is one this resolver derived.
+     * The declaration a <b>deferred</b> defect belongs to: the open declaration whose body wrote the name, when
+     * the entry that failed is one this resolver derived.
      *
      * <p><b>Holding is what makes this necessary.</b> A closed declaration's references are checked where the
      * author wrote them. A template's are not -- nothing about them can be settled until an application
@@ -1064,10 +1064,10 @@ public final class TsonSchemaLinker {
      * imported schema, examined on its own, correctly doesn't know about it. {@link #withAddedSubtypes} unions
      * with whatever subtypes the target already had rather than replacing them.
      *
-     * <p><b>Every chained value is credited, and nothing else</b> ({@link Chained}): a type, and a family base --
-     * a record-bodied template, the ABSTRACT base its members are IS-A, whose {@code subtypes} are its members.
-     * Both sides are asked of the chain, so a template IS-A its own parents as any record is. A reference is a
-     * hop, not a type of its own.
+     * <p><b>Every chained value is credited, and nothing else</b> ({@link Chained}): a type, a family base -- a
+     * record template, the ABSTRACT base its members are IS-A -- among them. Both sides are asked of the chain,
+     * so a record template IS-A its own parents as any record is. A reference is a hop, and a held template an
+     * abbreviation, neither a type of its own.
      */
     private static Map<String, Top> computeSubtypes(Map<String, Top> merged, Set<String> localNames) {
         Map<String, Set<String>> newSubtypesByName = new LinkedHashMap<>();
@@ -1794,7 +1794,7 @@ public final class TsonSchemaLinker {
         }
         if (supplied == 0) {
             if (OpenEntry.isFamilyBase(referenced)) {
-                // A record-bodied template has a parent, and naming it here names that parent
+                // A record template is a family base, and naming it here names that base
                 // (§5.10). Nothing is ever read *against* it: a value at the position
                 // is a value of some member, selected by a tag or by the discriminators, and every member is
                 // a closed entry -- so the existential is eliminated by dispatch rather than by inferring

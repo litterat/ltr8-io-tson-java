@@ -137,10 +137,10 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
     declares parameters, which folds three author errors into one rule — too many, too few, and **none at
     all**. That last is the one worth guarding here: a template named without being applied otherwise links
     and compiles clean and fails only at *read* time, against a document with nothing wrong with it. It is
-    conditional, and the condition is `template.extension`: a **family base** may be named bare
-    (`use => { u: box }` resolves to `box`, and a value there is a value of one of its instantiations), while
-    a container, a reference and a constructor-application template carry no `extension`, have no dispatch to
-    eliminate their parameters, and are refused (§5.10). *Parameter usage*: an open entry references
+    conditional, and the condition is `OpenEntry.isFamilyBase`: a **family base** — a record template — may be named
+    bare (`use => { u: box }` resolves to `box`, and a value there is a value of one of its instantiations), while
+    a container, a reference and a constructor-application template have no dispatch to eliminate their parameters,
+    and are refused (§5.10). *Parameter usage*: an open entry references
     every parameter it declares, so
     `box => <T> { v: text }` is rejected — every application of it would denote the same type, and a
     parameter list is author-written, so an unused one is a `SchemaValidationException`.

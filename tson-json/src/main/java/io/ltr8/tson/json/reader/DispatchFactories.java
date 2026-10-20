@@ -69,11 +69,10 @@ final class DispatchFactories {
     }
 
     /**
-     * An entry that declares type parameters. A <b>family base</b> -- a template whose held body carries
-     * {@code extension} (§5.10) -- is a type by the only test that matters, a value
-     * standing at it being a value of one of its instantiations, so it dispatches exactly as a closed base
-     * does: ABSTRACT on {@code $type}, SEALED on the discriminators {@code template.discriminators} states on
-     * the entry, which this module reads without ever parsing the held body's text. Reported under the
+     * An entry that declares type parameters. A <b>family base</b> -- a record template (§5.10) -- is a type by
+     * the only test that matters, a value standing at it being a value of one of its instantiations, so it
+     * dispatches exactly as a closed base does: ABSTRACT on {@code $type}, SEALED on the discriminators the open
+     * record states. Reported under the
      * template's own name, the one the author wrote; a family base has no field list of its own, so the
      * closure rules carry none.
      *

@@ -16,7 +16,6 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -32,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -151,12 +151,9 @@ class TsonSchemaLinkerTest {
         assertTrue(thrown.getMessage().contains("'set' declares no type parameters"), thrown.getMessage());
     }
 
-    /**
-     * A one-parameter template. Its body is <b>held</b> ([TSON-SCHEMA] §5.10) and a held body is text, so a
-     * test states one directly rather than assembling the tree it denotes.
-     */
-    private static Top template(String parameter, String body) {
-        return new TemplateBody(List.of(TemplateParam.typeParameter(parameter)), body, Optional.empty());
+    /** A one-parameter record template: the record it is, with its parameter stated ([TSON-SCHEMA] §5.10). */
+    private static Top recordTemplate(String parameter, SequencedMap<String, RecordField> fields) {
+        return RecordBody.of(fields).withParameters(List.of(TemplateParam.typeParameter(parameter)));
     }
 
     /**
@@ -175,7 +172,8 @@ class TsonSchemaLinkerTest {
     void anArgumentBearingApplicationIsCarriedThroughWithoutMaterialising() {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
-        entries.put("other", template("U", "!record { fields: { v => { type: U } } }"));
+        entries.put("other",
+                recordTemplate("U", RecordBody.fieldMap(Map.entry("v", RecordField.required(TypeRef.of("U"))))));
         TypeRef otherOfToken = new TypeRef("other", List.of(new TypeArgument.Ref(TypeRef.of("token"))));
         entries.put("generic", RecordBody.of(RecordBody.fieldMap()));
 

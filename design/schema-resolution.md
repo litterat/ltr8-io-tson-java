@@ -120,30 +120,30 @@ are kept in step deliberately.
   a non-record is the author's error. A **template** takes `abstract`, whose subject is the template's own
   instantiations (its `subtypes`, next bullet), while `final` is a schema error, every application being a subtype of
   the template by construction, so the claim
-  is false before the author writes anything else. **The mark is spliced into the held body rather than set
-  on a `RecordBody`** (`WireForm.heldWithExtension`), because by the time a declaration's annotations are read the body is
-  text:
-  §5.2's `{ x: T }` is rewritten to `!record { … }` at desugar and a composition or refinement template is held
-  by `holdIfOpen` one phase later, so neither producer has the mark in hand. Stating `extension: ABSTRACT` in that text
-  is enough — materialisation reads the closed body back through the `record` constructor's own
-  reader, so nothing in the closing path knows the member exists. An open body applying anything but `record`
-  has no such member and is refused, named by the constructor it applies. A restated field keeps a
+  is false before the author writes anything else. **On a record template the mark sets the open record's own
+  `extension`**, which is each application's: the base is ABSTRACT by construction, so the field is free to say how
+  an application is realised, and `HeldBody.of` states it in the held tree (`WireForm.heldRecord`), which
+  closing reads back through the `record` constructor's own reader. The selector rule (`=?` forcing ABSTRACT) is a
+  closed record's alone, an open record's `discriminators` being the base's. An open body applying anything but
+  `record` has no such member and is refused, named by the constructor it applies. A restated field keeps a
   discriminator it does not repeat, on the annotation-merge rule's own logic below.
-- **A template carrying `extension` is a family base, and takes part in IS-A as one** (§5.10).
-  `template.extension` is derived and is always ABSTRACT — a parent has no direct instances — and its
-  presence is the test: `TsonSchemaLinker.isFamilyBase`. Such a template is credited under its own supertypes
+- **A record template is a family base, and takes part in IS-A as one** (§5.10). It is a `RecordBody` with
+  `parameters`, ABSTRACT by construction — a parent has no direct instances — and `OpenEntry.isFamilyBase` is the
+  test. Such a template is credited under its own supertypes
   (so `base.subtypes` holds `box` beside `box<text>`), its `subtypes` holds its instantiations, and a type
   position naming it compiles to `AbstractTemplateReader` rather than to `OpenTemplateReader`'s refusal. What
   makes that safe is *elimination*: no value is read against the template — a value there is a value of some
   member, selected by a tag or by the discriminators, each member closed with its arguments fixed. A
-  container, a reference and a constructor-application template have no such dispatch, carry no `extension`,
+  container, a reference and a constructor-application template are `TemplateBody` values with no such dispatch,
   and stay "not a type until applied". Only `final` is refused there, its applications being
   subtypes by construction. **Member dispatch does not travel to a member**
   (`TemplateMaterialiser.closedExtension`): §5.7 fixation pins the selectors and clears their marks, so a
   member is an ordinary concrete record, where ABSTRACT does travel and is how `abstract` reaches every
   instantiation. One dispatcher serves both kinds of base — `RecordMemberDispatchReader` takes the selector
   *fields* rather than a body, and `FamilySelectors.of` (`schema.meta`) derives them — a closed base from its own
-  fields, a template base from its members' fields of those names, its own body being held text.
+  fields, a template base from its members' fields of those names, its own fields possibly naming its parameters. A
+  record template IS-A the base is no member of it: `FamilySelectors.fromMembers`, `RecordExtension`'s pin checks
+  and both encodings' member dispatchers skip an open subtype, its applications being the members.
   `RecordExtension` checks the family against that same derivation.
 - **Two different edges populate a family's `subtypes`, and they are minted by two different mechanisms.** The first is
   §5.8's reference-valued `supertypes`: `result => abstract <T> { payload: T }` with `ok => <T> result<T> & { note: text
@@ -288,10 +288,10 @@ are kept in step deliberately.
   touching it. The cost is a spurious `!ref`/`!value` tag on `toTson` output, documented.
 - **`schema.meta` value model:** one Java type per kernel vocabulary record/enum. `Top`/`Type`/`Atom`/`Product`/`Sum`
   replicate the kernel's composition chain (§4.1) as real Java subtyping — a consumer tests kind ancestry with
-  `instanceof Product`, and an entry's kind is `TypeKind.of(value, kernel)`. Every `Type` record and `TemplateBody`
+  `instanceof Product`, and an entry's kind is `TypeKind.of(value, kernel)`. Every `Type` record
   carries `TypeChain chain` as its first component (`Chained`), mirroring the constructor's flattened shape
   (`chained`'s field comes first), with `withChain` to place a body and the chain's accessors as defaults on
-  `Chained`; `Reference` and `Data` carry none. Body leaves are named
+  `Chained`; `Reference`, `Data` and `TemplateBody` carry none. Body leaves are named
   `RecordBody`/`EnumBody`/etc. (not `Record`, which would collide with `java.lang.Record`). Multi-word fields carry
   `@Field("snake_case")`. **A `schema.meta` class used as a bind target with more than one public constructor needs
   `@Record` on the canonical one** or `DefaultRecordBinder` throws (`IntegerType`/`IntegerSize` hit this) — the

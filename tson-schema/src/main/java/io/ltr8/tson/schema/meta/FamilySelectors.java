@@ -14,24 +14,20 @@ import java.util.SequencedMap;
  * derivation both encodings read, so a schema-load check and a read can never disagree about what selects a
  * member.
  *
- * <p><b>Why the names alone are not enough.</b> {@code record.discriminators} and {@code
- * template.discriminators} hold field names, and every consumer needs each selector's declared
+ * <p><b>Why the names alone are not enough.</b> {@code record.discriminators} holds field names, and every
+ * consumer needs each selector's declared
  * <em>type</em> as well: a pin is a bare token (§12.1) and only the type says which parser reads it. So the
  * names are resolved back to fields here, and where they come from differs by the kind of base.
  *
  * <p><b>A closed base declares them itself.</b> The names index into its own {@code fields}, which is the
  * whole of it.
  *
- * <p><b>A template base has no resolved fields at all</b> -- its body is held text (§5.10) -- so each
- * selector's type is taken from any member's field of that name. That is exact rather than a best effort:
+ * <p><b>A record template base takes each selector's type from any member's field of that name</b>, a member
+ * being closed where the base's own fields may still name its parameters. That is exact rather than a best effort:
  * §5.7's identity diagonal forbids the base pinning what its members each pin differently, and the tightening
  * table governs a field's <em>state</em> and never its type, so every member carries the selector at the
  * base's own declared type. Measured on a family whose other argument narrows: the selector stays {@code
  * text} while the narrowing lands on the parameter-typed field beside it.
- *
- * <p>That is also what lets an encoding with no access to the schema pipeline's engine dispatch a sealed
- * template family: the selector types come from entries it already holds, never from parsing held text --
- * the parse §1.3 promises a resolved-output consumer never has to make.
  *
  * <p><b>An empty result is a real answer, not a failure.</b> A template family with no applications has no
  * members to take a type from, so it has no dispatch table -- and a value there is refused at read time for
@@ -81,7 +77,6 @@ public final class FamilySelectors {
     public static List<String> namesOf(Top definition) {
         return switch (definition) {
             case RecordBody record -> record.discriminators();
-            case TemplateBody held -> held.discriminators();
             default -> List.of();
         };
     }
@@ -112,7 +107,8 @@ public final class FamilySelectors {
         SequencedMap<String, RecordField> selectors = new LinkedHashMap<>();
         for (String name : names) {
             for (String member : members) {
-                if (!(entries.get(member) instanceof RecordBody record)) {
+                // A record template IS-A the base is no member, its applications being the members.
+                if (!(entries.get(member) instanceof RecordBody record) || OpenEntry.isOpen(record)) {
                     continue;
                 }
                 Optional<Map.Entry<String, RecordField>> found = field(record, name);

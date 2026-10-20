@@ -1357,8 +1357,8 @@ type_chain => {
 chained     => { chain?: type_chain }
 application => @annotation type_ref   -- on an entry's key: the application it is the instantiation of (§8.2)
 type     => top & chained & {}
-template => top & chained & { parameters  template  extension?  discriminators? }
-record   => product & { access_pattern? size_type? fields groups? extension? discriminators? profile? }
+template => top & { parameters  template }   -- #17: a record template is a `record` with `parameters`
+record   => product & { access_pattern? size_type? fields groups? extension? discriminators? profile? parameters? }
 schema   => {type_name => top}
 ```
 
@@ -1372,15 +1372,15 @@ schema   => {type_name => top}
   open. `type_ref` is a name in `schema` whose value is a type, and the DATA-at-a-type-position rule (§4.1) is
   "the value is not a type", with no wrapper to consult.
 - **One record, three states named.** `parents` is what was written, and is the only list that ever holds an
-  application; it is held text's slot, and a family-base template keeps it after closing, since its parents are
-  closed entries and a FINAL parent is refused there as anywhere (§5.2). `supertypes` is the closed chain, complete
+  application; it is a record template's slot, kept after closing, since its parents are closed entries and a FINAL
+  parent is refused there as anywhere (§5.2). `supertypes` is the closed chain, complete
   to a fixed point through applied parents (§5.8), every element a bare name, lexically sorted by the fixtures'
   convention; a fresh record's is empty, as §4.1 says. `subtypes` is unchanged: the entries of this map only.
-  The record is a mixin because a template needs it too: a record-bodied template is the ABSTRACT base its
-  members are IS-A, and it stands in its own parents' `subtypes` as any record does.
+  A record template is the ABSTRACT base its members are IS-A (#17), and it stands in its own parents' `subtypes` as
+  any record does.
 - **An entry's application is an annotation on its key.** `application` is the entry's identity as an
-  instantiation (§8.2), and an entry of any kind can be one: a record-bodied template's member, a DATA entry
-  closed from a templated instance, the alias a non-record template's application closes to. It is a fact about
+  instantiation (§8.2), and an entry of any kind can be one: a record template's member, a DATA entry
+  closed from a templated instance, the alias a template's application closes to. It is a fact about
   the entry, not about a type, so it lives beside the entry as `@synthetic` does (§8.2): the resolver writes
   `@application:{ name: box  arguments: [{ name: int32 }] }` on the key wherever an entry closes an application,
   and reads it as stated on ingest, so an imported schema's instantiations unify with a later schema's. It is
@@ -1415,7 +1415,7 @@ schema changes; no verdict on a data document changes.
 
 **Suggested resolution.**
 
-- [TSON-SCHEMA] §4.1: `type_chain` and `chained` as above, `type` and `template` composing it, with the sentence
+- [TSON-SCHEMA] §4.1: `type_chain` and `chained` as above, `type` composing it, with the sentence
   "a type carries its IS-A chain; a declaration never writes it, and a constructor never declares its name";
   `application` declared with `synthetic` among the kernel's annotations, derived and never author-written.
 - [TSON-SCHEMA] §8.1: retitled to `type_ref` and `type_argument`; an entry resolves to its value; the kind of an
@@ -1429,17 +1429,17 @@ schema changes; no verdict on a data document changes.
   above, `schema => {type_name => top}`.
 
 **Status against Revision 37:** open; running on the `entry-is-value` branch of `r2026-38-proposal`. `meta-kernel.tn`
-declares `type_chain`, `chained`, `type` and `template` composing it, `record` without `supertypes`, and `schema =>
+declares `type_chain`, `chained`, `type` composing it, `record` without `supertypes`, and `schema =>
 {type_name => top}`, with no `type_definition`; the resolved fixtures carry the nested chain (`ResolvedFixtureTest`), and
 the bundled schemas are restamped. The Java model mirrors it: `schema.meta.TypeDefinition` is gone, `TsonSchema` maps a
-name to a `Top`, and every type body record and `TemplateBody` carries one `TypeChain chain` component, behind a
+name to a `Top`, and every type body record carries one `TypeChain chain` component, behind a
 `Chained` interface whose accessors every IS-A question goes through. `supertypes` is sorted and closed to a fixed
 point over every local chain, so an entry IS-A everything its supertypes are, an atom refinement of a refinement
-included (`small => !int32 ^ { … }` carries `[int32 integer]`). A closed type that is no template keeps no `parents`;
-a template keeps its written ones, is IS-A the closed entries they reach and stands in their `subtypes`, so a template
-composing or refining a final record is refused at its own declaration. `application` is a key annotation, written
-wherever an entry closes one — a member of a record-bodied template, a DATA entry, the alias a non-record template's
-application closes to — and read through `TsonSchema.applicationOf`. Kind and constructor-hood are judged by where
+included (`small => !int32 ^ { … }` carries `[int32 integer]`). A closed type keeps no `parents`; a record template
+keeps its written ones, is IS-A the closed entries they reach and stands in their `subtypes`, so a template composing
+or refining a final record is refused at its own declaration. `application` is a key annotation, written
+wherever an entry closes one — a member of a record template, a DATA entry, the alias a template's application closes
+to — and read through `TsonSchema.applicationOf`. Kind and constructor-hood are judged by where
 `top` and the base kinds are defined. Writing `chain` is a resolver error on an explicit construction, a held
 construction and an atom refinement alike, and so is a constructor declaring a field named `chain`. Beyond the
 proposal as written: what a closed refinement's one written parent was is kept as an in-memory fact for one reader, a
@@ -1450,10 +1450,8 @@ differences from "no diagnostic changes" above: a template application with an u
 holding it (`'box<some_typo>' field 'v' has an unresolved reference 'some_typo'`), and a resolved atom refinement's
 chain is complete. The corpus restates every resolved output in the nested form and adds vectors for the refusals, an
 emptied chain under subtraction, a complete chain, a chain completed through an applied parent, a template refused
-against a final parent, and a schema's own `data`. Part 2's cached §13.2 table is not re-stamped here. `template`
-composing `chained` is the running form; the direction proposed in `BACKLOG.md` resolves a record-bodied template as a
-`record` with `parameters`, which returns the chain to `type` alone and leaves `template` to the open bodies that are
-no type.
+against a final parent, and a schema's own `data`. Part 2's cached §13.2 table is not re-stamped here. #17 resolves
+a record template as a `record` with `parameters`, which leaves the chain to `type` alone; that is the running form.
 ---
 
 ## 15. `top`, `type` and the base kinds are `abstract`
@@ -1563,10 +1561,80 @@ an application; anywhere else in a record body is a resolver error, since the fa
 its members share". §5.8, "Parameterized references": "an operand may carry arguments, which may name the
 declaration's parameters; an operand that is itself a parameter is a resolver error".
 
-**Status against Revision 37:** open; running on the `record-template-slots` branch of `r2026-38-proposal`.
+**Status against Revision 37:** open; running on `r2026-38-proposal`.
 `ParameterTypes` refuses a parameter at any record slot but a field's type, reporting the slot (`parameter 'K' stands at
 a key of record.fields -- a record template's parameters stand only in a field's type, a field's default or fixed value,
 or an argument of an application, so that every application of it shares one shape (§5.10)`); `DefinitionResolver`
 refuses a parameter operand before looking the name up (`supertype 'T' is a parameter of this declaration, and a
 parameter is never an operand of '&' -- its fields are unknown until the template is applied, so there is nothing to
 flatten (§5.10)`). The corpus carries a refusal vector for each.
+
+## 17. A record template is a `record` with `parameters`; `template` holds every other open body
+
+**Section:** [TSON-SCHEMA] §5.10 ("Held bodies": "a record template `<T> { x: T }` is normalised to `<T> !record {
+… }` … and held"; "A record-bodied template is a family base, and may be named at a type position"; "The **two
+levels** of `extension`"), §4.1 (`template` composing `top`), §8.1; `meta-kernel.tn`'s `template`, `record`,
+`chained` and `type_chain`.
+
+**Kind:** proposal — a kernel restructuring with no change to any verdict. Builds on #16.
+
+**The problem.** §5.10 already separates two kinds of template by their body: a record-bodied template is a family
+base, a type a position may name, ABSTRACT, IS-A its parents, with its members IS-A it; every other template denotes
+nothing until applied. The kernel carries both in one constructor and encodes the difference as an optional field:
+`template.extension` is present exactly when the body is a record, and when present it is always ABSTRACT ("absent
+means this template is no type"). `template` composes `chained` only because a record template has a chain, and
+carries `discriminators` only because a record template has selectors. Every one of those facts is a record's, and
+the reason for holding a record body as text — that a parameter may stand in any slot, `min_items: N` included — no
+longer applies to one: after #16 a record template's parameters stand only in a field's `type`, a field's `value` and
+an application's arguments, all of which `record_field` and `type_ref` already hold as names or uninterpreted tokens.
+So an open record is a value of the vocabulary as it stands.
+
+The two kinds are the split C++ (alias template / class template), Haskell (`type` / `data`), ML (abbreviation /
+`datatype`) and Scala (`type F[A]` / `class F[A]`) all make. Only a record can be a family base: a base is what
+survives abstracting over the parameters, and residual shape, abstractness and dispatch are all record properties. A
+parameterised atom refinement (`<N> !integer ^ { max: N }`) has IS-A edges, but from its `^`, and its open form is
+just its source; a container has no IS-A at all.
+
+**Proposed.**
+
+```
+record => product & {
+  …
+  parameters?: [template_param]
+}
+
+template => top & {
+  parameters: [template_param]
+  template:   text
+}
+```
+
+- A record with `parameters` is a record template and a family base: ABSTRACT by construction, IS-A its parents as
+  written (one may be an application naming a parameter), its declared applications IS-A it. Its own `extension`
+  is each application's — the second of §5.10's "two levels" — so `result => abstract <T> { … }` makes `result<text>`
+  abstract over its own members; the base's ABSTRACT is not stated.
+- `record.discriminators` on a record template is the base's selector list, the `=?` fields and the fields a fresh
+  record pins to a value parameter; closing drops a selector its pin fixes, as §5.10's "the selectors do not travel to
+  a member (closing has just pinned them)" already says.
+- `template` holds every other open body as text, composes `top` alone, and carries no chain, `extension` or
+  `discriminators`: it is not a type, and an application of it is its expansion, with whatever chain the expansion's
+  own `^` or `&` gives it.
+- A record template named without arguments at an operand of `&` or `^` is a resolver error: a position may name the
+  base, but an operand is flattened, and a template has fields only once its parameters are bound.
+
+**Breaking changes, against Revision 37:** resolved output only. A record template is written
+`!record { fields: { … }  parameters: [ … ] }` with its parameters in place, where it was
+`!template { parameters: [ … ]  template: "!record { … }"  extension: ABSTRACT }`. No verdict changes, and no
+bundled schema declares a record template.
+
+**Suggested resolution.** [TSON-SCHEMA] §5.10, "Held bodies": a record template is not held; it is the `record` it
+denotes, with `parameters`, and only a template over another constructor is held as text. "A record-bodied template
+is a family base": the base is the record template entry, ABSTRACT by construction, and "The two levels of
+`extension`" becomes "the base's is ABSTRACT by construction; the record's own `extension` is each application's".
+§4.1 and `meta-kernel.tn`: as above.
+
+**Status against Revision 37:** open; running on the `record-families` branch of `r2026-38-proposal`. `RecordBody`
+carries `parameters`, and `schema.meta.OpenEntry` is where every phase asks whether an entry is open and whether it is
+a family base. Closing builds the open record's tree (`WireForm.heldRecord`) and runs the one substitution every
+other template closes by. `meta-kernel.tn` and its resolved fixture state the shapes above; the corpus vector
+`class2/schema/valid/a-bounded-template-parameter-is-recorded-with-its-bound` states the new resolved form.

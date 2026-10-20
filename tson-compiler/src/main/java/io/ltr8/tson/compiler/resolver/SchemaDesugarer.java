@@ -157,10 +157,8 @@ final class SchemaDesugarer {
      * <p>It is deliberately never in {@code TsonSchemaParser.declarationPositions()} -- the position belongs
      * to the diagnostic already reported against the real declaration, not to this stand-in.
      *
-     * <p><b>A stand-in keeping parameters is held like every other open body</b>
-     * ({@code WireForm.heldEmptyRecord}, applied by {@code DefinitionResolver} where this resolves), so
-     * {@code TemplateMaterialiser} has one substitution path and none of its own for a body with no fields to
-     * substitute into.
+     * <p><b>A stand-in keeping parameters is an open empty record</b>, a record template like any other where
+     * {@code DefinitionResolver} resolves it, so {@code TemplateMaterialiser} closes it by the one process.
      */
     private static TypeDef absorbed(SchemaMap.Declaration declaration) {
         return new StructuralTypeDef(typeParams(declaration.typeDef()), new RecordDef(List.of()));
@@ -351,13 +349,12 @@ final class SchemaDesugarer {
                 // see currentParameters.
                 StructuralDef body = structuralDef(structural.body());
                 // §5.2's own rewrite, applied where the body is written: a bare record body denotes
-                // `!record { fields: { ... } }`, so a record template becomes the construction it always
-                // was and is held like every other open form. See recordBinding.
+                // `!record { fields: { ... } }`, which `DefinitionResolver.openRecord` binds into the open
+                // record it is. See recordBinding.
                 //
-                // Every parameterised record body takes this path, `~`-marked or not. The other route --
-                // `DefinitionResolver.holdIfOpen`, one phase later -- wraps an open RecordBody into the same
-                // `!record { ... }`, and exists for composition and refinement: both absorb fields from a
-                // source, so the form to hold is the flattened one. A bare record has no source.
+                // Every parameterised record body takes this path, `~`-marked or not. A composition or
+                // refinement template is opened one phase later (`DefinitionResolver.parameterised`), since both
+                // absorb fields from a source and the open record is the flattened one. A bare record has none.
                 if (!structural.typeParams().isEmpty() && body instanceof RecordDef record) {
                     yield instance(recordBinding(record), structural.typeParams());
                 }

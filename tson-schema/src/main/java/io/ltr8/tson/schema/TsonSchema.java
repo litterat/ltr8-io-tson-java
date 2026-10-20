@@ -213,8 +213,8 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
 
     /**
      * The application {@code name} is the instantiation of ([TSON-SCHEMA] §8.2): the {@code @application} its key
-     * carries, which the resolver writes wherever an entry closes one -- a record-bodied template's member, a DATA
-     * entry, the alias a non-record template's application closes to. Empty for an entry that closes none.
+     * carries, which the resolver writes wherever an entry closes one -- a record template's member, a DATA
+     * entry, the alias a template's application closes to. Empty for an entry that closes none.
      */
     public Optional<TypeRef> applicationOf(String name) {
         return applicationOf(entries.getAnnotations(name));

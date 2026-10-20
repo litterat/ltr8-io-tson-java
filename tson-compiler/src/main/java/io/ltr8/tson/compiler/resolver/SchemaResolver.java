@@ -677,7 +677,10 @@ public final class SchemaResolver {
     private static void closeChains(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
                                     Map<String, Top> instantiations) {
         for (Map<String, Top> entries : List.of(resolvedLocals, instantiations)) {
+            // A record template keeps the parents as written: they may still name its own parameters, and
+            // closing each application is what completes that application's chain from them.
             entries.replaceAll((name, definition) -> definition instanceof Type type && !type.parents().isEmpty()
+                    && !OpenEntry.isOpen(definition)
                     ? type.withChain(type.chain().withParents(List.of()))
                     : definition);
         }
@@ -940,10 +943,9 @@ public final class SchemaResolver {
      * placeholder exists to prevent.
      */
     private static Top unresolved(List<String> parameters) {
-        // An open placeholder holds its body like every other open entry, so nothing downstream has to keep
-        // a second substitution path for the one shape that did not -- see WireForm.heldEmptyRecord.
-        return parameters.isEmpty() ? RecordBody.of(new java.util.LinkedHashMap<>())
-                : HeldBody.held(parameters, WireForm.heldEmptyRecord());
+        // An open placeholder is an open record like any record template, so it closes by the one process.
+        return RecordBody.of(new java.util.LinkedHashMap<>())
+                .withParameters(parameters.stream().map(TemplateParam::typeParameter).toList());
     }
 
     /**

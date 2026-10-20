@@ -9,6 +9,7 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -168,21 +169,14 @@ class OpenEntryResolvedFormTest {
     // ── The biconditional an entry's parameters rest on ─────────────────
 
     /**
-     * <b>An entry declares parameters exactly when its body is held, and the two lists agree.</b>
-     * [TSON-SCHEMA] §5.10's "Closed entries are parameter-free" is structural now rather than a MUST anyone
-     * can violate: {@code OpenEntry.parameterNames} reads the held body's own list, so a closed entry has
-     * nowhere to put one. This asks it of every entry of every schema -- the three bundled ones and a schema
-     * exercising each template shape -- which is the population the rule is about, and it is what would catch
-     * the derivation silently answering {@code []} for an entry that is genuinely open.
-     *
-     * <p><b>It is a property of a published entry, not of every {@code Top} ever built.</b>
-     * Resolution legitimately constructs an un-held intermediate and converts it: {@code holdIfOpen} takes a
-     * resolved record body and replaces it with the held form, and is handed the parameter list separately
-     * for exactly that reason. So the invariant cannot be an assertion in the constructor -- it would fire on
-     * the value about to be converted -- and belongs here, over entries a schema actually holds.
+     * <b>A record template is a record with parameters, and every other open entry is held.</b> [TSON-SCHEMA]
+     * §5.10's two kinds of template, asked of every entry of every schema -- the three bundled ones and a schema
+     * exercising each template shape: an entry with parameters is either a {@code RecordBody} or a {@code
+     * TemplateBody}, a held body never applies {@code record}, and every {@code TemplateBody} declares
+     * parameters.
      */
     @Test
-    void anEntryDeclaresParametersExactlyWhenItsBodyIsHeld() {
+    void aRecordTemplateIsARecordAndEveryOtherTemplateIsHeld() {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/shapes.tn"
@@ -208,11 +202,14 @@ class OpenEntryResolvedFormTest {
             for (Map.Entry<String, Top> entry
                     : tson.bindRegistry().core().resolveLinked(id).schema().entries().entrySet()) {
                 Top definition = entry.getValue();
-                boolean held = definition instanceof TemplateBody;
-                if (held) {
+                boolean declares = !OpenEntry.parameterNames(definition).isEmpty();
+                if (declares) {
                     open++;
                 }
-                if (OpenEntry.parameterNames(definition).isEmpty() == held) {
+                boolean shape = definition instanceof TemplateBody held
+                        ? !held.template().startsWith("!record") && declares
+                        : !declares || definition instanceof RecordBody;
+                if (!shape) {
                     broken.add(id + "#" + entry.getKey() + ": parameters " + OpenEntry.parameterNames(definition)
                             + " with a " + definition.getClass().getSimpleName() + " body");
                 }
@@ -220,7 +217,7 @@ class OpenEntryResolvedFormTest {
         }
 
         int openEntries = open;
-        assertEquals(List.of(), broken, "§5.10: only template entries are open");
+        assertEquals(List.of(), broken, "§5.10: a record template is a record, every other template is held");
         assertTrue(openEntries >= 8, () -> "not enough open entries to mean anything: " + openEntries);
     }
 
@@ -296,12 +293,12 @@ class OpenEntryResolvedFormTest {
         for (String id : ids) {
             for (Map.Entry<String, Top> entry : perSchema.get(id).entrySet()) {
                 Top definition = entry.getValue();
-                if (definition instanceof TemplateBody) {
+                if (OpenEntry.isOpen(definition)) {
                     open++;
                 }
                 closed++;
                 if (!Chained.supertypesOf(definition).contains("top") && !(definition instanceof Reference)
-                        && !(definition instanceof TemplateBody)
+                        && !OpenEntry.isOpen(definition)
                         && !perSchema.get(id).containsKey(headOf(definition))) {
                     neededTheGoverningMeta++;
                 }
@@ -326,8 +323,9 @@ class OpenEntryResolvedFormTest {
     /** §4.1's rule, read off what the entry already states. Four branches; see the test's own note. */
     private static TypeKind derive(Top definition, Map<String, Top> universe) {
         if (definition instanceof TemplateBody) {
-            // A template is not a type (§5.10), so its kind says that and nothing about what applying it
-            // produces -- that is the kind of the entry materialisation mints, from its own closed body.
+            // A held template is not a type (§5.10), so its kind says that and nothing about what applying it
+            // produces -- that is the kind of the entry materialisation mints, from its own closed body. A record
+            // template is a type, the family base, and falls to the record rules below.
             return TypeKind.TEMPLATE;
         }
         if (definition instanceof Reference) {

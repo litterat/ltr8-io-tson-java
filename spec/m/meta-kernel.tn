@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=670ce4dae260ac420be5bb1a1db1ec39fd1ea2e2273fe632e200b0158a1f4481"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=8d9451a15045c462bc6a124fa0b2df0c36b3f37c8ce87494dadeb189146931a8"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -29,8 +29,8 @@
 
   @doc:"""
     Where an entry sits in the IS-A order. `parents` is what was written: the
-    parents of held template text, one of which may be an application (`<T>
-    result<T> & { ... }`), and of a family-base template after it closes; it is
+    parents of a record template, one of which may be an application (`<T>
+    result<T> & { ... }`), kept after it closes; it is
     the only list that ever holds an application. `supertypes` is the closed
     chain: every entry this one IS-A, complete to a fixed point through applied
     parents ([TSON-SCHEMA] §5.8), each a bare name, sorted, and empty for a
@@ -44,7 +44,7 @@
   }
 
   @doc:"""
-    A value that carries an IS-A chain: `type` and `template` compose it. A
+    A value that carries an IS-A chain: `type` composes it. A
     declaration never writes `chain`, and a constructor never declares a field
     of that name: the resolver computes the chain from composition and
     refinement and the linker inverts it. On ingest it is read as stated and
@@ -139,9 +139,10 @@
   }
 
   @doc:"""
-    Held body — the body of an entry that declares type parameters
-    ([TSON-SCHEMA] §5.10). `template` is the constructor application as written,
-    unread until materialisation substitutes the parameters away, and
+    Held body — the body of an entry that declares type parameters and applies
+    any constructor but `record` ([TSON-SCHEMA] §5.10), a record template being
+    a `record` with `parameters`. `template` is the constructor application as
+    written, unread until materialisation substitutes the parameters away, and
     `parameters` lists what it binds, each a `template_param`.
 
     The text is how a held body is written in resolved output; a processor holds
@@ -155,32 +156,13 @@
     synthetic's identity is derived from its held binding record, so two
     spellings of one form must reduce to one entry, and whitespace is free.
 
-    Composes `top` and `chained`: it describes no value's shape and nothing is
-    typed by it as a whole, but a record template is the ABSTRACT base its
-    members are IS-A, so it carries a chain. Its `parents` are written and kept
-    after it closes; its `supertypes` are the closed entries those parents
-    reach, a template parent contributing its own ancestors and not itself; its
-    `subtypes` are its members and the entries IS-A it.
-
-    `extension` is the **parent's**, and only a record-bodied template has one:
-    absent means this template is no type, so naming it at a type position is an
-    error. Present, it is always ABSTRACT and never OPEN or FINAL: a parent has
-    no direct instances, and its applications are subtypes by construction. It
-    is derived rather than stated; the author's own `abstract` mark is the
-    *instantiation's* fact and travels inside the held text above.
-
-    `discriminators` says which fields the members are selected by, in the order
-    the pins are compared as a tuple. It is `record.discriminators` for a base
-    that is a template, and on the same terms: **whether it is present is what
-    says how the members are selected** — by reading those fields where it is,
-    by the tag where it is not. Its names are text, as `record.discriminators`'
-    are, each a value of the base's name type.
+    Composes `top` alone: it is not a type, its open form denotes nothing, and
+    naming it at a type position is an error. An application is its expansion,
+    and carries whatever chain the expansion's own `^` or `&` gives it.
     """
-  template => top & chained & {
-    parameters:      [template_param]
-    template:        text
-    extension?:      record_extension_type
-    discriminators?: [text; 1..]
+  template => top & {
+    parameters: [template_param]
+    template:   text
   }
 
   @doc:"""
@@ -484,9 +466,9 @@
     Structured type reference ([TSON-SCHEMA] §8.1). `name` is the referenced
     type — or, within a template body, a parameter of either kind, read against
     the enclosing template's `parameters` list — and `arguments` carries
-    positional arguments as type_argument records. A parameter here describes
-    the held body as parsed; in resolved output it sits inside the
-    `template.template` text.
+    positional arguments as type_argument records. In a record template a
+    parameter stands here as written, resolved output included; in any other
+    template it sits inside the `template.template` text.
 
     `name` is the only required field, so the positional form ([TSON-SCHEMA]
     §5.6, general over schema-backed data) applies at every type_ref-typed
@@ -508,8 +490,8 @@
     in an alias's `reference.target` — and means "an application", nothing
     else. Minted entry names are internal —
     implementation-chosen and non-normative, since a minted entry's identity is
-    its canonical content ([TSON-SCHEMA] §8.2). A closed entry — one whose body
-    is not a `!template` — contains no parameter references at any depth
+    its canonical content ([TSON-SCHEMA] §8.2). A closed entry — one that
+    declares no parameters — contains no parameter references at any depth
     ([TSON-SCHEMA] §5.10).
     """
   type_ref => {
@@ -525,9 +507,9 @@
     value-typed tokens (enum members) are never ambiguous with parameter names.
     The split carries the application's open/closed signal: substitution
     replaces a parameter-naming member with the bound argument as parameters
-    close ([TSON-SCHEMA] §8.1). A parameter here describes the held body as
-    parsed; in resolved output it sits inside the `template.template` text. The
-    group is not optional: exactly one member is present. There is no
+    close ([TSON-SCHEMA] §8.1). In a record template a parameter stands here
+    as written; in any other template it sits inside the `template.template`
+    text. The group is not optional: exactly one member is present. There is no
     positional form.
     """
   type_argument => {
@@ -606,8 +588,8 @@
     application the entry is the instantiation of ([TSON-SCHEMA] §8.2). An
     entry of any kind can be one, so it is a fact about the entry and not
     about a type: the resolver writes it wherever an entry closes an
-    application — a record-bodied template's member, a DATA entry, the alias a
-    non-record template's application closes to. On ingest it is read as
+    application — a record template's member, a DATA entry, the alias a
+    template's application closes to. On ingest it is read as
     stated, unlike `synthetic`, which is recomputed: it is the one fact the
     entry's value does not state, and what lets an imported schema's
     instantiations unify with a later schema's. A declaration never writes
@@ -629,18 +611,18 @@
     has it injected — except at a field group's member, whose presence is the
     group's and which is never supplied.
 
-    Within a template body it also carries a parameter, and needs no label to do
-    so: a token there is a parameter exactly when its text resolves into the
-    enclosing entry's `parameters` ([TSON-SCHEMA] §5.10's shadowing rule). This
-    describes the held body as parsed; in resolved output it sits inside the
-    `template.template` text.
+    In a record template it also carries a parameter, in `type` or in `value`,
+    and needs no label to do so: a token there is a parameter exactly when its
+    text resolves into the enclosing record's `parameters` ([TSON-SCHEMA]
+    §5.10's shadowing rule), in resolved output as in source.
 
     A parametric modifier takes the name mark its literal spelling takes
     ([TSON-SCHEMA] §5.7): `w?: T ~ P` is an optional DEFAULT field and
     `w?: T = P` an optional FIXED one, `w: T = P` is a FIXED field that is not
     optional, and `w: T ~ P` is refused. The parameter stands in `value` until
-    substitution makes it concrete; `optional` is the name's mark as written,
-    and closing changes neither it nor `role`.
+    substitution makes it concrete, a routed `= P` FREE until then: fixation
+    happens at materialisation, where the value is ([TSON-SCHEMA] §5.7).
+    `optional` is the name's mark as written, and closing never changes it.
 
     Which fields a member-dispatched family dispatches on is the enclosing
     record's own statement, `record.discriminators`, and no field says it of
@@ -707,20 +689,26 @@
   @doc:"""
     A record: named fields, fixed by the type, with the field groups over them.
 
-    `extension` states how the record may be realised, and is OPEN unless the
-    record says otherwise. Of the constructors, only `record` carries it; a
-    record-bodied template carries the parent's, always ABSTRACT, as `template`
-    says.
+    `parameters`, where present, make the record a template ([TSON-SCHEMA]
+    §5.10) and a **family base**: a type a position may name, ABSTRACT by
+    construction, a value there being a value of one of its declared members,
+    each IS-A it. A parameter stands only in a field's `type`, a field's
+    `value`, or an argument of an application in either or in a parent; the
+    rest of the record is what every application shares. Its type and bound
+    are derived from where it stands, as `template_param` says.
 
-    Its chain is `type`'s. Inside a held template body a parent may still be
+    `extension` states how the record may be realised, and is OPEN unless the
+    record says otherwise; on a record with `parameters` it states how each
+    application is realised, the base's own being ABSTRACT whatever it says, so
+    `result => abstract <T> { ... }` makes `result<text>` abstract over its own
+    members. Of the constructors, only `record` carries it.
+
+    Its chain is `type`'s. On a record with `parameters` a parent may still be
     open — `<T> result<T> & { ... }` — and it is substituted and closed with
-    every other reference the body holds, so `ok<text>` reaches an IS-A edge to
-    `result<text>` and not to `result<int32>`. A record-bodied template is the
-    ABSTRACT family base its members are IS-A, each member's chain naming it; a
-    template with no `extension` is not a type and never stands there
-    ([TSON-SCHEMA] §5.10). `fields` is flattened: a composition's fields are its
-    operands' and its own, merged, so a consumer that reads values against it
-    never repeats the merge.
+    every other reference the record holds, so `ok<text>` reaches an IS-A edge
+    to `result<text>` and not to `result<int32>`. `fields` is flattened: a
+    composition's fields are its operands' and its own, merged, so a consumer
+    that reads values against it never repeats the merge.
 
     `discriminators` names the fields this record's members are selected by, in
     the order their pins are compared as a tuple, and its presence is what makes
@@ -748,6 +736,7 @@
     extension?:      record_extension_type ~ OPEN
     discriminators?: [text; 1..]
     name_type?:      type_name
+    parameters?:     [template_param]
   }
 
   @doc:"""
