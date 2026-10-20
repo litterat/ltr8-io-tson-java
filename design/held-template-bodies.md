@@ -7,6 +7,9 @@ lives in git.
 
 **Invariants**
 
+- A phase asks whether an entry is open, what it binds and whether it is a family base through `schema.meta.OpenEntry`,
+  and reads its held tree through `HeldBody.of(Top)`. Nothing else tests for `TemplateBody` except the code that mints
+  one, so which kernel shape carries an open entry is decided in those two places.
 - Every open entry's body is held (a `TemplateBody`), an error placeholder included (`WireForm.heldEmptyRecord`);
   `close` dispatches on the constructor head — `record` closes to the instantiation, `reference` to a name, everything
   else to a synthetic — and any other body shape is an `IllegalStateException`.

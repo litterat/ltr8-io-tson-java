@@ -21,6 +21,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.IriType;
@@ -477,7 +478,7 @@ class DefinitionResolverTest {
         Top frame = resolveSnippet("frame => [text; 1920]");
 
         assertEquals(TypeKind.PRODUCT, TypeKind.of(frame, n -> true));
-        assertEquals(List.of(), TemplateBody.parameterNamesOf(frame));
+        assertEquals(List.of(), OpenEntry.parameterNames(frame));
         assertEquals(List.of(), Chained.supertypesOf(frame));
         assertEquals(Optional.of("array"), snippetFacts.get("frame").constructor(),
                 "the constructor the application closes at, not the template it was spelled through");
@@ -536,7 +537,7 @@ class DefinitionResolverTest {
     void resolvesAFreshRecordTemplateAsAHeldRecordConstruction() throws DataBindException {
         Top pair = resolveSnippet("pair => <A, B> { first: A  second: B }");
 
-        assertEquals(List.of("A", "B"), TemplateBody.parameterNamesOf(pair));
+        assertEquals(List.of("A", "B"), OpenEntry.parameterNames(pair));
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } parameters: [ " + typeParameter("A") + " "
                 + typeParameter("B") + " ] "
                         + "template: \"!record { fields: { "
@@ -574,7 +575,7 @@ class DefinitionResolverTest {
 
         Top box = resolver.resolve(schemaMap.declarations().get("box"));
 
-        assertEquals(List.of("T"), TemplateBody.parameterNamesOf(box));
+        assertEquals(List.of("T"), OpenEntry.parameterNames(box));
         assertEquals(List.of("base"), Chained.supertypesOf(box), "a template is IS-A what its parents reach");
         assertEquals(List.of(TypeRef.of("base")), Chained.parentsOf(box), "and keeps them as written");
         assertEquals("{ chain: { parents: [ base ] supertypes: [ \"base\" ] subtypes: [] } parameters: [ "
@@ -676,7 +677,7 @@ class DefinitionResolverTest {
     void aParametricFixedValueRidesTheValueSlotAndFixesNothingYet() throws DataBindException {
         Top sized = resolveSnippet("sized => <T> { value: type_ref = T }");
 
-        assertEquals(List.of("T"), TemplateBody.parameterNamesOf(sized));
+        assertEquals(List.of("T"), OpenEntry.parameterNames(sized));
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } parameters: [ " + typeParameter("T") + " ] "
                         + "template: \"!record { fields: { "
                         + "value => { type: type_ref value: T } } "
@@ -717,7 +718,7 @@ class DefinitionResolverTest {
         Top array = resolver.resolve(schemaMap.declarations().get("array"));
 
         assertEquals(TypeKind.PRODUCT, TypeKind.of(array, n -> true));
-        assertEquals(List.of(), TemplateBody.parameterNamesOf(array), "the container constructors carry no parameters");
+        assertEquals(List.of(), OpenEntry.parameterNames(array), "the container constructors carry no parameters");
         assertTrue(Chained.supertypesOf(array).contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("chained", "product", "top", "type"), Chained.supertypesOf(array));
         assertEquals("{ chain: { parents: [] supertypes: [ \"chained\" \"product\" \"top\" \"type\" ] subtypes: [] } "
@@ -747,7 +748,7 @@ class DefinitionResolverTest {
         Top map = resolver.resolve(schemaMap.declarations().get("map"));
 
         assertEquals(TypeKind.PRODUCT, TypeKind.of(map, n -> true));
-        assertEquals(List.of(), TemplateBody.parameterNamesOf(map), "the container constructors carry no parameters");
+        assertEquals(List.of(), OpenEntry.parameterNames(map), "the container constructors carry no parameters");
         assertTrue(Chained.supertypesOf(map).contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("chained", "product", "top", "type"), Chained.supertypesOf(map));
         assertEquals("{ chain: { parents: [] supertypes: [ \"chained\" \"product\" \"top\" \"type\" ] subtypes: [] } "
@@ -843,7 +844,7 @@ class DefinitionResolverTest {
         Top set = resolver.resolve(schemaMapFromFixture().declarations().get("set_type"));
 
         assertEquals(TypeKind.PRODUCT, TypeKind.of(set, n -> true));
-        assertEquals(List.of(), TemplateBody.parameterNamesOf(set), "the container constructors carry no parameters");
+        assertEquals(List.of(), OpenEntry.parameterNames(set), "the container constructors carry no parameters");
         assertTrue(Chained.supertypesOf(set).contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("array", "chained", "product", "top", "type"), Chained.supertypesOf(set));
         assertEquals("{ chain: { parents: [] supertypes: [ \"array\" \"chained\" \"product\" \"top\" \"type\" ] "

@@ -14,6 +14,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.FieldRole;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.Reference;
@@ -21,7 +22,6 @@ import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -290,11 +290,11 @@ final class TemplateMaterialiser {
         Set<String> refused = new LinkedHashSet<>();
         for (EarlyCheck check : early) {
             Top template = namespace.definition(check.head());
-            if (refused.contains(check.declaration()) || !(template instanceof TemplateBody held)) {
+            if (refused.contains(check.declaration()) || !OpenEntry.isOpen(template)) {
                 continue;
             }
             try {
-                classified(check.head(), template, held.parameterNames(), check.arguments());
+                classified(check.head(), template, OpenEntry.parameterNames(template), check.arguments());
             } catch (SchemaValidationException e) {
                 refused.add(check.declaration());
                 reporter.accept(check.declaration(), e);
@@ -314,7 +314,7 @@ final class TemplateMaterialiser {
     Map<String, Top> materialise(Map<String, Top> entries, MaterialisationFailureReporter reporter) {
         TemplateMaterialiser pass = this;
         for (Map.Entry<String, Top> entry : entries.entrySet()) {
-            if (entry.getValue() instanceof TemplateBody) {
+            if (OpenEntry.isOpen(entry.getValue())) {
                 // A template's own body is open: `chain<T>` inside `chain` awaits substitution and is not an
                 // application to close. Closing it here would mint an entry per level, keyed on the literal
                 // parameter name.
@@ -375,14 +375,14 @@ final class TemplateMaterialiser {
     Top closeApplicationInto(String declaredName, TypeRef application) {
         String head = application.name();
         Top template = namespace.definition(head);
-        if (!(template instanceof TemplateBody body)) {
+        if (!OpenEntry.isOpen(template)) {
             return null; // unresolved, or a head taking no parameters -- reported through the ordinary path
         }
-        List<String> parameters = body.parameterNames();
+        List<String> parameters = OpenEntry.parameterNames(template);
         if (parameters.isEmpty() || parameters.size() != application.arguments().size()) {
             return null; // arity is `instantiate`'s to report, in its own words
         }
-        HeldBody open = HeldBody.of(body);
+        HeldBody open = HeldBody.of(template);
         String constructor = open.application().typeRef().orElseThrow();
         if (REFERENCE.equals(constructor)) {
             return null; // §5.10: an alias hop mints no entry, so there is none for a declaration to own
@@ -480,7 +480,7 @@ final class TemplateMaterialiser {
         if (template == null) {
             return null; // unresolved head -- the linker's verdict, not this pass's
         }
-        List<String> parameters = TemplateBody.parameterNamesOf(template);
+        List<String> parameters = OpenEntry.parameterNames(template);
         if (parameters.isEmpty()) {
             throw new SchemaValidationException("'" + head + "' declares no type parameters, so '"
                     + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
@@ -535,8 +535,8 @@ final class TemplateMaterialiser {
             // than making one, and why it is the head that tells the three cases apart rather than the body.
             // The held body is parsed once here and reused by all three branches: this is the only place a
             // closure needs the tree, and the parse is thrown away with it.
-            if (template instanceof TemplateBody body) {
-                HeldBody open = HeldBody.of(body);
+            if (OpenEntry.isOpen(template)) {
+                HeldBody open = HeldBody.of(template);
                 String constructor = open.application().typeRef().orElseThrow();
                 if (REFERENCE.equals(constructor)) {
                     aliasClosing.add(name);
@@ -660,7 +660,7 @@ final class TemplateMaterialiser {
     private String closeHeldAlias(String head, Top template, HeldBody open,
             Map<String, TypeArgument> bindings) {
         CoreValue substituted = WireForm.substitute(open.application().coreValue(), head,
-                TemplateBody.parameterNamesOf(template), bindings);
+                OpenEntry.parameterNames(template), bindings);
         CoreValue closed = closeApplications(substituted);
         CoreValue target = closed instanceof RecordValue record ? WireForm.field(record, TARGET).orElse(null) : null;
         if (!(target instanceof TokenValue token)) {
@@ -728,7 +728,7 @@ final class TemplateMaterialiser {
         // thing here -- a token in a tree -- because the body was never read against the constructor's
         // vocabulary in the first place.
         CoreValue substituted = WireForm.substitute(open.application().coreValue(), head,
-                TemplateBody.parameterNamesOf(template), bindings);
+                OpenEntry.parameterNames(template), bindings);
         CoreValue wire = closeApplicationsOutsideSupertypes(substituted);
         try {
             return new Closed(wire, metaReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
@@ -926,10 +926,10 @@ final class TemplateMaterialiser {
      * linker's verdict), and a parameter whose type has no scalar reading.
      */
     private void checkArguments(String head, Top template, List<TypeArgument> arguments) {
-        if (!(template instanceof TemplateBody held) || held.parameters().size() != arguments.size()) {
+        List<TemplateParam> parameters = OpenEntry.parameters(template);
+        if (!OpenEntry.isOpen(template) || parameters.size() != arguments.size()) {
             return;
         }
-        List<TemplateParam> parameters = held.parameters();
         for (int i = 0; i < arguments.size(); i++) {
             TemplateParam parameter = parameters.get(i);
             TypeArgument argument = arguments.get(i);

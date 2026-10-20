@@ -22,11 +22,11 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Chained;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -577,7 +577,7 @@ public final class SchemaResolver {
      */
     private static void condemn(Set<String> names, Map<String, Top> resolvedLocals, Map<String, Top> namespace) {
         for (String name : names) {
-            Top placeholder = unresolved(TemplateBody.parameterNamesOf(resolvedLocals.get(name)));
+            Top placeholder = unresolved(OpenEntry.parameterNames(resolvedLocals.get(name)));
             resolvedLocals.put(name, placeholder);
             namespace.put(name, placeholder);
         }
@@ -657,12 +657,12 @@ public final class SchemaResolver {
             if (head == null || generated.contains(entry.getKey()) || member.supertypes().contains(head)) {
                 continue;
             }
-            if (!(namespace.get(head) instanceof TemplateBody held) || held.extension().isEmpty()) {
+            if (!OpenEntry.isFamilyBase(namespace.get(head))) {
                 continue;
             }
             List<String> chain = new ArrayList<>(member.supertypes());
             chain.add(head);
-            chain.addAll(held.supertypes());
+            chain.addAll(Chained.supertypesOf(namespace.get(head)));
             Top joined = member.withSupertypes(chain.stream().distinct().toList());
             entry.setValue(joined);
             namespace.put(entry.getKey(), joined);
@@ -774,8 +774,7 @@ public final class SchemaResolver {
                                         List<Map<String, Top>> views) {
         for (Map<String, Top> view : views) {
             view.replaceAll((name, definition) -> parameters.containsKey(name)
-                    && definition instanceof TemplateBody held
-                    ? held.withParameters(parameters.get(name)) : definition);
+                    ? OpenEntry.withParameters(definition, parameters.get(name)) : definition);
         }
     }
 
@@ -899,11 +898,12 @@ public final class SchemaResolver {
      * author did.
      */
     private static void refuseHeadAbstraction(String name, Top resolved) {
-        if (!(resolved instanceof io.ltr8.tson.schema.meta.TemplateBody held)) {
+        if (!OpenEntry.isOpen(resolved)) {
             return;
         }
-        for (io.ltr8.tson.schema.meta.TypeRef application : HeldBody.of(held).applications()) {
-            if (held.parameterNames().contains(application.name())) {
+        HeldBody held = HeldBody.of(resolved);
+        for (io.ltr8.tson.schema.meta.TypeRef application : held.applications()) {
+            if (held.parameters().contains(application.name())) {
                 throw new SchemaValidationException("'" + name + "': '" + application.name()
                         + "' is a type parameter applied to arguments -- a parameter stands for a type, never "
                         + "for a template, and §5.10 admits no head abstraction, so '" + application.name()

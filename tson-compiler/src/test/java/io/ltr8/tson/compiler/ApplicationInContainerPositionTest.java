@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Reference;
@@ -143,7 +144,7 @@ class ApplicationInContainerPositionTest {
                 .findFirst().orElseThrow().getValue();
         TemplateBody body = (TemplateBody) open;
 
-        assertEquals(List.of("p0"), TemplateBody.parameterNamesOf(open), "renamed positionally, as every open synthetic is");
+        assertEquals(List.of("p0"), OpenEntry.parameterNames(open), "renamed positionally, as every open synthetic is");
         // The application is held whole, so the names it mentions are simply the tokens in the body -- its
         // own head and the parameter it still awaits.
         assertTrue(HeldBody.of(body).names().containsAll(List.of("tree", "p0")),
@@ -320,7 +321,7 @@ class ApplicationInContainerPositionTest {
                   three => { g: grid<pixel, 3> }
                   four  => { g: grid<pixel, 4> }""");
 
-        assertEquals(List.of("T", "N"), TemplateBody.parameterNamesOf(both.schema().entries().get("grid")),
+        assertEquals(List.of("T", "N"), OpenEntry.parameterNames(both.schema().entries().get("grid")),
                 "the declared template, unchanged");
         assertEquals(openBefore, openNames(both), "both open synthetics reused, neither rewritten");
         assertEquals(2, openSynthetics(both));
@@ -396,7 +397,7 @@ class ApplicationInContainerPositionTest {
                 .get(fieldType(compiled, "box_carrier", "a")));
         Top instantiation = compiled.schema().entries().get(array.elementType().name());
 
-        assertEquals(List.of(), TemplateBody.parameterNamesOf(instantiation), "closed");
+        assertEquals(List.of(), OpenEntry.parameterNames(instantiation), "closed");
         assertEquals(TypeRef.of("text"), ((RecordBody) instantiation).fields()
                 .values().stream().toList().get(0).type(),
                 "T bound");

@@ -7,6 +7,7 @@ import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -18,7 +19,6 @@ import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.schema.meta.Type;
-import io.ltr8.tson.schema.meta.TemplateBody;
 
 import java.math.BigInteger;
 
@@ -241,7 +241,7 @@ class ContainerSugarEndToEndTest {
 
         Top entry = compiled.schema().entries().get("tag_list");
         assertEquals(TypeKind.PRODUCT, TypeKind.of(entry, n -> true), "the constructor's kind");
-        assertEquals(List.of(), TemplateBody.parameterNamesOf(entry), "closed -- §5.10");
+        assertEquals(List.of(), OpenEntry.parameterNames(entry), "closed -- §5.10");
         assertEquals(List.of(), Chained.supertypesOf(entry),
                 "empty: this is a construction of `array`, and a constructor is not a supertype");
         assertEquals(Optional.of("array"), compiled.schema().constructorOf("tag_list"),

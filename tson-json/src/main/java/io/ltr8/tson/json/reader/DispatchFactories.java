@@ -5,9 +5,9 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FamilySelectors;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.List;
@@ -81,10 +81,9 @@ final class DispatchFactories {
      * unsubstituted text no reader could read, so it reaches {@link OpenTemplateReader} unexamined.
      */
     static final ValueReaderFactory TEMPLATE = (name, definition, context) -> {
-        TemplateBody held = (TemplateBody) definition;
-        return held.extension().isEmpty()
-                ? new OpenTemplateReader(name, held.parameterNames(), context.locationOf(name))
-                : family(name, name, definition, context, new RecordDiagnostics(name, ""));
+        return OpenEntry.isFamilyBase(definition)
+                ? family(name, name, definition, context, new RecordDiagnostics(name, ""))
+                : new OpenTemplateReader(name, OpenEntry.parameterNames(definition), context.locationOf(name));
     };
 
     /**

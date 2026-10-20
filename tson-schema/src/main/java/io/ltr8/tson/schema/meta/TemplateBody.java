@@ -116,15 +116,6 @@ public record TemplateBody(TypeChain chain, List<TemplateParam> parameters, Stri
         return parameters.stream().map(TemplateParam::name).toList();
     }
 
-    /**
-     * The type parameters an entry whose value is {@code value} declares -- {@code []} unless it is held
-     * ([TSON-SCHEMA] §5.10). A held body carries the list it binds, so "does this entry declare parameters?" and
-     * "what does its body hold?" are one question, and a closed entry has nowhere to put a parameter list.
-     */
-    public static List<String> parameterNamesOf(Top value) {
-        return value instanceof TemplateBody held ? held.parameterNames() : List.of();
-    }
-
     /** The same body with each parameter replaced by {@code settled}'s entry for it, where there is one. */
     public TemplateBody withParameters(Map<String, TemplateParam> settled) {
         return new TemplateBody(chain, parameters.stream().map(p -> settled.getOrDefault(p.name(), p)).toList(),

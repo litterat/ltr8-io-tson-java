@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -62,13 +62,13 @@ final class TemplateRegularity {
         Set<String> irregular = new LinkedHashSet<>();
         Map<String, List<Application>> applications = new LinkedHashMap<>();
         for (Map.Entry<String, Top> entry : entries.entrySet()) {
-            if (!TemplateBody.parameterNamesOf(entry.getValue()).isEmpty()) {
+            if (!OpenEntry.parameterNames(entry.getValue()).isEmpty()) {
                 applications.put(entry.getKey(), applicationsIn(entry.getValue()));
             }
         }
         for (Map.Entry<String, List<Application>> template : applications.entrySet()) {
             String name = template.getKey();
-            List<String> parameters = TemplateBody.parameterNamesOf(entries.get(name));
+            List<String> parameters = OpenEntry.parameterNames(entries.get(name));
             for (Application application : template.getValue()) {
                 if (!reaches(application.head(), name, applications)) {
                     continue; // not on a cycle back to this declaration -- nothing to keep regular
@@ -164,8 +164,8 @@ final class TemplateRegularity {
         // A held body is not rewritable, so it answers for itself: `applications()` is the same kind of
         // declared question as `names()`, and returning the applications the wire tree holds is what keeps
         // this rule at the declaration now that every open body is held.
-        if (template instanceof TemplateBody held) {
-            HeldBody.of(held).applications().forEach(ref -> collect(ref, found));
+        if (OpenEntry.isOpen(template)) {
+            HeldBody.of(template).applications().forEach(ref -> collect(ref, found));
             return found;
         }
         MetaRefs.mapBodyRefs(template, ref -> {

@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Data;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Sum;
@@ -169,7 +170,7 @@ class OpenEntryResolvedFormTest {
     /**
      * <b>An entry declares parameters exactly when its body is held, and the two lists agree.</b>
      * [TSON-SCHEMA] §5.10's "Closed entries are parameter-free" is structural now rather than a MUST anyone
-     * can violate: {@code TemplateBody.parameterNamesOf} reads the held body's own list, so a closed entry has
+     * can violate: {@code OpenEntry.parameterNames} reads the held body's own list, so a closed entry has
      * nowhere to put one. This asks it of every entry of every schema -- the three bundled ones and a schema
      * exercising each template shape -- which is the population the rule is about, and it is what would catch
      * the derivation silently answering {@code []} for an entry that is genuinely open.
@@ -211,8 +212,8 @@ class OpenEntryResolvedFormTest {
                 if (held) {
                     open++;
                 }
-                if (TemplateBody.parameterNamesOf(definition).isEmpty() == held) {
-                    broken.add(id + "#" + entry.getKey() + ": parameters " + TemplateBody.parameterNamesOf(definition)
+                if (OpenEntry.parameterNames(definition).isEmpty() == held) {
+                    broken.add(id + "#" + entry.getKey() + ": parameters " + OpenEntry.parameterNames(definition)
                             + " with a " + definition.getClass().getSimpleName() + " body");
                 }
             }
