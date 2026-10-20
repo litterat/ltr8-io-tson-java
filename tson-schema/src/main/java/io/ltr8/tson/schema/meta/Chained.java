@@ -4,15 +4,14 @@ import java.util.List;
 
 /**
  * The meta-kernel's {@code chained => { chain?: type_chain }} ([TSON-SCHEMA] §4.1, SPEC-FEEDBACK.md #14): a value
- * that carries an IS-A chain. {@link Type} and {@link TemplateBody} are the two, as {@code type} and {@code
- * template} compose it; {@link Data} and {@link Reference} are not -- a value of meta vocabulary and a hop carry
- * no IS-A.
+ * that carries an IS-A chain. {@link Type} is the one, as {@code type} composes it; {@link Data}, {@link Reference}
+ * and {@link TemplateBody} are not -- a value of meta vocabulary, a hop and an abbreviation carry no IS-A.
  *
- * <p><b>Every question about what an entry IS-A asks this</b>, so a template -- the ABSTRACT base its members are
- * IS-A, and IS-A its own parents -- is answered the same way a closed type is. The accessors delegate to {@link
- * #chain}, and the statics answer for any {@link Top}, empty for one that carries no chain.
+ * <p><b>Every question about what an entry IS-A asks this</b>, so a record template -- the ABSTRACT family base its
+ * members are IS-A, and IS-A its own parents -- is answered the same way a closed type is. The accessors delegate
+ * to {@link #chain}, and the statics answer for any {@link Top}, empty for one that carries no chain.
  */
-public sealed interface Chained permits Type, TemplateBody {
+public sealed interface Chained permits Type {
 
     /** Where this value sits in the IS-A order ({@link TypeChain}). */
     TypeChain chain();
@@ -20,7 +19,7 @@ public sealed interface Chained permits Type, TemplateBody {
     /** This value with its chain replaced -- everything of its own unchanged. */
     Chained withChain(TypeChain chain);
 
-    /** The parents as written: held text's, and a family-base template's ({@link TypeChain#parents}). */
+    /** The parents as written, a record template's included ({@link TypeChain#parents}). */
     default List<TypeRef> parents() {
         return chain().parents();
     }

@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
-import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
 
@@ -112,8 +112,8 @@ class SubtypeTemplateFamilyTest {
                 () -> "the instantiation is indexed: " + Chained.subtypesOf(baseEntry));
         assertTrue(Chained.subtypesOf(baseEntry).contains("box"),
                 () -> "the template is IS-A its parent too: " + Chained.subtypesOf(baseEntry));
-        assertTrue(((TemplateBody) compiled.schema().entries().get("box")).template()
-                .contains("chain: { parents: [ base ] }"), "the held body writes its parent, which closing completes");
+        assertEquals(List.of(TypeRef.of("base")), Chained.parentsOf(compiled.schema().entries().get("box")),
+                "the open record keeps its parent as written, which closing completes");
     }
 
     /**

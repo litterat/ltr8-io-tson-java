@@ -35,14 +35,14 @@ once.
 
 **`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names;
 the `scoped`/`nameField` builders every producer goes through; `refValue` and its inverse
-`typeRefOf`/`argumentOf`; the held-record writers `heldRecord`/`heldEmptyRecord`, which spell `fields` as a map
+`typeRefOf`/`argumentOf`; the held-record writer `heldRecord`, which spells `fields` as a map
 from each field's declared name to its `record_field` (`fieldMap`/`fieldEntry`); and §5.10 `substitute` over a
 held body. Every walk over a held body descends into a map's keys and values as it does into a record or an
 array, `fields` being one.
 
-- **Why one class and not a producer beside one phase and a consumer beside another.** A held body is written
-  by two phases (`SchemaDesugarer` lifting a sugar form, `DefinitionResolver` holding a composition or
-  refinement template) and read by four (`TemplateMaterialiser` closing one, `HeldBody` answering §5.10's
+- **Why one class and not a producer beside one phase and a consumer beside another.** A held tree is written
+  by two phases (`SchemaDesugarer` lifting a sugar form, `HeldBody.of` writing an open record's) and read by
+  four (`TemplateMaterialiser` closing one, `HeldBody` answering §5.10's
   declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterTypes`
   walking one for parameter kinds). `isApplication`'s own contract is that a held body is written by one
   phase and read by several, so a second opinion about what an application looks like is what makes one of
@@ -52,7 +52,8 @@ array, `fields` being one.
 - **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
   gives canonical-explicit, fully quoted output — a different language from the one a held body is written in:
   `HeldBody.names()` and substitution both key on a token being *unquoted*, so a quoted body references no
-  parameters at all. That is why `heldRecord` builds the wire tree directly. Once built, the tree is an
+  parameters at all. That is why `heldRecord` builds the wire tree directly, for an open record's held tree. A
+  held body of any other constructor is built by the desugar phase the same way. Once built, the tree is an
   AST, and `TsonObjectWriter` writes an AST as syntax rather than as a description of itself
   (`AstWriter`) — which is how `HeldBody.held` turns it into `TemplateBody.template`.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the

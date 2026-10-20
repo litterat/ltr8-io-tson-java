@@ -580,7 +580,7 @@ its URI spelling and NFC; `validate(id)` requires a document's own `!!id` to be 
 
 The module exports two packages: `io.ltr8.tson.schema` (the above) and `io.ltr8.tson.schema.meta`, the resolved-schema
 value model — pure records, sealed interfaces and enums, §8's `Top` and its bodies. A schema map's entry is its value:
-a `Type` or a `TemplateBody` carries its own chain (`Chained.chain()`, a `TypeChain` of `parents`, `supertypes` and
+a `Type` carries its own chain (`Chained.chain()`, a `TypeChain` of `parents`, `supertypes` and
 `subtypes`, with accessors for each on `Chained`); the application an entry is the instantiation of is the derived
 `@application` on its key (`TsonSchema.applicationOf`); and what is not part of the value — where it was declared, its
 value annotations, its constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The

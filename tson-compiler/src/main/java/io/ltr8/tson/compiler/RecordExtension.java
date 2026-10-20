@@ -235,7 +235,9 @@ final class RecordExtension {
         for (String subtype : new LinkedHashSet<>(Chained.subtypesOf(def))) {
             Top sub = merged.get(subtype);
             // An undeclared member is refused on its own, and judging its pins too would report one mistake twice.
-            if (!(sub instanceof RecordBody record) || isUndeclaredMember(subtype, sub, facts, applications,
+            // A record template IS-A the base is no member: its applications are, each pinned once closed.
+            if (!(sub instanceof RecordBody record) || OpenEntry.isOpen(sub)
+                    || isUndeclaredMember(subtype, sub, facts, applications,
                     name -> TsonBundledSchemas.isMetaKernel(origins.get(name)))) {
                 continue;
             }
@@ -350,9 +352,9 @@ final class RecordExtension {
     /**
      * The record body whose family rules this entry is subject to, or {@code null} where it has none.
      *
-     * <p><b>A marked template is a family base and is judged as one</b> (§5.10). Its
-     * body is held text, so the body checked here is assembled from the two facts the entry states
-     * structurally: the derived {@code extension}, and the {@code discriminators} it names. Skipping it
+     * <p><b>A record template is a family base and is judged as one</b> (§5.10). Its own fields may still
+     * name its parameters, so the body checked here is assembled from the facts it states as a base: ABSTRACT,
+     * the {@code discriminators} it names, and each selector at its members' declared type. Skipping it
      * instead -- a guard on {@code parameters().isEmpty()} alone -- would accept a marked template with no
      * family check at all: no rule that every member pins every selector, and no
      * rule that the pins are pairwise distinct. An unchecked family is worse than a refused one.
@@ -361,18 +363,18 @@ final class RecordExtension {
      * dispatch cannot disagree about which fields a family is selected by -- a check that passed a family
      * the read could not place is the defect one derivation per consumer produces.
      *
-     * <p>An <em>unmarked</em> template still has none: it is no type until applied (§5.10), nothing can
-     * stand at it, and its instantiations are judged as the closed records they are.
+     * <p>A held template has none: it is no type until applied (§5.10), nothing can stand at it, and its
+     * instantiations are judged as the closed records they are.
      */
     private static RecordBody familyBodyOf(String name, Top def, Map<String, Top> merged,
                                            Map<String, TsonSchema.EntryFacts> facts) {
         if (!OpenEntry.isFamilyBase(def)) {
             return def instanceof RecordBody record && !OpenEntry.isOpen(def) ? record : null;
         }
-        // The selectors come from `FamilySelectors`, the one derivation both encodings read -- never from
-        // parsing the held text, which `tson-json` cannot do and §1.3 says no consumer should have to.
+        // The selectors come from `FamilySelectors`, the one derivation both encodings read.
         return new RecordBody(FamilySelectors.of(name, def, merged), List.of(),
-                FamilySelectors.extensionOf(def).orElseThrow(), FamilySelectors.namesOf(def), java.util.Optional.empty());
+                FamilySelectors.extensionOf(def).orElseThrow(), FamilySelectors.namesOf(def),
+                java.util.Optional.empty());
     }
 
     /** The colliding pin, named the way an author reads it: one value, or the tuple the selectors form. */

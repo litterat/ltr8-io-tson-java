@@ -15,9 +15,11 @@ in git. The sugar table and the naming rule these bullets refer to are in `desig
   `DerivedName.ofBinding` hashes what is written.
 - `DataClassObjectWriter` cannot produce a held body: `HeldBody.names()` and substitution key on a token being
   *unquoted*.
-- Only a *template* is normalised to a held body; a closed record or closed alias resolves at its declaration.
-- Only what the author wrote is written into a held record — no fixed constructor fields, no field facts at their
-  `record_field` defaults.
+- Only a *template* is normalised to a held body; a closed record or closed alias resolves at its declaration. A
+  record template's normalised `!record { … }` payload is bound by the resolver into the open record it denotes
+  (`DefinitionResolver.openRecord`).
+- Only what the author wrote is written into a record template's payload — no fixed constructor fields, no field
+  facts at their `record_field` defaults.
 - §5.11's uniqueness rule is asked here as well as in the resolver; the two see different phases' bodies.
 
 Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived names, reporting),
@@ -119,12 +121,12 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     which is why the kernel declares one `value` slot and no labelled group. §5.7's fixation then happens at
     materialisation
     (`TemplateMaterialiser.fixRoutedValues`), where the value is concrete.
-  - **A composition or refinement template is held too, but from one phase later** (`WireForm.heldRecord`, called by
-    `DefinitionResolver.holdIfOpen`). Both absorb fields from a source, and the form to hold is the
-    *flattened* one — a §5.7 tightening entry states a modifier and no type-ref, so it is not a `record_field`
-    at all until the inherited field supplies one. That needs a namespace this phase does not have, so the
-    rewrite happens in the resolver; the **spelling** is `WireForm`'s, which is the whole point.
-    `WireForm.heldRecord` and this phase's `recordBinding` are two producers of the wire form and one
+  - **A composition or refinement template is built one phase later**, as the *flattened* open record
+    (`DefinitionResolver.parameterised`), and every open record's held tree is written by `WireForm.heldRecord`
+    (through `HeldBody.of`). Both absorb fields from a source, and a §5.7 tightening entry states a modifier and no
+    type-ref, so it is not a `record_field` at all until the inherited field supplies one. That needs a namespace
+    this phase does not have, so the flattening happens in the resolver; the **spelling** is `WireForm`'s, which is
+    the whole point. `WireForm.heldRecord` and this phase's `recordBinding` are two producers of the wire form and one
     producer of its spelling — both going through `WireForm.refValue` and `WireForm.nameField` is what makes
     that true by construction rather than by two authors agreeing.
     - **`DataClassObjectWriter` cannot serve as that second producer**, which is why `WireForm.heldRecord` exists rather
@@ -137,7 +139,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     - **The writer is used for exactly one leaf**: a resolved annotation carries its value as a *bound
       object* (`Annotation.value` is `Optional<Object>`), and unbinding one is what an object writer is for.
       That is a self-contained value rather than part of the spelling, so it goes through
-      `DefinitionResolver.annotationWireValue` and nothing structural does.
+      `HeldBody.annotationValue` and nothing structural does.
   - **§5.11's uniqueness rule is asked here as well**, and asking it twice is not duplication: the resolver's
     copy sees a closed record body and this one sees a template's, which after normalisation are two
     different phases. Left to the constructor's own reader instead, the wire form carries one name twice as

@@ -18,11 +18,16 @@ import java.util.function.UnaryOperator;
  * access_pattern}/{@code size_type} are fixed by the constructor itself ({@code NAMED}/{@code FIXED}) and
  * never appear in output; {@code groups} and {@code discriminators} are empty for a record with none.
  *
+ * <p><b>{@code parameters}, where not empty, make the record a template</b> ([TSON-SCHEMA] §5.10) and a family
+ * base ({@link OpenEntry}): its field types and values may name the parameters, and the rest of the record is what
+ * every application shares. Its {@code extension} is each application's; the base's own is ABSTRACT by
+ * construction. A closed record declares none.
+ *
  * <p><b>{@code chain} is {@code chained}'s</b> (see {@link TypeChain}): the complete IS-A chain and its inverse,
  * computed by the resolver and the linker. A fresh record and a subtracted one ([TSON-SCHEMA] §5.9) have an empty
- * chain, and a composition's chain names every operand and each operand's own chain. Inside held template text
- * the parents are written, one of which may be an application ({@code <T> result<T> & { ... }}); substitution
- * reaches it with every other reference the body holds, so {@code ok<text>} reaches an edge to {@code
+ * chain, and a composition's chain names every operand and each operand's own chain. A record template keeps its
+ * parents as written, one of which may be an application ({@code <T> result<T> & { ... }}); substitution
+ * reaches it with every other reference the record holds, so {@code ok<text>} reaches an edge to {@code
  * result<text>} and not to {@code result<int32>}.
  *
  * <p><b>{@code fields} is an ordered map from a field's name to its facts</b> ({@code field_map}, the kernel's
@@ -47,7 +52,8 @@ import java.util.function.UnaryOperator;
 @Typename(name = "record")
 public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fields,
                           List<FieldGroup> groups, RecordExtensionType extension, List<String> discriminators,
-                          @Field("name_type") Optional<String> nameType) implements Product {
+                          @Field("name_type") Optional<String> nameType,
+                          List<TemplateParam> parameters) implements Product {
 
     /**
      * The kernel's {@code field_name}, an identifier: a record's name type where neither it nor a supertype states
@@ -73,6 +79,13 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
         groups = groups == null ? List.of() : List.copyOf(groups);
         discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
         nameType = nameType == null ? Optional.empty() : nameType;
+        parameters = parameters == null ? List.of() : List.copyOf(parameters);
+    }
+
+    /** A closed record: one that declares no parameters. */
+    public RecordBody(TypeChain chain, SequencedMap<String, RecordField> fields, List<FieldGroup> groups,
+                      RecordExtensionType extension, List<String> discriminators, Optional<String> nameType) {
+        this(chain, fields, groups, extension, discriminators, nameType, List.of());
     }
 
     /**
@@ -105,14 +118,15 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
                 && groups.equals(other.groups)
                 && extension == other.extension
                 && discriminators.equals(other.discriminators)
-                && nameType.equals(other.nameType);
+                && nameType.equals(other.nameType)
+                && parameters.equals(other.parameters);
     }
 
     /** Consistent with {@link #equals}: {@link #fields} contributes in declaration order. */
     @Override
     public int hashCode() {
         return Objects.hash(chain, List.copyOf(fields.sequencedEntrySet()), groups, extension,
-                discriminators, nameType);
+                discriminators, nameType, parameters);
     }
 
     /** {@link #fields} with each field replaced by what {@code map} makes of it, names and order unchanged. */
@@ -146,7 +160,7 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
 
     @Override
     public RecordBody withChain(TypeChain chain) {
-        return new RecordBody(chain, fields, groups, extension, discriminators, nameType);
+        return new RecordBody(chain, fields, groups, extension, discriminators, nameType, parameters);
     }
 
     @Override
@@ -156,11 +170,21 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
 
     /** This body with {@code extension} replaced -- every other facet, the chain included, unchanged. */
     public RecordBody withExtension(RecordExtensionType extension) {
-        return new RecordBody(chain, fields, groups, extension, discriminators, nameType);
+        return new RecordBody(chain, fields, groups, extension, discriminators, nameType, parameters);
     }
 
     /** This body with {@code fields} replaced -- every other facet, the chain included, unchanged. */
     public RecordBody withFields(SequencedMap<String, RecordField> fields) {
-        return new RecordBody(chain, fields, groups, extension, discriminators, nameType);
+        return new RecordBody(chain, fields, groups, extension, discriminators, nameType, parameters);
+    }
+
+    /** This body declaring {@code parameters} -- open where the list is not empty ([TSON-SCHEMA] §5.10). */
+    public RecordBody withParameters(List<TemplateParam> parameters) {
+        return new RecordBody(chain, fields, groups, extension, discriminators, nameType, parameters);
+    }
+
+    /** The parameter names, in declaration order -- {@code []} for a closed record. */
+    public List<String> parameterNames() {
+        return parameters.stream().map(TemplateParam::name).toList();
     }
 }

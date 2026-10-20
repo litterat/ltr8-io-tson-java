@@ -4,7 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
@@ -42,8 +42,8 @@ class TemplateParamTypeTest {
     private static Map<String, List<TemplateParam>> parameters() {
         Map<String, List<TemplateParam>> parameters = new LinkedHashMap<>();
         Tson.standard().resolve(SCHEMA).schema().entries().forEach((name, definition) -> {
-            if (definition instanceof TemplateBody held) {
-                parameters.put(name, held.parameters());
+            if (OpenEntry.isOpen(definition)) {
+                parameters.put(name, OpenEntry.parameters(definition));
             }
         });
         return parameters;

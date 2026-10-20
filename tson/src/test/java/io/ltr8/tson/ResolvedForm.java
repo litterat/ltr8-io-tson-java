@@ -127,8 +127,7 @@ final class ResolvedForm {
      */
     private static Top parsedForComparison(TemplateBody held) {
         return new TemplateBody(held.parameters(),
-                String.valueOf(new TsonDataParser(held.template()).parseDocument().root()),
-                held.extension());
+                String.valueOf(new TsonDataParser(held.template()).parseDocument().root()));
     }
 
     /**

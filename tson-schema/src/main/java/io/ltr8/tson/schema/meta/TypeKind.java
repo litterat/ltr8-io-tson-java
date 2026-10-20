@@ -17,11 +17,12 @@ public enum TypeKind {
     DATA,
 
     /**
-     * An entry that declares type parameters -- [TSON-SCHEMA] §5.10's <b>open</b> entry, whose body is a
-     * {@link TemplateBody}. A template is not a type: it cannot validate data, and naming one where a type is
-     * expected is a resolver error. Like {@link #REFERENCE} it is a {@code type_kind} and not a base kind
-     * (§4.1), and it says nothing about what an application of the template will produce -- that is the kind
-     * of the entry materialisation mints, derived from the constructor its closed body applies.
+     * A held template -- [TSON-SCHEMA] §5.10's open entry over any constructor but {@code record}, whose body is a
+     * {@link TemplateBody}. It is not a type: it cannot validate data, and naming one where a type is expected is
+     * a resolver error. A record template is a type, the family base, and takes a record's kind. Like {@link
+     * #REFERENCE} it is a {@code type_kind} and not a base kind (§4.1), and it says nothing about what an
+     * application of the template will produce -- that is the kind of the entry materialisation mints, derived
+     * from the constructor its closed body applies.
      */
     TEMPLATE;
 
@@ -36,9 +37,6 @@ public enum TypeKind {
      *               composed into {@code payload => data & { ... }} leaves {@code payload} a PRODUCT
      */
     public static TypeKind of(Top value, Predicate<String> kernel) {
-        if (OpenEntry.isOpen(value)) {
-            return TEMPLATE;
-        }
         return switch (value) {
             case RecordBody record -> ofChain(record.supertypes(), kernel);
             case Atom ignored -> ATOM;
@@ -46,7 +44,7 @@ public enum TypeKind {
             case Sum ignored -> SUM;
             case Reference ignored -> REFERENCE;
             case Data ignored -> DATA;
-            case TemplateBody ignored -> TEMPLATE; // open, answered above
+            case TemplateBody ignored -> TEMPLATE;
         };
     }
 

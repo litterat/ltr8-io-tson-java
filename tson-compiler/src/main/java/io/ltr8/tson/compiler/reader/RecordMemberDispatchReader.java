@@ -106,7 +106,9 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            if (!(entries.get(subtype) instanceof RecordBody record)) {
+            // A record template IS-A the base is no member: its applications are, each pinned once closed.
+            if (!(entries.get(subtype) instanceof RecordBody record)
+                    || io.ltr8.tson.schema.meta.OpenEntry.isOpen(record)) {
                 continue;
             }
             List<Object> key = pinsOf(record);

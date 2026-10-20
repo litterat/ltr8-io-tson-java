@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
+import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -99,7 +100,7 @@ final class ParameterTypes {
     /** The kernel record whose {@code value} slot routes a default or fixed value into its sibling's type. */
     private static final String RECORD_FIELD = "record_field";
 
-    /** The constructor a record template's held body applies. */
+    /** The constructor a record template's payload applies. */
     private static final String RECORD = "record";
 
     /** The one slot of a record template a parameter may stand in as a whole token: a field's type. */
@@ -226,6 +227,15 @@ final class ParameterTypes {
             kinds.put(parameter, seen.iterator().next());
         }
         return kinds;
+    }
+
+    /**
+     * The walk's own refusals, thrown, over a held payload not yet bound: a record template's parameters are
+     * confined to its field types and values before {@code record}'s reader is asked to bind them, so a parameter
+     * in a scalar slot is refused for where it stands (SPEC-FEEDBACK.md #16) rather than for the token it is.
+     */
+    static void checkSlots(List<String> parameters, DataValue payload, Function<String, Top> meta) {
+        Walk.over(HeldBody.ofTree(parameters, payload), new Occurrences(parameters, Map.of(), false), meta);
     }
 
     /** Where a declaration whose parameters will not type is reported, entry by entry. */

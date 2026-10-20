@@ -13,7 +13,7 @@ import java.util.Set;
 
 /**
  * What a written parent contributes to an IS-A chain ([TSON-SCHEMA] §5.8): the one rule a closed declaration's
- * chain is built by at its declaration and a held record's when materialisation closes it.
+ * chain is built by at its declaration and a record template's application's when materialisation closes it.
  *
  * <p><b>A closed parent</b> contributes itself, the end of its reference chain (§8.3: the terminal is the same
  * type under another name, so IS-A reaches it) and that entry's own chain. <b>An application</b> denotes no entry

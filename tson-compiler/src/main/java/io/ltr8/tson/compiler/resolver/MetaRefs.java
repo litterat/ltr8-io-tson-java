@@ -4,6 +4,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
@@ -65,13 +66,15 @@ final class MetaRefs {
 
     private static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map, boolean mapChain) {
         Top mapped = switch (body) {
+            // An open record maps nothing in its fields, as a held body does not: its references may name its
+            // own parameters, whose meaning is not settled until substitution supplies the arguments. Its chain
+            // maps below, a record template being IS-A its parents as any record is.
+            case RecordBody record when OpenEntry.isOpen(record) -> record;
             // `discriminators` is carried, not mapped: it holds field *names* of this record, which no
             // reference rewrite touches. Dropping it here would lose a family's selector list on every
             // synthetic rename and every materialisation rewrite -- a body that arrived sealed would come
             // back with nothing to dispatch on.
-            case RecordBody record -> new RecordBody(record.chain(),
-                    record.mapFields(field -> field.withType(map.apply(field.type()))),
-                    record.groups(), record.extension(), record.discriminators(), record.nameType());
+            case RecordBody record -> record.withFields(record.mapFields(field -> field.withType(map.apply(field.type()))));
             case ArrayBody array -> new ArrayBody(array.chain(), map.apply(array.elementType()),
                     array.voidable(), array.ordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(mapBody.chain(),

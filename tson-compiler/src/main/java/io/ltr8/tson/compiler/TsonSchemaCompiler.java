@@ -255,7 +255,7 @@ public final class TsonSchemaCompiler {
                 ValueReaderContext context =
                         new ValueReaderContext(linked, readers, foreign, namesMeaning, referrers);
                 if (OpenEntry.isFamilyBase(definition)) {
-                    // A *family base* -- a template carrying `extension` (§5.10). No
+                    // A *family base* -- a record template (§5.10). No
                     // value is read against it: one of its instantiations is, selected by a tag or by the
                     // discriminators, so it dispatches exactly as a closed abstract or sealed record does.
                     return new AbstractTemplateReader(name, definition, context, readers);

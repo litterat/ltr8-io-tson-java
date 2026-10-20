@@ -273,8 +273,8 @@ final class TypeInhabitance {
     /** The first thing a definition demands that nothing satisfies -- the next link of the chain. */
     private static String firstUnsatisfiedDependency(Top definition,
             Map<String, Top> namespace, Set<String> inhabited) {
-        if (definition == null) {
-            return null;
+        if (definition == null || OpenEntry.isOpen(definition)) {
+            return null; // an open entry is inhabited, as isInhabited says
         }
         return switch (definition) {
             case RecordBody record -> recordDependency(record, namespace, inhabited);

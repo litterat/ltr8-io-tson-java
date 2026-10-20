@@ -64,10 +64,10 @@ import java.util.function.Supplier;
  * composes the two argument lists and hands back what that denotes, minting no entry of its own (§5.10: "no
  * intermediate entry per alias hop"). See {@link #closeHeldAlias}.
  *
- * <p><b>So the three cases are told apart by the constructor head, not by the body's shape.</b> Every open
- * entry's body is a {@link HeldBody} -- a record, composition or refinement template, a sugar form's lift,
- * an alias, and an error placeholder alike ({@code WireForm.heldEmptyRecord}). {@code record} closes
- * to the instantiation, {@code reference} to a name, everything else to a synthetic.
+ * <p><b>So the three cases are told apart by the constructor head, not by the kernel shape.</b> Every open
+ * entry has a {@link HeldBody} -- a record template's tree written from the open record, a sugar form's lift,
+ * an alias, and an error placeholder alike. {@code record} closes to the instantiation, {@code reference} to a
+ * name, everything else to a synthetic.
  *
  * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application, which its key
  * records ({@code @application}, whatever the entry's kind), so two {@code box<text>} anywhere in the schema land
@@ -92,7 +92,7 @@ final class TemplateMaterialiser {
     private final DefinitionGetter namespace;
 
 
-    /** The constructor a held record template carries -- its closure is the instantiation itself. */
+    /** The constructor a record template's tree applies -- its closure is the instantiation itself. */
     private static final String RECORD = "record";
 
     /** The constructor a held alias carries -- §5.10's partial application, which mints no entry. */
@@ -569,13 +569,12 @@ final class TemplateMaterialiser {
                 publish.accept(name, alias);
                 return name;
             }
-            // Every open entry's body is held -- a record, composition or refinement template, a sugar
-            // form's lift, an alias, and an error placeholder alike (WireForm.heldEmptyRecord). The
-            // three branches above are the whole of §12.1's open form, told apart by the head they carry
-            // rather than by what shape the body arrived in. So this is a broken invariant, not an author
-            // error and not a gap.
+            // Every open entry has a held tree (OpenEntry, HeldBody.of) -- a record template, a sugar form's
+            // lift, an alias, and an error placeholder alike. The three branches above are the whole of
+            // §12.1's open form, told apart by the head they carry rather than by which kernel shape holds the
+            // entry. So this is a broken invariant, not an author error and not a gap.
             throw new IllegalStateException("'" + head + "' declares type parameters but its body is a "
-                    + template.getClass().getSimpleName() + " -- every open entry's body is held, and "
+                    + template.getClass().getSimpleName() + " -- every open entry has a held tree, and "
                     + "nothing else can be substituted into");
         } finally {
             closing.remove(name);

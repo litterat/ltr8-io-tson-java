@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
@@ -23,23 +24,24 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * A {@link TemplateBody}'s text, parsed -- the constructor application an open entry holds, as a working
- * value of the phases that need one.
+ * An open entry's held tree -- the constructor application it holds, as a working value of the phases that need
+ * one: a {@link TemplateBody}'s text parsed, or an open {@link RecordBody}'s tree written ({@link
+ * WireForm#heldRecord}).
  *
- * <p><b>The parsed form is a working value, not part of the entry.</b> {@link TemplateBody} carries the
- * application as text because that is what §5.10 means by held; this parses it once, on demand, for the four
- * questions a held body is asked before it closes: which names it mentions (§5.10's unreferenced-parameter
+ * <p><b>The tree is a working value, not part of the entry.</b> {@link TemplateBody} carries the application as
+ * text because a parameter may stand in any slot of a constructor other than {@code record}; a record template is
+ * the record value it is. Either way this builds the tree on demand for the four questions an open body is asked
+ * before it closes: which names it mentions (§5.10's unreferenced-parameter
  * rule), which applications it writes (§5.10.1's regularity rule and §5.10's arity rule), what substitution
  * rewrites at materialisation, and which constructor heads it applies. Nothing outside this package sees a
  * {@link DataValue}.
  *
- * <p><b>Parsing rather than holding is what keeps the value model a value model.</b> The AST is
+ * <p><b>Building rather than holding is what keeps the value model a value model.</b> The AST is
  * {@code tson-compiler}'s own grammar type and {@code tson-schema} depends on nothing here, so an entry
- * could not carry one without inverting that direction. It also makes the text authoritative, which is what
- * §8.1's ingest rule already assumes: an open entry's held body is re-resolved as source.
+ * could not carry one without inverting that direction.
  *
- * <p><b>Parsed per call, never cached.</b> Parsing is a pure function of the text and schema-load work, never
- * read-path work, and a caller that needs the tree twice parses once into a local.
+ * <p><b>Built per call, never cached.</b> It is a pure function of the entry and schema-load work, never
+ * read-path work, and a caller that needs the tree twice builds it once into a local.
  *
  * <p><b>The two questions are not interchangeable, and a check must pick the right one.</b>
  * {@link #applications()} returns a distinguishable shape; {@link #names()} returns every token the body
@@ -70,15 +72,14 @@ public final class HeldBody {
      * rather than a difference between two entries that should be equal.
      */
     public static TemplateBody held(List<String> parameters, DataValue application) {
-        // The parent's extension is derived here because this is the one door every open entry passes
-        // through, whatever spelling produced it -- and from the payload's own structure rather than from
-        // the text below it, which is not parsed back on this path at all.
+        if (WireForm.RECORD.equals(application.typeRef().orElse(null))) {
+            throw new IllegalStateException("a record template is a record with parameters, never held text "
+                    + "(§5.10): " + parameters);
+        }
         // Every parameter starts as a type parameter: its type is derived from the body once the whole schema has
         // resolved (ParameterTypes), which a held body is built well before.
         return new TemplateBody(parameters.stream().map(TemplateParam::typeParameter).toList(),
-                WRITER.toTson(application),
-                WireForm.parentExtension(application, parameters),
-                WireForm.parentDiscriminators(application, parameters));
+                WRITER.toTson(application));
     }
 
     /**
@@ -93,6 +94,11 @@ public final class HeldBody {
      */
     public static HeldBody of(Top open) {
         Objects.requireNonNull(open, "open");
+        if (OpenEntry.isFamilyBase(open)) {
+            // An open record is a value of the vocabulary as it stands, so its tree is written rather than parsed.
+            RecordBody record = (RecordBody) open;
+            return new HeldBody(record.parameterNames(), WireForm.heldRecord(record, HeldBody::annotationValue));
+        }
         if (!(open instanceof TemplateBody body)) {
             throw new IllegalStateException("only an open entry has a held body, and this one is closed: "
                     + open.getClass().getSimpleName());
@@ -105,6 +111,16 @@ public final class HeldBody {
                     + body.template() + " -- a held body is written by WireForm and read here, so the "
                     + "two have disagreed about the one spelling §5.10 requires", e);
         }
+    }
+
+    /** A held tree in hand, for a check that runs on a payload before it is bound. */
+    static HeldBody ofTree(List<String> parameters, DataValue application) {
+        return new HeldBody(List.copyOf(parameters), application);
+    }
+
+    /** A field annotation's bound value back in wire form, for {@link WireForm#heldRecord}. */
+    private static DataValue annotationValue(Object value) {
+        return new TsonDataParser(WRITER.toTson(value)).parseDocument().root();
     }
 
     /** The entry's own parameter names, in declaration order. */

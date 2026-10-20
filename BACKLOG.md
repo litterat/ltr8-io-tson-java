@@ -76,21 +76,13 @@ own prose (which had gone stale on it):
   schema declares. A segment is then judged by the key type of the namespace it lands in, rather than by §7.7
   uniformly, and a key that is no identifier needs a spelling: `orders_api."/orders/{id}".GET` is not one token under
   [TSON-DATA] §7.2. Lands on `r2026-38-proposal` before the branch goes to the reviewer.
-- [ ] **A record-bodied template is a `record` with `parameters`** (SPEC-FEEDBACK.md #14, Status). §5.10 makes a
-  record-bodied template the one template that is a type, the ABSTRACT base its declared applications are members of,
-  and the kernel carries that by giving every `template` a chain, `extension` and `discriminators` that only record
-  templates fill, and `TypeKind.TEMPLATE` plus "a `Type`, or a template with `extension`" checks beside it. Resolve it
-  as `!record { parameters: [...]  fields: {...}  chain: {...} }` instead: kind PRODUCT, IS-A `type`, open by
-  `parameters` being present, erasure visible as the fields naming no parameter, no held text and no two-level
-  `extension`; `template` keeps `parameters` and `template` text alone, loses `chained`, and the chain is `type`'s
-  again. Needs `record_field`'s pin and default split into a literal or a parameter reference, as `type_argument`
-  already is, and refuses a parameter at a record's own facets (`optional: B`, `extension: E`, `name_type: N`), which
-  held text admits today -- check the corpus for a vector that depends on that before the kernel edit, and decide
-  whether `final <T> { ... }` means each application is FINAL or stays refused. In Java, `RecordBody` gains
-  `parameters`, `TemplateBody` loses the family-base fields and `Chained`, the linker and compiler iterate one closed-
-  entries view in place of skipping `TemplateBody`, and the materialiser substitutes into a value for records rather
-  than re-reading text. Every record template's resolved output changes; no data verdict does. After #725's chain
-  record and before the namespace kind, both having to say what is looked up lexically.
+- [ ] **A parameter in a record template has no channel of its own** (SPEC-FEEDBACK.md #17). An open record's
+  parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
+  type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
+  channel: `record_field` `( type: type_ref | type_param: param_name )` and `( value: value | value_param: param_name
+  )`, `type_argument` a `param` member, so `type_ref.name` always names an entry. Sequenced with the `type_ref` /
+  `type_name` normalisation (qualified names, `!ref`), which needs exactly that, and with what `@application` means
+  on a declared entry that is no record.
 
 ## Checked annotations
 

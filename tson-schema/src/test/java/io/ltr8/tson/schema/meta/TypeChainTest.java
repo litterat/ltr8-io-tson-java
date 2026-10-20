@@ -64,8 +64,8 @@ class TypeChainTest {
     @Test
     void aConstructorIsWhatIsATheKernelsTopAndTheKernelsTopItself() {
         RecordBody constructor = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("atom", "top", "type"));
-        TemplateBody templated = new TemplateBody(List.of(new TemplateParam("T", TemplateParam.TYPE_REF,
-                Optional.empty())), "!record { fields: {} }", Optional.of(RecordExtensionType.ABSTRACT))
+        RecordBody templated = RecordBody.of(RecordBody.fieldMap())
+                .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())))
                 .withSupertypes(List.of("data", "top"));
 
         assertTrue(TypeKind.isConstructor("integer_type", constructor, n -> true));
@@ -76,10 +76,10 @@ class TypeChainTest {
     }
 
     @Test
-    void aTemplateCarriesAChainAsAnyTypeDoes() {
-        TemplateBody pet = new TemplateBody(List.of(new TemplateParam("T", TemplateParam.TYPE_REF,
-                Optional.empty())), "!record { fields: {} }", Optional.of(RecordExtensionType.ABSTRACT));
-        TemplateBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
+    void aRecordTemplateCarriesAChainAsAnyTypeDoes() {
+        RecordBody pet = RecordBody.of(RecordBody.fieldMap())
+                .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())));
+        RecordBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
                 .withSubtypes(List.of("dog")));
 
         assertEquals(List.of("animal"), Chained.supertypesOf(placed));

@@ -44,11 +44,11 @@ class HeldBodyTest {
      */
     @Test
     void aHeldApplicationIsABodyTheValueModelCanCarry() {
-        Top body = template("record");
+        Top body = template("tuple");
 
         TemplateBody held = assertInstanceOf(TemplateBody.class, body);
         assertEquals(List.of("T"), held.parameterNames());
-        assertEquals("!record {}", held.template());
+        assertEquals("!tuple {}", held.template());
     }
 
     /**
@@ -58,8 +58,8 @@ class HeldBodyTest {
      */
     @Test
     void twoTemplatesDifferingOnlyInTheirHeldBodyAreNotEqual() {
-        assertEquals(template("record"), template("record"));
-        assertNotEquals(template("record"), template("array"));
+        assertEquals(template("tuple"), template("tuple"));
+        assertNotEquals(template("tuple"), template("array"));
     }
 
     /**
@@ -99,12 +99,18 @@ class HeldBodyTest {
         return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), value));
     }
 
+    /** A record template is a record with parameters, never held text (§5.10): the door refuses one. */
+    @Test
+    void aRecordIsNeverHeld() {
+        assertThrows(IllegalStateException.class, () -> template("record"));
+    }
+
     /** A held body belongs to an entry that declares parameters; one with none is a closed entry (§5.10). */
     @Test
     void aHeldBodyBelongsToAnEntryThatDeclaresParameters() {
         assertThrows(IllegalArgumentException.class,
-                () -> new TemplateBody(List.of(), "!record {}", Optional.empty()));
+                () -> new TemplateBody(List.of(), "!set_type { element_type: T }"));
         assertThrows(NullPointerException.class,
-                () -> new TemplateBody(List.of(TemplateParam.typeParameter("T")), null, Optional.empty()));
+                () -> new TemplateBody(List.of(TemplateParam.typeParameter("T")), null));
     }
 }

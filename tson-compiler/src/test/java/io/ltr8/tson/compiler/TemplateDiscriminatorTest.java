@@ -5,7 +5,6 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TemplateBody;
 
 import org.junit.jupiter.api.Test;
 
@@ -85,10 +84,10 @@ class TemplateDiscriminatorTest {
     void theHeldBodyNamesTheSelector() {
         TsonCompiledSchema compiled = compile(FAMILY);
 
-        TemplateBody held = (TemplateBody) compiled.schema().entries().get("pet");
+        RecordBody base = bodyOf(compiled, "pet");
 
-        assertEquals(List.of("type"), held.discriminators(),
-                () -> "the field the author marked survives into the held body: " + held.template());
+        assertEquals(List.of("type"), base.discriminators(),
+                () -> "the field the author marked survives onto the open record: " + base);
     }
 
     /**

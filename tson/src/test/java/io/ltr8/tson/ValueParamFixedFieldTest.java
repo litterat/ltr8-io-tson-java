@@ -6,8 +6,8 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -77,25 +77,23 @@ class ValueParamFixedFieldTest {
      * because the obvious fix for the defect below is to make this REQUIRED_FIXED, which would put this
      * implementation at odds with the one sentence the spec is explicit about.
      *
-     * <p>The template's body is <b>held</b>, so the state and the parameter are read off the application the
-     * entry holds rather than off a {@code RecordField}: {@code record_field.value_param} is gone, the
-     * parameter standing in the ordinary {@code value} slot with §8.1's shadowing rule to tell it from a
-     * literal.
+     * <p>A record template is the record it is, so the state and the parameter are read off its own {@code
+     * RecordField}: the parameter stands in the ordinary {@code value} slot, with §8.1's shadowing rule to tell it
+     * from a literal.
      */
     @Test
     void anOpenTemplatesParametricFixedFieldStaysRequiredWithTheParameterRecorded() {
         TsonLinkedSchema linked = tson().resolve(SCHEMA);
 
-        TemplateBody held = assertInstanceOf(TemplateBody.class,
+        RecordBody open = assertInstanceOf(RecordBody.class,
                 linked.schema().entries().get("response"));
+        RecordField status = open.fields().get("status");
 
-        assertEquals(List.of("T", "S"), held.parameterNames(), "the entry's own parameter list, as declared");
+        assertEquals(List.of("T", "S"), open.parameterNames(), "the entry's own parameter list, as declared");
         assertEquals(List.of(TemplateParam.typeParameter("T"), new TemplateParam("S", TypeRef.of("int32"))),
-                held.parameters(), "S is routed into an int32 field, so an argument for it is read as an int32");
-        assertTrue(held.template().contains("value: S"),
-                () -> "the parameter stands in the ordinary value slot: " + held.template());
-        assertFalse(held.template().contains("FIXED"),
-                () -> "nothing is fixed at declaration: " + held.template());
+                open.parameters(), "S is routed into an int32 field, so an argument for it is read as an int32");
+        assertEquals("S", status.value().orElseThrow().text(), "the parameter stands in the ordinary value slot");
+        assertEquals(FieldRole.FREE, status.role(), "nothing is fixed at declaration");
     }
 
     /**
