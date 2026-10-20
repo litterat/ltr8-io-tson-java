@@ -1433,6 +1433,7 @@ final class DefinitionResolver {
                         + (supertypeRef instanceof ChoiceRef ? "variants" : "elements") + ", not fields (§5.8)");
             }
             String supertypeName = simple.name();
+            refuseParameterOperand(name, supertypeName, parameters, "supertype", "&");
             Top supertypeDef = namespaceDefinitions.definition(supertypeName);
             if (supertypeDef == null) {
                 // Not a library gap: composition copies the supertype's own fields, so the name has to
@@ -1689,6 +1690,9 @@ final class DefinitionResolver {
                     new io.ltr8.tson.schema.meta.TypeRef(generic.name(), typeArguments(name, generic)),
                     new ArrayList<>(operand.ancestors()), operand.body());
         }
+        if (refined.target() instanceof SimpleRef simple) {
+            refuseParameterOperand(name, simple.name(), parameters, "refinement source", "^");
+        }
         io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target(), parameters);
         String sourceName = sourceRef.name();
         Top sourceDef = namespaceDefinitions.definition(sourceName);
@@ -1821,6 +1825,22 @@ final class DefinitionResolver {
             fields.put(field.getKey(), field.getValue());
         }
         groups.addAll(source.groups());
+    }
+
+    /**
+     * A parameter is never an operand of {@code &} or {@code ^} (SPEC-FEEDBACK.md #16): both read the operand's
+     * field set to flatten, and a parameter has none until the template is applied, so {@code <T> T & { … }} and
+     * {@code <T> T ^ { … }} have no body to hold. An operand applied <em>to</em> a parameter, {@code result<T>},
+     * is a different thing and is admitted. Checked before the name is looked up, as §5.10's shadowing rule
+     * reads it: a parameter hides a schema entry of the same name.
+     */
+    private static void refuseParameterOperand(String name, String operand, List<String> parameters, String position,
+                                               String operator) {
+        if (parameters.contains(operand)) {
+            throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' is a parameter of"
+                    + " this declaration, and a parameter is never an operand of '" + operator + "' -- its fields are"
+                    + " unknown until the template is applied, so there is nothing to flatten (§5.10)");
+        }
     }
 
     /**

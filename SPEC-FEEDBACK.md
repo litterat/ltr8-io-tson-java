@@ -1507,3 +1507,66 @@ instead: (value_type | void_type | integer_type | …)`); a `data` that nothing 
 moves: an annotation typed by a base kind (`@data:_`) was a bind mismatch,
 the type having no class to build, and is now a schema error, a value at an abstract position naming no subtype. The
 corpus carries a refusal vector for each of the six and a valid vector for `!record { … }` and `!integer_type { … }`.
+
+## 16. A record template's parameters stand in three places, and a parameter is never an operand
+
+**Section:** [TSON-SCHEMA] §5.10 ("Held bodies": "a parameter in a value slot (`min_items: N`), in a type slot
+(`element_type: T`), inside a collection (`variants: [T error]`, `members: [a b M]`), or at any depth is a token like
+any other"; "A record-bodied template is a family base"), §5.8 ("Parameterized references").
+
+**Kind:** proposal — two refusals. The first step of separating a record template (a family, whose open form is a
+type) from every other template (an abbreviation, whose open form denotes nothing); the kernel split follows as its
+own entry.
+
+**The problem.** §5.10 admits a parameter wherever a token stands, and that is right for an abbreviation:
+`<N> !array { element_type: text  min_items: N }` needs it. A record template is a family base as well, and a base is
+"what survives erasure": the fields a position typed by the template can rely on whichever member it holds. A
+parameter in some slots of a `!record` body leaves no such shape. Each of these resolves today, in this
+implementation and by §5.10's text:
+
+| Slot | Declaration | `T<x>` gives |
+|---|---|---|
+| field name | `keyed => <K> { K: text }` | a field named by the argument |
+| group member | `grouped => <A> { ( A: text \| b: text ) }` | a group over the argument |
+| `record_field.optional` | `<B> !record { fields: { v => { type: text  optional: B } } }` | `v` optional or not |
+| `record_field.voidable` | `<V> !record { fields: { v => { type: text  voidable: V } } }` | `v` voidable or not |
+| `record_field.role` | `<R> !record { fields: { v => { type: text  role: R  value: "x" } } }` | `v` FREE, DEFAULT or FIXED |
+| `record.extension` | `<E> !record { fields: { … }  extension: E }` | each member's extensibility |
+| `record.name_type` | `<I> !record { fields: { … }  name_type: I }` | what the field names are |
+| `record.discriminators` | `<D> !record { fields: { kind => … }  discriminators: [D] … }` | what the members are selected by |
+
+The base of `keyed` cannot list the field; the base of `maybe` cannot say whether `v` may be missing; the base of
+`fam` cannot dispatch. §5.10 never says which of a base's facts an argument may decide.
+
+Separately, §5.8 lets an operand of `&` or `^` carry arguments, and says nothing of an operand that *is* a parameter:
+`named => <T> T & { name: text }` (a mixin) and `<T> T ^ { … }`. Both read the operand's field set to flatten, and a
+parameter has none until the template is applied, so neither body can be held in the flattened form §5.10 requires.
+
+**Proposed.**
+
+- In a record template a parameter stands only in a field's type (`v: T`), a field's default or fixed value
+  (`w?: int32 ~ N`, `type: text = N`), or an argument of an application (`items: box<T>`, `result<T> & { … }`); sugar
+  inside a field (`[T; N]`) lifts to an application and so is the third. Anywhere else in a `!record` body is a
+  resolver error at the declaration, naming the slot.
+- A parameter is never an operand of `&` or `^`; an operand applied to one (`result<T>`) is admitted. Read under the
+  shadowing rule, so `<T> T & { … }` is refused even where the schema declares an entry named `T`.
+- Templates over any other constructor are unchanged: `<V> !tuple { elements: [{ element_type: text  voidable: V }] }`
+  still takes a value parameter in a scalar slot.
+
+**Breaking changes, against Revision 37:** the eight slot forms above, all of which resolve today. Nothing in the
+bundled schemas or the conformance corpus uses them. The two operand forms were already refused by this
+implementation, as an unresolved operand name.
+
+**Suggested resolution.** [TSON-SCHEMA] §5.10, "Held bodies": after "at any depth is a token like any other", add "— in
+a template whose held body is a `!record`, only at a field's type, a field's default or fixed value, or an argument of
+an application; anywhere else in a record body is a resolver error, since the family base (below) would have no shape
+its members share". §5.8, "Parameterized references": "an operand may carry arguments, which may name the
+declaration's parameters; an operand that is itself a parameter is a resolver error".
+
+**Status against Revision 37:** open; running on the `record-template-slots` branch of `r2026-38-proposal`.
+`ParameterTypes` refuses a parameter at any record slot but a field's type, reporting the slot (`parameter 'K' stands at
+a key of record.fields -- a record template's parameters stand only in a field's type, a field's default or fixed value,
+or an argument of an application, so that every application of it shares one shape (§5.10)`); `DefinitionResolver`
+refuses a parameter operand before looking the name up (`supertype 'T' is a parameter of this declaration, and a
+parameter is never an operand of '&' -- its fields are unknown until the template is applied, so there is nothing to
+flatten (§5.10)`). The corpus carries a refusal vector for each.

@@ -189,6 +189,11 @@ recorded open form, and replacing the application with a reference to the entry 
       arity check, which reads the same accessor: materialisation runs first, and by then the parameter is
       gone — leaving either an arity error against a content-derived name nobody typed, or a wire-vocabulary
       mismatch, neither of which names what the author did.
+    - **A parameter is never an operand.** `<T> T & { … }` and `<T> T ^ { … }` are refused at the declaration
+      (`DefinitionResolver.refuseParameterOperand`, SPEC-FEEDBACK.md #16): both operators read the operand's field
+      set to flatten, and a parameter has none until applied. The check runs before the name is looked up, so a
+      parameter shadows an entry of the same name here as everywhere; an operand *applied to* a parameter
+      (`result<T>`) is the open-operand case above.
 - **`kind` is derived, never stored.** `TypeKind.of(value, kernel)` reads it off an entry's value — its chain and
   its branch of `Top` — so writing it would restate what the value already carries; the kernel declares no
   `type_kind`, and the model has no slot for one. A base kind in the chain counts only as the kernel's own entry
