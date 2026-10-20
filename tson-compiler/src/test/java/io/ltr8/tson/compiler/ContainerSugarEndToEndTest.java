@@ -127,7 +127,7 @@ class ContainerSugarEndToEndTest {
 
         ChoiceBody choice = assertInstanceOf(ChoiceBody.class, compiled.schema().entries().get("u"));
         String variant = choice.variants().getFirst().name();
-        assertTrue(variant.startsWith("box_text_"), () -> "names the instantiation, not 'box': " + variant);
+        assertTrue(variant.startsWith("record_v_text_"), () -> "names the expansion, not 'box': " + variant);
         assertEquals(List.of(), choice.variants().getFirst().arguments(),
                 "and names it as a closed reference, the application having been rewritten");
         assertInstanceOf(RecordBody.class, compiled.schema().entries().get(variant));
@@ -143,7 +143,7 @@ class ContainerSugarEndToEndTest {
         TupleBody tuple = assertInstanceOf(TupleBody.class, compiled.schema().entries().get("t"));
         assertEquals(TypeRef.of("text"), tuple.elements().getFirst().elementType());
         String second = tuple.elements().get(1).elementType().name();
-        assertTrue(second.startsWith("box_text_"), () -> "names the instantiation: " + second);
+        assertTrue(second.startsWith("record_v_text_"), () -> "names the expansion: " + second);
 
         TsonValue value = (TsonValue) compiled.get("t")
                 .read(TestDocuments.document("[\"a\" { v: \"b\" }]"));
@@ -165,7 +165,7 @@ class ContainerSugarEndToEndTest {
                   u   => w<text>""");
 
         ChoiceBody choice = assertInstanceOf(ChoiceBody.class, bodyOf(compiled, "u"));
-        assertTrue(choice.variants().getFirst().name().startsWith("box_text_"), choice::toString);
+        assertTrue(choice.variants().getFirst().name().startsWith("record_v_text_"), choice::toString);
     }
 
     /**
@@ -491,8 +491,8 @@ class ContainerSugarEndToEndTest {
         // The closed form only: `array_box_p0_...` is the template's own open synthetic, which stays an entry
         // of its own -- §8.2 gives open synthetics a separate identity rule and nothing merges them.
         assertEquals(1, compiled.schema().entries().keySet().stream()
-                .filter(n -> n.startsWith("array_box_text")).count(),
-                () -> "one closed array_box_text entry, shared: " + compiled.schema().entries().keySet());
+                .filter(n -> n.startsWith("array_record_v_text")).count(),
+                () -> "one closed array of the expanded box, shared: " + compiled.schema().entries().keySet());
     }
 
     /**

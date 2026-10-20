@@ -96,6 +96,15 @@ class UseSiteNamingTest {
         assertEquals(List.of("'5' is less than the minimum 10"), found);
     }
 
+    /** A record application nothing declares expands to a record no author named, shown as its body. */
+    @Test
+    void aMintedRecordIsNamedByItsBody() {
+        List<String> found = messages("  bx => <T> { v: T }\n  r => { e: bx<int32> }", "!r { e: { v: 1  nope: 2 } }");
+
+        assertEquals(1, found.size(), found::toString);
+        assertTrue(found.getFirst().startsWith("unknown field 'nope' on '{ v: int32 }'"), found.getFirst());
+    }
+
     /** The same for a set: {@code set<text>} expands to a set no author named, which is not the array {@code [text]}. */
     @Test
     void aMintedSetIsNotNamedAsAnArray() {

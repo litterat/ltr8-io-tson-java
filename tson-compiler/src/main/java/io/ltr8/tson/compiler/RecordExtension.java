@@ -120,8 +120,9 @@ final class RecordExtension {
 
     /**
      * A record a use-site template application minted that composes onto another: a family member with no
-     * declared name. A minted entry has no source position, and its chain records the application it closes; a
-     * constructor (IS-A the kernel's {@code top}) is no member of anything.
+     * declared name. Refused at minting for an expansion ({@code TemplateMaterialiser}), where the application is
+     * in hand; what reaches here is the instantiation entry an expansion naming itself keeps, which has no source
+     * position and records its application. A constructor (IS-A the kernel's {@code top}) is no member of anything.
      */
     private static boolean isUndeclaredMember(String name, Top def, Map<String, TsonSchema.EntryFacts> facts,
                                               Map<String, TypeRef> applications, Predicate<String> kernel) {

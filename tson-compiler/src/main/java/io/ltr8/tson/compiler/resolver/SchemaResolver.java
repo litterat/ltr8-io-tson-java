@@ -290,7 +290,7 @@ public final class SchemaResolver {
                         heldByName),
                 generated,
                 metaParser.schema().entries()::get, namespaceGetter::current, facts, applications,
-                localConstructors, metaParser.schema()::constructorOf);
+                localConstructors, metaParser.schema()::constructorOf, kernel);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
@@ -397,7 +397,8 @@ public final class SchemaResolver {
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
         republish(namespace, resolvedLocals, instantiations);
         familyBaseEdges(namespace, resolvedLocals, generated, applications);
-        appliedParentEdges(namespace, resolvedLocals, instantiations, applications);
+        appliedParentEdges(namespace, resolvedLocals, instantiations, applications,
+                materialiser.expansionsByApplication(), materialiser.syntheticNames());
         closeChains(namespace, resolvedLocals, instantiations);
 
         // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
@@ -609,13 +610,17 @@ public final class SchemaResolver {
      */
     private static void appliedParentEdges(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
                                            Map<String, Top> instantiations,
-                                           Map<String, io.ltr8.tson.schema.meta.TypeRef> applications) {
+                                           Map<String, io.ltr8.tson.schema.meta.TypeRef> applications,
+                                           Map<String, String> expansions, Set<String> synthetics) {
         Map<String, String> byApplication = new LinkedHashMap<>();
         namespace.keySet().forEach(entryName -> Optional.ofNullable(applications.get(entryName))
                 .filter(application -> !application.arguments().isEmpty())
                 .ifPresent(application -> byApplication.putIfAbsent(
                         DerivedName.canonicalApplication(application.name(), application.arguments()),
                         entryName)));
+        // A minted expansion records no application, so the materialiser's index stands in for it: the edge an
+        // operand `& box<int32>` reaches is to the entry `box<int32>` written at a use site expanded to.
+        expansions.forEach(byApplication::putIfAbsent);
         // <b>To a fixed point</b>, because the edge is transitive and each pass can only see the chains the
         // previous one left. `great => <T> ok<T> & { … }` over `ok => <T> result<T> & { … }` needs `ok_of`'s own
         // edge to `result_of` to exist before `great_of` can inherit it. Bounded by the entry count: each round
@@ -623,9 +628,9 @@ public final class SchemaResolver {
         for (int round = 0; round <= namespace.size(); round++) {
             // Republished between the two folds as well as after them: an owner's chain grows in this same
             // round, and `completed` reads its ancestors out of the namespace.
-            boolean changed = fold(resolvedLocals, byApplication, namespace);
+            boolean changed = fold(resolvedLocals, byApplication, namespace, synthetics);
             republish(namespace, resolvedLocals, instantiations);
-            changed |= fold(instantiations, byApplication, namespace);
+            changed |= fold(instantiations, byApplication, namespace, synthetics);
             republish(namespace, resolvedLocals, instantiations);
             if (!changed) {
                 return;
@@ -687,9 +692,13 @@ public final class SchemaResolver {
         republish(namespace, resolvedLocals, instantiations);
     }
 
-    /** One round of {@link #appliedParentEdges} over one map -- {@code true} when any chain grew. */
+    /**
+     * One round of {@link #appliedParentEdges} over one map -- {@code true} when any chain grew. A minted
+     * expansion gains no edge: it is a member of nothing, and one whose chain would name a declared type was
+     * refused when it was minted ({@code TemplateMaterialiser}).
+     */
     private static boolean fold(Map<String, Top> entries, Map<String, String> byApplication,
-                                 Map<String, Top> namespace) {
+                                 Map<String, Top> namespace, Set<String> synthetics) {
         boolean changedAny = false;
         // <b>To a fixed point within the map, not merely across rounds.</b> A pass visits entries in map
         // order while mutating them, so `great_of` can be reached before `ok_of` has grown the edge it
@@ -698,6 +707,9 @@ public final class SchemaResolver {
         for (int pass = 0; pass <= entries.size(); pass++) {
             boolean changed = false;
             for (Map.Entry<String, Top> entry : entries.entrySet()) {
+                if (synthetics.contains(entry.getKey())) {
+                    continue;
+                }
                 Top folded = completed(entry.getValue(), byApplication, namespace);
                 if (folded != entry.getValue()) {
                     entry.setValue(folded);

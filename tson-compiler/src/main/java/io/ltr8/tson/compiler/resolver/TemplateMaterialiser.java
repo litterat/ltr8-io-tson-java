@@ -21,6 +21,7 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Type;
@@ -36,6 +37,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -45,18 +47,17 @@ import java.util.function.Supplier;
  * <p><b>It runs over the resolved form, not the AST.</b> An application reaches here as a
  * {@link TypeRef} carrying {@code arguments} -- the one thing that shape means (a closed form is always an
  * entry named by a bare reference) -- so substitution is a walk over {@code schema.meta} values, and the
- * entry it produces is named from the application, which §8.2 keys identity on. Doing it over the AST
- * instead would reuse {@code SchemaDesugarer}'s injection machinery but has no channel for that application,
- * and would put type-level work back into a phase that is purely syntactic.
+ * entry it produces is named from what the closing produced. Doing it over the AST instead would reuse {@code
+ * SchemaDesugarer}'s injection machinery and put type-level work back into a phase that is purely syntactic.
  *
  * <p><b>A held body closes by one process, whatever wrote it.</b> {@code <T> [T]} and {@code <T> { x: T }}
  * are both an application with a parameter standing in a slot -- {@code !array { element_type: T }} and
  * {@code !record { fields: [ { name: x  type: T } ] }} -- so both substitute by the same walk and are read
- * back through their own constructor's reader. See {@link #closeHeld}. What differs is only what the result
- * <em>is</em>: a <b>record</b> template's closure is the instantiation entry itself ({@link
- * #closeHeldRecord}), because a substituted record is the type the author named by writing the application;
- * every other held form closes to a <em>synthetic</em> named for the form, which the instantiation then
- * references ({@link #closeHeldTemplate}), because a form has no author-written name to be keyed on.
+ * back through their own constructor's reader. See {@link #closeHeld}. <b>An application nothing declares is
+ * its expansion</b> (§5.10): the closure is a closed <em>synthetic</em> named for its binding record, a record
+ * ({@link #mintedRecord}) like any other form ({@link #closeHeldTemplate}), so two applications closing to one
+ * form are one entry. A declaration naming an application is that entry under its own name ({@link
+ * #closeApplicationInto}).
  *
  * <p><b>An alias closes by a third path and mints nothing.</b> §5.10's partial application,
  * {@code uuid_pair => <B> pair<uuid, B>}, holds {@code !reference { target: pair<uuid, B> }} like any other
@@ -66,19 +67,16 @@ import java.util.function.Supplier;
  *
  * <p><b>So the three cases are told apart by the constructor head, not by the kernel shape.</b> Every open
  * entry has a {@link HeldBody} -- a record template's tree written from the open record, a sugar form's lift,
- * an alias, and an error placeholder alike. {@code record} closes to the instantiation, {@code reference} to a
- * name, everything else to a synthetic.
+ * an alias, and an error placeholder alike. {@code reference} closes to a name, everything else to a
+ * synthetic.
  *
- * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application, which its key
- * records ({@code @application}, whatever the entry's kind), so two {@code box<text>} anywhere in the schema land
- * on one entry. The derived name is
- * built by {@link DerivedName#ofApplication} from the application itself, which is what makes that dedup fall out of
- * naming rather than needing a second table.
- *
- * <p><b>Knot-tying.</b> The memo entry is registered <em>before</em> the body is substituted, so a
+ * <p><b>Knot-tying, and the one instantiation entry.</b> The memo entry is registered <em>before</em> the body
+ * is substituted, under a name derived from the application ({@link DerivedName#ofApplication}), so a
  * recursive application reached during substitution ({@code tree<T>} inside {@code tree}, which becomes
  * {@code tree<text>} once {@code T} is bound) finds the entry under construction and references it by name
- * rather than recursing forever.
+ * rather than recursing forever. Such an expansion names itself, so its content cannot be written without a
+ * name: it keeps the instantiation entry the knot was tied on, keyed on the application and recording it
+ * ({@code @application}, §8.2) -- the record itself, or a reference to the synthetic for any other form.
  */
 final class TemplateMaterialiser {
 
@@ -92,7 +90,7 @@ final class TemplateMaterialiser {
     private final DefinitionGetter namespace;
 
 
-    /** The constructor a record template's tree applies -- its closure is the instantiation itself. */
+    /** The constructor a record template's tree applies. */
     private static final String RECORD = "record";
 
     /** The constructor a held alias carries -- §5.10's partial application, which mints no entry. */
@@ -171,11 +169,18 @@ final class TemplateMaterialiser {
     private final Map<String, String> ownedBy = new LinkedHashMap<>();
 
     /**
-     * The entry each minted application of a non-record template denotes, by its application-derived name: the
-     * synthetic its closing produced. An application nothing declares is its expansion, so a later sight of it
-     * names the same synthetic rather than closing it again.
+     * The entry each minted application denotes, by its application-derived name: the synthetic its closing
+     * produced. An application nothing declares is its expansion, so a later sight of it names the same
+     * synthetic rather than closing it again.
      */
     private final Map<String, String> expansions = new LinkedHashMap<>();
+
+    /**
+     * The same, keyed on §8.2's canonical application, for the applications no entry records: a minted
+     * expansion carries no {@code @application}, so the applied-parent fold reads the edge {@code & box<int32>}
+     * reaches from here ({@link #expansionsByApplication}).
+     */
+    private final Map<String, String> expansionsByApplication = new LinkedHashMap<>();
 
     /**
      * The applications whose closing reached themselves -- the knot tied on the application-derived name while
@@ -248,6 +253,9 @@ final class TemplateMaterialiser {
      */
     private final Map<String, Map<String, ParameterTypes.Kind>> kindsOnDemand = new LinkedHashMap<>();
 
+    /** Whether a name is the meta-kernel's own, for telling a constructor from a family member. */
+    private final Predicate<String> kernel;
+
     /** The governing meta's entries, which is where a slot's declared type is read from. */
     private final Function<String, Top> metaTypes;
 
@@ -272,7 +280,9 @@ final class TemplateMaterialiser {
             DefinitionMetaReader metaReader, Set<String> generated,
             Function<String, Top> metaTypes, Supplier<String> resolving,
             Map<String, TsonSchema.EntryFacts> facts, Map<String, TypeRef> applications,
-            Function<String, Optional<String>> localConstructors, Function<String, Optional<String>> metaConstructors) {
+            Function<String, Optional<String>> localConstructors, Function<String, Optional<String>> metaConstructors,
+            Predicate<String> kernel) {
+        this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.facts = Objects.requireNonNull(facts, "facts");
         this.applications = Objects.requireNonNull(applications, "applications");
@@ -380,8 +390,8 @@ final class TemplateMaterialiser {
      * definition back for the caller to own: nothing is published under a derived name, and nothing is
      * claimed in {@link #minted}, whose ledger is §8.2's freshness MUST over <em>internal</em> names.
      *
-     * <p>Every shape but two closes here. A <b>record</b> template's closure is the instantiation itself, so
-     * {@link #closeHeldRecord} answers directly. Every other held form -- an open instance such as {@code arr
+     * <p>Every shape but two closes here. A <b>record</b> template's closure is a record, so {@link
+     * #closeHeldRecord} answers directly. Every other held form -- an open instance such as {@code arr
      * => <T> !array { element_type: T }} -- substitutes to a construction the declaration simply <em>is</em>,
      * with no synthetic standing between them. §5.10's partial application
      * and an unresolvable or mis-applied head return {@code null} for the caller to handle.
@@ -563,13 +573,16 @@ final class TemplateMaterialiser {
                     aliasClosing.add(name);
                     return closeHeldAlias(head, template, open, bind(parameters, arguments));
                 }
-                // A record template's closure is the instantiation itself, where every other held form closes
-                // to a synthetic -- see closeHeldRecord.
+                // A record template's closure is a record, named for its content like every other closed form
+                // unless it names its own application -- see closeHeldRecord and mintedRecord.
                 if (RECORD.equals(constructor)) {
+                    Top closed = closeHeldRecord(head, template, open, bind(parameters, arguments));
+                    refuseMintedMember(head, arguments, closed);
+                    if (!tied.contains(name)) {
+                        return mintedRecord(name, DerivedName.canonicalApplication(head, arguments), closed);
+                    }
                     note(name, RECORD);
-                    Top instantiation = instantiation(name,
-                            closeHeldRecord(head, template, open, bind(parameters, arguments)),
-                            new TypeRef(head, arguments));
+                    Top instantiation = instantiation(name, closed, new TypeRef(head, arguments));
                     materialised.put(name, instantiation);
                     publish.accept(name, instantiation);
                     return name;
@@ -606,6 +619,71 @@ final class TemplateMaterialiser {
             aliasClosing.remove(name);
             heads.remove(heads.size() - 1);
         }
+    }
+
+    /**
+     * A minted record application as its expansion: a closed synthetic record, named by its binding record as
+     * every closed form is, so two applications closing to one record -- {@code box<int32>} and {@code
+     * crate<int32>} over two templates with one field list -- are one entry. Built once; a later application
+     * with the same content names the entry already there.
+     */
+    private String mintedRecord(String name, String canonical, Top closed) {
+        List<RecordValue.Field> fields = closed instanceof RecordBody record
+                && WireForm.heldRecord(record, HeldBody::annotationValue).coreValue() instanceof RecordValue wire
+                ? wire.fields() : List.of();
+        String formName = DerivedName.ofBinding(RECORD, fields);
+        minted.claim(formName, DerivedName.canonicalBinding(RECORD, fields));
+        expansions.put(name, formName);
+        expansionsByApplication.putIfAbsent(canonical, formName);
+        if (namespace.definition(formName) == null) {
+            note(formName, RECORD);
+            materialised.put(formName, closed);
+            synthetics.add(formName);
+            publish.accept(formName, closed);
+        }
+        return formName;
+    }
+
+    /**
+     * A minted record whose chain names a declared type is a family member with no declared name (§3.3.4,
+     * §8.2): a read reports the member it selects, a tag names it and a binding maps it, all by a name an
+     * application at a use site does not have. Its chain names one through a supertype, or through a parent
+     * application a declaration owns ({@code & result<text>} beside {@code rt => result<text>}), which is the
+     * edge {@code SchemaResolver}'s fold would otherwise add. Refused here, where the application is in hand to
+     * name, against the declaration that wrote it. A constructor -- a record IS-A the kernel's {@code top} -- is
+     * no member of anything.
+     */
+    private void refuseMintedMember(String head, List<TypeArgument> arguments, Top closed) {
+        if (!(closed instanceof RecordBody record) || TypeKind.isConstructor(head, record, kernel)) {
+            return;
+        }
+        List<String> onto = new ArrayList<>(record.supertypes());
+        record.parents().stream().filter(parent -> !parent.arguments().isEmpty())
+                .map(parent -> ownedBy.get(DerivedName.canonicalApplication(parent.name(), parent.arguments())))
+                .filter(Objects::nonNull).forEach(onto::add);
+        if (onto.isEmpty()) {
+            return;
+        }
+        String written = head + arguments.stream().map(argument -> switch (argument) {
+            case TypeArgument.Ref ref -> ref.ref().name();
+            case TypeArgument.Value value -> value.value().text();
+        }).collect(java.util.stream.Collectors.joining(", ", "<", ">"));
+        String base = onto.stream()
+                .filter(member -> onto.stream().noneMatch(other -> !other.equals(member)
+                        && Chained.supertypesOf(namespace.definition(other)).contains(member)))
+                .findFirst().orElse(onto.getFirst());
+        throw new SchemaValidationException("'" + written + "' composes onto '" + base + "', so it is a member of "
+                + "that family, and a member is declared: a read reports the member it selects, a tag names it and "
+                + "a binding maps it, all by a name an application at a use site does not have (§3.3.4, §8.2). "
+                + "Declare it -- 'my_name => " + written + "' -- and use that name in place of the application");
+    }
+
+    /**
+     * The minted record each canonical application closed to, for {@code SchemaResolver}'s applied-parent fold:
+     * an application at a composition operand reaches the entry a use site's application of it denotes.
+     */
+    Map<String, String> expansionsByApplication() {
+        return Map.copyOf(expansionsByApplication);
     }
 
     /** The first few links of the closing chain, for the termination guard's message. */
@@ -690,22 +768,15 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * A <b>record</b> template's closure, which is the instantiation entry itself rather than a synthetic
-     * with a reference to it. Substituting a record yields a record -- what the author declared, not a form
-     * derived from a sugar spelling -- so there is nothing for the extra hop to record, and the entry's facts
-     * carry the application the way §8.2 says every instantiation does.
-     *
-     * <p><b>Which is why the two shapes part company here and nowhere earlier.</b> Everything up to this
-     * point is common: one held body, one substitution, one set of closed inner applications. What differs is
-     * only what the result <em>is</em> -- a form that needs a name of its own, or the type the author named
-     * by writing the application.
+     * A <b>record</b> template's closure: the record body itself, which a declaration owns under its name and
+     * which {@link #mintedRecord} names for its content where nothing declares it.
      *
      * <p><b>It is minted with no subtypes, like every resolved entry.</b> {@code subtypes} is linking's,
      * derived one phase later over the closed namespace ({@code TsonSchemaLinker}), which is the invariant
      * {@code SchemaResolver}'s own merge rests on. Taking the template's list instead would hand each
      * instantiation the whole family -- {@code box<text>} claiming {@code box<int32>} -- and, where the
      * template arrived already linked through an {@code !!import}, itself. That last is what makes it
-     * load-bearing rather than untidy: §8.2 names an instantiation by a function of its resolved form alone,
+     * load-bearing rather than untidy: §8.2 names a minted entry by a function of its resolved form alone,
      * so two schemas closing one application mint one entry and §2.2.3 unifies them. An entry shaped by
      * *which* schema closed it is not a function of the form, and the unification fails as a name collision.
      */

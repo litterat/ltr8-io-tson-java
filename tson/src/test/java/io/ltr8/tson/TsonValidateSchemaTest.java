@@ -225,7 +225,7 @@ class TsonValidateSchemaTest {
     @Test
     void anUnresolvedArgumentStaysWithTheApplier() {
         assertStaysWithTheApplier("box<some_typo>",
-                "'box<some_typo>' field 'v' has an unresolved reference 'some_typo'");
+                "'{ v: some_typo }' field 'v' has an unresolved reference 'some_typo'");
     }
 
     private static void assertStaysWithTheApplier(String application, String message) {

@@ -1649,8 +1649,9 @@ entry"), §8.3 ("Instantiation entries are not references"). Builds on #17.
 **Kind:** proposal — resolved output and identity; no verdict changes.
 
 **The problem.** §8.2 gives a minted application two identities at once. Its content is a closed synthetic, keyed on
-the form, and the application is an instantiation entry, keyed on the canonical application. For a template over any
-constructor but `record`, that is two entries for one type: `s: set<text>` mints `set_type_text_…` (`@synthetic`)
+the form, and the application is an instantiation entry, keyed on the canonical application. For a record template
+that makes `box<int32>` and `crate<int32>`, over two templates with one field list, two entries for one record. For a
+template over any other constructor it is two entries for one type: `s: set<text>` mints `set_type_text_…` (`@synthetic`)
 and `set_text_…` (`@application`), and the second can only be a `!reference` to the first — which §8.3 says an
 instantiation entry never is. The second entry records nothing a value can tell apart: it admits exactly the
 synthetic's values. #17 makes the split this rests on explicit: a template that is not a record template is an
@@ -1658,7 +1659,8 @@ abbreviation, and an abbreviation's application is its expansion and nothing mor
 
 **Proposed.** An application nothing declares is its expansion. A use site naming `set<text>` names the synthetic
 `!set_type { element_type: text }` lands on, the entry `[text]`-style sugar or another template expanding to the same
-form also lands on; no instantiation entry is minted, and nothing records the application. A declaration naming an
+form also lands on; a use site naming `box<int32>` names a closed synthetic record, keyed on its content, which
+`crate<int32>` lands on too. No instantiation entry is minted, and nothing records the application. A declaration naming an
 application is unchanged: it is that entry, under the author's name (§8.2, "A declaration whose body denotes a
 type is that type's entry").
 
@@ -1666,24 +1668,31 @@ type is that type's entry").
   `nested<text>` names itself inside its own body, so its content cannot be written without a name: the knot is tied
   on the application, which keeps its instantiation entry, a `!reference` to the synthetic, keyed on the canonical
   application as §8.2 states today. The rule is total: whether closing reached the application again decides it.
+- **A minted record is a member of nothing.** One whose chain names a declared type — `k: dog_of<text>` over
+  `dog_of => <T> pet & { … }`, or a parent application a declaration owns — would be a family member with no name a
+  read, a tag or a binding could use, and is a resolver error at the declaration that wrote the application (§3.3.4's
+  "a family member is declared", applied at the moment the application is in hand). It gains no IS-A edge later. A
+  declaration's operand still reaches it: `vip => customer & box<int32>`, beside a use site's `box<int32>`, is IS-A
+  that synthetic, and so stands where `crate<int32>` is expected, the two applications being one type.
 - **A diagnostic names what the author wrote, and nothing for a form with no spelling.** A minted atom instance
   (`b<10>` over `b => <N> !integer_type { min: N  max: 100 }`) has no sugar spelling and no author-written name, so
   a message about it is the family's own (`'5' is less than the minimum 10`), located by its position, never the
-  entry's content-derived key.
-- **The record half, proposed and not yet running:** a minted application of a record template is a closed
-  synthetic record, keyed on its content, so `box<int32>` and `crate<int32>` over two templates with one field list
-  are one entry. Its operand edges follow: `vip => customer & box<int32>` is IS-A that entry, and so stands where
-  `crate<int32>` is expected, the two applications being one type.
+  entry's content-derived key. A minted record is named as the body a record is written with
+  (`unknown field 'nope' on '{ v: int32 }'`).
 
-**Breaking changes, against Revision 37:** resolved output only. A minted non-record instantiation entry and its
-`@application` go; the use site names the synthetic. No verdict changes.
+**Breaking changes, against Revision 37:** resolved output only. A minted instantiation entry and its
+`@application` go; the use site names the synthetic, `@synthetic` at its key. The use-site family member refused at
+linking is refused at resolution instead. One verdict changes: a minted record composing an application only a use
+site mints (`u: vip<text>` over `vip => <T> box<T> & { … }`, beside `w: box<text>`) was a member of that minted entry
+and refused; it is a member of nothing now, and loads.
 
-**Suggested resolution.** §8.2, "Every application materialises": a fully-bound application of a non-record
-template materialises its expansion, a synthetic entry, and mints no instantiation entry unless the expansion names
-the application itself. "*Two identities*", "Instantiation entries": declared, or minted for a self-reaching
+**Suggested resolution.** §8.2, "Every application materialises": a fully-bound application of a template
+materialises its expansion, a synthetic entry keyed on its content, and mints no instantiation entry unless the
+expansion names the application itself. "*Two identities*", "Instantiation entries": declared, or minted for a self-reaching
 expansion. The `vector_pixel_af3` example: `vector<pixel, 1920>` written at a use site lands on the closed synthetic
 `[pixel; 1920]` lands on. §8.1's sentence on use-site applications and §5.10's "every other constructor closes to a
 synthetic" say the same.
 
-**Status against Revision 37:** open; the non-record half running on the `rule4-identity` branch of
-`r2026-38-proposal` (`TemplateMaterialiser.instantiate`, its `expansions` and `tied` sets; `EntryDisplayName.authored`).
+**Status against Revision 37:** open; running on `r2026-38-proposal`, the record half on its `rule4-records` branch
+(`TemplateMaterialiser.instantiate`, `mintedRecord` and `refuseMintedMember`, its `expansions` and `tied` sets;
+`EntryDisplayName.authored`, reading `@synthetic` through `TsonSchema.EntryFacts.synthetic`).

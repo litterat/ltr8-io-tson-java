@@ -19,9 +19,12 @@ that runs before it. Current form only; history lives in git.
 - Which parents were applications is read off the **held** tree's chain `parents`, not off the closed one, whose
   `supertypes` are bare names; a closed type keeps no `parents` once the fold has run, and an open record keeps its
   parents as written.
-- An application of a non-record template that nothing declares is its expansion: the use site names the synthetic
-  closing produced, and no instantiation entry is minted — unless the expansion names its own application (the knot
-  was tied on it, `TemplateMaterialiser.tied`), which then keeps a `Reference` entry to the synthetic.
+- An application nothing declares is its expansion: the use site names the closed synthetic closing produced, named
+  for its binding record — a record (`mintedRecord`) like any other form — and no instantiation entry is minted. The
+  exception is an expansion that names its own application (the knot was tied on it, `TemplateMaterialiser.tied`),
+  which keeps an instantiation entry recording the application: the record itself, or a `Reference` to the synthetic.
+- A minted record is a member of nothing: one whose chain names a declared type is refused when it is minted
+  (`refuseMintedMember`), and the applied-parent fold gives it no edge.
 - An instantiation of any kind — a record member, a DATA entry, a self-reaching `Reference` hop — records the
   application it closes in the map `SchemaResolver` shares with the materialiser, which writes it on the entry's key
   as `@application`; that is what §8.2's identity and the applied-parent fold key on.
@@ -64,9 +67,11 @@ recorded open form, and replacing the application with a reference to the entry 
 - **Only a closed entry is scanned.** A template's own body is *open* — `chain<T>` inside `chain` awaits
   substitution and is not an application to close — so entries with a non-empty `parameters` list are
   skipped. Closing them would mint an entry per level, keyed on the literal parameter name.
-- **Identity is the flattened application** the entry's key records (§8.2), written in resolved output so an
-  ingested schema's applications unify with a later schema's, and the derived name is built from it, so two
-  `box<text>` anywhere in the schema land on one entry for free.
+- **A minted entry's identity is its content** (§8.2): its name is derived from its binding record, so two
+  `box<text>` anywhere in the schema land on one entry for free, and so do `box<int32>` and `crate<int32>` over two
+  templates with one field list. A declared entry's identity is its name, and its key records the canonical
+  application (`@application`), so an ingested schema's declared applications unify with a later schema's use sites
+  (`ownedBy`).
 - **A declaration naming the application *is* that entry, and nothing is minted beside it**
   (§8.2). `text_box => box<text>` resolves to the closed record itself, its key
   recording the canonical application — not a `Reference` to a content-named entry sitting beside it.
@@ -85,11 +90,17 @@ recorded open form, and replacing the application with a reference to the entry 
     A composition absorbing an application takes its fields while the entry is still open, so the IS-A edge
     to the owning declaration cannot be written at close time — that declaration may not have resolved yet.
     The pass indexes entries by their own canonical application and folds each owner and its ancestors into
-    `supertypes` to a fixed point, so `dogs` reaches `pet` whether it is declared before or after it.
-  - **A synthetic still mints, and must.** Only a *declared* application closes into a name; a use-site sugar
-    form has no author-written name for identity to key on, so it keeps its content-derived one (§8.2). One
-    that composes onto a record would be an unnameable family member, and the linker refuses it
-    (`RecordExtension`, `design/linking-and-compilation.md`).
+    `supertypes` to a fixed point, so `dogs` reaches `pet` whether it is declared before or after it. A minted
+    expansion records no application, so the materialiser's `expansionsByApplication` stands in for it: a
+    declaration's `& box<int32>` reaches the entry `box<int32>` written at a use site expanded to. A minted record
+    gains no edge itself (above).
+  - **A synthetic still mints, and must.** Only a *declared* application closes into a name; a use-site
+    application, like a sugar form, has no author-written name for identity to key on, so it keeps a
+    content-derived one (§8.2). One whose chain names a declared type — a supertype, or a parent application a
+    declaration owns — would be an unnameable family member, and `refuseMintedMember` refuses it at minting, with
+    the application in hand to name and against the declaration that wrote it. The linker's check
+    (`RecordExtension`, `design/linking-and-compilation.md`) is left for the instantiation entry a self-reaching
+    expansion keeps.
 - **Arguments close innermost-first**, so `box<box<text>>` builds the inner entry before the outer one names
   it, and no special case is needed for depth.
 - **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head

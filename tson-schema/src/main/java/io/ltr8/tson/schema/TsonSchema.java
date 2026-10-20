@@ -92,13 +92,15 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
      * entry a {@code ^} declaration's head names, as written: §5.7's refinement restates fields and adds none,
      * which is what lets a tightened constructor bind as the one it tightens, and the chain cannot tell it from a
      * composition adding nothing. All of it is provenance, and none of it is written ([TSON-SCHEMA] §8.1).
+     * {@code synthetic} is the key's {@code @synthetic} mark as {@link #factsOf} reads it: a form no author
+     * named, which a message names by its spelling or not at all.
      */
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
-                             Optional<String> constructor, Optional<String> refines) {
+                             Optional<String> constructor, Optional<String> refines, boolean synthetic) {
 
-        /** An entry with none of the four. */
+        /** An entry with none of the five. */
         public static final EntryFacts NONE = new EntryFacts(Optional.empty(), Annotations.empty(), Optional.empty(),
-                Optional.empty());
+                Optional.empty(), false);
 
         public EntryFacts {
             position = position == null ? Optional.empty() : position;
@@ -109,23 +111,28 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
 
         /** Whether this holds nothing at all -- the facts a schema need not record. */
         public boolean isEmpty() {
-            return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty() && refines.isEmpty();
+            return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty() && refines.isEmpty()
+                    && !synthetic;
         }
 
         public EntryFacts withPosition(Optional<SourcePosition> position) {
-            return new EntryFacts(position, annotations, constructor, refines);
+            return new EntryFacts(position, annotations, constructor, refines, synthetic);
         }
 
         public EntryFacts withAnnotations(Annotations annotations) {
-            return new EntryFacts(position, annotations, constructor, refines);
+            return new EntryFacts(position, annotations, constructor, refines, synthetic);
         }
 
         public EntryFacts withConstructor(Optional<String> constructor) {
-            return new EntryFacts(position, annotations, constructor, refines);
+            return new EntryFacts(position, annotations, constructor, refines, synthetic);
         }
 
         public EntryFacts withRefines(Optional<String> refines) {
-            return new EntryFacts(position, annotations, constructor, refines);
+            return new EntryFacts(position, annotations, constructor, refines, synthetic);
+        }
+
+        public EntryFacts withSynthetic(boolean synthetic) {
+            return new EntryFacts(position, annotations, constructor, refines, synthetic);
         }
 
         /** An entry declared at {@code position}. */
@@ -203,7 +210,8 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
 
     /** {@code name}'s facts, {@link EntryFacts#NONE} for an entry with none or a name this schema lacks. */
     public EntryFacts factsOf(String name) {
-        return facts.getOrDefault(name, EntryFacts.NONE);
+        EntryFacts known = facts.getOrDefault(name, EntryFacts.NONE);
+        return entries.getAnnotations(name).has(SYNTHETIC) ? known.withSynthetic(true) : known;
     }
 
     /** Where {@code name} was declared -- absent for an entry the resolver minted. */
@@ -235,6 +243,9 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
 
     /** The kernel's {@code application} annotation, derived and never author-written (§8.2). */
     public static final String APPLICATION = "application";
+
+    /** The kernel's {@code synthetic} annotation: the key of a form no author named (§8.2). */
+    public static final String SYNTHETIC = "synthetic";
 
     /**
      * The constructor {@code name}'s value applies: the one its facts record, and otherwise the one its Java

@@ -18,7 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * §8.2 names a materialised instantiation by a function of its <b>resolved form alone</b>, which is what lets
+ * §8.2 names a minted entry by a function of its <b>resolved form alone</b> -- an application nothing declares is
+ * its expansion (§5.10), named for its content -- which is what lets
  * §2.2.3 unify two schemas that each closed the same application: they mint one name because they mint one
  * entry.
  *
@@ -62,9 +63,9 @@ class MintedEntryUnificationTest {
         return Map.of("left", tson.resolve(LEFT), "right", tson.resolve(RIGHT));
     }
 
-    /** The one minted name both schemas reach by closing {@code box<text>}. */
+    /** The one minted name both schemas reach by closing {@code box<text>}: the record it expands to. */
     private static String mintedName(TsonLinkedSchema schema) {
-        return schema.schema().entries().keySet().stream().filter(name -> name.startsWith("box_text_"))
+        return schema.schema().entries().keySet().stream().filter(name -> name.startsWith("record_item_text_"))
                 .findFirst().orElseThrow(() -> new AssertionError(
                         "no box<text> instantiation in " + schema.schema().entries().keySet()));
     }

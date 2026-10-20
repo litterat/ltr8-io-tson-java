@@ -3,8 +3,10 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.math.BigInteger;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -28,11 +30,13 @@ import java.util.stream.Collectors;
  *
  * <p>The rendering is the sugar the author would have written, not a description of it: {@code
  * [order; 1..]}, <code>{text =&gt; order}</code>, {@code [text, int32]}, {@code (text | int32)}, and {@code
- * paged&lt;order&gt;} for an application that keeps an entry of its own. <b>A form with no sugar spelling has
- * no authored name</b> ({@link #authored}): an application nothing declares is its expansion (§5.10), so
- * {@code b<10>} over {@code b => <N> !integer_type { min: N  max: 100 }} is an atom instance no author named,
- * and a message about it is the family's own, located by its position. {@link #of} falls back to the entry
- * name for a caller that must name something.
+ * paged&lt;order&gt;} for an application that keeps an entry of its own, and a synthetic record as the body a
+ * record is written with, <code>{ v: text }</code>. <b>A synthetic form with no sugar spelling has no authored
+ * name</b> ({@link #authored}, read off the key's {@code @synthetic}, {@link TsonSchema.EntryFacts#synthetic}):
+ * an application nothing declares is its expansion (§5.10), so {@code b<10>} over {@code b => <N> !integer_type {
+ * min: N  max: 100 }} is an atom instance no author named, and a message about it is the family's own, located by
+ * its position. An entry with no position and no mark is a declaration, and keeps its name. {@link #of} falls back
+ * to the entry name for a caller that must name something.
  */
 public final class EntryDisplayName {
 
@@ -68,8 +72,9 @@ public final class EntryDisplayName {
     public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<TypeRef> application,
                             Map<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
                             Function<String, Optional<TypeRef>> applicationOf) {
-        return authored(name, value, facts, application, new Lookup(namespace, factsOf, applicationOf))
-                .orElse(name);
+        Lookup lookup = new Lookup(namespace, factsOf, applicationOf);
+        lookup.rendering().add(name);
+        return authored(name, value, facts, application, lookup).orElse(name);
     }
 
     /**
@@ -98,22 +103,44 @@ public final class EntryDisplayName {
                     .map(ref -> shown(ref, lookup)).collect(Collectors.joining(", ", "[", "]"));
             case ChoiceBody choice -> choice.variants().stream().map(ref -> shown(ref, lookup))
                     .collect(Collectors.joining(" | ", "(", ")"));
-            default -> null;
+            // A record application nothing declares is its expansion, a record no author named, shown as the
+            // body a record is written with.
+            case RecordBody record when facts.synthetic() && record.fields().isEmpty() -> "{}";
+            case RecordBody record when facts.synthetic() -> record.fields().entrySet().stream()
+                    .map(field -> field.getKey() + (field.getValue().optional() ? "?" : "") + ": "
+                            + shown(field.getValue().type(), lookup))
+                    .collect(Collectors.joining("  ", "{ ", " }"));
+            // An entry nobody marked as minted is declared, wherever its position went.
+            default -> facts.synthetic() ? null : name;
         }));
     }
 
-    /** The three views a rendering resolves an inner name through. */
+    /**
+     * The three views a rendering resolves an inner name through, and the names being rendered: a recursive
+     * form ({@code { v: text  next: <itself>? }}) names itself inside its own rendering, and is shown there by
+     * its entry name rather than unrolled.
+     */
     private record Lookup(Map<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
-                          Function<String, Optional<TypeRef>> applicationOf) {
+                          Function<String, Optional<TypeRef>> applicationOf, Set<String> rendering) {
+
+        Lookup(Map<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
+               Function<String, Optional<TypeRef>> applicationOf) {
+            this(namespace, factsOf, applicationOf, new HashSet<>());
+        }
     }
 
     /** One name inside a form, itself display-rendered when the namespace knows it and it is derived. */
     private static String shown(TypeRef ref, Lookup lookup) {
         Top referenced = lookup.namespace().get(ref.name());
-        return referenced == null ? ref.name()
-                : of(ref.name(), referenced, lookup.factsOf().apply(ref.name()),
-                        lookup.applicationOf().apply(ref.name()), lookup.namespace(), lookup.factsOf(),
-                        lookup.applicationOf());
+        if (referenced == null || !lookup.rendering().add(ref.name())) {
+            return ref.name();
+        }
+        try {
+            return authored(ref.name(), referenced, lookup.factsOf().apply(ref.name()),
+                    lookup.applicationOf().apply(ref.name()), lookup).orElse(ref.name());
+        } finally {
+            lookup.rendering().remove(ref.name());
+        }
     }
 
     /**
