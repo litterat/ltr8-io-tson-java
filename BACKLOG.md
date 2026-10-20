@@ -321,6 +321,13 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **The §7.2 refusal names a synthetic by its key.** `VariantSchemaReader` builds its `SubsumptionDiagnostics`
+  from the entry name and keeps it through `renamed`, so beside `text_list => [text]` and `r => { t: [text] }`,
+  `!r { t: !text_list [a] }` reads "'text_list' is not admissible at a 'array_text_4cc4a482' position". The position
+  is to be named as `EntryDisplayName` names it everywhere else (`[text]`), in the message and in `admissible()`'s
+  list; the JSON readers (`DispatchTagReader`, `RecordPlan`) already pass a display name. Pin it with a tree-mode
+  test on that schema.
+
 - [ ] **Whether a closed set of text binds to a host enum.** [TSON-SCHEMA] §7.4 lets an enum bind to "a host enum by a
   mapping the binder owns". `text_enum` is gone from the kernel, and a closed set of text that is no name is now
   `text_type`'s `members` facet (`!text ^ { members: [...] }`), an atom rather than an enum, so a schema that bound

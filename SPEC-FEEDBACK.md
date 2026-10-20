@@ -1674,6 +1674,11 @@ type is that type's entry").
   "a family member is declared", applied at the moment the application is in hand). It gains no IS-A edge later. A
   declaration's operand still reaches it: `vip => customer & box<int32>`, beside a use site's `box<int32>`, is IS-A
   that synthetic, and so stands where `crate<int32>` is expected, the two applications being one type.
+- **A declaration names only itself.** An unnamed form with a declaration's content is not that declaration:
+  beside `text_list => [text]`, a field written `t: [text]` names the synthetic, and `!text_list [a]` there is
+  refused by §7.2 as before. Collecting would need a new rule for every form kind -- an "exactly one matching
+  declaration" rule for containers and choices, and structural identity for records and atoms, whose declarations
+  are nominal -- and would make two declarations sharing a body ask whether they interchange. They are two types.
 - **A diagnostic names what the author wrote, and nothing for a form with no spelling.** A minted atom instance
   (`b<10>` over `b => <N> !integer_type { min: N  max: 100 }`) has no sugar spelling and no author-written name, so
   a message about it is the family's own (`'5' is less than the minimum 10`), located by its position, never the
@@ -1693,6 +1698,6 @@ expansion. The `vector_pixel_af3` example: `vector<pixel, 1920>` written at a us
 `[pixel; 1920]` lands on. §8.1's sentence on use-site applications and §5.10's "every other constructor closes to a
 synthetic" say the same.
 
-**Status against Revision 37:** open; running on `r2026-38-proposal`, the record half on its `rule4-records` branch
-(`TemplateMaterialiser.instantiate`, `mintedRecord` and `refuseMintedMember`, its `expansions` and `tied` sets;
-`EntryDisplayName.authored`, reading `@synthetic` through `TsonSchema.EntryFacts.synthetic`).
+**Status against Revision 37:** open; running on `r2026-38-proposal` (`TemplateMaterialiser.instantiate`,
+`mintedRecord` and `refuseMintedMember`, its `expansions` and `tied` sets; `EntryDisplayName.authored`, reading
+`@synthetic` through `TsonSchema.EntryFacts.synthetic`).
