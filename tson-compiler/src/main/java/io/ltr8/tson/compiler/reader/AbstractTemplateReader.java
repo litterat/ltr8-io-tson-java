@@ -30,10 +30,9 @@ import java.util.Set;
  *
  * <p><b>Both dispatchers are the ones a closed base uses</b> ({@link RecordDispatch}), so a family whose base
  * is a template and one whose base is a hand-written record read identically and report identically. The
- * selectors come from {@code FamilySelectors} either way -- a closed base declares them, and a template's are
- * recovered from its members at the base's own declared type -- which is the same derivation {@code
- * RecordExtension} checks the family against, since a check and a dispatch that disagreed about the selectors
- * would admit a family no reader could place.
+ * selectors come from {@code FamilySelectors} either way -- each base declares them in its own fields --
+ * which is the same derivation {@code RecordExtension} checks the family against, since a check and a dispatch
+ * that disagreed about the selectors would admit a family no reader could place.
  *
  * <p>{@link Subsumption.Applied} because the dispatcher it holds decides §7.2 at this position itself. The
  * marker changes nothing today -- {@code Subsumption.guard} runs past the template branch and never sees one
@@ -60,7 +59,7 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
                 // from any member, and handed to the same dispatcher a closed base uses: one dispatch, two
                 // sources for its inputs.
                 ? new RecordMemberDispatchReader(selfNames, name,
-                        FamilySelectors.of(name, definition, context.schema().entries()),
+                        FamilySelectors.of(definition),
                         Set.copyOf(context.subtypesOf(name, definition)), context, readers)
                 : new RecordTagDispatchReader(selfNames, name,
                         Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning()),

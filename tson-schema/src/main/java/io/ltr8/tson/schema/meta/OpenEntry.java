@@ -2,6 +2,7 @@ package io.ltr8.tson.schema.meta;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * An open entry ([TSON-SCHEMA] §5.10): one whose value declares parameters, and so is not closed until an
@@ -44,6 +45,27 @@ public final class OpenEntry {
     /** Whether {@code value} is a family base: a record that declares parameters. */
     public static boolean isFamilyBase(Top value) {
         return value instanceof RecordBody record && !record.parameters().isEmpty();
+    }
+
+    /**
+     * The first of {@code parameters} that {@code type} names, as its head or in an argument at any depth --
+     * empty where {@code type} means the same thing in every application, and so is closed already.
+     */
+    public static Optional<String> parameterIn(TypeRef type, List<String> parameters) {
+        if (parameters.contains(type.name())) {
+            return Optional.of(type.name());
+        }
+        for (TypeArgument argument : type.arguments()) {
+            Optional<String> found = switch (argument) {
+                case TypeArgument.Ref ref -> parameterIn(ref.ref(), parameters);
+                case TypeArgument.Value value -> parameters.contains(value.value().text())
+                        ? Optional.of(value.value().text()) : Optional.empty();
+            };
+            if (found.isPresent()) {
+                return found;
+            }
+        }
+        return Optional.empty();
     }
 
     /**

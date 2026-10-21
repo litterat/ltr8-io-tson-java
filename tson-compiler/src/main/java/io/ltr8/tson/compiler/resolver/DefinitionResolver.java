@@ -882,19 +882,24 @@ final class DefinitionResolver {
     }
 
     /**
-     * A family base's selector may not be typed by one of its parameters: a position typed by the base reads the
-     * selector before it knows which member it has, so a type that varies per application is one it cannot read.
-     * The <em>pin</em> varying is the whole point, and does (§5.10).
+     * A family base's selector may not be typed by one of its parameters, directly ({@code kind: K =?}) or as an
+     * argument ({@code kind: bounded<M> = N}): a position typed by the base reads the selector before it knows
+     * which member it has, so a type that varies per application is one it cannot read. The <em>pin</em>
+     * varying is the whole point, and does (§5.10).
      */
     private static RecordBody refuseParameterTypedSelector(RecordBody open) {
         for (String name : open.discriminators()) {
             RecordField field = open.fields().get(name);
-            if (field != null && open.parameterNames().contains(field.type().name())) {
-                throw new SchemaValidationException("discriminator field '" + name + "' is typed by the type "
-                        + "parameter '" + field.type().name() + "', and a position typed by this template reads a "
-                        + "discriminator before it knows which member it has -- so its type cannot vary per "
-                        + "application (§5.10). The value it is pinned to is what an argument supplies; its "
-                        + "type is the base's own");
+            Optional<String> parameter = field == null ? Optional.empty()
+                    : OpenEntry.parameterIn(field.type(), open.parameterNames());
+            if (parameter.isPresent()) {
+                String typed = parameter.get().equals(field.type().name()) ? "typed by the type parameter '"
+                        : "typed by an application of the parameter '";
+                throw new SchemaValidationException("discriminator field '" + name + "' is " + typed
+                        + parameter.get() + "', and a position typed by this template reads a discriminator "
+                        + "before it knows which member it has -- so its type cannot vary per application "
+                        + "(§5.10). The value it is pinned to is what an argument supplies; its type is the "
+                        + "base's own");
             }
         }
         return open;

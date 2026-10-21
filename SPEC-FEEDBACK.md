@@ -1701,3 +1701,26 @@ synthetic" say the same.
 **Status against Revision 37:** open; running on `r2026-38-proposal` (`TemplateMaterialiser.instantiate`,
 `mintedRecord` and `refuseMintedMember`, its `expansions` and `tied` sets; `EntryDisplayName.authored`, reading
 `@synthetic` through `TsonSchema.EntryFacts.synthetic`).
+
+## 19. A selector's type may contain no parameter, value parameters included
+
+**Section:** [TSON-SCHEMA] §5.10 ("A record-bodied template is a family base": "its declared type MUST contain no type
+parameter").
+
+**Kind:** error — the rule's wording misses a case its own reason covers.
+
+**The problem.** The condition on a family base's selector names *type* parameters only, and its reason — "a decoder
+parses the selectors before it knows the member and their pins are exactly what the parameters supply" — holds of a
+value parameter standing in the selector's type as much as of a type parameter. With `bounded => <M> !integer_type
+{ max: M }`, `pet => <M, N> { kind: bounded<M> = N  name: text }` satisfies the wording, and `pet<9, 3>` and `pet<5, 4>`
+give their selectors two types: a position typed by `pet` has no one type to read `kind` at before it knows the
+member.
+
+**Interpretation chosen.** A selector's declared type names no parameter of the template, of either kind, as its head
+or in an argument at any depth; one that does is a resolver error at the template. A parameter-free application
+(`kind: bounded<9> = N`) satisfies it and is the entry it expands to, in the base as in every member.
+
+**Suggested resolution.** §5.10: "its declared type MUST mention none of the template's parameters, at any depth".
+
+**Status against Revision 37:** open; running on `r2026-38-proposal` (`DefinitionResolver.refuseParameterTypedSelector`,
+`OpenEntry.parameterIn`).

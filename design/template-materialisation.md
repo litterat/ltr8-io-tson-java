@@ -6,8 +6,8 @@ that runs before it. Current form only; history lives in git.
 
 **Invariants**
 
-- The pass runs over the **resolved** form after the driving loop, and only a closed entry is scanned — an entry with
-  a non-empty `parameters` list is skipped.
+- The pass runs over the **resolved** form after the driving loop. In an open record it closes only the field types that
+  name none of its parameters (`OpenEntry.parameterIn`, applied in `MetaRefs`); a held body is not scanned.
 - An application's arguments are dereferenced before it is closed, and only a reference is dereferenced — a refinement
   and a fresh instance keep their own applications.
 - A declaration naming an application **is** that entry (`closeApplicationInto`): no internal name is derived or
@@ -64,9 +64,12 @@ recorded open form, and replacing the application with a reference to the entry 
   `SchemaMap.Declaration` has no channel for one, which is what rules out doing this in `SchemaDesugarer` alongside
   the sugar hoists. It also keeps that
   phase purely syntactic.
-- **Only a closed entry is scanned.** A template's own body is *open* — `chain<T>` inside `chain` awaits
-  substitution and is not an application to close — so entries with a non-empty `parameters` list are
-  skipped. Closing them would mint an entry per level, keyed on the literal parameter name.
+- **An open body closes only what names none of its parameters.** `chain<T>` inside `chain` awaits substitution and is
+  not an application to close: closing it would mint an entry per level, keyed on the literal parameter name. A field
+  type that names no parameter, at any depth (`kind: bounded<9>`, `tags: [box<text>]`), means the same in every
+  application, so an open record's is closed in place and the base names the entry each member names — which is what
+  `FamilySelectors` reads a selector's type from, and what keeps the synthetic merge's renames reaching the base. A held
+  body maps nothing: its references are tokens until substitution.
 - **A minted entry's identity is its content** (§8.2): its name is derived from its binding record, so two
   `box<text>` anywhere in the schema land on one entry for free, and so do `box<int32>` and `crate<int32>` over two
   templates with one field list. A declared entry's identity is its name, and its key records the canonical

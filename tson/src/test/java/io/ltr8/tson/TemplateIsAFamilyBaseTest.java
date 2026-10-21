@@ -4,6 +4,7 @@ import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
@@ -195,6 +196,63 @@ class TemplateIsAFamilyBaseTest {
                   texts  => arr<text>
                   holder => { p: arr }
                 """).stream().anyMatch(d -> d.message().contains("is a template taking")));
+    }
+
+    // ── A base names the entries its members name ────────────────────────
+
+    private static String fieldType(TsonLinkedSchema schema, String entry, String field) {
+        return ((RecordBody) schema.schema().entries().get(entry)).fields().get(field).type().name();
+    }
+
+    /**
+     * A field type naming none of the base's parameters means the same in every application, so the base names
+     * the entry its members do -- and the selector a base position reads is that entry, not an application.
+     */
+    @Test
+    void aSelectorTypedByAnApplicationIsTheEntryEveryMemberNames() {
+        String declarations = """
+                  bounded => <M> !integer_type { max: M }
+                  pet     => <N> { kind: bounded<9> = N  name: text }
+                  cat     => pet<3>
+                  dog     => pet<4>
+                  holder  => { p: pet }
+                """;
+        TsonLinkedSchema schema = linked("f13", declarations);
+
+        String closed = fieldType(schema, "cat", "kind");
+        assertEquals(closed, fieldType(schema, "pet", "kind"), "the base names the member's entry");
+        assertEquals(closed, ((RecordBody) schema.schema().entries().get("pet")).parameters().getFirst().type().name(),
+                "and N's derived type is that entry too");
+        assertEquals(List.of(), read("f14", declarations, "!holder { p: { kind: 4  name: \"rex\" } }"));
+    }
+
+    /**
+     * A form the desugar phase lifted inside a base, with an application in a slot, is renamed onto the entry the
+     * materialised channel publishes -- in the base as everywhere else, so the base names an entry the schema has.
+     */
+    @Test
+    void aLiftedFormInABaseNamesTheEntryTheSchemaPublishes() {
+        TsonLinkedSchema schema = linked("f15", """
+                  box    => <T> { v: T }
+                  pet    => <N> { kind: text = N  tags: [box<text>] }
+                  cat    => pet<"cat">
+                """);
+
+        String tags = fieldType(schema, "pet", "tags");
+        assertEquals(fieldType(schema, "cat", "tags"), tags);
+        assertTrue(schema.schema().entries().containsKey(tags), () -> tags + " is not an entry of the schema");
+    }
+
+    /** A family no declaration has a member of still has its selectors, which is what the refusal offers. */
+    @Test
+    void aFamilyWithNoMemberStillNamesItsSelector() {
+        List<Diagnostic> problems = read("f16", """
+                  pet    => <N> { kind: text = N  name: text }
+                  holder => { p: pet }
+                """, "!holder { p: { kind: cat  name: x } }");
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals("(no cat, and none to name)", problems.getFirst().actual());
     }
 
     // ── A family's members are the applications a declaration names ────────────

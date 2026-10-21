@@ -66,10 +66,13 @@ final class MetaRefs {
 
     private static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map, boolean mapChain) {
         Top mapped = switch (body) {
-            // An open record maps nothing in its fields, as a held body does not: its references may name its
-            // own parameters, whose meaning is not settled until substitution supplies the arguments. Its chain
-            // maps below, a record template being IS-A its parents as any record is.
-            case RecordBody record when OpenEntry.isOpen(record) -> record;
+            // An open record maps the field types that name none of its parameters, which mean the same thing in
+            // every application and so are closed already: the base names the entry each member names. A type
+            // naming a parameter, at any depth, waits for substitution to supply the argument. Its chain maps
+            // below, a record template being IS-A its parents as any record is.
+            case RecordBody record when OpenEntry.isOpen(record) -> record.withFields(record.mapFields(field ->
+                    OpenEntry.parameterIn(field.type(), record.parameterNames()).isPresent()
+                            ? field : field.withType(map.apply(field.type()))));
             // `discriminators` is carried, not mapped: it holds field *names* of this record, which no
             // reference rewrite touches. Dropping it here would lose a family's selector list on every
             // synthetic rename and every materialisation rewrite -- a body that arrived sealed would come

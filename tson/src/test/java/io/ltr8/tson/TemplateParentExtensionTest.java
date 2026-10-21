@@ -117,4 +117,17 @@ class TemplateParentExtensionTest {
         assertTrue(refusal.contains("discriminator field 'kind'"), refusal);
         assertTrue(refusal.contains("typed by the type parameter 'K'"), refusal);
     }
+
+    /** The same rule where the parameter is an argument of the selector's type, which varies with it just as much. */
+    @Test
+    void aDiscriminatorTypedByAnApplicationOfAParameterIsRefused() {
+        String refusal = refusal("p8", """
+                  bounded => <M> !integer_type { max: M }
+                  pet     => <M, N> { kind: bounded<M> = N  name: text }
+                  cat     => pet<9, 3>
+                """);
+
+        assertTrue(refusal.contains("discriminator field 'kind'"), refusal);
+        assertTrue(refusal.contains("typed by an application of the parameter 'M'"), refusal);
+    }
 }

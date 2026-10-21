@@ -90,10 +90,10 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     private final String pinned;
 
     /**
-     * <b>The selectors arrive already chosen, from either kind of base</b> ({@code FamilySelectors}) -- a
-     * closed record declares them, and a family-base template's are recovered from its members at the base's
-     * own declared type. Taking the fields rather than a {@code RecordBody} is what lets one dispatcher serve
-     * both, and is the same signature its {@code tson-compiler} peer takes.
+     * <b>The selectors arrive already chosen, from either kind of base</b> ({@code FamilySelectors}), each
+     * read off the base's own fields with a family base's parameter pin dropped. Taking the fields rather than
+     * a {@code RecordBody} keeps "which fields select" in that one derivation, and is the same signature its
+     * {@code tson-compiler} peer takes.
      */
     DispatchMemberReader(Set<String> selfNames, String displayName, SequencedMap<String, RecordField> selectorFields,
                            Set<String> subtypes,
