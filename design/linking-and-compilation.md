@@ -188,7 +188,7 @@ A `kind_type` instance — `!kind_type { of: uuid_type }`, or `kind<uuid_type>` 
 — is an atom whose values are the names of the closure's types built with one constructor: a computed set of names, as
 an enum's is a listed one. `computeKinds` runs after `computeSubtypes` and before the name-type checks, writes
 `members` (sorted, as `subtypes` is) onto every kind body in the merged map, and validation then checks `of`. The kernel
-declares three, `identifier_kind`, `atom_kind` and `value_kind`, and types `enum_type.name_type` and `record.name_type`
+declares three, `identifier_kind`, `atom_kind` and `type_kind`, and types `enum_type.name_type` and `record.name_type`
 by the first.
 
 - **Membership is one walk over resolved entries** (`resolver/KindMembers`, public because `NameType` asks it too).
@@ -199,7 +199,7 @@ by the first.
   `of` among its supertypes, which are already the IS-A closure. So `pet => abstract { … }` is a member of
   `kind<record>`, and so is a record template, a type (§5.10); `set<text>` is a member of `kind<set_type>` while
   core's `set` is not.
-- **A kind is a member of itself where the walk says so.** `value_kind` is built with `kind_type`, which IS-A `type`, so
+- **A kind is a member of itself where the walk says so.** `type_kind` is built with `kind_type`, which IS-A `type`, so
   it lists itself, and `kind<atom>` lists every kind. Nothing loops: the walk reads construction chains and never a
   kind's members, and a value of a kind is a name, never a value read through the type it names.
 - **A constructor is read in the structure namespace first**, so a schema's own `uuid_type => text` never

@@ -29,7 +29,7 @@ import java.util.function.Function;
  * supertypes. A record template is built with {@code record}: it is a type, the family base its members are IS-A
  * (§5.10), so a kind of {@code record} holds it.
  *
- * <p><b>A kind is a member of itself where the walk says so.</b> {@code value_kind} is built with {@code
+ * <p><b>A kind is a member of itself where the walk says so.</b> {@code type_kind} is built with {@code
  * kind_type}, which IS-A {@code type}, so it is one of the names it holds. Nothing loops: membership reads
  * constructors and never a kind's own members, and a value of a kind is a name, not a value read through the type
  * it names.

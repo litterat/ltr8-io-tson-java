@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=b2ab4f233fe0e7f35c5f58842552ad8cbfc0394b9999946a06ae1375c64e879e"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=eff72fa70006b563c88ebc02efaa9097695c841f7755c9ab5a4f745a35fef1a0"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -907,7 +907,7 @@
   atom_kind => !kind_type { of: atom }
 
   @doc:"The names of the types a value can have."
-  value_kind => !kind_type { of: type }
+  type_kind => !kind_type { of: type }
 
   @doc:"""
     Resolver output: a schema map, from each name to the value its entry

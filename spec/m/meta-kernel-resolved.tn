@@ -426,11 +426,11 @@
     members: [
       annotation atom_kind boolean doc field_name field_role identifier identifier_base identifier_kind
       integer iri non_negative_integer normalization param_name product_access_type product_size_type
-      record_extension_type regex scheme_name synthetic text type_name value value_kind void
+      record_extension_type regex scheme_name synthetic text type_kind type_name value void
     ]
   }
 
-  value_kind => !kind_type {
+  type_kind => !kind_type {
     of: type
     members: [
       annotation application array_array_text_1_3600e7d5_1_xxhash array_field_group_xxhash
@@ -440,7 +440,7 @@
       identifier_kind integer integer_member_set integer_size iri non_negative_integer normalization
       param_name product_access_type product_size_type record_extension_type record_field regex schema
       scheme_name scheme_set synthetic template_param text text_member_set tuple_element type_argument
-      type_chain type_name type_ref value value_kind void
+      type_chain type_kind type_name type_ref value void
     ]
   }
 

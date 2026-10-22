@@ -1896,7 +1896,7 @@ kind is IS-A `type`, so it stands in any value position, and in every such posit
 ```
 identifier_kind => !kind_type { of: identifier_type }
 atom_kind       => !kind_type { of: atom }
-value_kind      => !kind_type { of: type }
+type_kind      => !kind_type { of: type }
 
 enum_type => atom & { name_type: identifier_kind  members: enum_set }
 record    => product & { …  name_type?: identifier_kind }
@@ -1914,7 +1914,7 @@ enum_type => !record { … fields: { … name_type => !record_field { type: iden
 identifier_kind => !kind_type { of: identifier_type  members: [field_name identifier param_name scheme_name type_name] }
 ```
 
-`atom_kind` and `value_kind` are declared for the slots that follow and for a user meta-schema's own, and
+`atom_kind` and `type_kind` are declared for the slots that follow and for a user meta-schema's own, and
 `type_chain.supertypes` and `subtypes` stay `type_name`: those indexes list constructors.
 
 **What follows.** Three things, each its own entry once this one runs:
@@ -1935,7 +1935,7 @@ identifier_kind => !kind_type { of: identifier_type  members: [field_name identi
 - **The store.** Which namespace a name at a kind-typed slot resolves in stays prose per slot. Typing the store is
   the namespace entry.
 
-**Breaking changes, against Revision 37.** `kind_type`, `kind`, `identifier_kind`, `atom_kind` and `value_kind` join
+**Breaking changes, against Revision 37.** `kind_type`, `kind`, `identifier_kind`, `atom_kind` and `type_kind` join
 the kernel, `core` gains a `kind` sibling as it has `set` (§3.3.2 keeps the kernel's names out of a core-governed
 schema's type-name namespace), and every bundled schema's `!!id` pin changes (§13.2). `enum_type.name_type` and
 `record.name_type` are retyped, and no existing schema is judged differently by it: the kind refuses exactly what
@@ -1954,11 +1954,11 @@ consequence. §8.1: `members` among the derived indexes. §9's inventory names t
 
 **Status against Revision 37:** open; running on `kind-type`, a branch off `r2026-38-proposal`. `meta-kernel.tn`
 declares `kind_type => atom & { of: type_name  members?: [type_name] }`, `kind`, `identifier_kind`, `atom_kind` and
-`value_kind`, and types `enum_type.name_type` and `record.name_type` `identifier_kind`; `core` has its `kind` sibling;
+`type_kind`, and types `enum_type.name_type` and `record.name_type` `identifier_kind`; `core` has its `kind` sibling;
 the resolved fixtures carry the members (`identifier_kind`'s are `[field_name identifier param_name scheme_name
 type_name]`), and the bundled schemas are restamped. The linker computes every kind's `members` over the closure by the
 walk above, imported kinds included, and refuses `kind<data>`, a constructor above or beside `type`, and an `of` naming
-a type of the writer's own namespace. A kind is a member of itself where the walk says so (`value_kind` lists itself),
+a type of the writer's own namespace. A kind is a member of itself where the walk says so (`type_kind` lists itself),
 the walk reading construction and never a kind's members. The `name_type` checks read the slot's kind off the
 constructor's `name_type` field and judge the resolved referent a member of it, with the diagnostics the coded check
 had; a `~`/`=` value at a kind-typed field is judged a member where it is written, so a constructor pinning a non-member
