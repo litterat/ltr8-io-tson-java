@@ -18,6 +18,9 @@ at a record position is: §5.6's positional form, or a value by name. Current fo
 - `UNKNOWN_TYPE_REF` means the written name denotes nothing; a name that resolves and is not admissible, or a required
   selector that is absent, is `TYPE_MISMATCH`.
 - The pin table is keyed by `ValueIdentity`, and the selector scan is a `lookingAhead` that rewinds.
+- A record template IS-A a base is no member of it, even where it pins the selector: it has no values, and its
+  applications are the members. Both member dispatchers skip it, so a pin only the template states selects nothing
+  and the refusal offers only pins a document could write (`CrossEncodingParityTest`).
 - In a data document a bare token fills a record's one positional field (§5.6) whatever its type. In a schema
   document (`TsonReadContext.readsSchemaDocument()`) it does so only where that field is atom-typed; an unquoted
   token is otherwise a value by name, read only by a `TypeRef` component at a record-typed slot.

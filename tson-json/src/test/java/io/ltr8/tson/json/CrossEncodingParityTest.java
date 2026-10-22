@@ -94,6 +94,10 @@ class CrossEncodingParityTest {
               figure    => abstract { area: int32 }
               disc      => figure & { side: int32 }
               kennel    => { p: pet }
+              verdict   => abstract { v_kind: text =? }
+              passed    => verdict & { v_kind?: = "pass" }
+              pending   => <T> verdict & { v_kind?: = "wait"  detail: T }
+              ruling    => { v: verdict }
               dog_of    => dog
               pet_of    => pet
               gallery   => { f: figure }
@@ -418,6 +422,20 @@ class CrossEncodingParityTest {
     void anAliasOfASealedBaseSelectsNothingInBoth() {
         sameRule("kennel", "{ p: !pet_of { pet_type: \"dog\"  name: \"Rex\"  breed: \"lab\" } }", """
                 {"p": {"$type": "pet_of", "pet_type": "dog", "name": "Rex", "breed": "lab"}}""");
+    }
+
+    /**
+     * A record template IS-A a sealed base is no member of it, though it pins the selector: it has no values,
+     * and its applications are the members. So {@code pending}'s {@code "wait"} selects nothing, and the
+     * refusal offers only the pins a document could write -- never a route to the template, whose own reader
+     * would refuse for want of a subtype, naming a type the position never offered.
+     */
+    @Test
+    void aRecordTemplateUnderASealedBaseIsNoMemberInBoth() {
+        sameRule("ruling", "{ v: { v_kind: \"wait\"  detail: 1 } }", """
+                {"v": {"v_kind": "wait", "detail": 1}}""");
+        assertEquals(List.of("pass"), jsonDiagnostics("ruling", """
+                {"v": {"v_kind": "wait", "detail": 1}}""").stream().map(Diagnostic::expected).toList());
     }
 
     /**
