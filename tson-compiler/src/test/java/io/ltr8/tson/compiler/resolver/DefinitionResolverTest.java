@@ -646,23 +646,23 @@ class DefinitionResolverTest {
      * §8.1's shadowing rule tells it from a literal: inside a template a token that resolves into {@code
      * parameters} is a parameter, and a closed record has no parameters for one to resolve into.
      *
-     * <p>The field stays required and FREE: nothing is fixed at declaration, because the value does not exist
-     * yet. §5.7's fixation happens at materialisation, where the value is concrete -- {@code
-     * ValueParamFixedFieldTest} pins both ends.
+     * <p>The field is FIXED where it is declared, as its literal spelling would be: the role is the modifier's,
+     * and only the value waits for an application. Closing substitutes the value and changes no fact -- {@code
+     * ValueParamFixedFieldTest} pins both ends (SPEC-FEEDBACK.md #20).
      *
      * <p><b>The pin also makes the field this template's selector</b>, which is the derivation and not an
      * extra claim: one value per application is one value per member, so the base dispatches on
      * {@code [value]} with no {@code =?} written (§5.2, §5.10).
      */
     @Test
-    void aParametricFixedValueRidesTheValueSlotAndFixesNothingYet() {
+    void aParametricFixedValueRidesTheValueSlotOfAFixedField() {
         RecordBody sized = assertInstanceOf(RecordBody.class, resolveSnippet("sized => <T> { value: type_ref = T }"));
         RecordField value = sized.fields().get("value");
 
         assertEquals(List.of("T"), OpenEntry.parameterNames(sized));
         assertEquals(TypeRef.of("type_ref"), value.type());
         assertEquals("T", value.value().orElseThrow().text());
-        assertEquals(FieldRole.FREE, value.role());
+        assertEquals(FieldRole.FIXED, value.role());
         assertFalse(value.optional());
         assertEquals(List.of("value"), sized.discriminators());
         assertEquals(Optional.of(RecordExtensionType.ABSTRACT), FamilySelectors.extensionOf(sized));
@@ -1871,13 +1871,13 @@ class DefinitionResolverTest {
     }
 
     /**
-     * A parametric {@code = P} is FREE until materialisation closes it (§5.7's "Open modifiers"), and pins
-     * the field there. Its type slot is elided, so it inherits the source's type -- here {@code integer}, the
-     * source being {@code bound?: integer} -- and the open record holds the flattened field with the parameter
-     * in the ordinary {@code value} slot.
+     * A parametric {@code = P} pins the field where it is written, as a literal would (SPEC-FEEDBACK.md #20).
+     * Its type slot is elided, so it inherits the source's type -- here {@code integer}, the source being
+     * {@code bound?: integer} -- and the open record holds the flattened field with the parameter in the
+     * ordinary {@code value} slot.
      */
     @Test
-    void aParametricModifierOnAnInheritedOptionalFieldStillLandsInRequired() {
+    void aParametricPinOnAnInheritedOptionalFieldIsRequiredAndFixed() {
         Map<String, Top> entries = resolveAll("""
                 base => { bound?: integer }
                 bounded => <MIN> base ^ { bound: = MIN }
@@ -1887,9 +1887,9 @@ class DefinitionResolverTest {
         RecordField bound = open.fields().get("bound");
         assertEquals(TypeRef.of("integer"), bound.type(), "the type came from the source");
         assertEquals("MIN", bound.value().orElseThrow().text(), "the parameter stands in the value slot");
-        // The inherited optional did not survive, and no FIXED role was reached either.
+        // The name is unmarked, so the inherited optional did not survive; the pin is the modifier's.
         assertFalse(bound.optional());
-        assertEquals(FieldRole.FREE, bound.role());
+        assertEquals(FieldRole.FIXED, bound.role());
     }
 
     // ── Restating a group member (§5.11) ──────────────────────────────────

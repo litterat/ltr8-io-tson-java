@@ -13,7 +13,6 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.Chained;
-import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
@@ -776,7 +775,7 @@ final class TemplateMaterialiser {
      */
     private Top closeHeldRecord(String head, Top template, HeldBody open, Map<String, TypeArgument> bindings) {
         Closed closed = closeHeld(head, template, open, bindings);
-        Top body = fixRoutedValues(closed.body());
+        Top body = asMember(closed.body());
         // A held body's chain is the parents as written, so closing it is where the chain is completed
         // (Ancestry). A parent applied to the template's own parameter stays in `parents` beside its template's
         // ancestors, for SchemaResolver's fold to turn into the edge to the entry the closed application
@@ -855,28 +854,18 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * §5.7's fixation, applied where the section says it happens: "fixation happens downstream, where values
-     * are concrete". A field routed by {@code = P} is held as a required FREE field with the parameter
-     * standing in {@code value}, and a FREE field carrying a value is that and nothing else -- a closed FREE
-     * field has none. Once substitution has made the value concrete the field takes the facts its literal
-     * spelling would have had, optional and FIXED. A {@code ~ P} default arrives as a DEFAULT and stays one:
-     * data may still override it.
-     *
-     * <p><b>Fixation is also where a family's selectors stop.</b> Which fields a family dispatches <em>on</em>
-     * is the base's statement ({@code record.discriminators}): the base declares the selectors unpinned and
-     * names them, and whoever pins them is a member and carries the values instead. A template's own field is
-     * the base's -- required with the parameter standing in {@code value} -- so the names belong in the held
-     * body; the instantiation that closes it has pinned them, so it names none, which is what the body built
-     * here leaves unstated.
+     * A closed record template as its member: <b>where a family's selectors stop.</b> Which fields a family
+     * dispatches <em>on</em> is the base's statement ({@code record.discriminators}), and whoever pins them is a
+     * member and carries the values instead. The template's list is the base's; the application closing it has
+     * pinned them, substitution having put each argument in the {@code value} of a field already FIXED where it
+     * was written (§5.7), so the member names none.
      */
-    static Top fixRoutedValues(Top body) {
+    private static Top asMember(Top body) {
         if (!(body instanceof RecordBody record)) {
             return body;
         }
-        return new RecordBody(record.chain(), record.mapFields(
-                field -> field.role() == FieldRole.FREE && field.value().isPresent()
-                        ? field.withFacts(field.optional(), false, FieldRole.FIXED)
-                        : field), record.groups(), closedExtension(record), java.util.List.of(), record.nameType());
+        return new RecordBody(record.chain(), record.fields(), record.groups(), closedExtension(record),
+                java.util.List.of(), record.nameType());
     }
 
     /**
@@ -884,9 +873,9 @@ final class TemplateMaterialiser {
      *
      * <p>ABSTRACT is a claim about the marked type alone and holds of every instantiation identically, which
      * is how {@code abstract} on a template reaches them all (#504, and {@code AbstractTemplateFamilyTest}
-     * pins it). <b>Dispatching on members does not travel.</b> The lines above have just pinned those
-     * fields and left the member naming no selectors of its own, the selectors belonging to the base that
-     * declares them unpinned (§5.2) -- so a member of a sealed family is an ordinary
+     * pins it). <b>Dispatching on members does not travel.</b> Closing has pinned those fields and left the
+     * member naming no selectors of its own, the selectors belonging to the base (§5.2) -- so a member of a
+     * sealed family is an ordinary
      * concrete record, exactly as in a hand-written family, and a base that dispatches on members closes to
      * OPEN rather than carrying its abstractness into every one of them.
      */

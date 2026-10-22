@@ -742,9 +742,8 @@ final class SchemaDesugarer {
      * <p><b>A parameter rides the ordinary {@code value} slot</b>, with §8.1's shadowing rule to tell it from
      * a literal. That is what a held body buys, and why the kernel's {@code record_field} needs no separate
      * parameter channel: a body read as constructor vocabulary at its declaration could not say which of the
-     * two a token is, and a held body is read as vocabulary only once its parameters are gone. §5.7's fixation
-     * then happens at materialisation, where {@code TemplateMaterialiser} turns a required FREE field that
-     * has acquired a value into an optional FIXED one.
+     * two a token is, and a held body is read as vocabulary only once its parameters are gone. The role is the
+     * modifier's either way ({@link FieldModifiers}), so closing substitutes a value and changes no fact.
      */
     private Binding recordBinding(RecordDef record) {
         List<MapValue.MapEntry> fields = new ArrayList<>();
@@ -854,7 +853,7 @@ final class SchemaDesugarer {
         }
         FieldDef.FieldType type = field.type().orElseThrow();
         FieldModifiers.Resolved resolved =
-                FieldModifiers.of(field.name(), field.omittable(), type.voidable(), field.modifier(), currentParameters);
+                FieldModifiers.of(field.name(), field.omittable(), type.voidable(), field.modifier());
         List<RecordValue.Field> members = new ArrayList<>();
         members.add(new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(type.typeRef()))));
         WireForm.addFacts(members, resolved.optional(), resolved.voidable(), resolved.role());

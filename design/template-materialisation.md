@@ -116,18 +116,10 @@ recorded open form, and replacing the application with a reference to the entry 
   repeat and never nests, so nothing reaching this pass should run away, but if the static check ever has a
   hole the alternative is a `StackOverflowError`, which is neither a diagnosis nor something the exception
   policy can classify.
-- **Substitution is where a routed `=` becomes fixed.** §5.7 settles the name's mark at the declaration and the
-  value at materialisation: *fixation happens at materialisation, where values are concrete*. `fixRoutedValues` is
-  that moment: a bound field arriving FREE with a value becomes FIXED with the argument as its value, its
-  `optional` as the name was marked, so
-  `response<order, 201>` lands on exactly what the literal `status?: int32 = 201` beside it lands on. Carried
-  through unchanged instead, the closed entry held the right value on a field that did not enforce it — a
-  constraint the author wrote, silently absent from the type it governs, with no diagnostic anywhere because
-  nothing was wrong. **The two spellings are told apart by the role they arrive in**, which is the only
-  reason this is recoverable at all: §5.7 sends `= P` to FREE and `~ P` to DEFAULT, so a
-  routed default stays a default and data may still override it. §5.7 names the downstream: fixation happens
-  at materialisation, where a field whose routed parameter binds to a concrete argument takes the state its
-  literal spelling would have.
+- **Substitution changes no field fact.** A routed `= P` is FIXED where it is written and `~ P` DEFAULT, each with
+  `optional` as the name was marked (SPEC-FEEDBACK.md #20), so closing puts the argument in `value` and
+  `response<order, 201>` lands on exactly what the literal `status?: int32 = 201` beside it lands on. What closing
+  does change is the record-level selector list: the member names none (`asMember`), its pins being in place.
 - **An application whose head names nothing in scope is left whole, arguments and all.** This pass gives no
   verdict on an unresolvable head — that is the linker's, as an unresolved reference — but it still has to
   hand the linker something faithful, and collapsing the application to its bare head is not that: a stripped
@@ -185,8 +177,7 @@ recorded open form, and replacing the application with a reference to the entry 
       carried as a reference rather than as the head name §5.8 describes.
     - **A closed operand on a declaration with no parameters of its own states the edge at resolution.**
       `dog => pet<"dog"> & { breed: text }` is never held, so nothing later closes the application kept in
-      its chain and no instantiation ever arrives to carry the edge — which is the same "no later
-      materialisation of this body" that makes §5.7's fixation run here rather than at closing. So the edge is
+      its chain and no instantiation ever arrives to carry the edge. So the edge is
       stated where the composition resolves, and to the *family base* rather than to the application: a
       record template is a family base (`OpenEntry.isFamilyBase`) — ABSTRACT by construction, with its
       `discriminators` where a selector survives — which is what makes it a type a member can be IS-A (§5.10).

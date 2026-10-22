@@ -1724,3 +1724,68 @@ or in an argument at any depth; one that does is a resolver error at the templat
 
 **Status against Revision 37:** open; running on `r2026-38-proposal` (`DefinitionResolver.refuseParameterTypedSelector`,
 `OpenEntry.parameterIn`).
+
+## 20. A routed `= P` is FIXED where it is written
+
+**Section:** [TSON-SCHEMA] §5.7 ("Open modifiers": "**Fixation happens at materialisation, where values are
+concrete**"); `meta-kernel.tn`'s `record_field` and `field_role` docs.
+
+**Kind:** proposal — a simplification with no change to any verdict. Builds on #17.
+
+**The problem.** §5.7 settles a parametric modifier's name mark at the declaration and its role at materialisation:
+`w?: T ~ P` is DEFAULT where it is written, but `w: T = P` is held FREE with the parameter in `value` and becomes
+FIXED only when an application makes the value concrete. That makes the held state the one place a FREE field
+carries a value, against `field_role`'s own doc ("FREE has none"), and it gives `= P` and `~ P` two different
+moments for one kind of fact. The reason for waiting was that a held body is not read against the vocabulary until
+its parameters are gone, so nothing could be said of the field while it held one. After #17 an open record is a
+`record` with `parameters`, read as the vocabulary, and the role is known from the modifier alone: nothing about
+`FIXED` depends on the value it fixes.
+
+**Proposed.** A parametric modifier takes the facts its literal spelling takes, where it is written: `w: T = P` is a
+FIXED field that is not optional, `w?: T = P` an optional FIXED one, and `w?: T ~ P` an optional DEFAULT one, each
+with the parameter in `value`. An application substitutes its argument into `value` and changes no other fact. A
+FREE field never carries a value, open or closed. A fresh record template's selector pinned to a value parameter is
+FIXED to it in the template, as each member's is to its argument; the base reads the field with the pin dropped,
+which is what §5.10's "what a base carries is what survives erasure — a value parameter's pin dropped and the field
+kept" already says.
+
+**Breaking changes, against Revision 37:** resolved output only. An open record's routed `= P` field states
+`role: FIXED`, where it stated none. No verdict changes, and no bundled schema routes a parameter into a field.
+
+**Suggested resolution.** §5.7, "Open modifiers": replace "**Fixation happens at materialisation, where values are
+concrete**: a field whose `value` was a parameter and is now bound to a concrete argument takes exactly the facts its
+literal spelling has" with "**The role is the modifier's, as beside a literal**: `= P` is FIXED and `~ P` DEFAULT
+where they are written, and materialisation substitutes the argument into `value` without changing a fact". The
+rest of the paragraph stands.
+
+**Status against Revision 37:** open; running on `r2026-38-proposal` (`FieldModifiers.of` gives the role; closing
+substitutes and keeps it). `meta-kernel.tn`'s `record_field` doc states the rule, and the corpus vector
+`class2/schema/valid/a-routed-pin-is-fixed-where-it-is-written` states the resolved form.
+
+## 21. A template's parameter pin is a selector whatever its name's mark
+
+**Section:** [TSON-SCHEMA] §5.7 ("Open modifiers": "In a *fresh* record template a field pinned to a value parameter
+on an unmarked name is a **selector**"), §5.10 ("A record-bodied template is a family base": "in a *fresh* record
+template, a field pinned to a value parameter on an unmarked name").
+
+**Kind:** proposal — the running rule is wider than the text, and the text's restriction has no reason the family
+rules need.
+
+**The problem.** The two sentences make `type: text = T` a selector and `type?: text = T` not, so the second template
+is an ABSTRACT base dispatched by tag although every application pins `type` to a distinct value. The name's `?` says
+whether the key may be missing from a value of a *member* (§5.2); it says nothing about the base, whose selector is
+derived required whatever the members state. A hand-written family is already written this way: the base declares
+`pet_type: text =?` and each member `pet_type?: = "dog"`, so a member's own position injects the pin where a base
+position requires it. A template states base and members in one field, and the mark there is the members'.
+
+**Interpretation chosen.** In a fresh record template, a field pinned to a value parameter is a selector whether its
+name is marked or not. The base reads it required with the pin dropped, as it reads every selector; each member is
+FIXED to its argument, optional as the name was marked, exactly as a hand-written member restating `pet_type?: =
+"dog"` is.
+
+**Suggested resolution.** §5.7 and §5.10: drop "on an unmarked name", and add to §5.10 that the base reads the
+selector required whatever the mark, the mark being each member's.
+
+**Status against Revision 37:** open; running on `r2026-38-proposal` (`SchemaDesugarer.parametricallyPinned`).
+`TemplateIsAFamilyBaseTest`'s sealed family (`pet => <T, V> { type?: text = T  value: V }`) reads a value at a `pet`
+position by its `type`.

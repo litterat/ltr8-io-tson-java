@@ -162,8 +162,11 @@ final class RecordExtension {
         if (declared.isEmpty() || record.extension() != RecordExtensionType.ABSTRACT) {
             return;
         }
+        // Each is checked as the base reads it: a template's selector is FIXED to its parameter where it is
+        // written, and the base dispatches on it with the pin dropped.
+        SequencedMap<String, RecordField> selectors = FamilySelectors.of(def);
         for (String selector : declared) {
-            RecordField field = record.fields().get(selector);
+            RecordField field = selectors.get(selector);
             if (field != null) {
                 checkDiscriminatorField(name, selector, field, record.groups(), merged, facts, violations);
             }
@@ -228,6 +231,8 @@ final class RecordExtension {
             Map<String, Normalization> enumForms, List<Violation> violations) {
         // The same derivation the dispatchers read, never a second filter over the fields: a check that
         // decided "which fields select" differently from the read could pass a family no reader can place.
+        // Each is checked as the base reads it: a template's selector is FIXED to its parameter where it is
+        // written, and the base dispatches on it with the pin dropped.
         SequencedMap<String, RecordField> selectors = FamilySelectors.of(def);
         if (selectors.isEmpty() || selectors.values().stream().anyMatch(f -> parserFor(f, merged, facts).isEmpty())) {
             return; // already reported against the base, and a pin has nothing to be read at
