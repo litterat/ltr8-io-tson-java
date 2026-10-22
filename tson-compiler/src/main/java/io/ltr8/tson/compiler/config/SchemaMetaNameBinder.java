@@ -31,7 +31,8 @@ import java.util.Set;
  * recovers it mechanically from the bare name alone. A constructor that tightens another -- {@code set_type}
  * over {@code array}, {@code enum} over {@code enum_type} -- needs no entry here: it
  * restates fields and adds none, and the bind lookup falls back along its chain to the constructor it
- * tightens ({@code ValueReaderContext.bindingNamesFor}).
+ * tightens ({@code ValueReaderContext.bindingNamesFor}). {@code namespace => map & {}} composes rather than
+ * tightens, so the fallback does not reach it, and it is mapped here to {@code map}'s body, whose shape it has.
  *
  * <p><b>A handful of real entries resolve to a genuine Java class that isn't a record at all</b> --
  * {@code atom}/{@code product}/{@code sum}/{@code top} (meta-kernel's own empty-bodied base-kind
@@ -59,6 +60,7 @@ public final class SchemaMetaNameBinder {
             Map.entry("record", "record_body"),
             Map.entry("array", "array_body"),
             Map.entry("map", "map_body"),
+            Map.entry("namespace", "map_body"),
             Map.entry("tuple", "tuple_body"),
             Map.entry("choice", "choice_body"),
             Map.entry("kind_type", "kind_body"),

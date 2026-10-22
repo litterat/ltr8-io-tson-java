@@ -78,6 +78,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("set_type", TreeArrayBuilder.FACTORY);
         factories.put("tuple", TreeTupleBuilder.FACTORY);
         factories.put("map", TreeMapBuilder.FACTORY);
+        // A namespace composes `map` and adds no field, so the map factory serves it.
+        factories.put("namespace", TreeMapBuilder.FACTORY);
         factories.put("choice", DispatchChoiceReader.FACTORY);
         factories.put("scoped", DispatchScopedReader.FACTORY);
         factories.put("template", DispatchFactories.TEMPLATE);
@@ -101,6 +103,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("set_type", BindArrayBuilder.FACTORY);
         factories.put("tuple", BindTupleBuilder.FACTORY);
         factories.put("map", BindMapBuilder.FACTORY);
+        factories.put("namespace", BindMapBuilder.FACTORY);
         factories.put("choice", DispatchChoiceReader.FACTORY);
         factories.put("scoped", DispatchScopedReader.FACTORY);
         factories.put("template", DispatchFactories.TEMPLATE);

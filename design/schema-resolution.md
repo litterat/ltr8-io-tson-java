@@ -19,8 +19,8 @@ git.
   default, and a pin that is never supplied.
 - Refinement of a field is three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
   omission yields, so the order on it is checked on `RecordField.omitted`.
-- An entry is its value (SPEC-FEEDBACK.md #14): `schema => {type_name => top}`, and a type body, a record template's
-  included, carries its own chain, `type`'s one field `chain`, a `type_chain` (`TypeChain`): `parents` as written,
+- An entry is its value (SPEC-FEEDBACK.md #14): `schema` maps each `type_name` to a `top`, and a type body, a record
+  template's included, carries its own chain, `type`'s one field `chain`, a `type_chain` (`TypeChain`): `parents` as written,
   `supertypes` and `subtypes`. The application an entry is the instantiation of, of whatever kind, is the derived
   `@application` on its key (`TsonSchema.applicationOf`). What no value holds and nothing writes — where the entry was
   declared, the annotations on its value, the constructor tag, the entry a `^` names — is `TsonSchema.EntryFacts`,

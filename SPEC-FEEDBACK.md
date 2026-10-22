@@ -1971,3 +1971,49 @@ resolved form naming a user's name type reads back through meta.tn. The corpus s
 to end, the members of `identifier_kind` under a meta layer's closure (a new link-layer fact), a user
 `kind<uuid_type>`'s members, a pinned non-member, `kind<data>`, and a kind-typed field holding a member's name and a
 non-member's. Part 2's cached §13.2 table is not re-stamped here.
+---
+
+## 23. A namespace is a map whose keys name its entries: the schema map and a record's fields are two
+
+**Section:** [TSON-SCHEMA] §4.2 (`map`), §5.2 and #12 (a record's `fields`), §8.1 (resolver output, the `schema`
+map), §9 (the inventory), #13 (a qualified name enters a value), #14 (an entry is its value); [TSON-DATA] §7.1.
+
+**Kind:** proposal. The second of the namespace entries the register's preface says will be raised against Revision
+38, after #22. This entry is its first step, the kernel's own namespaces; the steps after it are stated below and are
+proposals, not running.
+
+**The problem.** #13 lets a qualified name enter any map keyed by an identifier family or an enum, so which maps a
+name may reach into is decided by the key type, a fact about spelling. The kernel already has two maps whose keys
+*name* what they hold, the schema map (`{type_name => top}`) and a record's fields (`field_map`), and an extension
+meta-schema has a third in every use #13 was built for, a named set of methods. Nothing says these three are one
+thing, and nothing separates them from a map of headers keyed by text.
+
+**Proposed.** A kernel constructor IS-A `map` that adds no field:
+
+```
+namespace => map & {}
+schema    => !namespace { key_type: type_name  value_type: top }
+field_map => !namespace { key_type: text  value_type: record_field  ordered: true }
+```
+
+A namespace is a map in every fact — keys, values, order, bounds, how a value is written and read — and a namespace
+type is declared by name as any map instance is. The `{K => V}` sugar keeps meaning `map`. The steps that follow,
+each its own change:
+
+1. *A value of a namespace type is an entry.* `myapi => !api { … }`, with `api => !namespace { key_type: identifier
+   value_type: method }` declared by a meta-schema, holds a value of `api`: §3.3.1 admits `!C` only where `C` IS-A
+   `top`, and `api` is an instance, so the form needs one sentence. The entry is DATA by §4.1's own definition.
+2. *Only a namespace is entered.* A segment selects a key in a namespace value, or a field in a record value; a map
+   that is not a namespace is not entered, replacing #13's key-type rule.
+
+**Breaking changes, against Revision 37:** `meta-kernel.tn` gains `namespace`; `schema` and `field_map` are written
+`!namespace { … }` with the same vocabulary. No document reads differently.
+
+**Suggested resolution.** [TSON-SCHEMA] §4.2, after `map`: "`namespace => map & {}` is a map whose keys name its
+entries. The schema map (§8.1) and a record's `fields` (§5.2) are namespaces." §8.1 and §9: `schema` and
+`field_map` as above.
+
+**Status against Revision 37:** open; running on `namespace-kernel`, a branch off `r2026-38-proposal`, as far as the
+kernel: `meta-kernel.tn` declares `namespace` and writes `schema` and `field_map` as instances of it, the resolved
+fixture carries them (`ResolvedFixtureTest`), and the bundled schemas are restamped. An instance of `namespace` binds
+and reads as a `map` instance does, in both encodings. Part 2's cached §13.2 table is not re-stamped here.
