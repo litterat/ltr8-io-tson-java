@@ -19,12 +19,12 @@ git.
   default, and a pin that is never supplied.
 - Refinement of a field is three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
   omission yields, so the order on it is checked on `RecordField.omitted`.
-- An entry is its value (SPEC-FEEDBACK.md #14): `schema => {type_name => top}`, and a type body or a template carries
-  its own chain, `chained`'s one field `chain`, a `type_chain` (`TypeChain`): `parents` as written, `supertypes` and
-  `subtypes`. The application an entry is the instantiation of, of whatever kind, is the derived `@application` on its
-  key (`TsonSchema.applicationOf`). What no value holds and nothing writes — where the entry was declared, the
-  annotations on its value, the constructor tag, the entry a `^` names — is `TsonSchema.EntryFacts`, never a field of
-  any constructor.
+- An entry is its value (SPEC-FEEDBACK.md #14): `schema => {type_name => top}`, and a type body, a record template's
+  included, carries its own chain, `type`'s one field `chain`, a `type_chain` (`TypeChain`): `parents` as written,
+  `supertypes` and `subtypes`. The application an entry is the instantiation of, of whatever kind, is the derived
+  `@application` on its key (`TsonSchema.applicationOf`). What no value holds and nothing writes — where the entry was
+  declared, the annotations on its value, the constructor tag, the entry a `^` names — is `TsonSchema.EntryFacts`,
+  never a field of any constructor.
 - `supertypes` is bare names, sorted, complete to a fixed point through applied parents
   (`SchemaResolver.appliedParentEdges`); `parents` is the one list holding applications, and a closed type that is no
   template keeps none (`closeChains`). A template keeps its written parents and is IS-A the closed entries they reach.
@@ -288,15 +288,14 @@ are kept in step deliberately.
   in a `Memoized`; `RecursiveModelTest`), so binding does not constrain it. Re-read its Javadoc before
   touching it. The cost is a spurious `!ref`/`!value` tag on `toTson` output, documented.
 - **`schema.meta` value model:** one Java type per kernel vocabulary record/enum. `Top`/`Type`/`Atom`/`Product`/`Sum`
-  replicate the kernel's composition chain (§4.1) as real Java subtyping — a consumer tests kind ancestry with
-  `instanceof Product`, and an entry's kind is `TypeKind.of(value, kernel)`. Every `Type` record
-  carries `TypeChain chain` as its first component (`Chained`), mirroring the constructor's flattened shape
-  (`chained`'s field comes first), with `withChain` to place a body and the chain's accessors as defaults on
-  `Chained`; `Reference`, `Data` and `TemplateBody` carry none. Body leaves are named
-  `RecordBody`/`EnumBody`/etc. (not `Record`, which would collide with `java.lang.Record`). Multi-word fields carry
-  `@Field("snake_case")`. **A `schema.meta` class used as a bind target with more than one public constructor needs
-  `@Record` on the canonical one** or `DefaultRecordBinder` throws (`IntegerType`/`IntegerSize` hit this) — the
-  annotation and the fallback both exist for exactly this case.
+  replicate the kernel's composition chain (§4.1) as real Java subtyping — a consumer tests kind ancestry with `instanceof
+  Product`, and an entry's kind is `TypeKind.of(value, kernel)`. Every `Type` record carries `TypeChain chain` as its first
+  component, mirroring the constructor's flattened shape (`type`'s field comes first), with `withChain` to place a body and
+  the chain's accessors as defaults on `Type`; `Reference`, `Data` and `TemplateBody` carry none, and `TypeChain`'s statics
+  (`supertypesOf`, …) answer empty for them. Body leaves are named `RecordBody`/`EnumBody`/etc. (not `Record`, which would
+  collide with `java.lang.Record`). Multi-word fields carry `@Field("snake_case")`. **A `schema.meta` class used as a bind
+  target with more than one public constructor needs `@Record` on the canonical one** or `DefaultRecordBinder` throws
+  (`IntegerType`/`IntegerSize` hit this) — the annotation and the fallback both exist for exactly this case.
 - **No hand-written writer** — resolved values serialize through `TsonObjectWriter.toTson` directly,
   deliberately, to prove the model is idiomatic Java `ltr8-bind` already binds. Documented textual
   divergences from the fixture (no tag at the root, quoted strings for enum members, empty lists written

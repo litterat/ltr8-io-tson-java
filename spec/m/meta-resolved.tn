@@ -20,7 +20,7 @@
 !schema {
   bytes_encoding => !enum { members: [BASE64 BASE64URL BASE32 HEX] }
 
-  bytes_type => !record { chain: { supertypes: [atom chained top type] }  fields: {
+  bytes_type => !record { chain: { supertypes: [atom top type] }  fields: {
     chain      => !record_field { type: type_chain  optional: true }
     encoding   => !record_field { type: bytes_encoding  optional: true  role: DEFAULT  value: BASE64 }
     length     => !record_field { type: non_negative_integer  optional: true }
@@ -34,7 +34,7 @@
 
   set => !template { parameters: [{ name: T  type: type_ref }]  template: "!set_type { element_type: T }" }
 
-  scoped => !record { chain: { supertypes: [chained sum top type] }  fields: {
+  scoped => !record { chain: { supertypes: [sum top type] }  fields: {
     chain   => !record_field { type: type_chain  optional: true }
     scope   => !record_field { type: scope_set }
     schemas => !record_field { type: map_schema_identity_array_type_name_1_ef020ac1_true_1_xxhash  optional: true }
@@ -44,7 +44,7 @@
 
   ieee_format => !enum { members: [BINARY16 BINARY32 BINARY64 BINARY128 BINARY256 DECIMAL32 DECIMAL64 DECIMAL128] }
 
-  float_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  float_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain               => !record_field { type: type_chain  optional: true }
     spec                => !record_field { type: iri      optional: true  role: FIXED  value: "https://ieeexplore.ieee.org/document/8766229" }
     format              => !record_field { type: ieee_format }
@@ -64,7 +64,7 @@
 
   decimal_member_set => !set_type { element_type: value  min_items: 1 }
 
-  decimal_type => !record { chain: { supertypes: [atom chained top type] }  fields: {
+  decimal_type => !record { chain: { supertypes: [atom top type] }  fields: {
     chain           => !record_field { type: type_chain  optional: true }
     min             => !record_field { type: value    optional: true }
     exclusive_min   => !record_field { type: value    optional: true }
@@ -80,7 +80,7 @@
     !field_group { members: [[max] [exclusive_max]]  optional: true }
   ] }
 
-  rational_type => !record { chain: { supertypes: [atom chained top type] }  fields: {
+  rational_type => !record { chain: { supertypes: [atom top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     min           => !record_field { type: value  optional: true }
     exclusive_min => !record_field { type: value  optional: true }
@@ -95,12 +95,12 @@
 
   complex_component => !enum { members: [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64] }
 
-  complex_type => !record { chain: { supertypes: [atom chained top type] }  fields: {
+  complex_type => !record { chain: { supertypes: [atom top type] }  fields: {
     chain     => !record_field { type: type_chain  optional: true }
     component => !record_field { type: complex_component  optional: true  role: DEFAULT  value: NUMBER }
   } }
 
-  date_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  date_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     spec          => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
     min           => !record_field { type: value  optional: true }
@@ -113,7 +113,7 @@
     !field_group { members: [[max] [exclusive_max]]  optional: true }
   ] }
 
-  time_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  time_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     spec          => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
     min           => !record_field { type: value    optional: true }
@@ -127,7 +127,7 @@
     !field_group { members: [[max] [exclusive_max]]  optional: true }
   ] }
 
-  datetime_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  datetime_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     spec          => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
     min           => !record_field { type: value    optional: true }
@@ -141,7 +141,7 @@
     !field_group { members: [[max] [exclusive_max]]  optional: true }
   ] }
 
-  duration_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  duration_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     spec          => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
     min           => !record_field { type: value    optional: true }
@@ -156,7 +156,7 @@
     !field_group { members: [[max] [exclusive_max]]  optional: true }
   ] }
 
-  period_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  period_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     spec          => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
     min           => !record_field { type: value  optional: true }
@@ -170,13 +170,13 @@
     !field_group { members: [[max] [exclusive_max]]  optional: true }
   ] }
 
-  uuid_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  uuid_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain   => !record_field { type: type_chain  optional: true }
     spec    => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9562" }
     version => !record_field { type: non_negative_integer  optional: true }
   } }
 
-  uri_type => !record { chain: { supertypes: [atom atom_specification chained text_type top type] }  fields: {
+  uri_type => !record { chain: { supertypes: [atom atom_specification text_type top type] }  fields: {
     chain          => !record_field { type: type_chain  optional: true }
     min_length     => !record_field { type: non_negative_integer  optional: true }
     max_length     => !record_field { type: non_negative_integer  optional: true }
@@ -190,7 +190,7 @@
     allow_fragment => !record_field { type: boolean     optional: true  role: DEFAULT  value: true }
   } }
 
-  email_type => !record { chain: { supertypes: [atom atom_specification chained text_type top type] }  fields: {
+  email_type => !record { chain: { supertypes: [atom atom_specification text_type top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     min_length    => !record_field { type: non_negative_integer  optional: true }
     max_length    => !record_field { type: non_negative_integer  optional: true }
@@ -201,21 +201,21 @@
     spec          => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc5322" }
   } }
 
-  ipv4_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  ipv4_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain     => !record_field { type: type_chain  optional: true }
     spec      => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
     within    => !record_field { type: array_value_xxhash  optional: true }
     excluding => !record_field { type: array_value_xxhash  optional: true }
   } }
 
-  ipv6_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  ipv6_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain     => !record_field { type: type_chain  optional: true }
     spec      => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
     within    => !record_field { type: array_value_xxhash  optional: true }
     excluding => !record_field { type: array_value_xxhash  optional: true }
   } }
 
-  cidr4_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  cidr4_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain      => !record_field { type: type_chain  optional: true }
     spec       => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
     min_prefix => !record_field { type: non_negative_integer  optional: true }
@@ -224,7 +224,7 @@
     excluding  => !record_field { type: array_value_xxhash  optional: true }
   } }
 
-  cidr6_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  cidr6_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain      => !record_field { type: type_chain  optional: true }
     spec       => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
     min_prefix => !record_field { type: non_negative_integer  optional: true }
@@ -233,23 +233,23 @@
     excluding  => !record_field { type: array_value_xxhash  optional: true }
   } }
 
-  mac_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  mac_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain => !record_field { type: type_chain  optional: true }
     spec  => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9542" }
   } }
 
-  hostname_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  hostname_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain     => !record_field { type: type_chain  optional: true }
     spec      => !record_field { type: iri      optional: true  role: FIXED    value: "https://www.rfc-editor.org/rfc/rfc5890" }
     allow_idn => !record_field { type: boolean  optional: true  role: DEFAULT  value: true }
   } }
 
-  host_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  host_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain => !record_field { type: type_chain  optional: true }
     spec  => !record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3987" }
   } }
 
-  media_type_type => !record { chain: { supertypes: [atom atom_specification chained top type] }  fields: {
+  media_type_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
     chain            => !record_field { type: type_chain  optional: true }
     spec             => !record_field { type: iri      optional: true  role: FIXED    value: "https://www.rfc-editor.org/rfc/rfc6838" }
     allow_parameters => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }

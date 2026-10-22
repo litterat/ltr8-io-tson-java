@@ -8,7 +8,6 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
@@ -22,9 +21,9 @@ import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -94,7 +93,7 @@ final class RecordExtension {
         for (String name : localNames) {
             Top def = merged.get(name);
             if (def != null && isUndeclaredMember(name, def, facts, applications, kernel)) {
-                String base = nearest(Chained.supertypesOf(def), merged);
+                String base = nearest(TypeChain.supertypesOf(def), merged);
                 String shownName = shown(name, merged, facts, applications);
                 violations.add(new Violation(name, "'" + shownName + "' composes onto '"
                         + shown(base, merged, facts, applications) + "', so it is a member of that family, and a "
@@ -140,7 +139,7 @@ final class RecordExtension {
     private static String nearest(List<String> chain, Map<String, Top> merged) {
         return chain.stream()
                 .filter(member -> chain.stream().noneMatch(other -> !other.equals(member)
-                        && Chained.supertypesOf(merged.get(other)).contains(member)))
+                        && TypeChain.supertypesOf(merged.get(other)).contains(member)))
                 .findFirst().orElse(chain.getFirst());
     }
 
@@ -180,7 +179,7 @@ final class RecordExtension {
      */
     private static void checkNothingComposesOntoFinal(String name, Top def,
             Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts, List<Violation> violations) {
-        for (String supertype : Chained.supertypesOf(def)) {
+        for (String supertype : TypeChain.supertypesOf(def)) {
             Top target = merged.get(ReferenceChain.terminal(supertype, merged));
             if (target instanceof RecordBody parent
                     && parent.extension() == RecordExtensionType.FINAL) {
@@ -238,7 +237,7 @@ final class RecordExtension {
             return; // already reported against the base, and a pin has nothing to be read at
         }
         Map<List<Object>, String> seen = new LinkedHashMap<>();
-        for (String subtype : new LinkedHashSet<>(Chained.subtypesOf(def))) {
+        for (String subtype : new LinkedHashSet<>(TypeChain.subtypesOf(def))) {
             Top sub = merged.get(subtype);
             // An undeclared member is refused on its own, and judging its pins too would report one mistake twice.
             // A record template IS-A the base is no member: its applications are, each pinned once closed.

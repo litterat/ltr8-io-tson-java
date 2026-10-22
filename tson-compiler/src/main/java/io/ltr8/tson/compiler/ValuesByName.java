@@ -9,7 +9,6 @@ import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLoader;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.EnumBody;
@@ -19,8 +18,8 @@ import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.RecordComponent;
@@ -125,7 +124,7 @@ final class ValuesByName {
                 return true;
             }
             Top definition = definition();
-            return definition != null && Chained.supertypesOf(definition).stream()
+            return definition != null && TypeChain.supertypesOf(definition).stream()
                     .anyMatch(supertype -> of(supertype).identity().equals(target));
         }
     }

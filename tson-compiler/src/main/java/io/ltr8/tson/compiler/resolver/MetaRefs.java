@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
@@ -12,6 +11,7 @@ import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.Type;
 
 import java.util.function.UnaryOperator;
 
@@ -96,8 +96,8 @@ final class MetaRefs {
             // substitution supplies the arguments.
             default -> body; // an atom body holds no type references
         };
-        return mapChain && mapped instanceof Chained chained
-                ? Chained.withChain(mapped, mapChain(chained.chain(), map)) : mapped;
+        return mapChain && mapped instanceof Type type
+                ? TypeChain.withChain(mapped, mapChain(type.chain(), map)) : mapped;
     }
 
     /** Every reference {@code chain} holds, mapped -- a name in it as the bare reference it is. */

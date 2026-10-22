@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -45,7 +44,7 @@ final class Ancestry {
 
     /** The names {@code value}'s chain already holds -- all of it once resolution is done. */
     static List<String> closedNames(Top value) {
-        return value == null ? List.of() : Chained.supertypesOf(value);
+        return value == null ? List.of() : TypeChain.supertypesOf(value);
     }
 
     /**
@@ -54,7 +53,7 @@ final class Ancestry {
      */
     static List<String> ofTemplate(String head, DefinitionGetter namespace) {
         Top template = namespace.definition(head);
-        return OpenEntry.isOpen(template) ? Chained.supertypesOf(template) : List.of();
+        return OpenEntry.isOpen(template) ? TypeChain.supertypesOf(template) : List.of();
     }
 
     /**

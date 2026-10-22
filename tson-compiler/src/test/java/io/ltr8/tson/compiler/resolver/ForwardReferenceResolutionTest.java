@@ -1,13 +1,12 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -39,8 +38,8 @@ class ForwardReferenceResolutionTest {
 
         Top employee = resolved.entries().get("employee");
         assertNotNull(employee);
-        assertTrue(Chained.supertypesOf(employee).contains("person"),
-                () -> "employee should compose person; supertypes=" + Chained.supertypesOf(employee));
+        assertTrue(TypeChain.supertypesOf(employee).contains("person"),
+                () -> "employee should compose person; supertypes=" + TypeChain.supertypesOf(employee));
     }
 
     @Test

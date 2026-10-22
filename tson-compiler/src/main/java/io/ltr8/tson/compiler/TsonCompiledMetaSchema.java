@@ -4,10 +4,8 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.reader.ErrorReader;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Type;
 
 import java.util.HashMap;
 import java.util.Map;

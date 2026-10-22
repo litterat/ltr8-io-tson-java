@@ -9,12 +9,11 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -79,9 +78,9 @@ final class ResolvedForm {
      * {@code scoped.scope} alike, so two resolved documents are compared as §8 writes them.
      */
     static Top canonical(Top value) {
-        return value instanceof Chained chained
-                ? Chained.withChain(value, chained.chain().withSupertypes(chained.supertypes().stream().sorted()
-                        .toList()).withSubtypes(chained.subtypes().stream().sorted().toList()))
+        return value instanceof Type type
+                ? TypeChain.withChain(value, type.chain().withSupertypes(type.supertypes().stream().sorted()
+                        .toList()).withSubtypes(type.subtypes().stream().sorted().toList()))
                 : value;
     }
 

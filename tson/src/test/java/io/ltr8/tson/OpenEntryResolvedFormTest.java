@@ -1,5 +1,4 @@
 package io.ltr8.tson;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.Diagnostic;
@@ -17,7 +16,7 @@ import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -297,7 +296,7 @@ class OpenEntryResolvedFormTest {
                     open++;
                 }
                 closed++;
-                if (!Chained.supertypesOf(definition).contains("top") && !(definition instanceof Reference)
+                if (!TypeChain.supertypesOf(definition).contains("top") && !(definition instanceof Reference)
                         && !OpenEntry.isOpen(definition)
                         && !perSchema.get(id).containsKey(headOf(definition))) {
                     neededTheGoverningMeta++;
@@ -333,10 +332,10 @@ class OpenEntryResolvedFormTest {
             // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.
             return TypeKind.REFERENCE;
         }
-        if (Chained.supertypesOf(definition).contains("top")) {
+        if (TypeChain.supertypesOf(definition).contains("top")) {
             // A constructor: its kind states what its *instances* will be, not what its own body is --
             // `integer_type => atom & { ... }` has a !record body and kind ATOM.
-            for (String supertype : Chained.supertypesOf(definition)) {
+            for (String supertype : TypeChain.supertypesOf(definition)) {
                 switch (supertype) {
                     case "atom" -> { return TypeKind.ATOM; }
                     case "sum" -> { return TypeKind.SUM; }

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=c50085d26e23c303eb3e43f3c1781f9114f5bd1deed189d71081e59124bcb874"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=1ed7702e6ba0375351089945300114bf1b5db00961d84b6f7ba28d8ea4e02d97"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -44,25 +44,21 @@
   }
 
   @doc:"""
-    A value that carries an IS-A chain: `type` composes it. A
-    declaration never writes `chain`, and a constructor never declares a field
-    of that name: the resolver computes the chain from composition and
-    refinement and the linker inverts it. On ingest it is read as stated and
-    never recomputed, because a flat body and its chain cannot be recomputed
-    from each other.
-    """
-  chained => {
-    chain?: type_chain
-  }
-
-  @doc:"""
     The kind of kinds that describe the shape of a data value: `atom`,
     `product` and `sum` IS-A `type`, and nothing else does. An entry whose
     value is a body whose constructor IS-A `type` is a type; one whose
     constructor composes `data` is not, and neither is a `reference` or a
-    `template`, which compose `top`. A type carries its IS-A chain.
+    `template`, which compose `top`.
+
+    A type carries its IS-A chain. A declaration never writes `chain`, and a
+    constructor never declares a field of that name: the resolver computes the
+    chain from composition and refinement and the linker inverts it. On ingest
+    it is read as stated and never recomputed, because a flat body and its
+    chain cannot be recomputed from each other.
     """
-  type      => abstract top & chained & {}
+  type      => abstract top & {
+    chain?: type_chain
+  }
 
   @doc:"""
     The kind of a scalar: a value written as one token, which its atom family

@@ -27,7 +27,6 @@ import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.BytesType;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -77,6 +76,7 @@ import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.meta.TypeChain;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -1064,8 +1064,8 @@ public final class TsonSchemaLinker {
      * imported schema, examined on its own, correctly doesn't know about it. {@link #withAddedSubtypes} unions
      * with whatever subtypes the target already had rather than replacing them.
      *
-     * <p><b>Every chained value is credited, and nothing else</b> ({@link Chained}): a type, a family base -- a
-     * record template, the ABSTRACT base its members are IS-A -- among them. Both sides are asked of the chain,
+     * <p><b>Every type is credited, and nothing else</b> ({@link Type}): a family base -- a record template, the
+     * ABSTRACT base its members are IS-A -- among them. Both sides are asked of the chain,
      * so a record template IS-A its own parents as any record is. A reference is a hop, and a held template an
      * abbreviation, neither a type of its own.
      */
@@ -1073,8 +1073,8 @@ public final class TsonSchemaLinker {
         Map<String, Set<String>> newSubtypesByName = new LinkedHashMap<>();
         for (String localName : localNames) {
             Top local = merged.get(localName);
-            for (String supertype : Chained.supertypesOf(local)) {
-                if (merged.get(supertype) instanceof Chained) {
+            for (String supertype : TypeChain.supertypesOf(local)) {
+                if (merged.get(supertype) instanceof Type) {
                     newSubtypesByName.computeIfAbsent(supertype, ignored -> new LinkedHashSet<>()).add(localName);
                 }
             }
@@ -1095,12 +1095,12 @@ public final class TsonSchemaLinker {
      * def} itself untouched. A value that carries no chain carries no subtypes and comes back unchanged.
      */
     private static Top withAddedSubtypes(Top def, Set<String> newSubtypes) {
-        if (!(def instanceof Chained chained)) {
+        if (!(def instanceof Type type)) {
             return def;
         }
-        Set<String> combined = new LinkedHashSet<>(chained.subtypes());
+        Set<String> combined = new LinkedHashSet<>(type.subtypes());
         combined.addAll(newSubtypes);
-        return Chained.withChain(def, chained.chain().withSubtypes(List.copyOf(combined)));
+        return TypeChain.withChain(def, type.chain().withSubtypes(List.copyOf(combined)));
     }
 
     /**
@@ -1202,10 +1202,10 @@ public final class TsonSchemaLinker {
      * route could see the other's.
      */
     private static Top unified(Top incumbent, Top arriving) {
-        if (Chained.subtypesOf(incumbent).containsAll(Chained.subtypesOf(arriving))) {
+        if (TypeChain.subtypesOf(incumbent).containsAll(TypeChain.subtypesOf(arriving))) {
             return incumbent;
         }
-        return withAddedSubtypes(incumbent, new LinkedHashSet<>(Chained.subtypesOf(arriving)));
+        return withAddedSubtypes(incumbent, new LinkedHashSet<>(TypeChain.subtypesOf(arriving)));
     }
 
     // ── Validation ───────────────────────────────────────────────────────
@@ -1220,12 +1220,12 @@ public final class TsonSchemaLinker {
         // whenever a refinement derives from one -- meta-kernel's own `set_type => array ^ {...}` resolves with
         // [array, product, top, type]. The fallback is defensive rather than load-bearing: a refinement source
         // resolves through the type-name namespace alone, so a schema deriving from `array` already names it.
-        for (String supertype : Chained.supertypesOf(def)) {
+        for (String supertype : TypeChain.supertypesOf(def)) {
             if (!namespace.containsKey(supertype) && !structureNamespace.containsKey(supertype)) {
                 throw new SchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");
             }
         }
-        for (String subtype : Chained.subtypesOf(def)) {
+        for (String subtype : TypeChain.subtypesOf(def)) {
             if (!namespace.containsKey(subtype)) {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }

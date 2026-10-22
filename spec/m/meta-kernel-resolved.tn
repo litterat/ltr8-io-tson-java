@@ -12,13 +12,12 @@
     written as a constructor application resolves to itself.
   - Fields at their default values are omitted (`optional: false`,
     `voidable: false`, `role: FREE`), and so are empty chains.
-  - A type body and a template carry `chained`'s one field, `chain`,
-    a `type_chain`. `supertypes` is the complete IS-A chain, every
-    element a bare name, closed to a fixed point through applied
-    parents; `subtypes` is its inverse over the entries of this map
-    only (inverse edges from schemas that import this one are not
-    represented here); `parents` is held text's and a family-base
-    template's, the parents as written. Both name lists are written lexically
+  - A type body carries `type`'s one field, `chain`, a `type_chain`.
+    `supertypes` is the complete IS-A chain, every element a bare
+    name, closed to a fixed point through applied parents; `subtypes`
+    is its inverse over the entries of this map only (inverse edges
+    from schemas that import this one are not represented here);
+    `parents` is a record template's, the parents as written. Both name lists are written lexically
     sorted; a resolver's native ordering is implementation-defined,
     so comparison tools canonicalise both lists before comparing.
     Set-typed fields are compared as written, in source declaration
@@ -106,18 +105,9 @@
     subtypes   => !record_field { type: array_type_name_xxhash  optional: true }
   } }
 
-  chained => !record {
-    chain: {
-      subtypes: [array atom choice enum enum_type identifier_type integer_type iri_type map product record regex_type set_type sum text_type tuple value_type void_type type]
-    }
-    fields: {
-      chain => !record_field { type: type_chain  optional: true }
-    }
-  }
-
   type => !record {
     chain: {
-      supertypes: [chained top]
+      supertypes: [top]
       subtypes: [array atom choice enum enum_type identifier_type integer_type iri_type map product record regex_type set_type sum text_type tuple value_type void_type]
     }
     fields: {
@@ -128,7 +118,7 @@
 
   atom => !record {
     chain: {
-      supertypes: [chained top type]
+      supertypes: [top type]
       subtypes: [enum enum_type identifier_type integer_type iri_type regex_type text_type value_type void_type]
     }
     fields: {
@@ -137,13 +127,13 @@
     extension: ABSTRACT
   }
 
-  product => !record { chain: { supertypes: [chained top type]  subtypes: [array map record set_type tuple] }  fields: {
+  product => !record { chain: { supertypes: [top type]  subtypes: [array map record set_type tuple] }  fields: {
     chain          => !record_field { type: type_chain  optional: true }
     access_pattern => !record_field { type: product_access_type }
     size_type      => !record_field { type: product_size_type }
   }  extension: ABSTRACT }
 
-  sum => !record { chain: { supertypes: [chained top type]  subtypes: [choice] }  fields: {
+  sum => !record { chain: { supertypes: [top type]  subtypes: [choice] }  fields: {
     chain => !record_field { type: type_chain  optional: true }
   }  extension: ABSTRACT }
 
@@ -164,13 +154,13 @@
     template   => !record_field { type: text }
   } }
 
-  value_type => !record { chain: { supertypes: [atom chained top type] }  fields: {
+  value_type => !record { chain: { supertypes: [atom top type] }  fields: {
     chain => !record_field { type: type_chain  optional: true }
   } }
 
   value => !value_type {}
 
-  void_type => !record { chain: { supertypes: [atom chained top type] }  fields: {
+  void_type => !record { chain: { supertypes: [atom top type] }  fields: {
     chain => !record_field { type: type_chain  optional: true }
   } }
 
@@ -183,7 +173,7 @@
     signed => !record_field { type: boolean }
   } }
 
-  integer_type => !record { chain: { supertypes: [atom chained top type] }  fields: {
+  integer_type => !record { chain: { supertypes: [atom top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     size          => !record_field { type: integer_size  optional: true }
     min           => !record_field { type: integer  optional: true }
@@ -203,7 +193,7 @@
   text_member_set => !set_type { element_type: text  min_items: 1 }
 
   text_type => !record {
-    chain: { supertypes: [atom chained top type]  subtypes: [identifier_type iri_type regex_type] }
+    chain: { supertypes: [atom top type]  subtypes: [identifier_type iri_type regex_type] }
     fields: {
     chain         => !record_field { type: type_chain  optional: true }
     min_length    => !record_field { type: non_negative_integer  optional: true }
@@ -224,7 +214,7 @@
 
   normalization => !enum { members: [NONE NFC NFKC NFKC_CASEFOLD ASCII_CASEFOLD] }
 
-  identifier_type => !record { chain: { supertypes: [atom atom_specification chained text_type top type] }  fields: {
+  identifier_type => !record { chain: { supertypes: [atom atom_specification text_type top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     min_length    => !record_field { type: non_negative_integer  optional: true }
     max_length    => !record_field { type: non_negative_integer  optional: true }
@@ -243,7 +233,7 @@
 
   identifier => !identifier_type { continue_add: "-" }
 
-  iri_type => !record { chain: { supertypes: [atom atom_specification chained text_type top type] }  fields: {
+  iri_type => !record { chain: { supertypes: [atom atom_specification text_type top type] }  fields: {
     chain          => !record_field { type: type_chain  optional: true }
     min_length     => !record_field { type: non_negative_integer  optional: true }
     max_length     => !record_field { type: non_negative_integer  optional: true }
@@ -263,7 +253,7 @@
 
   iri => !iri_type { allow_relative: false }
 
-  regex_type => !record { chain: { supertypes: [atom atom_specification chained text_type top type] }  fields: {
+  regex_type => !record { chain: { supertypes: [atom atom_specification text_type top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     min_length    => !record_field { type: non_negative_integer  optional: true }
     max_length    => !record_field { type: non_negative_integer  optional: true }
@@ -332,7 +322,7 @@
 
   field_map => !map { key_type: text  value_type: record_field  ordered: true }
 
-  record => !record { chain: { supertypes: [chained product top type] }  fields: {
+  record => !record { chain: { supertypes: [product top type] }  fields: {
     chain          => !record_field { type: type_chain  optional: true }
     access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: NAMED }
     size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: FIXED }
@@ -344,7 +334,7 @@
     parameters     => !record_field { type: array_template_param_xxhash  optional: true }
   } }
 
-  array => !record { chain: { supertypes: [chained product top type]  subtypes: [set_type] }  fields: {
+  array => !record { chain: { supertypes: [product top type]  subtypes: [set_type] }  fields: {
     chain          => !record_field { type: type_chain  optional: true }
     access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: INDEX }
     size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
@@ -356,7 +346,7 @@
     max_items      => !record_field { type: non_negative_integer  optional: true }
   } }
 
-  set_type => !record { chain: { supertypes: [array chained product top type] }  fields: {
+  set_type => !record { chain: { supertypes: [array product top type] }  fields: {
     chain          => !record_field { type: type_chain  optional: true }
     access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: INDEX }
     size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
@@ -367,7 +357,7 @@
     min_items      => !record_field { type: non_negative_integer  optional: true }
     max_items      => !record_field { type: non_negative_integer  optional: true }
   } }
-  map => !record { chain: { supertypes: [chained product top type] }  fields: {
+  map => !record { chain: { supertypes: [product top type] }  fields: {
     chain          => !record_field { type: type_chain  optional: true }
     access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: NAMED }
     size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
@@ -379,7 +369,7 @@
     max_items      => !record_field { type: non_negative_integer  optional: true }
   } }
 
-  tuple => !record { chain: { supertypes: [chained product top type] }  fields: {
+  tuple => !record { chain: { supertypes: [product top type] }  fields: {
     chain          => !record_field { type: type_chain  optional: true }
     access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: INDEX }
     size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: FIXED }
@@ -392,19 +382,19 @@
 
   integer_member_set => !set_type { element_type: integer  min_items: 1 }
 
-  enum_type => !record { chain: { supertypes: [atom chained top type]  subtypes: [enum] }  fields: {
+  enum_type => !record { chain: { supertypes: [atom top type]  subtypes: [enum] }  fields: {
     chain     => !record_field { type: type_chain  optional: true }
     name_type => !record_field { type: type_name }
     members   => !record_field { type: enum_set }
   } }
 
-  enum => !record { chain: { supertypes: [atom chained enum_type top type] }  fields: {
+  enum => !record { chain: { supertypes: [atom enum_type top type] }  fields: {
     chain     => !record_field { type: type_chain  optional: true }
     name_type => !record_field { type: type_name  optional: true  role: FIXED  value: identifier }
     members   => !record_field { type: enum_set }
   } }
 
-  choice => !record { chain: { supertypes: [chained sum top type] }  fields: {
+  choice => !record { chain: { supertypes: [sum top type] }  fields: {
     chain    => !record_field { type: type_chain  optional: true }
     variants => !record_field { type: array_type_ref_xxhash }
     disjoint => !record_field { type: boolean  optional: true }

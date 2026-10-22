@@ -1,13 +1,12 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.tree.TsonValue;
-import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -127,7 +126,7 @@ class DirectApplicationDeclarationTest {
         assertEquals(TypeKind.PRODUCT, TypeKind.of(linked.schema().entries().get("by"), n -> true));
         assertEquals("box", linked.schema().applicationOf("bx").orElseThrow().name());
         assertEquals("box", linked.schema().applicationOf("by").orElseThrow().name());
-        assertEquals(java.util.List.of("bx", "by"), Chained.subtypesOf(linked.schema().entries().get("box")),
+        assertEquals(java.util.List.of("bx", "by"), TypeChain.subtypesOf(linked.schema().entries().get("box")),
                 "both are members of the template they close");
     }
 
@@ -147,7 +146,7 @@ class DirectApplicationDeclarationTest {
     void theFamilyBaseIndexesTheDeclaredMemberNames() {
         TsonLinkedSchema linked = resolve("dad6", FAMILY);
 
-        assertEquals(List.of("dogs", "cats"), Chained.subtypesOf(linked.schema().entries().get("pet")),
+        assertEquals(List.of("dogs", "cats"), TypeChain.subtypesOf(linked.schema().entries().get("pet")),
                 "the members are the declarations, not content-derived names");
     }
 

@@ -3,11 +3,10 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -85,7 +84,7 @@ public final class Subsumption {
                                                 Map<String, Set<String>> namesMeaning,
                                                 TsonTypeReaderResolver resolver) {
         return new VariantSchemaReader(name, admitting(List.of(name), namesMeaning), ownParser,
-                admitting(Chained.subtypesOf(definition), namesMeaning), resolver);
+                admitting(TypeChain.subtypesOf(definition), namesMeaning), resolver);
     }
 
     /**

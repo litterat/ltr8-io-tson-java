@@ -12,7 +12,6 @@ import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
@@ -23,8 +22,8 @@ import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TemplateParam;
-import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -663,7 +662,7 @@ final class TemplateMaterialiser {
         }).collect(java.util.stream.Collectors.joining(", ", "<", ">"));
         String base = onto.stream()
                 .filter(member -> onto.stream().noneMatch(other -> !other.equals(member)
-                        && Chained.supertypesOf(namespace.definition(other)).contains(member)))
+                        && TypeChain.supertypesOf(namespace.definition(other)).contains(member)))
                 .findFirst().orElse(onto.getFirst());
         throw new SchemaValidationException("'" + written + "' composes onto '" + base + "', so it is a member of "
                 + "that family, and a member is declared: a read reports the member it selects, a tag names it and "
@@ -1025,7 +1024,7 @@ final class TemplateMaterialiser {
         }
         // By name, so a core type and the kernel original it copies are one bound, as they are at the declaration.
         String boundTerminal = ReferenceChain.terminal(bound, this::lookup);
-        List<String> chain = Chained.supertypesOf(target);
+        List<String> chain = TypeChain.supertypesOf(target);
         boolean admitted = terminal.equals(boundTerminal) || chain.contains(boundTerminal) || chain.contains(bound);
         if (!admitted) {
             throw new SchemaValidationException("'" + head + "<...>' binds '" + parameter.name() + "' to '"

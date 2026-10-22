@@ -16,7 +16,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import java.util.Map;
 
 /**
- * {@code chained}'s one field, {@code chain}, for a hand-built constructor record, with every kernel entry its type
+ * {@code type}'s one field, {@code chain}, for a hand-built constructor record, with every kernel entry its type
  * reaches copied into the schema being built. A constructor composing {@code atom} flattens it in first
  * (SPEC-FEEDBACK.md #14), and its body class carries a component for it, so a schema standing in for the kernel's
  * own states it as the kernel does.
@@ -29,7 +29,7 @@ final class KernelChainFields {
     /** The kernel's own {@code chain} field, its type's closure added to {@code entries}. */
     static Map.Entry<String, RecordField> chainField(Map<String, Top> entries) {
         TsonSchema kernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        RecordField declared = ((RecordBody) kernel.entries().get("chained")).fields().get("chain");
+        RecordField declared = ((RecordBody) kernel.entries().get("type")).fields().get("chain");
         copy(declared.type(), kernel, entries);
         return Map.entry("chain", declared);
     }

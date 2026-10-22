@@ -1,13 +1,12 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -103,7 +102,7 @@ class MintedEntryUnificationTest {
         Map<String, TsonLinkedSchema> schemas = both();
         String name = mintedName(schemas.get("right"));
 
-        assertEquals(List.of(), Chained.subtypesOf(schemas.get("right").schema().entries().get(name)),
+        assertEquals(List.of(), TypeChain.subtypesOf(schemas.get("right").schema().entries().get(name)),
                 "a closed record has no subtypes of its own here");
     }
 
@@ -115,7 +114,7 @@ class MintedEntryUnificationTest {
     void theTemplateDoesNotIndexAMintedInstantiation() {
         Map<String, TsonLinkedSchema> schemas = both();
         schemas.forEach((which, schema) -> assertFalse(
-                Chained.subtypesOf(schema.schema().entries().get("box")).contains(mintedName(schema)),
-                () -> which + ": " + Chained.subtypesOf(schema.schema().entries().get("box"))));
+                TypeChain.subtypesOf(schema.schema().entries().get("box")).contains(mintedName(schema)),
+                () -> which + ": " + TypeChain.subtypesOf(schema.schema().entries().get("box"))));
     }
 }

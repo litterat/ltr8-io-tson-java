@@ -6,11 +6,11 @@ import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -86,10 +86,10 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
 
     /**
      * The entries IS-A {@code name}, whose value is {@code definition}: its chain's {@code subtypes} -- a type's,
-     * and a family base template's, whose subtypes are its members ({@link Chained}).
+     * and a family base template's, whose subtypes are its members ({@link TypeChain#subtypesOf}).
      */
     public List<String> subtypesOf(String name, Top definition) {
-        return Chained.subtypesOf(definition);
+        return TypeChain.subtypesOf(definition);
     }
 
     /**

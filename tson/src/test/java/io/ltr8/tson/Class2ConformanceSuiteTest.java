@@ -1,5 +1,4 @@
 package io.ltr8.tson;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -13,7 +12,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.suite.SuiteBindings;
 import io.ltr8.tson.suite.SuiteCheckout;
 import io.ltr8.tson.suite.Sidecar;
@@ -284,7 +283,7 @@ class Class2ConformanceSuiteTest {
                 Top definition = definitionOf(entries, name);
                 assertEquals(new TreeSet<>(fieldTextArray(claim, "subtypes").stream()
                                 .map(ResolvedForm::withoutHash).toList()),
-                        new TreeSet<>(Chained.subtypesOf(definition).stream()
+                        new TreeSet<>(TypeChain.subtypesOf(definition).stream()
                                 .map(ResolvedForm::withoutHash).toList()),
                         "§8.2 subtypes index of " + name);
             }

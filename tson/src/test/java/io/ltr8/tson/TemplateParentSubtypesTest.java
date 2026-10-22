@@ -1,10 +1,9 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -50,7 +49,7 @@ class TemplateParentSubtypesTest {
     private static List<String> subtypesOf(TsonLinkedSchema schema, String name) {
         Top definition = schema.schema().entries().get(name);
         return definition == null ? List.of()
-                : Chained.subtypesOf(definition);
+                : TypeChain.subtypesOf(definition);
     }
 
     @Test
