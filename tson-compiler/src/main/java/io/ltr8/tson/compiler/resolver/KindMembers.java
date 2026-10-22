@@ -27,7 +27,10 @@ import java.util.function.Function;
  * !enum} -- is followed, through a constructor template's held body to the constructor it applies, until a
  * constructor is reached, and the entry is a member when that constructor is {@code of} or has {@code of} among its
  * supertypes. A record template is built with {@code record}: it is a type, the family base its members are IS-A
- * (§5.10), so a kind of {@code record} holds it.
+ * (§5.10), so a kind of {@code record} holds it. So does the kernel's {@code top}: a fresh abstract record built
+ * with {@code record} and IS-A nothing, it is a type and not a constructor by the rule, and a member of every kind
+ * whose {@code of} is {@code record} or above it -- {@link io.ltr8.tson.schema.meta.TypeKind#isConstructor}
+ * answers for applicability, a different question, and is not consulted here.
  *
  * <p><b>A kind is a member of itself where the walk says so.</b> {@code type_kind} is built with {@code
  * kind_type}, which IS-A {@code type}, so it is one of the names it holds. Nothing loops: membership reads
@@ -90,8 +93,7 @@ public final class KindMembers {
     public static boolean isMember(Top type, String head, String of, Function<String, Top> local,
                                    Function<String, Top> structure) {
         Function<String, Top> constructors = structureFirst(structure, local);
-        // `top` is the root every constructor IS-A, and so a constructor although it IS-A nothing itself.
-        if (type == null || isConstructor(type) || type == constructors.apply(TOP)
+        if (type == null || isConstructor(type)
                 || type instanceof TemplateBody || type instanceof Reference) {
             return false;
         }

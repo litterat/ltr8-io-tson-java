@@ -88,7 +88,8 @@ public enum TypeKind {
      * base kind ({@code op => <T> data & { path: T }}) answers as its closed form would; and judged by where
      * {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself: it is what
      * every other answer IS-A, and as abstract as the base kinds beneath it, so its own reader is what refuses a
-     * direct application of it.
+     * direct application of it. That is applicability, not kind membership: by the chain {@code top} is a
+     * type, and a member of {@code type_kind}.
      *
      * @param name the entry whose value {@code value} is
      */

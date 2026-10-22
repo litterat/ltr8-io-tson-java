@@ -10,10 +10,11 @@ history lives in git.
 - The registration is a `@Typename` and a name binder, and nothing else: no reader family, no
   `ValueReaderFactoryRegistry` entry.
 - A constructor with no resolvable class is an error where it is written.
-- `Data.references()` is declared, not discovered, and serves `type_ref` slots; a reference slot is typed `type_ref`,
-  not `type_name`. A slot holding a value by name is typed by the value's type, and nothing declares its references:
-  the resolver's read records each with its slot (`TsonSchema.valuesByName`). Both bind a `TypeRef` -- every reference
-  has one host shape, and only the linker's judgement differs by slot.
+- `Data.references()` is declared, not discovered, and serves `type_ref` slots, the application form. A slot naming
+  the type of a value is typed `type_kind` (or a narrower kind, `request: kind<record>`), and a slot holding a value by
+  name is typed by the value's type; neither declares its references, since the read records each with its slot
+  (`TsonSchema.valuesByName`) and the linker judges it by the slot's type, membership of the kind or IS-A the value's
+  type. All three bind a `TypeRef` -- every reference has one host shape, and only the judgement differs by slot.
 - One interim rule, closed by `ref<T>` landing on the proposal branch: the host's component type selects the
   spelling at a record-typed slot (a `TypeRef` takes a name, a record class a braced value).
 - The linker reads a name's slot type off the constructor's resolved fields along the path the read recorded,
@@ -63,18 +64,19 @@ because that is the only layer able to name request and response types *by name*
   discovered*: a payload's Java shape says nothing about which components are references, and consulting the
   constructor's declaration would only work for slots spelled `type_ref`. A body holding a `TypeRef` returns
   it and the name is checked against the same namespace every other reference is. A body that declares none
-  simply has none checked — that is the cost of the branch being open, and it is the reason to type a
-  reference slot `type_ref` rather than `type_name` (§5.6's positional form keeps the author writing a bare
-  name either way). §9's guidance for extension meta-schemas is the other half: a slot holding a type reference
-  MUST be typed `type_ref`, which is what makes it participate in reference walking and identity.
+  simply has none checked — that is the cost of the branch being open, and the reason a slot naming a type is
+  typed by a kind (`request: kind<record>`, `design/references.md`): a kind-typed slot's name is recorded by the read
+  and judged a member at link whatever the class declares, so `references()` is left with the `type_ref` slots, the
+  application form, which §9 reserves for a slot that may hold an application.
 - **A value by name is recorded by the read, not declared by the host** (SPEC-FEEDBACK.md #13). A slot typed by a
   constructor or a record (`request?: record`, `method: method`) whose component is a `TypeRef` reads an unquoted
   qualified name (`orders.methods.place_order`) as written, into the `TypeRef`'s `name`, and the read records it with
   the path it descended (`["methods", "place_order", "request"]`), which `SchemaResolver` keeps per entry in
-  `TsonSchema.valuesByName`. **One host shape for every reference** is the point: `type_ref`, a qualified name and the
-  coming `ref<T>` are each a reference that must resolve, and differ only in the judgement — one segment naming a type
-  at a `type_ref` slot (`type_ref` is `ref<type>`, types living only in the schema map), segments reaching a value
-  IS-A the slot's type here. With one Java type, a host declaring its by-name references would decide their judgement
+  `TsonSchema.valuesByName`. **One host shape for every reference** is the point: `type_ref`, a kind-typed slot's name,
+  a qualified name and the coming `ref<T>` are each a reference that must resolve, and differ only in the judgement —
+  an application at a `type_ref` slot, one segment that is a member of the kind at a `type_kind` slot
+  (`ValuesByName.judgeMember`), segments reaching a value IS-A the slot's
+  type here. With one Java type, a host declaring its by-name references would decide their judgement
   by which list it put them in — `request: text` returned from `references()` would resolve as a type and pass — so
   nothing asks it to: the read's record is judged against the slot whatever the class returns, and a by-name
   reference it also returns from `references()` is recognised by identity and not resolved as a type
@@ -100,7 +102,7 @@ because that is the only layer able to name request and response types *by name*
   to let anything name such an entry as a type — which is what makes that refusal load-bearing rather than
   a nicety. A value by name may reach a DATA entry (`orders.methods.place_order` starts at one), and that is
   no exception: a slot holding a value is not a type position, so `response: orders` at a `type_ref` slot is
-  still §4.1's refusal and `request: orders` at a `record` slot is refused as no `record`.
+  still §4.1's refusal and `request: orders` at a `kind<record>` slot is refused as no member of the kind.
 - **Resolved output is ordinary.** §8.1's `body` carries an instance of whichever constructor built the entry, and a
   meta-schema's own constructor is not a special case: a DATA entry writes as `body: !operation { ... }`, formally
   indistinguishable from `!record { ... }`. A value by name is a `TypeRef` and is written as any `TypeRef` is; the

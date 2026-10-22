@@ -93,8 +93,16 @@ import java.util.function.Function;
  */
 final class ParameterTypes {
 
-    /** The kernel entry every type-reference slot is typed by ([TSON-SCHEMA] §9). */
-    private static final String TYPE_REF = TemplateParam.TYPE_REF.name();
+    /** The kind every type slot is typed by, {@code kind<type>}. */
+    private static final String TYPE_KIND = TemplateParam.TYPE_KIND.name();
+
+    /** The application form, which stands where an application may: a composition operand, an argument. */
+    private static final String TYPE_REF = "type_ref";
+
+    /** Whether a slot declared {@code name} holds a type: the kind of the types, or the application form. */
+    private static boolean typePosition(String name) {
+        return TYPE_KIND.equals(name) || TYPE_REF.equals(name);
+    }
 
     /** The kernel record whose {@code value} slot routes a default or fixed value into its sibling's type. */
     private static final String RECORD_FIELD = "record_field";
@@ -110,7 +118,7 @@ final class ParameterTypes {
         TYPE, VALUE;
 
         static Kind of(TypeRef type) {
-            return TemplateParam.TYPE_REF.equals(type) ? TYPE : VALUE;
+            return typePosition(type.name()) ? TYPE : VALUE;
         }
     }
 
@@ -397,9 +405,9 @@ final class ParameterTypes {
                                 + spell(declared.get()) + " is not -- a written bound narrows what the uses "
                                 + "require, and never widens it");
                     }
-                    return new TemplateParam(parameter, TemplateParam.TYPE_REF, declared);
+                    return new TemplateParam(parameter, TemplateParam.TYPE_KIND, declared);
                 }
-                return new TemplateParam(parameter, TemplateParam.TYPE_REF, inherited.map(Use::type));
+                return new TemplateParam(parameter, TemplateParam.TYPE_KIND, inherited.map(Use::type));
             }
             Use derived = narrowest(parameter, "read as", all, local, meta);
             if (declared.isPresent()) {
@@ -580,7 +588,7 @@ final class ParameterTypes {
                         token(token.text(), declared, type, slot);
                 case ArrayValue array -> elements(array, type, slot);
                 case MapValue map when type instanceof MapBody entries -> entries(map, entries, slot);
-                case RecordValue record when TYPE_REF.equals(declared.name()) -> application(record);
+                case RecordValue record when typePosition(declared.name()) -> application(record);
                 case RecordValue record when type instanceof RecordBody nested ->
                         record(record, declared.name(), nested);
                 default -> {
@@ -603,10 +611,10 @@ final class ParameterTypes {
 
         /** A parameter standing at a slot: the slot's declared type is the whole of the verdict. */
         private void token(String parameter, TypeRef declared, Top type, String slot) {
-            if (!TYPE_REF.equals(declared.name()) && !(type instanceof Atom)) {
+            if (!typePosition(declared.name()) && !(type instanceof Atom)) {
                 throw new SchemaValidationException("parameter '" + parameter + "' stands where '" + declared.name()
-                        + "' is declared, which is neither a type reference nor a scalar -- §5.10 binds a value "
-                        + "parameter to scalars only and a type parameter to references, so nothing could be "
+                        + "' is declared, which is neither a kind of type nor a scalar -- §5.10 binds a value "
+                        + "parameter to scalars only and a type parameter to type names, so nothing could be "
                         + "applied here");
             }
             if (recordTemplate && !FIELD_TYPE.equals(slot)) {

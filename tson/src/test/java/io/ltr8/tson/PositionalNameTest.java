@@ -26,7 +26,8 @@ class PositionalNameTest {
             !!meta:"https://tson.io/2026/38/m/meta.tn"
             !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
             {
-              holder => { p?: record_field  q?: record  t?: type_ref }
+              named  => { v: text }
+              holder => { p?: record_field  q?: kind<record>  t?: type_ref }
             }""";
 
     private static List<Diagnostic> read(String data) {
@@ -43,16 +44,20 @@ class PositionalNameTest {
     /** {@code type_ref}'s one field is {@code name}, a {@code type_name}: the token fills it. */
     @Test
     void aTypeReferenceKeepsItsBareSpelling() {
-        assertEquals(List.of(), read("!holder { t: some_type  p: { type: some_type } }"));
+        assertEquals(List.of(), read("!holder { t: some_type  p: { type: named } }"));
     }
 
-    /** {@code record_field}'s one field is {@code type}, a {@code type_ref}: in a data document a name fills it. */
+    /**
+     * {@code record_field}'s one field is {@code type}, a {@code type_kind}: in a data document a name fills it, and is
+     * judged a member of the kind in the governing schema's namespace.
+     */
     @Test
-    void aNameFillsAProductTypedPositionalFieldInADataDocument() {
-        assertEquals(List.of(), read("!holder { p: some_type }"));
+    void aNameFillsAKindTypedPositionalFieldInADataDocument() {
+        assertEquals(List.of(), read("!holder { p: named }"));
+        assertFalse(read("!holder { p: some_type }").isEmpty(), "a name that is no member is refused");
     }
 
-    /** {@code record}'s one field is {@code fields}, a map: the token fills it, and is judged there as a map. */
+    /** A kind-typed slot holds a type's name, one segment: a dotted token is refused by the grammar, never read by name. */
     @Test
     void aDottedTokenIsReadAsThePositionalField() {
         List<Diagnostic> reported = read("!holder { q: orders.methods.place_order }");
@@ -61,25 +66,20 @@ class PositionalNameTest {
                 diagnostic.message()));
     }
 
-    /** The same spelling in a schema document: a constructor's binding record is read as a schema document's value. */
+    /**
+     * In a schema document the same fill: {@code record_field}'s positional field is {@code type}, an atom, so
+     * {@code p => text} is {@code p => { type: text }}, which is what the sugar {@code p: text} desugars to.
+     */
     @Test
-    void aNameIsNoPositionalRecordFieldInASchemaDocument() {
-        List<Diagnostic> problems = Tson.standard().validateSchema("""
-                !!id:"https://example.test/positional-name-schema.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
-                  r => !record { fields: { p => text } }
-                }""");
-        assertEquals(1, problems.size(), problems.toString());
-        assertTrue(problems.getFirst().message().contains("expected a record for 'record_field', found the name 'text'"),
-                problems.getFirst().message());
-        assertEquals(List.of(), Tson.standard().validateSchema("""
-                !!id:"https://example.test/positional-name-schema-explicit.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
-                  r => !record { fields: { p => { type: text } } }
-                }"""));
+    void aNameFillsThePositionalRecordFieldInASchemaDocument() {
+        for (String fields : List.of("{ p => text }", "{ p => { type: text } }")) {
+            assertEquals(List.of(), Tson.standard().validateSchema("""
+                    !!id:"https://example.test/positional-name-schema.tn"
+                    !!meta:"https://tson.io/2026/38/m/meta.tn"
+                    !!import:"https://tson.io/2026/38/m/core.tn"
+                    {
+                      r => !record { fields: %s }
+                    }""".formatted(fields)), fields);
+        }
     }
 }

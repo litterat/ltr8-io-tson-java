@@ -46,13 +46,13 @@ class ValuesByNameTest {
                 {
                   method_name => identifier
                   status_name => identifier
-                  method      => { request?: record  response?: type_ref  errors?: [record]
-                                   replies?: {status_name => record} }
+                  method      => { request?: kind<record>  response?: type_ref  errors?: [kind<record>]
+                                   replies?: {status_name => kind<record>} }
                   interface   => data & { methods: {method_name => method} }
                   http_verb   => !enum [GET POST]
                   binding     => data & { method: method  verb: http_verb  route: text }
-                  filed_in_references => data & { request: record  method?: method }
-                  filed_nowhere       => data & { request: record }
+                  filed_in_references => data & { request: kind<record>  method?: method }
+                  filed_nowhere       => data & { request: kind<record> }
                 }
                 """);
         DOCUMENTS.put("https://example.test/orders.tn", orders("https://example.test/orders.tn", ""));
@@ -188,11 +188,12 @@ class ValuesByNameTest {
                 "/methods/m/request", "'user_id' (an alias of 'uuid')", "built by 'uuid_type'", "no 'record'");
     }
 
+    /** A kind-typed slot holds a type's name, one segment: a qualified name there fails the kind's own grammar. */
     @Test
     void aMethodIsNoRecord() {
         refused(api("method-as-record", """
                 api => !interface { methods: { m => { request: orders.methods.place_order } } }"""),
-                "'orders.methods.place_order' is a 'method'", "no 'record'");
+                "'orders.methods.place_order'", "cannot appear in an identifier");
     }
 
     @Test

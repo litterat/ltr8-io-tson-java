@@ -217,7 +217,7 @@ class TsonValidateSchemaTest {
     void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
         assertStaysWithTheApplier("box<3>",
                 "'box<...>' substitutes into a body that is not valid data for 'record', the constructor's "
-                        + "own constraint vocabulary -- 'type_name': '3': U+0033 at index 0 cannot start an "
+                        + "own constraint vocabulary -- 'type_kind': '3': U+0033 at index 0 cannot start an "
                         + "identifier -- an identifier never begins with a digit or a sign");
     }
 

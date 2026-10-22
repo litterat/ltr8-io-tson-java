@@ -53,10 +53,10 @@ class TemplateParamTypeTest {
         return new TemplateParam(name, TypeRef.of(type));
     }
 
-    /** A type slot gives {@code type_ref}; a scalar slot of the applied constructor gives that slot's type. */
+    /** A type slot gives {@code type_kind}; a scalar slot of the applied constructor gives that slot's type. */
     @Test
     void aSlotGivesItsDeclaredType() {
-        assertEquals(List.of(param("T", "type_ref"), param("N", "non_negative_integer")), parameters().get("vector"));
+        assertEquals(List.of(param("T", "type_kind"), param("N", "non_negative_integer")), parameters().get("vector"));
     }
 
     /** A routed default is read as the field's own declared type, not as {@code record_field.value}'s. */
@@ -74,7 +74,7 @@ class TemplateParamTypeTest {
     /** A field typed by a parameter makes the routed parameter's type that parameter. */
     @Test
     void aTypeMayNameAnEarlierParameter() {
-        assertEquals(List.of(param("T", "type_ref"), param("N", "T")), parameters().get("typed_by"));
+        assertEquals(List.of(param("T", "type_kind"), param("N", "T")), parameters().get("typed_by"));
     }
 
     /**
@@ -115,7 +115,7 @@ class TemplateParamTypeTest {
         Map<String, List<TemplateParam>> core = parameters();
         assertEquals(List.of(param("S", "schema_identity")), core.get("extern_of"));
         assertEquals(List.of(param("S", "schema_identity"), param("T", "type_name")), core.get("extern_type"));
-        assertEquals(List.of(param("T", "type_ref")), core.get("set"));
+        assertEquals(List.of(param("T", "type_kind")), core.get("set"));
     }
 
     // ── A template over a meta constructor is the meta's ─────────────────────────────

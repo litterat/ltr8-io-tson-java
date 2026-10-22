@@ -65,9 +65,10 @@ own prose (which had gone stale on it):
   host's component type decides whether a record-typed slot in a `data` body takes a value by name (`TypeRef`) or a
   braced value (the record's class), so two hosts of one meta admit different documents. The slot's type declares
   instead whether its value is by name only (`ref<T>`), inline only (a plain `T`), or either. `Data.references()`
-  and the read-collected by-name list (`TsonSchema.valuesByName`) then merge into one judgement by slot type, a
-  `type_ref` slot being `ref<type>`. The value Java receives becomes the resolved reference -- the declaring schema's
-  identity, the entry, and the member path (`originOf` plus the path) -- rather than the spelling, so a check over
+  and the read-collected by-name list (`TsonSchema.valuesByName`) then merge into one judgement by slot type, as a
+  kind-typed slot's name already is (`ValuesByName.judgeMember`). The value Java receives becomes the resolved
+  reference -- the declaring schema's identity, the entry, and the member path (`originOf` plus the path) -- rather
+  than the spelling, so a check over
   references (every method of an interface bound, say) never walks a name again. Lands on `r2026-38-proposal` before
   the branch goes to the reviewer.
 - [ ] **The namespace kind: a schema's own account of what a `data` body holds** (SPEC-FEEDBACK.md #13). A qualified
@@ -86,7 +87,7 @@ own prose (which had gone stale on it):
 - [ ] **A parameter in a record template has no channel of its own** (SPEC-FEEDBACK.md #17). An open record's
   parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
   type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
-  channel: `record_field` `( type: type_ref | type_param: param_name )` and `( value: value | value_param: param_name
+  channel: `record_field` `( type: type_kind | type_param: param_name )` and `( value: value | value_param: param_name
   )`, `type_argument` a `param` member, so `type_ref.name` always names an entry. Sequenced with the `type_ref` /
   `type_name` normalisation (qualified names, `!ref`), which needs exactly that, and with what `@application` means
   on a declared entry that is no record.

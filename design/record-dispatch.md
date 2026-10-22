@@ -107,9 +107,11 @@ constructor's binding record, a data entry's body — reaches the governing meta
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a
 bare value as that field — `type_ref`'s `name` is a `type_name`, which is how `request: search_request` at a
-`type_ref` slot stays a type reference — and where the field is a product or a sum, an unquoted token
-(`ReferenceNameReader.nameIn`) is a **value by name** the record reader does not read as the field:
-`!record { fields: { p => x } }` is "expected a record for 'record_field', found the name 'x'". Whether the token is
+`type_ref` slot stays a type reference, and `record_field`'s `type` is `type_kind`, an atom whose value is a type's
+name (`KindSlotReader`, which also admits the application a sugar lift writes there before the closer mints its
+entry) — and where the field is a product or a sum, an unquoted token
+(`ReferenceNameReader.nameIn`) is a **value by name** the record reader does not read as the field (`record_field`'s
+own positional field being an atom, `fields: { p => x }` fills its `type`, as the sugar `p: x` does). Whether the token is
 a well-formed qualified name — each `.`-separated segment a [TSON-DATA] §7.7 identifier — is the linker's to judge,
 where the name is resolved (`ValuesByName.segments`).
 **Every data document reads as it did before the rule**, tree mode and bind mode alike: `p: x` at a `record_field`
@@ -119,7 +121,8 @@ subsumption guard and a deferred reader; nothing about it is threaded into the r
 has no positional form, so the rule has no JSON side.
 
 **A value by name is read only where the bound component is a `TypeRef` at a record-typed slot.** Every reference
-has one host shape: a `type_ref` slot binds a `TypeRef`, and so does a slot holding a value by name, whose
+has one host shape: a `type_ref` slot binds a `TypeRef`, so does a kind-typed slot, and so does a slot holding a value
+by name, whose
 `ReferenceNameReader` (set in place of the slot type's own reader by `BindTargets`) keeps the token as written in the
 `TypeRef`'s `name`. The slot is judged by the reader it would otherwise have — a record reader whose bare token is
 not positional, a dispatcher, or an `ErrorReader` for a record type no class is bound to, since a name needs no class

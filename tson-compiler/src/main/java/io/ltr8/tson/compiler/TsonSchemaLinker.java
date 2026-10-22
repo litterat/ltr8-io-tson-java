@@ -146,6 +146,9 @@ public final class TsonSchemaLinker {
     /** meta.tn's {@code void}-targeted marker (§5.4), written bare -- presence is the assertion. */
     private static final String DISJOINT = "disjoint";
 
+    /** The constructor every type a value can have is built with: what `type_kind` is the kind of. */
+    private static final String TYPE = "type";
+
     /** [TSON-SCHEMA] §4.1's structural root -- what an entry IS-A when it is a constructor. */
 
 
@@ -1293,8 +1296,8 @@ public final class TsonSchemaLinker {
             case RecordBody r -> {
                 // The chain is checked by validateEntry, its every member a bare name in a closed body.
                 for (Map.Entry<String, RecordField> field : r.fields().entrySet()) {
-                    validateTypeRef(field.getValue().type(), namespace, ownParameters, entryName,
-                            " field '" + field.getKey() + "'");
+                    validateTypeRef(field.getValue().type(), namespace, structureNamespace, ownParameters,
+                            constructors, entryName, " field '" + field.getKey() + "'");
                     checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, structureNamespace,
                             ownParameters, constructors);
                 }
@@ -1309,25 +1312,30 @@ public final class TsonSchemaLinker {
             }
             // The target in full: an alias naming an application states its arguments there, and a closed one
             // names the entry materialisation minted for it.
-            case Reference ref -> validateTypeRef(ref.target(), namespace, ownParameters, entryName, "");
+            // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
+            case Reference ref -> validateTypeRef(ref.target(), namespace, structureNamespace, ownParameters, null,
+                    entryName, "");
             case MapBody m -> {
-                validateTypeRef(m.keyType(), namespace, ownParameters, entryName, " key_type");
-                validateTypeRef(m.valueType(), namespace, ownParameters, entryName, " value_type");
+                validateTypeRef(m.keyType(), namespace, structureNamespace, ownParameters, constructors, entryName,
+                        " key_type");
+                validateTypeRef(m.valueType(), namespace, structureNamespace, ownParameters, constructors,
+                        entryName, " value_type");
             }
-            case ArrayBody a -> validateTypeRef(a.elementType(), namespace, ownParameters, entryName,
-                    " element_type");
+            case ArrayBody a -> validateTypeRef(a.elementType(), namespace, structureNamespace, ownParameters,
+                    constructors, entryName, " element_type");
             case TupleBody t -> {
                 int index = 0;
                 for (TupleElement element : t.elements()) {
-                    validateTypeRef(element.elementType(), namespace, ownParameters, entryName,
-                            " element[" + index + "]");
+                    validateTypeRef(element.elementType(), namespace, structureNamespace, ownParameters, constructors,
+                            entryName, " element[" + index + "]");
                     index++;
                 }
             }
             case ChoiceBody c -> {
                 int index = 0;
                 for (TypeRef variant : c.variants()) {
-                    validateTypeRef(variant, namespace, ownParameters, entryName, " variant[" + index + "]");
+                    validateTypeRef(variant, namespace, structureNamespace, ownParameters, constructors, entryName,
+                            " variant[" + index + "]");
                     index++;
                 }
                 checkVariantsAreDistinct(entryName, c, namespace);
@@ -1426,7 +1434,9 @@ public final class TsonSchemaLinker {
                     if (heldByName.contains(reference)) {
                         continue; // a reference by name, which the class also listed: judged by its slot instead
                     }
-                    validateTypeRef(reference, namespace, ownParameters, entryName,
+                    // A `type_ref` slot is the application form, judged by resolution alone until qualified type
+                    // names land; `null` constructors asks for no membership.
+                    validateTypeRef(reference, namespace, structureNamespace, ownParameters, null, entryName,
                             " (!" + TsonCompiledMetaSchema.typenameOf(data) + ")");
                 }
             }
@@ -1766,8 +1776,14 @@ public final class TsonSchemaLinker {
      * {@link UnresolvedReference} has to be able to re-state itself against a different subject: a defect a
      * held body deferred surfaces on the entry materialisation minted and belongs to the declaration whose
      * text wrote it, and only the subject differs between the two statements of it.
+     *
+     * <p>A slot typed {@code type_kind} holds the name of a type a value can have: resolved, then judged a member of
+     * the kind ({@link KindMembers}) where {@code constructors} is given, so a constructor named as a type is
+     * refused, and a DATA entry with its own diagnostic. A {@code type_ref} slot passes {@code null} and is judged by
+     * resolution alone.
      */
-    private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace, List<String> ownParameters,
+    private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace, Map<String, Top> structureNamespace,
+                                         List<String> ownParameters, Function<String, Optional<String>> constructors,
                                          String subject, String trail) {
         String context = "'" + subject + "'" + trail;
         Top target = namespace.get(ref.name());
@@ -1785,9 +1801,23 @@ public final class TsonSchemaLinker {
             throw new UnresolvedReference(subject, trail, ref.name());
         }
         checkArity(ref, namespace, ownParameters, context);
+        // Membership walks construction to `type`, so it is judged only where `type` is in reach: a namespace built
+        // without the kernel (a test's, a fragment's) gets resolution alone, as a kind with no meta gets no verdict.
+        if (constructors != null && ref.arguments().isEmpty() && !ownParameters.contains(ref.name())
+                && (structureNamespace.containsKey(TYPE) || namespace.containsKey(TYPE))
+                && !KindMembers.isMember(ref.name(), TYPE, namespace::get, constructors, structureNamespace::get)) {
+            Top found = namespace.get(ReferenceChain.terminal(ref.name(), namespace));
+            throw new SchemaValidationException(context + " names '" + ref.name() + "', which is "
+                    + (found != null && TypeChain.supertypesOf(found).contains("top")
+                            ? "a constructor: a constructor is applied, with '!' or by a sugar form, and is never "
+                                    + "itself the type of a value (§4.1)"
+                            : "no type a value can have -- a slot typed 'type_kind' holds the name of a type built "
+                                    + "with 'type'"));
+        }
         for (TypeArgument arg : ref.arguments()) {
             if (arg instanceof TypeArgument.Ref nested) {
-                validateTypeRef(nested.ref(), namespace, ownParameters, subject, trail);
+                validateTypeRef(nested.ref(), namespace, structureNamespace, ownParameters, constructors, subject,
+                        trail);
             }
             // TypeArgument.Value is a literal token, not a type reference -- nothing to validate.
         }

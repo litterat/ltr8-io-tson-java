@@ -68,7 +68,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(75, registered.entries().size());
+        assertEquals(76, registered.entries().size());
     }
 
     /**
@@ -134,12 +134,9 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("tuple_element")
-                .read(TestDocuments.document("{ element_type: { name: text arguments: [] } voidable: true }")));
+                .read(TestDocuments.document("{ element_type: text voidable: true }")));
 
         assertEquals(true, result.get("voidable"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> elementType = (Map<String, Object>) result.get("element_type");
-        assertEquals("text", elementType.get("name"));
-        assertEquals(List.of(), elementType.get("arguments"));
+        assertEquals("text", result.get("element_type"), "a type_kind slot holds a type's name");
     }
 }
