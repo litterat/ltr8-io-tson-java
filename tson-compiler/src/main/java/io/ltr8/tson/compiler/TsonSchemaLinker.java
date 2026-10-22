@@ -773,8 +773,15 @@ public final class TsonSchemaLinker {
             Top definition = merged.get(name);
             List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
             if (held != null && definition instanceof Data) {
-                values.check(name, definition, held, refused ->
-                        reportOrThrow(receiver, schema, name, facts, refused.getMessage(), refused));
+                values.check(name, definition, held,
+                        refused -> reportOrThrow(receiver, schema, name, facts, refused.getMessage(), refused),
+                        gap -> {
+                            if (receiver == null) {
+                                throw gap;
+                            }
+                            receiver.report(TsonDiagnostics.ofSchemaGap(localIdentity(schema), name,
+                                    gap.getMessage(), at(facts, name)));
+                        });
             }
         }
     }

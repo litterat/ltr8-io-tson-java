@@ -325,7 +325,7 @@ class MetaLayerDataConstructorTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("dangling", SEARCH.replace("request: search_request", "request: no_such_type")));
 
-        assertTrue(thrown.getMessage().contains("'no_such_type' is no entry of this schema or its imports"),
+        assertTrue(thrown.getMessage().contains("'no_such_type' is no type declared in this schema or its imports"),
                 thrown.getMessage());
     }
 

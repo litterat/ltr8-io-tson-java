@@ -92,12 +92,17 @@ final class DefaultTsonReadContext implements TsonReadContext {
          */
         final TsonReadContext.HeldByName heldByName;
 
+        /** Whether the document is a value body ({@link TsonReadContext#readsValueBody()}). */
+        final boolean valueBody;
+
         Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy,
-               TsonReadContext.HeldByName heldByName) {
+               TsonReadContext.HeldByName heldByName,
+               boolean valueBody) {
             this.events = events;
             this.receiver = receiver;
             this.identifierPolicy = identifierPolicy;
             this.heldByName = heldByName;
+            this.valueBody = valueBody;
         }
     }
 
@@ -160,15 +165,16 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
                               IdentifierPolicy identifierPolicy) {
-        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy, null), null, null, null,
+        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy, null, false), null, null, null,
                 Optional.empty(), Optional.empty());
     }
 
     /** {@link #of(TsonEventSource, DiagnosticsReceiver, IdentifierPolicy)} for a value inside a schema document. */
     static TsonReadContext ofSchemaDocument(TsonEventSource events, DiagnosticsReceiver receiver,
                                             IdentifierPolicy identifierPolicy,
-                                            TsonReadContext.HeldByName heldByName) {
-        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy, heldByName), null, null,
+                                            TsonReadContext.HeldByName heldByName, boolean valueBody) {
+        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy, heldByName, valueBody), null,
+                null,
                 null, Optional.empty(), Optional.empty());
     }
 
@@ -317,6 +323,11 @@ final class DefaultTsonReadContext implements TsonReadContext {
     @Override
     public boolean readsSchemaDocument() {
         return cursor.heldByName != null;
+    }
+
+    @Override
+    public boolean readsValueBody() {
+        return cursor.valueBody;
     }
 
     @Override
