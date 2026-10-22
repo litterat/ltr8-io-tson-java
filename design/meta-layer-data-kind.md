@@ -77,7 +77,10 @@ because that is the only layer able to name request and response types *by name*
 - **A segment's type walk is schema-directed; its value walk goes through the host's object.** The linker follows
   the declared types (`field_map` to a field's type, a namespace to its `value_type`) and enters a map only where it
   is a namespace; the value at each step it reads off the host's record components, `data` being opaque to the type
-  system. The value walk goes when a namespace value is itself an entry (BACKLOG).
+  system, and follows a tagged subtype through the value's own class where a record family base lacks the field.
+  The value walk goes when a namespace value is itself an entry (BACKLOG). A kind-typed slot of a value body holds
+  one bare name: a braced application there is refused and the alias spelling named, since nothing lifts or mints
+  in a value body; a `type_ref` slot there is judged by resolution, arity and §4.1.
 - **§8.2 reaches a body's values at the read, not at the link.** The linker's name walk sees a bound `Data`
   body as an opaque object, so `SchemaResolver` reads a `data` constructor's payload under the registry's
   identifier policy and the readers judge it as they judge a data document: the keys of an identifier-keyed map

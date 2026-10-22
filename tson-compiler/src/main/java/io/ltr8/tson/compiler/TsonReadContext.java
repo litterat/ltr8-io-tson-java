@@ -249,6 +249,13 @@ public interface TsonReadContext {
     boolean readsSchemaDocument();
 
     /**
+     * Whether this reads a value body in a schema document -- a {@code data} constructor's instance, whose values the
+     * resolver never lifts or mints -- rather than one of the kernel's own bodies, where a sugar lift may leave an
+     * application in a slot for the closer to mint.
+     */
+    boolean readsValueBody();
+
+    /**
      * Records {@code reference}, read by name at this context's position (SPEC-FEEDBACK.md #13), with the slot it
      * fills -- the path this context has descended from the value's root. Only a schema document's read keeps it,
      * handing it to the sink its factory was given ({@link #schemaDocument}); anywhere else it is dropped, a data
@@ -328,11 +335,11 @@ public interface TsonReadContext {
      * Each reference the read produces by name reaches {@code heldByName} with its slot ({@link #heldByName}).
      */
     static TsonReadContext schemaDocument(TsonEventSource events, IdentifierPolicy identifierPolicy,
-                                          HeldByName heldByName) {
+                                          HeldByName heldByName, boolean valueBody) {
         Objects.requireNonNull(identifierPolicy, "identifierPolicy");
         Objects.requireNonNull(heldByName, "heldByName");
         return DefaultTsonReadContext.ofSchemaDocument(events, DiagnosticsReceiver.throwing(), identifierPolicy,
-                heldByName);
+                heldByName, valueBody);
     }
 
     /**

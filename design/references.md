@@ -23,8 +23,15 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   `type_kind` or a `type_ref` slot is a type parameter (`ParameterTypes.typePosition`).
 - A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its slot
-  (`TsonReadContext.heldByName`); a braced value through the `type_ref` reader, since a sugar lift writes an
-  application into the slot it fills and the closer mints its entry afterwards.
+  (`TsonReadContext.heldByName`). A braced value is read through the `type_ref` reader in a kernel body, where a
+  sugar lift writes an application into the slot it fills and the closer mints its entry afterwards; in a value body
+  (`TsonReadContext.readsValueBody`, a `data` constructor's instance) nothing lifts or mints, so it is refused and
+  the alias spelling named: `order_box => box<order>`, then the bare name.
+- A `type_ref` slot of a value body is recorded too (`RecordedApplicationReader`) and judged by resolution, arity and
+  §4.1 (`ValuesByName.judgeApplication`), as the resolver judges a kernel body's own.
+- The slot walk (`ValuesByName.slotType`) follows the value beside the declared types: at a record family base whose
+  field is the tagged subtype's, the value's own class names the subtype. A slot the walk cannot follow reaches a
+  collecting resolve as `NOT_IMPLEMENTED`, never as an exception.
 - A slot that names a value is typed `ref<T>` (`ref_type => atom & { of: type_name }`, `ref => <T> !ref_type { of: T }`).
   Its value is a qualified name; `of` is a type of the writer's namespace, never a constructor (`ref<record>` is
   refused: that is `kind<record>`). A slot typed by a record holds the record's value inline and takes no name.

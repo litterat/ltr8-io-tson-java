@@ -95,6 +95,11 @@ final class BindTargets {
             bound = reader;
         } else {
             bound = shaped(reader, payload, what, where, site, top);
+            if (payload.typeClass() == TypeRef.class) {
+                // A type_ref slot, the application form: in a value body its name or application is recorded for
+                // the linker to judge by resolution and arity, as a kernel body's is judged by the resolver.
+                bound = new RecordedApplicationReader(bound);
+            }
         }
         return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
     }

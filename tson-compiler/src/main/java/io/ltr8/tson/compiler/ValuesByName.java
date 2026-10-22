@@ -97,7 +97,7 @@ final class ValuesByName {
             return space.schema().entries();
         }
 
-        private String terminal() {
+        String terminal() {
             return ReferenceChain.terminal(name, entries());
         }
 
@@ -156,15 +156,17 @@ final class ValuesByName {
      * ({@link TsonSchema#valuesByName()}).
      */
     void check(String entryName, Top definition, List<TsonSchema.ValueByName> held,
-               Consumer<SchemaValidationException> refused) {
+               Consumer<SchemaValidationException> refused, Consumer<UnsupportedOperationException> gap) {
         Typed constructor = constructorOf(TsonSchemaLinker.constructorOf(entryName, definition, facts).orElseThrow(),
                 definition, governingMeta);
         for (TsonSchema.ValueByName value : held) {
             String where = "'" + entryName + "' at " + pointer(value.slot());
             try {
-                judge(where, value.reference(), slotType(where, constructor, value.slot()), value.cell());
+                judge(where, value.reference(), slotType(where, constructor, definition, value.slot()), value.cell());
             } catch (SchemaValidationException e) {
                 refused.accept(e);
+            } catch (UnsupportedOperationException e) {
+                gap.accept(e); // a slot this library does not yet follow: reported as the gap it is, never thrown
             }
         }
     }
@@ -172,23 +174,62 @@ final class ValuesByName {
     /**
      * The declared type of the slot {@code steps} reach from the body of {@code constructor}: a field's type at a
      * record, the value type at a map, the element type at an array -- the path the read descended, read against the
-     * declaration it descended through.
+     * declaration it descended through. The value is walked beside the types: where a record is a family base whose
+     * subtype the value's tag selected (§7.2), the field is the subtype's, and the subtype is read off the value's own
+     * class, the constructor it is the body of.
      */
-    private static Typed slotType(String where, Typed constructor, List<String> steps) {
+    private Typed slotType(String where, Typed constructor, Object value, List<String> steps) {
         Typed at = constructor;
+        Object held = value;
         for (String step : steps) {
             Top body = at.definition();
-            at = switch (body) {
-                case RecordBody record when record.fields().containsKey(step) ->
-                        at.of(record.fields().get(step).type().name());
-                case MapBody map -> at.of(map.valueType().name());
-                case ArrayBody array -> at.of(array.elementType().name());
+            switch (body) {
+                case RecordBody record -> {
+                    if (!record.fields().containsKey(step) && held != null) {
+                        Typed selected = taggedType(at, held);
+                        if (selected != null && selected.definition() instanceof RecordBody subtype
+                                && subtype.fields().containsKey(step)) {
+                            at = selected;
+                            record = subtype;
+                        }
+                    }
+                    if (!record.fields().containsKey(step)) {
+                        throw new UnsupportedOperationException(where + ": a value by name read through '"
+                                + at.name() + "', a record with no field '" + step + "' -- the read descended a "
+                                + "field the declared record lacks, which this library follows only where the "
+                                + "value's own tag selects a subtype that declares it");
+                    }
+                    at = at.of(record.fields().get(step).type().name());
+                    held = held == null ? null : component(held, step);
+                }
+                case MapBody map -> {
+                    at = at.of(map.valueType().name());
+                    held = held instanceof Map<?, ?> entries ? entries.get(step) : null;
+                }
+                case ArrayBody ignored -> {
+                    at = at.of(((ArrayBody) body).elementType().name());
+                    held = held instanceof List<?> list && step.chars().allMatch(Character::isDigit)
+                            && Integer.parseInt(step) < list.size() ? list.get(Integer.parseInt(step)) : null;
+                }
                 case null, default -> throw new UnsupportedOperationException(where + ": a value by name read "
                         + "through '" + at.name() + "' -- a slot is followed through records, maps and arrays, and "
                         + "this library does not yet follow one through anything else");
-            };
+            }
         }
         return at;
+    }
+
+    /**
+     * The type {@code held}'s own class is the body of, as a {@link Typed} in the same space as {@code declared}, or
+     * {@code null} where the class carries no {@code @Typename} or names no entry there.
+     */
+    private static Typed taggedType(Typed declared, Object held) {
+        io.ltr8.annotation.Typename typename = held.getClass().getAnnotation(io.ltr8.annotation.Typename.class);
+        if (typename == null) {
+            return null;
+        }
+        Typed tagged = declared.of(typename.name());
+        return tagged.definition() == null ? null : tagged;
     }
 
     /**
@@ -214,13 +255,19 @@ final class ValuesByName {
     }
 
     private void judge(String where, TypeRef reference, Typed slot, Optional<Ref<?>> cell) {
+        if (slot.definition() instanceof RecordBody && "type_ref".equals(slot.terminal())) {
+            judgeApplication(where, reference);
+            return;
+        }
         List<String> segments = segments(where, reference);
         String name = reference.name();
         String head = segments.getFirst();
         if (!merged.containsKey(head)) {
-            throw new SchemaValidationException(where + " names '" + name + "', and '" + head + "' is no entry "
-                    + "of this schema or its imports -- the first segment names the entry a value is reached "
-                    + "through, and a member is reached through its entry");
+            throw new SchemaValidationException(where + " names '" + name + "', and '" + head + "' is no "
+                    + (slot.definition() instanceof KindBody && segments.size() == 1
+                            ? "type declared in this schema or its imports"
+                            : "entry of this schema or its imports -- the first segment names the entry a value is "
+                                    + "reached through, and a member is reached through its entry"));
         }
         String terminal = ReferenceChain.terminal(head, merged);
         Top referent = merged.get(terminal);
@@ -336,6 +383,38 @@ final class ValuesByName {
                 + "' (a member of '" + slot.name() + "'), and " + entry + " is an entry whose body is built by '"
                 + TsonSchemaLinker.constructorOf(terminal, referent, facts).orElse("nothing") + "', which is no '"
                 + kind.of() + "'");
+    }
+
+    /**
+     * A {@code type_ref}-typed slot of a value body holds the application form: a name that resolves, with as many
+     * arguments as the entry it names declares parameters, each argument the same; and never a DATA entry (§4.1).
+     * Judged by resolution and arity alone, as a {@code type_ref} slot is everywhere.
+     */
+    private void judgeApplication(String where, TypeRef reference) {
+        String name = reference.name();
+        String terminal = ReferenceChain.terminal(name, merged);
+        Top referent = merged.get(terminal);
+        if (referent == null) {
+            throw new SchemaValidationException(where + " names '" + name + "', which is no type declared in this "
+                    + "schema or its imports");
+        }
+        if (referent instanceof Data) {
+            throw new SchemaValidationException(where + " names '" + name + "', which is built with '"
+                    + TsonSchemaLinker.constructorOf(terminal, referent, facts).orElse("a data constructor")
+                    + "' and describes something other than a data value -- it is declared by this schema but is not "
+                    + "a type, so nothing can be typed by it (§4.1)");
+        }
+        int parameters = OpenEntry.isOpen(referent) ? OpenEntry.parameterNames(referent).size() : 0;
+        if (reference.arguments().size() != parameters) {
+            throw new SchemaValidationException(where + " applies '" + name + "' to " + reference.arguments().size()
+                    + " argument" + (reference.arguments().size() == 1 ? "" : "s") + ", and it declares "
+                    + parameters + " parameter" + (parameters == 1 ? "" : "s"));
+        }
+        for (io.ltr8.tson.schema.meta.TypeArgument argument : reference.arguments()) {
+            if (argument instanceof io.ltr8.tson.schema.meta.TypeArgument.Ref nested) {
+                judgeApplication(where, nested.ref());
+            }
+        }
     }
 
     /** The meta layer governing the schema that declared {@code entry}: this schema's, or an import's own. */

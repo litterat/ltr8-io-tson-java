@@ -2069,6 +2069,13 @@ no method); `method: orders.methods.nope` (no key, the keys listed); `method: hs
 `{text => method}` (a map that is no namespace); `r: ref<record>` (a constructor); a reference in a data document (not
 yet read: a data document has no link to resolve it at).
 
+**A value body's slots, under #22 and this entry.** A kind-typed slot of a value body holds one bare name: a braced
+application there (`request: { name: box  arguments: [ { name: order } ] }`, §5.6's data spelling) is refused, since
+nothing lifts or mints in a value body and the application would have no entry to be the name of; the alias spelling,
+`order_box => box<order>` then `request: order_box`, gives it one. A `type_ref`-typed slot of a value body is the
+application form and is judged by resolution, arity and §4.1, as the kernel's own are. A slot reached through a record
+family base is the tagged subtype's.
+
 **Breaking changes, against Revision 37:** `meta-kernel.tn` gains `ref_type` and `ref`. A meta layer's value-by-name
 slots are written `ref<T>`; a record-typed slot no longer takes a name. §9's guidance reads: a slot naming a type is
 typed by a kind, a slot naming a value by a reference, and `type_ref` is for a slot that holds an application.
