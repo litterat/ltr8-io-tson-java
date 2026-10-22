@@ -6,7 +6,6 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.consumer.Operation;
-import io.ltr8.tson.compiler.consumer.Webhook;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -64,12 +63,12 @@ class MetaLayerDataConstructorTest {
               operation => data & {
                 path:     text
                 method:   text
-                request:  type_ref
-                response: type_ref
+                request:  type_kind
+                response: type_kind
               }
               webhook => data & {
                 path:     text
-                delivers?: [type_ref]?
+                delivers?: [type_kind]?
               }
               status_code => text
               plain       => { a: text }
@@ -263,29 +262,7 @@ class MetaLayerDataConstructorTest {
         assertTrue(thrown.getMessage().contains("expected a token for 'text'"), thrown.getMessage());
     }
 
-    /**
-     * <b>A {@link Data} body returning {@code null} from {@code references()} is the reading application's
-     * mistake and is named as one.</b> {@link io.ltr8.tson.compiler.consumer.Webhook} returns an OPTIONAL
-     * component directly, and the binder hands an omitted field to the constructor as {@code null} rather
-     * than normalising it — so a document writing no {@code delivers} makes the linker iterate a null.
-     *
-     * <p>What this pins is the classification, not the failure: unguarded it is a {@code
-     * NullPointerException} out of the schema pipeline, which {@code Tson.validateSchema} does not classify
-     * and the CLI reports with a please-report-it banner and exit 70 — a bug report filed against this
-     * library for a bug in the caller's own class. The schema here is perfectly good.
-     */
-    @Test
-    void aDataBodyReturningNullReferencesNamesTheClassThatDidIt() {
-        BindMismatchException thrown = assertThrows(BindMismatchException.class,
-                () -> linked("nullrefs", """
-                        hook => !webhook { path: "/hook" }"""));
-
-        assertTrue(thrown.getMessage().contains(Webhook.class.getName()), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("returned null from references()"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("List.of()"), thrown.getMessage());
-    }
-
-    /** And a guarded one links, which is what makes the message above a fix rather than a refusal. */
+    /** A body whose optional list of names is omitted links: the class declares nothing, so there is nothing to guard. */
     @Test
     void aDataBodyThatNamesItsReferencesLinks() {
         assertNotNull(linked("withrefs", """
@@ -342,13 +319,14 @@ class MetaLayerDataConstructorTest {
         }
     }
 
-    /** {@link Data#references()} reaches the linker, so a name that resolves to nothing is an author error. */
+    /** A name at a kind-typed slot is recorded by the read and judged at link: one resolving to nothing is an error. */
     @Test
     void aDanglingReferenceInsideAnOperationIsASchemaError() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("dangling", SEARCH.replace("request: search_request", "request: no_such_type")));
 
-        assertTrue(thrown.getMessage().contains("unresolved reference 'no_such_type'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'no_such_type' is no entry of this schema or its imports"),
+                thrown.getMessage());
     }
 
     // ── An operation is not a type ───────────────────────────────────────────────────────────────

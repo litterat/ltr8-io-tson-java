@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=ae69684a16ff530639f4f2ceb61fa9e01fde0530f746318f6b6e85d0b846e208"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=61bff1353c3733e9d1258af08e542385adb7d4eb30494db93d8cb72094452e9e"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -916,6 +916,29 @@
 
   @doc:"The names of the types a value can have."
   type_kind => !kind_type { of: type }
+
+  @doc:"""
+    A reference to a value: an atom whose values are qualified names, each
+    segment a [TSON-DATA] §7.7 identifier, naming a value whose type is `of`
+    or IS-A it. The first segment resolves in the writer's type-name namespace
+    and names an entry; each further segment selects a key in a namespace
+    value or a field in a record value, and a map that is no namespace is not
+    entered. The referent is judged when the schema links, and delivered to a
+    host with the name as written. A slot typed by a reference holds the name
+    and nothing else; a slot typed by the value's type holds the value inline
+    and nothing else.
+
+    `of` names a type of the writer's own namespace, never a constructor: a
+    reference to a type is a kind (`kind<record>`), and `ref<record>` is a
+    resolver error at the declaration. A reference in a data document is not
+    yet read.
+    """
+  ref_type => atom & {
+    of: type_name
+  }
+
+  @doc:"The spelling of a reference an author writes inline: `ref<method>` is `!ref_type { of: method }`."
+  ref => <T> !ref_type { of: T }
 
   @doc:"""
     Resolver output: a schema map, from each name to the value its entry

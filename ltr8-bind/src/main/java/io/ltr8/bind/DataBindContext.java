@@ -246,6 +246,11 @@ public class DataBindContext {
 		if (descriptor != null) {
 			return descriptor;
 		}
+		if (parameterizedType != targetClass && descriptors.get(targetClass) instanceof DataClassAtom atom) {
+			// A registered atom serves every parameterisation of its class: its wire form is one token whatever
+			// the type argument says about the value it stands for (a reference's referent, say).
+			return atom;
+		}
 
 		Set<Type> active = inFlight.get();
 		if (!active.add(parameterizedType)) {

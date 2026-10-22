@@ -362,8 +362,8 @@ public final class Tson {
             // obtained and whose doing that was.
             problems.report(TsonDiagnostics.ofSchemaUnavailable("", "", e, Optional.empty()));
         } catch (BindMismatchException e) {
-            // A class bound to this schema's governing meta cannot work with it -- a Data body returning null
-            // from references(), say. The schema may be perfectly good and this call cannot say either way,
+            // A class bound to this schema's governing meta cannot work with it -- a record component
+            // the binder cannot analyse, say. The schema may be perfectly good and this call cannot say either way,
             // so it reports the wiring mistake rather than letting a bare runtime exception past a caller who
             // asked for a list of problems, which would read as a fault in this library.
             problems.report(TsonDiagnostics.ofSchemaBindMismatch("", "", e, Optional.empty()));

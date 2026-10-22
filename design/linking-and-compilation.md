@@ -393,14 +393,13 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
 
 ## Values by name (`ValuesByName`, SPEC-FEEDBACK.md #13)
 
-A meta layer's `data` body may hold a value written by name — `request: place_order_request` at a `record`-typed
-slot, `method: orders.methods.place_order` at a slot typed by the meta's own `method` record. The read keeps the name
-as written and records it with the slot it fills (`design/record-dispatch.md`); `SchemaResolver` keeps that record
-per entry, `TsonSchema.valuesByName`, so what is judged is what was read and nothing the host class declares
+A meta layer's `data` body may hold a name — `request: place_order_request` at a slot typed `kind<record>`,
+`method: orders.methods.place_order` at a slot typed `ref<method>`. The read keeps the name as written and records it
+with the slot it fills (`design/record-dispatch.md`); `SchemaResolver` keeps that record per entry,
+`TsonSchema.valuesByName`, so what is judged is what was read and nothing the host class declares
 (`design/meta-layer-data-kind.md`). This is the lookup and the judgement, run by `checkValuesByName` over local
-entries after `validateEntry`, so a body's unresolved `type_ref` is reported first and on its own. A by-name
-reference the class also returns from `references()` is skipped there, matched by identity: it is judged by its slot
-here, never resolved as a type, so which list a host files it in changes nothing.
+entries after `validateEntry`: a kind-typed slot's name is judged a member (`judgeMember`), a reference-typed slot's
+by the walk below, and the value it reaches is delivered into the host's `Ref` cell.
 
 - **The name is a `TypeRef`, and its grammar is judged here.** A value by name is held as every reference is, a
   `TypeRef` whose `name` is the token as written; `ValuesByName.segments` splits it at each `.` and requires each

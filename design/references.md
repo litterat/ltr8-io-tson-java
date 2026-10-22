@@ -25,9 +25,15 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its slot
   (`TsonReadContext.heldByName`); a braced value through the `type_ref` reader, since a sugar lift writes an
   application into the slot it fills and the closer mints its entry afterwards.
+- A slot that names a value is typed `ref<T>` (`ref_type => atom & { of: type_name }`, `ref => <T> !ref_type { of: T }`).
+  Its value is a qualified name; `of` is a type of the writer's namespace, never a constructor (`ref<record>` is
+  refused: that is `kind<record>`). A slot typed by a record holds the record's value inline and takes no name.
 - A recorded name at a kind-typed slot of a DATA body is judged a member by `ValuesByName.judgeMember`; a qualified
   name there is refused where it reaches a value, and is a gap where it would reach a type through a namespace of
-  types.
+  types. A recorded name at a reference-typed slot resolves its first segment in the schema map and each further
+  one as a key of a namespace value or a field of a record value, never into a map that is no namespace; the
+  referent IS-A `of`, and the value reached is delivered into the host's `Ref<T>` (`Ref.deliver`), a `TypeRef` host
+  taking the name alone. A reference in a data document is not yet read (`NOT_IMPLEMENTED`).
 - One host shape for every reference: a `TypeRef`, whatever the slot. Only the judgement differs by slot.
 
 Related: `design/linking-and-compilation.md` (the judgements), `design/held-template-bodies.md` (parameter
@@ -73,6 +79,8 @@ claim a value of `api` is a value of `namespace`, which it is not.
 | `record.discriminators`, `field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
 | `record.name_type`, `enum_type.name_type` | reference | structure namespace for a constructor-pinned value, else type-name | `identifier_kind` | `NameType.admits` |
 | `kind_type.of` | reference | structure namespace | a constructor, `type` or IS-A it | `KindMembers.ofRefusal` |
+| `ref_type.of` | reference | type-name namespace | a type or a data constructor, never a constructor of types | `validateBody` |
+| a slot typed `ref<T>` | reference by key, a path | schema map, then namespace values and record fields | `ref<T>`: the referent IS-A `T` | `ValuesByName.judge` |
 | `schema.value_type: top` | tag | structure namespace | IS-A `top` | `DefinitionResolver` |
 | `!I ^ { … }` head | reference | type-name namespace | an atom instance, never the family's constructor | resolver |
 | `A & B` operand, `A - { … }` source | reference | type-name namespace | a constructor or a record type | resolver |

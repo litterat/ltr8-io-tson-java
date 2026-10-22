@@ -5,6 +5,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -114,6 +115,7 @@ final class TypeInhabitance {
             // A kind's values are the names of its members, whatever the types they name admit, so it is
             // inhabited exactly when linking found a member.
             case KindBody kind -> !kind.memberNames().isEmpty();
+            case RefBody ignored -> true; // a name; what it reaches is the linker's judgement
             case Reference reference -> refInhabited(reference.target(), namespace, inhabited);
             case TemplateBody ignored -> true; // open, answered above
             default -> true; // an atom's own satisfiability is its family's question, not this one

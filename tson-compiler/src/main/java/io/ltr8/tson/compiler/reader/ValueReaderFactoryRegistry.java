@@ -104,7 +104,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     /** The atom constructors meta-kernel.tn and meta.tn declare, in the order those documents declare them. */
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
             // meta-kernel.tn
-            "integer_type", "text_type", "identifier_type", "uri_type", "regex_type", "kind_type",
+            "integer_type", "text_type", "identifier_type", "uri_type", "regex_type", "kind_type", "ref_type",
             // meta.tn
             "bytes_type", "float_type", "decimal_type", "rational_type", "date_type", "time_type",
             "datetime_type", "duration_type", "period_type", "uuid_type", "complex_type", "mac_type",

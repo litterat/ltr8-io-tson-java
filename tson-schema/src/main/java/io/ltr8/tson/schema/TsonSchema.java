@@ -151,7 +151,7 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
      * fills -- a field name at a record, a key at a map, an index at an array, as the read descended -- and
      * {@code reference} the {@code type_ref} value read there, its {@code name} the qualified name as written.
      */
-    public record ValueByName(List<String> slot, TypeRef reference) {
+    public record ValueByName(List<String> slot, TypeRef reference, Optional<io.ltr8.tson.schema.meta.Ref<?>> cell) {
 
         public ValueByName {
             slot = List.copyOf(slot);

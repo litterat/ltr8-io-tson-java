@@ -968,7 +968,8 @@ public final class SchemaResolver {
                                IdentifierPolicy names, Map<Object, List<TsonSchema.ValueByName>> heldByName) {
         List<TsonSchema.ValueByName> held = new ArrayList<>();
         Object body = reader.read(TsonReadContext.schemaDocument(new ListEventSource(DataValueEvents.of(value)), names,
-                (slot, reference) -> held.add(new TsonSchema.ValueByName(slot, reference))));
+                (slot, reference, cell) -> held.add(new TsonSchema.ValueByName(slot, reference,
+                        java.util.Optional.ofNullable(cell)))));
         if (!held.isEmpty() && body != null) {
             heldByName.put(body, List.copyOf(held));
         }

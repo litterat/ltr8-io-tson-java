@@ -22,6 +22,7 @@ import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
+import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -146,6 +147,13 @@ public final class DataClassObjectWriter {
                 // nothing here names the carrier class.
                 writeAnnotations((Annotations) boxed.annotations().invoke(value), writer);
                 write(boxed.value().invoke(value), boxed.valueClass(), writer, typeRef);
+                return;
+            }
+            if (value instanceof Ref<?> reference) {
+                // A value held by name writes as the name, a bare token, as a type_ref does: resolved output states
+                // the reference as written (SPEC-FEEDBACK.md #24), so its bridge's text form is not what is wanted.
+                writeAnnotations(value, dataClass, writer);
+                writer.unquotedToken(reference.name());
                 return;
             }
             if (dataClass.bridge().isPresent()) {

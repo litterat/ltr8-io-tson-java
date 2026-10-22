@@ -45,6 +45,7 @@ import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.HostType;
 import io.ltr8.tson.schema.meta.HostnameType;
 import io.ltr8.tson.schema.meta.MediaTypeType;
@@ -716,7 +717,7 @@ public final class TsonSchemaLinker {
                 // `[some_typo]` is a form they can find in their source where `array_some_typo_95c9a10f` is
                 // a name §8.2 makes non-normative and nobody ever typed.
                 validateEntry(displayName(entry.getKey(), merged, facts, applications), entry.getValue(),
-                        merged, structureNamespace, heldByName(entry.getKey(), schema, origins, loader),
+                        merged, structureNamespace,
                         constructors);
             } catch (UnresolvedReference e) {
                 String author = heldDeclarationNaming(e.name(), entry.getKey(), merged, facts);
@@ -776,25 +777,6 @@ public final class TsonSchemaLinker {
                         reportOrThrow(receiver, schema, name, facts, refused.getMessage(), refused));
             }
         }
-    }
-
-    /**
-     * The references entry {@code name}'s body holds by name, as the read that bound it collected them -- this
-     * schema's own for a local entry, the declaring schema's for an imported one -- by identity, so the one
-     * {@code TypeRef} a body also returns from {@code references()} is recognised as the by-name reference it is.
-     */
-    private static Set<TypeRef> heldByName(String name, TsonSchema schema, Map<String, String> origins,
-                                           TsonSchemaLoader loader) {
-        List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
-        String origin = origins.get(name);
-        if (held == null && loader != null && origin != null && !origin.equals(localIdentity(schema))) {
-            held = loader.load(origin).map(declarer -> declarer.schema().valuesByName().get(name)).orElse(null);
-        }
-        Set<TypeRef> references = Collections.newSetFromMap(new IdentityHashMap<>());
-        if (held != null) {
-            held.forEach(value -> references.add(value.reference()));
-        }
-        return references;
     }
 
     /**
@@ -1247,7 +1229,7 @@ public final class TsonSchemaLinker {
     // ── Validation ───────────────────────────────────────────────────────
 
     private static void validateEntry(String name, Top def, Map<String, Top> namespace,
-                                       Map<String, Top> structureNamespace, Set<TypeRef> heldByName,
+                                       Map<String, Top> structureNamespace,
                                        Function<String, Optional<String>> constructors) {
         checkOpenEntryUsesEveryParameter(name, def);
         // A chain is not an author-written reference but the residue of one, so it gets the structure-namespace
@@ -1266,18 +1248,12 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def, namespace, structureNamespace, OpenEntry.parameterNames(def), heldByName,
-                constructors);
+        validateBody(name, def, namespace, structureNamespace, OpenEntry.parameterNames(def), constructors);
     }
 
-    /**
-     * {@code heldByName} is the references the body holds by name, by identity: a {@code Data} body's own
-     * {@code references()} may return one of them too, and it is judged against its slot ({@link ValuesByName}), not
-     * resolved here as a type.
-     */
     private static void validateBody(String entryName, Top body, Map<String, Top> namespace,
                                       Map<String, Top> structureNamespace, List<String> ownParameters,
-                                      Set<TypeRef> heldByName, Function<String, Optional<String>> constructors) {
+                                      Function<String, Optional<String>> constructors) {
         if (OpenEntry.isOpen(body)) {
             // A held body is opaque to everything that needs to know what a reference *resolves to*: that
             // cannot be settled until substitution supplies the arguments, so type-kind validation and
@@ -1413,32 +1389,29 @@ public final class TsonSchemaLinker {
             }
             case Scoped ignored -> {
             }
-            case Data data -> {
-                // A body describing something other than a data value. Its shape is the consumer's own Java
-                // class, so nothing here can introspect it -- what it declares through `references()` is
-                // validated like any other reference, and everything else is opaque by design.
-                //
-                // A null list is the reading application's mistake and is named as one. It arrives when the
-                // class returns an OPTIONAL bound component, which the binder hands to the constructor as
-                // null when the field is omitted rather than normalising it -- and iterating it here would
-                // be a NullPointerException out of the schema pipeline, which every channel above reads as
-                // a fault in this library and reports with a please-report-it banner.
-                List<TypeRef> references = data.references();
-                if (references == null) {
-                    throw new BindMismatchException(data.getClass().getName() + " returned null from "
-                            + "references() for '" + entryName + "' -- return List.of() for a body that names "
-                            + "no types. A null usually means an OPTIONAL component: the binder passes an "
-                            + "omitted field as null and does not normalise it to an empty list");
+            // A reference names values of one type: `of` resolves in the writer's own namespace, and names a type
+            // or a data constructor, never a constructor of types -- the names of the types built with a
+            // constructor are a kind, and `kind<record>` is that spelling.
+            case RefBody ref -> {
+                Top of = namespace.get(ReferenceChain.terminal(ref.of(), namespace));
+                if (of == null) {
+                    throw new UnresolvedReference(entryName, " of", ref.of());
                 }
-                for (TypeRef reference : references) {
-                    if (heldByName.contains(reference)) {
-                        continue; // a reference by name, which the class also listed: judged by its slot instead
-                    }
-                    // A `type_ref` slot is the application form, judged by resolution alone until qualified type
-                    // names land; `null` constructors asks for no membership.
-                    validateTypeRef(reference, namespace, structureNamespace, ownParameters, null, entryName,
-                            " (!" + TsonCompiledMetaSchema.typenameOf(data) + ")");
+                if (TypeChain.supertypesOf(of).contains(TYPE) || of == namespace.get(TYPE)) {
+                    throw new SchemaValidationException("'" + entryName + "' is a reference whose 'of' names '"
+                            + ref.of() + "', a constructor -- a reference (ref<T>) names a value of the type T, and "
+                            + "the names of the types built with a constructor are a kind: write kind<" + ref.of()
+                            + ">");
                 }
+                if (OpenEntry.isOpen(of)) {
+                    throw new SchemaValidationException("'" + entryName + "' is a reference whose 'of' names '"
+                            + ref.of() + "', an open entry: a template denotes no type until it is applied (§5.10)");
+                }
+            }
+            // A body describing something other than a data value: its shape is the consumer's own class, opaque
+            // here by design. Every reference it holds is at a slot typed by a kind or a reference, recorded by the
+            // read and judged by its slot (ValuesByName), so nothing is asked of the class.
+            case Data ignored -> {
             }
         }
     }

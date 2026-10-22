@@ -254,7 +254,16 @@ public interface TsonReadContext {
      * handing it to the sink its factory was given ({@link #schemaDocument}); anywhere else it is dropped, a data
      * document having no namespace to judge it in.
      */
-    void heldByName(io.ltr8.tson.schema.meta.TypeRef reference);
+    void heldByName(io.ltr8.tson.schema.meta.TypeRef reference, io.ltr8.tson.schema.meta.Ref<?> cell);
+
+    /**
+     * Where a schema document's read hands each reference it produces by name: its slot, the name, and the host's
+     * {@code Ref} cell where the host holds one.
+     */
+    @FunctionalInterface
+    interface HeldByName {
+        void held(List<String> slot, io.ltr8.tson.schema.meta.TypeRef reference, io.ltr8.tson.schema.meta.Ref<?> cell);
+    }
 
     /**
      * How many problems have been reported through this read so far, counting every scoped copy since they
@@ -319,7 +328,7 @@ public interface TsonReadContext {
      * Each reference the read produces by name reaches {@code heldByName} with its slot ({@link #heldByName}).
      */
     static TsonReadContext schemaDocument(TsonEventSource events, IdentifierPolicy identifierPolicy,
-                                          BiConsumer<List<String>, io.ltr8.tson.schema.meta.TypeRef> heldByName) {
+                                          HeldByName heldByName) {
         Objects.requireNonNull(identifierPolicy, "identifierPolicy");
         Objects.requireNonNull(heldByName, "heldByName");
         return DefaultTsonReadContext.ofSchemaDocument(events, DiagnosticsReceiver.throwing(), identifierPolicy,

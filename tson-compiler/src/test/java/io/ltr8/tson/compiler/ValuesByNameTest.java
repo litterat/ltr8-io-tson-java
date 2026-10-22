@@ -46,12 +46,13 @@ class ValuesByNameTest {
                 {
                   method_name => identifier
                   status_name => identifier
-                  method      => { request?: kind<record>  response?: type_ref  errors?: [kind<record>]
+                  method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
                                    replies?: {status_name => kind<record>} }
-                  interface   => data & { methods: {method_name => method} }
+                  method_map  => !namespace { key_type: method_name  value_type: method }
+                  interface   => data & { methods: method_map }
                   http_verb   => !enum [GET POST]
-                  binding     => data & { method: method  verb: http_verb  route: text }
-                  filed_in_references => data & { request: kind<record>  method?: method }
+                  binding     => data & { method: ref<method>  verb: http_verb  route: text }
+                  filed_in_references => data & { request: kind<record>  method?: ref<method> }
                   filed_nowhere       => data & { request: kind<record> }
                 }
                 """);
@@ -142,7 +143,9 @@ class ValuesByNameTest {
         assertEquals(List.of(), problems(id));
         Binding binding = assertInstanceOf(Binding.class,
                 registry().resolveLinked(id).schema().entries().get("post_orders"));
-        assertEquals(new Binding(TypeRef.of("orders.methods.place_order"), "POST", "/orders"), binding);
+        assertEquals("orders.methods.place_order", binding.method().name());
+        assertEquals("POST", binding.verb());
+        assertEquals("/orders", binding.route());
     }
 
     @Test
@@ -263,7 +266,7 @@ class ValuesByNameTest {
         List<Diagnostic> problems = problems(api("data-as-type", """
                 api => !interface { methods: { m => { response: orders } } }"""));
         assertEquals(1, problems.size(), problems.toString());
-        assertTrue(problems.getFirst().message().contains("describes something other than a data value"),
+        assertTrue(problems.getFirst().message().contains("which is no 'type'"),
                 problems.getFirst().message());
     }
 
@@ -282,7 +285,7 @@ class ValuesByNameTest {
     /** A reference component at an atom-typed slot is the class's mistake: there a token is a literal. */
     @Test
     void aReferenceIsNoAtomsComponent() {
-        assertMisbound("name_at_text", "text", "is an atom");
+        assertMisbound("name_at_text", "text", "is not a reference");
     }
 
     /** The grammar is the linker's: each segment between the dots is an identifier, none empty. */
@@ -335,12 +338,11 @@ class ValuesByNameTest {
         assertEquals(body, read);
     }
 
-    // ── Which list a host returns a reference from changes nothing ──────────────────────────────────
+    // ── The class declares nothing; the slot judges ─────────────────────────────────────────────────
 
     /**
-     * A by-name reference is judged against its slot from what the read collected, so returning it from
-     * {@code references()} -- where a {@code type_ref} slot's reference belongs -- neither excuses a wrong one nor
-     * refuses a right one.
+     * A name is judged against its slot from what the read collected: a type's name at a kind-typed slot by
+     * membership, a value's name at a reference-typed slot by the referent's type.
      */
     @Test
     void aReferenceByNameFiledInReferencesIsStillJudgedBySlot() {
@@ -351,6 +353,23 @@ class ValuesByNameTest {
                 a => !filed_in_references { request: user_id }"""), "'a' at /request", "built by 'uuid_type'");
         assertEquals(List.of(), problems(api("filed-right", """
                 a => !filed_in_references { request: order  method: orders.methods.place_order }""")));
+    }
+
+    /**
+     * A {@code Ref} host receives the value its name reaches when the schema links: the binding's {@code method}
+     * is the interface's {@code place_order}, delivered into the cell the read created with the name.
+     */
+    @Test
+    void aReferenceHostReceivesTheValueItNamesWhenTheSchemaLinks() {
+        String id = api("delivered", """
+                b => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }""");
+
+        io.ltr8.tson.suite.data.Binding b = assertInstanceOf(io.ltr8.tson.suite.data.Binding.class,
+                registry().resolveLinked(id).schema().entries().get("b"));
+
+        assertEquals("orders.methods.place_order", b.method().name());
+        assertTrue(b.method().isResolved(), "delivered at link");
+        assertEquals("place_order_request", b.method().get().request().name());
     }
 
     /** A host that declares no reference at all has its by-name ones judged the same way. */

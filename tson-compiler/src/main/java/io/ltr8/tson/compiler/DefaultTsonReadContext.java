@@ -90,10 +90,10 @@ final class DefaultTsonReadContext implements TsonReadContext {
          * Where a schema document's read hands each reference it produces by name ({@link #heldByName}); {@code
          * null} for every other read, which is what {@link #readsSchemaDocument()} answers from.
          */
-        final BiConsumer<List<String>, TypeRef> heldByName;
+        final TsonReadContext.HeldByName heldByName;
 
         Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy,
-               BiConsumer<List<String>, TypeRef> heldByName) {
+               TsonReadContext.HeldByName heldByName) {
             this.events = events;
             this.receiver = receiver;
             this.identifierPolicy = identifierPolicy;
@@ -167,7 +167,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
     /** {@link #of(TsonEventSource, DiagnosticsReceiver, IdentifierPolicy)} for a value inside a schema document. */
     static TsonReadContext ofSchemaDocument(TsonEventSource events, DiagnosticsReceiver receiver,
                                             IdentifierPolicy identifierPolicy,
-                                            BiConsumer<List<String>, TypeRef> heldByName) {
+                                            TsonReadContext.HeldByName heldByName) {
         return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy, heldByName), null, null,
                 null, Optional.empty(), Optional.empty());
     }
@@ -320,7 +320,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
-    public void heldByName(TypeRef reference) {
+    public void heldByName(TypeRef reference, io.ltr8.tson.schema.meta.Ref<?> cell) {
         if (cursor.heldByName == null) {
             return;
         }
@@ -329,7 +329,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
             slot.add(step.name() != null ? step.name() : Integer.toString(step.index()));
         }
         Collections.reverse(slot);
-        cursor.heldByName.accept(List.copyOf(slot), reference);
+        cursor.heldByName.held(List.copyOf(slot), reference, cell);
     }
 
     /**

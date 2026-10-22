@@ -1205,16 +1205,13 @@ name there is refused), and at a record-typed slot it may carry segments and mus
 declared type. `type_ref` is `ref<type>`, one segment because types live only in the schema map; `ref<method>` takes
 segments because methods live in collections.
 
-**Interim, and what closes it.** One rule runs here as interim, closed by an entry that lands on this proposal
-branch before the branch goes to the reviewer: the host decides the spelling at a declared-record slot. An
-implementation binding the slot to a reference holds a name, one binding it to the record holds a braced value, so
-two hosts of one meta admit different documents; `ref<T>` closes it by making the spelling the slot's declaration.
-What the host declares does not decide what is checked: the read records every reference it produces by name, with
-its slot, and the linker judges that record, so a host that omits a name, or lists it among its type references,
-changes nothing — with one host shape for every reference, the list a host filed one in would otherwise decide its
-judgement. `data` is opaque to the type system, and its body is the host's to interpret, so a qualified name reaches
-into a data-kind entry's body — `orders.methods` — only as the interim the namespace kind replaces; recording what
-the read produced walks no body and interprets nothing.
+**The slot declares the spelling (#24).** A value by name stands at a slot typed `ref<T>`, the kernel's `ref_type`,
+and nowhere else; a slot typed by a record holds the record's value inline. The read records every name it produces
+at such a slot, with the slot, and the linker judges that record, so a host declares none of its references and the
+list it might have filed one in decides nothing. A segment selects a key of a namespace value (#23) or a field of a
+record value; a map that is no namespace is not entered, so the service meta's methods are a `method_map =>
+!namespace { ... }`. `data` is opaque to the type system, so selecting in a data-kind entry's value still reaches
+through the host's object; the type walk beside it is schema-directed.
 
 **Against the Revision 37 change log.** §5.10 (and the preamble) record "a type slot cannot be bounded at a field"
 as a deferral, and the bounded type slot at a field as withdrawn. This entry does not reinstate it: `request?:
@@ -1304,7 +1301,8 @@ resolved fixture changes.
 - [TSON-SCHEMA] §9: a slot holding a value by name is typed by the value's type; `type_ref` remains the type slot.
 - [TSON-DATA] §7.1: `.` is the identifier separator of [TSON-SCHEMA] §5.12, no longer "future".
 
-**Status against Revision 37:** open; running on the `qualified-name` branch of `r2026-38-proposal`, as stated above.
+**Status against Revision 37:** open; running on `r2026-38-proposal` as stated above, the host-decides interim closed by
+#24 and the key-type rule for entering a map replaced by #23's namespace.
 
 ---
 
@@ -2013,7 +2011,7 @@ each its own change:
    value_type: method }` declared by a meta-schema, holds a value of `api`: §3.3.1 admits `!C` only where `C` IS-A
    `top`, and `api` is an instance, so the form needs one sentence. The entry is DATA by §4.1's own definition.
 2. *Only a namespace is entered.* A segment selects a key in a namespace value, or a field in a record value; a map
-   that is not a namespace is not entered, replacing #13's key-type rule.
+   that is not a namespace is not entered, replacing #13's key-type rule. Running, with #24.
 
 **Breaking changes, against Revision 37:** `meta-kernel.tn` gains `namespace`; `schema` and `field_map` are written
 `!namespace { … }` with the same vocabulary. No document reads differently.
@@ -2026,3 +2024,57 @@ entries. The schema map (§8.1) and a record's `fields` (§5.2) are namespaces."
 kernel: `meta-kernel.tn` declares `namespace` and writes `schema` and `field_map` as instances of it, the resolved
 fixture carries them (`ResolvedFixtureTest`), and the bundled schemas are restamped. An instance of `namespace` binds
 and reads as a `map` instance does, in both encodings. Part 2's cached §13.2 table is not re-stamped here.
+
+---
+
+## 24. A reference to a value is the kind's sibling: `ref_type`, an atom whose values are qualified names
+
+**Section:** [TSON-SCHEMA] §4.2 (the atoms), §5.6 (the positional form), §9 (the inventory, and its guidance on
+reference slots); #13 (values by name), #22 (`kind_type`), #23 (namespaces).
+
+**Kind:** proposal, running.
+
+**The problem.** #13 lets a value be named at a slot typed by its record, and leaves the spelling to the host: a
+component bound to a reference takes a name, one bound to the record takes a braced value, so two hosts of one meta
+admit different documents. The slot cannot say which it holds. And a reference to a value and a reference to a type
+are judged by one predicate — the referent's value is a value of `T` — with `kind<C>` the constructor case (#22), so
+the value case wants the same shape of declaration.
+
+**Proposed.** A kernel atom beside `kind_type`:
+
+```
+ref_type => atom & { of: type_name }
+ref      => <T> !ref_type { of: T }
+```
+
+A value of `ref<T>` is a qualified name, each segment a [TSON-DATA] §7.7 identifier, naming a value whose type is `T`
+or IS-A it. The first segment resolves in the writer's type-name namespace and names an entry; each further segment
+selects a key in a namespace value or a field in a record value, and a map that is no namespace is not entered. `of`
+names a type of the writer's own namespace, never a constructor: `ref<record>` is a resolver error at the declaration,
+and `kind<record>` is the spelling for the names of the record types. A slot typed `ref<T>` holds the name and nothing
+else; a slot typed `T` holds a value inline and nothing else. The referent is judged when the schema links, and a host
+receives the name as written with the value delivered at link.
+
+```
+method_map => !namespace { key_type: method_name  value_type: method }
+interface  => data & { methods: method_map }
+binding    => data & { method: ref<method>  verb: http_verb  route: text }
+
+orders => !interface { methods: { place_order => { request: place_order_request } } }
+http   => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }
+```
+
+Refusals, each where it stands: `method: orders` (an interface, no method); `method: orders.methods` (the namespace,
+no method); `method: orders.methods.nope` (no key, the keys listed); `method: hs.headers.accept` where `headers` is
+`{text => method}` (a map that is no namespace); `r: ref<record>` (a constructor); a reference in a data document (not
+yet read: a data document has no link to resolve it at).
+
+**Breaking changes, against Revision 37:** `meta-kernel.tn` gains `ref_type` and `ref`. A meta layer's value-by-name
+slots are written `ref<T>`; a record-typed slot no longer takes a name. §9's guidance reads: a slot naming a type is
+typed by a kind, a slot naming a value by a reference, and `type_ref` is for a slot that holds an application.
+
+**Status against Revision 37:** open; running on `ref-atom`, a branch off `r2026-38-proposal`: the kernel entries, the
+resolved fixture, the corpus's `meta-service.tn` (`method_map`, `rpc_map`, `verb_map`, `binding.method: ref<method>`),
+the vectors above, and the Java host `Ref<T>` carrying the name and the delivered value. `Data.references()` is gone:
+a host declares nothing, the read records every name at a kind- or reference-typed slot, and the linker judges each
+by its slot.

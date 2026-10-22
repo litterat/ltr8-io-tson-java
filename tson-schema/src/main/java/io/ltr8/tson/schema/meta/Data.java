@@ -1,7 +1,5 @@
 package io.ltr8.tson.schema.meta;
 
-import java.util.List;
-
 /**
  * A body that describes <b>something other than a data value</b> -- the base kind for vocabulary a
  * meta-schema introduces beyond the kernel's own ({@code operation} describing an HTTP endpoint, say),
@@ -25,39 +23,18 @@ import java.util.List;
  * author error rather than something that resolves, links and compiles and then fails at read.
  *
  * <p><b>A kernel declaration stands behind this.</b> meta-kernel declares the fourth base kind,
- * {@code data => top & {}}, and {@code type_kind} carries {@code DATA} beside {@code ATOM}/{@code PRODUCT}/
+ * {@code data => top & {}}, and {@link EntryKind} carries {@code DATA} beside {@code ATOM}/{@code PRODUCT}/
  * {@code SUM}/{@code REFERENCE}, so a meta-schema composes its own constructor against it
- * ({@code operation => ~data & { ... }}) and the kind is a fact of the resolved schema rather than one the
- * Java side carries alone. §9 adds the rule an extension author needs beside it: a constructor field
- * holding a type reference MUST be typed {@code type_ref}, which is what makes the slot participate in
- * flattening, {@code @alias} recording, and structural identity.
+ * ({@code operation => data & { ... }}) and the kind is a fact of the resolved schema rather than one the
+ * Java side carries alone.
  *
- * <p><b>A body's references reach the linker two ways.</b> Its type references, at slots typed {@code type_ref},
- * it declares through {@link #references()}. The values it holds by name (SPEC-FEEDBACK.md #13) -- at a slot typed
- * by a constructor or a record, a {@link TypeRef} carrying the qualified name as written -- it does not declare:
- * the resolver's read records each one it produces, with its slot, and the linker judges them from that record
- * whatever the class returns, so a by-name reference returned from {@link #references()} too is harmless. Both are
- * one host shape because both are references that must resolve; a reference type ({@code ref<T>}) folds the two
- * into one judgement by the slot's declared type.
+ * <p><b>A body declares none of its references.</b> A slot naming a type is typed by a kind ({@code request:
+ * kind<record>}) and a slot naming a value by a reference ({@code method: ref<method>}); the resolver's read records
+ * every name it produces at either, with its slot, and the linker judges each by the slot's declared type
+ * ({@code ValuesByName}), whatever the class does with it. A host component at a kind-typed slot is a
+ * {@link TypeRef}; at a reference-typed slot it is a {@link Ref}, which receives the value when the schema links,
+ * or a {@link TypeRef} for the name alone.
  */
 public non-sealed interface Data extends Top {
 
-    /**
-     * Every type this body names, for the linker to resolve like any other reference -- empty by default,
-     * since a body naming none is the ordinary case.
-     *
-     * <p>Declared rather than discovered: a payload's Java shape says nothing about which of its components
-     * are references, and asking the constructor's own declaration would only work for slots spelled
-     * {@code type_ref}. An implementation holding a {@link TypeRef} component returns it here and the name
-     * is checked at link time, against the same namespace every other reference is checked against.
-     *
-     * <p><b>Never {@code null} -- return {@link List#of()} for a body that names no types.</b> The case to
-     * watch is an implementation returning an OPTIONAL bound component directly: the binder hands an omitted
-     * field to the constructor as {@code null} and does not normalise it to an empty list, so
-     * {@code references()} inherits that {@code null}. Linking one is a {@code BindMismatchException}
-     * naming the class, since it is the reading application's mistake rather than anything about the schema.
-     */
-    default List<TypeRef> references() {
-        return List.of();
-    }
 }

@@ -189,9 +189,8 @@ reports `FIELD_REQUIRED` and abandons construction first — so a null guard on 
 guarding against something that cannot happen, and defaulting one is masking a violation the read already
 caught.
 
-The place this bites is `Data.references()`, whose default returns `List.of()`: an implementation that
-returns an optional component instead, unguarded, hands the linker a `null`, which `Tson.resolve` refuses with a
-`BindMismatchException` naming the class. Return `list == null ? List.of() : list`.
+A method on the class that returns an optional list component unguarded hands its caller a `null`; return
+`list == null ? List.of() : list`.
 
 ## Binding profiles
 
