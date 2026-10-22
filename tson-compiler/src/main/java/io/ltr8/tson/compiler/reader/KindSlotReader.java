@@ -36,7 +36,7 @@ final class KindSlotReader implements TsonTypeReader<TypeRef> {
                 return null; // refused by the kind, and reported there
             }
             TypeRef reference = TypeRef.of(name.toString());
-            ctx.heldByName(reference);
+            ctx.heldByName(reference, null);
             return reference;
         }
         // Resolved on the read and not when the reader is built: the kernel's own readers are built in one pass.

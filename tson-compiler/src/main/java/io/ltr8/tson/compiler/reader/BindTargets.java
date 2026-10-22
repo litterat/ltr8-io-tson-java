@@ -9,6 +9,7 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TupleElement;
 
@@ -35,11 +36,11 @@ import java.util.Optional;
  *       class needs the tuple's arity and somewhere for each voidable position's void value.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
  *       nothing is rebuilt.</li>
- *   <li><b>A {@code TypeRef} target at a record-typed slot</b> holds a reference written by name (SPEC-FEEDBACK.md
- *       #13), so the position's reader is set aside for a {@link ReferenceNameReader}: a slot whose record has no
- *       positional bare token -- a constructor such as {@code record}, or a record a schema declares -- or one whose
- *       record type no class is bound to, since a name needs no class for the value it names. At a {@code type_ref}
- *       slot nothing changes: its bare token fills {@code name} positionally
+ *   <li><b>A {@code Ref} or {@code TypeRef} target at a reference-typed slot</b> ({@code ref<T>}, SPEC-FEEDBACK.md
+ *       #13) holds a value by name, so the position's reader is set aside for a {@link ReferenceNameReader}: a
+ *       {@code Ref} receives the value when the schema links, a {@code TypeRef} the name alone. The slot declares the
+ *       spelling, so a {@code TypeRef} at a record-typed slot is a mismatch: that position holds the record's value
+ *       inline. At a {@code type_ref} slot nothing changes: its bare token fills {@code name} positionally
  *       ({@link RecordAbstractReader#bareTokenFillsPositionally}), and the record reader binds it as it always has.
  *       At a kind-typed slot ({@code record_field.type} is {@code type_kind}, a meta's {@code request: kind<record>})
  *       a {@link KindSlotReader} reads a type's name, recorded for the linker to judge a member of the kind, or an
@@ -78,14 +79,19 @@ final class BindTargets {
                                 boolean top) {
         DataClass payload = target instanceof DataClassAnnotated boxed ? boxed.valueClass() : target;
         TsonTypeReader<?> bound;
-        if (payload.typeClass() == TypeRef.class && readsAKind(reader)) {
+        boolean byName = payload.typeClass() == TypeRef.class || payload.typeClass() == Ref.class;
+        if (byName && readsARef(reader)) {
+            // The name reader produces the host value itself -- the Ref the linker will deliver into, or the
+            // TypeRef -- so the atom's own bridge (Ref's name form) is not applied on top of it.
+            TsonTypeReader<?> named = new ReferenceNameReader(expectedAt(reader, what), payload.typeClass() == Ref.class);
+            return AnnotationBoxing.wrap(named, target, site.annotationTypes());
+        } else if (payload.typeClass() == TypeRef.class && readsAKind(reader)) {
             bound = new KindSlotReader((AtomTypeReader<?>) RecordAbstractReader.unwrapped(reader), site.resolver());
-        } else if (payload.typeClass() == TypeRef.class && heldByName(reader)) {
-            bound = new ReferenceNameReader(expectedAt(reader, what));
-        } else if (payload.typeClass() == TypeRef.class && readsAnAtom(reader)) {
-            site.mismatches().add(what + " is an atom, and " + where + " holds a " + TypeRef.class.getSimpleName()
-                    + " -- at an atom-typed position a token is a literal, and a value stands by name only at a "
-                    + "record-typed position (a constructor, or a record a schema declares)");
+        } else if (byName && (recordHeldByName(reader) || readsAnAtom(reader))) {
+            site.mismatches().add(what + " is not a reference, and " + where + " holds a "
+                    + payload.typeClass().getSimpleName() + " -- a value stands by name only at a position typed "
+                    + "ref<T> (and a type's name at one typed by a kind); a position typed by a record holds the "
+                    + "record's value inline, so declare that record's class");
             bound = reader;
         } else {
             bound = shaped(reader, payload, what, where, site, top);
@@ -93,21 +99,24 @@ final class BindTargets {
         return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
     }
 
+    /** Whether {@code reader} reads a reference ({@code ref<T>}): a token there is a value's qualified name. */
+    private static boolean readsARef(TsonTypeReader<?> reader) {
+        return RecordAbstractReader.unwrapped(reader) instanceof AtomTypeReader<?> atom && atom.readsARef();
+    }
+
     /**
-     * Whether a {@code TypeRef} target at the position {@code reader} reads holds a reference by name: a record whose
-     * bare token is not positional, or a record position this compile cannot see into (a dispatcher, a type with no
-     * bound class, a reader still being built). Every other position -- {@code type_ref} among them -- is bound as
-     * it always was.
+     * Whether the record position {@code reader} reads would have taken a value by name under the retired
+     * host-decides rule: a record whose bare token is not positional, or a record position this compile cannot see
+     * into (a dispatcher, an unbuildable type). A {@code TypeRef} or {@code Ref} host there is now a mismatch; at a
+     * {@code type_ref} slot, whose bare token fills {@code name} positionally, it binds as it always has.
      */
-    private static boolean heldByName(TsonTypeReader<?> reader) {
-        TsonTypeReader<?> slot = RecordAbstractReader.unwrapped(reader);
-        return switch (slot) {
-            case null -> true;
+    private static boolean recordHeldByName(TsonTypeReader<?> reader) {
+        return switch (RecordAbstractReader.unwrapped(reader)) {
             case RecordAbstractReader<?> record -> !record.bareTokenFillsPositionally();
             case ErrorReader ignored -> true;
             case RecordTagDispatchReader ignored -> true;
             case RecordMemberDispatchReader ignored -> true;
-            default -> false;
+            case null, default -> false;
         };
     }
 
@@ -126,6 +135,7 @@ final class BindTargets {
     private static String expectedAt(TsonTypeReader<?> reader, String what) {
         return switch (RecordAbstractReader.unwrapped(reader)) {
             case RecordAbstractReader<?> record -> "a '" + record.displayName + "' value";
+            case AtomTypeReader<?> atom when atom.readsARef() -> "a '" + atom.refOf() + "' value";
             case null, default -> "a value for " + what;
         };
     }

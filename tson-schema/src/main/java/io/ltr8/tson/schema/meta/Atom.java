@@ -11,7 +11,7 @@ import java.util.List;
  * families, one per {@code *_type} constructor. {@link Scoped} is the sibling SUM-kind case -- see {@link Sum}, not
  * here.
  */
-public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody, KindBody, IntegerType, TextType,
+public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody, KindBody, RefBody, IntegerType, TextType,
         IdentifierType,
         UriType, IriType, RegexType,
         DecimalType, FloatType, RationalType, UuidType, BytesType, DateType, TimeType, DateTimeType, DurationType,

@@ -4,7 +4,6 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.TypeRef;
 
-import java.util.List;
 
 /**
  * A consumer's own meta-layer constructor body: an HTTP operation, which describes an endpoint rather than
@@ -14,9 +13,4 @@ import java.util.List;
  */
 @Typename(name = "operation")
 public record Operation(String path, String method, TypeRef request, TypeRef response) implements Data {
-
-    @Override
-    public List<TypeRef> references() {
-        return List.of(request, response);
-    }
 }

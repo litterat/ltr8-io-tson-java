@@ -37,13 +37,17 @@ import java.util.Optional;
  * ({@code ref<T>}) makes it the slot's declaration. A framed name ({@code @doc:"x" orders}, {@code !record x}) is
  * refused too: a name's type is its referent's, and an annotation would have nowhere to go.
  */
-final class ReferenceNameReader implements TsonTypeReader<io.ltr8.tson.schema.meta.TypeRef> {
+final class ReferenceNameReader implements TsonTypeReader<Object> {
 
     /** What the position holds, as a message names it: {@code a 'method' value}. */
     private final String expected;
 
-    ReferenceNameReader(String expected) {
+    /** Whether the host component is a {@link io.ltr8.tson.schema.meta.Ref}, delivered at link, not a {@code TypeRef}. */
+    private final boolean toCell;
+
+    ReferenceNameReader(String expected, boolean toCell) {
         this.expected = expected;
+        this.toCell = toCell;
     }
 
     /** The name {@code event} spells, or empty where it is no unquoted token. */
@@ -53,14 +57,15 @@ final class ReferenceNameReader implements TsonTypeReader<io.ltr8.tson.schema.me
     }
 
     @Override
-    public io.ltr8.tson.schema.meta.TypeRef read(TsonReadContext ctx) {
+    public Object read(TsonReadContext ctx) {
         TsonEvent event = ctx.peek();
         Optional<String> name = nameIn(event);
         if (name.isPresent()) {
             ctx.next();
             io.ltr8.tson.schema.meta.TypeRef reference = io.ltr8.tson.schema.meta.TypeRef.of(name.get());
-            ctx.heldByName(reference);
-            return reference;
+            io.ltr8.tson.schema.meta.Ref<Object> cell = toCell ? io.ltr8.tson.schema.meta.Ref.to(name.get()) : null;
+            ctx.heldByName(reference, cell);
+            return cell != null ? cell : reference;
         }
         String found = found(event);
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the name of " + expected + ", found " + found

@@ -14,6 +14,7 @@ import io.ltr8.tson.atom.parser.IdentifierParser;
 import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
 import io.ltr8.tson.atom.parser.KindParser;
+import io.ltr8.tson.atom.parser.RefParser;
 import io.ltr8.tson.atom.parser.HostParser;
 import io.ltr8.tson.atom.parser.HostnameParser;
 import io.ltr8.tson.atom.parser.MediaTypeParser;
@@ -43,6 +44,7 @@ import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.HostType;
 import io.ltr8.tson.schema.meta.HostnameType;
 import io.ltr8.tson.schema.meta.MediaTypeType;
@@ -124,6 +126,14 @@ public final class AtomParsers {
     public static Optional<AtomType<?>> forType(Top body, Normalization enumForm, boolean governsSchemas) {
         if (governsSchemas && body instanceof KindBody kind) {
             return Optional.of(KindParser.namesOnly(kind));
+        }
+        if (body instanceof RefBody reference) {
+            if (!governsSchemas) {
+                throw new UnsupportedOperationException("a reference ('ref<" + reference.of() + ">') in a data "
+                        + "document is not yet read: this library resolves a reference when a schema links, and a "
+                        + "data document has no link");
+            }
+            return Optional.of(new RefParser(reference));
         }
         return Optional.ofNullable(switch (body) {
             case ValueType ignored -> null;

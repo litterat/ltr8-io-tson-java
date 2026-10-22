@@ -10,13 +10,14 @@ history lives in git.
 - The registration is a `@Typename` and a name binder, and nothing else: no reader family, no
   `ValueReaderFactoryRegistry` entry.
 - A constructor with no resolvable class is an error where it is written.
-- `Data.references()` is declared, not discovered, and serves `type_ref` slots, the application form. A slot naming
-  the type of a value is typed `type_kind` (or a narrower kind, `request: kind<record>`), and a slot holding a value by
-  name is typed by the value's type; neither declares its references, since the read records each with its slot
-  (`TsonSchema.valuesByName`) and the linker judges it by the slot's type, membership of the kind or IS-A the value's
-  type. All three bind a `TypeRef` -- every reference has one host shape, and only the judgement differs by slot.
-- One interim rule, closed by `ref<T>` landing on the proposal branch: the host's component type selects the
-  spelling at a record-typed slot (a `TypeRef` takes a name, a record class a braced value).
+- A host declares none of its references. A slot naming a type is typed by a kind (`request: kind<record>`) and a
+  slot naming a value by a reference (`method: ref<method>`); the read records each name with its slot
+  (`TsonSchema.valuesByName`) and the linker judges it by the slot's type, membership of the kind or IS-A the
+  reference's `of`. The hosts are `TypeRef` (the name) and, at a reference-typed slot, `Ref<T>` (the name and the
+  value delivered at link); the host shape is one, and only the judgement differs by slot.
+- The slot declares the spelling: a value by name stands at a slot typed `ref<T>` only, held by a `Ref<T>` (the name,
+  and the value delivered at link) or a `TypeRef` (the name alone); a record-typed slot holds the record's value
+  inline, and a `TypeRef` component there is a bind mismatch.
 - The linker reads a name's slot type off the constructor's resolved fields along the path the read recorded,
   never off the Java class.
 - `TypeInhabitance` and `DiscriminationClass` handle a `Data` body by their `default` arm, which is safe only while the
@@ -60,37 +61,23 @@ because that is the only layer able to name request and response types *by name*
   constraint in the constructor's declaration are enforced exactly as for a written body.
 - **A constructor with no resolvable class is an error where it is written**, not a value carried in some
   generic form. A schema asserting structure nothing can interpret is worth failing on.
-- **`Data.references()` is how a body's own references reach the linker**, and it is *declared, not
-  discovered*: a payload's Java shape says nothing about which components are references, and consulting the
-  constructor's declaration would only work for slots spelled `type_ref`. A body holding a `TypeRef` returns
-  it and the name is checked against the same namespace every other reference is. A body that declares none
-  simply has none checked — that is the cost of the branch being open, and the reason a slot naming a type is
-  typed by a kind (`request: kind<record>`, `design/references.md`): a kind-typed slot's name is recorded by the read
-  and judged a member at link whatever the class declares, so `references()` is left with the `type_ref` slots, the
-  application form, which §9 reserves for a slot that may hold an application.
-- **A value by name is recorded by the read, not declared by the host** (SPEC-FEEDBACK.md #13). A slot typed by a
-  constructor or a record (`request?: record`, `method: method`) whose component is a `TypeRef` reads an unquoted
-  qualified name (`orders.methods.place_order`) as written, into the `TypeRef`'s `name`, and the read records it with
-  the path it descended (`["methods", "place_order", "request"]`), which `SchemaResolver` keeps per entry in
-  `TsonSchema.valuesByName`. **One host shape for every reference** is the point: `type_ref`, a kind-typed slot's name,
-  a qualified name and the coming `ref<T>` are each a reference that must resolve, and differ only in the judgement —
-  an application at a `type_ref` slot, one segment that is a member of the kind at a `type_kind` slot
-  (`ValuesByName.judgeMember`), segments reaching a value IS-A the slot's
-  type here. With one Java type, a host declaring its by-name references would decide their judgement
-  by which list it put them in — `request: text` returned from `references()` would resolve as a type and pass — so
-  nothing asks it to: the read's record is judged against the slot whatever the class returns, and a by-name
-  reference it also returns from `references()` is recognised by identity and not resolved as a type
-  (`design/linking-and-compilation.md`). This walks no data body and interprets nothing; it records what the reader
-  itself produced at a vocabulary-typed slot. Under `ref<T>` the two lists merge into one judgement by slot type.
-- **Which slot reads a `TypeRef` by name is decided when the reader is built** (`BindTargets`): a slot read by a
-  record whose bare token is not positional. At `type_ref` the bare token fills `name` (§5.6) and is bound as it
-  always was; at an atom a token is a literal and a `TypeRef` is a `BindMismatchException`. The component holds a
-  reference and nothing else: a braced value at the slot is refused at the read, which is the binding's verdict —
-  a class wanting a record value inline declares that record's class instead. That the host decides is the interim
-  rule above.
-- **A segment reaches into a data body only as an interim.** `data` is opaque to the type system and is the host's
-  to interpret, so the linker selects a field of a bound body through the host's record components and nothing in
-  the schema walks the body's values. That hop is what the namespace kind replaces.
+- **A host declares nothing; the slot declares the spelling** (SPEC-FEEDBACK.md #13, #24). A slot naming a type is
+  typed by a kind, `request: kind<record>`, and a slot naming a value by a reference, `method: ref<method>`; a slot
+  typed by a record holds the record's value inline, and a `TypeRef` or `Ref` component there is a
+  `BindMismatchException`. The read records every name it produces at a kind- or reference-typed slot with the
+  path it descended (`["methods", "place_order", "request"]`), which `SchemaResolver` keeps per entry in
+  `TsonSchema.valuesByName`, and the linker judges each by the slot's declared type: a member of the kind
+  (`ValuesByName.judgeMember`), or a value IS-A the reference's `of` (`ValuesByName.judge`). A payload's Java shape
+  says nothing about which components are references, so nothing asks it; the host class is opaque by design.
+- **One host shape for every reference.** A `type_ref` slot binds a `TypeRef`, a kind-typed slot a `TypeRef`, and a
+  reference-typed slot a `Ref<T>` or a `TypeRef`; `BindTargets` sets a `KindSlotReader` or `ReferenceNameReader` in
+  place of the slot's atom reader for them, and a `Ref` receives the value the name reaches when the schema links
+  (`Ref.deliver`), so a host reads `binding.method().get()` after the link and the name before it. A reference in a
+  data document is not yet read (`NOT_IMPLEMENTED`).
+- **A segment's type walk is schema-directed; its value walk goes through the host's object.** The linker follows
+  the declared types (`field_map` to a field's type, a namespace to its `value_type`) and enters a map only where it
+  is a namespace; the value at each step it reads off the host's record components, `data` being opaque to the type
+  system. The value walk goes when a namespace value is itself an entry (BACKLOG).
 - **§8.2 reaches a body's values at the read, not at the link.** The linker's name walk sees a bound `Data`
   body as an opaque object, so `SchemaResolver` reads a `data` constructor's payload under the registry's
   identifier policy and the readers judge it as they judge a data document: the keys of an identifier-keyed map

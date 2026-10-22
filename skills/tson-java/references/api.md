@@ -589,10 +589,11 @@ host values the atoms read to
 are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed except for its one deliberately open branch,
 **`Data`**, which a consumer's own class implements: §4.1's fourth base kind, where an instance of a meta-schema's own
 constructor lives when the thing it describes is not a data type. A consumer registers such a class by carrying
-`@Typename` and being findable by the `metaNameBinder`; `Data.references()` is how its type references (at
-`type_ref` slots) reach the linker, declared rather than discovered. A slot typed by a constructor or a record binds a
-`TypeRef` holding a qualified name as written (`request: place_order_request`, `method: orders.methods.place_order`);
-those the class need not declare, since the resolver records each with its slot as it reads the body.
+`@Typename` and being findable by the `metaNameBinder`; it declares none of its references. A slot typed by a kind
+(`request: kind<record>`) binds a `TypeRef` holding a type's name; a slot typed by a reference (`method: ref<method>`)
+binds a `Ref<T>` holding the qualified name as written (`orders.methods.place_order`) and, once the schema has linked,
+the value it names (`method().get()`), or a `TypeRef` for the name alone. The resolver records each with its slot
+as it reads the body, and the linker judges it there.
 
 ---
 

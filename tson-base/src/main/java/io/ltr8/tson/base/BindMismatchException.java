@@ -26,13 +26,6 @@ package io.ltr8.tson.base;
  *       {@code @Unbound} is how a class says a component is its own and not the wire's.</li>
  * </ul>
  * A FIXED field is neither: its value is settled by the schema, so a component for it would hold a constant.
- *
- * <p><b>The third shape is a broken contract rather than a mismatch</b>, and reaches this at link time: a
- * {@code schema.meta.Data} implementation returning {@code null} from {@code references()},
- * which the linker iterates. It is here for the reason the other two are -- the schema is fine, the class is
- * nearly fine, and the failure is the reading application's to fix -- and it is here rather than left as the
- * {@code NullPointerException} it would otherwise be because every channel above reads a bare runtime
- * exception out of the schema pipeline as a fault in this library, and asks for a bug report against it.
  */
 public class BindMismatchException extends RuntimeException {
 

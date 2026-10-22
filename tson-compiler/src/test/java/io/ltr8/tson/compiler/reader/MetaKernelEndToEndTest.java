@@ -68,7 +68,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(76, registered.entries().size());
+        assertEquals(78, registered.entries().size());
     }
 
     /**

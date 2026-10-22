@@ -39,14 +39,14 @@ class ReferenceNameReaderTest {
 
     @Test
     void theReaderKeepsTheNameAsWrittenInATypeRef() {
-        assertEquals(TypeRef.of("orders.methods.place_order"), new ReferenceNameReader("a 'method' value")
+        assertEquals(TypeRef.of("orders.methods.place_order"), new ReferenceNameReader("a 'method' value", false)
                 .read(TestDocuments.document("orders.methods.place_order")));
     }
 
     @Test
     void aBracedValueIsNoName() {
         List<Diagnostic> reported = new ArrayList<>();
-        assertNull(new ReferenceNameReader("a 'method' value")
+        assertNull(new ReferenceNameReader("a 'method' value", false)
                 .read(TestDocuments.document("{ a: 1 }", reported::add)));
         assertEquals(1, reported.size(), reported.toString());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, reported.getFirst().code());

@@ -92,7 +92,7 @@
 !schema {
   top => !record {
     chain: {
-      subtypes: [array atom choice data enum enum_type identifier_type integer_type iri_type kind_type map namespace product record reference regex_type set_type sum template text_type tuple type value_type void_type]
+      subtypes: [array atom choice data enum enum_type identifier_type integer_type iri_type kind_type map namespace product record ref_type reference regex_type set_type sum template text_type tuple type value_type void_type]
     }
     fields: {}
     extension: ABSTRACT
@@ -107,7 +107,7 @@
   type => !record {
     chain: {
       supertypes: [top]
-      subtypes: [array atom choice enum enum_type identifier_type integer_type iri_type kind_type map namespace product record regex_type set_type sum text_type tuple value_type void_type]
+      subtypes: [array atom choice enum enum_type identifier_type integer_type iri_type kind_type map namespace product record ref_type regex_type set_type sum text_type tuple value_type void_type]
     }
     fields: {
       chain => !record_field { type: type_chain  optional: true }
@@ -118,7 +118,7 @@
   atom => !record {
     chain: {
       supertypes: [top type]
-      subtypes: [enum enum_type identifier_type integer_type iri_type kind_type regex_type text_type value_type void_type]
+      subtypes: [enum enum_type identifier_type integer_type iri_type kind_type ref_type regex_type text_type value_type void_type]
     }
     fields: {
       chain => !record_field { type: type_chain  optional: true }
@@ -428,6 +428,13 @@
       record_extension_type regex scheme_name synthetic text type_kind type_name value void
     ]
   }
+
+  ref_type => !record { chain: { supertypes: [atom top type] }  fields: {
+    chain => !record_field { type: type_chain  optional: true }
+    of    => !record_field { type: type_name }
+  } }
+
+  ref => !template { parameters: [{ name: T  type: type_name }]  template: "!ref_type { of: T }" }
 
   type_kind => !kind_type {
     of: type

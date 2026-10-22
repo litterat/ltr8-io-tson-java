@@ -12,11 +12,11 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLoader;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Data;
-import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
@@ -31,14 +31,13 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * The values a {@link Data} body holds by name, resolved and judged (SPEC-FEEDBACK.md #13) -- the linker's half
- * of a slot whose declared type is a constructor or a record and whose value is a reference written as a qualified
- * name, held as a {@link TypeRef} whose {@code name} is the token as written.
+ * The names a {@link Data} body holds, resolved and judged by their slots (SPEC-FEEDBACK.md #13, #24): a value's
+ * qualified name at a slot typed {@code ref<T>}, held as a {@link Ref} the linker delivers into or a {@link TypeRef}
+ * carrying the name alone; and a type's name at a slot typed by a kind, judged a member ({@link #judgeMember}).
  *
  * <p><b>Fed by the read, not by the host.</b> The references judged are the ones the resolver's read produced by
  * name, each with its slot ({@link TsonSchema#valuesByName()}). The host class declares nothing for them, so none
- * can be missed, and one it also returns from {@link Data#references()} is judged here by its slot and not resolved
- * as a type there.
+ * can be missed.
  *
  * <p><b>The grammar is judged here, where the name is resolved.</b> The read keeps any unquoted token; this splits
  * it at each {@code .} and requires each segment to be a [TSON-DATA] §7.7 identifier ({@link #segments}), so
@@ -119,6 +118,27 @@ final class ValuesByName {
             return space.originOf(terminal) + "#" + terminal;
         }
 
+        /**
+         * Whether this map type is a namespace: built with the kernel's {@code namespace}, a map whose keys name its
+         * entries, which is the one map a qualified name enters ({@code method_map => !namespace { ... }}); a
+         * {@code {K => V}} sugar map is built with {@code map} and is not.
+         */
+        boolean isNamespace() {
+            String terminal = terminal();
+            Top definition = definition();
+            if (definition == null) {
+                return false;
+            }
+            String constructor = TsonSchemaLinker.constructorOf(terminal, definition, space.schema().facts())
+                    .orElse(null);
+            if (constructor == null) {
+                return false;
+            }
+            Top built = entries().get(constructor);
+            return constructor.equals("namespace")
+                    || built != null && TypeChain.supertypesOf(built).contains("namespace");
+        }
+
         /** §7.2: this type is {@code wanted}, or lists it among its supertypes. */
         boolean isA(Typed wanted) {
             String target = wanted.identity();
@@ -142,7 +162,7 @@ final class ValuesByName {
         for (TsonSchema.ValueByName value : held) {
             String where = "'" + entryName + "' at " + pointer(value.slot());
             try {
-                judge(where, value.reference(), slotType(where, constructor, value.slot()));
+                judge(where, value.reference(), slotType(where, constructor, value.slot()), value.cell());
             } catch (SchemaValidationException e) {
                 refused.accept(e);
             }
@@ -193,7 +213,7 @@ final class ValuesByName {
         return segments;
     }
 
-    private void judge(String where, TypeRef reference, Typed slot) {
+    private void judge(String where, TypeRef reference, Typed slot, Optional<Ref<?>> cell) {
         List<String> segments = segments(where, reference);
         String name = reference.name();
         String head = segments.getFirst();
@@ -217,15 +237,21 @@ final class ValuesByName {
             judgeMember(where, name, segments, kind, slot, referent, entry);
             return;
         }
+        if (!(slot.definition() instanceof RefBody ref)) {
+            throw new SchemaValidationException(where + " is typed '" + slot.name() + "', which is no reference: a "
+                    + "value stands by name only at a position typed ref<T>");
+        }
+        Typed wanted = slot.of(ref.of());
         TsonLinkedSchema declarersMeta = metaOf(terminal);
         Typed at = constructorOf(TsonSchemaLinker.constructorOf(terminal, referent, facts).orElseThrow(), referent,
                 declarersMeta);
         if (segments.size() == 1) {
-            if (!at.isA(slot)) {
-                throw new SchemaValidationException(where + " wants " + a(slot.name()) + ", and " + entry
-                        + " is an entry whose body is built by '" + at.name() + "', which is no '" + slot.name()
+            if (!at.isA(wanted)) {
+                throw new SchemaValidationException(where + " wants " + a(wanted.name()) + ", and " + entry
+                        + " is an entry whose body is built by '" + at.name() + "', which is no '" + wanted.name()
                         + "'");
             }
+            cell.ifPresent(c -> c.deliver(referent));
             return;
         }
         if (!(referent instanceof Data held)) {
@@ -252,11 +278,10 @@ final class ValuesByName {
                     at = at.of(field.type().name());
                 }
                 case MapBody map -> {
-                    Top keys = at.of(map.keyType().name()).definition();
-                    if (!(keys instanceof IdentifierType || keys instanceof EnumBody)) {
+                    if (!at.isNamespace()) {
                         throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
-                                + "' is a map keyed by '" + map.keyType().name() + "', whose keys are not names, "
-                                + "so it cannot be entered by name");
+                                + "' is " + a(at.name()) + ", a map that is no namespace, so it is not entered by "
+                                + "name -- a segment selects a key of a namespace value or a field of a record value");
                     }
                     Map<?, ?> entries = asMap(value, reached);
                     Optional<Object> found = keyed(entries, segment);
@@ -276,10 +301,12 @@ final class ValuesByName {
             }
             reached = reached + '.' + segment;
         }
-        if (!at.isA(slot)) {
-            throw new SchemaValidationException(where + " wants " + a(slot.name()) + ", and '" + name + "' is "
-                    + a(at.name()) + ", which is no '" + slot.name() + "'");
+        if (!at.isA(wanted)) {
+            throw new SchemaValidationException(where + " wants " + a(wanted.name()) + ", and '" + name + "' is "
+                    + a(at.name()) + ", which is no '" + wanted.name() + "'");
         }
+        Object delivered = value;
+        cell.ifPresent(c -> c.deliver(delivered));
     }
 
     /**

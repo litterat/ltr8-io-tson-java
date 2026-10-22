@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.config;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.Token;
 
 /**
@@ -23,15 +24,16 @@ public final class ResolverBindContext {
     private ResolverBindContext() {
     }
 
-    /** A fresh context carrying the atom vocabulary and the schema model's own two registrations. */
+    /** A fresh context carrying the atom vocabulary and the schema model's own three registrations. */
     public static DataBindContext defaultContext() {
         return registerDefaults(DataBindContext.builder()).build();
     }
 
-    /** {@code builder} with the atom vocabulary and the schema model's own two registrations added. */
+    /** {@code builder} with the atom vocabulary and the schema model's own three registrations added. */
     public static DataBindContext.Builder registerDefaults(DataBindContext.Builder builder) {
         return builder.registerAtoms(AtomContext.hostTypes())
                 .registerAtom(Token.class)
-                .registerAtom(SourcePosition.class, new SourcePositionStringBridge());
+                .registerAtom(SourcePosition.class, new SourcePositionStringBridge())
+                .registerAtom(Ref.class, new RefNameBridge());
     }
 }
