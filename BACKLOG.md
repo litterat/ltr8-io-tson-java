@@ -76,6 +76,13 @@ own prose (which had gone stale on it):
   schema declares. A segment is then judged by the key type of the namespace it lands in, rather than by §7.7
   uniformly, and a key that is no identifier needs a spelling: `orders_api."/orders/{id}".GET` is not one token under
   [TSON-DATA] §7.2. Lands on `r2026-38-proposal` before the branch goes to the reviewer.
+- [ ] **Whether a kind admits an abstract type** (SPEC-FEEDBACK.md #22). `kind<record>` holds every type built with
+  `record` (`KindMembers.isMember`), so it holds an abstract record (`pet => abstract { ... }`) and a record template's
+  family base (`boxed => <T> { v: T }`), neither of which has instances of its own: a document writing `payload_type:
+  boxed` names a type no value is read through until an application is chosen. Settle it with `ref<T>` and the
+  namespace kind, when a kind's value becomes a resolved reference rather than a spelling. The choice is membership by
+  construction alone, as running, or a concrete-only kind that excludes every abstract member; never an exception for
+  record templates alone, since a family base is a type like any abstract record (§5.10).
 - [ ] **A parameter in a record template has no channel of its own** (SPEC-FEEDBACK.md #17). An open record's
   parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
   type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
