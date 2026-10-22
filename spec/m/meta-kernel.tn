@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=b2ab4f233fe0e7f35c5f58842552ad8cbfc0394b9999946a06ae1375c64e879e"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=ae69684a16ff530639f4f2ceb61fa9e01fde0530f746318f6b6e85d0b846e208"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -91,11 +91,13 @@
   data      => abstract top & {}
 
   @doc:"""
-    Aliasing body — the entry `target` names. `target` is a type_ref, so a
+    Aliasing body — the entry `target` names: a type, or a constructor, since
+    an alias of a constructor is applied as its target is ([TSON-SCHEMA]
+    §3.3.1). So `target` is typed `type_ref` and judged by resolution alone,
+    the one slot beside `kind_type.of` whose name may be a constructor's. A
     partial application ([TSON-SCHEMA] §5.10, `uuid_pair => <B> pair<uuid, B>`)
-    can state the arguments it already binds. A `target` naming a parameter
-    describes the held body as parsed; in resolved output it sits inside the
-    `template.template` text.
+    is an open entry, and its target, the arguments it already binds and the
+    parameter alike, sits inside the `template.template` text as parsed.
 
     A reference is a hop, not a rewrite: resolved output states the chain as the
     author wrote it, and a use site names whatever entry it names. A processor
@@ -111,27 +113,27 @@
     One parameter of an open entry: its name, and the type an argument for it is
     read as — the declared type of the slot it stands in, in the vocabulary of
     the constructor the held body applies. It is derived from the body and never
-    required of the author: a type slot gives `type_ref`; a scalar slot of the applied
+    required of the author: a type slot gives `type_kind`; a scalar slot of the applied
     constructor gives that slot's declared type (`min_items: N` gives
     `non_negative_integer`); a routed default or fixed value gives the field's
     own declared type (`w?: int32 ~ N` gives `int32`); and a parameter passed to
     another template takes that template's recorded type for the position, with
-    `type_ref` where nothing grounds it. A parameter is a type parameter exactly
-    when its `type` is `type_ref`. A `type` may name an earlier parameter of the
+    `type_kind` where nothing grounds it. A parameter is a type parameter exactly
+    when its `type` is `type_kind`. A `type` may name an earlier parameter of the
     same template, where a routed default's field is typed by one.
 
     A declaration may narrow what it derives by writing a type after the name,
     `<T: text, N: int8>`, read by the kind the positions give. On a value
     parameter it narrows `type` itself and must IS-A the derived type. On a type
     parameter it is `bound`: an argument must name a type that IS-A it. `bound`
-    is present only where `type` is `type_ref`, and a parameter passed to
+    is present only where `type` is `type_kind`, and a parameter passed to
     another template inherits that template's bound for the position, so an
     unannotated parameter is bounded as narrowly as its uses require.
     """
   template_param => {
     name:   param_name
-    type:   type_ref
-    bound?: type_ref
+    type:   type_kind
+    bound?: type_kind
   }
 
   @doc:"""
@@ -466,10 +468,15 @@
     parameter stands here as written, resolved output included; in any other
     template it sits inside the `template.template` text.
 
-    `name` is the only required field, so the positional form ([TSON-SCHEMA]
-    §5.6, general over schema-backed data) applies at every type_ref-typed
-    position: a bare name token fills `name` directly, and a braced record is
-    the explicit form, canonical only when `arguments` is present.
+    An application stands where one may: `type_chain.parents`,
+    `type_argument.name`, the `application` annotation, and held text. Every
+    other slot that names a type is typed by a kind, `type_kind` for the type
+    of a value, and holds the name alone; `reference.target` and `kind_type.of`
+    may name a constructor and are not. `name` is the only required field,
+    so the positional form ([TSON-SCHEMA] §5.6, general over schema-backed
+    data) applies at every type_ref-typed position: a bare name token fills
+    `name` directly, and a braced record is the explicit form, canonical only
+    when `arguments` is present.
 
     Every application denotes an entry ([TSON-SCHEMA] §8.2): a sugar form lifts
     to a synthetic entry, closed or open per the lift rule ([TSON-SCHEMA] §5.3),
@@ -598,8 +605,8 @@
     `optional`, that the key may be missing; `voidable`, that the value may be
     void, the void sentinel `_` written in its place; `role`, what `value` is
     for; and `value`, a concrete default or fixed value read against the field's
-    declared type — for a type_ref-typed slot, a reference in the bare
-    positional form. Its name is not among them: a field is a value of
+    declared type — for a `type_kind` slot, a type name. Its name is not
+    among them: a field is a value of
     `record.fields`, keyed by its name. Each fact is one mark of the spelling
     `name?: type? ~ value`: the name's `?`, the type's `?`, and `~` or `=` with
     its value. What omission yields is derived, never stored: a missing field
@@ -634,7 +641,7 @@
     container's part is never missing, so a container has no `optional`.
     """
   record_field => {
-    type:      type_ref
+    type:      type_kind
     optional?: boolean ~ false
     voidable?: boolean ~ false
     role?:     field_role ~ FREE
@@ -646,7 +653,7 @@
     position is never missing, so `[A, B?]` admits `[a _]` and refuses `[a]`.
     """
   tuple_element => {
-    element_type: type_ref
+    element_type: type_kind
     voidable?:    boolean ~ false
   }
 
@@ -738,7 +745,7 @@
   @doc:"""
     A sequence of elements of one type. The container constructors carry no
     parameters: a type slot (array's element_type, map's key_type and
-    value_type) is an ordinary required field typed type_ref, filled by the
+    value_type) is an ordinary required field typed `type_kind`, filled by the
     construction or by a sugar form's desugaring like any other required field,
     and a closed application carries the bound reference as the field's value
     (!array { element_type: person }), its binding record being ordinary data
@@ -756,7 +763,7 @@
   array => product & {
     access_pattern?: product_access_type = INDEX
     size_type?:      product_size_type = VARIABLE
-    element_type:    type_ref
+    element_type:    type_kind
     voidable?:       boolean ~ false
     ordered?:        boolean ~ true
     unique_items?:   boolean ~ false
@@ -793,8 +800,8 @@
   map => product & {
     access_pattern?: product_access_type = NAMED
     size_type?:      product_size_type = VARIABLE
-    key_type:        type_ref
-    value_type:      type_ref
+    key_type:        type_kind
+    value_type:      type_kind
     voidable?:       boolean ~ false
     ordered?:        boolean ~ false
     min_items?:      non_negative_integer
@@ -856,7 +863,7 @@
     encoding's discrimination rules consume ([TSON-SCHEMA] §5.4, §7.2).
     """
   choice => sum & {
-    variants:  [type_ref]
+    variants:  [type_kind]
     disjoint?: boolean
   }
 
@@ -868,9 +875,10 @@
     `of`, a constructor template followed to the constructor it applies, and
     it is not itself a constructor (it is not IS-A `top`). A record written in
     braces is built with `record`, and so is a record template, which is a
-    type. A template over another constructor is no type and no member; an
-    application of one is, as the type it expands to, and so is an alias of a
-    member.
+    type, and so is `top` itself: a fresh abstract record IS-A nothing, so it
+    is a member of every kind whose `of` is `record` or above it. A template
+    over another constructor is no type and no member; an application of one
+    is, as the type it expands to, and so is an alias of a member.
 
     `of` names a constructor of the writer's structure namespace
     ([TSON-SCHEMA] §3.3.1), as a constructor role does, and never a type of its
@@ -907,7 +915,7 @@
   atom_kind => !kind_type { of: atom }
 
   @doc:"The names of the types a value can have."
-  value_kind => !kind_type { of: type }
+  type_kind => !kind_type { of: type }
 
   @doc:"""
     Resolver output: a schema map, from each name to the value its entry

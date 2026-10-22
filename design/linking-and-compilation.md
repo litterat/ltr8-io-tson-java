@@ -12,6 +12,10 @@ Current form only; history lives in git.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds.
 - A reference to a DATA-kinded entry is refused at every position a type-ref occupies.
+- A kernel slot typed `type_kind` (`record_field.type`, the element and container type slots, `choice.variants`, a
+  parameter's `type` and `bound`) is judged by `KindMembers` in `validateTypeRef`, after resolution: a constructor
+  named as a type is refused there. A `type_ref` slot, the application form, and `reference.target`, which may name
+  a constructor, are judged by resolution and arity alone (`constructors == null`). `design/references.md` has the account.
 - A value by name (`TsonSchema.valuesByName`, collected by the read) resolves its first segment in the schema's own
   merged namespace, alias hops followed, never the meta's; each further segment selects in the bound value; the
   referent's declared type must IS-A the slot's, compared by canonical identity. Local entries only, after
@@ -188,7 +192,7 @@ A `kind_type` instance — `!kind_type { of: uuid_type }`, or `kind<uuid_type>` 
 — is an atom whose values are the names of the closure's types built with one constructor: a computed set of names, as
 an enum's is a listed one. `computeKinds` runs after `computeSubtypes` and before the name-type checks, writes
 `members` (sorted, as `subtypes` is) onto every kind body in the merged map, and validation then checks `of`. The kernel
-declares three, `identifier_kind`, `atom_kind` and `value_kind`, and types `enum_type.name_type` and `record.name_type`
+declares three, `identifier_kind`, `atom_kind` and `type_kind`, and types `enum_type.name_type` and `record.name_type`
 by the first.
 
 - **Membership is one walk over resolved entries** (`resolver/KindMembers`, public because `NameType` asks it too).
@@ -199,7 +203,7 @@ by the first.
   `of` among its supertypes, which are already the IS-A closure. So `pet => abstract { … }` is a member of
   `kind<record>`, and so is a record template, a type (§5.10); `set<text>` is a member of `kind<set_type>` while
   core's `set` is not.
-- **A kind is a member of itself where the walk says so.** `value_kind` is built with `kind_type`, which IS-A `type`, so
+- **A kind is a member of itself where the walk says so.** `type_kind` is built with `kind_type`, which IS-A `type`, so
   it lists itself, and `kind<atom>` lists every kind. Nothing loops: the walk reads construction chains and never a
   kind's members, and a value of a kind is a name, never a value read through the type it names.
 - **A constructor is read in the structure namespace first**, so a schema's own `uuid_type => text` never
@@ -401,8 +405,9 @@ here, never resolved as a type, so which list a host files it in changes nothing
 - **The name is a `TypeRef`, and its grammar is judged here.** A value by name is held as every reference is, a
   `TypeRef` whose `name` is the token as written; `ValuesByName.segments` splits it at each `.` and requires each
   segment to be a [TSON-DATA] §7.7 identifier, none empty, and no arguments, refusing `orders.1x`, `.orders` and
-  `orders.` as no qualified name before anything is looked up. At a `type_ref` slot the same host shape is one
-  segment naming a type, judged by `validateTypeRef` as always: `type_ref` is `ref<type>`.
+  `orders.` as no qualified name before anything is looked up. At a kind-typed slot the same host shape is one
+  segment naming a member of the kind (`judgeMember`); at a `type_ref` slot it is an application, judged by
+  `validateTypeRef` as always.
 - **The slot's type is the meta's, the name is the schema's.** The slot's declared type is read off the entry's
   constructor (`TsonSchemaLinker.constructorOf`, in the governing meta's namespace) by walking the recorded path
   through the resolved fields: a field name at a record, any key at a map, any index at an array. A path through
@@ -434,8 +439,8 @@ here, never resolved as a type, so which list a host files it in changes nothing
   RFC 6901 pointer: no entry for the first segment; an entry (after any alias hop) built by another constructor; a
   segment that is no field (listing the fields declared) or no key (listing the keys held); a selected value of
   another type; a type entry given a further segment; an open entry; a segment into a list; a map whose keys are not
-  names. §4.1's refusal of a DATA entry
-  at a type position is unchanged and not this pass's: `response: orders` at a `type_ref` slot is a reference, and
-  `validateTypeRef` refuses it.
+  names; a qualified name at a kind-typed slot, which reaches a value and no value is a type. §4.1's refusal of a
+  DATA entry at a type position is unchanged and not this pass's: `response: orders` at a `type_ref` slot is a
+  reference, and `validateTypeRef` refuses it.
 - **Local entries only.** An imported body's names were judged when its own schema linked, in its own namespace; a
   second judgement here would be in the wrong one.

@@ -52,7 +52,7 @@ class TemplateParamBoundTest {
     }
 
     private static TemplateParam bounded(String name, String bound) {
-        return new TemplateParam(name, TemplateParam.TYPE_REF, Optional.of(TypeRef.of(bound)));
+        return new TemplateParam(name, TemplateParam.TYPE_KIND, Optional.of(TypeRef.of(bound)));
     }
 
     private static List<Diagnostic> problems(String declarations) {

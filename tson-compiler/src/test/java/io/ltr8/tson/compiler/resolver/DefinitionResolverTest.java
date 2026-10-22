@@ -160,9 +160,9 @@ class DefinitionResolverTest {
     // ── DefinitionResolver: the one construct it resolves so far ──────────────
 
 
-    /** How a parameter whose type is still the provisional {@code type_ref} is written. */
+    /** How a type parameter is written: its {@code type} is {@code type_kind}, the kind of the types. */
     private static String typeParameter(String name) {
-        return "{ name: \"" + name + "\" type: type_ref }";
+        return "{ name: \"" + name + "\" type: type_kind }";
     }
 
     @Test
@@ -593,14 +593,14 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesTupleElementFromTheRealMetaKernelFixture() throws IOException, DataBindException {
-        // tuple_element => { element_type: type_ref  voidable?: boolean ~ false } -- a fresh
+        // tuple_element => { element_type: type_kind  voidable?: boolean ~ false } -- a fresh
         // record (no supertypes, so no tightening involved), exercising an ordinary literal default.
         SchemaMap schemaMap = kernelDeclarations();
 
         Top tupleElement = resolver.resolve(schemaMap.declarations().get("tuple_element"));
 
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"element_type\" => { type: "
-                        + "type_ref optional: false voidable: false role: \"FREE\" } \"voidable\" => { type: boolean "
+                        + "type_kind optional: false voidable: false role: \"FREE\" } \"voidable\" => { type: boolean "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } } groups: [] extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(tupleElement));
@@ -704,7 +704,7 @@ class DefinitionResolverTest {
                         + "fields: { \"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } "
                         + "\"access_pattern\" => { type: product_access_type optional: true voidable: false role: "
                         + "\"FIXED\" value: INDEX } \"size_type\" => { type: product_size_type optional: true voidable: "
-                        + "false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: type_ref optional: false "
+                        + "false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: type_kind optional: false "
                         + "voidable: false role: \"FREE\" } \"voidable\" => { type: boolean optional: true voidable: "
                         + "false role: \"DEFAULT\" value: false } \"ordered\" => { type: boolean optional: true "
                         + "voidable: false role: \"DEFAULT\" value: true } \"unique_items\" => { type: boolean optional: "
@@ -733,8 +733,8 @@ class DefinitionResolverTest {
                         + "fields: { \"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } "
                         + "\"access_pattern\" => { type: product_access_type optional: true voidable: false role: "
                         + "\"FIXED\" value: NAMED } \"size_type\" => { type: product_size_type optional: true voidable: "
-                        + "false role: \"FIXED\" value: VARIABLE } \"key_type\" => { type: type_ref optional: false "
-                        + "voidable: false role: \"FREE\" } \"value_type\" => { type: type_ref optional: false voidable: "
+                        + "false role: \"FIXED\" value: VARIABLE } \"key_type\" => { type: type_kind optional: false "
+                        + "voidable: false role: \"FREE\" } \"value_type\" => { type: type_kind optional: false voidable: "
                         + "false role: \"FREE\" } \"voidable\" => { type: boolean optional: true voidable: false role: "
                         + "\"DEFAULT\" value: false } \"ordered\" => { type: boolean optional: true voidable: false "
                         + "role: \"DEFAULT\" value: false } \"min_items\" => { type: non_negative_integer optional: true "
@@ -830,7 +830,7 @@ class DefinitionResolverTest {
                         + "subtypes: [] } fields: { \"chain\" => { type: type_chain optional: true voidable: false role: "
                         + "\"FREE\" } \"access_pattern\" => { type: product_access_type optional: true voidable: false "
                         + "role: \"FIXED\" value: INDEX } \"size_type\" => { type: product_size_type optional: true "
-                        + "voidable: false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: type_ref "
+                        + "voidable: false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: type_kind "
                         + "optional: false voidable: false role: \"FREE\" } \"voidable\" => { type: boolean optional: "
                         + "true voidable: false role: \"FIXED\" value: false } \"ordered\" => { type: boolean optional: "
                         + "true voidable: false role: \"FIXED\" value: false } \"unique_items\" => { type: boolean "
@@ -1482,10 +1482,10 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   sneaky => !template {
-                    parameters: [{ name: T  type: type_ref }]  template: "!array { element_type: T }"
+                    parameters: [{ name: T  type: type_kind }]  template: "!array { element_type: T }"
                   }
                   open_sneaky => <U> !template {
-                    parameters: [{ name: U  type: type_ref }]  template: "!array { element_type: U }"
+                    parameters: [{ name: U  type: type_kind }]  template: "!array { element_type: U }"
                   }
                 }""").parseSchemaDocument().body();
 
@@ -1562,7 +1562,9 @@ class DefinitionResolverTest {
     /** The same, keeping the facts resolution recorded -- a tightened constructor binds through them. */
     private static TsonCompiledMetaSchema compileAsMetaParser(Map<String, Top> entries,
                                                               Map<String, TsonSchema.EntryFacts> facts) {
-        TsonSchema synthetic = new TsonSchema(TsonBundledSchemas.META_KERNEL_ID, "", List.of(),
+        // Its own meta, as the real kernel is: the readers of a schema that governs schemas read names only.
+        TsonSchema synthetic = new TsonSchema(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_KERNEL_ID,
+                List.of(),
                 io.ltr8.annotation.AnnotatedMap.of(entries), false, Map.of(), facts);
         TsonLinkedSchema linkedSynthetic = new TsonLinkedSchema(synthetic);
         return new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()).bootstrap(linkedSynthetic);

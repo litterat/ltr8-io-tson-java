@@ -5,6 +5,7 @@ import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -13,6 +14,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -211,6 +213,10 @@ final class ValuesByName {
             throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is an open "
                     + "entry: a template denotes no value until it is applied (§5.10), so nothing is there to name");
         }
+        if (slot.definition() instanceof KindBody kind) {
+            judgeMember(where, name, segments, kind, slot, referent, entry);
+            return;
+        }
         TsonLinkedSchema declarersMeta = metaOf(terminal);
         Typed at = constructorOf(TsonSchemaLinker.constructorOf(terminal, referent, facts).orElseThrow(), referent,
                 declarersMeta);
@@ -274,6 +280,35 @@ final class ValuesByName {
             throw new SchemaValidationException(where + " wants " + a(slot.name()) + ", and '" + name + "' is "
                     + a(at.name()) + ", which is no '" + slot.name() + "'");
         }
+    }
+
+    /**
+     * A kind-typed slot holds a type's name, one segment, and the name is a member of the kind or refused
+     * ({@link KindMembers}): the referent's construction chain reaches the kind's {@code of}, and the referent is no
+     * constructor. A type reached through a namespace of types is not yet a spelling this library reads.
+     */
+    private void judgeMember(String where, String name, List<String> segments, KindBody kind, Typed slot,
+                             Top referent, String entry) {
+        if (segments.size() > 1 && referent instanceof Data) {
+            throw new SchemaValidationException(where + " wants the name of a type built with '" + kind.of()
+                    + "' (a member of '" + slot.name() + "'), and '" + name + "' reaches into " + entry
+                    + ", a value: what a further segment selects in a value is a value, and no value is a type");
+        }
+        if (segments.size() > 1) {
+            throw new UnsupportedOperationException(where + " names '" + name + "' at a position typed by the kind '"
+                    + slot.name() + "', which holds a type's name -- this library does not yet read a type through "
+                    + "a namespace of types, so the name is one segment");
+        }
+        if (KindMembers.isMember(name, kind.of(), merged::get,
+                named -> TsonSchemaLinker.constructorOf(named, merged.get(named), facts),
+                governingMeta.schema().entries()::get)) {
+            return;
+        }
+        String terminal = ReferenceChain.terminal(name, merged);
+        throw new SchemaValidationException(where + " wants the name of a type built with '" + kind.of()
+                + "' (a member of '" + slot.name() + "'), and " + entry + " is an entry whose body is built by '"
+                + TsonSchemaLinker.constructorOf(terminal, referent, facts).orElse("nothing") + "', which is no '"
+                + kind.of() + "'");
     }
 
     /** The meta layer governing the schema that declared {@code entry}: this schema's, or an import's own. */

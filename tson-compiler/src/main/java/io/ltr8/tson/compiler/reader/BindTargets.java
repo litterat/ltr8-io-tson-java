@@ -41,7 +41,10 @@ import java.util.Optional;
  *       record type no class is bound to, since a name needs no class for the value it names. At a {@code type_ref}
  *       slot nothing changes: its bare token fills {@code name} positionally
  *       ({@link RecordAbstractReader#bareTokenFillsPositionally}), and the record reader binds it as it always has.
- *       At an atom a {@code TypeRef} is a mismatch: a token there is a literal, never a reference.
+ *       At a kind-typed slot ({@code record_field.type} is {@code type_kind}, a meta's {@code request: kind<record>})
+ *       a {@link KindSlotReader} reads a type's name, recorded for the linker to judge a member of the kind, or an
+ *       application still to close.
+ *       At any other atom a {@code TypeRef} is a mismatch: a token there is a literal, never a reference.
  *       One host shape serves both because both are references that must resolve; the linker judges each by its
  *       slot.</li>
  * </ul>
@@ -75,7 +78,9 @@ final class BindTargets {
                                 boolean top) {
         DataClass payload = target instanceof DataClassAnnotated boxed ? boxed.valueClass() : target;
         TsonTypeReader<?> bound;
-        if (payload.typeClass() == TypeRef.class && heldByName(reader)) {
+        if (payload.typeClass() == TypeRef.class && readsAKind(reader)) {
+            bound = new KindSlotReader((AtomTypeReader<?>) RecordAbstractReader.unwrapped(reader), site.resolver());
+        } else if (payload.typeClass() == TypeRef.class && heldByName(reader)) {
             bound = new ReferenceNameReader(expectedAt(reader, what));
         } else if (payload.typeClass() == TypeRef.class && readsAnAtom(reader)) {
             site.mismatches().add(what + " is an atom, and " + where + " holds a " + TypeRef.class.getSimpleName()
@@ -106,6 +111,11 @@ final class BindTargets {
         };
     }
 
+    /** Whether {@code reader} reads a kind: a token there is a type's name. */
+    private static boolean readsAKind(TsonTypeReader<?> reader) {
+        return RecordAbstractReader.unwrapped(reader) instanceof AtomTypeReader<?> atom && atom.readsAKind();
+    }
+
     /** Whether {@code reader} reads an atom: a token there is a literal, which no reference can hold. */
     private static boolean readsAnAtom(TsonTypeReader<?> reader) {
         return RecordAbstractReader.unwrapped(reader) instanceof AtomTypeReader<?>
@@ -114,8 +124,10 @@ final class BindTargets {
 
     /** What a position holding a reference by name expects, as its refusal says it: {@code a 'method' value}. */
     private static String expectedAt(TsonTypeReader<?> reader, String what) {
-        return RecordAbstractReader.unwrapped(reader) instanceof RecordAbstractReader<?> record
-                ? "a '" + record.displayName + "' value" : "a value for " + what;
+        return switch (RecordAbstractReader.unwrapped(reader)) {
+            case RecordAbstractReader<?> record -> "a '" + record.displayName + "' value";
+            case null, default -> "a value for " + what;
+        };
     }
 
     private static TsonTypeReader<?> shaped(TsonTypeReader<?> reader, DataClass target, String what, String where,

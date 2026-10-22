@@ -1896,7 +1896,7 @@ kind is IS-A `type`, so it stands in any value position, and in every such posit
 ```
 identifier_kind => !kind_type { of: identifier_type }
 atom_kind       => !kind_type { of: atom }
-value_kind      => !kind_type { of: type }
+type_kind      => !kind_type { of: type }
 
 enum_type => atom & { name_type: identifier_kind  members: enum_set }
 record    => product & { …  name_type?: identifier_kind }
@@ -1914,18 +1914,25 @@ enum_type => !record { … fields: { … name_type => !record_field { type: iden
 identifier_kind => !kind_type { of: identifier_type  members: [field_name identifier param_name scheme_name type_name] }
 ```
 
-`atom_kind` and `value_kind` are declared for the slots that follow and for a user meta-schema's own, and
+`atom_kind` and `type_kind` are declared for the slots that follow and for a user meta-schema's own, and
 `type_chain.supertypes` and `subtypes` stay `type_name`: those indexes list constructors.
 
 **What follows.** Three things, each its own entry once this one runs:
 
-- **The reference slots.** `map.key_type`, `record_field.type`, the element types, `map.value_type` and
-  `choice.variants` are typed `type_ref` by §9's rule, since an application may still stand there in a held body;
-  the kind judges the *referent* — the entry a use site holds a bare reference to, a minted one for an application —
-  so what those slots need is a `type_ref` whose `name` is narrowed to a kind, and §5.7's refinement does not narrow a
-  field's type today. `reference.target`, `record.supertypes` (a composition operand may be a constructor, §4.3),
-  `template_param.type` and `bound` stay `type_ref` in any case. The §9 guidance then reads: "a slot
-  that names a type is typed by a reference into a kind; `type_ref` alone is for a slot that may name a constructor."
+- **The type slots, running.** A slot that names the type of a value is typed `type_kind`: `record_field.type`,
+  `tuple_element.element_type`, `array.element_type`, `map.key_type` and `value_type`, `choice.variants`,
+  `template_param.type` and `bound`. Its value is a bare name, judged a member of the kind when
+  the schema links, so a constructor named as a type (`field: record`) is refused there, and the constructor-or-record
+  rule of a composition operand stays coded. `type_ref` is the application form and stands at the four positions an
+  application may: `type_chain.parents`, `type_argument.name`, the `application` annotation, and held text; and at
+  `reference.target`, which with `kind_type.of` and a `!C` head is a position that may name a constructor, an alias
+  being applied as its target is (§3.3.1). §9's
+  guidance then reads: "a slot that names a type is typed `type_kind`, or by a narrower kind; `type_ref` is for a
+  slot that holds an application." Two consequences: `top` is a member of `type_kind`, being a fresh abstract record
+  IS-A nothing, which is what admits the kernel's own `schema => !namespace { value_type: top }` at a kind-typed slot;
+  and a type parameter is one whose `type` is `type_kind`, the name `type_ref` having been that marker. Whether
+  `map.key_type` is the narrower `atom_kind` is open: neither Part 2 nor this implementation states that a map's key
+  is an atom, so narrowing it would be a new rule.
 - **The value-level case.** `stock_id => !uuid_type {}` and `customer_id => !uuid_type {}` are kept apart, and an
   author wanting a slot that takes either lists a `choice` at every such slot. What they mean is the dependent sum
   over `kind<uuid_type>`: a choice whose variants are computed rather than listed, tagged as a non-disjoint choice is
@@ -1935,7 +1942,7 @@ identifier_kind => !kind_type { of: identifier_type  members: [field_name identi
 - **The store.** Which namespace a name at a kind-typed slot resolves in stays prose per slot. Typing the store is
   the namespace entry.
 
-**Breaking changes, against Revision 37.** `kind_type`, `kind`, `identifier_kind`, `atom_kind` and `value_kind` join
+**Breaking changes, against Revision 37.** `kind_type`, `kind`, `identifier_kind`, `atom_kind` and `type_kind` join
 the kernel, `core` gains a `kind` sibling as it has `set` (§3.3.2 keeps the kernel's names out of a core-governed
 schema's type-name namespace), and every bundled schema's `!!id` pin changes (§13.2). `enum_type.name_type` and
 `record.name_type` are retyped, and no existing schema is judged differently by it: the kind refuses exactly what
@@ -1954,11 +1961,11 @@ consequence. §8.1: `members` among the derived indexes. §9's inventory names t
 
 **Status against Revision 37:** open; running on `kind-type`, a branch off `r2026-38-proposal`. `meta-kernel.tn`
 declares `kind_type => atom & { of: type_name  members?: [type_name] }`, `kind`, `identifier_kind`, `atom_kind` and
-`value_kind`, and types `enum_type.name_type` and `record.name_type` `identifier_kind`; `core` has its `kind` sibling;
+`type_kind`, and types `enum_type.name_type` and `record.name_type` `identifier_kind`; `core` has its `kind` sibling;
 the resolved fixtures carry the members (`identifier_kind`'s are `[field_name identifier param_name scheme_name
 type_name]`), and the bundled schemas are restamped. The linker computes every kind's `members` over the closure by the
 walk above, imported kinds included, and refuses `kind<data>`, a constructor above or beside `type`, and an `of` naming
-a type of the writer's own namespace. A kind is a member of itself where the walk says so (`value_kind` lists itself),
+a type of the writer's own namespace. A kind is a member of itself where the walk says so (`type_kind` lists itself),
 the walk reading construction and never a kind's members. The `name_type` checks read the slot's kind off the
 constructor's `name_type` field and judge the resolved referent a member of it, with the diagnostics the coded check
 had; a `~`/`=` value at a kind-typed field is judged a member where it is written, so a constructor pinning a non-member
@@ -1970,7 +1977,9 @@ documents are schemas, the reader checks the grammar alone and the schema's own 
 resolved form naming a user's name type reads back through meta.tn. The corpus states the city enum of the problem end
 to end, the members of `identifier_kind` under a meta layer's closure (a new link-layer fact), a user
 `kind<uuid_type>`'s members, a pinned non-member, `kind<data>`, and a kind-typed field holding a member's name and a
-non-member's. Part 2's cached §13.2 table is not re-stamped here.
+non-member's. The type slots above are typed `type_kind` in `meta-kernel.tn`, with the resolved fixtures and the
+corpus's service fixture (`request?: kind<record>`) following; the kernel's `type_kind` lists `top`. Part 2's cached
+§13.2 table is not re-stamped here.
 ---
 
 ## 23. A namespace is a map whose keys name its entries: the schema map and a record's fields are two

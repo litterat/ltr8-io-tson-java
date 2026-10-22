@@ -39,17 +39,16 @@
     reference is a hop, not a rewrite, so a use site naming an alias
     names the alias. A processor collapses the chain when it compiles
     readers, after linking, not in resolved output.
-  - Type-reference positions (`record_field.type`,
-    `tuple_element.element_type`, choice variant elements, the
-    chain, and binding-record type slots) hold type_ref values;
-    `name` is type_ref's only required field, so a bare name token
-    is the positional form (Part 2 Section 5.6, general over
-    schema-backed data) and a braced record appears only when
-    `arguments` is present — which, in output, is only where an
-    application is still open: template bodies and an alias's
-    `reference.target` (Part 2 Section 8.1).
+  - A slot that names a type (`record_field.type`,
+    `tuple_element.element_type`, a container's type slots, choice
+    variants, a parameter's `type` and `bound`) is typed `type_kind`, the kind of the types, and holds a bare
+    name: a type's name, judged a member of the kind when the schema
+    links. `type_ref` is the application form and stands only where
+    one may: `type_chain.parents`, `type_argument.name`, the
+    `application` annotation, held text, and `reference.target`, which
+    may name a constructor (Part 2 Section 8.1).
   - The container constructors carry no parameters: their type
-    slots are plain required `type_ref`-typed fields, filled by the
+    slots are plain required `type_kind`-typed fields, filled by the
     construction (or by a sugar form's desugaring) like any other
     required field. Within a template body `value` also carries a
     parameter, unlabelled: a token there is a parameter exactly when
@@ -145,8 +144,8 @@
 
   template_param => !record { fields: {
     name  => !record_field { type: param_name }
-    type  => !record_field { type: type_ref }
-    bound => !record_field { type: type_ref  optional: true }
+    type  => !record_field { type: type_kind }
+    bound => !record_field { type: type_kind  optional: true }
   } }
 
   template => !record { chain: { supertypes: [top] }  fields: {
@@ -302,7 +301,7 @@
   application => @annotation !reference { target: type_ref }
 
   record_field => !record { fields: {
-    type     => !record_field { type: type_ref }
+    type     => !record_field { type: type_kind }
     optional => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     voidable => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     role     => !record_field { type: field_role  optional: true  role: DEFAULT  value: FREE }
@@ -310,7 +309,7 @@
   } }
 
   tuple_element => !record { fields: {
-    element_type => !record_field { type: type_ref }
+    element_type => !record_field { type: type_kind }
     voidable     => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
   } }
 
@@ -338,7 +337,7 @@
     chain          => !record_field { type: type_chain  optional: true }
     access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: INDEX }
     size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
-    element_type   => !record_field { type: type_ref }
+    element_type   => !record_field { type: type_kind }
     voidable       => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     ordered        => !record_field { type: boolean  optional: true  role: DEFAULT  value: true }
     unique_items   => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
@@ -350,7 +349,7 @@
     chain          => !record_field { type: type_chain  optional: true }
     access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: INDEX }
     size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
-    element_type   => !record_field { type: type_ref }
+    element_type   => !record_field { type: type_kind }
     voidable       => !record_field { type: boolean  optional: true  role: FIXED  value: false }
     ordered        => !record_field { type: boolean  optional: true  role: FIXED  value: false }
     unique_items   => !record_field { type: boolean  optional: true  role: FIXED  value: true }
@@ -361,8 +360,8 @@
     chain          => !record_field { type: type_chain  optional: true }
     access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: NAMED }
     size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
-    key_type       => !record_field { type: type_ref }
-    value_type     => !record_field { type: type_ref }
+    key_type       => !record_field { type: type_kind }
+    value_type     => !record_field { type: type_kind }
     voidable       => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     ordered        => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     min_items      => !record_field { type: non_negative_integer  optional: true }
@@ -372,8 +371,8 @@
     chain          => !record_field { type: type_chain  optional: true }
     access_pattern => !record_field { type: product_access_type  optional: true  role: FIXED  value: NAMED }
     size_type      => !record_field { type: product_size_type    optional: true  role: FIXED  value: VARIABLE }
-    key_type       => !record_field { type: type_ref }
-    value_type     => !record_field { type: type_ref }
+    key_type       => !record_field { type: type_kind }
+    value_type     => !record_field { type: type_kind }
     voidable       => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     ordered        => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     min_items      => !record_field { type: non_negative_integer  optional: true }
@@ -407,7 +406,7 @@
 
   choice => !record { chain: { supertypes: [sum top type] }  fields: {
     chain    => !record_field { type: type_chain  optional: true }
-    variants => !record_field { type: array_type_ref_xxhash }
+    variants => !record_field { type: array_type_kind_xxhash }
     disjoint => !record_field { type: boolean  optional: true }
   } }
 
@@ -426,21 +425,22 @@
     members: [
       annotation atom_kind boolean doc field_name field_role identifier identifier_base identifier_kind
       integer iri non_negative_integer normalization param_name product_access_type product_size_type
-      record_extension_type regex scheme_name synthetic text type_name value value_kind void
+      record_extension_type regex scheme_name synthetic text type_kind type_name value void
     ]
   }
 
-  value_kind => !kind_type {
+  type_kind => !kind_type {
     of: type
     members: [
       annotation application array_array_text_1_3600e7d5_1_xxhash array_field_group_xxhash
       array_template_param_xxhash array_text_1_xxhash array_tuple_element_xxhash
-      array_type_argument_xxhash array_type_name_xxhash array_type_ref_xxhash atom_kind atom_specification
+      array_type_argument_xxhash array_type_kind_xxhash array_type_name_xxhash array_type_ref_xxhash atom_kind
+      atom_specification
       boolean doc enum_set field_group field_map field_name field_role identifier identifier_base
       identifier_kind integer integer_member_set integer_size iri non_negative_integer normalization
       param_name product_access_type product_size_type record_extension_type record_field regex schema
-      scheme_name scheme_set synthetic template_param text text_member_set tuple_element type_argument
-      type_chain type_name type_ref value value_kind void
+      scheme_name scheme_set synthetic template_param text text_member_set top tuple_element type_argument
+      type_chain type_kind type_name type_ref value void
     ]
   }
 
@@ -451,6 +451,8 @@
   @synthetic array_template_param_xxhash => !array { element_type: template_param }
 
   @synthetic array_type_ref_xxhash => !array { element_type: type_ref }
+
+  @synthetic array_type_kind_xxhash => !array { element_type: type_kind }
 
   @synthetic array_type_argument_xxhash => !array { element_type: type_argument }
 

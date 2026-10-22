@@ -32,7 +32,7 @@
 
   scope_set => !set_type { element_type: scope_kind  min_items: 1 }
 
-  set => !template { parameters: [{ name: T  type: type_ref }]  template: "!set_type { element_type: T }" }
+  set => !template { parameters: [{ name: T  type: type_kind }]  template: "!set_type { element_type: T }" }
 
   scoped => !record { chain: { supertypes: [sum top type] }  fields: {
     chain   => !record_field { type: type_chain  optional: true }

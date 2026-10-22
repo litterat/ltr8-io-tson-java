@@ -56,25 +56,25 @@ public final class TsonBundledSchemas {
      * library holds it so a hash-pinned reference to a pre-loaded schema can be verified, and so the
      * shipped resource can be checked against its own published digest ({@link #declaredSha256}).
      */
-    public static final String META_KERNEL_SHA256 = "b2ab4f233fe0e7f35c5f58842552ad8cbfc0394b9999946a06ae1375c64e879e";
+    public static final String META_KERNEL_SHA256 = "ae69684a16ff530639f4f2ceb61fa9e01fde0530f746318f6b6e85d0b846e208";
 
     /** meta's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String META_SHA256 = "af8b57663dfaf5bbbc77b09050ac284344083b1374c2c2cd4688704583302d9e";
+    public static final String META_SHA256 = "f0d5f7fedbf309ee95603f670df3af96409e12332fcfcd6040199ee615eaf9a2";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "7167a3f9100aaf590b452d202d02fbea736cfeb95bf8b543605eb06ef19d542c";
+    public static final String CORE_SHA256 = "d93aa6f0a35ae42de18b0626da934ea1aad53ff67b09e6b220e0ec3d45d529ce";
 
     /**
      * net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code
      * !!id}. See {@link #META_KERNEL_SHA256}.
      */
-    public static final String NET_SHA256 = "9102aac7a8c711853a873f421f5c0a4877d5cc18ed409e81379cd71866698c58";
+    public static final String NET_SHA256 = "cf9a4bf1b1eadc02411437a726b4759f115ad3f405e3e23d92b405837372ce6f";
 
     /**
      * policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s {@code
      * !!id}. See {@link #META_KERNEL_SHA256}.
      */
-    public static final String POLICY_SHA256 = "e546eb9ea0a526cf4058b53d4ce17352637cad30dee3d06bb79398367fe8af32";
+    public static final String POLICY_SHA256 = "3f242771f98badb1c1e34df552c52f289cd29819c610ebbfbf7374c5d6afbe36";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",

@@ -129,16 +129,15 @@ class TemplateClosesByApplicationTest {
     }
 
     /**
-     * And the type-channel spelling is refused on closing -- by §5.2 rather than by §4.2's own rule: {@code
-     * element_type} is typed {@code type_ref}, which is a record, and a fixed value is available on a field
-     * typed by an atom or an enum and nowhere else. So §4.2's rule is enforced, at the point the argument
-     * lands, by the rule that owns field values.
+     * And the type-channel spelling closes the same way: {@code element_type} is typed {@code type_kind}, an atom, so
+     * §5.2 admits a fixed value there, and the pin {@code text} is judged a member of the kind where it is written --
+     * a constructor template may pin its element type as {@code set_type} pins {@code unique_items}.
      */
     @Test
-    void aTypeChannelConstructorParameterIsRefusedWhenItCloses() {
-        List<Diagnostic> problems = metaProblems("tags => my_set<text>");
+    void aTypeChannelConstructorParameterPinsWhenItCloses() {
+        assertEquals(List.of(), metaProblems("tags => my_set<text>"));
+        List<Diagnostic> problems = metaProblems("tags => my_set<no_such_type>");
 
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("cannot have a fixed value"), problems::toString);
     }
 }

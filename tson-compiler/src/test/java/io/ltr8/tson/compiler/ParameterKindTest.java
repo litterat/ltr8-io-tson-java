@@ -140,7 +140,7 @@ class ParameterKindTest {
             String message = rejected(declaration);
 
             assertTrue(message.contains("parameter 'T' stands where"), message);
-            assertTrue(message.contains("neither a type reference nor a scalar"), message);
+            assertTrue(message.contains("neither a kind of type nor a scalar"), message);
         }
     }
 

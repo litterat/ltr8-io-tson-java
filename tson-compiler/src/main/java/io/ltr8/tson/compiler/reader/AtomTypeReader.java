@@ -12,6 +12,7 @@ import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.ValueParser;
@@ -50,7 +51,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
             .forType(definition, context.linked().enumForm(name), context.linked().governsSchemas())
             .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(context.authoredName(name, definition), parser,
-                    context.locationOf(name), namesProfile(definition)))
+                    context.locationOf(name), namesProfile(definition), definition instanceof KindBody))
             .orElseThrow(() -> new IllegalStateException(
                     "'" + name + "' is registered as an atom but its body has no parser: " + definition));
 
@@ -87,7 +88,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * {@code AtomParsers} declines it and {@link ValueParser} answers here.
      */
     static final ValueReaderFactory VALUE = (name, definition, context) ->
-            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name), null);
+            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name), null, false);
 
     /**
      * The schema entry's own declared name -- the <em>declaration's</em>, not the built-in it refines, so a
@@ -119,15 +120,23 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     private final IdentifierProfile names;
 
+    /** Whether the body is a kind, whose value is a type's name. */
+    private final boolean kind;
+
     /** {@code body}'s profile when it is an identifier family -- its constructor IS-A {@code identifier_type}. */
     private static IdentifierProfile namesProfile(Top body) {
         return body instanceof IdentifierType identifier ? identifier.profile() : null;
     }
 
 
+    /** Whether this reads a kind, whose value is a type's name -- a position a {@code TypeRef} target holds by name. */
+    boolean readsAKind() {
+        return kind;
+    }
+
     /** A reader over an {@link AtomType} chosen by the caller rather than by the declaration's own body. */
     static <T> AtomTypeReader<T> of(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
-        return new AtomTypeReader<>(name, delegate, schemaLocation, null);
+        return new AtomTypeReader<>(name, delegate, schemaLocation, null, false);
     }
 
     /**
@@ -136,7 +145,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     @Override
     public TsonTypeReader<?> renamed(String displayName) {
-        return new AtomTypeReader<>(displayName, delegate, schemaLocation, names);
+        return new AtomTypeReader<>(displayName, delegate, schemaLocation, names, kind);
     }
 
     /**
@@ -166,7 +175,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * the entry's own is {@code value}, which names the escape hatch rather than anything the author wrote.
      */
     TsonTypeReader<?> overAtom(String displayName, AtomType<?> replacement) {
-        return new AtomTypeReader<>(displayName, replacement, schemaLocation, null);
+        return new AtomTypeReader<>(displayName, replacement, schemaLocation, null, false);
     }
 
     /**
@@ -180,15 +189,16 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * case that does rename, its entry naming the escape hatch rather than anything in the schema.
      */
     Optional<TsonTypeReader<?>> boundTo(Class<?> wire) {
-        return delegate.boundTo(wire).map(bound -> new AtomTypeReader<>(name, bound, schemaLocation, names));
+        return delegate.boundTo(wire).map(bound -> new AtomTypeReader<>(name, bound, schemaLocation, names, kind));
     }
 
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation,
-                           IdentifierProfile names) {
+                           IdentifierProfile names, boolean kind) {
         this.name = name;
         this.delegate = delegate;
         this.schemaLocation = schemaLocation;
         this.names = names;
+        this.kind = kind;
     }
 
 

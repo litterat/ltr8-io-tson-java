@@ -119,10 +119,12 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     use"): a TYPE parameter exactly when that type is `type_ref`. §12.1 decides the channel by token shape, so an
     unquoted non-numeric argument arrives as a reference — the right default with nothing else known, and wrong for `e =>
     <M> !enum { members: [a b M] }` applied as `e<c>`, where `c` is a member. What settles it is the **declared type of
-    the slot the parameter stands in**, read from the constructor's own vocabulary: `type_ref` for a type slot, and the
-    slot's own type (`non_negative_integer` for `min_items`) for a slot resolving to an `Atom`. §9 makes that general
-    rather than a table of kernel names — a slot holding a type reference MUST be typed `type_ref` — so an extension
-    meta-schema's constructors classify by the same walk. Two more sources: a **routed default or fixed value** (a
+    the slot the parameter stands in**, read from the constructor's own vocabulary: `type_kind` for a type slot, or
+    `type_ref` where an application may stand (an operand, an argument), and the slot's own type
+    (`non_negative_integer` for `min_items`) for a slot resolving to an `Atom`. §9 makes that general rather than a
+    table of kernel names — a slot naming a type is typed `type_kind`, one holding an application `type_ref` — so an
+    extension meta-schema's constructors classify by the same walk
+    (`ParameterTypes.typePosition`). Two more sources: a **routed default or fixed value** (a
     parameter at `record_field.value`) is read as the field's own declared type, from the sibling `type` slot — `c?:
     percent ~ C` gives `percent`, and `w?: T ~ N` gives `N` the type `T`, an earlier parameter — and a payload in
     **§5.6's positional form** (`!enum [a b M]`) is walked as the one unmarked field it binds (`members`).
@@ -181,11 +183,11 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       is refused, naming the slot (`parameter 'K' stands at a key of record.fields`) -- a field name, a group
       member, `optional`, `voidable`, `role`, `extension`, `name_type`, `discriminators`, a bare parent. Each would
       leave the family base without a shape its applications share. The general kind check runs first, so
-      `<T> !record { fields: T }` keeps its "neither a type reference nor a scalar" verdict. A template over any
+      `<T> !record { fields: T }` keeps its "neither a kind of type nor a scalar" verdict. A template over any
       other constructor keeps every scalar slot (`<V> !tuple { … voidable: V }`).
-    - **The slot types are the constructor's own vocabulary.** `array.element_type` is typed `type_ref`,
-      `enum.members` a set of `identifier`, `record_field.value` a `value` — so a `type_ref` slot gives a TYPE
-      parameter, one resolving to an `Atom` a VALUE parameter, and anything else (a parameter standing for a whole
+    - **The slot types are the constructor's own vocabulary.** `array.element_type` is typed `type_kind`,
+      `enum.members` a set of `identifier`, `record_field.value` a `value` — so a `type_kind` or `type_ref` slot gives
+      a TYPE parameter, one resolving to an `Atom` a VALUE parameter, and anything else (a parameter standing for a whole
       collection or record) is refused at the declaration, along with a parameter standing in both kinds of position.
       §5.10 has an argument "read by the position it lands in", and the kind is what makes that position known at the
       application.

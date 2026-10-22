@@ -27,15 +27,15 @@ import java.util.Optional;
 @Typename(name = "template_param")
 public record TemplateParam(String name, TypeRef type, Optional<TypeRef> bound) {
 
-    /** The kernel type of a type reference: what a type parameter's argument is read as. */
-    public static final TypeRef TYPE_REF = TypeRef.of("type_ref");
+    /** The kind of the types, {@code kind<type>}: what a type parameter's argument is read as, a type name. */
+    public static final TypeRef TYPE_KIND = TypeRef.of("type_kind");
 
     @Record
     public TemplateParam {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(bound, "bound");
-        if (bound.isPresent() && !TYPE_REF.equals(type)) {
+        if (bound.isPresent() && !TYPE_KIND.equals(type)) {
             throw new IllegalArgumentException("parameter '" + name + "' is a value parameter (its type is "
                     + type + "), and only a type parameter has a bound");
         }
@@ -48,11 +48,11 @@ public record TemplateParam(String name, TypeRef type, Optional<TypeRef> bound) 
 
     /** A parameter whose type is not yet derived, or derives to nothing narrower: an unbounded type parameter. */
     public static TemplateParam typeParameter(String name) {
-        return new TemplateParam(name, TYPE_REF);
+        return new TemplateParam(name, TYPE_KIND);
     }
 
     /** Whether an argument for this parameter is a type reference rather than a value (§5.10's two kinds). */
     public boolean isTypeParameter() {
-        return TYPE_REF.equals(type);
+        return TYPE_KIND.equals(type);
     }
 }

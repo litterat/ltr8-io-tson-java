@@ -99,11 +99,12 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   **Construction is exempt**: §5.5 transfers kind and no supertypes, so `!C { … }` yields an
   entry with an empty chain, which is why an instance is not itself a constructor.
 - **A constructor's parameters are confined to no channel**, which is §4.2's own rule: "an argument is
-  substituted as a token and read by the position it lands in, so a slot typed `type_ref` takes a type where
+  substituted as a token and read by the position it lands in, so a slot typed `type_kind` takes a type where
   an atom-typed slot takes a value". Nothing is checked at the declaration, and each channel is decided where
-  the argument lands. A parameter routed into a *vocabulary slot* typed `type_ref` — `my_set => <T> array ^ {
-  element_type: = T }` — is refused when it closes, by §5.2's rule that a fixed value is available on a field
-  typed by an atom or an enum and nowhere else; the legal value-routed form (`max_items: = N`, an atom-typed
+  the argument lands. A parameter routed into a *vocabulary slot* typed `type_kind` — `my_set => <T> array ^ {
+  element_type: = T }` — pins the element type when it closes, `type_kind` being an atom whose value is a type's
+  name, so §5.2 admits the fixed value and judges it a member where it is written; the value-routed form
+  (`max_items: = N`, an atom-typed
   slot) closes normally. A parameter standing as a *field type* or a *variant* closes into a working type
   rather than a tolerated one: `ctor_box => <T> base & { value: T }` with `flagged => ctor_box<boolean>`
   materialises, compiles, accepts `{ value: true }` and rejects `{ value: banana }` with a `TYPE_MISMATCH` at

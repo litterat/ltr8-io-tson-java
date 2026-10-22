@@ -52,7 +52,7 @@ class BootstrapReferencesTest {
         Top recordField = MetaKernelBootstrapResolver.getMetaKernelSchema()
                 .entries().get("record_field");
 
-        assertEquals("type_ref", field(recordField, "type").type().name());
+        assertEquals("type_kind", field(recordField, "type").type().name());
         assertTrue(field(recordField, "type").type().annotations().isEmpty());
     }
 

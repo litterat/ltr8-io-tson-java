@@ -83,7 +83,7 @@ class MetaTn1CompiledEndToEndTest {
         for (String name : meta.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(120, meta.schema().entries().size());
+        assertEquals(121, meta.schema().entries().size());
     }
 
     @Test

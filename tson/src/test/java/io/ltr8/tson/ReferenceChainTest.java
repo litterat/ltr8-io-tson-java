@@ -58,7 +58,7 @@ class ReferenceChainTest {
     /** A position naming something that is not a reference is unaffected, as it always was. */
     @Test
     void aNonReferenceIsUnaffected() {
-        assertEquals("type_ref", fieldType(kernelEntry("record_field"), "type").name());
+        assertEquals("type_kind", fieldType(kernelEntry("record_field"), "type").name());
     }
 
     private static final String CHAIN = """
