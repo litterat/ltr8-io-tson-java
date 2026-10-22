@@ -501,7 +501,7 @@ final class DefinitionResolver {
         if (typeDef instanceof StructuralTypeDef structural) {
             List<String> parameters = structural.typeParams();
             if (structural.body() instanceof RecordDef recordDef) {
-                RecordBody body = resolveRecordBody(recordDef.entries(), parameters);
+                RecordBody body = resolveRecordBody(recordDef.entries());
                 // Only an error placeholder is both parameterised and still a bare RecordDef here -- the
                 // desugar phase rewrote every real record template into the `!record { ... }` §5.2 says it
                 // denotes, which `openRecord` binds.
@@ -1391,8 +1391,7 @@ final class DefinitionResolver {
                 // held body carries `extension`, so a value can stand at it and be a value of one of its
                 // members. Where this declaration takes no parameters of its own it is never held, so there
                 // is no later materialisation to close the application kept in the chain and mint
-                // the edge the way an open operand's gets one -- the same "no later materialisation of this
-                // body" the fixation below is doing its work for. So the edge is stated here, and to the base
+                // the edge the way an open operand's gets one. So the edge is stated here, and to the base
                 // itself rather than to an instantiation nothing mints: `dog => pet<"dog"> & { … }` IS-A
                 // `pet`, which is what puts `dog` in `pet.subtypes` and lets a `pet` position dispatch.
                 if (parameters.isEmpty()
@@ -1414,16 +1413,7 @@ final class DefinitionResolver {
                                     ? typeArguments(name, generic)
                                     : operand.arguments()));
                 }
-                // §5.7's fixation, at the only place a closed operand gets one. A field routed `= P` is held
-                // required and FREE with the parameter in `value`, and becomes optional and FIXED when
-                // substitution makes the value concrete -- which for an operand applied to concrete arguments
-                // is here, there being no later materialisation of this body to do it. An operand applied to
-                // this declaration's own parameter stays FREE: its value is still a parameter, and its own
-                // closing is what fixes it.
-                RecordBody absorbed = namesOwnParameter(generic, parameters)
-                        ? operand.body()
-                        : (RecordBody) TemplateMaterialiser.fixRoutedValues(operand.body());
-                absorb(name, absorbed, fields, groups, seenFieldNames, inheritedFields);
+                absorb(name, operand.body(), fields, groups, seenFieldNames, inheritedFields);
                 continue;
             }
             if (!(supertypeRef instanceof SimpleRef simple)) {
@@ -1496,7 +1486,7 @@ final class DefinitionResolver {
         if (construction.body().isPresent()) {
             refuseDeclaredChain(name, construction.body().get().entries(), transitiveSupertypes);
             for (RecordEntry entry : construction.body().get().entries()) {
-                resolveEntry(name, entry, fields, groups, seenFieldNames, inheritedFields, parameters);
+                resolveEntry(name, entry, fields, groups, seenFieldNames, inheritedFields);
             }
         }
 
@@ -1777,7 +1767,7 @@ final class DefinitionResolver {
                         + "' names no inherited field -- a refinement copies its source's whole field set and "
                         + "admits no new fields; composition (`&`) is what adds one (§5.7)");
             }
-            fields.put(fieldDef.name(), resolveTighteningField(name, fieldDef, inherited, groups, parameters));
+            fields.put(fieldDef.name(), resolveTighteningField(name, fieldDef, inherited, groups));
         }
 
         determineKind(name, transitiveSupertypes);
@@ -2000,12 +1990,12 @@ final class DefinitionResolver {
 
     // ── Record bodies, fields, and field groups (§5.2, §5.11) ─────────────
 
-    private RecordBody resolveRecordBody(List<RecordEntry> entries, List<String> parameters) {
+    private RecordBody resolveRecordBody(List<RecordEntry> entries) {
         SequencedMap<String, RecordField> fields = new LinkedHashMap<>();
         List<FieldGroup> groups = new ArrayList<>();
         Set<String> seenFieldNames = new HashSet<>();
         for (RecordEntry entry : entries) {
-            resolveEntry(null, entry, fields, groups, seenFieldNames, Set.of(), parameters);
+            resolveEntry(null, entry, fields, groups, seenFieldNames, Set.of());
         }
         return new RecordBody(fields, groups, RecordExtensionType.OPEN, markedNames(entries), Optional.empty());
     }
@@ -2052,16 +2042,16 @@ final class DefinitionResolver {
      */
     private void resolveEntry(String declarationName, RecordEntry entry, SequencedMap<String, RecordField> fields,
                                List<FieldGroup> groups, Set<String> seenFieldNames,
-                               Set<String> inheritedFields, List<String> parameters) {
+                               Set<String> inheritedFields) {
         switch (entry) {
             case FieldDef fieldDef -> {
                 if (inheritedFields.contains(fieldDef.name())) {
                     fields.put(fieldDef.name(), resolveTighteningField(declarationName, fieldDef,
-                            fields.get(fieldDef.name()), groups, parameters));
+                            fields.get(fieldDef.name()), groups));
                 } else {
                     requireFieldNameNotSeen(declarationName, fieldDef.name(), seenFieldNames, FieldOrigin.BODY_FIELD);
                     seenFieldNames.add(fieldDef.name());
-                    fields.put(fieldDef.name(), resolveField(fieldDef, parameters, Optional.empty()));
+                    fields.put(fieldDef.name(), resolveField(fieldDef, Optional.empty()));
                 }
             }
             case GroupDef groupDef -> {
@@ -2094,7 +2084,7 @@ final class DefinitionResolver {
      * since an injected member would be present and presence is what selects the group's alternative.
      */
     private RecordField resolveTighteningField(String declarationName, FieldDef fieldDef, RecordField inherited,
-                                                List<FieldGroup> groups, List<String> parameters) {
+                                                List<FieldGroup> groups) {
         boolean member = groups.stream().anyMatch(group -> group.hasMember(fieldDef.name()));
         if (member) {
             restateMemberMark(declarationName, fieldDef, groups);
@@ -2105,7 +2095,7 @@ final class DefinitionResolver {
                     + "a member's omission is the group's (§5.11). A pin ('= value') is checked where written "
                     + "and never supplied");
         }
-        RecordField tightened = resolveField(fieldDef, parameters, Optional.of(inherited));
+        RecordField tightened = resolveField(fieldDef, Optional.of(inherited));
         if (member) {
             tightened = tightened.withFacts(true, tightened.voidable(), tightened.role());
         }
@@ -2222,13 +2212,10 @@ final class DefinitionResolver {
      * text resolves into the enclosing entry's own {@code parameters}. There is no separate channel for a
      * parameter, and the kernel declares none, a held body being unread until its parameters are gone.
      *
-     * <p>What a parametric modifier still changes is the field's <b>role</b>. A parametric {@code =}
-     * (e.g. {@code array}'s {@code element_type: type_ref = T}, {@code T} declared by {@code array =>
-     * <T> ...}) leaves the field FREE -- nothing is actually fixed at declaration, the argument arriving at
-     * application (§5.10), so {@code array}'s own {@code element_type} states no facts in output -- and
-     * fixation happens at materialisation (§5.7). A parametric {@code ~} is a DEFAULT, identically to a literal
-     * default. A literal modifier gives the role DEFAULT ({@code ~}) or FIXED ({@code =}); whether omission
-     * reaches it is the name's {@code ?}, which {@link FieldModifiers} reads beside it.
+     * <p><b>The role is the modifier's, whatever stands in {@code value}.</b> {@code =} gives FIXED and
+     * {@code ~} DEFAULT, a parameter as a literal does (SPEC-FEEDBACK.md #20): the parameter is the value an
+     * application will supply, and closing substitutes it without changing a fact. Whether omission reaches the
+     * value is the name's {@code ?}, which {@link FieldModifiers} reads beside it.
      *
      * <p>{@code inherited}, supplied only from {@link #resolveTighteningField}, is the field this entry
      * tightens. Two things are read off it: its <b>type</b>, when {@code field.type()} is elided ({@code
@@ -2245,11 +2232,11 @@ final class DefinitionResolver {
      * extra: ?}) has no annotation position at all, so an entry that mentions nothing must not be able to
      * erase what it does not mention.
      */
-    private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
+    private RecordField resolveField(FieldDef field, Optional<RecordField> inherited) {
         Annotations own = annotationsOf(field.name(), field.annotations());
         // No mark to inherit: which fields a family dispatches on is the *record's* statement
         // (`record.discriminators`), and a member states none of its own.
-        return resolveFieldEntry(field, parameters, inherited)
+        return resolveFieldEntry(field, inherited)
                 .withAnnotations(inherited.map(source -> merged(own, source.annotations())).orElse(own));
     }
 
@@ -2292,8 +2279,7 @@ final class DefinitionResolver {
      * output". Unlike a declaration, there is no before/after ambiguity here -- a field has one annotation
      * position and it is the field's own.
      */
-    private RecordField resolveFieldEntry(FieldDef field, List<String> parameters,
-                                           Optional<RecordField> inherited) {
+    private RecordField resolveFieldEntry(FieldDef field, Optional<RecordField> inherited) {
         io.ltr8.tson.schema.meta.TypeRef type;
         if (field.type().isPresent()) {
             type = resolveTypeRef(field.type().get().typeRef());
@@ -2317,12 +2303,11 @@ final class DefinitionResolver {
                 ? field.type().get().voidable()
                 : inherited.map(RecordField::voidable).orElse(false);
 
-        // A parameter and a literal share the `value` slot: §8.1's shadowing rule tells them apart, a token
-        // being a parameter exactly when its text resolves into the enclosing entry's own `parameters`.
-        // What still differs is the *role* -- §5.7 leaves a parametric `= P` FREE, nothing being fixed until
-        // the value is concrete -- and that is what FieldModifiers decides.
+        // A parameter and a literal share the `value` slot, and the role is the modifier's for both: §8.1's
+        // shadowing rule tells them apart, a token being a parameter exactly when its text resolves into the
+        // enclosing entry's own `parameters`.
         FieldModifiers.Resolved resolved =
-                FieldModifiers.of(field.name(), field.omittable(), voidable, field.modifier(), parameters);
+                FieldModifiers.of(field.name(), field.omittable(), voidable, field.modifier());
         return new RecordField(type, resolved.optional(), resolved.voidable(), resolved.role(),
                 resolved.value().map(DefinitionResolver::toMetaToken), Annotations.empty(),
                 positions.of(field));

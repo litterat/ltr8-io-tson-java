@@ -27,11 +27,9 @@ import java.util.Optional;
  * <p><b>{@code value} is one slot, and carries a parameter as readily as a literal.</b> Inside a template
  * body a token there is a parameter exactly when its text resolves into the enclosing entry's {@code
  * parameters} (§8.1's shadowing rule), and a closed entry has no parameters for one to resolve into -- so
- * the same slot is unambiguous at both ends and needs no label. A held body is not read as this vocabulary
- * until materialisation has substituted, which is what makes that true; §5.7's fixation (a parametric
- * {@code = P} is a required {@link FieldRole#FREE} field carrying the parameter until its value is concrete,
- * then becomes optional and FIXED) is what the single channel costs and where it is paid. That held state
- * is the one place a FREE field carries a value.
+ * the same slot is unambiguous at both ends and needs no label. The role beside it is the modifier's either
+ * way: {@code = P} is {@link FieldRole#FIXED} where it is written, as {@code = 201} is, and closing substitutes
+ * the value without changing a fact. So a {@link FieldRole#FREE} field never carries a value.
  *
  * <p><b>A field never says it is a discriminator.</b> Which fields a sealed family dispatches on is the
  * enclosing record's own statement ({@code record.discriminators}), because §5.8 flattens a base's fields

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=8d9451a15045c462bc6a124fa0b2df0c36b3f37c8ce87494dadeb189146931a8"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=c50085d26e23c303eb3e43f3c1781f9114f5bd1deed189d71081e59124bcb874"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -616,20 +616,20 @@
     text resolves into the enclosing record's `parameters` ([TSON-SCHEMA]
     §5.10's shadowing rule), in resolved output as in source.
 
-    A parametric modifier takes the name mark its literal spelling takes
+    A parametric modifier takes the facts its literal spelling takes
     ([TSON-SCHEMA] §5.7): `w?: T ~ P` is an optional DEFAULT field and
     `w?: T = P` an optional FIXED one, `w: T = P` is a FIXED field that is not
     optional, and `w: T ~ P` is refused. The parameter stands in `value` until
-    substitution makes it concrete, a routed `= P` FREE until then: fixation
-    happens at materialisation, where the value is ([TSON-SCHEMA] §5.7).
-    `optional` is the name's mark as written, and closing never changes it.
+    an application substitutes its argument there, which changes no other fact.
 
     Which fields a member-dispatched family dispatches on is the enclosing
     record's own statement, `record.discriminators`, and no field says it of
     itself. A field it names is required and not voidable, no member of a field
     group, typed by an atom or an enum, and carries no value of its own; each
     subtype restates it FIXED, the pins pairwise distinct under the field type's
-    own equality.
+    own equality. In a record template a field FIXED to a parameter is named
+    too: each application supplies its pin, and the base reads the field with
+    that pin dropped.
 
     The two facts are the series' two kinds of nothing, and each has one name
     wherever it applies: a slot that may be missing is `optional`, on a record

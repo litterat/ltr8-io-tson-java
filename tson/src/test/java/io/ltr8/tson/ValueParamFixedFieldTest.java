@@ -72,17 +72,16 @@ class ValueParamFixedFieldTest {
     }
 
     /**
-     * The declaration is <b>right</b>, and deliberately so: §5.7 says a parametric {@code = P} places the
-     * field in REQUIRED, "because nothing is fixed at declaration -- the value does not exist yet". Pinned
-     * because the obvious fix for the defect below is to make this REQUIRED_FIXED, which would put this
-     * implementation at odds with the one sentence the spec is explicit about.
+     * The role is the modifier's, settled where the field is written: {@code status?: int32 = S} is an optional
+     * FIXED field exactly as {@code status?: int32 = 201} is, and only the value waits for an application
+     * (SPEC-FEEDBACK.md #20).
      *
-     * <p>A record template is the record it is, so the state and the parameter are read off its own {@code
+     * <p>A record template is the record it is, so the role and the parameter are read off its own {@code
      * RecordField}: the parameter stands in the ordinary {@code value} slot, with §8.1's shadowing rule to tell it
      * from a literal.
      */
     @Test
-    void anOpenTemplatesParametricFixedFieldStaysRequiredWithTheParameterRecorded() {
+    void anOpenTemplatesParametricPinIsFixedWhereDeclared() {
         TsonLinkedSchema linked = tson().resolve(SCHEMA);
 
         RecordBody open = assertInstanceOf(RecordBody.class,
@@ -93,14 +92,13 @@ class ValueParamFixedFieldTest {
         assertEquals(List.of(TemplateParam.typeParameter("T"), new TemplateParam("S", TypeRef.of("int32"))),
                 open.parameters(), "S is routed into an int32 field, so an argument for it is read as an int32");
         assertEquals("S", status.value().orElseThrow().text(), "the parameter stands in the ordinary value slot");
-        assertEquals(FieldRole.FREE, status.role(), "nothing is fixed at declaration");
+        assertEquals(FieldRole.FIXED, status.role(), "the pin is fixed where it is written");
+        assertTrue(status.optional(), "and the name's mark is as written");
     }
 
     /**
-     * Substitution is where §5.7's "fixation happens downstream, where values are concrete" applies: the
-     * argument arrives, so the field is fixed to it, and the templated form lands on exactly the state the
-     * literal form beside it has. Before this, the closed entry carried the right value on a field whose
-     * state no longer said it was fixed.
+     * Closing substitutes the argument and changes no fact, so the templated form lands on exactly the state
+     * the literal form beside it has.
      */
     @Test
     void aMaterialisedValueParameterFieldIsFixedToItsArgument() {
@@ -114,9 +112,8 @@ class ValueParamFixedFieldTest {
     }
 
     /**
-     * A routed <em>default</em> is not promoted: §5.7 sends {@code ~ P} to REQUIRED_DEFAULT, and a default
-     * that data may override is the whole difference between the two spellings. The promotion above reads
-     * the state to tell them apart, so this is the half that says it reads it correctly.
+     * A routed <em>default</em> stays a default: {@code ~ P} is DEFAULT where it is written, as {@code ~ 201}
+     * is, and a default that data may override is the whole difference between the two spellings.
      */
     @Test
     void aMaterialisedValueParameterDefaultStaysADefault() {

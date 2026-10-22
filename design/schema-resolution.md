@@ -137,7 +137,7 @@ are kept in step deliberately.
   container, a reference and a constructor-application template are `TemplateBody` values with no such dispatch,
   and stay "not a type until applied". Only `final` is refused there, its applications being
   subtypes by construction. **Member dispatch does not travel to a member**
-  (`TemplateMaterialiser.closedExtension`): §5.7 fixation pins the selectors and clears their marks, so a
+  (`TemplateMaterialiser.closedExtension`): closing pins the selectors and the member names none, so a
   member is an ordinary concrete record, where ABSTRACT does travel and is how `abstract` reaches every
   instantiation. One dispatcher serves both kinds of base — `RecordMemberDispatchReader` takes the selector
   *fields* rather than a body, and `FamilySelectors.of` (`schema.meta`) derives them from the base's own fields,
@@ -315,7 +315,7 @@ the mark being stated in the held body's own text (`extension: ABSTRACT`) and re
 reader when the body closes, so every instantiation is abstract over the family the edge above builds. **A template
 dispatches on members** where a selector survives erasure — a `=?` field, or one pinned to a value parameter — its
 members (its `subtypes`, the entries whose chain names it) being the instantiations the dispatch ranges over; that does
-not travel to a member, §5.7 fixation having pinned the selectors and cleared them. Only `final` stays a resolver error
+not travel to a member, closing having pinned the selectors and the member naming none. Only `final` stays a resolver error
 there: every application is a subtype of the template by construction, so the claim is false before an author writes
 anything else (§5.10, §5.2). `OpenOperandCompositionTest` pins the substitutability table, `SubtypeTemplateFamilyTest`
 the family a base template and its subtype templates close into, and `AbstractTemplateFamilyTest` the mark over that

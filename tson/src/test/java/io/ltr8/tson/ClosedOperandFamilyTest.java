@@ -15,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the argument is a literal rather than the declaring declaration's own parameter (§5.10).
  *
  * <p><b>The member is the author's own declaration and nothing is minted for the operand.</b> §5.8 absorbs
- * the operand's fields, §5.7's fixation turns the routed {@code = T} into the member's own {@code
- * REQUIRED_FIXED} pin, and what outlives the substitution is that {@code dog} IS-A {@code pet}. An entry for
+ * the operand's fields, substitution puts the argument in the routed {@code = T}, already FIXED where it is
+ * written, and what outlives the substitution is that {@code dog} IS-A {@code pet}. An entry for
  * {@code pet<"dog">} would be a derivation step wearing an entry's clothes -- nothing names it, and the
  * member a document actually writes is {@code dog}.
  *

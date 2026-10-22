@@ -22,8 +22,8 @@ history lives in git.
   `name_type` is written too.
 - Substitution is one rule at every depth: an **unquoted** token in a tree, rewritten when its text resolves into the
   entry's `parameters` (§8.1's shadowing rule); a quoted token is a literal.
-- §5.7's fixation happens at closing (`fixRoutedValues`): a routed `= P` arrives FREE with the parameter as its value
-  and becomes FIXED; a `~ P` arrives a DEFAULT and stays one. `optional` is the name's mark throughout.
+- A routed `= P` is FIXED where it is written and `~ P` DEFAULT, `optional` as the name was marked; closing substitutes
+  the value and changes no fact. A FREE field never carries a value.
 - Applications inside a held body close before the entry is named, and in the synthetic merge the closed-record name
   wins; only a form whose binding held an application moves.
 - A closed form is named for itself through `DerivedName.ofBinding`, the application gets a second `Reference` entry,
@@ -85,11 +85,9 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
   - **There is no other body shape.** Every open entry has a held tree — an *error placeholder* included, which is
     an open empty record, so it closes by the same process as any record template. `close` is total over held
     trees, with any other shape an `IllegalStateException` naming the invariant.
-  - **§5.7's fixation happens here** (`fixRoutedValues`), which is what an open record's single `value` channel
-    costs and where §5.7 says to pay it: a field routed by `= P` is held FREE with the parameter standing in
-    `value`, and a FREE field carrying a value is that and nothing else — a closed FREE field has none. Closing
-    makes it FIXED, what the literal spelling gives, and leaves `optional` as the name was marked.
-    A `~ P` default arrives as a DEFAULT and stays one: data may still override it.
+  - **Closing changes no field fact.** A field routed by `= P` is FIXED where it is written, as `= 201` is, with
+    the parameter standing in `value`; closing substitutes the argument there. What closing does change is the
+    record's selector list, which the member does not carry (`asMember`).
   - **Substitution is one rule, at every depth.** The body was never read against constructor vocabulary, so
     a parameter in a slot, one inside an application a slot holds (`tree<p0>` becoming `tree<text>`), and one
     inside a collection are the same thing here: an unquoted token in a tree, rewritten when its text resolves
@@ -302,6 +300,6 @@ leaves the desugar phase as `<B> !reference { target: pair<text, B> }`, spellabl
 materialisation dispatch on the constructor head (`record` closes to the instantiation, `reference` to a name,
 everything else to a synthetic) rather than on which kernel shape holds the entry.
 The kernel has no `record_field.value_param`, `instance_template` or `template_argument`: a
-routed parameter rides `value` with §8.1's shadowing rule to tell it from a literal, and §5.7's fixation
-happens at materialisation. What a held body cannot enforce is half of §5.10's argument-kind rule —
+routed parameter rides `value` with §8.1's shadowing rule to tell it from a literal, beside the role its modifier
+gives. What a held body cannot enforce is half of §5.10's argument-kind rule —
 `design/template-materialisation.md`, under kind checking.

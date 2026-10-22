@@ -118,9 +118,8 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     a second entry for one type. One producer, one spelling: `WireForm.refValue` is the single place a type
     slot's shape is decided.
   - **A parameter rides the ordinary `value` slot**, with §8.1's shadowing rule to tell it from a literal,
-    which is why the kernel declares one `value` slot and no labelled group. §5.7's fixation then happens at
-    materialisation
-    (`TemplateMaterialiser.fixRoutedValues`), where the value is concrete.
+    which is why the kernel declares one `value` slot and no labelled group. The role beside it is the
+    modifier's (`FieldModifiers`): `= P` is FIXED where it is written, and closing only substitutes the value.
   - **A composition or refinement template is built one phase later**, as the *flattened* open record
     (`DefinitionResolver.parameterised`), and every open record's held tree is written by `WireForm.heldRecord`
     (through `HeldBody.of`). Both absorb fields from a source, and a §5.7 tightening entry states a modifier and no
