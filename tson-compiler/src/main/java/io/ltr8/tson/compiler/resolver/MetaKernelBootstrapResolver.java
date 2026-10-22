@@ -18,6 +18,7 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.IriType;
@@ -78,9 +79,10 @@ import java.util.Optional;
  * whose {@code signed} field already references {@code boolean}, which is not resolved until the second
  * pass, so there is no point at which a reader could be compiled against a complete schema. Rather than
  * deciding case by case which of meta-kernel's own instances need hand-picking, {@link #instanceBody}
- * hand-picks all of them uniformly -- meta-kernel only ever instantiates constructors in three known
- * shapes: a bare {@code {}}, a bare array of tokens ({@code enum}), and the binding record {@link
- * SchemaDesugarer} emits for a container application.
+ * hand-picks all of them uniformly -- meta-kernel only ever instantiates constructors in four known
+ * shapes: a bare {@code {}}, a bare array of tokens ({@code enum}), a record of tokens ({@code identifier_type},
+ * {@code iri_type} and {@code kind_type} instances), and the binding record {@link SchemaDesugarer} emits for a
+ * container application.
  *
  * <p>{@link #getMetaKernelSchema()} reads meta-kernel.tn packaged as a classpath resource, via
  * {@link TsonBundledSchemas#fetch} (`tson-schema` -- see that class's own Javadoc for why its own
@@ -251,16 +253,14 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * The direct, hand-written construction for one of meta-kernel's own eight real constructor
-     * targets (see this class's own Javadoc) -- {@link Optional#empty()} for anything else, left
-     * for the caller to decide what that means (today: the declaration is simply left out of the
-     * result, rather than failing the whole bootstrap; unexercised against the real fixture, since
-     * all eight real targets are covered).
+     * The direct, hand-written construction for one of meta-kernel's own constructor targets (see this
+     * class's own Javadoc) -- {@link Optional#empty()} for anything else, left for the caller to decide what
+     * that means (the declaration is left out of the result, rather than failing the whole bootstrap;
+     * unexercised against the real fixture, since every real target is covered).
      *
      * <p>Package-private, not {@code private} -- {@code MetaKernelBootstrapResolverTest} exercises the
      * unrecognized-target and wrong-shape-body branches directly, since neither is reachable through
-     * the real fixture (every real target is one of the eight, and every empty-bodied one really is
-     * empty).
+     * the real fixture (every real target is covered, and every empty-bodied one really is empty).
      */
     static Optional<Top> instanceBody(Instance instance) {
         return instanceBody("", instance);
@@ -306,6 +306,9 @@ public final class MetaKernelBootstrapResolver {
                 yield Optional.of(RegexType.UNCONSTRAINED);
             }
             case "enum" -> Optional.of(toEnumBody(instance.value()));
+            // The kernel's three kinds, `!kind_type { of: identifier_type }` and its two siblings: `of` is the one
+            // authored field, and the members are derived when the kernel links, as every kind's are.
+            case "kind_type" -> Optional.of(new KindBody(bindingField(instance.value(), "of")));
             // Emitted by SchemaDesugarer above, never written by hand in the fixture. array and set differ
             // only in the defaults set tightens (§5.7): ordered/duplicating vs unordered/unique.
             case "array" -> Optional.of(toArrayBody(instance.value(), false));

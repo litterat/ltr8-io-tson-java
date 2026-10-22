@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=1ed7702e6ba0375351089945300114bf1b5db00961d84b6f7ba28d8ea4e02d97"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=0cafe3c7d8ab3c3657089e19b134b14af44b4122944ad8cd36c34632df95b62a"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -716,13 +716,13 @@
     `name_type` names the family this record's field names belong to, as an
     enum_type's names its members': every name in `fields`, `discriminators`
     and the groups is a value of it, and so is every field name a data value of
-    this record writes. It names an identifier family, so every field name is a
-    name under its profile, and the field name slots are therefore `text`, each
-    judged by this type. A record's name type is set where it is declared and
-    a subtype cannot change it: absent, it is its supertypes' one name type,
-    and `field_name`, the kernel's identifier, for a record with none; stated
-    beside supertypes, it is theirs. Supertypes with different name types do
-    not compose.
+    this record writes. It names an identifier family, a member of
+    `identifier_kind`, so every field name is a name under its profile, and the
+    field name slots are therefore `text`, each judged by this type. A record's
+    name type is set where it is declared and a subtype cannot change it:
+    absent, it is its supertypes' one name type, and `field_name`, the kernel's
+    identifier, for a record with none; stated beside supertypes, it is theirs.
+    Supertypes with different name types do not compose.
     """
   record => product & {
     access_pattern?: product_access_type = NAMED
@@ -731,7 +731,7 @@
     groups?:         [field_group]
     extension?:      record_extension_type ~ OPEN
     discriminators?: [text; 1..]
-    name_type?:      type_name
+    name_type?:      identifier_kind
     parameters?:     [template_param]
   }
 
@@ -818,8 +818,8 @@
   @doc:"""
     An enumeration: a closed set of names, and the type they are drawn from
     ([TSON-SCHEMA] §7.4), as a record's `name_type` is its field names'.
-    `name_type` names an identifier family — an atom-family instance whose
-    constructor IS-A identifier_type — and each member must be a value of it,
+    `name_type` names an identifier family — a member of `identifier_kind`, a
+    type built with identifier_type — and each member must be a value of it,
     distinct from the others under its equality, and is a name under its
     profile ([TSON-DATA] §8.2). A closed set of text that is no name is the
     text family's own `members` facet, `!text ^ { members: [...] }`; an
@@ -834,7 +834,7 @@
     members and never the type.
     """
   enum_type => atom & {
-    name_type: type_name
+    name_type: identifier_kind
     members:   enum_set
   }
 
@@ -852,6 +852,55 @@
     variants:  [type_ref]
     disjoint?: boolean
   }
+
+  @doc:"""
+    The names of the types built with the constructor `of`: an atom whose
+    values are type names, as an enum's are the names it lists. An entry of the
+    governing schema's closure is a member when, past its alias hops
+    ([TSON-SCHEMA] §8.3), the constructor its value applies is `of` or IS-A
+    `of`, a constructor template followed to the constructor it applies, and
+    it is not itself a constructor (it is not IS-A `top`). A record written in
+    braces is built with `record`, and so is a record template, which is a
+    type. A template over another constructor is no type and no member; an
+    application of one is, as the type it expands to, and so is an alias of a
+    member.
+
+    `of` names a constructor of the writer's structure namespace
+    ([TSON-SCHEMA] §3.3.1), as a constructor role does, and never a type of its
+    type-name namespace. It is `type` or at or below it; any other `of` is a
+    resolver error at the declaration.
+
+    A value is a type name ([TSON-DATA] §7.7), and conforms when it resolves to
+    a member. In a data document it resolves in the type-name namespace of the
+    governing schema. In a schema document it resolves where the slot holding
+    it says, `name_type`'s by [TSON-SCHEMA] §7.4, and is judged a member when
+    that schema links. The value is the name, never a value of the type it
+    names.
+
+    `members` is a resolver-derived index, parallel to `subtypes`: computed at
+    link over the governing schema's closure and sorted as `subtypes` is.
+    Declarations never set it; on ingest it MUST be discarded and recomputed.
+    A kind with no members admits no value.
+    """
+  kind_type => atom & {
+    of:       type_name
+    members?: [type_name]
+  }
+
+  @doc:"""
+    The spelling of a kind an author writes inline: `kind<uuid_type>` is
+    `!kind_type { of: uuid_type }`.
+    """
+  kind => <T> !kind_type { of: T }
+
+  @doc:"The names of the identifier families, which a `name_type` names."
+  identifier_kind => !kind_type { of: identifier_type }
+
+  @doc:"The names of the atoms."
+  atom_kind => !kind_type { of: atom }
+
+  @doc:"The names of the types a value can have."
+  value_kind => !kind_type { of: type }
 
   @doc:"""
     Resolver output: a schema map, from each name to the value its entry

@@ -1788,3 +1788,186 @@ selector required whatever the mark, the mark being each member's.
 **Status against Revision 37:** open; running on `r2026-38-proposal` (`SchemaDesugarer.parametricallyPinned`).
 `TemplateIsAFamilyBaseTest`'s sealed family (`pet => <T, V> { type?: text = T  value: V }`) reads a value at a `pet`
 position by its `type`.
+
+---
+
+## 22. The types built with a constructor are a kind: `kind_type`, an atom whose values are their names
+
+**Section:** [TSON-SCHEMA] §4.1 and #9 (the `type` kind, "a constructor is an entry IS-A `top`"), §4.2 (atoms and
+atom constructors), §3.3.1 and §3.3.2 (the structure namespace, available "at constructor roles only"), §5.10
+(constructor templates and their value parameters), §7.4 (`enum_type.name_type`), §8.1 (resolved output: the derived
+index `subtypes`), §8.3 (alias hops), §9 (the inventory, and "a slot that names a type MUST be typed `type_ref`"),
+§5.4 (sums); [TSON-DATA] §7.7 (the name grammar).
+
+**Kind:** proposal. The first of the namespace entries the register's preface says will be raised against Revision
+38, and deliberately the one with no namespace in it.
+
+**The problem.** Nearly every kernel slot that names a type carries a rule about what it may name, and no slot
+states it: `enum_type.name_type` must name an identifier family, `record.name_type` likewise, `map.key_type` an atom,
+`record_field.type` a type a value can have. Each rule is prose in one section and a check coded in a resolver, and
+a meta-schema extension declaring a slot of its own has no way to state one. A user meta-schema shows the shape of
+what is wanted — an enum whose member names may contain a space, declared by pointing `name_type` at a second
+identifier family:
+
+```
+identifier      => !identifier_type { continue_add: "-" }
+text_identifier => !identifier_type { continue_add: " " }
+enum            => enum_type ^ { name_type?: = identifier }
+text_enum       => enum_type ^ { name_type?: = text_identifier }
+
+enum_type => atom & { name_type: kind<identifier_type>  members: enum_set }
+```
+
+The last line is the one the kernel cannot write today. What it says is "`name_type` holds the name of a type built
+with `identifier_type`": *the types built with a constructor* is a set the schema language has no name for, and
+the slot's value is a *name* drawn from that set, not a value of any type in it.
+
+**Background: what this is, and why it is not a sum.** The kernel already has a universe. `type` is the universe
+of the types a value can have, and `type_name` is its *code* type: a name is a code, and the type-name namespace is
+the decoding from codes to the types they denote — a universe à la Tarski, codes on one side and the types on the
+other. A slot typed `type_name` holds a code. `kind<T>` is a predicate on codes, and the set it carves out is a
+subuniverse: in dependent-type terms the refinement `{ c : type_name | c decodes to a type built with T }`; in
+System F-omega terms literally a *kind*, the classifier of type constructors, so that `name_type: kind<identifier_type>`
+is a kind signature; in Haskell terms a class whose instances are computed by construction instead of declared. In
+each framing its inhabitants are **names of types**, and it holds no value of any of them.
+
+A sum type is a different object. A coproduct `A + B` is closed, its variants are listed, and its inhabitants are
+*values* injected from a variant — never names. The two are related by the dependent sum: "some type in the kind
+and a value of it", `Σ (c : kind<T>). decode(c)`, the existential package whose witness is the tag in
+`!stock_id 7d3e…`. A `choice` is that same shape over a *listed* set of codes. So the honest order is: a kind is a
+set of names; a choice is a sum over a listed set of names; a sum over a computed set of names is a choice whose
+variants are a kind. The kind is the set, and the sum is what one builds on top of it.
+
+The sum reading fails on the example above, and the failure is invisible on the wire: with `kind_type` a sum,
+`name_type: kind<identifier_type>` would mean "a value of some identifier type" and admit the token `NewYork`; the
+predicate reading admits only `identifier` or `text_identifier`, names of types built with `identifier_type`. A
+type name is an identifier token, which is why the conflation reads correctly until the enum is written down.
+
+**Proposed.** The set of types built with a constructor is an atom, and the kernel declares it:
+
+```
+kind_type => atom & { of: type_name  members?: [type_name] }   -- names of the types built with `of`
+kind      => <T> !kind_type { of: T }                           -- the inline spelling: kind<identifier_type>
+```
+
+Its place in the hierarchy is `top → type → atom → kind_type → identifier_kind`, where the enum sits: an enum is an
+atom whose value set is a *listed* set of names from an identifier family, and a kind is an atom whose value set is
+a *computed* set of names from `type_name`. One lists, the other walks, and nothing new is needed below `top`. A
+kind is IS-A `type`, so it stands in any value position, and in every such position the value is a name.
+
+- **A value of a kind is a type-name token** ([TSON-DATA] §7.7's grammar; a JSON string in [TSON-JSON]), and it
+  conforms when it resolves, where the slot's prose says a name there resolves, to a member. The referent is
+  found first and judged after: a kind never selects among candidates, it refuses the one found. The members are
+  the governing schema's closure's, so a user meta-schema's `text_identifier` is a member of the kernel's
+  `identifier_kind` when that schema is read. Nothing of the kind reaches the data the referent types: `NewYork`
+  conforms to `identifier`, and the kind only judged which identifier family was allowed to stand there.
+- **Membership is one walk.** An entry is a member of `!kind_type { of: C }` iff, past its alias hops (§8.3), the
+  constructor its value applies is C or IS-A C — a constructor template followed to the constructor its body
+  applies — and the entry is not itself a constructor, which is to say not IS-A `top` (§3.3.1, #9). A record written
+  in braces is built with `record`, and so is a record template, which is a type (#17); a template over another
+  constructor is no type and no member, while what an application of one expands to is (#18); an alias of a member
+  is listed beside it. The walk runs over resolved entries, not names, and has no namespace question.
+- **`of` names a constructor of the parent system.** It resolves in the writer's **structure namespace** (§3.3.1),
+  as a constructor role does (§3.3.2): `identifier_type` is the kernel's, reached through the meta chain, and never
+  a type of the writer's type-name namespace. `of` must be `type` or at or below it: `kind<data>` names no type a
+  value can have, and is a resolver error at the declaration. `of` is typed `type_name` and not by a kind, and this
+  is a known gap rather than a design: its values are names of *constructors* at or below `type`, which #9's rule
+  excludes from membership of any kind, so `kind<type>` does not cover them. This is the one slot where the
+  type-theoretic account asks for a higher kind — a classifier of constructors — and the series has none. The
+  slot's store is stated here in prose, as every constructor role's is (§3.3.1).
+- **A kind is not a bound.** "Any type IS-A `stock_id`" names a type of the writer's type-name namespace and walks
+  supertypes; a kind names a constructor of the structure namespace and walks construction. Two stores, two
+  mechanisms: `template_param.bound` is untouched, and `kind<stock_id>` is not a kind.
+- **Members are computed at link, over the governing schema's closure**, and are static once linked. Two schemas
+  importing different sets have different members for the same `kind<identifier_type>`, and a document is judged
+  under its own schema's. A kind never reaches past the closure, and an empty kind admits no value, which §5.10.1's
+  productivity rule already refuses.
+- **Resolved output carries the members as a derived index**, on the terms of `subtypes`: computed by the resolver,
+  discarded and recomputed on ingest, never authored; `top`'s `subtypes` already writes every type of the closure in
+  full, so the cost and the reason are the same. A kind has no `disjoint`: that was a sum's fact, and a set of names
+  has none.
+- **The constructor is the thing; the template is sugar.** A type position admits no inline application (§5.3), so
+  the kernel declares the kinds its own slots point into by name, and an author writes `kind<T>` where a one-off is
+  wanted, which materialises the same instance as a constructor template with one value parameter (§5.10, as
+  `extern_type` is). An instance can be declared, named and refined like any type.
+
+**Where the kernel uses it.** The kernel declares three named kinds and types its name slots by them:
+
+```
+identifier_kind => !kind_type { of: identifier_type }
+atom_kind       => !kind_type { of: atom }
+value_kind      => !kind_type { of: type }
+
+enum_type => atom & { name_type: identifier_kind  members: enum_set }
+record    => product & { …  name_type?: identifier_kind }
+```
+
+`enum_type.name_type` and `record.name_type` are the slots whose value is a bare name today (`type_name`), and each
+has a coded check — "must name an identifier family" — that the kind now states and the coded check retires,
+keeping its diagnostic. §7.4's prose on which namespace a `name_type` resolves in is unchanged: that is the store,
+and a kind says nothing about stores. `enum => enum_type ^ { name_type?: = identifier }` pins a code, judged a member
+at link, after resolution; the resolved form of the slot holds the kind's name and the resolved form of the kind
+holds names:
+
+```
+enum_type => !record { … fields: { … name_type => !record_field { type: identifier_kind } … } }
+identifier_kind => !kind_type { of: identifier_type  members: [field_name identifier param_name scheme_name type_name] }
+```
+
+`atom_kind` and `value_kind` are declared for the slots that follow and for a user meta-schema's own, and
+`type_chain.supertypes` and `subtypes` stay `type_name`: those indexes list constructors.
+
+**What follows.** Three things, each its own entry once this one runs:
+
+- **The reference slots.** `map.key_type`, `record_field.type`, the element types, `map.value_type` and
+  `choice.variants` are typed `type_ref` by §9's rule, since an application may still stand there in a held body;
+  the kind judges the *referent* — the entry a use site holds a bare reference to, a minted one for an application —
+  so what those slots need is a `type_ref` whose `name` is narrowed to a kind, and §5.7's refinement does not narrow a
+  field's type today. `reference.target`, `record.supertypes` (a composition operand may be a constructor, §4.3),
+  `template_param.type` and `bound` stay `type_ref` in any case. The §9 guidance then reads: "a slot
+  that names a type is typed by a reference into a kind; `type_ref` alone is for a slot that may name a constructor."
+- **The value-level case.** `stock_id => !uuid_type {}` and `customer_id => !uuid_type {}` are kept apart, and an
+  author wanting a slot that takes either lists a `choice` at every such slot. What they mean is the dependent sum
+  over `kind<uuid_type>`: a choice whose variants are computed rather than listed, tagged as a non-disjoint choice is
+  (`!stock_id 7d3e…`, `$type` in JSON), with a type declared later a variant without any list being amended. Under
+  this entry `id: kind<uuid_type>` holds the *name* `stock_id`, so the value-level case is a choice whose variant set
+  is a kind — `choice.variants` admitting a set of names however produced — and not a kind standing as a type.
+- **The store.** Which namespace a name at a kind-typed slot resolves in stays prose per slot. Typing the store is
+  the namespace entry.
+
+**Breaking changes, against Revision 37.** `kind_type`, `kind`, `identifier_kind`, `atom_kind` and `value_kind` join
+the kernel, `core` gains a `kind` sibling as it has `set` (§3.3.2 keeps the kernel's names out of a core-governed
+schema's type-name namespace), and every bundled schema's `!!id` pin changes (§13.2). `enum_type.name_type` and
+`record.name_type` are retyped, and no existing schema is judged differently by it: the kind refuses exactly what
+the coded check refused. The one verdict change is core's new name: a schema importing core can no longer declare a
+`kind` of its own.
+
+**Suggested resolution.** [TSON-SCHEMA] §4.2, a new paragraph beside `enum_type`: "`kind_type => atom & { of:
+type_name  members?: [type_name] }` is the atom whose values are the names of every type in the closure built with
+the constructor `of`: an entry that, past its alias hops, is built with `of` or a constructor IS-A it, and which is
+not itself a constructor. `of` names a constructor of the writer's structure namespace (§3.3.1), as a
+constructor role does, and is `type` or below it. A value is a type name that resolves, where the slot says a name
+resolves, to a member. The members are computed at link and written in resolved output as the derived index
+`members` (§8.1), recomputed on ingest. `kind => <T> !kind_type { of: T }` is the inline spelling." §7.4:
+`enum_type.name_type` is typed `identifier_kind`, and the "must name an identifier family" sentence becomes a
+consequence. §8.1: `members` among the derived indexes. §9's inventory names the five entries.
+
+**Status against Revision 37:** open; running on `kind-type`, a branch off `r2026-38-proposal`. `meta-kernel.tn`
+declares `kind_type => atom & { of: type_name  members?: [type_name] }`, `kind`, `identifier_kind`, `atom_kind` and
+`value_kind`, and types `enum_type.name_type` and `record.name_type` `identifier_kind`; `core` has its `kind` sibling;
+the resolved fixtures carry the members (`identifier_kind`'s are `[field_name identifier param_name scheme_name
+type_name]`), and the bundled schemas are restamped. The linker computes every kind's `members` over the closure by the
+walk above, imported kinds included, and refuses `kind<data>`, a constructor above or beside `type`, and an `of` naming
+a type of the writer's own namespace. A kind is a member of itself where the walk says so (`value_kind` lists itself),
+the walk reading construction and never a kind's members. The `name_type` checks read the slot's kind off the
+constructor's `name_type` field and judge the resolved referent a member of it, with the diagnostics the coded check
+had; a `~`/`=` value at a kind-typed field is judged a member where it is written, so a constructor pinning a non-member
+`name_type` fails at its own meta layer's link rather than at the first schema applying it. An entry's constructor is
+its recorded tag (`!identifier_type`), or its body's where it has none, so an application of a template over
+`identifier_type` is admitted as a `name_type`, being the instance it expands to. Both encodings read a kind as an atom:
+a type-name token, or a JSON string, naming a member of the governing schema's closure; under a meta layer, whose
+documents are schemas, the reader checks the grammar alone and the schema's own link judges membership, which is how a
+resolved form naming a user's name type reads back through meta.tn. The corpus states the city enum of the problem end
+to end, the members of `identifier_kind` under a meta layer's closure (a new link-layer fact), a user
+`kind<uuid_type>`'s members, a pinned non-member, `kind<data>`, and a kind-typed field holding a member's name and a
+non-member's. Part 2's cached §13.2 table is not re-stamped here.

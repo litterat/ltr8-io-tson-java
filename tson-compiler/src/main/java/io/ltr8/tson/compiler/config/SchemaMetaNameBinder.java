@@ -24,8 +24,8 @@ import java.util.Set;
  * io.ltr8.tson.schema.meta.RecordBody}, {@link io.ltr8.tson.schema.meta.ArrayBody}, {@link
  * io.ltr8.tson.schema.meta.MapBody}, {@link io.ltr8.tson.schema.meta.TupleBody}, {@link
  * io.ltr8.tson.schema.meta.EnumBody}, {@link io.ltr8.tson.schema.meta.ChoiceBody}, {@link
- * io.ltr8.tson.schema.meta.TemplateBody}) -- but each of those classes' own {@code @Typename} is the
- * *bare* constructor name (matching the instance side,
+ * io.ltr8.tson.schema.meta.KindBody}, {@link io.ltr8.tson.schema.meta.TemplateBody}) -- but each of those
+ * classes' own {@code @Typename} is the *bare* constructor name (matching the instance side,
  * e.g. {@code RecordBody}'s own is {@code "record"}, not {@code "record_body"}), so this forward
  * (schema-name -> Class) direction needs the {@code "_body"} suffix added explicitly; nothing
  * recovers it mechanically from the bare name alone. A constructor that tightens another -- {@code set_type}
@@ -61,6 +61,7 @@ public final class SchemaMetaNameBinder {
             Map.entry("map", "map_body"),
             Map.entry("tuple", "tuple_body"),
             Map.entry("choice", "choice_body"),
+            Map.entry("kind_type", "kind_body"),
             Map.entry("enum_type", "enum_body"),
             Map.entry("template", "template_body"),
             Map.entry("datetime_type", "date_time_type"),

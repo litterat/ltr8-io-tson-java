@@ -1,5 +1,7 @@
 package io.ltr8.tson.schema;
 
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -106,6 +108,22 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
                 .map(body -> ((IdentifierType) body).normalization())
                 .filter(form -> form != Normalization.NONE)
                 .orElse(Normalization.NFC);
+    }
+
+    /**
+     * Whether this schema is a meta layer -- its own {@code !!meta} names the meta-kernel ([TSON-SCHEMA] §2.2.2) --
+     * so that a document it governs is a schema. A name such a document writes at a kind-typed position resolves
+     * in that document's own namespace or its constructor's, where the position's prose says ([TSON-SCHEMA] §7.4
+     * for {@code name_type}), and not in this schema's: its readers check the name's grammar and leave membership
+     * to the link of the schema being read (SPEC-FEEDBACK.md #22). A {@code !!meta} that is no identity at all, as a
+     * schema assembled by hand may carry, names no meta-kernel.
+     */
+    public boolean governsSchemas() {
+        try {
+            return CanonicalIdentity.sameIdentity(schema.meta(), TsonBundledSchemas.META_KERNEL_ID);
+        } catch (SchemaValidationException notAnIdentity) {
+            return false;
+        }
     }
 
     /**

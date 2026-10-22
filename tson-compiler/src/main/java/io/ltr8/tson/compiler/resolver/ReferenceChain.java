@@ -16,10 +16,10 @@ import java.util.function.Function;
  *
  * <p><b>Why this is a shared class rather than a loop each caller writes.</b> Resolved output states the
  * chain as the author wrote it: a use site naming an alias names the alias, and a processor collapses the
- * chain when it needs the type. That makes the walk the only mechanism, and four passes were doing it --
- * the linker's choice-variant distinctness and its §5.2 field-value check, subtype naming, and
- * discrimination-class classification. Written four times, the one decision inside it (below) was four
- * decisions that could drift apart silently.
+ * chain when it needs the type. That makes the walk the only mechanism, and several passes do it -- the linker's
+ * choice-variant distinctness and its §5.2 field-value check, subtype naming, discrimination-class
+ * classification, and a kind's membership walk, whose alias hops come first. Written once each, the one decision
+ * inside it (below) would be several decisions that could drift apart silently.
  *
  * <p><b>The walk stops at three things</b>, and the second is the one worth knowing:
  * <ul>

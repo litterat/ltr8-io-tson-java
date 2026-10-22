@@ -171,8 +171,9 @@ valid vector's subject is a schema document and its expected side is that docume
 own form, read back through `ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question
 of `spec/m/*-resolved.tn`) and compared entry for entry, `@synthetic` key markers included. `link/` states
 individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived disjointness, §8.2's
-`subtypes` index. `validate/` is a data document against a schema that loaded, where the expected side of a
-failure is §8.1's category plus the RFC 6901 pointer into the data and nothing else.
+`subtypes` index, a kind's derived `members` (compared as a set, minted names normalised). `validate/` is a data
+document against a schema that loaded, where the expected side of a failure is §8.1's category plus the RFC 6901
+pointer into the data and nothing else.
 
 **At the schema and link layers the category is the phase's, not the diagnostic code's.** §8.1 says every
 error that makes a schema fail to load or ingest is a resolver error "however value-like the violated rule",

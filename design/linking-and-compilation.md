@@ -32,6 +32,12 @@ Current form only; history lives in git.
 - An enum's `name_type` resolves in the governing meta's namespace for the value its constructor pinned (traced through a
   template's held body), and otherwise in the schema's; the enum checks run before the name checks, and an enum they
   refuse is not judged by name again.
+- A kind is an atom whose values are type names. Its `members` are recomputed for **every** kind in the closure,
+  imports included, and never trusted from a body; `of` resolves in the structure namespace alone and must be `type` or
+  IS-A it. `KindBody`'s equality is `of` alone, so an importer re-deriving an import's kind unifies with it.
+- Whether a `name_type` referent may stand in its slot is membership of the slot's kind (`NameType.admits`, reading
+  `identifier_kind` off the constructor's `name_type` field), never a test of the referent's body class; the
+  diagnostics are the ones the coded check had.
 
 Related: `design/meta-layer-data-kind.md`, `design/choice-disjointness.md`, `design/name-hygiene-and-minted-names.md`,
 `design/class2-compilation.md`, `design/compiled-registries.md`, `design/schema-resolution.md`.
@@ -81,7 +87,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   FINAL record, that a sealed family's selectors are usable and its members pin them distinctly, and that
   every family member is declared;
   detailed below. It is listed here for what it reads, and runs later:
-  `link` goes subtypes → disjointness → `checkNames` → validate → inhabitance → `checkRecordExtension` →
+  `link` goes subtypes → kinds → disjointness → `checkNames` → validate → inhabitance → `checkRecordExtension` →
   `withNameAnnotations` → the `@disjoint` check;
   (4) **validate** every reference
   resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter);
@@ -175,6 +181,63 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   `TsonSchemaLoader` (`Optional<TsonLinkedSchema> load(id)`) is the pluggable import/meta lookup hook,
   registered-only by default (nothing fetched). `TsonSchemaLinker.linkBootstrap` is the one sanctioned way
   to link meta-kernel's raw bootstrap output without registering it.
+
+## The types built with a constructor (`KindMembers`, SPEC-FEEDBACK.md #22)
+
+A `kind_type` instance — `!kind_type { of: uuid_type }`, or `kind<uuid_type>` through the kernel's or core's template
+— is an atom whose values are the names of the closure's types built with one constructor: a computed set of names, as
+an enum's is a listed one. `computeKinds` runs after `computeSubtypes` and before the name-type checks, writes
+`members` (sorted, as `subtypes` is) onto every kind body in the merged map, and validation then checks `of`. The kernel
+declares three, `identifier_kind`, `atom_kind` and `value_kind`, and types `enum_type.name_type` and `record.name_type`
+by the first.
+
+- **Membership is one walk over resolved entries** (`resolver/KindMembers`, public because `NameType` asks it too).
+  From an entry, alias hops first reach the type it is (`ReferenceChain`); that type is no member if it IS-A `top` or
+  is `top` (a constructor), a reference, or a `template` body (no type). Otherwise the constructor its value applies
+  — its recorded tag (`EntryFacts.constructor`), else its body's `@Typename` — is followed, through a constructor
+  template's held body to the constructor it applies, and the entry is a member when that constructor is `of` or has
+  `of` among its supertypes, which are already the IS-A closure. So `pet => abstract { … }` is a member of
+  `kind<record>`, and so is a record template, a type (§5.10); `set<text>` is a member of `kind<set_type>` while
+  core's `set` is not.
+- **A kind is a member of itself where the walk says so.** `value_kind` is built with `kind_type`, which IS-A `type`, so
+  it lists itself, and `kind<atom>` lists every kind. Nothing loops: the walk reads construction chains and never a
+  kind's members, and a value of a kind is a name, never a value read through the type it names.
+- **A constructor is read in the structure namespace first**, so a schema's own `uuid_type => text` never
+  captures a hop (§3.3.1: no declaration captures a constructor role). The kernel links itself with no structure
+  namespace loaded, so a constructor not found there is read in the entry's own namespace; a hop that names `of`
+  itself reaches it even where no namespace in reach declares it. The closure walked is the merged map only: the
+  governing meta's own instances (the kernel's `text`, `identifier`) are never members of a user schema's kind.
+- **`of` is a constructor role, checked in `validateBody`.** It resolves through its alias hops in the structure
+  namespace only, and must be `type` or IS-A it; `kind<data>`, `kind<top>`, `kind<template>` and a type of the
+  schema's own (`kind<stock_id>` — a kind is not a bound) are refused with a `SchemaValidationException` reported
+  against the declaration that wrote the application (`reportedAgainst`). With no governing meta loaded nothing is
+  judged, as `checkMayGovern` judges nothing it cannot load.
+- **Recomputed everywhere, trusted nowhere.** Members are computed over the governing schema's closure, so an imported
+  kind is recomputed over the importer's — the kernel's `identifier_kind`, reached through meta.tn's import, lists a
+  user meta layer's own `text_identifier` there — and an author's hand-written `members` are discarded. `KindBody.equals`
+  compares `of` and the chain, never the members, for the same reason: the index says what a closure holds, not which
+  kind this is.
+- **An empty kind admits no value**, and `TypeInhabitance` refuses it: a kind is inhabited exactly when it has a
+  member, whatever the types it names admit.
+- **A value at a kind-typed field is a name.** `checkFieldValue` hands a `~`/`=` value at a kind-typed field to
+  `checkKindValue`, which resolves it in the schema's namespace, then the structure namespace, and asks the walk: so
+  `enum => enum_type ^ { name_type?: = identifier }` is a member at the kernel's link, a meta layer's pin of its own
+  `text_identifier` at that layer's, and a pin of a text family is refused where it is written.
+- **`name_type` is judged by the slot's kind.** `NameType.admits` reads the kind off the constructor the entry's value
+  applies (through a constructor template's held body), in the structure namespace first, takes that constructor's
+  `name_type` field type, and asks `KindMembers.isMember` of the referent `NameType.of` resolved, whose own
+  constructor is its body's.
+  `EnumLabels` and `FieldNames` refuse a non-member with the diagnostics the coded check had; `NameType.profile`
+  reads the profile only of a member. Where the slot's kind is out of reach (no meta loaded, or a meta layer reaching
+  the kernel only through its own `!!meta`), the kernel's `identifier_kind`'s `of`, `identifier_type`, is used. The
+  walk admits what an application of a template over `identifier_type` expands to, an `identifier_type` instance
+  (`KindMembersTest`).
+- **Readers judge membership where the names resolve.** A kind compiles as an atom (`kind_type` is an atom
+  constructor in both registries, read by `AtomParsers`' `KindParser`): a type-name token, or a JSON string, that names
+  a member of the linked index. Under a meta layer (`TsonLinkedSchema.governsSchemas`, the governing schema's own
+  `!!meta` naming the kernel) the document is a schema whose names resolve in itself, so the reader checks the grammar
+  alone (`KindParser.namesOnly`) and that schema's link judges membership — which is what lets a resolved form naming
+  a user's own name type read back through meta.tn.
 
 ## The inhabitance check (`TypeInhabitance`, §5.10.1's productivity rule)
 

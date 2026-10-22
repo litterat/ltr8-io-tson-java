@@ -881,7 +881,7 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.ATOM, TypeKind.of(enumType, n -> true));
         assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"top\" \"type\" ] subtypes: [] } "
                         + "fields: { \"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } "
-                        + "\"name_type\" => { type: type_name optional: false voidable: false role: \"FREE\" } "
+                        + "\"name_type\" => { type: identifier_kind optional: false voidable: false role: \"FREE\" } "
                         + "\"members\" => { type: enum_set optional: false voidable: false role: \"FREE\" } } groups: [] "
                         + "extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(enumType));
@@ -891,9 +891,9 @@ class DefinitionResolverTest {
         assertEquals(List.of("atom", "enum_type", "top", "type"), TypeChain.supertypesOf(enumDef));
         assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"enum_type\" \"top\" \"type\" ] "
                         + "subtypes: [] } fields: { \"chain\" => { type: type_chain optional: true voidable: false role: "
-                        + "\"FREE\" } \"name_type\" => { type: type_name optional: true voidable: false role: \"FIXED\" "
-                        + "value: identifier } \"members\" => { type: enum_set optional: false voidable: false role: "
-                        + "\"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
+                        + "\"FREE\" } \"name_type\" => { type: identifier_kind optional: true voidable: false role: "
+                        + "\"FIXED\" value: identifier } \"members\" => { type: enum_set optional: false voidable: false "
+                        + "role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(enumDef));
     }
 
