@@ -58,6 +58,7 @@ enum DiscriminationClass {
             // they can only be reached with a tag.
             case io.ltr8.tson.schema.meta.TextType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.IdentifierType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.meta.KindBody ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.UriType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.IriType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.RegexType ignored -> Optional.of(STRING);

@@ -12,6 +12,8 @@ and why the same table is what untagged reading dispatches on. Current form only
 - An enum's class is its members' shared class, read off each member's spelling; every enum is over an identifier
   family, so no fact beyond the body is needed. A closed set of text values is `text_type`'s `members` facet and is
   string-class as every text atom is, whatever its members spell.
+- A kind (`kind_type`) is an atom whose values are type names, string-class as an identifier family is. It is no sum
+  and carries no `disjoint`; a choice may list one as a variant like any other atom.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's
   §8.3 reference chain.
 - `ChoiceReader.untaggedRecovery` and the derivation both go through `DiscriminationClass.of`: one fact, not two.
@@ -37,8 +39,8 @@ match.
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
 §4's three scalar classes — `boolean`, `number` (every numeric family: an `integer` and a `decimal`
 are one class, so never disjoint), `string` (every text-form family: `text`, an enum whose `type` is not an
-identifier family whatever its members spell, `uuid`, `date`, `bytes`, …; an enum over an identifier family takes its
-members' shared token class instead, so `[true false]` is boolean-class) — plus `brace` (records **and**
+identifier family whatever its members spell, a kind, `uuid`, `date`, `bytes`, …; an enum over an identifier family
+takes its members' shared token class instead, so `[true false]` is boolean-class) — plus `brace` (records **and**
 maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a
 discrimination the wire can't deliver) and `bracket` (arrays and tuples). A variant classifies through its
 §8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —

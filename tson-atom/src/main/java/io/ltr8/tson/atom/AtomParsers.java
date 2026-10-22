@@ -13,6 +13,7 @@ import io.ltr8.tson.atom.parser.EnumParser;
 import io.ltr8.tson.atom.parser.IdentifierParser;
 import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
+import io.ltr8.tson.atom.parser.KindParser;
 import io.ltr8.tson.atom.parser.HostParser;
 import io.ltr8.tson.atom.parser.HostnameParser;
 import io.ltr8.tson.atom.parser.MediaTypeParser;
@@ -41,6 +42,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.HostType;
 import io.ltr8.tson.schema.meta.HostnameType;
 import io.ltr8.tson.schema.meta.MediaTypeType;
@@ -109,6 +111,20 @@ public final class AtomParsers {
      * ({@code TsonLinkedSchema.enumForms}). Ignored for every other body.
      */
     public static Optional<AtomType<?>> forType(Top body, Normalization enumForm) {
+        return forType(body, enumForm, false);
+    }
+
+    /**
+     * {@link #forType(Top, Normalization)} for a position read under a schema that {@code governsSchemas} -- a meta
+     * layer, whose documents are schemas. A name such a document writes at a kind-typed position resolves in that
+     * document's own namespace and not in the closure the kind's members were computed over, so the kind reads the
+     * type-name grammar alone ({@link KindParser#namesOnly}) and the document's own link judges membership. Every
+     * other body is read as {@link #forType(Top, Normalization)} reads it.
+     */
+    public static Optional<AtomType<?>> forType(Top body, Normalization enumForm, boolean governsSchemas) {
+        if (governsSchemas && body instanceof KindBody kind) {
+            return Optional.of(KindParser.namesOnly(kind));
+        }
         return Optional.ofNullable(switch (body) {
             case ValueType ignored -> null;
             case VoidType ignored -> null;
@@ -134,6 +150,7 @@ public final class AtomParsers {
             case Cidr4Type t -> new Cidr4Parser(t);
             case Cidr6Type t -> new Cidr6Parser(t);
             case EnumBody t -> new EnumParser(t, enumForm);
+            case KindBody t -> new KindParser(t);
             case ComplexType ignored -> ComplexParser.UNCONSTRAINED;
             case Ipv4Type t -> Ipv4Parser.of(t);
             case HostnameType t -> new HostnameParser(t);

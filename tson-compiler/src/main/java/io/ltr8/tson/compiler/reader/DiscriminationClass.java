@@ -17,6 +17,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.HostType;
 import io.ltr8.tson.schema.meta.HostnameType;
 import io.ltr8.tson.schema.meta.MediaTypeType;
@@ -83,6 +84,7 @@ public enum DiscriminationClass {
             case FloatType ignored -> Optional.of(NUMBER);
             case TextType ignored -> Optional.of(STRING);
             case IdentifierType ignored -> Optional.of(STRING);
+            case KindBody ignored -> Optional.of(STRING); // a type name, written as an identifier is
             case UriType ignored -> Optional.of(STRING);
             case IriType ignored -> Optional.of(STRING);
             case RegexType ignored -> Optional.of(STRING);

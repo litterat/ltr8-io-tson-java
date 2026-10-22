@@ -22,8 +22,9 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * What an enum's {@code name_type} obliges ([TSON-SCHEMA] §7.4): that it names an identifier family, that each
- * member is a value of it, and that no two members are one value under its equality. {@link FieldNames} holds a
+ * What an enum's {@code name_type} obliges ([TSON-SCHEMA] §7.4): that it names an identifier family -- a member of
+ * {@code identifier_kind}, the kind the slot is typed by ({@link NameType#admits}) -- that each member is a value of
+ * it, and that no two members are one value under its equality. {@link FieldNames} holds a
  * record's field names to the same three; the peer of {@link RecordExtension} in shape: a checker over the linked
  * closure that hands back violations and leaves reporting to the linker.
  *
@@ -33,15 +34,13 @@ import java.util.function.Function;
  * constructor pinned ({@code enum}'s {@code name_type: identifier}) was written. The linked closure is the first
  * place both are present.
  *
- * <p><b>An identifier family is an atom-family instance whose constructor IS-A {@code identifier_type}</b> -- one
- * hop through the constructor the instance's body is, since construction transfers no supertypes and a family
- * instance is IS-A nothing. An enum's members are names under a naming vocabulary's equality, and carry §8.2's
- * per-name rules under its profile; a closed set of values on any other family, {@code text} included, is that family's own
- * {@code members} facet.
+ * <p><b>An identifier family is a type built with {@code identifier_type}</b>, which is what membership of the
+ * kernel's {@code identifier_kind} walks: an instance, a refinement of one, an instantiation of a template over the
+ * constructor, and an alias of any of them. An enum's members are names under a naming vocabulary's equality, and
+ * carry §8.2's per-name rules under its profile; a closed set of values on any other family, {@code text} included,
+ * is that family's own {@code members} facet.
  */
 final class EnumLabels {
-
-    static final String IDENTIFIER_TYPE = "identifier_type";
 
     /** One problem, and the entry it is reported against -- always one this schema declares. */
     record Violation(String entry, String message) {
@@ -83,7 +82,7 @@ final class EnumLabels {
                     + "' names nothing in scope (§7.4)"));
         }
         NameType.Resolved label = resolved.get();
-        if (!isFamily(label.definition(), IDENTIFIER_TYPE, label.lookup())) {
+        if (!NameType.admits(body, constructor, label, merged::get, structure)) {
             return Optional.of(new Violation(name, "'" + name + "': its name_type '" + body.nameType() + "' is not "
                     + "an identifier family -- an enum's members are names drawn from an atom-family instance whose "
                     + "constructor IS-A identifier_type (§7.4). A closed set of values on another family is that "
@@ -123,23 +122,5 @@ final class EnumLabels {
             }
         }
         return Optional.empty();
-    }
-
-    /**
-     * Whether {@code instance} is an atom-family instance built by {@code family} or by a constructor IS-A it --
-     * read from the constructor its class is the body of, which every instance of the family shares, so this
-     * answers for {@code !identifier ^ { ... }} as for {@code identifier} and for a meta layer's tightening of
-     * the family as for the family.
-     */
-    static boolean isFamily(Top instance, String family, Function<String, Top> lookup) {
-        if (!(instance instanceof Atom) || TypeChain.supertypesOf(instance).contains("top")) {
-            return false;
-        }
-        String constructor = TsonSchema.constructorOf(instance);
-        if (constructor.equals(family)) {
-            return true;
-        }
-        Top built = lookup.apply(constructor);
-        return built != null && TypeChain.supertypesOf(built).contains(family);
     }
 }

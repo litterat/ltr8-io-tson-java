@@ -129,6 +129,9 @@ class CrossEncodingParityTest {
               encoded     => { c: charset }
               safe_header => !enum_type { name_type: header_name  members: [Accept content-type] }
               screened    => { h: safe_header }
+              stock_id    => !uuid_type {}
+              customer_id => !uuid_type {}
+              ided        => { id: kind<uuid_type> }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -531,6 +534,28 @@ class CrossEncodingParityTest {
                 {"v": {"$schema": "https://example.test/other.tn", "$type": "robot", "serial": "R2"}}""");
         sameVerdict("extern_box", "{ v: !robot { serial: R2 } }", """
                 {"v": {"$type": "robot", "serial": "R2"}}""");
+    }
+
+    // ── Kind positions (SPEC-FEEDBACK.md #22): an atom whose values are member names ─────────────────
+
+    @Test
+    void aMemberNameAtAKindIsAcceptedByBoth() {
+        bothAccept("ided", "{ id: stock_id }", """
+                {"id": "stock_id"}""");
+    }
+
+    /** One rule with one code: a type built with another constructor is no member, in either encoding. */
+    @Test
+    void aNonMemberNameAtAKindIsRefusedByBoth() {
+        sameVerdict("ided", "{ id: text }", """
+                {"id": "text"}""");
+    }
+
+    /** A kind holds a name, so a value of one of its members is refused as no name, the same way in both. */
+    @Test
+    void aValueOfAMemberAtAKindIsRefusedByBoth() {
+        sameVerdict("ided", "{ id: \"7d3e5f8a-1b2c-4d5e-8f90-a1b2c3d4e5f6\" }", """
+                {"id": "7d3e5f8a-1b2c-4d5e-8f90-a1b2c3d4e5f6"}""");
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {

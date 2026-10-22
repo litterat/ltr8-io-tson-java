@@ -28,6 +28,10 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Typed field names — `record.name_type` names the identifier family a record's field names belong to, as
       `enum_type.name_type` does an enum's members, so a record declares `@id`, `$ref` or `first name` as written,
       judged under its own name type in both encodings (SPEC-FEEDBACK.md #10)
+- [x] Kinds — `kind<uuid_type>`, or `!kind_type { of: uuid_type }`, is the atom whose values are the names of the
+      types in the schema's closure built with a constructor: its members are computed at link, never listed, and a
+      value is a type name that must name one, in both encodings. The kernel types `enum_type.name_type` and
+      `record.name_type` by its `identifier_kind`, and judges a name type by membership (SPEC-FEEDBACK.md #22)
 - [x] Wire-format annotation access — a bound record's own `@name[:value]` annotations, via an
       opt-in carrier component
 - [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above,

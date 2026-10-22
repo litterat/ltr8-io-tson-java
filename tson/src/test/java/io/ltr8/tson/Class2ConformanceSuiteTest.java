@@ -11,6 +11,7 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.suite.SuiteBindings;
@@ -60,7 +61,8 @@ import static org.junit.jupiter.api.Assertions.fail;
  *       its serialization, so a valid vector states the resolved output in the spec's own form and this
  *       compares entry for entry, through {@link ResolvedForm}'s normalisations.</li>
  *   <li>{@code link/} -- individual facts about the linked namespace: §2.2.3's import closure, §5.4's
- *       derived disjointness, §8.2's {@code subtypes} index.</li>
+ *       derived disjointness, §8.2's {@code subtypes} index, and a kind's {@code members} index
+ *       (SPEC-FEEDBACK.md #22).</li>
  *   <li>{@code validate/} -- a data document against a schema that loaded, where the expected side of a
  *       failure is §8.1's category and the RFC 6901 pointer into the data, and nothing else.</li>
  * </ul>
@@ -286,6 +288,20 @@ class Class2ConformanceSuiteTest {
                         new TreeSet<>(TypeChain.subtypesOf(definition).stream()
                                 .map(ResolvedForm::withoutHash).toList()),
                         "§8.2 subtypes index of " + name);
+            }
+        }
+        if (hasField(expected, "members")) {
+            for (RecordValue claim : Sidecar.fieldRecordArray(expected, "members")) {
+                String name = fieldText(claim, "name");
+                // A kind's derived index, compared as a set and normalised as the subtypes index is: an
+                // instantiation a kind lists carries a minted name (RUNNER.md rule 6).
+                if (!(definitionOf(entries, name) instanceof KindBody kind)) {
+                    throw new AssertionError(name + " is not a kind, so it has no members index");
+                }
+                assertEquals(new TreeSet<>(fieldTextArray(claim, "members").stream()
+                                .map(ResolvedForm::withoutHash).toList()),
+                        new TreeSet<>(kind.memberNames().stream().map(ResolvedForm::withoutHash).toList()),
+                        "the members index of " + name);
             }
         }
     }

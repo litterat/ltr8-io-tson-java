@@ -11,6 +11,7 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.resolver.HeldBody;
+import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.*;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -43,6 +44,7 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.HostType;
 import io.ltr8.tson.schema.meta.HostnameType;
 import io.ltr8.tson.schema.meta.MediaTypeType;
@@ -98,9 +100,9 @@ import java.util.function.Predicate;
  * each type's {@code subtypes} (the reverse of {@code supertypes}, for *this schema's own merged view* of every
  * entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for why crediting a
  * subtype onto an imported entry's copy here never touches the imported schema's own separately-registered
- * original), derives choice disjointness, checks that every reference anywhere in the schema actually
- * resolves, and resolves and judges every value a {@code Data} body holds by name ({@code ValuesByName}). A
- * {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
+ * original), computes each kind's members ({@link #computeKinds}), derives choice disjointness, checks that every
+ * reference anywhere in the schema actually resolves, and resolves and judges every value a {@code Data} body holds
+ * by name ({@code ValuesByName}). A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
  * link a schema before registering it, same as any other caller. Identities are canonicalized through
@@ -134,8 +136,9 @@ import java.util.function.Predicate;
  * <p><b>Collisions are decided by entry identity.</b> One schema reached by several routes unifies; two
  * *different* schemas declaring one name is the error, as is a local declaration shadowing any name the
  * import closure already binds (no redefinition -- see {@link #mergeImports}). <b>Merged entries keep
- * their home namespace</b>: an imported entry is carried in exactly as the imported schema
- * resolved it, never re-validated against the importer's own namespace -- only the *importer's own* new
+ * their home namespace</b>: an imported entry is carried in exactly as the imported schema resolved it, its
+ * derived indexes aside -- {@code subtypes} gains this schema's subtypes, and a kind's members are recomputed over
+ * this closure -- and never re-validated against the importer's own namespace: only the *importer's own* new
  * material gets validated here.
  */
 public final class TsonSchemaLinker {
@@ -684,6 +687,7 @@ public final class TsonSchemaLinker {
                 enumForms.put(name, form);
             }
         }
+        merged = computeKinds(merged, facts, structureNamespace::get);
         merged = computeDisjointness(merged);
         // Before the name checks: a member that is not a value of its enum's name type is the more basic verdict,
         // and the per-name rules would otherwise report it as a restricted character.
@@ -1125,6 +1129,35 @@ public final class TsonSchemaLinker {
     }
 
     /**
+     * Derives every kind's {@code members} (SPEC-FEEDBACK.md #22) over the fully-merged namespace, by {@link
+     * KindMembers}' construction walk. Every kind in the closure is recomputed, an imported one included: members
+     * are computed over the <em>governing</em> schema's closure, so one kind holds different members in two
+     * schemas importing different sets, and whatever a body arrived carrying -- an import's own closure, or an
+     * author's hand -- is discarded rather than trusted.
+     *
+     * <p>Before the name-type checks, {@code checkNames} and validation, and after {@link #computeSubtypes}, which
+     * no member depends on: the walk reads each entry's constructor and the constructors' {@code supertypes}, both
+     * already resolved. A kind with no members admits no value, and the inhabitance check reports it.
+     *
+     * @param structure the governing meta's namespace, where a constructor role resolves (§3.3.1)
+     */
+    private static Map<String, Top> computeKinds(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
+                                                 Function<String, Top> structure) {
+        Map<String, Top> result = null;
+        for (Map.Entry<String, Top> entry : merged.entrySet()) {
+            if (entry.getValue() instanceof KindBody kind) {
+                List<String> members = KindMembers.of(kind, merged,
+                        name -> constructorOf(name, merged.get(name), facts), structure);
+                if (result == null) {
+                    result = new LinkedHashMap<>(merged);
+                }
+                result.put(entry.getKey(), kind.linked(members));
+            }
+        }
+        return result == null ? merged : result;
+    }
+
+    /**
      * Stage 1: every {@code !!import}'s whole namespace, in declaration order, brought in as-is (§2.2.3's
      * "merged entries keep their home namespace" -- no re-resolution here).
      *
@@ -1299,6 +1332,17 @@ public final class TsonSchemaLinker {
                 }
                 checkVariantsAreDistinct(entryName, c, namespace);
                 checkVariantsAreNotVoid(entryName, c, namespace);
+            }
+            // `of` is a constructor role, so it resolves in the structure namespace and nowhere else (§3.3.1),
+            // and must name `type` or a constructor below it (SPEC-FEEDBACK.md #22). The members are the linker's
+            // own computation, not references an author wrote, so there is nothing else here to validate. With
+            // no governing meta loaded there is nothing to resolve `of` against, and no verdict is given.
+            case KindBody kind -> {
+                if (!structureNamespace.isEmpty()) {
+                    KindMembers.ofRefusal(kind, structureNamespace::get).ifPresent(refusal -> {
+                        throw new SchemaValidationException("'" + entryName + "' is a kind, but " + refusal);
+                    });
+                }
             }
             case TemplateBody ignored -> { } // open, answered above
             case ValueType ignored -> {
@@ -1609,6 +1653,10 @@ public final class TsonSchemaLinker {
             return;
         }
         Token value = field.value().get();
+        if (target instanceof KindBody kind) {
+            checkKindValue(entryName, fieldName, field, value, kind, namespace, structureNamespace, constructors);
+            return;
+        }
         Optional<AtomType<?>> parser = AtomParsers.forType(target,
                 EnumLabels.labelForm(target, constructors.apply(terminal), namespace, structureNamespace::get));
         if (parser.isEmpty()) {
@@ -1633,6 +1681,38 @@ public final class TsonSchemaLinker {
                     + asWritten(value) + " is not a value of that type -- " + e.getMessage() + ". §5.2 makes "
                     + "a field's fixed or default value a value of the field's own declared type");
         }
+    }
+
+    /**
+     * A {@code ~}/{@code =} value at a kind-typed field: a type name, judged a member of the kind by the walk over
+     * the entry it resolves to (SPEC-FEEDBACK.md #22) -- {@code enum => enum_type ^ { name_type?: = identifier }}
+     * pins a name, and the pin is judged here, after resolution. The name resolves where the constructor pinning it
+     * is declared: this schema's own namespace, then the structure namespace, so a meta layer pins a name type it
+     * declares itself and an ordinary schema one of its meta's. A name resolving to nothing, or to an entry not
+     * built with the kind's constructor, is refused with the field's own two halves named, as any other value of
+     * the wrong type is.
+     */
+    private static void checkKindValue(String entryName, String fieldName, RecordField field, Token value,
+                                       KindBody kind, Map<String, Top> namespace, Map<String, Top> structureNamespace,
+                                       Function<String, Optional<String>> constructors) {
+        Function<String, Top> lookup = name -> {
+            Top found = namespace.get(name);
+            return found != null ? found : structureNamespace.get(name);
+        };
+        // A name the structure namespace supplies has no facts here; its body's constructor stands in.
+        Function<String, Optional<String>> constructorOf =
+                name -> namespace.containsKey(name) ? constructors.apply(name) : Optional.empty();
+        if (KindMembers.isMember(value.text(), kind.of(), lookup, constructorOf, structureNamespace::get)) {
+            return;
+        }
+        throw new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
+                + "declared '" + field.type().name() + "', but its "
+                + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " " + asWritten(value)
+                + " is not a value of that type -- " + (lookup.apply(value.text()) == null
+                        ? "it names nothing in scope"
+                        : "'" + value.text() + "' is not a member of the kind, the names of the types built "
+                                + "with '" + kind.of() + "'")
+                + ". §5.2 makes a field's fixed or default value a value of the field's own declared type");
     }
 
     /**

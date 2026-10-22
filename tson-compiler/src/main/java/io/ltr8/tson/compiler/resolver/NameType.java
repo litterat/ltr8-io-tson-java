@@ -2,12 +2,15 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TextFamily;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -19,18 +22,29 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
- * Where an entry's {@code name_type} resolves: an enum's, which its members are values of ([TSON-SCHEMA] §7.4), and
- * a record's, which its field names are values of (SPEC-FEEDBACK.md #10). Either names an identifier family, so the
- * names are judged as names, under its profile. A value the entry's constructor wrote
- * resolves where that constructor is declared, the governing meta's namespace -- so {@code !enum [A B]} names the
- * kernel's {@code identifier}, and a record that says nothing the kernel's {@code field_name}, whatever the schema
- * declares or imports; one an author wrote resolves in the schema's own namespace first. Shared by the linker's
- * enum and field name checks and by materialisation, which checks a template's value argument of an enum type
- * before linking has run.
+ * Where an entry's {@code name_type} resolves, and whether what it resolves to may stand there: an enum's, which its
+ * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of (SPEC-FEEDBACK.md
+ * #10). A value the entry's constructor wrote resolves where that constructor is declared, the governing meta's
+ * namespace -- so {@code !enum [A B]} names the kernel's {@code identifier}, and a record that says nothing the
+ * kernel's {@code field_name}, whatever the schema declares or imports; one an author wrote resolves in the schema's
+ * own namespace first. Shared by the linker's enum and field name checks and by materialisation, which checks a
+ * template's value argument of an enum type before linking has run.
+ *
+ * <p><b>What may stand there is the slot's kind's to say</b> (SPEC-FEEDBACK.md #22). The kernel types both slots
+ * {@code identifier_kind}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
+ * kind off the constructor the entry is built with -- the {@code name_type} field's own type -- and asks {@link
+ * KindMembers} whether the referent is a member. The resolution above is the store and the kind the judgment: the
+ * referent is found first, and the kind refuses the one found. Where the slot's kind is out of reach -- no governing
+ * meta loaded, or a meta layer that reaches the kernel's kinds through its own {@code !!meta} without importing them
+ * -- the kernel's {@code identifier_kind} is what the slot is typed by in every meta this library loads, and its
+ * {@code of} is used.
  */
 public final class NameType {
 
     private static final String NAME_TYPE = "name_type";
+
+    /** The {@code of} of the kernel's {@code identifier_kind}, for a slot whose own kind is out of reach. */
+    private static final String IDENTIFIER_TYPE = "identifier_type";
 
     private NameType() {
     }
@@ -56,14 +70,62 @@ public final class NameType {
     /**
      * The profile {@code entry}'s names are judged under by [TSON-DATA] §8.2's per-name rules: its name type's, whose
      * added characters -- a {@code start_add}, a {@code continue_add}, a {@code medial} -- are the profile's own.
-     * Empty where the type resolves to nothing or is no identifier family, each refused on its own.
+     * Empty where the type resolves to nothing or is not a member of the slot's kind, each refused on its own.
      */
     public static Optional<IdentifierProfile> profile(Top entry, Optional<String> constructor,
                                                       Function<String, Top> local, Function<String, Top> structure) {
         return of(entry, constructor, local, structure)
-                .map(Resolved::definition)
-                .filter(IdentifierType.class::isInstance)
-                .map(body -> ((IdentifierType) body).profile());
+                .filter(type -> admits(entry, constructor, type, local, structure))
+                .map(type -> type.definition() instanceof IdentifierType identifiers ? identifiers.profile() : null);
+    }
+
+    /**
+     * Whether {@code type}, {@code entry}'s resolved name type, is a member of the kind its {@code name_type} slot
+     * is typed by -- read off {@code constructor}, the one {@code entry}'s value applies: {@code identifier_kind}
+     * for both of the kernel's slots. A referent that resolved to nothing is no member. The referent's own
+     * constructor is its body's ({@link TsonSchema#constructorOf}), the resolved value being all a name type is
+     * resolved to here.
+     */
+    public static boolean admits(Top entry, Optional<String> constructor, Resolved type, Function<String, Top> local,
+                                 Function<String, Top> structure) {
+        if (type.definition() == null) {
+            return false;
+        }
+        String of = slotKind(entry, constructor, local, structure).map(KindBody::of).orElse(IDENTIFIER_TYPE);
+        return KindMembers.isMember(type.definition(), TsonSchema.constructorOf(type.definition()), of,
+                type.lookup(), structure);
+    }
+
+    /**
+     * The kind {@code entry}'s {@code name_type} slot is typed by: the {@code name_type} field of the constructor
+     * {@code entry}'s value applies -- through a constructor template's held body to the constructor it applies
+     * -- read in the structure namespace first, where every constructor role resolves (§3.3.1). Empty where no such
+     * constructor or kind is in reach.
+     */
+    private static Optional<KindBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
+                                               Function<String, Top> structure) {
+        Function<String, Top> constructors = fallingBackTo(structure, local);
+        Optional<String> head = constructor.or(() -> Optional.of(TsonSchema.constructorOf(entry)));
+        Set<String> seen = new HashSet<>();
+        while (head.isPresent() && seen.add(head.get())) {
+            Top found = constructors.apply(ReferenceChain.terminal(head.get(), constructors));
+            if (found instanceof TemplateBody held) {
+                head = HeldBody.of(held).application().typeRef();
+                continue;
+            }
+            return slotKindOf(found, constructors);
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<KindBody> slotKindOf(Top constructor, Function<String, Top> constructors) {
+        if (!(constructor instanceof RecordBody record)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(record.fields().get(NAME_TYPE))
+                .map(field -> constructors.apply(ReferenceChain.terminal(field.type().name(), constructors)))
+                .filter(KindBody.class::isInstance)
+                .map(KindBody.class::cast);
     }
 
     /**

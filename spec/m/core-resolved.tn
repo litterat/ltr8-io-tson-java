@@ -144,6 +144,8 @@
 
   set => !template { parameters: [{ name: T  type: type_ref }]  template: "!set_type { element_type: T }" }
 
+  kind => !template { parameters: [{ name: T  type: type_name }]  template: "!kind_type { of: T }" }
+
   tuple1 => !template { parameters: [{ name: T  type: type_ref }]  template: "!tuple { elements: [{ element_type: T }] }" }
 
   voidable_tuple1 => !template {

@@ -21,6 +21,9 @@ surface. Current form only; history lives in git.
   inspecting a value.
 - A choice value may omit its tag only when the choice is disjoint **and** class-stable; no member-shape matching, no
   trying variants in order. A missing required tag is `TYPE_MISMATCH`.
+- A kind (`kind_type`) is an atom, read by `AtomReader` from a string naming a member, and never a discrimination case
+  ([TSON-JSON] §5.6). Under a meta layer (`TsonLinkedSchema.governsSchemas`) it reads the name's grammar alone: the
+  document is a schema, and its names are judged members where that schema links.
 - A dispatcher only selects: every reader it can select is wired when the schema compiles, it builds nothing, and one
   set serves every mode. The reader it selects validates in full.
 - Readers are named mode, then family, then form, and carry no `Json` prefix inside the unexported `reader` package; a

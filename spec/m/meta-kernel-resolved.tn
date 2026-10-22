@@ -93,7 +93,7 @@
 !schema {
   top => !record {
     chain: {
-      subtypes: [array atom choice data enum enum_type identifier_type integer_type iri_type map product record reference regex_type set_type sum template text_type tuple type value_type void_type]
+      subtypes: [array atom choice data enum enum_type identifier_type integer_type iri_type kind_type map product record reference regex_type set_type sum template text_type tuple type value_type void_type]
     }
     fields: {}
     extension: ABSTRACT
@@ -108,7 +108,7 @@
   type => !record {
     chain: {
       supertypes: [top]
-      subtypes: [array atom choice enum enum_type identifier_type integer_type iri_type map product record regex_type set_type sum text_type tuple value_type void_type]
+      subtypes: [array atom choice enum enum_type identifier_type integer_type iri_type kind_type map product record regex_type set_type sum text_type tuple value_type void_type]
     }
     fields: {
       chain => !record_field { type: type_chain  optional: true }
@@ -119,7 +119,7 @@
   atom => !record {
     chain: {
       supertypes: [top type]
-      subtypes: [enum enum_type identifier_type integer_type iri_type regex_type text_type value_type void_type]
+      subtypes: [enum enum_type identifier_type integer_type iri_type kind_type regex_type text_type value_type void_type]
     }
     fields: {
       chain => !record_field { type: type_chain  optional: true }
@@ -330,7 +330,7 @@
     groups         => !record_field { type: array_field_group_xxhash  optional: true }
     extension      => !record_field { type: record_extension_type  optional: true  role: DEFAULT  value: OPEN }
     discriminators => !record_field { type: array_text_1_xxhash  optional: true }
-    name_type      => !record_field { type: type_name  optional: true }
+    name_type      => !record_field { type: identifier_kind  optional: true }
     parameters     => !record_field { type: array_template_param_xxhash  optional: true }
   } }
 
@@ -384,13 +384,13 @@
 
   enum_type => !record { chain: { supertypes: [atom top type]  subtypes: [enum] }  fields: {
     chain     => !record_field { type: type_chain  optional: true }
-    name_type => !record_field { type: type_name }
+    name_type => !record_field { type: identifier_kind }
     members   => !record_field { type: enum_set }
   } }
 
   enum => !record { chain: { supertypes: [atom enum_type top type] }  fields: {
     chain     => !record_field { type: type_chain  optional: true }
-    name_type => !record_field { type: type_name  optional: true  role: FIXED  value: identifier }
+    name_type => !record_field { type: identifier_kind  optional: true  role: FIXED  value: identifier }
     members   => !record_field { type: enum_set }
   } }
 
@@ -399,6 +399,39 @@
     variants => !record_field { type: array_type_ref_xxhash }
     disjoint => !record_field { type: boolean  optional: true }
   } }
+
+  kind_type => !record { chain: { supertypes: [atom top type] }  fields: {
+    chain   => !record_field { type: type_chain  optional: true }
+    of      => !record_field { type: type_name }
+    members => !record_field { type: array_type_name_xxhash  optional: true }
+  } }
+
+  kind => !template { parameters: [{ name: T  type: type_name }]  template: "!kind_type { of: T }" }
+
+  identifier_kind => !kind_type { of: identifier_type  members: [field_name identifier param_name scheme_name type_name] }
+
+  atom_kind => !kind_type {
+    of: atom
+    members: [
+      annotation atom_kind boolean doc field_name field_role identifier identifier_base identifier_kind
+      integer iri non_negative_integer normalization param_name product_access_type product_size_type
+      record_extension_type regex scheme_name synthetic text type_name value value_kind void
+    ]
+  }
+
+  value_kind => !kind_type {
+    of: type
+    members: [
+      annotation application array_array_text_1_3600e7d5_1_xxhash array_field_group_xxhash
+      array_template_param_xxhash array_text_1_xxhash array_tuple_element_xxhash
+      array_type_argument_xxhash array_type_name_xxhash array_type_ref_xxhash atom_kind atom_specification
+      boolean doc enum_set field_group field_map field_name field_role identifier identifier_base
+      identifier_kind integer integer_member_set integer_size iri non_negative_integer normalization
+      param_name product_access_type product_size_type record_extension_type record_field regex schema
+      scheme_name scheme_set synthetic template_param text text_member_set tuple_element type_argument
+      type_chain type_name type_ref value value_kind void
+    ]
+  }
 
   schema => !map { key_type: type_name  value_type: top }
 

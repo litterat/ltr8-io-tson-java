@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/38/m/core.tn?sha256=347dbe69db30be2a61e2d24343631ef1f7c997be4678a129a7bf51f7e9a3b207"
-!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=1bc68bb8317ec1ef35ef1a18ca7fcad986ab7e20105a21006dda4260607982c6"
+!!id:"https://tson.io/2026/38/m/core.tn?sha256=f6fd1956a9f8d6188eea493bb31cd4b48e53ba0aa9519c557a48fce8cec2608e"
+!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=0d2edb9f666ba7ad59dbe7f3da49a079bd340222d2781fdc45fe898e9211df7b"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 38 draft).
@@ -29,7 +29,7 @@
   they must be reachable through the `!!meta` chain; they appear here only by
   use. Core's own `doc` declaration, and its same-named siblings
   of kernel and meta entries (`void`, `boolean`, `integer`, `text`, `regex`,
-  `uri` and `set`), face the other direction: they exist so that *data
+  `uri`, `set` and `kind`), face the other direction: they exist so that *data
   documents* and user schemas governed by or importing core can use them.
 
   References:
@@ -321,6 +321,17 @@
     the governing namespace.
     """
   set => <T> !set_type { element_type: T }
+
+  @doc:"""
+    The spelling of a kind an author writes inline: `kind<uuid_type>` holds the
+    name of a type in the schema's closure built with `uuid_type`, as
+    `!kind_type { of: uuid_type }` does. `T` names a constructor of the
+    structure namespace, not a type of this one.
+
+    A sibling of the meta-kernel's declaration under the same name: user
+    schemas reach it through their core import.
+    """
+  kind => <T> !kind_type { of: T }
 
   @doc:"""
     A tuple of exactly one element: `tuple1<text>` admits `[a]` and
