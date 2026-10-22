@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=0cafe3c7d8ab3c3657089e19b134b14af44b4122944ad8cd36c34632df95b62a"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=b2ab4f233fe0e7f35c5f58842552ad8cbfc0394b9999946a06ae1375c64e879e"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -680,7 +680,7 @@
     record's `name_type` are a resolver error. The keys are `text`, each judged
     by that `name_type`.
     """
-  field_map => !map { key_type: text  value_type: record_field  ordered: true }
+  field_map => !namespace { key_type: text  value_type: record_field  ordered: true }
 
   @doc:"""
     A record: named fields, fixed by the type, with the field groups over them.
@@ -801,6 +801,13 @@
     max_items?:      non_negative_integer
   }
 
+  @doc:"""
+    A map whose keys name its entries: the schema map, a record's fields. A
+    namespace is a map in every fact — its keys, values, order and bounds are
+    map's, and so is how a value of it is written and read.
+    """
+  namespace => map & {}
+
   @doc:"A fixed sequence of positions, each with a type of its own."
   tuple => product & {
     access_pattern?: product_access_type = INDEX
@@ -908,5 +915,5 @@
     with sugar expanded, bodies flattened and chains computed, and an entry
     written as a constructor application resolves to itself.
     """
-  schema => {type_name => top}
+  schema => !namespace { key_type: type_name  value_type: top }
 }

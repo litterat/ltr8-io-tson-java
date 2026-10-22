@@ -24,7 +24,8 @@ import java.util.function.UnaryOperator;
  * a *lookup-by-constructor-name* convenience only -- it says nothing about whether an {@code
  * array}-typed position should ever dispatch to {@code !set [...]} at read time, which {@link
  * RecordBindReader.Factory}'s own Javadoc deliberately does not attempt for any composite kind but
- * {@code record}.
+ * {@code record}. {@code namespace} registers to the {@code map} factory on the same footing: it composes
+ * {@code map} and adds no field.
  *
  * <p><b>{@code enum}</b> uses {@link AtomTypeReader#ENUM_OBJECT_MODE} in both {@link #tree} and {@link
  * #bind} (dispatching {@code boolean} to a real {@code Boolean} via the vocabulary's own
@@ -123,6 +124,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("array", array);
         factories.put("set_type", array);
         factories.put("map", map);
+        factories.put("namespace", map);
         factories.put("tuple", tuple);
         factories.put("enum", leaf.apply(enumFactory));
         factories.put("choice", choice);

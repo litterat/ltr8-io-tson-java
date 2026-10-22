@@ -12,7 +12,8 @@ import java.util.Optional;
 /**
  * The meta-kernel's {@code map} constructor's own vocabulary, resolved (Part 2 §4.2, §8.1) --
  * {@code access_pattern}/{@code size_type} are fixed ({@code NAMED}/{@code VARIABLE}) and never
- * appear in output. Also backs the kernel's own {@code schema} type (<code>{type_name =&gt; top}</code>).
+ * appear in output. Also backs every instance of the kernel's {@code namespace}, a map in every fact -- the
+ * kernel's own {@code schema} and {@code field_map} among them -- whose constructor its entry's tag records.
  * {@code @Field} renames each component to the kernel's own snake_case wire
  * name -- {@code ltr8-bind} otherwise writes the bare Java component name verbatim (camelCase).
  *
