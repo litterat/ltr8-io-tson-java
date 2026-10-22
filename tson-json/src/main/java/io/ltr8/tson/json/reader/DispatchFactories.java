@@ -97,7 +97,7 @@ final class DispatchFactories {
                 // The sealed reader takes its subtypes raw: it maps each member's pins to that member, so an
                 // alias is not a second member. Where it compares a written tag it admits aliases (`deeper`).
                 ? new DispatchMemberReader(selfNames, displayName,
-                        FamilySelectors.of(name, definition, context.schema().entries()),
+                        FamilySelectors.of(definition),
                         Set.copyOf(context.subtypesOf(name, definition)), context, location, rules)
                 : new DispatchTagReader(name, displayName, selfNames, context.admitting(context.subtypesOf(name,
                         definition)), context.instantiableSubtypesOf(name, definition),

@@ -103,14 +103,14 @@ final class RecordExtension {
                         + "'my_name => " + shownName + "' -- and use that name in place of the application"));
                 continue;
             }
-            RecordBody record = def == null ? null : familyBodyOf(name, def, merged, facts);
+            RecordBody record = def == null ? null : familyBodyOf(def);
             if (record != null) {
                 checkDeclaration(name, def, record, merged, facts, violations);
             }
         }
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             Top def = entry.getValue();
-            RecordBody base = familyBodyOf(entry.getKey(), def, merged, facts);
+            RecordBody base = familyBodyOf(def);
             if (base != null && FamilySelectors.dispatchesOnMembers(def)) {
                 checkFamily(entry.getKey(), def, merged, facts, applications, localNames, origins, enumForms, violations);
             }
@@ -228,7 +228,7 @@ final class RecordExtension {
             Map<String, Normalization> enumForms, List<Violation> violations) {
         // The same derivation the dispatchers read, never a second filter over the fields: a check that
         // decided "which fields select" differently from the read could pass a family no reader can place.
-        SequencedMap<String, RecordField> selectors = FamilySelectors.of(base, def, merged);
+        SequencedMap<String, RecordField> selectors = FamilySelectors.of(def);
         if (selectors.isEmpty() || selectors.values().stream().anyMatch(f -> parserFor(f, merged, facts).isEmpty())) {
             return; // already reported against the base, and a pin has nothing to be read at
         }
@@ -355,7 +355,7 @@ final class RecordExtension {
      *
      * <p><b>A record template is a family base and is judged as one</b> (§5.10). Its own fields may still
      * name its parameters, so the body checked here is assembled from the facts it states as a base: ABSTRACT,
-     * the {@code discriminators} it names, and each selector at its members' declared type. Skipping it
+     * the {@code discriminators} it names, and each selector at the type the base declares it. Skipping it
      * instead -- a guard on {@code parameters().isEmpty()} alone -- would accept a marked template with no
      * family check at all: no rule that every member pins every selector, and no
      * rule that the pins are pairwise distinct. An unchecked family is worse than a refused one.
@@ -367,13 +367,12 @@ final class RecordExtension {
      * <p>A held template has none: it is no type until applied (§5.10), nothing can stand at it, and its
      * instantiations are judged as the closed records they are.
      */
-    private static RecordBody familyBodyOf(String name, Top def, Map<String, Top> merged,
-                                           Map<String, TsonSchema.EntryFacts> facts) {
+    private static RecordBody familyBodyOf(Top def) {
         if (!OpenEntry.isFamilyBase(def)) {
             return def instanceof RecordBody record && !OpenEntry.isOpen(def) ? record : null;
         }
         // The selectors come from `FamilySelectors`, the one derivation both encodings read.
-        return new RecordBody(FamilySelectors.of(name, def, merged), List.of(),
+        return new RecordBody(FamilySelectors.of(def), List.of(),
                 FamilySelectors.extensionOf(def).orElseThrow(), FamilySelectors.namesOf(def),
                 java.util.Optional.empty());
     }

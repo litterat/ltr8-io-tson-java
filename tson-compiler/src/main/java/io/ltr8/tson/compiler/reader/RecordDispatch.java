@@ -47,7 +47,7 @@ final class RecordDispatch {
                 // aliases (`deeper`).
                 case ABSTRACT -> FamilySelectors.dispatchesOnMembers(definition)
                         ? new RecordMemberDispatchReader(selfNames, displayName,
-                                FamilySelectors.of(name, definition, context.schema().entries()),
+                                FamilySelectors.of(definition),
                                 Set.copyOf(context.subtypesOf(name, definition)), context, context.readers())
                         : new RecordTagDispatchReader(selfNames, displayName,
                                 Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning()),

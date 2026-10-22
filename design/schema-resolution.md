@@ -140,10 +140,11 @@ are kept in step deliberately.
   (`TemplateMaterialiser.closedExtension`): §5.7 fixation pins the selectors and clears their marks, so a
   member is an ordinary concrete record, where ABSTRACT does travel and is how `abstract` reaches every
   instantiation. One dispatcher serves both kinds of base — `RecordMemberDispatchReader` takes the selector
-  *fields* rather than a body, and `FamilySelectors.of` (`schema.meta`) derives them — a closed base from its own
-  fields, a template base from its members' fields of those names, its own fields possibly naming its parameters. A
-  record template IS-A the base is no member of it: `FamilySelectors.fromMembers`, `RecordExtension`'s pin checks
-  and both encodings' member dispatchers skip an open subtype, its applications being the members.
+  *fields* rather than a body, and `FamilySelectors.of` (`schema.meta`) derives them from the base's own fields,
+  either kind: a family base's selector names none of its parameters (refused at declaration, directly or as an
+  argument), its parameter-free field types are closed in place, and its parameter pin is dropped. A record template
+  IS-A the base is no member of it: `RecordExtension`'s pin checks and both encodings' member dispatchers skip an
+  open subtype, its applications being the members.
   `RecordExtension` checks the family against that same derivation.
 - **Two different edges populate a family's `subtypes`, and they are minted by two different mechanisms.** The first is
   §5.8's reference-valued `supertypes`: `result => abstract <T> { payload: T }` with `ok => <T> result<T> & { note: text

@@ -338,12 +338,6 @@ final class TemplateMaterialiser {
     Map<String, Top> materialise(Map<String, Top> entries, MaterialisationFailureReporter reporter) {
         TemplateMaterialiser pass = this;
         for (Map.Entry<String, Top> entry : entries.entrySet()) {
-            if (OpenEntry.isOpen(entry.getValue())) {
-                // A template's own body is open: `chain<T>` inside `chain` awaits substitution and is not an
-                // application to close. Closing it here would mint an entry per level, keyed on the literal
-                // parameter name.
-                continue;
-            }
             try {
                 entry.setValue(MetaRefs.mapRefsKeepingChain(entry.getValue(), pass::close));
             } catch (SchemaValidationException e) {
