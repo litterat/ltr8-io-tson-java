@@ -1930,9 +1930,9 @@ identifier_kind => !kind_type { of: identifier_type  members: [field_name identi
   guidance then reads: "a slot that names a type is typed `type_kind`, or by a narrower kind; `type_ref` is for a
   slot that holds an application." Two consequences: `top` is a member of `type_kind`, being a fresh abstract record
   IS-A nothing, which is what admits the kernel's own `schema => !namespace { value_type: top }` at a kind-typed slot;
-  and a type parameter is one whose `type` is `type_kind`, the name `type_ref` having been that marker. Whether
-  `map.key_type` is the narrower `atom_kind` is open: neither Part 2 nor this implementation states that a map's key
-  is an atom, so narrowing it would be a new rule.
+  and a type parameter is one whose `type` is `type_kind`, the name `type_ref` having been that marker.
+  `map.key_type` is `type_kind` and not the narrower `atom_kind`: a map's keys may be records, tuples or arrays, and
+  nothing in Part 2 says otherwise.
 - **The value-level case.** `stock_id => !uuid_type {}` and `customer_id => !uuid_type {}` are kept apart, and an
   author wanting a slot that takes either lists a `choice` at every such slot. What they mean is the dependent sum
   over `kind<uuid_type>`: a choice whose variants are computed rather than listed, tagged as a non-disjoint choice is

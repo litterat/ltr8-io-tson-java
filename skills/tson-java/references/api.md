@@ -542,7 +542,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
     public Optional<Top> nameType(String entryName); // a record's name_type, where not field_name
     public boolean isKernel(String entryName);      // the meta-kernel's own entry, judged by origin
-    public TypeKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
+    public EntryKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
     public boolean isConstructor(String name, Top value); // IS-A the kernel's top
 }
 

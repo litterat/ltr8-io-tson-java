@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * {@code product} and {@code sum} compose with {@code type}, and {@code data}, {@code reference} and
  * {@code template} with {@code top} directly.
  */
-class TypeKindHierarchyTest {
+class EntryKindHierarchyTest {
 
     @Test
     void theThreeKindsOfDataValuesAreTypes() {

@@ -28,7 +28,7 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Type;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.ArrayList;
@@ -989,7 +989,7 @@ public final class SchemaResolver {
      */
     private static IdentifierPolicy payloadNames(TsonCompiledMetaSchema meta, String constructor,
                                                  IdentifierPolicy names) {
-        return meta.compiledSchema().kindOf(constructor) == TypeKind.DATA ? names : IdentifierPolicy.none();
+        return meta.compiledSchema().kindOf(constructor) == EntryKind.DATA ? names : IdentifierPolicy.none();
     }
 
     /**

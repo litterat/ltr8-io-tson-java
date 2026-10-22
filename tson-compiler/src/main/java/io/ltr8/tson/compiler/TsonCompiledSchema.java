@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.EntryKind;
 
 import java.util.Collection;
 import java.util.List;
@@ -50,7 +50,7 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
      * {@code name}'s kind ([TSON-SCHEMA] §4.1), judged by where each base kind its chain names is defined --
      * {@code null} for a name this schema lacks.
      */
-    public TypeKind kindOf(String name) {
+    public EntryKind kindOf(String name) {
         return linkedSchema.kindOf(name);
     }
 

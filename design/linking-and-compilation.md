@@ -31,7 +31,7 @@ Current form only; history lives in git.
 - `RecordExtension`'s FINAL check reads the entry's chain (`TypeChain.supertypesOf`), a template's included, which a §5.9
   subtraction leaves empty.
 - Everything that asks what an entry IS-A asks its `TypeChain` — `computeSubtypes` credits a template as it does a type,
-  and the constructor test (`TypeKind.isConstructor`) reads a template's chain as a closed one's, judging `top` by
+  and the constructor test (`EntryKind.isConstructor`) reads a template's chain as a closed one's, judging `top` by
   its origin.
 - An enum's `name_type` resolves in the governing meta's namespace for the value its constructor pinned (traced through a
   template's held body), and otherwise in the schema's; the enum checks run before the name checks, and an enum they

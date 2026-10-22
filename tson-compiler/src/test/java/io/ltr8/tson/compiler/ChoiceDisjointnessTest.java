@@ -13,7 +13,6 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.ValueType;

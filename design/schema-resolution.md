@@ -289,7 +289,7 @@ are kept in step deliberately.
   touching it. The cost is a spurious `!ref`/`!value` tag on `toTson` output, documented.
 - **`schema.meta` value model:** one Java type per kernel vocabulary record/enum. `Top`/`Type`/`Atom`/`Product`/`Sum`
   replicate the kernel's composition chain (§4.1) as real Java subtyping — a consumer tests kind ancestry with `instanceof
-  Product`, and an entry's kind is `TypeKind.of(value, kernel)`. Every `Type` record carries `TypeChain chain` as its first
+  Product`, and an entry's kind is `EntryKind.of(value, kernel)`. Every `Type` record carries `TypeChain chain` as its first
   component, mirroring the constructor's flattened shape (`type`'s field comes first), with `withChain` to place a body and
   the chain's accessors as defaults on `Type`; `Reference`, `Data` and `TemplateBody` carry none, and `TypeChain`'s statics
   (`supertypesOf`, …) answer empty for them. Body leaves are named `RecordBody`/`EnumBody`/etc. (not `Record`, which would

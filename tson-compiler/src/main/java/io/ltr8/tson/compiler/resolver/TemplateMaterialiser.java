@@ -19,7 +19,7 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -646,7 +646,7 @@ final class TemplateMaterialiser {
      * no member of anything.
      */
     private void refuseMintedMember(String head, List<TypeArgument> arguments, Top closed) {
-        if (!(closed instanceof RecordBody record) || TypeKind.isConstructor(head, record, kernel)) {
+        if (!(closed instanceof RecordBody record) || EntryKind.isConstructor(head, record, kernel)) {
             return;
         }
         List<String> onto = new ArrayList<>(record.supertypes());

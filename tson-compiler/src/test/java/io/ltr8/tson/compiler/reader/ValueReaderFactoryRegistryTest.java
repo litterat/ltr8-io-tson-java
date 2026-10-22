@@ -9,7 +9,6 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.ScopeKind;
 import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.tree.TsonValue;

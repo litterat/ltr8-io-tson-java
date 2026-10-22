@@ -12,7 +12,7 @@ import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
@@ -75,7 +75,7 @@ class MetaKernelBootstrapResolverTest {
                 "identifier", IdentifierType.IDENTIFIER);
         expected.forEach((name, body) -> {
             Top resolved = schema.entries().get(name);
-            assertEquals(TypeKind.ATOM, TypeKind.of(resolved, n -> true));
+            assertEquals(EntryKind.ATOM, EntryKind.of(resolved, n -> true));
             assertEquals(body, resolved);
             assertEquals(List.of(), TypeChain.supertypesOf(resolved));
             assertEquals(java.util.Optional.of(name + "_type"), schema.constructorOf(name));
@@ -87,7 +87,7 @@ class MetaKernelBootstrapResolverTest {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         Top integer = schema.entries().get("integer");
-        assertEquals(TypeKind.ATOM, TypeKind.of(integer, n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(integer, n -> true));
         assertEquals(IntegerType.UNCONSTRAINED, integer);
     }
 
@@ -98,7 +98,7 @@ class MetaKernelBootstrapResolverTest {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         Top booleanDef = schema.entries().get("boolean");
-        assertEquals(TypeKind.ATOM, TypeKind.of(booleanDef, n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(booleanDef, n -> true));
         assertEquals(new EnumBody(List.of("true", "false")), booleanDef);
     }
 
@@ -118,20 +118,20 @@ class MetaKernelBootstrapResolverTest {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         Top text = schema.entries().get("text");
-        assertEquals(TypeKind.ATOM, TypeKind.of(text, n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(text, n -> true));
         assertEquals(TextType.UNCONSTRAINED, text);
 
         Top iri = schema.entries().get("iri");
-        assertEquals(TypeKind.ATOM, TypeKind.of(iri, n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(iri, n -> true));
         assertEquals(IriType.IRI, iri);
 
         Top regex = schema.entries().get("regex");
-        assertEquals(TypeKind.ATOM, TypeKind.of(regex, n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(regex, n -> true));
         assertEquals(RegexType.UNCONSTRAINED, regex);
 
         // The kernel's second identifier_type instance, told apart from `identifier` by its entry name.
         Top schemeName = schema.entries().get("scheme_name");
-        assertEquals(TypeKind.ATOM, TypeKind.of(schemeName, n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(schemeName, n -> true));
         assertEquals(IdentifierType.SCHEME_NAME, schemeName);
     }
 

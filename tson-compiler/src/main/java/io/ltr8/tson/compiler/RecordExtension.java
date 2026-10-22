@@ -3,27 +3,28 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
+import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.FamilySelectors;
+import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.FieldRole;
+import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
+import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
-import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.FamilySelectors;
-import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.EntryKind;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -129,7 +130,7 @@ final class RecordExtension {
         TypeRef application = applications.get(name);
         return known.position().isEmpty() && def instanceof RecordBody record
                 && application != null && !application.arguments().isEmpty()
-                && !record.supertypes().isEmpty() && !TypeKind.isConstructor(name, record, kernel);
+                && !record.supertypes().isEmpty() && !EntryKind.isConstructor(name, record, kernel);
     }
 
     /**

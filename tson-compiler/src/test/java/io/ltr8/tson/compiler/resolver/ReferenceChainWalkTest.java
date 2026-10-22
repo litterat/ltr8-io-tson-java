@@ -4,13 +4,11 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 

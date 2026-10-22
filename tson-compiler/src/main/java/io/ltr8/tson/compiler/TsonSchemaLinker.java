@@ -25,7 +25,7 @@ import io.ltr8.unicode.ConfusableNames;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -656,7 +656,7 @@ public final class TsonSchemaLinker {
             // §2.2.2's meta-programming case, asked of the type system rather than of a marker: a constructor
             // is an entry that IS-A `top` (§4.1), which is to say one composing, transitively, with a base
             // kind. Only a schema chaining directly to the meta-kernel may declare one.
-            if (TypeKind.isConstructor(entry.getKey(), def, kernel)) {
+            if (EntryKind.isConstructor(entry.getKey(), def, kernel)) {
                 if (constructorsAllowed == null) {
                     constructorsAllowed = isMetaKernelGoverned(schema);
                 }

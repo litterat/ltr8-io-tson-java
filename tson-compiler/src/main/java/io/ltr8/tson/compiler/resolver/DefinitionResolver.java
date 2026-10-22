@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.WriteException;
-import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.*;
 import io.ltr8.tson.compiler.ast.VoidValue;
@@ -28,25 +27,27 @@ import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
-import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.Type;
-import io.ltr8.tson.schema.meta.TypeChain;
-import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.schema.meta.EntryKind;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -156,7 +157,7 @@ import java.util.function.Predicate;
  * {@code kind: PRODUCT}, its own chain being {@code [top type]}. None found is {@code PRODUCT} (the
  * structural default), exactly one is that kind, and two or more is a schema error. A fresh (non-composed)
  * record has an empty chain by construction, so it is always {@code PRODUCT}. The kind is not stored: it is
- * the value's ({@code TypeKind.of}), read from the same chain.
+ * the value's ({@code EntryKind.of}), read from the same chain.
  *
  * <p><b>A chain is the resolver's to compute, never the author's to write</b> (SPEC-FEEDBACK.md #14): a
  * construction or an atom refinement stating {@code supertypes} or {@code subtypes} is refused
@@ -190,7 +191,7 @@ final class DefinitionResolver {
 
     /**
      * The kernel's alias constructor -- §5.10's partial application, {@code <B> pair<uuid, B>}, whose held
-     * body is a {@code !reference { target: ... }} and whose entry is {@link TypeKind#REFERENCE} rather than
+     * body is a {@code !reference { target: ... }} and whose entry is {@link EntryKind#REFERENCE} rather than
      * the constructor's own kind.
      */
     private static final String REFERENCE = "reference";
@@ -571,7 +572,7 @@ final class DefinitionResolver {
 
     /**
      * Whether {@code !C { ... }} may apply {@code C} at all: <b>{@code C} IS-A the kernel's {@code top}</b>
-     * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain ({@link TypeKind#isConstructor}, judged in the
+     * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain ({@link EntryKind#isConstructor}, judged in the
      * structure namespace every head resolves in, where {@code top} must be the kernel's own).
      *
      * <p><b>A wider and more exact question than whether {@code C} is marked a constructor.</b> §4.1 makes
@@ -599,7 +600,7 @@ final class DefinitionResolver {
      */
     private void requireApplicable(String name, String target, Top applied) {
         String terminal = ReferenceChain.terminal(target, metaDefinitions::definition);
-        if (TypeKind.isConstructor(terminal, applied, metaKernel)) {
+        if (EntryKind.isConstructor(terminal, applied, metaKernel)) {
             return;
         }
         throw new SchemaValidationException("'" + name + "': '!" + target + "' is not applicable -- it is "
@@ -986,10 +987,10 @@ final class DefinitionResolver {
             // than advice that would fail in turn.
             throw new SchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an "
                     + "atom-family instance to narrow (§5.5), and '" + sourceName + "' is "
-                    + (TypeKind.isConstructor(sourceName, source, kernel)
+                    + (EntryKind.isConstructor(sourceName, source, kernel)
                             ? "a constraint vocabulary -- '^' narrows one of its instances. Did you mean "
                                     + "constructor application ('!" + sourceName + " { ... }')?"
-                            : "kind=" + TypeKind.of(source, kernel) + ", which has no atom constraints to tighten"));
+                            : "kind=" + EntryKind.of(source, kernel) + ", which has no atom constraints to tighten"));
         }
         // The tag the source's value carries, and failing a recorded one the constructor its class is the body
         // of -- every resolved instance records its tag, and a hand-assembled one is the class's own.
@@ -1635,7 +1636,7 @@ final class DefinitionResolver {
      * PRODUCT (its own chain is {@code [chained, top, type]}), so "inherit the nearest ancestor's kind" would
      * give the wrong answer even for {@code atom}'s own subtypes.
      */
-    TypeKind determineKind(String name, List<String> transitiveSupertypes) {
+    EntryKind determineKind(String name, List<String> transitiveSupertypes) {
         List<String> baseKindsFound = new ArrayList<>();
         for (String supertype : transitiveSupertypes) {
             if (BASE_KINDS.contains(supertype) && kernel.test(supertype)) {
@@ -1651,7 +1652,7 @@ final class DefinitionResolver {
                     + "gives a type exactly one, so nothing can be both. Compose or refine from sources that "
                     + "agree on their base kind");
         }
-        return TypeKind.ofChain(baseKindsFound, kernel);
+        return EntryKind.ofChain(baseKindsFound, kernel);
     }
 
     private static final Set<String> BASE_KINDS = Set.of("atom", "product", "sum", "data");

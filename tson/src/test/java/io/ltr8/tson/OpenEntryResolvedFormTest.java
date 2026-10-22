@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Data;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -13,10 +14,10 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
-import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -223,7 +224,7 @@ class OpenEntryResolvedFormTest {
     // ── §8.1: a kind is derived, never recorded ─────────────────────────
 
     /**
-     * <b>{@code TypeKind.of} agrees with what the entry's own value determines</b>, over every entry of the
+     * <b>{@code EntryKind.of} agrees with what the entry's own value determines</b>, over every entry of the
      * three bundled schemas plus a schema exercising each declaration form. An entry's kind is its value's
      * type's kind (SPEC-FEEDBACK.md #14), derived and never written, so nothing but this test stands between
      * the derivation and a model that quietly stops agreeing with the rule it states.
@@ -301,9 +302,9 @@ class OpenEntryResolvedFormTest {
                         && !perSchema.get(id).containsKey(headOf(definition))) {
                     neededTheGoverningMeta++;
                 }
-                TypeKind derived = derive(definition, universe);
-                if (derived != TypeKind.of(definition, n -> true)) {
-                    mismatches.add(id + "#" + entry.getKey() + ": states " + TypeKind.of(definition, n -> true)
+                EntryKind derived = derive(definition, universe);
+                if (derived != EntryKind.of(definition, n -> true)) {
+                    mismatches.add(id + "#" + entry.getKey() + ": states " + EntryKind.of(definition, n -> true)
                             + " but derives " + derived);
                 }
             }
@@ -320,34 +321,34 @@ class OpenEntryResolvedFormTest {
     }
 
     /** §4.1's rule, read off what the entry already states. Four branches; see the test's own note. */
-    private static TypeKind derive(Top definition, Map<String, Top> universe) {
+    private static EntryKind derive(Top definition, Map<String, Top> universe) {
         if (definition instanceof TemplateBody) {
             // A held template is not a type (§5.10), so its kind says that and nothing about what applying it
             // produces -- that is the kind of the entry materialisation mints, from its own closed body. A record
             // template is a type, the family base, and falls to the record rules below.
-            return TypeKind.TEMPLATE;
+            return EntryKind.TEMPLATE;
         }
         if (definition instanceof Reference) {
             // §4.1 gives an alias REFERENCE, a type_kind and not a base kind -- and the kernel's `reference`
             // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.
-            return TypeKind.REFERENCE;
+            return EntryKind.REFERENCE;
         }
         if (TypeChain.supertypesOf(definition).contains("top")) {
             // A constructor: its kind states what its *instances* will be, not what its own body is --
             // `integer_type => atom & { ... }` has a !record body and kind ATOM.
             for (String supertype : TypeChain.supertypesOf(definition)) {
                 switch (supertype) {
-                    case "atom" -> { return TypeKind.ATOM; }
-                    case "sum" -> { return TypeKind.SUM; }
-                    case "data" -> { return TypeKind.DATA; }
+                    case "atom" -> { return EntryKind.ATOM; }
+                    case "sum" -> { return EntryKind.SUM; }
+                    case "data" -> { return EntryKind.DATA; }
                     default -> { }
                 }
             }
-            return TypeKind.PRODUCT;
+            return EntryKind.PRODUCT;
         }
         Top constructor = universe.get(headOf(definition));
         assertNotNull(constructor, "no entry for the body's constructor head " + headOf(definition));
-        return TypeKind.of(constructor, n -> true);
+        return EntryKind.of(constructor, n -> true);
     }
 
     /** The constructor name a body identifies as -- the {@code !head} a resolved document writes on it. */

@@ -18,7 +18,7 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   is (§3.3.1). No kind covers "a constructor": the series has no classifier of constructors.
 - `top` is a member of `type_kind`, `kind<product>` and `kind<record>`: a fresh abstract record IS-A nothing is a type
   by the rule on `kind_type`, and the kernel's own `schema => !namespace { value_type: top }` depends on it.
-  `TypeKind.isConstructor` answers a different question, applicability, and counts `top` by name.
+  `EntryKind.isConstructor` answers a different question, applicability, and counts `top` by name.
 - A type parameter is one whose `type` is `type_kind` (`TemplateParam.TYPE_KIND`); a parameter standing at a
   `type_kind` or a `type_ref` slot is a type parameter (`ParameterTypes.typePosition`).
 - A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the

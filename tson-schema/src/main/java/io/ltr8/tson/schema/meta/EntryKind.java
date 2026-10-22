@@ -7,7 +7,7 @@ import java.util.function.Predicate;
  * The kind of a resolved entry (Part 2 §4.1, §8.1) -- its value's type's kind ({@link #of}), derived and never
  * written, since the meta-kernel has no {@code type_kind}.
  */
-public enum TypeKind {
+public enum EntryKind {
     ATOM, PRODUCT, SUM, REFERENCE,
 
     /**
@@ -36,7 +36,7 @@ public enum TypeKind {
      *               where a base kind is defined, never by its spelling, so a schema's own {@code data => { ... }}
      *               composed into {@code payload => data & { ... }} leaves {@code payload} a PRODUCT
      */
-    public static TypeKind of(Top value, Predicate<String> kernel) {
+    public static EntryKind of(Top value, Predicate<String> kernel) {
         return switch (value) {
             case RecordBody record -> ofChain(record.supertypes(), kernel);
             case Atom ignored -> ATOM;
@@ -56,7 +56,7 @@ public enum TypeKind {
      * the nearest ancestor's kind would answer wrongly for {@code atom}'s own subtypes. A chain reaching two is
      * refused where it is resolved.
      */
-    public static TypeKind ofChain(List<String> chain, Predicate<String> kernel) {
+    public static EntryKind ofChain(List<String> chain, Predicate<String> kernel) {
         for (String supertype : chain) {
             if (!kernel.test(supertype)) {
                 continue;

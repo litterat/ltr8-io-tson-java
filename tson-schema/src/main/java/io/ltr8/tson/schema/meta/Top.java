@@ -11,7 +11,7 @@ package io.ltr8.tson.schema.meta;
  * {@code reference => top & { target: type_name } } (which composes with {@code top} directly, not
  * through {@code type}) becomes {@link Reference} implementing this interface directly. Lets a consumer
  * test kind ancestry with an ordinary {@code instanceof Type}/{@code instanceof Product} rather than
- * switching on {@link TypeKind} by hand, and also lets {@code ltr8-bind}'s generic writer/reader dispatch on this same
+ * switching on {@link EntryKind} by hand, and also lets {@code ltr8-bind}'s generic writer/reader dispatch on this same
  * sealed hierarchy directly for {@code !record}/{@code !array}/etc. type-refs -- {@code
  * DefaultUnionBinder} recurses through a multi-level sealed hierarchy like this one (a permitted
  * subclass that's itself sealed is flattened, not left as an unusable "member"), which is what

@@ -18,7 +18,7 @@ import java.util.List;
  * <p>Every body record carries {@code chain} as its first component, mirroring the constructor's flattened
  * shape, where {@code type}'s field comes first.
  *
- * <p>Not a base kind: {@link TypeKind} has no {@code TYPE}, and a kind is read from the base kind below it.
+ * <p>Not a base kind: {@link EntryKind} has no {@code TYPE}, and a kind is read from the base kind below it.
  */
 public sealed interface Type extends Top permits Atom, Product, Sum {
 

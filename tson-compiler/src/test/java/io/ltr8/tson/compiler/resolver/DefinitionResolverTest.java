@@ -19,42 +19,43 @@ import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.FamilySelectors;
-import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.IriType;
-import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.ComplexType;
 import io.ltr8.tson.schema.meta.EmailType;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.FamilySelectors;
+import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.Ipv4Type;
-import io.ltr8.tson.schema.meta.Ipv6Type;
-import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.Ipv4Type;
+import io.ltr8.tson.schema.meta.Ipv6Type;
+import io.ltr8.tson.schema.meta.IriType;
+import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
+import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.RegexType;
+import io.ltr8.tson.schema.meta.ScopeKind;
+import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueType;
-import io.ltr8.tson.schema.meta.ScopeKind;
-import io.ltr8.tson.schema.meta.Scoped;
-import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.base.ParseException;
+import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -313,7 +314,7 @@ class DefinitionResolverTest {
 
         Top top = resolver.resolve(schemaMap.declarations().get("top"));
 
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(top, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(top, n -> true));
         assertEquals(List.of(), TypeChain.supertypesOf(top));
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: {} groups: [] extension: \"ABSTRACT\" "
                 + "discriminators: [] parameters: [] }",
@@ -338,10 +339,10 @@ class DefinitionResolverTest {
         // §4.1: atom/product/sum are each kind PRODUCT -- their own transitive chain is just
         // [type, top], which contains none of the three literal base-kind names, so the structural
         // default applies even to the base kinds' own entries. They compose with `type`; reference with top.
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(atom, n -> true));
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(product, n -> true));
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(sum, n -> true));
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(reference, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(atom, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(product, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(sum, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(reference, n -> true));
         assertEquals(List.of("top", "type"), TypeChain.supertypesOf(atom));
         assertEquals(List.of("top", "type"), TypeChain.supertypesOf(product));
         assertEquals(List.of("top", "type"), TypeChain.supertypesOf(sum));
@@ -383,7 +384,7 @@ class DefinitionResolverTest {
         // ~atom & {...} -- propagates straight from the "~" marker; kind: ATOM
         // because "atom" (the literal base-kind name) is in integer_type's own transitive chain.
         assertTrue(TypeChain.supertypesOf(integerType).contains("top"), "a constructor: IS-A top");
-        assertEquals(TypeKind.ATOM, TypeKind.of(integerType, n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(integerType, n -> true));
         assertEquals(List.of("atom", "top", "type"), TypeChain.supertypesOf(integerType));
 
         assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"top\" \"type\" ] subtypes: [] } "
@@ -417,11 +418,11 @@ class DefinitionResolverTest {
 
         // type_name/field_name/param_name => identifier; each is its own fresh REFERENCE entry, not
         // three views of the same one -- source/target both name "identifier" for all three.
-        assertEquals(TypeKind.REFERENCE, TypeKind.of(typeName, n -> true));
-        assertEquals(TypeKind.REFERENCE, TypeKind.of(fieldName, n -> true));
-        assertEquals(TypeKind.REFERENCE, TypeKind.of(paramName, n -> true));
-        assertEquals(TypeKind.REFERENCE, TypeKind.of(annotation, n -> true));
-        assertEquals(TypeKind.REFERENCE, TypeKind.of(doc, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(typeName, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(fieldName, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(paramName, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(annotation, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(doc, n -> true));
 
         assertEquals("{ target: identifier }", write(typeName));
         assertEquals(write(typeName), write(fieldName));
@@ -474,7 +475,7 @@ class DefinitionResolverTest {
     void resolvesASizedArrayToAConstructionOfArray() {
         Top frame = resolveSnippet("frame => [text; 1920]");
 
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(frame, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(frame, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(frame));
         assertEquals(List.of(), TypeChain.supertypesOf(frame));
         assertEquals(Optional.of("array"), snippetFacts.get("frame").constructor(),
@@ -510,7 +511,7 @@ class DefinitionResolverTest {
     void aSizeLessDeclarationLevelArrayIsAConstructionWithNoSupertypes() {
         Top idList = resolveSnippet("id_list => [text]");
 
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(idList, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(idList, n -> true));
         assertEquals(List.of(), TypeChain.supertypesOf(idList));
         assertEquals(Optional.of("array"), snippetFacts.get("id_list").constructor());
         assertEquals(TypeRef.of("text"), assertInstanceOf(ArrayBody.class, idList).elementType());
@@ -696,7 +697,7 @@ class DefinitionResolverTest {
 
         Top array = resolver.resolve(schemaMap.declarations().get("array"));
 
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(array, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(array, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(array), "the container constructors carry no parameters");
         assertTrue(TypeChain.supertypesOf(array).contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("product", "top", "type"), TypeChain.supertypesOf(array));
@@ -725,7 +726,7 @@ class DefinitionResolverTest {
 
         Top map = resolver.resolve(schemaMap.declarations().get("map"));
 
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(map, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(map, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(map), "the container constructors carry no parameters");
         assertTrue(TypeChain.supertypesOf(map).contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("product", "top", "type"), TypeChain.supertypesOf(map));
@@ -822,7 +823,7 @@ class DefinitionResolverTest {
 
         Top set = resolver.resolve(schemaMapFromFixture().declarations().get("set_type"));
 
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(set, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(set, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(set), "the container constructors carry no parameters");
         assertTrue(TypeChain.supertypesOf(set).contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("array", "product", "top", "type"), TypeChain.supertypesOf(set));
@@ -878,7 +879,7 @@ class DefinitionResolverTest {
         Top enumDef = resolver.resolve(schemaMap.declarations().get("enum"));
 
         // enum_type => atom & { type: type_name  members: enum_set }: the constructor, `type` required.
-        assertEquals(TypeKind.ATOM, TypeKind.of(enumType, n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(enumType, n -> true));
         assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"top\" \"type\" ] subtypes: [] } "
                         + "fields: { \"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } "
                         + "\"name_type\" => { type: identifier_kind optional: false voidable: false role: \"FREE\" } "
@@ -887,7 +888,7 @@ class DefinitionResolverTest {
                 write(enumType));
         // enum => enum_type ^ { name_type?: = identifier }: a constructor tightening, `name_type` pinned and injected, so
         // `members` is the one unmarked field and `!enum [A B]` stays the positional form.
-        assertEquals(TypeKind.ATOM, TypeKind.of(enumDef, n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(enumDef, n -> true));
         assertEquals(List.of("atom", "enum_type", "top", "type"), TypeChain.supertypesOf(enumDef));
         assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"enum_type\" \"top\" \"type\" ] "
                         + "subtypes: [] } fields: { \"chain\" => { type: type_chain optional: true voidable: false role: "
@@ -919,7 +920,7 @@ class DefinitionResolverTest {
         DefinitionResolver accessResolver = definitionResolverFor(metaKernelParser, resolved::get);
         Top accessType = accessResolver.resolve(schemaMap.declarations().get("product_access_type"));
 
-        assertEquals(TypeKind.ATOM, TypeKind.of(accessType, n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(accessType, n -> true));
         assertFalse(TypeChain.supertypesOf(accessType).contains("top"), "an instance: IS-A stops at construction");
         assertEquals(List.of(), TypeChain.supertypesOf(accessType));
         assertEquals(Optional.of("enum"), accessResolver.factsOf("product_access_type").constructor());
@@ -1083,7 +1084,7 @@ class DefinitionResolverTest {
         Top declared = instanceResolver.resolve(schemaMap.declarations().get("declared"));
 
         assertEquals(ComplexType.UNCONSTRAINED, complex);
-        assertEquals(TypeKind.SUM, TypeKind.of(declared, n -> true));
+        assertEquals(EntryKind.SUM, EntryKind.of(declared, n -> true));
         assertEquals(new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()), declared);
     }
 
@@ -2157,7 +2158,7 @@ class DefinitionResolverTest {
         assertEquals(List.of("name", "email"), fieldNames(subtracted));
         // IS-A broken: a subtracted record is a record with an empty chain.
         assertEquals(List.of(), bodyOf(subtracted).supertypes());
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(subtracted, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(subtracted, n -> true));
         // the source is untouched -- removal builds a new field list, it does not edit the supertype's
         assertEquals(List.of("name", "email", "password"), fieldNames(entries.get("account")));
     }

@@ -2,9 +2,9 @@ package io.ltr8.tson.schema;
 
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.unicode.Normalization;
 
 import java.util.Map;
@@ -144,16 +144,16 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
         return schema.entries().containsKey(entryName) && TsonBundledSchemas.isMetaKernel(originOf(entryName));
     }
 
-    /** {@code entryName}'s kind ({@link TypeKind#of}), judged by origin; {@code null} for a name it lacks. */
-    public TypeKind kindOf(String entryName) {
+    /** {@code entryName}'s kind ({@link EntryKind#of}), judged by origin; {@code null} for a name it lacks. */
+    public EntryKind kindOf(String entryName) {
         Top value = schema.entries().get(entryName);
-        return value == null ? null : TypeKind.of(value, this::isKernel);
+        return value == null ? null : EntryKind.of(value, this::isKernel);
     }
 
     /** Whether entry {@code name}, whose value is {@code value}, IS-A the kernel's {@code top} ({@link
-     * TypeKind#isConstructor}). */
+     * EntryKind#isConstructor}). */
     public boolean isConstructor(String name, Top value) {
-        return TypeKind.isConstructor(name, value, this::isKernel);
+        return EntryKind.isConstructor(name, value, this::isKernel);
     }
 
 }

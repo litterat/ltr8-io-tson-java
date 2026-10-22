@@ -2,15 +2,15 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -69,7 +69,7 @@ class ChoiceSugarResolutionTest {
         TsonSchema schema = resolve("  contact => (text | integer)");
 
         Top contact = schema.entries().get("contact");
-        assertEquals(TypeKind.SUM, TypeKind.of(contact, n -> true));
+        assertEquals(EntryKind.SUM, EntryKind.of(contact, n -> true));
         assertEquals(List.of("text", "integer"), variantNames(contact));
         assertEquals(java.util.Optional.of("choice"), schema.constructorOf("contact"));
         assertTrue(TypeChain.supertypesOf(contact).isEmpty(), () -> "expected no supertypes, got "

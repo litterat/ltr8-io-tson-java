@@ -29,7 +29,7 @@ import java.util.function.Function;
  * supertypes. A record template is built with {@code record}: it is a type, the family base its members are IS-A
  * (§5.10), so a kind of {@code record} holds it. So does the kernel's {@code top}: a fresh abstract record built
  * with {@code record} and IS-A nothing, it is a type and not a constructor by the rule, and a member of every kind
- * whose {@code of} is {@code record} or above it -- {@link io.ltr8.tson.schema.meta.TypeKind#isConstructor}
+ * whose {@code of} is {@code record} or above it -- {@link io.ltr8.tson.schema.meta.EntryKind#isConstructor}
  * answers for applicability, a different question, and is not consulted here.
  *
  * <p><b>A kind is a member of itself where the walk says so.</b> {@code type_kind} is built with {@code

@@ -28,7 +28,7 @@ that runs before it. Current form only; history lives in git.
 - An instantiation of any kind — a record member, a DATA entry, a self-reaching `Reference` hop — records the
   application it closes in the map `SchemaResolver` shares with the materialiser, which writes it on the entry's key
   as `@application`; that is what §8.2's identity and the applied-parent fold key on.
-- Kind is derived (`TypeKind.of`, judged by where each base kind is defined) and never written; a held template is
+- Kind is derived (`EntryKind.of`, judged by where each base kind is defined) and never written; a held template is
   `TEMPLATE`. A record, open or closed, takes the base kind its chain reaches; every other entry takes the branch of
   `Top` its body occupies.
 - A template `TemplateRegularity` condemns is replaced with a placeholder in both the entry map and the namespace; the
@@ -205,7 +205,7 @@ recorded open form, and replacing the application with a reference to the entry 
     - **A template named without arguments is no operand either.** `x => box & { … }` is refused
       (`DefinitionResolver.refuseUnappliedTemplate`): a record template is a type a position may name, but an
       operand is flattened, and a template has fields only once its parameters are bound.
-- **`kind` is derived, never stored.** `TypeKind.of(value, kernel)` reads it off an entry's value — its chain and
+- **`kind` is derived, never stored.** `EntryKind.of(value, kernel)` reads it off an entry's value — its chain and
   its branch of `Top` — so writing it would restate what the value already carries; the kernel declares no
   `type_kind`, and the model has no slot for one. A base kind in the chain counts only as the kernel's own entry
   (`kernel` tests where the name is defined): a schema's own `data => { … }` composed into `payload => data & { … }`
@@ -228,7 +228,7 @@ recorded open form, and replacing the application with a reference to the entry 
   - **A template composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }`
     makes `listed<text>` a constructor: its `!record` body describes its instances, so the body's branch
     (PRODUCT) is the wrong answer, and its kind is the base kind its chain reaches (ATOM), by the rule a
-    declared entry follows (`TypeKind.ofChain`, which `DefinitionResolver.determineKind` guards). Construction then
+    declared entry follows (`EntryKind.ofChain`, which `DefinitionResolver.determineKind` guards). Construction then
     transfers that kind to `!listed_text [...]`. `OpenEntryResolvedFormTest` covers `atom` and `data`.
   - **And it makes the derivation total.** Every other entry's kind follows from what it already states —
     the base-kind name in its own `supertypes` for a constructor, its body's branch otherwise — and an open

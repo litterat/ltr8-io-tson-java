@@ -50,7 +50,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond
   them, exactly the entries describing *a type* rather than a part of one. Over the bundled schemas that is
   every vocabulary constructor plus `top`, `type`, the four base kinds, `reference` and `template` — judged by where
-  `top` is defined (`TypeKind.isConstructor`, one predicate the resolver's gate, the linker's §2.2.2 eligibility,
+  `top` is defined (`EntryKind.isConstructor`, one predicate the resolver's gate, the linker's §2.2.2 eligibility,
   the meta's reader table and the governed compile all ask), and over a template's chain as over a closed one's.
   **A per-entry constructor marker would be both too narrow and inconsistent.** `reference` describes no
   value, so it would go unmarked, and the language needs it applicable — which takes a by-name exception that

@@ -96,7 +96,7 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
   javac's error-type contract (it answers every question) rather than Swift's (every questioner must check
   first), and the choice is load-bearing: a `Sum`-bodied placeholder makes `parent => child & { ... }` fail
   *because* `child` did, reporting a consequence beside its cause. Swift's other half is kept — producing one
-  means a diagnostic was already reported. It never escapes a reporting resolve, so it needs no `TypeKind`
+  means a diagnostic was already reported. It never escapes a reporting resolve, so it needs no `EntryKind`
   of its own.
     - **It keeps the declaration's own type parameters**, which is the one declaration-specific thing it
       carries. Answering every question is not answering them all with nothing: with the arity dropped, an

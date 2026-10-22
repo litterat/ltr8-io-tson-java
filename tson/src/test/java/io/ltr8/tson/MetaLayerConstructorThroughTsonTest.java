@@ -13,7 +13,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.consumer.Webhook;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -136,7 +136,7 @@ class MetaLayerConstructorThroughTsonTest {
         assertEquals("/search", search.path());
         assertEquals("GET", search.method());
         assertEquals(TypeRef.of("search_request"), search.request());
-        assertEquals(TypeKind.DATA, TypeKind.of(linked.schema().entries().get("search"), n -> true));
+        assertEquals(EntryKind.DATA, EntryKind.of(linked.schema().entries().get("search"), n -> true));
     }
 
     /**

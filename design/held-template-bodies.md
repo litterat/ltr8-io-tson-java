@@ -227,7 +227,7 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     apart by the constructor head: the body shape does not distinguish them, every open entry's being held.
   - **`reference`'s kind is not a base kind**, so `DefinitionResolver`
     dispatches the head instead of judging it by the generic `!C value` rule: §4.1 gives an alias
-    `kind: REFERENCE`, a derived kind (`TypeKind.of`; the
+    `kind: REFERENCE`, a derived kind (`EntryKind.of`; the
     kernel declares no `type_kind`) with nothing in the supertype chain to supply it, because `reference`
     describes no value. The
     binding check still runs — `reference`'s vocabulary is a record like any other. §5.10 is explicit that this mints no

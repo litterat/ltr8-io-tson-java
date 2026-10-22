@@ -11,7 +11,6 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonAtom;

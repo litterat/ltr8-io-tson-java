@@ -43,7 +43,8 @@ constructor — the parameter names and the application as text (§8.1). A schem
 (`schema => !namespace { key_type: type_name  value_type: top }`): a type carries its own chain
 (`type => abstract top & { chain?: type_chain }`), and nothing carries `parameters` (they are the template body's),
 `disjoint` (derived over the choice body, §5.4) or `kind`: a kind is derived from an entry's own chain and body (§4.1,
-`TypeKind.of`, judged by where each base kind is defined), and the kernel declares no `type_kind`. `top`, `type` and
+`EntryKind.of`, judged by where each base kind is defined), and the kernel's `type_kind` is the kind of the types, not
+that derivation. `top`, `type` and
 the four base kinds are `abstract` (SPEC-FEEDBACK.md #15).
 
 **Changing a bundled schema means re-stamping all three digests bottom-up**, moving the matching

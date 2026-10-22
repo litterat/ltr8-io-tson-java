@@ -10,7 +10,6 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

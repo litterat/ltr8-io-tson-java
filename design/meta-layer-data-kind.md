@@ -33,7 +33,7 @@ Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `d
 own. The question that needs an answer is where an *instance* of such a constructor lands when the thing it describes
 is not a data type — `schema`, a namespace of `top` keyed by `type_name`, admits any value, and an entry is a type
 exactly when its value is one. `data => abstract top & {}` is the fourth base kind that lets one say otherwise, and
-`TypeKind.DATA` is what it resolves to. The kernel names the other side:
+`EntryKind.DATA` is what it resolves to. The kernel names the other side:
 `type => abstract top & { chain?: type_chain }`, which `atom`, `product` and `sum` compose with (SPEC-FEEDBACK.md #9),
 so an entry is a type exactly when it IS-A `type`, and `data` IS-A `top` alone. `type` is not a base kind — kind
 derivation reads `atom`, `sum` and `data` off the chain and skips `type` as it skips `top`, each counted only as the

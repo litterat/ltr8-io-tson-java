@@ -47,18 +47,18 @@ class TypeChainTest {
     void anEntrysKindIsItsValuesAndARecordsIsTheBaseKindItsChainReaches() {
         RecordBody constructor = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("atom", "top", "type"));
 
-        assertEquals(TypeKind.ATOM, TypeKind.of(constructor, n -> true));
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(RecordBody.of(RecordBody.fieldMap()), n -> true));
-        assertEquals(TypeKind.ATOM, TypeKind.of(IntegerType.UNCONSTRAINED, n -> true));
-        assertEquals(TypeKind.REFERENCE, TypeKind.of(new Reference(TypeRef.of("text")), n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(constructor, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(RecordBody.of(RecordBody.fieldMap()), n -> true));
+        assertEquals(EntryKind.ATOM, EntryKind.of(IntegerType.UNCONSTRAINED, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(new Reference(TypeRef.of("text")), n -> true));
     }
 
     @Test
     void aBaseKindIsJudgedByWhereItIsDefinedNeverBySpelling() {
         RecordBody payload = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("data"));
 
-        assertEquals(TypeKind.DATA, TypeKind.of(payload, n -> true));
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(payload, n -> false), "a schema's own `data` is a record");
+        assertEquals(EntryKind.DATA, EntryKind.of(payload, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(payload, n -> false), "a schema's own `data` is a record");
     }
 
     @Test
@@ -68,11 +68,11 @@ class TypeChainTest {
                 .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_KIND, Optional.empty())))
                 .withSupertypes(List.of("data", "top"));
 
-        assertTrue(TypeKind.isConstructor("integer_type", constructor, n -> true));
-        assertTrue(TypeKind.isConstructor("op", templated, n -> true), "a template answers as its closed form");
-        assertTrue(TypeKind.isConstructor("top", RecordBody.of(RecordBody.fieldMap()), n -> true));
-        assertFalse(TypeKind.isConstructor("integer_type", constructor, n -> false), "a schema's own top");
-        assertFalse(TypeKind.isConstructor("person", RecordBody.of(RecordBody.fieldMap()), n -> true));
+        assertTrue(EntryKind.isConstructor("integer_type", constructor, n -> true));
+        assertTrue(EntryKind.isConstructor("op", templated, n -> true), "a template answers as its closed form");
+        assertTrue(EntryKind.isConstructor("top", RecordBody.of(RecordBody.fieldMap()), n -> true));
+        assertFalse(EntryKind.isConstructor("integer_type", constructor, n -> false), "a schema's own top");
+        assertFalse(EntryKind.isConstructor("person", RecordBody.of(RecordBody.fieldMap()), n -> true));
     }
 
     @Test

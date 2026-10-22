@@ -16,7 +16,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -98,9 +98,9 @@ class TinySchemaImportsCoreTn1Test {
         assertEquals(Set.of("my_int", "my_percentage", "my_record"), resolvedTiny.entries().keySet());
 
         Top myInt = resolvedTiny.entries().get("my_int");
-        assertEquals(TypeKind.REFERENCE, TypeKind.of(myInt, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(myInt, n -> true));
         Top myRecord = resolvedTiny.entries().get("my_record");
-        assertEquals(TypeKind.PRODUCT, TypeKind.of(myRecord, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(myRecord, n -> true));
 
         // Links (merging core.tn's own entries in, via the shared schemaRegistry this time --
         // TsonSchemaLinker's own import-merge, a separate pass from resolveSchema's own above) and
