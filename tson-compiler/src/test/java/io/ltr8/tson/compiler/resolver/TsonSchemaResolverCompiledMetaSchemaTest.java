@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
@@ -20,7 +19,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.VoidType;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -369,7 +368,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
         // Transitive, per SchemaResolver's own induction: direct supertype + its own supertype chain.
-        assertEquals(List.of("atom", "chained", "top", "type"), Chained.supertypesOf(resolved.entries().get("my_type")));
+        assertEquals(List.of("atom", "top", "type"), TypeChain.supertypesOf(resolved.entries().get("my_type")));
         // Imported entries are visible during resolution but never part of the result itself.
         assertEquals(Set.of("my_type"), resolved.entries().keySet());
     }
@@ -440,7 +439,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         // The same entry set a genuinely registered meta-kernel has: the bootstrap desugars its own document,
         // so TsonSchemaLinker.linkBootstrap has nothing left to add. Never cached (see the next test).
-        assertEquals(70, compiled.schema().entries().size());
+        assertEquals(69, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
         assertNotNull(compiled.compiledSchema().get("integer_size")

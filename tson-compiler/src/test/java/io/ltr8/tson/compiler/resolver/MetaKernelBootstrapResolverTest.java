@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -18,7 +17,7 @@ import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.IriType;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -78,7 +77,7 @@ class MetaKernelBootstrapResolverTest {
             Top resolved = schema.entries().get(name);
             assertEquals(TypeKind.ATOM, TypeKind.of(resolved, n -> true));
             assertEquals(body, resolved);
-            assertEquals(List.of(), Chained.supertypesOf(resolved));
+            assertEquals(List.of(), TypeChain.supertypesOf(resolved));
             assertEquals(java.util.Optional.of(name + "_type"), schema.constructorOf(name));
         });
     }
@@ -138,19 +137,19 @@ class MetaKernelBootstrapResolverTest {
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is the 62 declarations the fixture writes plus one injected declaration per distinct sugar form
-     * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar. They are the same
-     * entries the linker used to synthesize; producing them here is what leaves the linker with nothing to
-     * materialize (see {@code MetaKernelSchemaRegistryTest}). {@code enum}'s member set is not among them:
-     * it is the fixture's own {@code enum_set} declaration, since {@code set} has no sugar and a {@code !}
-     * form stays prohibited at a field position (§5.2) -- and {@code record.fields} is the fixture's own
+     * output is the 61 declarations the fixture writes plus one injected declaration per distinct sugar form
+     * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar. Producing them here
+     * is what leaves the linker with nothing to materialize (see {@code MetaKernelSchemaRegistryTest}).
+     * {@code enum}'s member set is not among them: it is the fixture's own {@code enum_set} declaration, since
+     * {@code set} has no sugar and a {@code !} form stays prohibited at a field position (§5.2) -- and {@code
+     * record.fields} is the fixture's own
      * {@code field_map} for the same reason, an ordered map having no sugar either.
      */
     @Test
     void theFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(70, schema.entries().size());
+        assertEquals(69, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_text", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_template_param", "array_field_group")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),

@@ -19,7 +19,6 @@ import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
@@ -204,7 +203,7 @@ class RecordBindReaderTest {
         for (String name : linked.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(70, linked.schema().entries().size());
+        assertEquals(69, linked.schema().entries().size());
     }
 
     @Test

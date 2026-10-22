@@ -26,10 +26,10 @@ import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -667,7 +667,7 @@ public final class SchemaResolver {
             }
             List<String> chain = new ArrayList<>(member.supertypes());
             chain.add(head);
-            chain.addAll(Chained.supertypesOf(namespace.get(head)));
+            chain.addAll(TypeChain.supertypesOf(namespace.get(head)));
             Top joined = member.withSupertypes(chain.stream().distinct().toList());
             entry.setValue(joined);
             namespace.put(entry.getKey(), joined);
@@ -732,26 +732,24 @@ public final class SchemaResolver {
      * grew.
      */
     private static Top completed(Top definition, Map<String, String> byApplication, Map<String, Top> namespace) {
-        if (!(definition instanceof Chained chained)) {
+        if (!(definition instanceof Type type)) {
             return definition;
         }
-        Set<String> chain = new LinkedHashSet<>(chained.supertypes());
-        if (definition instanceof Type type) {
-            for (io.ltr8.tson.schema.meta.TypeRef parent : type.parents()) {
-                if (parent.arguments().isEmpty()) {
-                    continue;
-                }
-                String owner = byApplication.get(DerivedName.canonicalApplication(parent.name(), parent.arguments()));
-                if (owner != null) {
-                    chain.add(owner);
-                }
+        Set<String> chain = new LinkedHashSet<>(type.supertypes());
+        for (io.ltr8.tson.schema.meta.TypeRef parent : type.parents()) {
+            if (parent.arguments().isEmpty()) {
+                continue;
+            }
+            String owner = byApplication.get(DerivedName.canonicalApplication(parent.name(), parent.arguments()));
+            if (owner != null) {
+                chain.add(owner);
             }
         }
         for (String member : List.copyOf(chain)) {
             chain.addAll(Ancestry.closedNames(namespace.get(member)));
         }
-        return chain.size() == chained.supertypes().size() ? definition
-                : Chained.withChain(definition, chained.chain().withSupertypes(List.copyOf(chain)));
+        return chain.size() == type.supertypes().size() ? definition
+                : TypeChain.withChain(definition, type.chain().withSupertypes(List.copyOf(chain)));
     }
 
     /**

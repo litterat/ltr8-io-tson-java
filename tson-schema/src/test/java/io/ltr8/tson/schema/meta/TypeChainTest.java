@@ -11,8 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A type carries its own IS-A chain (SPEC-FEEDBACK.md #14): {@code chained}'s one record on every body and on a
- * template, the kind an entry's value gives it, judged by where a base kind is defined, and the constructor test.
+ * A type carries its own IS-A chain (SPEC-FEEDBACK.md #14): {@code type}'s one field on every type body, a record
+ * template's included, the kind an entry's value gives it, judged by where a base kind is defined, and the constructor test.
  */
 class TypeChainTest {
 
@@ -35,7 +35,7 @@ class TypeChainTest {
         assertEquals(List.of("integer"), placed.supertypes());
         assertEquals(List.of("adult_age"), placed.subtypes());
         assertNotEquals(age, placed);
-        assertEquals(age, Chained.withoutChain(placed));
+        assertEquals(age, TypeChain.withoutChain(placed));
     }
 
     @Test
@@ -82,9 +82,9 @@ class TypeChainTest {
         RecordBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
                 .withSubtypes(List.of("dog")));
 
-        assertEquals(List.of("animal"), Chained.supertypesOf(placed));
-        assertEquals(List.of(TypeRef.of("animal")), Chained.parentsOf(placed));
-        assertEquals(List.of("dog"), Chained.subtypesOf(placed));
+        assertEquals(List.of("animal"), TypeChain.supertypesOf(placed));
+        assertEquals(List.of(TypeRef.of("animal")), TypeChain.parentsOf(placed));
+        assertEquals(List.of("dog"), TypeChain.subtypesOf(placed));
         assertEquals(placed.parameterNames(), pet.parameterNames());
     }
 }

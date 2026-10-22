@@ -7,7 +7,6 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -19,8 +18,8 @@ import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -474,12 +473,12 @@ final class ParameterTypes {
             if (definition == null) {
                 return false;
             }
-            if (Chained.supertypesOf(definition).contains(b.type().name())) {
+            if (TypeChain.supertypesOf(definition).contains(b.type().name())) {
                 return true;
             }
             Top other = lookup(b, local, meta);
             return other != null && a.type().name().equals(b.type().name())
-                    && Chained.withoutChain(definition).equals(Chained.withoutChain(other));
+                    && TypeChain.withoutChain(definition).equals(TypeChain.withoutChain(other));
         }
 
         private static Top lookup(Use use, Function<String, Top> local,

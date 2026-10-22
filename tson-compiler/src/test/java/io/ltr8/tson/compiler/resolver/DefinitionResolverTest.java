@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
@@ -55,7 +54,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.ScopeKind;
 import io.ltr8.tson.schema.meta.Scoped;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -315,7 +314,7 @@ class DefinitionResolverTest {
         Top top = resolver.resolve(schemaMap.declarations().get("top"));
 
         assertEquals(TypeKind.PRODUCT, TypeKind.of(top, n -> true));
-        assertEquals(List.of(), Chained.supertypesOf(top));
+        assertEquals(List.of(), TypeChain.supertypesOf(top));
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: {} groups: [] extension: \"ABSTRACT\" "
                 + "discriminators: [] parameters: [] }",
                 write(top));
@@ -325,7 +324,6 @@ class DefinitionResolverTest {
     void resolvesAtomProductSumAndReferenceByComposingWithTop() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("chained", resolver.resolve(schemaMap.declarations().get("chained")));
         resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
 
         Top atom = resolver.resolve(schemaMap.declarations().get("atom"));
@@ -344,21 +342,21 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.PRODUCT, TypeKind.of(product, n -> true));
         assertEquals(TypeKind.PRODUCT, TypeKind.of(sum, n -> true));
         assertEquals(TypeKind.PRODUCT, TypeKind.of(reference, n -> true));
-        assertEquals(List.of("chained", "top", "type"), Chained.supertypesOf(atom));
-        assertEquals(List.of("chained", "top", "type"), Chained.supertypesOf(product));
-        assertEquals(List.of("chained", "top", "type"), Chained.supertypesOf(sum));
-        assertEquals(List.of("top"), Chained.supertypesOf(reference));
+        assertEquals(List.of("top", "type"), TypeChain.supertypesOf(atom));
+        assertEquals(List.of("top", "type"), TypeChain.supertypesOf(product));
+        assertEquals(List.of("top", "type"), TypeChain.supertypesOf(sum));
+        assertEquals(List.of("top"), TypeChain.supertypesOf(reference));
 
         // atom, sum: empty trailing body, no fields inherited from type (which has none) -- just the composition itself.
-        assertEquals("{ chain: { parents: [] supertypes: [ \"chained\" \"top\" \"type\" ] subtypes: [] } fields: { "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" \"type\" ] subtypes: [] } fields: { "
                 + "\"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
                 + "extension: \"ABSTRACT\" discriminators: [] parameters: [] }", write(atom));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"chained\" \"top\" \"type\" ] subtypes: [] } fields: { "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" \"type\" ] subtypes: [] } fields: { "
                 + "\"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
                 + "extension: \"ABSTRACT\" discriminators: [] parameters: [] }", write(sum));
 
         // product: two brand-new fields added by the trailing body (type contributes none).
-        assertEquals("{ chain: { parents: [] supertypes: [ \"chained\" \"top\" \"type\" ] subtypes: [] } fields: { "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" \"type\" ] subtypes: [] } fields: { "
                 + "\"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } \"access_pattern\" => "
                 + "{ type: product_access_type optional: false voidable: false role: \"FREE\" } \"size_type\" => { type: "
                 + "product_size_type optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
@@ -377,7 +375,6 @@ class DefinitionResolverTest {
     void resolvesIntegerTypeWithFieldGroupsAndOptionalFields() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("chained", resolver.resolve(schemaMap.declarations().get("chained")));
         resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
 
@@ -385,11 +382,11 @@ class DefinitionResolverTest {
 
         // ~atom & {...} -- propagates straight from the "~" marker; kind: ATOM
         // because "atom" (the literal base-kind name) is in integer_type's own transitive chain.
-        assertTrue(Chained.supertypesOf(integerType).contains("top"), "a constructor: IS-A top");
+        assertTrue(TypeChain.supertypesOf(integerType).contains("top"), "a constructor: IS-A top");
         assertEquals(TypeKind.ATOM, TypeKind.of(integerType, n -> true));
-        assertEquals(List.of("atom", "chained", "top", "type"), Chained.supertypesOf(integerType));
+        assertEquals(List.of("atom", "top", "type"), TypeChain.supertypesOf(integerType));
 
-        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"chained\" \"top\" \"type\" ] subtypes: [] } "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"top\" \"type\" ] subtypes: [] } "
                         + "fields: { \"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } "
                         + "\"size\" => { type: integer_size optional: true voidable: false role: \"FREE\" } \"min\" => { "
                         + "type: integer optional: true voidable: false role: \"FREE\" } \"exclusive_min\" => { type: "
@@ -479,7 +476,7 @@ class DefinitionResolverTest {
 
         assertEquals(TypeKind.PRODUCT, TypeKind.of(frame, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(frame));
-        assertEquals(List.of(), Chained.supertypesOf(frame));
+        assertEquals(List.of(), TypeChain.supertypesOf(frame));
         assertEquals(Optional.of("array"), snippetFacts.get("frame").constructor(),
                 "the constructor the application closes at, not the template it was spelled through");
 
@@ -514,7 +511,7 @@ class DefinitionResolverTest {
         Top idList = resolveSnippet("id_list => [text]");
 
         assertEquals(TypeKind.PRODUCT, TypeKind.of(idList, n -> true));
-        assertEquals(List.of(), Chained.supertypesOf(idList));
+        assertEquals(List.of(), TypeChain.supertypesOf(idList));
         assertEquals(Optional.of("array"), snippetFacts.get("id_list").constructor());
         assertEquals(TypeRef.of("text"), assertInstanceOf(ArrayBody.class, idList).elementType());
     }
@@ -568,8 +565,8 @@ class DefinitionResolverTest {
         RecordBody box = assertInstanceOf(RecordBody.class, resolver.resolve(schemaMap.declarations().get("box")));
 
         assertEquals(List.of("T"), OpenEntry.parameterNames(box));
-        assertEquals(List.of("base"), Chained.supertypesOf(box), "a template is IS-A what its parents reach");
-        assertEquals(List.of(TypeRef.of("base")), Chained.parentsOf(box), "and keeps them as written");
+        assertEquals(List.of("base"), TypeChain.supertypesOf(box), "a template is IS-A what its parents reach");
+        assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(box), "and keeps them as written");
         assertEquals(TypeRef.of("T"), box.fields().get("value").type());
     }
 
@@ -589,7 +586,7 @@ class DefinitionResolverTest {
         RecordBody box = assertInstanceOf(RecordBody.class, entries.get("box"));
         assertEquals(List.of("id", "value"), List.copyOf(box.fields().keySet()));
         assertEquals(TypeRef.of("text"), box.fields().get("id").type());
-        assertEquals(List.of(TypeRef.of("base")), Chained.parentsOf(box), "closing completes the chain from these");
+        assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(box), "closing completes the chain from these");
     }
 
     // ── Field modifiers (§5.2, §5.10): default (~) and fixed (=) values ───
@@ -693,7 +690,6 @@ class DefinitionResolverTest {
     void resolvesArrayFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("chained", resolver.resolve(schemaMap.declarations().get("chained")));
         resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
@@ -702,9 +698,9 @@ class DefinitionResolverTest {
 
         assertEquals(TypeKind.PRODUCT, TypeKind.of(array, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(array), "the container constructors carry no parameters");
-        assertTrue(Chained.supertypesOf(array).contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("chained", "product", "top", "type"), Chained.supertypesOf(array));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"chained\" \"product\" \"top\" \"type\" ] subtypes: [] } "
+        assertTrue(TypeChain.supertypesOf(array).contains("top"), "a constructor: IS-A top");
+        assertEquals(List.of("product", "top", "type"), TypeChain.supertypesOf(array));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"product\" \"top\" \"type\" ] subtypes: [] } "
                         + "fields: { \"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } "
                         + "\"access_pattern\" => { type: product_access_type optional: true voidable: false role: "
                         + "\"FIXED\" value: INDEX } \"size_type\" => { type: product_size_type optional: true voidable: "
@@ -723,7 +719,6 @@ class DefinitionResolverTest {
     void resolvesMapFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("chained", resolver.resolve(schemaMap.declarations().get("chained")));
         resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
@@ -732,9 +727,9 @@ class DefinitionResolverTest {
 
         assertEquals(TypeKind.PRODUCT, TypeKind.of(map, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(map), "the container constructors carry no parameters");
-        assertTrue(Chained.supertypesOf(map).contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("chained", "product", "top", "type"), Chained.supertypesOf(map));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"chained\" \"product\" \"top\" \"type\" ] subtypes: [] } "
+        assertTrue(TypeChain.supertypesOf(map).contains("top"), "a constructor: IS-A top");
+        assertEquals(List.of("product", "top", "type"), TypeChain.supertypesOf(map));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"product\" \"top\" \"type\" ] subtypes: [] } "
                         + "fields: { \"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } "
                         + "\"access_pattern\" => { type: product_access_type optional: true voidable: false role: "
                         + "\"FIXED\" value: NAMED } \"size_type\" => { type: product_size_type optional: true voidable: "
@@ -829,9 +824,9 @@ class DefinitionResolverTest {
 
         assertEquals(TypeKind.PRODUCT, TypeKind.of(set, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(set), "the container constructors carry no parameters");
-        assertTrue(Chained.supertypesOf(set).contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("array", "chained", "product", "top", "type"), Chained.supertypesOf(set));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"array\" \"chained\" \"product\" \"top\" \"type\" ] "
+        assertTrue(TypeChain.supertypesOf(set).contains("top"), "a constructor: IS-A top");
+        assertEquals(List.of("array", "product", "top", "type"), TypeChain.supertypesOf(set));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"array\" \"product\" \"top\" \"type\" ] "
                         + "subtypes: [] } fields: { \"chain\" => { type: type_chain optional: true voidable: false role: "
                         + "\"FREE\" } \"access_pattern\" => { type: product_access_type optional: true voidable: false "
                         + "role: \"FIXED\" value: INDEX } \"size_type\" => { type: product_size_type optional: true "
@@ -876,7 +871,6 @@ class DefinitionResolverTest {
     void resolvesEnumTypeAndEnumFromTheRealMetaKernelFixture() throws IOException, DataBindException {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("chained", resolver.resolve(schemaMap.declarations().get("chained")));
         resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         Top enumType = resolver.resolve(schemaMap.declarations().get("enum_type"));
@@ -885,7 +879,7 @@ class DefinitionResolverTest {
 
         // enum_type => atom & { type: type_name  members: enum_set }: the constructor, `type` required.
         assertEquals(TypeKind.ATOM, TypeKind.of(enumType, n -> true));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"chained\" \"top\" \"type\" ] subtypes: [] } "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"top\" \"type\" ] subtypes: [] } "
                         + "fields: { \"chain\" => { type: type_chain optional: true voidable: false role: \"FREE\" } "
                         + "\"name_type\" => { type: type_name optional: false voidable: false role: \"FREE\" } "
                         + "\"members\" => { type: enum_set optional: false voidable: false role: \"FREE\" } } groups: [] "
@@ -894,8 +888,8 @@ class DefinitionResolverTest {
         // enum => enum_type ^ { name_type?: = identifier }: a constructor tightening, `name_type` pinned and injected, so
         // `members` is the one unmarked field and `!enum [A B]` stays the positional form.
         assertEquals(TypeKind.ATOM, TypeKind.of(enumDef, n -> true));
-        assertEquals(List.of("atom", "chained", "enum_type", "top", "type"), Chained.supertypesOf(enumDef));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"chained\" \"enum_type\" \"top\" \"type\" ] "
+        assertEquals(List.of("atom", "enum_type", "top", "type"), TypeChain.supertypesOf(enumDef));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"enum_type\" \"top\" \"type\" ] "
                         + "subtypes: [] } fields: { \"chain\" => { type: type_chain optional: true voidable: false role: "
                         + "\"FREE\" } \"name_type\" => { type: type_name optional: true voidable: false role: \"FIXED\" "
                         + "value: identifier } \"members\" => { type: enum_set optional: false voidable: false role: "
@@ -913,7 +907,6 @@ class DefinitionResolverTest {
         // handles that for the whole file -- see its class Javadoc).
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("chained", resolver.resolve(schemaMap.declarations().get("chained")));
         resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("enum_type", resolver.resolve(schemaMap.declarations().get("enum_type")));
@@ -927,8 +920,8 @@ class DefinitionResolverTest {
         Top accessType = accessResolver.resolve(schemaMap.declarations().get("product_access_type"));
 
         assertEquals(TypeKind.ATOM, TypeKind.of(accessType, n -> true));
-        assertFalse(Chained.supertypesOf(accessType).contains("top"), "an instance: IS-A stops at construction");
-        assertEquals(List.of(), Chained.supertypesOf(accessType));
+        assertFalse(TypeChain.supertypesOf(accessType).contains("top"), "an instance: IS-A stops at construction");
+        assertEquals(List.of(), TypeChain.supertypesOf(accessType));
         assertEquals(Optional.of("enum"), accessResolver.factsOf("product_access_type").constructor());
         assertEquals(new EnumBody(List.of("INDEX", "NAMED")), accessType);
     }
@@ -949,7 +942,6 @@ class DefinitionResolverTest {
     void booleanInstanceResolvesCorrectlyViaTheCompiledReader() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("chained", resolver.resolve(schemaMap.declarations().get("chained")));
         resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("enum_type", resolver.resolve(schemaMap.declarations().get("enum_type")));
@@ -978,7 +970,7 @@ class DefinitionResolverTest {
                 .resolve(schemaMap.declarations().get("bytes"));
 
         assertEquals(BytesType.UNCONSTRAINED, bytes);
-        assertEquals(List.of(), Chained.supertypesOf(bytes));
+        assertEquals(List.of(), TypeChain.supertypesOf(bytes));
     }
 
     @Test
@@ -1174,20 +1166,20 @@ class DefinitionResolverTest {
 
         // bounded keeps int8's own size (untouched by bounded's own refinement) alongside its new bounds.
         assertEquals(Optional.of("integer_type"), instanceResolver.factsOf("bounded").constructor());
-        assertEquals(List.of("int8"), Chained.supertypesOf(bounded));
+        assertEquals(List.of("int8"), TypeChain.supertypesOf(bounded));
         assertEquals(new IntegerType(Optional.of(new IntegerSize(8, true)),
                 Optional.of(java.math.BigInteger.valueOf(-100)), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(100)), Optional.empty(), Optional.empty()),
-                Chained.withoutChain(bounded));
+                TypeChain.withoutChain(bounded));
 
         // tighter keeps int8's size AND bounded's min (neither touched by tighter's own refinement),
         // but overrides bounded's own max with its own.
         assertEquals(Optional.of("integer_type"), instanceResolver.factsOf("tighter").constructor());
-        assertEquals(List.of("bounded"), Chained.supertypesOf(tighter));
+        assertEquals(List.of("bounded"), TypeChain.supertypesOf(tighter));
         assertEquals(new IntegerType(Optional.of(new IntegerSize(8, true)),
                 Optional.of(java.math.BigInteger.valueOf(-100)), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(50)), Optional.empty(), Optional.empty()),
-                Chained.withoutChain(tighter));
+                TypeChain.withoutChain(tighter));
     }
 
     /**
@@ -1243,7 +1235,7 @@ class DefinitionResolverTest {
                 }""").parseSchemaDocument().body();
         chainNamespace.put("reference", instanceResolver.resolve(schemaMap.declarations().get("reference")));
 
-        assertEquals(IriType.IRI, Chained.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("schemed"))));
+        assertEquals(IriType.IRI, TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("schemed"))));
         SchemaValidationException relaxed = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("relaxed")));
         assertTrue(relaxed.getMessage().contains("allow_relative re-enables what the source forbids"),
@@ -1306,19 +1298,19 @@ class DefinitionResolverTest {
         // Restating a bound at exactly the source's own value is a no-op, not a widening.
         assertEquals(new IntegerType(Optional.empty(), Optional.of(java.math.BigInteger.ZERO), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(100)), Optional.empty(), Optional.empty()),
-                Chained.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("restated"))));
+                TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("restated"))));
 
         // A width is compared against the source's own width, not its explicit bounds -- uint8's own
         // 0..255 reaches past percent's ceiling, yet adding it to a 0..100 source still narrows.
         assertEquals(new IntegerType(Optional.of(new IntegerSize(8, false)),
                 Optional.of(java.math.BigInteger.ZERO), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(100)), Optional.empty(), Optional.empty()),
-                Chained.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("sized"))));
+                TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("sized"))));
 
         // Tightening one end leaves the other inherited, which must compare equal rather than as a drop.
         assertEquals(new IntegerType(Optional.empty(), Optional.of(java.math.BigInteger.ZERO), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(50)), Optional.empty(), Optional.empty()),
-                Chained.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("oneEnd"))));
+                TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("oneEnd"))));
     }
 
     /**
@@ -1368,7 +1360,7 @@ class DefinitionResolverTest {
         // Emptiness is the rule, not narrowness -- a range admitting exactly one value pins a constant.
         assertEquals(new IntegerType(Optional.empty(), Optional.of(java.math.BigInteger.valueOf(5)), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(5)), Optional.empty(), Optional.empty()),
-                Chained.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("pinnedToOneValue"))));
+                TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("pinnedToOneValue"))));
     }
 
     /**
@@ -1397,7 +1389,7 @@ class DefinitionResolverTest {
         assertEquals(new FloatType(FloatType.Format.BINARY32,
                 Optional.of(new java.math.BigDecimal("0.0")), Optional.empty(),
                 Optional.of(new java.math.BigDecimal("1.0")), Optional.empty(), true, true, true, true),
-                Chained.withoutChain(probability));
+                TypeChain.withoutChain(probability));
     }
 
     /**
@@ -1420,7 +1412,7 @@ class DefinitionResolverTest {
         chainNamespace.put("short_text", instanceResolver.resolve(schemaMap.declarations().get("short_text")));
 
         assertEquals(new TextType(Optional.of(1), Optional.of(5), Optional.empty(), Optional.empty()),
-                Chained.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("shorter"))));
+                TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("shorter"))));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("longer")));
@@ -1632,7 +1624,6 @@ class DefinitionResolverTest {
     private void resolveUpToArray() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("chained", resolver.resolve(schemaMap.declarations().get("chained")));
         resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
@@ -1857,7 +1848,7 @@ class DefinitionResolverTest {
         RecordField nickname = bodyOf(entries.get("anonymous")).fields().values().stream().toList().get(1);
         assertEquals(RecordField.optionalVoidable(TypeRef.of("void")), nickname);
         // unlike removal (§5.9), IS-A survives -- the field is still in the contract
-        assertEquals(List.of("base"), Chained.supertypesOf(entries.get("anonymous")));
+        assertEquals(List.of("base"), TypeChain.supertypesOf(entries.get("anonymous")));
         assertEquals(List.of("name", "nickname"), fieldNames(entries.get("anonymous")));
     }
 
@@ -2183,7 +2174,7 @@ class DefinitionResolverTest {
         Top staff = entries.get("staff_public");
         // inherited in supertype order (minus the removal), then the body's genuinely new field
         assertEquals(List.of("name", "email", "badge_id", "badge"), fieldNames(staff));
-        assertEquals(List.of(), Chained.supertypesOf(staff), "a subtracted record's chain is empty");
+        assertEquals(List.of(), TypeChain.supertypesOf(staff), "a subtracted record's chain is empty");
     }
 
     /** A body entry may tighten a field that survives the removal -- §5.9's own {@code account_view}. */

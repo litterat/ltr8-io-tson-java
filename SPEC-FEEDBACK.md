@@ -1354,9 +1354,8 @@ type_chain => {
   supertypes?:  [type_name]      -- closed: every entry this one IS-A, complete
   subtypes?:    [type_name]      -- the inverse, over this map only (§3.3.4)
 }
-chained     => { chain?: type_chain }
 application => @annotation type_ref   -- on an entry's key: the application it is the instantiation of (§8.2)
-type     => top & chained & {}
+type     => top & { chain?: type_chain }
 template => top & { parameters  template }   -- #17: a record template is a `record` with `parameters`
 record   => product & { access_pattern? size_type? fields groups? extension? discriminators? profile? parameters? }
 schema   => {type_name => top}
@@ -1389,7 +1388,7 @@ schema   => {type_name => top}
   does not state.
 - **A declaration never writes `chain`, and a constructor never declares it.** `!record { chain: { … } }` in
   source is a resolver error, as writing `choice.disjoint` is, and a meta-schema's `widget => atom & { chain?: … }`
-  is refused where it is declared, the name being `chained`'s. On ingest the chain is read as stated, never
+  is refused where it is declared, the name being `type`'s. On ingest the chain is read as stated, never
   recomputed, because a flat body and its chain cannot be recomputed from each other. That is §10.1's reading of
   resolved output already, and the record fixtures' `fields` stay flattened for the reason §1.3 gives: the field
   set is the type, and a consumer that reads values against it must not repeat the merge.
@@ -1415,7 +1414,7 @@ schema changes; no verdict on a data document changes.
 
 **Suggested resolution.**
 
-- [TSON-SCHEMA] §4.1: `type_chain` and `chained` as above, `type` composing it, with the sentence
+- [TSON-SCHEMA] §4.1: `type_chain` as above and `type` carrying it, with the sentence
   "a type carries its IS-A chain; a declaration never writes it, and a constructor never declares its name";
   `application` declared with `synthetic` among the kernel's annotations, derived and never author-written.
 - [TSON-SCHEMA] §8.1: retitled to `type_ref` and `type_argument`; an entry resolves to its value; the kind of an
@@ -1429,11 +1428,11 @@ schema changes; no verdict on a data document changes.
   above, `schema => {type_name => top}`.
 
 **Status against Revision 37:** open; running on the `entry-is-value` branch of `r2026-38-proposal`. `meta-kernel.tn`
-declares `type_chain`, `chained`, `type` composing it, `record` without `supertypes`, and `schema =>
+declares `type_chain`, `type` carrying it, `record` without `supertypes`, and `schema =>
 {type_name => top}`, with no `type_definition`; the resolved fixtures carry the nested chain (`ResolvedFixtureTest`), and
 the bundled schemas are restamped. The Java model mirrors it: `schema.meta.TypeDefinition` is gone, `TsonSchema` maps a
-name to a `Top`, and every type body record carries one `TypeChain chain` component, behind a
-`Chained` interface whose accessors every IS-A question goes through. `supertypes` is sorted and closed to a fixed
+name to a `Top`, and every type body record carries one `TypeChain chain` component, with `Type`'s accessors and
+`TypeChain`'s statics the one way every IS-A question is asked. `supertypes` is sorted and closed to a fixed
 point over every local chain, so an entry IS-A everything its supertypes are, an atom refinement of a refinement
 included (`small => !int32 ^ { … }` carries `[int32 integer]`). A closed type keeps no `parents`; a record template
 keeps its written ones, is IS-A the closed entries they reach and stands in their `subtypes`, so a template composing
@@ -1474,7 +1473,7 @@ already has.
 
 ```
 top     => abstract {}
-type    => abstract top & chained & {}
+type    => abstract top & { chain?: type_chain }
 atom    => abstract type & {}
 product => abstract type & { access_pattern: product_access_type  size_type: product_size_type }
 sum     => abstract type & {}
@@ -1574,7 +1573,7 @@ flatten (§5.10)`). The corpus carries a refusal vector for each.
 **Section:** [TSON-SCHEMA] §5.10 ("Held bodies": "a record template `<T> { x: T }` is normalised to `<T> !record {
 … }` … and held"; "A record-bodied template is a family base, and may be named at a type position"; "The **two
 levels** of `extension`"), §4.1 (`template` composing `top`), §8.1; `meta-kernel.tn`'s `template`, `record`,
-`chained` and `type_chain`.
+`type` and `type_chain`.
 
 **Kind:** proposal — a kernel restructuring with no change to any verdict. Builds on #16.
 
@@ -1582,7 +1581,7 @@ levels** of `extension`"), §4.1 (`template` composing `top`), §8.1; `meta-kern
 base, a type a position may name, ABSTRACT, IS-A its parents, with its members IS-A it; every other template denotes
 nothing until applied. The kernel carries both in one constructor and encodes the difference as an optional field:
 `template.extension` is present exactly when the body is a record, and when present it is always ABSTRACT ("absent
-means this template is no type"). `template` composes `chained` only because a record template has a chain, and
+means this template is no type"). `template` carries a chain only because a record template has one, and
 carries `discriminators` only because a record template has selectors. Every one of those facts is a record's, and
 the reason for holding a record body as text — that a parameter may stand in any slot, `min_items: N` included — no
 longer applies to one: after #16 a record template's parameters stand only in a field's `type`, a field's `value` and

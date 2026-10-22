@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.*;
@@ -18,11 +17,11 @@ import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import org.junit.jupiter.api.Test;
 
@@ -409,7 +408,7 @@ class TsonSchemaLinkerTest {
         TsonSchema linked = TsonSchemaLinker.link(schemaOf(entries,
                 Map.of("parent", TsonSchema.EntryFacts.at(position).withAnnotations(doc))), null).schema();
 
-        assertEquals(List.of("child"), Chained.subtypesOf(linked.entries().get("parent")));
+        assertEquals(List.of("child"), TypeChain.subtypesOf(linked.entries().get("parent")));
         assertEquals(position, linked.positionOf("parent"));
         assertEquals(doc, linked.factsOf("parent").annotations());
     }
@@ -560,9 +559,9 @@ class TsonSchemaLinkerTest {
         TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
 
         assertEquals(Set.of("success_response", "failure_response"),
-                Set.copyOf(Chained.subtypesOf(result.schema().entries().get("response"))));
-        assertTrue(Chained.subtypesOf(result.schema().entries().get("success_response")).isEmpty());
-        assertTrue(Chained.subtypesOf(result.schema().entries().get("token")).isEmpty());
+                Set.copyOf(TypeChain.subtypesOf(result.schema().entries().get("response"))));
+        assertTrue(TypeChain.subtypesOf(result.schema().entries().get("success_response")).isEmpty());
+        assertTrue(TypeChain.subtypesOf(result.schema().entries().get("token")).isEmpty());
     }
 
     @Test
@@ -578,8 +577,8 @@ class TsonSchemaLinkerTest {
 
         TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
 
-        assertEquals(Set.of("mid", "leaf"), Set.copyOf(Chained.subtypesOf(result.schema().entries().get("top"))));
-        assertEquals(Set.of("leaf"), Set.copyOf(Chained.subtypesOf(result.schema().entries().get("mid"))));
+        assertEquals(Set.of("mid", "leaf"), Set.copyOf(TypeChain.subtypesOf(result.schema().entries().get("top"))));
+        assertEquals(Set.of("leaf"), Set.copyOf(TypeChain.subtypesOf(result.schema().entries().get("mid"))));
     }
 
     @Test
@@ -606,10 +605,10 @@ class TsonSchemaLinkerTest {
 
         // This importer's own merged view: the pre-existing subtype plus the newly-local one.
         assertEquals(Set.of("imported_child", "local_child"),
-                Set.copyOf(Chained.subtypesOf(result.schema().entries().get("imported_base"))));
+                Set.copyOf(TypeChain.subtypesOf(result.schema().entries().get("imported_base"))));
 
         // The originally-registered "imported" schema itself is untouched -- it never learns of local_child.
-        assertEquals(Set.of("imported_child"), Set.copyOf(Chained.subtypesOf(imported.entries().get("imported_base"))));
+        assertEquals(Set.of("imported_child"), Set.copyOf(TypeChain.subtypesOf(imported.entries().get("imported_base"))));
     }
 
     @Test

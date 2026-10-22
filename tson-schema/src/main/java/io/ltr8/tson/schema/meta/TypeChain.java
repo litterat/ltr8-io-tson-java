@@ -7,9 +7,10 @@ import java.util.List;
 
 /**
  * The meta-kernel's {@code type_chain} ([TSON-SCHEMA] §4.1, SPEC-FEEDBACK.md #14): where an entry sits in the
- * IS-A order. Carried by every {@link Chained} value, through {@code chained => { chain?: type_chain }}, which
- * {@code type} and {@code template} both compose. Which application an entry is the instantiation of is no part of
- * it: an entry of any kind can be one, so that fact sits on the entry's key ({@code TsonSchema#applicationOf}).
+ * IS-A order. Carried by every {@link Type}, as {@code type}'s one field, and asked of any {@link Top} by the
+ * statics here, which answer empty for a value that carries none. Which application an entry is the instantiation
+ * of is no part of it: an entry of any kind can be one, so that fact sits on the entry's key ({@code
+ * TsonSchema#applicationOf}).
  *
  * <p><b>Three states, one record.</b> {@link #parents} is what was written -- the parents of held template text,
  * one of which may be an application ({@code <T> result<T> & { ... }}), and of a family-base template after it
@@ -44,6 +45,39 @@ public record TypeChain(List<TypeRef> parents, List<String> supertypes, List<Str
     /** {@code chain}, or {@link #EMPTY} where a bound document omitted the field. */
     public static TypeChain orEmpty(TypeChain chain) {
         return chain == null ? EMPTY : chain;
+    }
+
+    /** {@code value}'s chain, {@link TypeChain#EMPTY} for a value that carries none. */
+    public static TypeChain chainOf(Top value) {
+        return value instanceof Type type ? type.chain() : EMPTY;
+    }
+
+    /** {@code value}'s supertypes, empty for a value that carries no chain. */
+    public static List<String> supertypesOf(Top value) {
+        return chainOf(value).supertypes();
+    }
+
+    /** {@code value}'s subtypes, empty for a value that carries no chain. */
+    public static List<String> subtypesOf(Top value) {
+        return chainOf(value).subtypes();
+    }
+
+    /** {@code value}'s written parents, empty for a value that carries no chain. */
+    public static List<TypeRef> parentsOf(Top value) {
+        return chainOf(value).parents();
+    }
+
+    /** {@code value} with {@code chain} in place of its own; a value that carries none is returned as it is. */
+    public static Top withChain(Top value, TypeChain chain) {
+        return value instanceof Type type ? type.withChain(chain) : value;
+    }
+
+    /**
+     * {@code value} with its chain emptied, for a comparison of what two values are rather than where each sits:
+     * a core type and the kernel original it copies are one body in two schema maps, each with its own subtypes.
+     */
+    public static Top withoutChain(Top value) {
+        return withChain(value, EMPTY);
     }
 
     /** {@code true} when nothing is stated: no parents, no chain, no inverse. */

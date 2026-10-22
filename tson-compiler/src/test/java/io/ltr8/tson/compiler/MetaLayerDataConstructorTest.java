@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -15,8 +14,8 @@ import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.tree.TsonValue;
-import io.ltr8.tson.schema.meta.Type;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -145,8 +144,8 @@ class MetaLayerDataConstructorTest {
                 core(consumerContext()).resolveLinked(META_HTTP).schema().entries().get("operation");
 
         assertEquals(TypeKind.DATA, TypeKind.of(operation, n -> true));
-        assertTrue(Chained.supertypesOf(operation).contains("top"), "a constructor: IS-A top, via the base kind");
-        assertEquals(List.of("data", "top"), Chained.supertypesOf(operation),
+        assertTrue(TypeChain.supertypesOf(operation).contains("top"), "a constructor: IS-A top, via the base kind");
+        assertEquals(List.of("data", "top"), TypeChain.supertypesOf(operation),
                 "the transitive chain -- `data` is itself `top & {}` -- and IS-A `top` is what makes"
                         + " `!operation { ... }` applicable");
     }

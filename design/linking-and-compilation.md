@@ -24,9 +24,9 @@ Current form only; history lives in git.
   so its duplicate check is two spellings that are one value of the record's name type, and nothing else.
 - `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
 - `TsonSchemaRegistry.register` never overwrites: that plus unmodifiable `entries()` *is* the "locked" guarantee.
-- `RecordExtension`'s FINAL check reads the entry's chain (`Chained.supertypes`), a template's included, which a §5.9
+- `RecordExtension`'s FINAL check reads the entry's chain (`TypeChain.supertypesOf`), a template's included, which a §5.9
   subtraction leaves empty.
-- Everything that asks what an entry IS-A asks `Chained` — `computeSubtypes` credits a template as it does a type,
+- Everything that asks what an entry IS-A asks its `TypeChain` — `computeSubtypes` credits a template as it does a type,
   and the constructor test (`TypeKind.isConstructor`) reads a template's chain as a closed one's, judging `top` by
   its origin.
 - An enum's `name_type` resolves in the governing meta's namespace for the value its constructor pinned (traced through a
@@ -74,7 +74,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   one canonical identity, is redundant rather than an error. Because identities carry the spec revision, a
   closure reaching both `/2026/32/m/core.tn` and `/2026/38/m/core.tn` is rejected here rather than surfacing
   later as a field conflict between two identically-spelled types; (2) **populate `subtypes`**
-  (reverse of `supertypes`, over every chained value, a template's included); (3) **derive `disjoint`** for every choice
+  (reverse of `supertypes`, over every type, a record template's included); (3) **derive `disjoint`** for every choice
   entry (`ChoiceDisjointness`, §5.4) — total and two-valued, detailed in `design/choice-disjointness.md`, so a linked
   choice always carries the fact;
   (3a) **check what `record.extension` obliges** (`RecordExtension`, §5.2) — that nothing composes onto a

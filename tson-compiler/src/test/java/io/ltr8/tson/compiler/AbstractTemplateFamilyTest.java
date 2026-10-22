@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -8,7 +7,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -135,7 +134,7 @@ class AbstractTemplateFamilyTest {
 
         assertEquals(RecordExtensionType.ABSTRACT, bodyOf(registry, "result_int").extension());
         assertEquals(List.of(target(registry, "ok_int")),
-                Chained.subtypesOf(registry.get(ID).schema().entries().get(target(registry, "result_int"))));
+                TypeChain.subtypesOf(registry.get(ID).schema().entries().get(target(registry, "result_int"))));
     }
 
     // ── Reading against it ──────────────────────────────────────────────────

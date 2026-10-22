@@ -23,8 +23,8 @@ import java.util.Optional;
  *
  * <p><b>An entry is its value</b> (SPEC-FEEDBACK.md #14): a name maps to the body it resolves to -- a {@code
  * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@code Data} -- and a
- * type body or a template carries its own IS-A chain ({@code Chained}). The entry's kind is its value's ({@code
- * TypeKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
+ * type body, a record template's included, carries its own IS-A chain ({@code Type.chain}). The entry's kind is
+ * its value's ({@code TypeKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
  *
  * <p><b>{@link #facts} holds what a value's Java shape cannot</b>, per entry ({@link EntryFacts}): where it was
  * declared, the annotations written on its value, the constructor its value applies and the entry a refinement

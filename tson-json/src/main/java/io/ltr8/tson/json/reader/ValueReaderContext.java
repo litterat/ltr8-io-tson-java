@@ -3,9 +3,8 @@ package io.ltr8.tson.json.reader;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.Collection;
 import java.util.List;
@@ -51,7 +50,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
      * and a family base template's, whose subtypes are its members.
      */
     public List<String> subtypesOf(String name, Top definition) {
-        return Chained.subtypesOf(definition);
+        return TypeChain.subtypesOf(definition);
     }
 
     /**

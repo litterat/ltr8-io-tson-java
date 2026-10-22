@@ -93,6 +93,6 @@ public enum TypeKind {
      * @param name the entry whose value {@code value} is
      */
     public static boolean isConstructor(String name, Top value, Predicate<String> kernel) {
-        return (Chained.supertypesOf(value).contains("top") || "top".equals(name)) && kernel.test("top");
+        return (TypeChain.supertypesOf(value).contains("top") || "top".equals(name)) && kernel.test("top");
     }
 }

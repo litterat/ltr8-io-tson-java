@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -11,7 +10,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -73,8 +72,8 @@ class ChoiceSugarResolutionTest {
         assertEquals(TypeKind.SUM, TypeKind.of(contact, n -> true));
         assertEquals(List.of("text", "integer"), variantNames(contact));
         assertEquals(java.util.Optional.of("choice"), schema.constructorOf("contact"));
-        assertTrue(Chained.supertypesOf(contact).isEmpty(), () -> "expected no supertypes, got "
-                + Chained.supertypesOf(contact));
+        assertTrue(TypeChain.supertypesOf(contact).isEmpty(), () -> "expected no supertypes, got "
+                + TypeChain.supertypesOf(contact));
     }
 
     /** More than two variants: §5.4 sets a floor of two, not a ceiling, and the array field takes them positionally. */

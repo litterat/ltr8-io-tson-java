@@ -1,11 +1,10 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -91,7 +90,7 @@ class TemplateIsAFamilyBaseTest {
                   dogpet   => pet<"dog", dog_type>
                 """);
 
-        List<String> members = Chained.subtypesOf(schema.schema().entries().get("pet_base"));
+        List<String> members = TypeChain.subtypesOf(schema.schema().entries().get("pet_base"));
         assertTrue(members.contains("pet"), () -> "the template is a member of its base: " + members);
         assertTrue(members.contains(target(schema, "dogpet")), () -> "and so is the member: " + members);
     }
@@ -102,7 +101,7 @@ class TemplateIsAFamilyBaseTest {
         TsonLinkedSchema schema = linked("f2", SEALED_FAMILY);
 
         assertEquals(List.of(target(schema, "dogpet"), target(schema, "catpet")),
-                Chained.subtypesOf(schema.schema().entries().get("pet")));
+                TypeChain.subtypesOf(schema.schema().entries().get("pet")));
     }
 
     // ── Gap 2: abstract on a template is a claim with a subject ───────────
@@ -270,8 +269,8 @@ class TemplateIsAFamilyBaseTest {
                   holder => { any: box  k: box<text> }
                 """;
         TsonLinkedSchema schema = linked("f11", declarations);
-        assertEquals(List.of("bt"), Chained.subtypesOf(schema.schema().entries().get("box")));
-        assertEquals(List.of("box"), Chained.supertypesOf(schema.schema().entries().get("bt")));
+        assertEquals(List.of("bt"), TypeChain.subtypesOf(schema.schema().entries().get("box")));
+        assertEquals(List.of("box"), TypeChain.supertypesOf(schema.schema().entries().get("bt")));
 
         assertEquals(List.of(), read("f11", declarations, "!holder { any: !bt { v: 1 }  k: { v: x } }"));
         List<Diagnostic> untagged = read("f11", declarations, "!holder { any: { v: 1 }  k: { v: x } }");

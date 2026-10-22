@@ -1,11 +1,10 @@
 package io.ltr8.tson;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
 import java.util.Map;
@@ -78,8 +77,8 @@ class ConstructorLevelDisciplineTest {
                 """;
         var entries = Tson.standard().resolve(source).schema().entries();
 
-        assertTrue(Chained.supertypesOf(entries.get("c")).contains("top"), "the base-kind composition");
-        assertTrue(Chained.supertypesOf(entries.get("composed")).contains("top"), "and everything deriving from it");
+        assertTrue(TypeChain.supertypesOf(entries.get("c")).contains("top"), "the base-kind composition");
+        assertTrue(TypeChain.supertypesOf(entries.get("composed")).contains("top"), "and everything deriving from it");
     }
 
     /**

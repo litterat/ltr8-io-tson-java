@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.ParseException;
@@ -17,8 +16,8 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.tree.TsonValue;
-import io.ltr8.tson.schema.meta.Type;
 
 import java.math.BigInteger;
 
@@ -242,7 +241,7 @@ class ContainerSugarEndToEndTest {
         Top entry = compiled.schema().entries().get("tag_list");
         assertEquals(TypeKind.PRODUCT, TypeKind.of(entry, n -> true), "the constructor's kind");
         assertEquals(List.of(), OpenEntry.parameterNames(entry), "closed -- §5.10");
-        assertEquals(List.of(), Chained.supertypesOf(entry),
+        assertEquals(List.of(), TypeChain.supertypesOf(entry),
                 "empty: this is a construction of `array`, and a constructor is not a supertype");
         assertEquals(Optional.of("array"), compiled.schema().constructorOf("tag_list"),
                 "the constructor the sugar names");
@@ -282,7 +281,7 @@ class ContainerSugarEndToEndTest {
         for (String name : List.of("id_list", "tag_list", "triple")) {
             Top entry = compiled.schema().entries().get(name);
             assertInstanceOf(ArrayBody.class, entry, name);
-            assertEquals(List.of(), Chained.supertypesOf(entry), name);
+            assertEquals(List.of(), TypeChain.supertypesOf(entry), name);
         }
     }
 

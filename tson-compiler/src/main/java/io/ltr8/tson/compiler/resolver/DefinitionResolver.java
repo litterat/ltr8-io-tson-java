@@ -36,7 +36,6 @@ import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
@@ -46,8 +45,8 @@ import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeChain;
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.TupleBody;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -199,8 +198,7 @@ final class DefinitionResolver {
     /** The kernel's open-entry body constructor -- resolver vocabulary, see {@link #requireAuthorable}. */
     private static final String TEMPLATE = "template";
 
-    /** {@code type}'s two fields, which the resolver computes and no declaration writes (SPEC-FEEDBACK.md #14). */
-    /** {@code chained}'s one field ([TSON-SCHEMA] §4.1): a type's IS-A chain, which no declaration writes. */
+    /** {@code type}'s one field ([TSON-SCHEMA] §4.1): a type's IS-A chain, which no declaration writes. */
     private static final String CHAIN = "chain";
 
     /** The {@code _} a bare annotation stands for (§6), read against the annotation's type like a written one. */
@@ -621,7 +619,7 @@ final class DefinitionResolver {
         if (!(head instanceof RecordBody record) || record.extension() != RecordExtensionType.ABSTRACT) {
             return;
         }
-        List<String> instantiable = Chained.subtypesOf(head).stream()
+        List<String> instantiable = TypeChain.subtypesOf(head).stream()
                 .filter(subtype -> !TEMPLATE.equals(subtype) && isInstantiable(metaDefinitions.definition(subtype)))
                 .toList();
         String terminal = ReferenceChain.terminal(target, metaDefinitions::definition);
@@ -718,7 +716,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * Refuses a construction that writes {@code chained}'s {@code chain}: the IS-A chain is the resolver's,
+     * Refuses a construction that writes {@code type}'s {@code chain}: the IS-A chain is the resolver's,
      * computed from what composition and refinement say and from the whole schema map, so a value written for it
      * is a claim no declaration can make -- as {@code choice.disjoint} is derived and never written
      * (SPEC-FEEDBACK.md #14). Read off the binding record as written, before the constructor's reader
@@ -740,18 +738,18 @@ final class DefinitionResolver {
 
     /**
      * Refuses a constructor declaring a field named {@code chain}: a declaration composing the kernel's {@code
-     * chained} -- every type constructor, through {@code type} -- has that name already, and it is the IS-A chain
+     * type} -- every type constructor -- has that name already, and it is the IS-A chain
      * the resolver computes (§4.1). Refused where it is declared, since what it collides with is a value no
      * instance writes, and the collision would otherwise surface only at an instance that used the field.
      */
     private void refuseDeclaredChain(String name, List<RecordEntry> entries, List<String> chain) {
-        if (!chain.contains("chained") || !kernel.test("chained")) {
+        if (!chain.contains("type") || !kernel.test("type")) {
             return;
         }
         for (RecordEntry entry : entries) {
             if (entry instanceof FieldDef field && CHAIN.equals(field.name())) {
                 throw new SchemaValidationException("'" + name + "' declares a field 'chain', the name the kernel's "
-                        + "'chained' gives a type's IS-A chain (§4.1) -- '" + name + "' composes it, and a "
+                        + "'type' gives a type's IS-A chain (§4.1) -- '" + name + "' composes it, and a "
                         + "constructor never declares that name. Name the field something else");
             }
         }

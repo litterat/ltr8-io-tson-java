@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.meta.Chained;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
@@ -8,7 +7,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
 
@@ -79,7 +78,7 @@ class OpenOperandCompositionTest {
                         + compiled.schema().entries().keySet());
 
         Top c = compiled.schema().entries().get("c");
-        assertEquals(List.of("base", "box"), Chained.supertypesOf(c),
+        assertEquals(List.of("base", "box"), TypeChain.supertypesOf(c),
                 "the ancestors arrive by value, and the edge runs to the family base the operand applies");
         assertEquals(List.of("tag", "item", "extra"),
                 ((RecordBody) c).fields().keySet().stream().toList(),
@@ -156,11 +155,11 @@ class OpenOperandCompositionTest {
 
         Top vip = compiled.schema().entries().get("vip");
 
-        assertEquals(List.of("base", "customer"), Chained.supertypesOf(vip),
-                () -> "customer directly, base through the open operand: " + Chained.supertypesOf(vip));
-        assertFalse(Chained.supertypesOf(vip).contains("box"),
-                () -> "a template is not a type, so nothing is IS-A one: " + Chained.supertypesOf(vip));
-        assertEquals(List.of("customer", "box"), Chained.parentsOf(vip).stream().map(TypeRef::name).toList(),
+        assertEquals(List.of("base", "customer"), TypeChain.supertypesOf(vip),
+                () -> "customer directly, base through the open operand: " + TypeChain.supertypesOf(vip));
+        assertFalse(TypeChain.supertypesOf(vip).contains("box"),
+                () -> "a template is not a type, so nothing is IS-A one: " + TypeChain.supertypesOf(vip));
+        assertEquals(List.of("customer", "box"), TypeChain.parentsOf(vip).stream().map(TypeRef::name).toList(),
                 "and it keeps its parents as written");
     }
 
@@ -170,10 +169,10 @@ class OpenOperandCompositionTest {
         TsonCompiledSchema compiled = compile(LATTICE);
         String vipText = aliasTarget(compiled, "vip_text");
 
-        assertTrue(Chained.subtypesOf(compiled.schema().entries().get("customer")).contains(vipText),
-                () -> "customer: " + Chained.subtypesOf(compiled.schema().entries().get("customer")));
-        assertTrue(Chained.subtypesOf(compiled.schema().entries().get("base")).contains(vipText),
-                () -> "base: " + Chained.subtypesOf(compiled.schema().entries().get("base")));
+        assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get("customer")).contains(vipText),
+                () -> "customer: " + TypeChain.subtypesOf(compiled.schema().entries().get("customer")));
+        assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get("base")).contains(vipText),
+                () -> "base: " + TypeChain.subtypesOf(compiled.schema().entries().get("base")));
     }
 
     /**
@@ -188,10 +187,10 @@ class OpenOperandCompositionTest {
         String vipText = aliasTarget(compiled, "vip_text");
         String boxText = aliasTarget(compiled, "text_box");
 
-        assertTrue(Chained.subtypesOf(compiled.schema().entries().get(boxText)).contains(vipText),
-                () -> boxText + ": " + Chained.subtypesOf(compiled.schema().entries().get(boxText)));
-        assertTrue(Chained.supertypesOf(compiled.schema().entries().get(vipText)).contains(boxText),
-                () -> vipText + ": " + Chained.supertypesOf(compiled.schema().entries().get(vipText)));
+        assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get(boxText)).contains(vipText),
+                () -> boxText + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(boxText)));
+        assertTrue(TypeChain.supertypesOf(compiled.schema().entries().get(vipText)).contains(boxText),
+                () -> vipText + ": " + TypeChain.supertypesOf(compiled.schema().entries().get(vipText)));
     }
 
     /**
@@ -205,8 +204,8 @@ class OpenOperandCompositionTest {
         String vipText = aliasTarget(compiled, "vip_text");
         String intBox = aliasTarget(compiled, "int_box");
 
-        assertFalse(Chained.subtypesOf(compiled.schema().entries().get(intBox)).contains(vipText),
-                () -> intBox + ": " + Chained.subtypesOf(compiled.schema().entries().get(intBox)));
+        assertFalse(TypeChain.subtypesOf(compiled.schema().entries().get(intBox)).contains(vipText),
+                () -> intBox + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(intBox)));
     }
 
     /** §5.7 against an open source: the same absorption, and the same two omissions. */
@@ -219,7 +218,7 @@ class OpenOperandCompositionTest {
                   use  => vip<text>
                 """);
 
-        List<String> chain = Chained.supertypesOf(compiled.schema().entries().get(aliasTarget(compiled, "use")));
+        List<String> chain = TypeChain.supertypesOf(compiled.schema().entries().get(aliasTarget(compiled, "use")));
         assertTrue(chain.contains("base") && !chain.contains("box"),
                 () -> "box is not a type and contributes no name to the chain; its own base does: " + chain);
         assertTrue(compiled.schema().applicationOf("vip").isEmpty(),
