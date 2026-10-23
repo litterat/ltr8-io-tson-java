@@ -23,6 +23,10 @@ package io.ltr8.tson.schema.meta;
  * held body of an entry that declares type parameters. {@link Data} is the only {@code non-sealed} branch --
  * its implementations are consumer classes this library has never seen -- where a held body is an ordinary
  * record here, carrying the application as text.
+ *
+ * <p>{@link Namespace} is the value of a namespace type -- an instance of a constructor IS-A the kernel's
+ * {@code namespace}, a map whose keys are names -- and is what a qualified name's segment selects a key of, and
+ * nothing else is.
  */
-public sealed interface Top permits Type, Reference, Data, TemplateBody {
+public sealed interface Top permits Type, Reference, Data, TemplateBody, Namespace {
 }

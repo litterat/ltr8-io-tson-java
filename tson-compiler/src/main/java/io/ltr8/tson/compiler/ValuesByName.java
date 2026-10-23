@@ -14,6 +14,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.RefBody;
@@ -31,9 +32,10 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * The names a {@link Data} body holds, resolved and judged by their slots (SPEC-FEEDBACK.md #13, #24): a value's
- * qualified name at a slot typed {@code ref<T>}, held as a {@link Ref} the linker delivers into or a {@link TypeRef}
- * carrying the name alone; and a type's name at a slot typed by a kind, judged a member ({@link #judgeMember}).
+ * The names a value entry holds -- a {@link Data} body or a {@link Namespace} -- resolved and judged by their slots
+ * (SPEC-FEEDBACK.md #13, #24): a value's qualified name at a slot typed {@code ref<T>}, held as a {@link Ref} the
+ * linker delivers into or a {@link TypeRef} carrying the name alone; and a type's name at a slot typed by a kind,
+ * judged a member ({@link #judgeMember}).
  *
  * <p><b>Fed by the read, not by the host.</b> The references judged are the ones the resolver's read produced by
  * name, each with its slot ({@link TsonSchema#valuesByName()}). The host class declares nothing for them, so none
@@ -48,8 +50,8 @@ import java.util.function.Consumer;
  * constructor's resolved fields by walking the slot's path in the governing meta's namespace. The name is
  * the governed schema's to resolve: its first segment through this schema's own entries and imports, alias hops
  * followed ([TSON-SCHEMA] §8.3), never through the meta's namespace (§3.3.2); each further segment selects in the
- * value reached -- a field of a record, then a key of a map, never a position in a list -- and a type entry admits
- * none. An open entry is no referent at all: a template denotes no value until it is applied. The referent's
+ * value reached -- a field of a record, a key of a namespace value, never a position in a list -- and a type entry
+ * admits none. An open entry is no referent at all: a template denotes no value until it is applied. The referent's
  * declared type is then judged against the slot's by §7.2's IS-A, comparing canonical identities: an entry's
  * declared type is the constructor that built its body, a field's is its type, and a map value's is the map's value
  * type. Found first, judged after, never a choice among candidates.
@@ -60,11 +62,14 @@ import java.util.function.Consumer;
  * Each type is looked up in the namespace of the meta layer that governs the schema declaring it, so an imported
  * referent is judged by its own meta's vocabulary and still compared by identity.
  *
- * <p><b>A selected value is reached through the body's record components -- an interim.</b> {@code data} is opaque
+ * <p><b>A namespace entry is entered by key.</b> Its value is the map its constructor describes, so a segment selects
+ * a key of {@link Namespace#entries()} and the value reached is of the constructor's {@code value_type}.
+ *
+ * <p><b>A data body's value is reached through its record components -- an interim.</b> {@code data} is opaque
  * to the type system and its body the host's to interpret, so the hop into one goes through the host's object, and
- * nothing in the schema walks the body's values; the namespace kind replaces it. A component is named as binding
- * names it (a component's {@code @Field} rename, else its own name), an {@code Optional} unwrapped, and a map
- * entered by key. A map whose keys are not names -- its key type no identifier family or enum -- cannot be entered.
+ * nothing in the schema walks the body's values; a namespace entry is what replaces it. A component is named as
+ * binding names it (a component's {@code @Field} rename, else its own name), an {@code Optional} unwrapped, and a
+ * map entered by key. A map whose keys are not names -- its key type no identifier family or enum -- cannot be entered.
  * A body whose class is not a Java record cannot be entered at all, which is this library's gap rather than the
  * schema's ({@link UnsupportedOperationException}).
  *
@@ -155,10 +160,11 @@ final class ValuesByName {
                Consumer<SchemaValidationException> refused, Consumer<UnsupportedOperationException> gap) {
         Typed constructor = constructorOf(TsonSchemaLinker.constructorOf(entryName, definition, facts).orElseThrow(),
                 definition, governingMeta);
+        Object body = definition instanceof Namespace<?> namespace ? namespace.entries() : definition;
         for (TsonSchema.ValueByName value : held) {
             String where = "'" + entryName + "' at " + pointer(value.slot());
             try {
-                judge(where, value.reference(), slotType(where, constructor, definition, value.slot()), value.cell());
+                judge(where, value.reference(), slotType(where, constructor, body, value.slot()), value.cell());
             } catch (SchemaValidationException e) {
                 refused.accept(e);
             } catch (UnsupportedOperationException e) {
@@ -297,11 +303,12 @@ final class ValuesByName {
             cell.ifPresent(c -> c.deliver(referent));
             return;
         }
-        if (!(referent instanceof Data held)) {
-            throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a type: a "
-                    + "type entry admits no further segment, so '" + segments.get(1) + "' selects in no value");
-        }
-        Object value = held;
+        Object value = switch (referent) {
+            case Namespace<?> namespace -> namespace.entries();
+            case Data held -> held;
+            default -> throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a "
+                    + "type: a type entry admits no further segment, so '" + segments.get(1) + "' selects in no value");
+        };
         String reached = head;
         for (String segment : segments.subList(1, segments.size())) {
             Top body = at.body();
@@ -359,7 +366,7 @@ final class ValuesByName {
      */
     private void judgeMember(String where, String name, List<String> segments, KindBody kind, Typed slot,
                              Top referent, String entry) {
-        if (segments.size() > 1 && referent instanceof Data) {
+        if (segments.size() > 1 && (referent instanceof Data || referent instanceof Namespace<?>)) {
             throw new SchemaValidationException(where + " wants the name of a type built with '" + kind.of()
                     + "' (a member of '" + slot.name() + "'), and '" + name + "' reaches into " + entry
                     + ", a value: what a further segment selects in a value is a value, and no value is a type");
@@ -399,6 +406,11 @@ final class ValuesByName {
                     + TsonSchemaLinker.constructorOf(terminal, referent, facts).orElse("a data constructor")
                     + "' and describes something other than a data value -- it is declared by this schema but is not "
                     + "a type, so nothing can be typed by it (§4.1)");
+        }
+        if (referent instanceof Namespace<?> namespace) {
+            throw new SchemaValidationException(where + " names '" + name + "', which is a value of the namespace "
+                    + "type '" + namespace.type() + "', a map of names -- a value and not a type, so nothing can be "
+                    + "typed by it");
         }
         int parameters = OpenEntry.isOpen(referent) ? OpenEntry.parameterNames(referent).size() : 0;
         if (reference.arguments().size() != parameters) {

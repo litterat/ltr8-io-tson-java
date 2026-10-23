@@ -19,7 +19,8 @@ public enum EntryKind {
     /**
      * A namespace type: a constructor IS-A the kernel's {@code namespace}, whose instances are maps from its
      * {@code key_type} to its {@code value_type} ({@link MapBody#ofNamespace}). It is a type -- its values
-     * are its instances -- and {@code type_kind} holds it, where it holds no other constructor.
+     * are its instances -- and {@code type_kind} holds it, where it holds no other constructor. An entry whose
+     * value is one of those instances, a {@link Namespace}, takes this kind too, and is no type.
      */
     NAMESPACE,
 
@@ -52,6 +53,7 @@ public enum EntryKind {
             case Reference ignored -> REFERENCE;
             case Data ignored -> DATA;
             case TemplateBody ignored -> TEMPLATE;
+            case Namespace<?> ignored -> NAMESPACE;
         };
     }
 

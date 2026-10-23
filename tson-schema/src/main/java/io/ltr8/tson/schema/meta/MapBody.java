@@ -19,7 +19,9 @@ import java.util.function.Predicate;
  * <p><b>A namespace type is read as one.</b> A type IS-A the kernel's {@code namespace} -- the kernel's {@code schema}
  * and {@code field_map}, a meta layer's {@code api => namespace & { key_type: = identifier  value_type: = method }}
  * -- resolves to a {@link RecordBody} carrying the facets it states, and a value of it is a map from {@code
- * key_type} to {@code value_type}, never a record of those facets. {@link #ofNamespace} is that map.
+ * key_type} to {@code value_type}, never a record of those facets. {@link #ofNamespace} is that map. An instance of
+ * it standing as an entry ({@code myapi => !api { ... }}) is a {@link Namespace}: the map, and the constructor it is
+ * an instance of.
  *
  * <p>{@code voidable} governs the <b>value</b> and only the value, spelled {@code {K => V?}} -- a key can
  * never be void ([TSON-DATA] §2.9), so there is nothing else for the name to be ambiguous between. It is the

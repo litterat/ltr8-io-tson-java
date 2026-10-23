@@ -361,6 +361,7 @@ class OpenEntryResolvedFormTest {
             case Reference reference -> "reference";
             case Data data -> data.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case TemplateBody held -> "template";
+            case io.ltr8.tson.schema.meta.Namespace<?> namespace -> namespace.type();
         };
     }
 }

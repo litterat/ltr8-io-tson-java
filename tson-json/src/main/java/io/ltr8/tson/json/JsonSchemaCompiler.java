@@ -8,6 +8,7 @@ import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -148,10 +149,15 @@ public final class JsonSchemaCompiler {
     }
 
     /**
-     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries. An open entry
-     * reads as a template ([TSON-SCHEMA] §5.10) whichever kernel shape holds it, so it takes the template's reader.
+     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, and the one a
+     * namespace value names itself. An open entry reads as a template ([TSON-SCHEMA] §5.10) whichever kernel shape
+     * holds it, so it takes the template's reader. A data body and a namespace value name a meta layer's own
+     * constructor, which has no factory: nothing is typed by such an entry, and its reader is the refusal.
      */
     private static String constructorOf(Top body) {
+        if (body instanceof Namespace<?> value) {
+            return value.type();
+        }
         Class<?> leaf = OpenEntry.isOpen(body) ? TemplateBody.class : body.getClass();
         Typename typename = leaf.getAnnotation(Typename.class);
         if (typename == null) {

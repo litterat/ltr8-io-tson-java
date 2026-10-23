@@ -4,9 +4,12 @@ import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.compiler.stream.EventSkip;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -45,20 +48,41 @@ final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumpti
     /** The same for each subtype: what a tag may spell to select it, the entry's own name among them. */
     private final Set<String> subtypes;
 
+    /**
+     * Each tag selecting a namespace type, with the constructor it names: a value read through one is an instance
+     * of that constructor, delivered as such ({@link NamespaceInstanceReader}) rather than as the bare map a position
+     * typed by the namespace type reads.
+     */
+    private final Map<String, String> namespaces;
+
     private final TsonTypeReaderResolver readerFor;
     private final RecordExtensionDiagnostics extension;
 
     /**
-     * @param subtypes every name a tag may spell to select a member, aliases included
-     * @param named    what a refusal names as satisfying the position: the subtypes that have instances of their
-     *                 own, an abstract one being no answer
+     * @param subtypes   every name a tag may spell to select a member, aliases included
+     * @param named      what a refusal names as satisfying the position: the subtypes that have instances of their
+     *                   own, an abstract one being no answer
+     * @param namespaces each tag among {@code subtypes} selecting a namespace type, with the constructor it names
      */
     RecordTagDispatchReader(Set<String> selfNames, String displayName, Set<String> subtypes, List<String> named,
-                             TsonTypeReaderResolver readerFor) {
+                             Map<String, String> namespaces, TsonTypeReaderResolver readerFor) {
         this.selfNames = Set.copyOf(selfNames);
         this.subtypes = subtypes;
+        this.namespaces = Map.copyOf(namespaces);
         this.readerFor = readerFor;
         this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", named));
+    }
+
+    /** {@code subtypes}' tags that select a namespace type of {@code context}'s schema, each with its constructor. */
+    static Map<String, String> namespaces(Set<String> subtypes, ValueReaderContext context) {
+        Map<String, String> namespaces = new HashMap<>();
+        for (String subtype : subtypes) {
+            String terminal = ReferenceChain.terminal(subtype, context.schema().entries());
+            if (context.linked().namespace(terminal).isPresent()) {
+                namespaces.put(subtype, terminal);
+            }
+        }
+        return namespaces;
     }
 
     @Override
@@ -78,6 +102,8 @@ final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumpti
             EventSkip.dataValue(ctx);
             return null;
         }
-        return readerFor.resolve(tag.get()).read(ctx);
+        Object read = readerFor.resolve(tag.get()).read(ctx);
+        String namespace = namespaces.get(tag.get());
+        return namespace == null ? read : NamespaceInstanceReader.instance(namespace, read);
     }
 }

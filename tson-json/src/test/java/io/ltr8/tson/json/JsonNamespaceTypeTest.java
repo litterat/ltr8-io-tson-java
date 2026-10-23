@@ -45,15 +45,7 @@ class JsonNamespaceTypeTest {
             .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_TEXT))))).resolve(USER_TEXT));
 
     private static List<Diagnostic> read(String json) {
-        List<Diagnostic> problems = new ArrayList<>();
-        DiagnosticsReceiver receiver = problems::add;
-        try (ByteSource bytes = ByteSource.of(json)) {
-            JsonReadContext ctx = JsonReadContext.of(new JsonStream(bytes, ProcessorPolicy.defaults(), receiver),
-                    receiver);
-            ctx = COMPILED.rootDeclaration("request").map(ctx::underDeclaration).orElse(ctx);
-            COMPILED.get("request").read(ctx);
-        }
-        return problems;
+        return read(COMPILED, "request", json);
     }
 
     @Test
@@ -66,5 +58,38 @@ class JsonNamespaceTypeTest {
     void aKeyIsJudgedByTheKeyType() {
         assertEquals(1, read("""
                 {"headers": {"1st": "text/plain"}}""").size());
+    }
+
+    /**
+     * An entry built with a namespace type is a value, not a type: the schema declaring one compiles, its types read,
+     * and a document read against the entry itself is refused rather than thrown, as for a data entry.
+     */
+    @Test
+    void aNamespaceEntryCompilesAndTypesNothing() {
+        JsonCompiledSchema governed = JsonSchemaCompiler.compile(Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_TEXT))))).resolve("""
+                !!id:"https://example.test/defaults.tn"
+                !!meta:"https://example.test/meta-headers.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
+                {
+                  defaults => !headers { accept => "text/plain"  user-agent => "probe" }
+                  greeting => text
+                }
+                """));
+
+        assertEquals(List.of(), read(governed, "greeting", "\"hello\""));
+        assertEquals(1, read(governed, "defaults", "{\"accept\": \"text/plain\"}").size());
+    }
+
+    private static List<Diagnostic> read(JsonCompiledSchema compiled, String type, String json) {
+        List<Diagnostic> problems = new ArrayList<>();
+        DiagnosticsReceiver receiver = problems::add;
+        try (ByteSource bytes = ByteSource.of(json)) {
+            JsonReadContext ctx = JsonReadContext.of(new JsonStream(bytes, ProcessorPolicy.defaults(), receiver),
+                    receiver);
+            ctx = compiled.rootDeclaration(type).map(ctx::underDeclaration).orElse(ctx);
+            compiled.get(type).read(ctx);
+        }
+        return problems;
     }
 }

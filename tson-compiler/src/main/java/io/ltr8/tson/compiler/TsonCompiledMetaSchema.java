@@ -2,9 +2,11 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.reader.ErrorReader;
+import io.ltr8.tson.compiler.reader.NamespaceInstanceReader;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
 import io.ltr8.tson.schema.meta.Data;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.HashMap;
@@ -56,7 +58,7 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
      * Reads an instance of {@code name}, one of this meta-schema's own declared constructors --
      * {@code name} is the declaration's own name (e.g. {@code "record"}), not necessarily its
      * resolved body's own constructor name (though for every meta-kernel/meta.tn declaration the two
-     * are identical).
+     * are identical). An instance of a namespace type is the map it reads as, delivered as a {@link Namespace}.
      */
     public TsonTypeReader<?> reader(String name) {
         ReaderResolver constructor = constructors.get(name);
@@ -128,6 +130,11 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
             if (instanceReader == null) {
                 continue;
             }
+            if (compiledSchema.linkedSchema().namespace(name).isPresent()) {
+                // A namespace type reads as the map its facets describe; an instance of it, `!api { ... }`, is
+                // that map as a value of the constructor.
+                instanceReader = new NamespaceInstanceReader(name, instanceReader);
+            }
             ValueReaderFactory factory;
             try {
                 factory = resolver.resolve(name);
@@ -153,10 +160,14 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
 
     /**
      * The constructor name a resolved body identifies as -- its own {@code @Typename}, e.g. {@code
-     * "record"}/{@code "float_type"}. Package-private so {@link TsonSchemaCompiler} dispatches a
-     * body to its factory the same way this class scopes one.
+     * "record"}/{@code "float_type"}, and a {@link Namespace}'s {@code type}, the constructor it is an instance of.
+     * Package-private so {@link TsonSchemaCompiler} dispatches a body to its factory the same way this class scopes
+     * one.
      */
     static String typenameOf(Top body) {
+        if (body instanceof Namespace<?> value) {
+            return value.type();
+        }
         Typename typename = body.getClass().getAnnotation(Typename.class);
         if (typename == null) {
             throw new IllegalStateException(body.getClass() + " has no @Typename -- every Top leaf must carry "

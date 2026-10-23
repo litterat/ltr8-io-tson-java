@@ -249,9 +249,9 @@ public interface TsonReadContext {
     boolean readsSchemaDocument();
 
     /**
-     * Whether this reads a value body in a schema document -- a {@code data} constructor's instance, whose values the
-     * resolver never lifts or mints -- rather than one of the kernel's own bodies, where a sugar lift may leave an
-     * application in a slot for the closer to mint.
+     * Whether this reads a value body in a schema document -- a {@code data} constructor's instance or a namespace
+     * type's, whose values the resolver never lifts or mints -- rather than one of the kernel's own bodies, where a
+     * sugar lift may leave an application in a slot for the closer to mint.
      */
     boolean readsValueBody();
 

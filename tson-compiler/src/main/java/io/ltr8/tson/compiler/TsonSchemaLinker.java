@@ -53,6 +53,7 @@ import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.Product;
@@ -789,7 +790,8 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * The values each local {@code Data} entry holds by name, as the resolver's read collected them
+     * The values each local value entry -- a {@code Data} body or a {@code Namespace} -- holds by name, as the
+     * resolver's read collected them
      * ({@link TsonSchema#valuesByName()}), resolved in this schema's namespace and judged against the slots they
      * fill (SPEC-FEEDBACK.md #13, {@link ValuesByName}). Each refused name is its own diagnostic, against the entry
      * that holds it.
@@ -804,13 +806,13 @@ public final class TsonSchemaLinker {
                                           Optional<TsonLinkedSchema> governingMeta, TsonSchemaLoader loader,
                                           DiagnosticsReceiver receiver) {
         if (governingMeta.isEmpty()) {
-            return; // only meta-kernel links without a registered meta, and it declares no Data entry
+            return; // only meta-kernel links without a registered meta, and it declares no value entry
         }
         ValuesByName values = new ValuesByName(schema, merged, facts, origins, governingMeta.get(), loader);
         for (String name : localNames) {
             Top definition = merged.get(name);
             List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
-            if (held != null && definition instanceof Data) {
+            if (held != null && (definition instanceof Data || definition instanceof Namespace<?>)) {
                 values.check(name, definition, held,
                         refused -> reportOrThrow(receiver, schema, name, facts, refused.getMessage(), refused),
                         gap -> {
@@ -1460,6 +1462,11 @@ public final class TsonSchemaLinker {
             // read and judged by its slot (ValuesByName), so nothing is asked of the class.
             case Data ignored -> {
             }
+            // A namespace value's keys were read under the constructor's key family and its values under its
+            // value type, so the read judged both; every reference a value holds is at a slot typed by a kind or a
+            // reference, recorded by the read and judged by its slot (ValuesByName), as a data body's is.
+            case Namespace<?> ignored -> {
+            }
         }
     }
 
@@ -1816,6 +1823,12 @@ public final class TsonSchemaLinker {
                     + "with '" + TsonCompiledMetaSchema.typenameOf(notAType) + "' and describes something "
                     + "other than a data value -- it is declared by this schema but is not a type, so "
                     + "nothing can be typed by it");
+        }
+        if (target instanceof Namespace<?> value) {
+            // A namespace value is a map, an instance of its constructor: a value and never a type.
+            throw new SchemaValidationException(context + " names '" + ref.name() + "', which is a value of the "
+                    + "namespace type '" + value.type() + "', a map of names -- a value and not a type, so nothing "
+                    + "can be typed by it");
         }
         if (!namespace.containsKey(ref.name()) && !ownParameters.contains(ref.name())) {
             throw new UnresolvedReference(subject, trail, ref.name());

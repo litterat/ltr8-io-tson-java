@@ -30,6 +30,7 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -1154,7 +1155,12 @@ final class DefinitionResolver {
         try {
             body = definitionMetaReader.read(constructorName, value);
         } catch (ReadException e) {
-            throw bodyIsNotValidData(name, constructorName, e);
+            throw MapBody.isNamespace(metaDefinitions.definition(constructorName), metaKernel)
+                    ? payloadFailure("'" + name + "': the body", "'" + name + "': the body is no value of the "
+                            + "namespace type '" + constructorName + "', a map from its key type to its value type -- "
+                            + e.diagnostic().path().filter(path -> !path.isEmpty()).map(path -> "at " + path + ": ")
+                                    .orElse("") + e.getMessage(), e)
+                    : bodyIsNotValidData(name, constructorName, e);
         } catch (BindMismatchException e) {
             // The constructor is a meta layer's own and the consumer never registered a class for it, or
             // registered one that disagrees. Either way it is their configuration, and it already says so --

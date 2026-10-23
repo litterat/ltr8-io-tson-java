@@ -4,6 +4,7 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -71,11 +72,12 @@ import java.util.Optional;
  * still need to survive linking, so {@link TsonLinkedSchema} would need to carry it too) without
  * buying any safety a universal property like linked-ness actually needs.
  *
- * <p><b>{@link #valuesByName()}</b> -- for each entry whose body is a {@code data} constructor's instance, the
- * references that body holds by name (SPEC-FEEDBACK.md #13), each with the slot it fills, as the resolver's read
- * collected them: the reader records what it produced at a slot holding a value by name, so the list depends on
- * nothing the host class declares. The linker resolves each and judges it against the slot's declared type. A fact
- * the resolver hands the linker, never part of §8's output: no resolved document writes it.
+ * <p><b>{@link #valuesByName()}</b> -- for each entry whose body is a {@code data} constructor's instance or a
+ * namespace type's ({@link Namespace}), the references that body holds by name (SPEC-FEEDBACK.md #13), each with the
+ * slot it fills, as the resolver's read collected them: the reader records what it produced at a slot holding a value
+ * by name, so the list depends on nothing the host class declares. The linker resolves each and judges it against the
+ * slot's declared type. A fact the resolver hands the linker, never part of §8's output: no resolved document writes
+ * it.
  */
 public record TsonSchema(String id, String meta, List<String> imports, AnnotatedMap<String, Top> entries,
                           boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
@@ -147,7 +149,7 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
     }
 
     /**
-     * One reference a {@code data} body holds by name: {@code slot} is the path from the body to the position it
+     * One reference a value body holds by name: {@code slot} is the path from the body to the position it
      * fills -- a field name at a record, a key at a map, an index at an array, as the read descended -- and
      * {@code reference} the {@code type_ref} value read there, its {@code name} the qualified name as written.
      */
@@ -260,9 +262,13 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
     /**
      * The constructor {@code value}'s class is named for, by its {@link Typename} -- exact where one constructor
      * has that shape, and only one of them where several share it ({@code enum_type}, {@code enum} and a meta
-     * layer's own tightening of either are one class), which is why an entry's own facts are asked first.
+     * layer's own tightening of either are one class), which is why an entry's own facts are asked first. A
+     * namespace value names its own: the constructor it is an instance of.
      */
     public static String constructorOf(Top value) {
+        if (value instanceof Namespace<?> namespace) {
+            return namespace.type();
+        }
         Typename typename = value.getClass().getAnnotation(Typename.class);
         if (typename == null) {
             throw new IllegalStateException(value.getClass() + " has no @Typename -- every Top leaf carries one, "

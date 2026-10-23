@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -109,7 +110,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     /**
      * Validates {@code typeDefinition} is map-shaped before ever constructing one, and resolves a
-     * {@code descriptor} to build it with -- a {@code LinkedHashMap} for an ordered map, so the order the
+     * {@code descriptor} to build it with -- an {@link AnnotatedMap} for a namespace type's value, keeping its
+     * keys' annotations and order, a {@code LinkedHashMap} for an ordered map, so the order the
      * document wrote is kept, and a {@code Map} otherwise -- making a real effort to
      * get the key/value types right: the schema's own {@code key_type}/{@code value_type} names are
      * each resolved to a real bound Java class the same way any other schema type name is (falling
@@ -136,7 +138,10 @@ final class MapBindReader extends MapAbstractReader<Object> {
             }
             Type keyType = resolveType(body.keyType().name());
             Type valueType = resolveType(body.valueType().name());
-            Class<?> mapClass = body.ordered() ? LinkedHashMap.class : Map.class;
+            // A value of a namespace type is a map of names, whose keys' annotations and order are part of what
+            // an instance of the constructor holds (NamespaceInstanceReader).
+            Class<?> mapClass = context.linked().namespace(name).isPresent() ? AnnotatedMap.class
+                    : body.ordered() ? LinkedHashMap.class : Map.class;
             DataClass dataClass = descriptorFor(mapClass, new DataParameterizedType(mapClass, keyType, valueType));
             if (!(dataClass instanceof DataClassMap descriptor)) {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()

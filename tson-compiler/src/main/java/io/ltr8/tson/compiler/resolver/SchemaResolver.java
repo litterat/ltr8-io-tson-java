@@ -966,12 +966,14 @@ public final class SchemaResolver {
      */
     /**
      * Whether {@code constructor}'s instances are value bodies: a constructor composing the kernel's {@code data},
-     * whose payload the resolver reads into a host class and never lifts or mints, so a kind-typed slot there holds
-     * a bare name and a braced application is refused rather than left for a closer that will not come.
+     * whose payload the resolver reads into a host class, or a namespace type, whose payload is a map of such
+     * values; neither is ever lifted or minted, so a kind-typed slot there holds a bare name and a braced
+     * application is refused rather than left for a closer that will not come.
      */
     private static boolean isValueBody(TsonCompiledMetaSchema metaParser, String constructor) {
         Top body = metaParser.schema().entries().get(constructor);
-        return body != null && TypeChain.supertypesOf(body).contains("data");
+        return body != null && (TypeChain.supertypesOf(body).contains("data")
+                || metaParser.kindOf(constructor) == EntryKind.NAMESPACE);
     }
 
     private static Object read(TsonTypeReader<?> reader, io.ltr8.tson.compiler.ast.DataValue value,
@@ -988,12 +990,13 @@ public final class SchemaResolver {
     }
 
     /**
-     * The identifier policy a constructor's payload is read under: the loader's for a {@code data} constructor,
-     * none for the rest.
+     * The identifier policy a constructor's payload is read under: the loader's for a {@code data} constructor and
+     * a namespace type, none for the rest.
      *
-     * <p><b>A {@code data} body is the one payload the linker cannot see into</b> -- it binds to the consumer's
+     * <p><b>A {@code data} body is a payload the linker cannot see into</b> -- it binds to the consumer's
      * own class, its fields' types left behind in the meta -- so its identifier-typed values, a key of an
      * identifier-keyed map among them, are judged here, at the read, as the same values are in a data document.
+     * A namespace value is a map of such bodies, keyed by names, and is read under the same policy.
      * Every other constructor builds the schema layer's own vocabulary, whose names [TSON-SCHEMA] §11.4's scopes
      * cover and {@code TsonSchemaLinker} judges: field names, enum members, parameters. Its identifier-typed
      * values outside those scopes are references -- a choice's variants, a supertype -- whose verdict belongs to
@@ -1001,7 +1004,8 @@ public final class SchemaResolver {
      */
     private static IdentifierPolicy payloadNames(TsonCompiledMetaSchema meta, String constructor,
                                                  IdentifierPolicy names) {
-        return meta.compiledSchema().kindOf(constructor) == EntryKind.DATA ? names : IdentifierPolicy.none();
+        EntryKind kind = meta.compiledSchema().kindOf(constructor);
+        return kind == EntryKind.DATA || kind == EntryKind.NAMESPACE ? names : IdentifierPolicy.none();
     }
 
     /**
