@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
@@ -30,7 +31,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.SequencedMap;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -151,7 +151,7 @@ class TsonSchemaLinkerTest {
     }
 
     /** A one-parameter record template: the record it is, with its parameter stated ([TSON-SCHEMA] §5.10). */
-    private static Top recordTemplate(String parameter, SequencedMap<String, RecordField> fields) {
+    private static Top recordTemplate(String parameter, Namespace<RecordField> fields) {
         return RecordBody.of(fields).withParameters(List.of(TemplateParam.typeParameter(parameter)));
     }
 

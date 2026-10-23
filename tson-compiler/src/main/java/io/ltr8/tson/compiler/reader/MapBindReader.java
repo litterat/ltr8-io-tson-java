@@ -14,7 +14,9 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.lang.reflect.Type;
@@ -53,9 +55,16 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     private final DataClassMap descriptor;
 
+    /**
+     * The namespace constructor a value read here is an instance of, where the map is a namespace type's: what a
+     * position whose host holds a {@link Namespace} wraps the map in ({@link BindTargets}). {@code null} for a
+     * map that is no namespace.
+     */
+    final String namespace;
+
     public MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor,
                          TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
-                         AnnotationTypes annotationTypes, boolean keysAreNames) {
+                         AnnotationTypes annotationTypes, boolean keysAreNames, String namespace) {
         super(name, displayName, body,
                 ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()),
                         descriptor.keyDataClass(), annotationTypes), descriptor.keyDataClass()),
@@ -63,13 +72,15 @@ final class MapBindReader extends MapAbstractReader<Object> {
                         descriptor.valueDataClass(), annotationTypes), descriptor.valueDataClass()),
                 schemaLocation, keysAreNames);
         this.descriptor = descriptor;
+        this.namespace = namespace;
     }
 
     /** Over key and value readers already bound to {@code descriptor}'s own -- {@link BindTargets}' rebuild. */
     MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor, TsonTypeReader<?> key,
-                  TsonTypeReader<?> value, SchemaLocation schemaLocation, boolean keysAreNames) {
+                  TsonTypeReader<?> value, SchemaLocation schemaLocation, boolean keysAreNames, String namespace) {
         super(name, displayName, body, key, value, schemaLocation, keysAreNames);
         this.descriptor = descriptor;
+        this.namespace = namespace;
     }
 
 
@@ -140,7 +151,9 @@ final class MapBindReader extends MapAbstractReader<Object> {
             Type valueType = resolveType(body.valueType().name());
             // A value of a namespace type is a map of names, whose keys' annotations and order are part of what
             // an instance of the constructor holds (NamespaceInstanceReader).
-            Class<?> mapClass = context.linked().namespace(name).isPresent() ? AnnotatedMap.class
+            String terminal = ReferenceChain.terminal(name, context.schema().entries()::get);
+            String namespace = context.linked().namespace(terminal).isPresent() ? terminal : null;
+            Class<?> mapClass = namespace != null ? AnnotatedMap.class
                     : body.ordered() ? LinkedHashMap.class : Map.class;
             DataClass dataClass = descriptorFor(mapClass, new DataParameterizedType(mapClass, keyType, valueType));
             if (!(dataClass instanceof DataClassMap descriptor)) {
@@ -149,7 +162,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
             }
             return new MapBindReader(name, context.displayName(name, typeDefinition), body, descriptor, resolver,
                     context.locationOf(name), AnnotationTypes.of(context),
-                    keysAreNames(body, context));
+                    keysAreNames(body, context), namespace);
         }
 
         /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */

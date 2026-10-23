@@ -97,7 +97,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      */
     static boolean elementsAreNames(ArrayBody body, ValueReaderContext context) {
         return body.uniqueItems() && ReferenceChain.terminalDefinition(body.elementType().name(),
-                        context.schema().entries())
+                        context.schema().entries()::get)
                 .map(element -> element instanceof IdentifierType)
                 .orElse(false);
     }

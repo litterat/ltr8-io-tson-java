@@ -7,6 +7,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.base.diagnostics.Refusal;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.unicode.Nfc;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.json.JsonReadContext;
@@ -104,7 +105,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         this.schemaLocation = schemaLocation;
         this.rules = rules;
         TsonSchema schema = context.schema();
-        Map<String, Top> entries = schema.entries();
+        Namespace<Top> entries = schema.entries();
         this.selectors = selectorFields.entrySet().stream()
                 .map(field -> selectorOf(field.getKey(), field.getValue(), context.linked())).toList();
         // The family's members compose the base, so they share its name type; a template base states none.

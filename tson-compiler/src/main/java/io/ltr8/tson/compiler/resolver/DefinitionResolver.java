@@ -1514,7 +1514,7 @@ final class DefinitionResolver {
                     ? directSupertypes.stream().filter(parent -> !parent.arguments().isEmpty()).toList()
                     : directSupertypes);
         }
-        return new RecordBody(chain, fields, groups, RecordExtensionType.OPEN,
+        return new RecordBody(chain, RecordBody.fieldMap(fields), groups, RecordExtensionType.OPEN,
                 construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()),
                 nameType);
     }
@@ -1751,7 +1751,7 @@ final class DefinitionResolver {
     private RecordBody refineOnto(String name, RefinedDef refined,
             List<String> parameters, io.ltr8.tson.schema.meta.TypeRef source,
             List<String> transitiveSupertypes, RecordBody sourceBody) {
-        SequencedMap<String, RecordField> fields = new LinkedHashMap<>(sourceBody.fields());
+        SequencedMap<String, RecordField> fields = new LinkedHashMap<>(sourceBody.fields().entries());
         List<FieldGroup> groups = new ArrayList<>(sourceBody.groups());
         Set<String> inheritedFields = Set.copyOf(sourceBody.fields().keySet());
         refuseDeclaredChain(name, refined.body().entries(), transitiveSupertypes);
@@ -1785,7 +1785,7 @@ final class DefinitionResolver {
         } else {
             chain = chain.withParents(List.of(source));
         }
-        return new RecordBody(chain, fields, groups, RecordExtensionType.OPEN,
+        return new RecordBody(chain, RecordBody.fieldMap(fields), groups, RecordExtensionType.OPEN,
                 markedNames(refined.body().entries()), sourceBody.nameType());
     }
 
@@ -2003,7 +2003,8 @@ final class DefinitionResolver {
         for (RecordEntry entry : entries) {
             resolveEntry(null, entry, fields, groups, seenFieldNames, Set.of());
         }
-        return new RecordBody(fields, groups, RecordExtensionType.OPEN, markedNames(entries), Optional.empty());
+        return new RecordBody(RecordBody.fieldMap(fields), groups, RecordExtensionType.OPEN, markedNames(entries),
+                Optional.empty());
     }
 
     /**

@@ -156,7 +156,7 @@ public class DefaultClassBinder {
 			// claimed by isRecord()'s own isRecord() check first.
 			result = tupleBinder.resolveTuple(context, targetClass);
 		} else if (isRecord(targetClass)) {
-			result = recordBinder.resolveRecord(context, targetClass);
+			result = recordBinder.resolveRecord(context, targetClass, parameterizedType);
 		} else if (isUnion(targetClass)) {
 			result = unionBinder.resolveUnion(context, targetClass, parameterizedType);
 		} else if (targetClass.isEnum()) {

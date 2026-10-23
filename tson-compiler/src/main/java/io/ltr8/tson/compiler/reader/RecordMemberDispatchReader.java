@@ -4,6 +4,7 @@ import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -90,7 +91,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     RecordMemberDispatchReader(Set<String> selfNames, String displayName, SequencedMap<String, RecordField> selectorFields,
                                 Set<String> subtypes, ValueReaderContext context,
                                 TsonTypeReaderResolver readerFor) {
-        Map<String, Top> entries = context.schema().entries();
+        Namespace<Top> entries = context.schema().entries();
         this.selfNames = Set.copyOf(selfNames);
         this.readerFor = readerFor;
         this.selectors = selectorFields.entrySet().stream()
@@ -123,9 +124,9 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
-    private static Selector selectorOf(String name, RecordField field, Map<String, Top> entries,
+    private static Selector selectorOf(String name, RecordField field, Namespace<Top> entries,
                                        TsonLinkedSchema linked) {
-        String terminal = ReferenceChain.terminal(field.type().name(), entries);
+        String terminal = ReferenceChain.terminal(field.type().name(), entries::get);
         Top target = entries.get(terminal);
         AtomType<?> parser = AtomParsers.forType(target, linked.enumForm(terminal)).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()

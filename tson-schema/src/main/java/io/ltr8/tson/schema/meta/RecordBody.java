@@ -1,10 +1,10 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +30,8 @@ import java.util.function.UnaryOperator;
  * reaches it with every other reference the record holds, so {@code ok<text>} reaches an edge to {@code
  * result<text>} and not to {@code result<int32>}.
  *
- * <p><b>{@code fields} is an ordered map from a field's name to its facts</b> ({@code field_map}, the kernel's
- * {@code !map { key_type: text  value_type: record_field  ordered: true }}), flattened: a composition's fields
+ * <p><b>{@code fields} is a value of the kernel's {@code field_map}</b>, the namespace type mapping a field's name
+ * to its facts in declaration order ({@link Namespace} typed {@value #FIELD_MAP}), flattened: a composition's fields
  * are its operands' and its own, merged, so a consumer reading values against it never repeats the merge. The
  * name is the key and nowhere else, so the map's own key uniqueness refuses a name written twice by its
  * spelling; two spellings that are one name under the record's {@code name_type} are the linker's to refuse,
@@ -50,7 +50,7 @@ import java.util.function.UnaryOperator;
  * {@code java.lang.Record} (the very language feature every type in this model is built from).
  */
 @Typename(name = "record")
-public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fields,
+public record RecordBody(TypeChain chain, Namespace<RecordField> fields,
                           List<FieldGroup> groups, RecordExtensionType extension, List<String> discriminators,
                           @Field("name_type") Optional<String> nameType,
                           List<TemplateParam> parameters) implements Product {
@@ -62,6 +62,9 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
      * author's own schema first, as an enum's does, and the absent default is the kernel's.
      */
     public static final String FIELD_NAME = "field_name";
+
+    /** The kernel's {@code field_map}, the namespace type a record's {@link #fields} are a value of. */
+    public static final String FIELD_MAP = "field_map";
 
     /**
      * <b>Absent and empty are the same value</b> for the three the kernel makes optional ({@code chain}, {@code
@@ -75,7 +78,7 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
     @Record
     public RecordBody {
         chain = TypeChain.orEmpty(chain);
-        fields = Collections.unmodifiableSequencedMap(new LinkedHashMap<>(fields));
+        Objects.requireNonNull(fields, "fields");
         groups = groups == null ? List.of() : List.copyOf(groups);
         discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
         nameType = nameType == null ? Optional.empty() : nameType;
@@ -83,7 +86,7 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
     }
 
     /** A closed record: one that declares no parameters. */
-    public RecordBody(TypeChain chain, SequencedMap<String, RecordField> fields, List<FieldGroup> groups,
+    public RecordBody(TypeChain chain, Namespace<RecordField> fields, List<FieldGroup> groups,
                       RecordExtensionType extension, List<String> discriminators, Optional<String> nameType) {
         this(chain, fields, groups, extension, discriminators, nameType, List.of());
     }
@@ -93,28 +96,32 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
      * a record's fields by hand. A name given twice is refused, as the kernel's map refuses a repeated key.
      */
     @SafeVarargs
-    public static SequencedMap<String, RecordField> fieldMap(Map.Entry<String, RecordField>... entries) {
+    public static Namespace<RecordField> fieldMap(Map.Entry<String, RecordField>... entries) {
         SequencedMap<String, RecordField> fields = new LinkedHashMap<>();
         for (Map.Entry<String, RecordField> entry : entries) {
             if (fields.putIfAbsent(entry.getKey(), entry.getValue()) != null) {
                 throw new IllegalArgumentException("field '" + entry.getKey() + "' is given twice");
             }
         }
-        return fields;
+        return fieldMap(fields);
+    }
+
+    /** {@code fields}, in its order, as a value of {@value #FIELD_MAP}. */
+    public static Namespace<RecordField> fieldMap(SequencedMap<String, RecordField> fields) {
+        return Namespace.of(FIELD_MAP, fields);
     }
 
     /**
      * Order-sensitive over {@link #fields}: the kernel's {@code field_map} is {@code ordered: true}, so two records
-     * declaring the same fields in different orders are two values, where {@code Map.equals} would call them one.
-     * The override stands in for an ordered-map value type: a {@link SequencedMap} keeps order and compares as a
-     * set, so the equality the kernel states has to be written here until a map type that owns it carries
-     * {@code fields}.
+     * declaring the same fields in different orders are two values, where {@link Namespace}'s equality, which
+     * leaves order to the constructor, would call them one.
      */
     @Override
     public boolean equals(Object o) {
         return o instanceof RecordBody other
                 && chain.equals(other.chain)
-                && List.copyOf(fields.sequencedEntrySet()).equals(List.copyOf(other.fields.sequencedEntrySet()))
+                && fields.equals(other.fields)
+                && List.copyOf(fields.entrySet()).equals(List.copyOf(other.fields.entrySet()))
                 && groups.equals(other.groups)
                 && extension == other.extension
                 && discriminators.equals(other.discriminators)
@@ -125,15 +132,18 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
     /** Consistent with {@link #equals}: {@link #fields} contributes in declaration order. */
     @Override
     public int hashCode() {
-        return Objects.hash(chain, List.copyOf(fields.sequencedEntrySet()), groups, extension,
+        return Objects.hash(chain, List.copyOf(fields.entrySet()), groups, extension,
                 discriminators, nameType, parameters);
     }
 
-    /** {@link #fields} with each field replaced by what {@code map} makes of it, names and order unchanged. */
-    public SequencedMap<String, RecordField> mapFields(UnaryOperator<RecordField> map) {
-        SequencedMap<String, RecordField> mapped = new LinkedHashMap<>();
-        fields.forEach((name, field) -> mapped.put(name, map.apply(field)));
-        return mapped;
+    /**
+     * {@link #fields} with each field replaced by what {@code map} makes of it, names, order and key annotations
+     * unchanged.
+     */
+    public Namespace<RecordField> mapFields(UnaryOperator<RecordField> map) {
+        AnnotatedMap<String, RecordField> mapped = new AnnotatedMap<>();
+        fields.forEach((name, field) -> mapped.put(name, map.apply(field), fields.getAnnotations(name)));
+        return new Namespace<>(fields.type(), mapped);
     }
 
     /** The name type's name, for a message: the one stated, or {@link #FIELD_NAME}. */
@@ -142,19 +152,19 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public RecordBody(SequencedMap<String, RecordField> fields, List<FieldGroup> groups, RecordExtensionType extension,
+    public RecordBody(Namespace<RecordField> fields, List<FieldGroup> groups, RecordExtensionType extension,
                        List<String> discriminators, Optional<String> nameType) {
         this(TypeChain.EMPTY, fields, groups, extension, discriminators, nameType);
     }
 
     /** The same body with an empty chain, {@code discriminators} unstated and the default field name type. */
-    public RecordBody(SequencedMap<String, RecordField> fields, List<FieldGroup> groups,
+    public RecordBody(Namespace<RecordField> fields, List<FieldGroup> groups,
                        RecordExtensionType extension) {
         this(fields, groups, extension, List.of(), Optional.empty());
     }
 
     /** A fresh record body: no supertypes, no field groups, just plain fields, extensible. */
-    public static RecordBody of(SequencedMap<String, RecordField> fields) {
+    public static RecordBody of(Namespace<RecordField> fields) {
         return new RecordBody(fields, List.of(), RecordExtensionType.OPEN);
     }
 
@@ -174,7 +184,7 @@ public record RecordBody(TypeChain chain, SequencedMap<String, RecordField> fiel
     }
 
     /** This body with {@code fields} replaced -- every other facet, the chain included, unchanged. */
-    public RecordBody withFields(SequencedMap<String, RecordField> fields) {
+    public RecordBody withFields(Namespace<RecordField> fields) {
         return new RecordBody(chain, fields, groups, extension, discriminators, nameType, parameters);
     }
 

@@ -39,8 +39,8 @@ import io.ltr8.tson.schema.meta.UuidType;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * The granularity at which TSON text discriminates an untagged value: [TSON-DATA] §4's three scalar
@@ -72,7 +72,7 @@ public enum DiscriminationClass {
      * the enclosing choice non-disjoint and blocks untagged recovery -- the conservative side, the tag
      * stays required.
      */
-    public static Optional<DiscriminationClass> of(String name, Map<String, ? extends Top> namespace) {
+    public static Optional<DiscriminationClass> of(String name, Function<String, ? extends Top> namespace) {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
         return ReferenceChain.terminalDefinition(name, namespace).flatMap(DiscriminationClass::classify);

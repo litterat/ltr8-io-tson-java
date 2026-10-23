@@ -16,11 +16,12 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A resolved schema (Part 2 §8): the kernel's own {@code schema} type, <code>{type_name =&gt; top}</code>, plus
- * the governing-chain directives its own document header carried ({@code !!id}/{@code !!meta}/{@code
- * !!import}*, §2.2) -- the "produced schema" this module exists for, as opposed to {@code tson-compiler}'s
- * grammar-only {@code SchemaDocument}/{@code SchemaMap}. {@code entries}' insertion order is preserved, matching
- * {@code SchemaMap.declarations}' own ordering guarantee.
+ * A resolved schema (Part 2 §8): a value of the kernel's {@code schema}, the namespace type
+ * <code>{type_name =&gt; top}</code> ({@link #entries}, a {@link Namespace} typed {@value #SCHEMA}), plus the
+ * governing-chain directives its own document header carried ({@code !!id}/{@code !!meta}/{@code !!import}*, §2.2)
+ * -- the "produced schema" this module exists for, as opposed to {@code tson-compiler}'s grammar-only {@code
+ * SchemaDocument}/{@code SchemaMap}. {@code entries}' insertion order is preserved, matching {@code
+ * SchemaMap.declarations}' own ordering guarantee.
  *
  * <p><b>An entry is its value</b> (SPEC-FEEDBACK.md #14): a name maps to the body it resolves to -- a {@code
  * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@code Data} -- and a
@@ -79,7 +80,7 @@ import java.util.Optional;
  * slot's declared type. A fact the resolver hands the linker, never part of §8's output: no resolved document writes
  * it.
  */
-public record TsonSchema(String id, String meta, List<String> imports, AnnotatedMap<String, Top> entries,
+public record TsonSchema(String id, String meta, List<String> imports, Namespace<Top> entries,
                           boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
                           Map<String, EntryFacts> facts) {
 
@@ -88,7 +89,7 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
      * declaration's name sits in the schema text it was resolved from, absent for an entry the resolver minted
      * (which is what tells a derived name from a declared one). {@code annotations} are those written after
      * {@code =>}, on the value (§6): the value's own Java shape has no slot for them, and the ones written before
-     * the name are the key's ({@link #entries}' {@link AnnotatedMap}). {@code constructor} is the constructor
+     * the name are the key's ({@link #entries}). {@code constructor} is the constructor
      * the value applies -- the tag resolved output writes, {@code !integer_type}, {@code !enum}, {@code
      * !set_type} -- which binding erases into a class that several constructors share. {@code refines} is the
      * entry a {@code ^} declaration's head names, as written: §5.7's refinement restates fields and adds none,
@@ -165,9 +166,11 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
         Objects.requireNonNull(id, "!!id is required");
         Objects.requireNonNull(meta, "!!meta is required");
         imports = List.copyOf(imports);
-        // AnnotatedMap is fillable while a binder or resolver builds one, so copy to an immutable form --
-        // entries() has always been unmodifiable and that is part of a registered schema being locked.
-        entries = AnnotatedMap.copyOf(entries);
+        // A Namespace's map is an immutable copy, which is part of a registered schema being locked.
+        if (!SCHEMA.equals(entries.type())) {
+            throw new IllegalArgumentException("a schema's entries are a value of '" + SCHEMA + "', not of '"
+                    + entries.type() + "'");
+        }
         Map<String, List<ValueByName>> held = new LinkedHashMap<>();
         valuesByName.forEach((name, values) -> held.put(name, List.copyOf(values)));
         valuesByName = Collections.unmodifiableMap(held);
@@ -189,10 +192,18 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
         this(id, meta, imports, entries, bootstrap, Map.of(), Map.of());
     }
 
+    /** {@code entries}, a map with each key's annotations, as the schema map: a value of {@value #SCHEMA}. */
+    public TsonSchema(String id, String meta, List<String> imports, AnnotatedMap<String, Top> entries,
+                       boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
+                       Map<String, EntryFacts> facts) {
+        this(id, meta, imports, new Namespace<>(SCHEMA, entries), bootstrap, valuesByName, facts);
+    }
+
     /**
      * {@code entries} as a plain map -- the ordinary case, where no declaration name carries annotations.
      * §6 binds an annotation written before a declaration's name to that name, which in resolved form is
-     * this map's key, so {@link AnnotatedMap} is what holds them; a caller with none to carry need not know.
+     * the schema map's key, so the {@link Namespace}'s {@link AnnotatedMap} is what holds them; a caller with none
+     * to carry need not know.
      */
     public TsonSchema(String id, String meta, List<String> imports, Map<String, Top> entries,
                        boolean bootstrap) {
@@ -242,6 +253,9 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
         values.add(io.ltr8.annotation.Annotation.of(APPLICATION, application));
         return Annotations.of(values);
     }
+
+    /** The kernel's {@code schema}, the namespace type the schema map is a value of. */
+    public static final String SCHEMA = "schema";
 
     /** The kernel's {@code application} annotation, derived and never author-written (§8.2). */
     public static final String APPLICATION = "application";

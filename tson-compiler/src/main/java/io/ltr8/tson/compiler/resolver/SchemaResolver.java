@@ -954,7 +954,7 @@ public final class SchemaResolver {
      */
     private static Top unresolved(List<String> parameters) {
         // An open placeholder is an open record like any record template, so it closes by the one process.
-        return RecordBody.of(new java.util.LinkedHashMap<>())
+        return RecordBody.of(RecordBody.fieldMap())
                 .withParameters(parameters.stream().map(TemplateParam::typeParameter).toList());
     }
 

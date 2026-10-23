@@ -405,7 +405,7 @@ public final class TsonSchemaLinker {
     private static String displayName(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
                                       Map<String, TypeRef> applications) {
         return EntryDisplayName.of(name, merged.get(name), facts.getOrDefault(name, TsonSchema.EntryFacts.NONE),
-                Optional.ofNullable(applications.get(name)), merged,
+                Optional.ofNullable(applications.get(name)), merged::get,
                 other -> facts.getOrDefault(other, TsonSchema.EntryFacts.NONE),
                 other -> Optional.ofNullable(applications.get(other)));
     }
@@ -629,7 +629,7 @@ public final class TsonSchemaLinker {
                 loader == null ? Optional.empty() : loader.load(CanonicalIdentity.canonicalize(schema.meta()));
         checkMayGovern(schema, governingMeta);
         Map<String, Top> structureNamespace = governingMeta
-                .<Map<String, Top>>map(linked -> linked.schema().entries()).orElse(Map.of());
+                .<Map<String, Top>>map(linked -> linked.schema().entries().entries()).orElse(Map.of());
 
         Set<String> localNames = new LinkedHashSet<>();
         // A constructor is judged by where `top` is defined, never by its spelling (§4.1).
@@ -995,8 +995,7 @@ public final class TsonSchemaLinker {
         return carryOver(result, schema.entries());
     }
 
-    private static AnnotatedMap<String, Top> carryOver(AnnotatedMap<String, Top> into,
-            AnnotatedMap<String, Top> from) {
+    private static AnnotatedMap<String, Top> carryOver(AnnotatedMap<String, Top> into, Namespace<Top> from) {
         AnnotatedMap<String, Top> result = into;
         for (String name : from.annotatedKeys()) {
             if (result.containsKey(name)) {

@@ -12,6 +12,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.suite.SuiteBindings;
@@ -306,7 +307,7 @@ class Class2ConformanceSuiteTest {
         }
     }
 
-    private static Top definitionOf(Map<String, Top> entries, String name) {
+    private static Top definitionOf(Namespace<Top> entries, String name) {
         Top definition = entries.get(name);
         if (definition != null) {
             return definition;

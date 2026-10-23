@@ -159,9 +159,13 @@ public final class DataClassObjectWriter {
                 return;
             }
             if (value instanceof Namespace<?> namespace) {
-                // A namespace value is an instance of its constructor, written as the map it is under that
-                // constructor's tag, which is the value's own and no Java class's: `!api { get_orders => ... }`.
-                writer.typeRef(namespace.type());
+                // A namespace value is an instance of its constructor, written as the map it is. Where the position
+                // admits more than one constructor (a schema entry, typed `top`) the value names its own under the
+                // tag, which is the value's and no Java class's: `!api { get_orders => ... }`. A position its host
+                // types as a Namespace is a named one, `fields: { ... }`, whose type already says which.
+                if (dataClass == null || dataClass.typeClass() != Namespace.class) {
+                    writer.typeRef(namespace.type());
+                }
                 writeNamespace(namespace, writer);
                 return;
             }

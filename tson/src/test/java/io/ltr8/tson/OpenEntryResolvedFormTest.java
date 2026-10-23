@@ -281,7 +281,7 @@ class OpenEntryResolvedFormTest {
         Map<String, Top> universe = new LinkedHashMap<>();
         Map<String, Map<String, Top>> perSchema = new LinkedHashMap<>();
         for (String id : ids) {
-            Map<String, Top> entries = tson.bindRegistry().core().resolveLinked(id).schema().entries();
+            Map<String, Top> entries = tson.bindRegistry().core().resolveLinked(id).schema().entries().entries();
             perSchema.put(id, entries);
             entries.forEach(universe::putIfAbsent);
         }

@@ -60,8 +60,13 @@ public final class ReferenceChain {
 
     /** The entry at the end of {@code name}'s chain, or empty where the walk reaches no type. */
     public static Optional<Top> terminalDefinition(String name, Map<String, ? extends Top> entries) {
-        Stop stop = walk(name, entries::get);
-        return stop.reached() ? Optional.<Top>ofNullable(entries.get(stop.name())) : Optional.empty();
+        return terminalDefinition(name, entries::get);
+    }
+
+    /** The same over a lookup -- a schema's {@code Namespace} of entries, or a namespace still being built. */
+    public static Optional<Top> terminalDefinition(String name, Function<String, ? extends Top> entries) {
+        Stop stop = walk(name, entries);
+        return stop.reached() ? Optional.<Top>ofNullable(entries.apply(stop.name())) : Optional.empty();
     }
 
     /**

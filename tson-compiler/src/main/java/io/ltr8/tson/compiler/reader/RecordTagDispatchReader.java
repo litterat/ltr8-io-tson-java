@@ -77,7 +77,7 @@ final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumpti
     static Map<String, String> namespaces(Set<String> subtypes, ValueReaderContext context) {
         Map<String, String> namespaces = new HashMap<>();
         for (String subtype : subtypes) {
-            String terminal = ReferenceChain.terminal(subtype, context.schema().entries());
+            String terminal = ReferenceChain.terminal(subtype, context.schema().entries()::get);
             if (context.linked().namespace(terminal).isPresent()) {
                 namespaces.put(subtype, terminal);
             }

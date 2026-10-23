@@ -8,12 +8,12 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -94,7 +94,7 @@ class KindMembersTest {
                 """);
         RecordBody order = assertInstanceOf(RecordBody.class, linked.schema().entries().get("order"));
         KindBody inline = kind(linked, ReferenceChain.terminal(order.fields().get("id").type().name(),
-                linked.schema().entries()));
+                linked.schema().entries()::get));
 
         assertEquals(new KindBody("uuid_type"), inline);
         assertEquals(Optional.of(List.of("stock_id", "uuid")), inline.members());
@@ -349,7 +349,7 @@ class KindMembersTest {
 
     @Test
     void theResolvedFormWritesTheMembers() {
-        Map<String, Top> entries = link(IDS).schema().entries();
+        Namespace<Top> entries = link(IDS).schema().entries();
 
         assertEquals(Optional.of(List.of("customer_id", "stock_id", "uuid", "v4_stock_id")),
                 ((KindBody) entries.get("any_id")).members());

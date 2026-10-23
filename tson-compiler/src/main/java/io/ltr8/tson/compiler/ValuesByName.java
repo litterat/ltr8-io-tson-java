@@ -62,8 +62,10 @@ import java.util.function.Consumer;
  * Each type is looked up in the namespace of the meta layer that governs the schema declaring it, so an imported
  * referent is judged by its own meta's vocabulary and still compared by identity.
  *
- * <p><b>A namespace entry is entered by key.</b> Its value is the map its constructor describes, so a segment selects
- * a key of {@link Namespace#entries()} and the value reached is of the constructor's {@code value_type}.
+ * <p><b>A namespace value is entered by key.</b> A namespace entry, or a {@link Namespace} reached as a component (a
+ * record value's {@code fields}), holds the map its constructor describes, so a segment selects a key of it and the
+ * value reached is of the constructor's {@code value_type}. A data body's host may declare a plain map for a
+ * namespace-typed component instead, which is entered the same way.
  *
  * <p><b>A data body's value is reached through its record components -- an interim.</b> {@code data} is opaque
  * to the type system and its body the host's to interpret, so the hop into one goes through the host's object, and
@@ -98,12 +100,12 @@ final class ValuesByName {
     /** A type named in one meta layer's namespace: where its name is looked up, and the name. */
     private record Typed(TsonLinkedSchema space, String name) {
 
-        private Map<String, Top> entries() {
+        private Namespace<Top> entries() {
             return space.schema().entries();
         }
 
         String terminal() {
-            return ReferenceChain.terminal(name, entries());
+            return ReferenceChain.terminal(name, entries()::get);
         }
 
         Top definition() {
@@ -160,11 +162,10 @@ final class ValuesByName {
                Consumer<SchemaValidationException> refused, Consumer<UnsupportedOperationException> gap) {
         Typed constructor = constructorOf(TsonSchemaLinker.constructorOf(entryName, definition, facts).orElseThrow(),
                 definition, governingMeta);
-        Object body = definition instanceof Namespace<?> namespace ? namespace.entries() : definition;
         for (TsonSchema.ValueByName value : held) {
             String where = "'" + entryName + "' at " + pointer(value.slot());
             try {
-                judge(where, value.reference(), slotType(where, constructor, body, value.slot()), value.cell());
+                judge(where, value.reference(), slotType(where, constructor, definition, value.slot()), value.cell());
             } catch (SchemaValidationException e) {
                 refused.accept(e);
             } catch (UnsupportedOperationException e) {
@@ -206,7 +207,8 @@ final class ValuesByName {
                 }
                 case MapBody map -> {
                     at = at.of(map.valueType().name());
-                    held = held instanceof Map<?, ?> entries ? entries.get(step) : null;
+                    held = held instanceof Namespace<?> namespace ? namespace.get(step)
+                            : held instanceof Map<?, ?> entries ? entries.get(step) : null;
                 }
                 case ArrayBody ignored -> {
                     at = at.of(((ArrayBody) body).elementType().name());
@@ -304,7 +306,7 @@ final class ValuesByName {
             return;
         }
         Object value = switch (referent) {
-            case Namespace<?> namespace -> namespace.entries();
+            case Namespace<?> namespace -> namespace;
             case Data held -> held;
             default -> throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a "
                     + "type: a type entry admits no further segment, so '" + segments.get(1) + "' selects in no value");
@@ -480,7 +482,14 @@ final class ValuesByName {
         return renamed != null && !renamed.value().isEmpty() ? renamed.value() : component.getName();
     }
 
+    /**
+     * The map a value of a namespace type holds: a {@link Namespace}'s entries, or the map a {@code Data} body's host
+     * declared for its namespace-typed component.
+     */
     private static Map<?, ?> asMap(Object value, String reached) {
+        if (value instanceof Namespace<?> namespace) {
+            return namespace.entries();
+        }
         if (value instanceof Map<?, ?> map) {
             return map;
         }

@@ -15,6 +15,7 @@ import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.atom.VocabularyAtoms;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.json.JsonDataEmitter;
+import io.ltr8.tson.schema.meta.Namespace;
 
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
@@ -120,6 +121,9 @@ public final class DataClassObjectWriter {
     private void writeCore(Object value, DataClass dataClass, JsonDataEmitter out) throws Throwable {
         switch (dataClass) {
             case DataClassAtom ignored -> writeAtom(value, out);
+            // A namespace value is the map it holds; the position typing it already names its constructor.
+            case DataClassRecord record when value instanceof Namespace<?> namespace ->
+                    write(namespace.entries(), record.fields()[record.fieldIndex().get("entries")].dataClass(), out);
             case DataClassRecord record -> writeRecord(value, record, out);
             case DataClassArray array -> writeArray(value, array, out);
             case DataClassMap map -> writeMap(value, map, out);

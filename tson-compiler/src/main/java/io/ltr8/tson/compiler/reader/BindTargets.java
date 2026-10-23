@@ -5,10 +5,12 @@ import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassMap;
+import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TupleElement;
@@ -34,6 +36,10 @@ import java.util.Optional;
  *       and {@code Map<String, SequencedMap<String, Long>>} each receive what they declare. A void element
  *       cannot reach a primitive array, an ordered map needs a map that keeps insertion order, and a tuple
  *       class needs the tuple's arity and somewhere for each voidable position's void value.</li>
+ *   <li><b>A namespace type's map at a {@link Namespace} target</b> -- a record's {@code fields}, a value of {@code
+ *       field_map} -- is read for the target's {@code entries} and delivered as an instance of the constructor
+ *       ({@link NamespaceInstanceReader}). A map that is no namespace has no constructor to name and cannot fill
+ *       one; a {@code Map} target at a namespace type receives the map.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
  *       nothing is rebuilt.</li>
  *   <li><b>A {@code Ref} or {@code TypeRef} target at a reference-typed slot</b> ({@code ref<T>}, SPEC-FEEDBACK.md
@@ -212,6 +218,9 @@ final class BindTargets {
 
     private static TsonTypeReader<?> map(MapBindReader map, DataClass target, String what, String where, Site site,
                                          boolean top) {
+        if (target.typeClass() == Namespace.class) {
+            return namespace(map, target, what, where, site, top);
+        }
         if (!(target instanceof DataClassMap keyed)) {
             site.mismatches().add(what + " is a map, and " + where + " binds " + target.typeClass().getName());
             return map;
@@ -226,7 +235,27 @@ final class BindTargets {
         TsonTypeReader<?> value = to(site.resolver().resolve(map.body.valueType().name()), keyed.valueDataClass(),
                 what + "'s value", targetName + "'s value", site, false);
         return new MapBindReader(top ? site.field() : map.name, top ? site.field() : map.displayName, map.body,
-                keyed, key, value, map.schemaLocation, map.keysAreNames);
+                keyed, key, value, map.schemaLocation, map.keysAreNames, map.namespace);
+    }
+
+    /**
+     * A namespace type's value at a target holding a {@link Namespace}: the map read for the namespace's own
+     * {@code entries}, as an instance of the constructor the position names. A map that is no namespace has no
+     * constructor to name, so a {@code Namespace} target there is a mismatch.
+     */
+    private static TsonTypeReader<?> namespace(MapBindReader map, DataClass target, String what, String where,
+                                               Site site, boolean top) {
+        if (map.namespace == null) {
+            site.mismatches().add(what + " is a map that is no namespace, and " + where + " binds "
+                    + Namespace.class.getName() + ", a value of a namespace type -- declare a map");
+            return map;
+        }
+        if (!(target instanceof DataClassRecord record) || !record.fieldIndex().containsKey("entries")) {
+            throw new IllegalStateException(Namespace.class.getName() + " binds as " + target
+                    + ", which has no 'entries' to read the map into");
+        }
+        DataClass entries = record.fields()[record.fieldIndex().get("entries")].dataClass();
+        return new NamespaceInstanceReader(map.namespace, map(map, entries, what, where, site, top));
     }
 
     /**

@@ -281,7 +281,7 @@ final class RecordExtension {
         Top definition = merged.get(name);
         return definition == null ? name : EntryDisplayName.of(name, definition,
                 facts.getOrDefault(name, TsonSchema.EntryFacts.NONE), Optional.ofNullable(applications.get(name)),
-                merged, other -> facts.getOrDefault(other, TsonSchema.EntryFacts.NONE),
+                merged::get, other -> facts.getOrDefault(other, TsonSchema.EntryFacts.NONE),
                 other -> Optional.ofNullable(applications.get(other)));
     }
 
@@ -377,7 +377,7 @@ final class RecordExtension {
             return def instanceof RecordBody record && !OpenEntry.isOpen(def) ? record : null;
         }
         // The selectors come from `FamilySelectors`, the one derivation both encodings read.
-        return new RecordBody(FamilySelectors.of(def), List.of(),
+        return new RecordBody(RecordBody.fieldMap(FamilySelectors.of(def)), List.of(),
                 FamilySelectors.extensionOf(def).orElseThrow(), FamilySelectors.namesOf(def),
                 java.util.Optional.empty());
     }
