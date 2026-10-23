@@ -5,7 +5,6 @@ import io.ltr8.tson.compiler.reader.ErrorReader;
 import io.ltr8.tson.compiler.reader.NamespaceInstanceReader;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
-import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -170,9 +169,8 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
         }
         Typename typename = body.getClass().getAnnotation(Typename.class);
         if (typename == null) {
-            throw new IllegalStateException(body.getClass() + " has no @Typename -- every Top leaf must carry "
-                    + "one, a " + Data.class.getSimpleName() + " implementation included (it names the "
-                    + "constructor it is the body of)");
+            throw new IllegalStateException(body.getClass() + " has no @Typename -- every Top leaf but a "
+                    + "Namespace carries one, naming the constructor it is the body of");
         }
         return typename.name();
     }

@@ -24,7 +24,7 @@ import java.util.Optional;
  * SchemaMap.declarations}' own ordering guarantee.
  *
  * <p><b>An entry is its value</b> (SPEC-FEEDBACK.md #14): a name maps to the body it resolves to -- a {@code
- * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@code Data} -- and a
+ * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@link Namespace} -- and a
  * type body, a record template's included, carries its own IS-A chain ({@code Type.chain}). The entry's kind is
  * its value's ({@code EntryKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
  *
@@ -73,8 +73,8 @@ import java.util.Optional;
  * still need to survive linking, so {@link TsonLinkedSchema} would need to carry it too) without
  * buying any safety a universal property like linked-ness actually needs.
  *
- * <p><b>{@link #valuesByName()}</b> -- for each entry whose body is a {@code data} constructor's instance or a
- * namespace type's ({@link Namespace}), the references that body holds by name (SPEC-FEEDBACK.md #13), each with the
+ * <p><b>{@link #valuesByName()}</b> -- for each entry whose value is an instance of a namespace type
+ * ({@link Namespace}), the references that value holds by name (SPEC-FEEDBACK.md #13), each with the
  * slot it fills, as the resolver's read collected them: the reader records what it produced at a slot holding a value
  * by name, so the list depends on nothing the host class declares. The linker resolves each and judges it against the
  * slot's declared type. A fact the resolver hands the linker, never part of §8's output: no resolved document writes
@@ -234,7 +234,7 @@ public record TsonSchema(String id, String meta, List<String> imports, Namespace
 
     /**
      * The application {@code name} is the instantiation of ([TSON-SCHEMA] §8.2): the {@code @application} its key
-     * carries, which the resolver writes wherever an entry closes one -- a record template's member, a DATA
+     * carries, which the resolver writes wherever an entry closes one -- a record template's member, a namespace
      * entry, the alias a template's application closes to. Empty for an entry that closes none.
      */
     public Optional<TypeRef> applicationOf(String name) {

@@ -121,9 +121,10 @@ whatever was consulted last: `orElse` composes the caller's binder over the kern
 the one that authors the failure, because a name neither knows is a missing line of *their* configuration.
 
 `withDataBindContext` binds the **data** a schema describes. `withMetaNameBinder` is a separate namespace
-and binds the **schema vocabulary** a governing *meta* describes — a consumer's own meta-schema declaring
-`search => !operation { … }` needs its `operation` class there. It composes over the library's binder
-rather than replacing it, so the kernel's names still resolve first.
+and binds the **schema vocabulary** a governing *meta* describes — a consumer's own meta-schema declaring an
+`operation` record and a namespace type of it, applied as `api => !operations { search => { … } }`, needs its
+`operation` class there. It composes over the library's binder rather than replacing it, so the kernel's
+names still resolve first.
 
 A **profile** is fixed when the context is built (`DataBindContext.Builder.profile`), never afterwards, so
 one `Tson` is one profile — a server speaking two schema versions builds one instance per version.

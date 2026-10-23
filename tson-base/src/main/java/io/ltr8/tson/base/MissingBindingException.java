@@ -12,7 +12,7 @@ package io.ltr8.tson.base;
  * <p><b>Deferred, unlike its parent.</b> {@link BindMismatchException} fails the compile because a class that
  * exists and disagrees would lose data on every document of that type; a type with no class to build is
  * different, because a schema legitimately declares types a given consumer never binds -- core.tn's forty, the
- * kernel's {@code data} base kind, every constructor a meta layer declares. Failing the compile for those would
+ * kernel's abstract kinds, every record a meta layer declares. Failing the compile for those would
  * make bind mode unusable, so this rides an {@code ErrorReader} to the first read of that <em>specific</em> type
  * and is thrown there, still saying what it is.
  */

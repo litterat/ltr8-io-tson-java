@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.base.Diagnostic;
@@ -8,6 +9,7 @@ import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
@@ -74,15 +76,14 @@ class TsonSchemaCompilerTest {
 
     @Test
     void anEntryWithNoRegisteredFactoryDoesNotBlockCompilingTheRestOfTheSchemaButFailsOnlyWhenActuallyRead() {
-        // "orphan" is a meta-layer constructor's instance (EndpointBody) -- [TSON-SCHEMA] §2.2.2's extension
+        // "orphan" is an instance of a meta layer's own namespace type -- [TSON-SCHEMA] §2.2.2's extension
         // point, and the only kind of entry left that this library can build no reader for, every kernel and
         // meta constructor having one. TsonSchemaCompiler.compile() still builds the whole schema eagerly,
-        // including "orphan" itself (get("orphan") succeeds, unlike the old lazy behavior where it never got
-        // attempted at all until asked for); "used" (which never references "orphan") reads normally either
-        // way.
+        // including "orphan" itself (get("orphan") succeeds); "used" (which never references "orphan") reads
+        // normally either way.
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("used", RecordBody.of(RecordBody.fieldMap()));
-        entries.put("orphan", new EndpointBody("/search"));
+        entries.put("orphan", new Namespace<>("endpoints", AnnotatedMap.of(Map.of("search", "/search"))));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 

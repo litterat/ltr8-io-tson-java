@@ -218,7 +218,7 @@ public final class SchemaResolver {
         // wherever the entry came from.
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
         // Which names denote the meta-kernel's own entries: a kind and a constructor are judged by where a base
-        // kind is defined, never by its spelling (§4.1), so a schema's own `data` stays an ordinary record.
+        // kind is defined, never by its spelling (§4.1), so a schema's own `namespace` stays an ordinary record.
         Set<String> kernelNames = new LinkedHashSet<>();
         // Which application each entry is the instantiation of (§8.2): an import's as its key states it, a local
         // one's as materialisation closes it. Keyed on the entry, whatever its kind; written on the local keys as
@@ -299,7 +299,7 @@ public final class SchemaResolver {
                         heldByName, isValueBody(metaParser, type)),
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary. Its value is
-                // as opaque to the linker as a data body, so it is read under the policy too.
+                // as opaque to the linker as a namespace value's, so it is read under the policy too.
                 (type, value) -> read(metaParser.get(type), value, names, heldByName, false),
                 metaParser.schema().entries()::get, namespaceGetter, new ApplicationCloser() {
 
@@ -494,7 +494,7 @@ public final class SchemaResolver {
             }
         });
         // §8.2's second derived key annotation: every entry that closes an application, whatever its kind -- a
-        // record template's member, a DATA entry, the hop a non-record template's application closes to --
+        // record template's member, a namespace entry, the hop a non-record template's application closes to --
         // carries `@application` on its key, which is where resolved output states an instantiation's identity
         // and where ingest reads it back as stated.
         for (String name : List.copyOf(localOnly.keySet())) {
@@ -965,15 +965,13 @@ public final class SchemaResolver {
      * {@code heldByName} under the body it returns, for the schema to carry to the linker.
      */
     /**
-     * Whether {@code constructor}'s instances are value bodies: a constructor composing the kernel's {@code data},
-     * whose payload the resolver reads into a host class, or a namespace type, whose payload is a map of such
-     * values; neither is ever lifted or minted, so a kind-typed slot there holds a bare name and a braced
-     * application is refused rather than left for a closer that will not come.
+     * Whether {@code constructor}'s instances are value bodies: a namespace type, whose payload is a map of values
+     * the resolver reads into the consumer's host classes. Nothing in one is ever lifted or minted, so a kind-typed
+     * slot there holds a bare name and a braced application is refused rather than left for a closer that will not
+     * come.
      */
     private static boolean isValueBody(TsonCompiledMetaSchema metaParser, String constructor) {
-        Top body = metaParser.schema().entries().get(constructor);
-        return body != null && (TypeChain.supertypesOf(body).contains("data")
-                || metaParser.kindOf(constructor) == EntryKind.NAMESPACE);
+        return metaParser.kindOf(constructor) == EntryKind.NAMESPACE;
     }
 
     private static Object read(TsonTypeReader<?> reader, io.ltr8.tson.compiler.ast.DataValue value,
@@ -990,22 +988,20 @@ public final class SchemaResolver {
     }
 
     /**
-     * The identifier policy a constructor's payload is read under: the loader's for a {@code data} constructor and
-     * a namespace type, none for the rest.
+     * The identifier policy a constructor's payload is read under: the loader's for a namespace type, none for the
+     * rest.
      *
-     * <p><b>A {@code data} body is a payload the linker cannot see into</b> -- it binds to the consumer's
-     * own class, its fields' types left behind in the meta -- so its identifier-typed values, a key of an
-     * identifier-keyed map among them, are judged here, at the read, as the same values are in a data document.
-     * A namespace value is a map of such bodies, keyed by names, and is read under the same policy.
-     * Every other constructor builds the schema layer's own vocabulary, whose names [TSON-SCHEMA] §11.4's scopes
-     * cover and {@code TsonSchemaLinker} judges: field names, enum members, parameters. Its identifier-typed
-     * values outside those scopes are references -- a choice's variants, a supertype -- whose verdict belongs to
-     * the declaration they name, which may be another schema's.
+     * <p><b>A namespace value is a payload the linker cannot see into</b> -- a map keyed by names whose values bind
+     * to the consumer's own classes, their fields' types left behind in the meta -- so its keys and its
+     * identifier-typed values, a key of an identifier-keyed map among them, are judged here, at the read, as the
+     * same values are in a data document. Every other constructor builds the schema layer's own vocabulary, whose
+     * names [TSON-SCHEMA] §11.4's scopes cover and {@code TsonSchemaLinker} judges: field names, enum members,
+     * parameters. Its identifier-typed values outside those scopes are references -- a choice's variants, a supertype
+     * -- whose verdict belongs to the declaration they name, which may be another schema's.
      */
     private static IdentifierPolicy payloadNames(TsonCompiledMetaSchema meta, String constructor,
                                                  IdentifierPolicy names) {
-        EntryKind kind = meta.compiledSchema().kindOf(constructor);
-        return kind == EntryKind.DATA || kind == EntryKind.NAMESPACE ? names : IdentifierPolicy.none();
+        return meta.compiledSchema().kindOf(constructor) == EntryKind.NAMESPACE ? names : IdentifierPolicy.none();
     }
 
     /**

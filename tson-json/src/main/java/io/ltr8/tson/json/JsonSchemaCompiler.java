@@ -151,7 +151,7 @@ public final class JsonSchemaCompiler {
     /**
      * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, and the one a
      * namespace value names itself. An open entry reads as a template ([TSON-SCHEMA] §5.10) whichever kernel shape
-     * holds it, so it takes the template's reader. A data body and a namespace value name a meta layer's own
+     * holds it, so it takes the template's reader. A namespace value names a meta layer's own
      * constructor, which has no factory: nothing is typed by such an entry, and its reader is the refusal.
      */
     private static String constructorOf(Top body) {

@@ -39,7 +39,6 @@ import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.FloatType;
@@ -104,7 +103,7 @@ import java.util.function.Predicate;
  * entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for why crediting a
  * subtype onto an imported entry's copy here never touches the imported schema's own separately-registered
  * original), computes each kind's members ({@link #computeKinds}), derives choice disjointness, checks that every
- * reference anywhere in the schema actually resolves, and resolves and judges every value a {@code Data} body holds
+ * reference anywhere in the schema actually resolves, and resolves and judges every value a namespace entry holds
  * by name ({@code ValuesByName}). A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
@@ -790,8 +789,7 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * The values each local value entry -- a {@code Data} body or a {@code Namespace} -- holds by name, as the
-     * resolver's read collected them
+     * The values each local namespace entry holds by name, as the resolver's read collected them
      * ({@link TsonSchema#valuesByName()}), resolved in this schema's namespace and judged against the slots they
      * fill (SPEC-FEEDBACK.md #13, {@link ValuesByName}). Each refused name is its own diagnostic, against the entry
      * that holds it.
@@ -812,7 +810,7 @@ public final class TsonSchemaLinker {
         for (String name : localNames) {
             Top definition = merged.get(name);
             List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
-            if (held != null && (definition instanceof Data || definition instanceof Namespace<?>)) {
+            if (held != null && definition instanceof Namespace<?>) {
                 values.check(name, definition, held,
                         refused -> reportOrThrow(receiver, schema, name, facts, refused.getMessage(), refused),
                         gap -> {
@@ -1438,7 +1436,7 @@ public final class TsonSchemaLinker {
             case Scoped ignored -> {
             }
             // A reference names values of one type: `of` resolves in the writer's own namespace, and names a type
-            // or a data constructor, never a constructor of types -- the names of the types built with a
+            // or a namespace type, never a constructor of types -- the names of the types built with a
             // constructor are a kind, and `kind<record>` is that spelling.
             case RefBody ref -> {
                 Top of = namespace.get(ReferenceChain.terminal(ref.of(), namespace));
@@ -1456,14 +1454,10 @@ public final class TsonSchemaLinker {
                             + ref.of() + "', an open entry: a template denotes no type until it is applied (§5.10)");
                 }
             }
-            // A body describing something other than a data value: its shape is the consumer's own class, opaque
-            // here by design. Every reference it holds is at a slot typed by a kind or a reference, recorded by the
-            // read and judged by its slot (ValuesByName), so nothing is asked of the class.
-            case Data ignored -> {
-            }
             // A namespace value's keys were read under the constructor's key family and its values under its
             // value type, so the read judged both; every reference a value holds is at a slot typed by a kind or a
-            // reference, recorded by the read and judged by its slot (ValuesByName), as a data body's is.
+            // reference, recorded by the read and judged by its slot (ValuesByName), so nothing is asked of the
+            // host class a value binds to.
             case Namespace<?> ignored -> {
             }
         }
@@ -1596,7 +1590,9 @@ public final class TsonSchemaLinker {
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Reference reference -> collectNames(reference.target(), into);
             case TemplateBody ignored -> { } // open, answered above
-            default -> { } // an atom body names no type
+            case Atom ignored -> { } // an atom body names no type
+            case Scoped ignored -> { } // a scope names namespaces, not types
+            case Namespace<?> ignored -> { } // a value names no type of its own
         }
     }
 
@@ -1634,7 +1630,9 @@ public final class TsonSchemaLinker {
             case Atom atom -> atom.coherenceCheck();
             case Product product -> product.coherenceCheck();
             case Sum sum -> sum.coherenceCheck();
-            default -> List.of();
+            case Reference ignored -> List.of();
+            case TemplateBody ignored -> List.of();
+            case Namespace<?> ignored -> List.of();
         };
         if (!violations.isEmpty()) {
             // No name leads this one, deliberately. Only an entry resolution never produced can reach here --
@@ -1805,26 +1803,17 @@ public final class TsonSchemaLinker {
      *
      * <p>A slot typed {@code type_kind} holds the name of a type a value can have: resolved, then judged a member of
      * the kind ({@link KindMembers}) where {@code constructors} is given, so a constructor named as a type is
-     * refused, and a DATA entry with its own diagnostic. A {@code type_ref} slot passes {@code null} and is judged by
-     * resolution alone.
+     * refused, and a namespace entry with its own diagnostic. A {@code type_ref} slot passes {@code null} and is
+     * judged by resolution alone.
      */
     private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace, Map<String, Top> structureNamespace,
                                          List<String> ownParameters, Function<String, Optional<String>> constructors,
                                          String subject, String trail) {
         String context = "'" + subject + "'" + trail;
         Top target = namespace.get(ref.name());
-        if (target instanceof Data notAType) {
-            // §8.1's schema map holds only type definitions, so an entry describing something else has no
-            // way to say "declare me, but do not let anything name me as a type". The Data marker is that
-            // way. Without this the misuse resolves, links AND compiles, and fails only when a document is
-            // read against it. §4.1: naming a DATA entry where a type is expected is a resolver error.
-            throw new SchemaValidationException(context + " names '" + ref.name() + "', which is built "
-                    + "with '" + TsonCompiledMetaSchema.typenameOf(notAType) + "' and describes something "
-                    + "other than a data value -- it is declared by this schema but is not a type, so "
-                    + "nothing can be typed by it");
-        }
         if (target instanceof Namespace<?> value) {
-            // A namespace value is a map, an instance of its constructor: a value and never a type.
+            // A namespace value is a map, an instance of its constructor: a value and never a type. Without this
+            // the misuse resolves, links and compiles, and fails only when a document is read against it.
             throw new SchemaValidationException(context + " names '" + ref.name() + "', which is a value of the "
                     + "namespace type '" + value.type() + "', a map of names -- a value and not a type, so nothing "
                     + "can be typed by it");

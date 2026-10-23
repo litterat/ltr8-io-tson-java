@@ -8,7 +8,6 @@ import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.schema.meta.Data;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -21,13 +20,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-DATA] §8.2's name hygiene at an identifier-keyed map in a <em>schema</em> governed by a meta layer: the
- * map's keys are names there as in a data document. A {@code data} body binds to the consumer's own class, so the
- * linker cannot see into it; its payload is read under the identifier policy instead.
+ * map's keys are names there as in a data document. A namespace value's values bind to the consumer's own class,
+ * so the linker cannot see into them; its payload is read under the identifier policy instead.
  *
- * <p>The shape is a meta layer for interfaces, {@code iface => data & { methods: {method_name => …} } }, each
- * interface written in a schema the meta governs, so every method name is a key of a map read as part of that
- * schema. The scope is isolated by Latin {@code pass} beside Cyrillic {@code раѕѕ}, each single-script, as
- * {@code IdentifierValueHygieneTest} does.
+ * <p>The shape is a meta layer for interfaces, {@code iface => { methods: {method_name => …} } } held in a namespace
+ * type {@code ifaces}, each interface written in a schema the meta governs, so every method name is a key of a map
+ * read as part of that schema. The scope is isolated by Latin {@code pass} beside Cyrillic {@code раѕѕ}, each
+ * single-script, as {@code IdentifierValueHygieneTest} does.
  */
 class GovernedSchemaHygieneTest {
 
@@ -44,7 +43,8 @@ class GovernedSchemaHygieneTest {
             !!import:"https://tson.io/2026/38/m/meta.tn"
             {
               method_name => identifier
-              iface       => data & { methods: {method_name => text} }
+              iface       => { methods: {method_name => text} }
+              ifaces      => namespace & { key_type: = identifier  value_type: = iface }
               routes      => @annotation {method_name => text}
             }""";
 
@@ -61,7 +61,7 @@ class GovernedSchemaHygieneTest {
 
     /** The meta's {@code iface}, bound so a governed schema's payload can be read at all. */
     @Typename(name = "iface")
-    public record Iface(Map<String, String> methods) implements Data {
+    public record Iface(Map<String, String> methods) {
     }
 
     private static Tson tson() {
@@ -79,7 +79,7 @@ class GovernedSchemaHygieneTest {
         return problems.stream().map(Diagnostic::code).toList();
     }
 
-    /** A schema governed by the meta above, declaring one interface whose method map is {@code methods}. */
+    /** A schema governed by the meta above, declaring one interface, {@code orders}, whose method map is {@code methods}. */
     private static String governed(String methods) {
         return governed("", methods);
     }
@@ -89,7 +89,7 @@ class GovernedSchemaHygieneTest {
                 !!id:"https://example.test/2026/38/orders-1.tn"
                 !!meta:"%s"
                 {
-                  orders => %s!iface { methods: { %s } }
+                  apis => %s!ifaces { orders => { methods: { %s } } }
                 }""".formatted(META_ID, annotation, methods);
     }
 
@@ -115,14 +115,15 @@ class GovernedSchemaHygieneTest {
     void inAGovernedSchemaTheKeysAreNamesToo() {
         List<Diagnostic> confusable = tson().validateSchema(governed("pass => a  " + CYRILLIC_PASS + " => b"));
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES), codes(confusable));
-        assertEquals(Optional.of("/orders"), confusable.getFirst().schemaPointer());
-        assertTrue(confusable.getFirst().message().contains("at /methods/" + CYRILLIC_PASS), confusable.toString());
+        assertEquals(Optional.of("/apis"), confusable.getFirst().schemaPointer());
+        assertTrue(confusable.getFirst().message().contains("at /orders/methods/" + CYRILLIC_PASS),
+                confusable.toString());
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
                 codes(tson().validateSchema(governed(MIXED + " => a"))));
     }
 
-    /** An annotation's value is as opaque to the linker as a data body, and is judged the same way. */
+    /** An annotation's value is as opaque to the linker as a namespace value, and is judged the same way. */
     @Test
     void anAnnotationValuesKeysAreNamesToo() {
         assertEquals(List.of(), tson().validateSchema(governed("@routes:{ pass => a } ", "pass => a")));

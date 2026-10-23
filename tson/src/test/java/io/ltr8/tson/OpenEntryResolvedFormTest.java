@@ -5,7 +5,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
@@ -270,8 +269,8 @@ class OpenEntryResolvedFormTest {
                 {
                   listed      => <T> atom & { members: [T] }
                   listed_text => listed<text>
-                  payload     => <T> data & { value: T }
-                  payload_iri => payload<iri>
+                  payloads     => <T> namespace & { key_type: = identifier  value_type: = T }
+                  iri_payloads => payloads<iri>
                 }
                 """);
         List<String> ids = List.of(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID,
@@ -340,7 +339,6 @@ class OpenEntryResolvedFormTest {
                 switch (supertype) {
                     case "atom" -> { return EntryKind.ATOM; }
                     case "sum" -> { return EntryKind.SUM; }
-                    case "data" -> { return EntryKind.DATA; }
                     case "namespace" -> { return EntryKind.NAMESPACE; }
                     default -> { }
                 }
@@ -359,7 +357,6 @@ class OpenEntryResolvedFormTest {
             case Product product -> product.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Sum sum -> sum.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Reference reference -> "reference";
-            case Data data -> data.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case TemplateBody held -> "template";
             case io.ltr8.tson.schema.meta.Namespace<?> namespace -> namespace.type();
         };

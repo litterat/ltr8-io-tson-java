@@ -143,7 +143,7 @@ public final class KindMembers {
      * Why {@code kind}'s {@code of} cannot be a kind's, or empty where it can: it names a constructor of the
      * structure namespace, followed through its alias hops, that is {@code type} or IS-A it, or is the kernel's
      * {@code namespace} or IS-A it. A name that namespace does not declare is refused, a type of the schema's own
-     * namespace among them; so is a constructor above {@code type} or beside it, {@code data}, {@code template}
+     * namespace among them; so is a constructor above {@code type} or beside it, {@code template}
      * and {@code reference} included, which no value has a type built with.
      */
     public static Optional<String> ofRefusal(KindBody kind, Function<String, Top> structure) {

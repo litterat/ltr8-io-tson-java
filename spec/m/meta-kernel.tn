@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=da75fbca2e9faf8abc127ca10b3d96a5a9ec2c956f2609d168abbc48065bfecd"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=48699b346722c105f886b5beac011865fd4b61ec42f920133e45d8c030e77d23"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -17,10 +17,10 @@
   @doc:"""
     The structural root, and what a schema map's entries are: `schema` maps a
     name to a `top`, an entry being its value. Every constructor transitively
-    IS-A `atom`, `product`, `sum` or `data`, except `reference`, `template`
-    and `namespace`, which compose with `top` directly. `atom`, `product` and
-    `sum` IS-A `type`, which IS-A `top`; `data` and `namespace` IS-A `top`
-    alone. Construction transfers kind, not IS-A, so instances and fresh
+    IS-A `atom`, `product` or `sum`, except `reference`, `template` and
+    `namespace`, which compose with `top` directly. `atom`, `product` and
+    `sum` IS-A `type`, which IS-A `top`; `namespace` IS-A `top` alone.
+    Construction transfers kind, not IS-A, so instances and fresh
     records sit under the kinds with empty chains; a namespace type is
     declared by composition, which is what places it in the order. `top` and
     the kinds beneath it are abstract: none has instances of its own, so a
@@ -48,11 +48,12 @@
   @doc:"""
     The kind of kinds that describe the shape of a data value: `atom`,
     `product` and `sum` IS-A `type`, and nothing else does. An entry whose
-    value is a body whose constructor IS-A `type` is a type; one whose
-    constructor composes `data` is not, and neither is a `reference` or a
-    `template`, which compose `top`. A `namespace` composes `top` too, and
-    is a type of another kind: a value of it is a map, so it is the one
-    constructor `type_kind` holds.
+    value is a body whose constructor IS-A `type` is a type; a `reference`
+    or a `template` is not, composing `top`. A `namespace` composes `top`
+    too, and is a type of another kind: a value of it is a map, so it is
+    the one constructor `type_kind` holds. An entry whose value is an
+    instance of a namespace type is a value, never a type: it is how a meta
+    layer puts its own vocabulary in a schema map.
 
     A type carries its IS-A chain. A declaration never writes `chain`, and a
     constructor never declares a field of that name: the resolver computes the
@@ -82,17 +83,6 @@
 
   @doc:"The kind of a value that is one of several types: a choice or a scope."
   sum       => abstract type & {}
-
-  @doc:"""
-    The body of an entry that describes something other than an atom, product,
-    or sum type — vocabulary a meta-schema introduces beyond the kernel's own,
-    whose instances ride along in a schema map without being types. No data
-    value ever has such an entry as its type.
-
-    An entry whose body IS-A data is declared by its schema but is not a type:
-    naming one where a type is expected is a resolver error.
-    """
-  data      => abstract top & {}
 
   @doc:"""
     The constructor whose instances are maps. A value of a type IS-A

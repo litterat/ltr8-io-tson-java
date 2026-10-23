@@ -68,7 +68,7 @@ class SidecarSchemasTest {
         // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
         // register itself. A fresh registry per schema file, deliberately, so one file's own
         // failure doesn't leave a shared registry in a half-registered state for the next. Bound as the
-        // class2 runner binds, since a fixture may apply a `data` constructor, which reads only into a class.
+        // class2 runner binds, since a fixture's namespace values read only into classes.
         TsonCompiledMetaRegistry compiledRegistry =
                 new TsonCompiledMetaRegistry(SuiteBindings.context(), id -> fetch(schemasRoot, id));
         TsonCompiledSchemaLoader loader = compiledRegistry;

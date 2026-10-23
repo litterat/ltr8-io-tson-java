@@ -11,8 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * The Java model's kinds mirror the kernel's composition (Part 2 §4.1, SPEC-FEEDBACK.md #9): {@code atom},
- * {@code product} and {@code sum} compose with {@code type}, and {@code data}, {@code reference}, {@code template}
- * and {@code namespace} with {@code top} directly -- a {@link Namespace} being the value of a namespace type.
+ * {@code product} and {@code sum} compose with {@code type}, and {@code reference}, {@code template} and
+ * {@code namespace} with {@code top} directly -- a {@link Namespace} being the value of a namespace type.
  */
 class EntryKindHierarchyTest {
 
@@ -23,9 +23,8 @@ class EntryKindHierarchyTest {
 
     @Test
     void whatComposesWithTopDirectlyIsNoType() {
-        assertEquals(Set.of(Type.class, Reference.class, Data.class, TemplateBody.class, Namespace.class),
+        assertEquals(Set.of(Type.class, Reference.class, TemplateBody.class, Namespace.class),
                 Set.of(Top.class.getPermittedSubclasses()));
-        assertFalse(Type.class.isAssignableFrom(Data.class));
         assertFalse(Type.class.isAssignableFrom(Reference.class));
         assertFalse(Type.class.isAssignableFrom(TemplateBody.class));
         assertFalse(Type.class.isAssignableFrom(Namespace.class));

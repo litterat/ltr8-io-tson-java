@@ -1,8 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.annotation.Field;
 import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.resolver.KindMembers;
@@ -11,7 +9,6 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLoader;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -24,15 +21,13 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.RecordComponent;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * The names a value entry holds -- a {@link Data} body or a {@link Namespace} -- resolved and judged by their slots
+ * The names a value entry holds -- a {@link Namespace}, a value of a namespace type -- resolved and judged by their slots
  * (SPEC-FEEDBACK.md #13, #24): a value's qualified name at a slot typed {@code ref<T>}, held as a {@link Ref} the
  * linker delivers into or a {@link TypeRef} carrying the name alone; and a type's name at a slot typed by a kind,
  * judged a member ({@link #judgeMember}).
@@ -50,7 +45,7 @@ import java.util.function.Consumer;
  * constructor's resolved fields by walking the slot's path in the governing meta's namespace. The name is
  * the governed schema's to resolve: its first segment through this schema's own entries and imports, alias hops
  * followed ([TSON-SCHEMA] §8.3), never through the meta's namespace (§3.3.2); each further segment selects in the
- * value reached -- a field of a record, a key of a namespace value, never a position in a list -- and a type entry
+ * value reached -- a key of a namespace value, a field of a record, never a position in a list -- and a type entry
  * admits none. An open entry is no referent at all: a template denotes no value until it is applied. The referent's
  * declared type is then judged against the slot's by §7.2's IS-A, comparing canonical identities: an entry's
  * declared type is the constructor that built its body, a field's is its type, and a map value's is the map's value
@@ -62,21 +57,15 @@ import java.util.function.Consumer;
  * Each type is looked up in the namespace of the meta layer that governs the schema declaring it, so an imported
  * referent is judged by its own meta's vocabulary and still compared by identity.
  *
- * <p><b>A namespace value is entered by key.</b> A namespace entry, or a {@link Namespace} reached as a component (a
- * record value's {@code fields}), holds the map its constructor describes, so a segment selects a key of it and the
- * value reached is of the constructor's {@code value_type}. A data body's host may declare a plain map for a
- * namespace-typed component instead, which is entered the same way.
+ * <p><b>A namespace value is entered by key, and only there is the value walked.</b> A namespace entry holds the
+ * map its constructor describes, so a segment selects a key of it and the value reached is of the constructor's
+ * {@code value_type}; a value of a namespace type reached that way is the map the read built for it, entered the
+ * same way. A segment selecting a field of a record value is followed by the record's declared fields alone: the
+ * value is the host's object, which this walk never reads, so a name whose walk passes through a field is judged by
+ * type and then reported as this library's gap ({@link UnsupportedOperationException}), since the value it reaches
+ * is neither found nor delivered.
  *
- * <p><b>A data body's value is reached through its record components -- an interim.</b> {@code data} is opaque
- * to the type system and its body the host's to interpret, so the hop into one goes through the host's object, and
- * nothing in the schema walks the body's values; a namespace entry is what replaces it. A component is named as
- * binding names it (a component's {@code @Field} rename, else its own name), an {@code Optional} unwrapped, and a
- * map entered by key. A map whose keys are not names -- its key type no identifier family or enum -- cannot be entered.
- * A body whose class is not a Java record cannot be entered at all, which is this library's gap rather than the
- * schema's ({@link UnsupportedOperationException}).
- *
- * <p>Every refusal is a {@link SchemaValidationException} naming the step that failed; a host class whose components
- * cannot be read to select a field is the reading application's mistake ({@link BindMismatchException}).
+ * <p>Every refusal is a {@link SchemaValidationException} naming the step that failed.
  */
 final class ValuesByName {
 
@@ -177,9 +166,10 @@ final class ValuesByName {
     /**
      * The declared type of the slot {@code steps} reach from the body of {@code constructor}: a field's type at a
      * record, the value type at a map, the element type at an array -- the path the read descended, read against the
-     * declaration it descended through. The value is walked beside the types: where a record is a family base whose
-     * subtype the value's tag selected (§7.2), the field is the subtype's, and the subtype is read off the value's own
-     * class, the constructor it is the body of.
+     * declaration it descended through. The value is walked beside the types while it is entered by key: where a
+     * record is a family base whose subtype the value's tag selected (§7.2), the field is the subtype's, and the
+     * subtype is read off the value's own class, the constructor it is the body of. Past a record's field the walk
+     * is by the declared types alone.
      */
     private Typed slotType(String where, Typed constructor, Object value, List<String> steps) {
         Typed at = constructor;
@@ -203,7 +193,7 @@ final class ValuesByName {
                                 + "value's own tag selects a subtype that declares it");
                     }
                     at = at.of(record.fields().get(step).type().name());
-                    held = held == null ? null : component(held, step);
+                    held = null;
                 }
                 case MapBody map -> {
                     at = at.of(map.valueType().name());
@@ -305,12 +295,12 @@ final class ValuesByName {
             cell.ifPresent(c -> c.deliver(referent));
             return;
         }
-        Object value = switch (referent) {
-            case Namespace<?> namespace -> namespace;
-            case Data held -> held;
-            default -> throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a "
+        if (!(referent instanceof Namespace<?> namespace)) {
+            throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a "
                     + "type: a type entry admits no further segment, so '" + segments.get(1) + "' selects in no value");
-        };
+        }
+        Object value = namespace;
+        String throughField = null;
         String reached = head;
         for (String segment : segments.subList(1, segments.size())) {
             Top body = at.body();
@@ -322,11 +312,10 @@ final class ValuesByName {
                                 + "' is " + a(at.name()) + ", which has no field '" + segment + "' -- it declares "
                                 + String.join(", ", record.fields().keySet()));
                     }
-                    value = component(value, segment);
-                    if (value == null) {
-                        throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
-                                + "' holds no value for its field '" + segment + "'");
+                    if (throughField == null) {
+                        throughField = reached + '.' + segment;
                     }
+                    value = null;
                     at = at.of(field.type().name());
                 }
                 case MapBody map -> {
@@ -335,13 +324,15 @@ final class ValuesByName {
                                 + "' is " + a(at.name()) + ", a map that is no namespace, so it is not entered by "
                                 + "name -- a segment selects a key of a namespace value or a field of a record value");
                     }
-                    Map<?, ?> entries = asMap(value, reached);
-                    Optional<Object> found = keyed(entries, segment);
-                    if (found.isEmpty()) {
-                        throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
-                                + "' has no key '" + segment + "' -- it holds " + keysOf(entries));
+                    if (value != null) {
+                        Map<?, ?> entries = asMap(value, reached);
+                        Optional<Object> found = keyed(entries, segment);
+                        if (found.isEmpty()) {
+                            throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
+                                    + "' has no key '" + segment + "' -- it holds " + keysOf(entries));
+                        }
+                        value = found.get();
                     }
-                    value = found.get();
                     at = at.of(map.valueType().name());
                 }
                 case ArrayBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
@@ -357,6 +348,11 @@ final class ValuesByName {
             throw new SchemaValidationException(where + " wants " + a(wanted.name()) + ", and '" + name + "' is "
                     + a(at.name()) + ", which is no '" + wanted.name() + "'");
         }
+        if (throughField != null) {
+            throw new UnsupportedOperationException(where + " names '" + name + "', which reaches its value through "
+                    + "'" + throughField + "', a field of a record value -- this library enters a value by the keys of "
+                    + "a namespace value and does not yet read a record value's field, so the value is not found");
+        }
         Object delivered = value;
         cell.ifPresent(c -> c.deliver(delivered));
     }
@@ -368,7 +364,7 @@ final class ValuesByName {
      */
     private void judgeMember(String where, String name, List<String> segments, KindBody kind, Typed slot,
                              Top referent, String entry) {
-        if (segments.size() > 1 && (referent instanceof Data || referent instanceof Namespace<?>)) {
+        if (segments.size() > 1 && referent instanceof Namespace<?>) {
             throw new SchemaValidationException(where + " wants the name of a type built with '" + kind.of()
                     + "' (a member of '" + slot.name() + "'), and '" + name + "' reaches into " + entry
                     + ", a value: what a further segment selects in a value is a value, and no value is a type");
@@ -392,7 +388,7 @@ final class ValuesByName {
 
     /**
      * A {@code type_ref}-typed slot of a value body holds the application form: a name that resolves, with as many
-     * arguments as the entry it names declares parameters, each argument the same; and never a DATA entry (§4.1).
+     * arguments as the entry it names declares parameters, each argument the same; and never a value (§4.1).
      * Judged by resolution and arity alone, as a {@code type_ref} slot is everywhere.
      */
     private void judgeApplication(String where, TypeRef reference) {
@@ -402,12 +398,6 @@ final class ValuesByName {
         if (referent == null) {
             throw new SchemaValidationException(where + " names '" + name + "', which is no type declared in this "
                     + "schema or its imports");
-        }
-        if (referent instanceof Data) {
-            throw new SchemaValidationException(where + " names '" + name + "', which is built with '"
-                    + TsonSchemaLinker.constructorOf(terminal, referent, facts).orElse("a data constructor")
-                    + "' and describes something other than a data value -- it is declared by this schema but is not "
-                    + "a type, so nothing can be typed by it (§4.1)");
         }
         if (referent instanceof Namespace<?> namespace) {
             throw new SchemaValidationException(where + " names '" + name + "', which is a value of the namespace "
@@ -451,40 +441,9 @@ final class ValuesByName {
         return new Typed(meta, TsonCompiledMetaSchema.typenameOf(definition));
     }
 
-    /** The value of field {@code name} of {@code value}, through its record component; {@code null} if absent. */
-    private static Object component(Object value, String name) {
-        RecordComponent[] components = value.getClass().getRecordComponents();
-        if (components == null) {
-            throw new UnsupportedOperationException("a value held by name is entered through record components, "
-                    + "and " + value.getClass().getName() + " is not a record");
-        }
-        for (RecordComponent component : components) {
-            if (!name.equals(wireName(component))) {
-                continue;
-            }
-            try {
-                Object held = component.getAccessor().invoke(value);
-                return held instanceof Optional<?> optional ? optional.orElse(null) : held;
-            } catch (IllegalAccessException | InvocationTargetException e) {
-                throw new BindMismatchException("component '" + component.getName() + "' of "
-                        + value.getClass().getName() + " could not be read to select field '" + name + "': " + e, e);
-            }
-        }
-        throw new BindMismatchException(value.getClass().getName() + " has no component for field '" + name + "'");
-    }
-
-    /** The field name a component binds under, as binding reads it: its {@code @Field} rename, else its own. */
-    private static String wireName(RecordComponent component) {
-        Field renamed = component.getAnnotation(Field.class);
-        if (renamed == null) {
-            renamed = component.getAccessor().getAnnotation(Field.class);
-        }
-        return renamed != null && !renamed.value().isEmpty() ? renamed.value() : component.getName();
-    }
-
     /**
-     * The map a value of a namespace type holds: a {@link Namespace}'s entries, or the map a {@code Data} body's host
-     * declared for its namespace-typed component.
+     * The map a value of a namespace type holds: a {@link Namespace}'s entries, or the map the read built for a value
+     * of a namespace type held under a key of another.
      */
     private static Map<?, ?> asMap(Object value, String reached) {
         if (value instanceof Namespace<?> namespace) {
@@ -493,8 +452,8 @@ final class ValuesByName {
         if (value instanceof Map<?, ?> map) {
             return map;
         }
-        throw new BindMismatchException("'" + reached + "' is a map, and the component holding it is a "
-                + value.getClass().getName());
+        throw new IllegalStateException("'" + reached + "' is a value of a namespace type, read as a "
+                + value.getClass().getName() + " rather than a map");
     }
 
     /** The value under the key spelled {@code segment}: a {@code String} key directly, any other by its text. */

@@ -65,8 +65,9 @@ import java.util.Optional;
  * already-resolved, already-linked schema (a registry's own {@code compile}/{@code get}) picks a mode.
  *
  * <p><b>What that fixes is the mode, not the vocabulary.</b> The resolution core's own binder knows the
- * kernel's names; a governing meta of a consumer's own may declare constructors beyond them ({@code
- * operation => ~data & { ... }}), and {@link ProcessorConfig#metaNameBinder} adds the classes those bind to --
+ * kernel's names; a governing meta of a consumer's own may declare vocabulary beyond them (a record {@code
+ * operation => { ... }} held in a namespace type, {@code api => namespace & { ... }}), and {@link
+ * ProcessorConfig#metaNameBinder} adds the classes its values bind to --
  * composed over the library's binder, so the mode and every kernel name stand.
  *
  * <p>Out of the box this serves only meta-kernel/meta.tn/core.tn: {@link SchemaSource#registeredOnly()}

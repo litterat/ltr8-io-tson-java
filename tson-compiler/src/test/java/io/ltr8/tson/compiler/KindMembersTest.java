@@ -235,7 +235,7 @@ class KindMembersTest {
         List<String> members = kind(kernel, "type_kind").members().orElseThrow();
 
         assertTrue(members.containsAll(List.of("field_map", "namespace", "schema")), members::toString);
-        assertFalse(members.contains("set_type") || members.contains("record") || members.contains("data"),
+        assertFalse(members.contains("set_type") || members.contains("record") || members.contains("reference"),
                 members::toString);
     }
 
@@ -285,15 +285,15 @@ class KindMembersTest {
     }
 
     @Test
-    void aKindOfDataIsRefusedAtTheDeclaration() {
+    void aKindOfAConstructorBesideTypeIsRefusedAtTheDeclaration() {
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 {
-                  order => { id: kind<data> }
+                  order => { id: kind<reference> }
                 }
                 """));
 
-        assertTrue(e.getMessage().contains("'data'") && e.getMessage().contains("not 'type', 'namespace' or a constructor"),
-                e.getMessage());
+        assertTrue(e.getMessage().contains("'reference'")
+                        && e.getMessage().contains("not 'type', 'namespace' or a constructor"), e.getMessage());
     }
 
     @Test

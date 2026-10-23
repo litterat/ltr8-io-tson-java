@@ -95,7 +95,7 @@ class NamespaceTypeTest {
     @Test
     void aNamespaceTypeIsNoBaseKindBesides() {
         List<Diagnostic> problems = tson("").validateSchema(META_TEXT.formatted("""
-                  both => namespace & data & { key_type: = header_name  value_type: = text }
+                  both => namespace & sum & { key_type: = header_name  value_type: = text }
                 """));
 
         assertEquals(1, problems.size(), problems::toString);

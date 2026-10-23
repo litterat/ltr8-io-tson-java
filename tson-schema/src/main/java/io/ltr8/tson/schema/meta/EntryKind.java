@@ -11,12 +11,6 @@ public enum EntryKind {
     ATOM, PRODUCT, SUM, REFERENCE,
 
     /**
-     * An entry that describes something other than a data value -- meta-schema vocabulary riding along in a
-     * schema map. Its body is a {@link Data}, or the record describing one; nothing may be typed by it.
-     */
-    DATA,
-
-    /**
      * A namespace type: a constructor IS-A the kernel's {@code namespace}, whose instances are maps from its
      * {@code key_type} to its {@code value_type} ({@link MapBody#ofNamespace}). It is a type -- its values
      * are its instances -- and {@code type_kind} holds it, where it holds no other constructor. An entry whose
@@ -41,8 +35,8 @@ public enum EntryKind {
      * of a constructor is what its instances are.
      *
      * @param kernel whether a chain's name denotes the meta-kernel's own entry of that name -- a kind is judged by
-     *               where a base kind is defined, never by its spelling, so a schema's own {@code data => { ... }}
-     *               composed into {@code payload => data & { ... }} leaves {@code payload} a PRODUCT
+     *               where a base kind is defined, never by its spelling, so a schema's own {@code namespace => { ... }}
+     *               composed into {@code payload => namespace & { ... }} leaves {@code payload} a PRODUCT
      */
     public static EntryKind of(Top value, Predicate<String> kernel) {
         return switch (value) {
@@ -51,15 +45,14 @@ public enum EntryKind {
             case Product ignored -> PRODUCT;
             case Sum ignored -> SUM;
             case Reference ignored -> REFERENCE;
-            case Data ignored -> DATA;
             case TemplateBody ignored -> TEMPLATE;
             case Namespace<?> ignored -> NAMESPACE;
         };
     }
 
     /**
-     * The kind a record's chain reaches: the first of the kernel's {@code atom}, {@code product}, {@code sum},
-     * {@code data} and {@code namespace} that appears in it as the kernel's own entry ({@code top} never counts),
+     * The kind a record's chain reaches: the first of the kernel's {@code atom}, {@code product}, {@code sum} and
+     * {@code namespace} that appears in it as the kernel's own entry ({@code top} never counts),
      * and {@link #PRODUCT} where none does, a record being a product. Those entries themselves and not each
      * ancestor's own kind: the {@code atom} entry is itself a record of kind {@code PRODUCT}, so inheriting the
      * nearest ancestor's kind would answer wrongly for {@code atom}'s own subtypes. A chain reaching two is refused
@@ -80,9 +73,6 @@ public enum EntryKind {
                 case "sum" -> {
                     return SUM;
                 }
-                case "data" -> {
-                    return DATA;
-                }
                 case MapBody.NAMESPACE -> {
                     return NAMESPACE;
                 }
@@ -97,7 +87,7 @@ public enum EntryKind {
      * Whether {@code value} IS-A the meta-kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind, a
      * namespace type, {@code reference} or {@code template} -- what a construction may apply, what only a
      * meta-kernel-governed schema may declare, and what a meta layer builds a reader for. Read off the chain, so a
-     * template composing a base kind ({@code op => <T> data & { path: T }}) answers as its closed form would; and
+     * template composing a base kind ({@code op => <T> product & { path: T }}) answers as its closed form would; and
      * judged by where {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself:
      * it is what every other answer IS-A, and as abstract as the base kinds beneath it, so its own reader is what
      * refuses a direct application of it. That is applicability, not kind membership: by the chain {@code top} is

@@ -62,7 +62,7 @@ class JsonNamespaceTypeTest {
 
     /**
      * An entry built with a namespace type is a value, not a type: the schema declaring one compiles, its types read,
-     * and a document read against the entry itself is refused rather than thrown, as for a data entry.
+     * and a document read against the entry itself is refused rather than thrown.
      */
     @Test
     void aNamespaceEntryCompilesAndTypesNothing() {

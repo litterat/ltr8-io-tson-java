@@ -130,9 +130,9 @@ public final class ProcessorConfig {
 
     /**
      * The names a consumer's own <b>meta layer</b> adds -- consulted when resolving a schema whose governing
-     * meta declares constructors of its own, so that {@code search => !operation { ... }} can bind to that
-     * consumer's own {@code @Typename("operation")} class. Defaults to unset: the kernel's own vocabulary
-     * alone, which is every schema governed by the bundled meta.tn.
+     * meta declares vocabulary of its own, so that each value of {@code api => !operations { search => { ... } }}
+     * can bind to that consumer's own class for {@code operation}, found by name. Defaults to unset: the kernel's
+     * own vocabulary alone, which is every schema governed by the bundled meta.tn.
      *
      * <p><b>Composed over the library's own binder, never replacing it</b> ({@code SchemaMetaNameBinder.contextExtendedWith}): {@code record}/{@code enum}/{@code integer_type} and the
      * rest resolve first, and this binder answers only for a name the kernel does not declare. So it adds

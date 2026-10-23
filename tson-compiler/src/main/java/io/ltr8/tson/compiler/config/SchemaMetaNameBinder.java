@@ -90,8 +90,9 @@ public final class SchemaMetaNameBinder {
 
     /**
      * {@link #defaultContext()} extended with the names a consumer's own <b>meta layer</b> adds -- the
-     * context to resolve a schema against when its governing meta declares constructors of its own
-     * ({@code operation => ~data & { ... }}), whose instances bind to that consumer's Java classes.
+     * context to resolve a schema against when its governing meta declares vocabulary of its own -- a record
+     * {@code operation => { ... }} and a namespace of it, {@code api => namespace & { key_type: = identifier
+     * value_type: = operation }} -- whose values bind to that consumer's Java classes.
      * {@code ProcessorConfig.metaNameBinder} is the front-door route to it.
      *
      * <p>Composition, never replacement: {@link #INSTANCE} answers first and {@code additional} is asked
