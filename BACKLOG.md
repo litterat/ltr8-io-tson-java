@@ -363,6 +363,15 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   gets none (`EntryDisplayName.authored`), and let `TupleDiagnostics` state the rule alone where it has no name, as
   `ArrayDiagnostics` does.
 
+- [ ] **A map key's pointer step is the key's Java rendering.** `MapAbstractReader.readInto` replaces the `?`
+  placeholder for any key that is not a single token with `ValueIdentity.nameOf(key)` or `String.valueOf(key)`, so
+  `counts: { @doc:"x" 0x10 => oops }` reports `/counts/16` where the unannotated key reports `/counts/0x10`, and a
+  compound key `grid: { {x: 1 y: 2} => oops }` reports `/grid/TsonRecord[fields={x=1, y=2}, …]` in tree mode and
+  `/grid/Point[x=1, y=2]` when bound, naming the reading application's class; the duplicate-key message quotes the
+  same rendering. An annotated single-token key takes its step from the token's spelling, which means keeping the key
+  token's text across the annotations before it; a compound key keeps `?` until it has a pointer form. The JSON
+  encoding writes such a map as pairs and reports `/grid/0/1`, so the two encodings disagree about the step too.
+
 - [ ] **A tuple refused a scalar prints the event record.** `only: tuple1<text>` given `a` reports
   `expected a tuple (array-shaped) for '[text]', found TokenEvent[text=a, form=UNQUOTED, position=…]`:
   `TypeRefCheck.describe` names a record, map, array, `{}` and `_` and falls back to `String.valueOf` for anything
