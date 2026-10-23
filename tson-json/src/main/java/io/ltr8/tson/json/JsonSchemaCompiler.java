@@ -7,6 +7,7 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -136,8 +137,13 @@ public final class JsonSchemaCompiler {
                 // than walked on every value.
                 return resolve(reference.target().name());
             }
-            ValueReaderFactory factory = factories.resolve(constructorOf(body));
-            return factory.create(name, definition, context);
+            // A namespace type resolves to a record of the facets it states, and a value of it is the map they
+            // describe, never a record of those facets. Its keys are read under a pinned key family, and by their
+            // spelling alone where the family is a default the host supplies (MapBody.Namespace#read): a record's
+            // field names, which linking judges by the record's name_type.
+            Top read = linked.namespace(name).<Top>map(MapBody.Namespace::read).orElse(body);
+            ValueReaderFactory factory = factories.resolve(constructorOf(read));
+            return factory.create(name, read, context);
         }
     }
 

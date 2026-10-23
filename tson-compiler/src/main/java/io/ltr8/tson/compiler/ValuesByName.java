@@ -119,24 +119,20 @@ final class ValuesByName {
         }
 
         /**
-         * Whether this map type is a namespace: built with the kernel's {@code namespace}, a map whose keys name its
-         * entries, which is the one map a qualified name enters ({@code method_map => !namespace { ... }}); a
+         * What a value of this type is read as: the map a namespace type's value is ({@link
+         * TsonLinkedSchema#namespace}), and the definition otherwise.
+         */
+        Top body() {
+            return space.namespace(terminal()).<Top>map(MapBody.Namespace::map).orElseGet(this::definition);
+        }
+
+        /**
+         * Whether this type is a namespace type, IS-A the kernel's {@code namespace}: a map whose keys name its
+         * entries, which is the one map a qualified name enters ({@code method_map => namespace & { ... }}); a
          * {@code {K => V}} sugar map is built with {@code map} and is not.
          */
         boolean isNamespace() {
-            String terminal = terminal();
-            Top definition = definition();
-            if (definition == null) {
-                return false;
-            }
-            String constructor = TsonSchemaLinker.constructorOf(terminal, definition, space.schema().facts())
-                    .orElse(null);
-            if (constructor == null) {
-                return false;
-            }
-            Top built = entries().get(constructor);
-            return constructor.equals("namespace")
-                    || built != null && TypeChain.supertypesOf(built).contains("namespace");
+            return space.namespace(terminal()).isPresent();
         }
 
         /** §7.2: this type is {@code wanted}, or lists it among its supertypes. */
@@ -182,7 +178,7 @@ final class ValuesByName {
         Typed at = constructor;
         Object held = value;
         for (String step : steps) {
-            Top body = at.definition();
+            Top body = at.body();
             switch (body) {
                 case RecordBody record -> {
                     if (!record.fields().containsKey(step) && held != null) {
@@ -308,7 +304,7 @@ final class ValuesByName {
         Object value = held;
         String reached = head;
         for (String segment : segments.subList(1, segments.size())) {
-            Top body = at.definition();
+            Top body = at.body();
             switch (body) {
                 case RecordBody record -> {
                     RecordField field = record.fields().get(segment);

@@ -7,9 +7,19 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
 **Invariants**
 
 - A slot that names the type of a value is typed `type_kind` (`record_field.type`, `tuple_element.element_type`,
-  `array.element_type`, `map.key_type` and `value_type`, `choice.variants`, `template_param.type` and `bound`). Its
-  value is one bare name, judged a member of the kind at link (`KindMembers`), never by the reader against the kernel's
-  own members.
+  `array.element_type`, `map.key_type` and `value_type`, `namespace.value_type`, `choice.variants`,
+  `template_param.type` and `bound`). Its value is one bare name, judged a member of the kind at link (`KindMembers`),
+  never by the reader against the kernel's own members. `namespace.key_type` is typed `identifier_kind`: a
+  namespace's keys are names, which is what a qualified name's segment selects, so an enum-keyed map is no namespace.
+  A FIXED `key_type` is the family every key is read and judged under; a DEFAULT one stands where the value's host
+  states none, and the host supplies it otherwise: `field_map`'s keys are the record's `name_type`'s, its supertypes'
+  where it states none, and `field_name` where neither does.
+- A constructor is no member of any kind, its instances being types, with one family excepted: a namespace
+  constructor (the kernel's `namespace`, or one IS-A it) has maps for instances, so it is a type. `type_kind` holds
+  `namespace`, `field_map`, `schema` and a meta layer's own namespace types; `kind<namespace>` holds every namespace
+  constructor, each being a member of the kind of every namespace constructor it is or IS-A. A namespace type is a
+  member of no other kind: its `!record` tag is not followed, a value of it being a map, so `kind<record>`,
+  `kind<product>` and `kind<map>` exclude it.
 - `type_ref` is the application form. It stands where an application may (`type_chain.parents`,
   `type_argument.name`, the `application` annotation, held text) and at `reference.target`, which may name a
   constructor. A `type_ref` slot is judged by resolution and arity alone.
@@ -17,8 +27,8 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   composition operand (constructor or record). `reference.target` admits either, an alias being applied as its target
   is (§3.3.1). No kind covers "a constructor": the series has no classifier of constructors.
 - `top` is a member of `type_kind`, `kind<product>` and `kind<record>`: a fresh abstract record IS-A nothing is a type
-  by the rule on `kind_type`, and the kernel's own `schema => !namespace { value_type: top }` depends on it.
-  `EntryKind.isConstructor` answers a different question, applicability, and counts `top` by name.
+  by the rule on `kind_type`, and the kernel's own `schema => namespace & { key_type: = type_name  value_type: = top }`
+  depends on it. `EntryKind.isConstructor` answers a different question, applicability, and counts `top` by name.
 - A type parameter is one whose `type` is `type_kind` (`TemplateParam.TYPE_KIND`); a parameter standing at a
   `type_kind` or a `type_ref` slot is a type parameter (`ParameterTypes.typePosition`).
 - A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the
@@ -64,11 +74,14 @@ enclosing collection (`discriminators` and group members in `fields`, a paramete
 a qualified name); a foreign schema map named by identity (`scoped.schemas` values, an EXTERN value's `!type`).
 
 **Judgement.** One predicate covers every reference row: *the referent's value is a value of `T`*. For a constructor
-`T` that is `kind<T>`, the referent being a type built with `T`, less the constructors themselves (`KindMembers`); for
+`T` that is `kind<T>`, the referent being a type built with `T`, less the constructors whose instances are types
+(`KindMembers`); for
 a type `T` it is a value entry or a key of a namespace value whose declared type IS-A `T`, which is #13's by-name slot
 (`ValuesByName`). The two relations behind it are distinct and both recorded: IS-A (`supertypes`, inverse
 `subtypes`) and instance-of (the body's tag, inverse `kind_type.members`). Folding instance-of into the chain would
-claim a value of `api` is a value of `namespace`, which it is not.
+claim a value of `uuid` is a value of `uuid_type`, whose values are types, which it is not. A namespace type is the
+other way round: `api => namespace & { … }` is a composition, so `api` IS-A `namespace`, and a value of `api` is a
+map.
 
 ## The kernel's slots
 
@@ -81,16 +94,24 @@ claim a value of `api` is a value of `namespace`, which it is not.
 | `reference.target` | reference | type-name namespace | any entry, type or constructor; `type_ref`, by resolution | `validateTypeRef` |
 | `template_param.type`, `bound` | reference | type-name namespace | `type_kind`; the argument is judged IS-A `bound` at the application | `validateTypeRef`, `TemplateMaterialiser.checkBound` |
 | `template.template` | parameters and applications as parsed | `parameters`, then type-name namespace | §5.10's shadowing rule | `HeldBody` |
-| `record_field.type`, `tuple_element.element_type`, `array.element_type`, `map.key_type`, `map.value_type`, `choice.variants` | reference | type-name namespace | `type_kind`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
-| `record_field.value` at a kind-typed slot | reference | type-name, then structure namespace | member of the slot's kind | `checkKindValue` |
+| `record_field.type`, `tuple_element.element_type`, `array.element_type`, `map.key_type`, `map.value_type`, `namespace.value_type`, `choice.variants` | reference | type-name namespace | `type_kind`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
+| `record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference | type-name, then structure namespace | member of the slot's kind | `checkKindValue` |
 | `record.discriminators`, `field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
 | `record.name_type`, `enum_type.name_type` | reference | structure namespace for a constructor-pinned value, else type-name | `identifier_kind` | `NameType.admits` |
-| `kind_type.of` | reference | structure namespace | a constructor, `type` or IS-A it | `KindMembers.ofRefusal` |
+| `kind_type.of` | reference | structure namespace | a constructor, `type` or `namespace`, or IS-A either | `KindMembers.ofRefusal` |
 | `ref_type.of` | reference | type-name namespace | a type or a data constructor, never a constructor of types | `validateBody` |
 | a slot typed `ref<T>` | reference by key, a path | schema map, then namespace values and record fields | `ref<T>`: the referent IS-A `T` | `ValuesByName.judge` |
-| `schema.value_type: top` | tag | structure namespace | IS-A `top` | `DefinitionResolver` |
+| `schema.value_type: = top` | tag | structure namespace | IS-A `top` | `DefinitionResolver` |
 | `!I ^ { … }` head | reference | type-name namespace | an atom instance, never the family's constructor | resolver |
 | `A & B` operand, `A - { … }` source | reference | type-name namespace | a constructor or a record type | resolver |
+
+The schema map and a record's `fields` are values of the kernel's two namespace types, `schema` and `field_map`. A
+namespace type is a constructor composed over `namespace` stating its facets (`field_map => namespace & { key_type?: ~
+field_name  value_type: = record_field  ordered?: = true }`), and a value of one is written and read as a map from its
+`key_type` to its `value_type`, never as a record of those facets (`TsonLinkedSchema.namespace`). Its keys are the key
+rows above: of the pinned family where `key_type` is FIXED, and where it is a DEFAULT, of the family the host supplies,
+read by spelling and judged once the host resolves (a record's field names by its `name_type`). Its values are judged
+by `value_type`.
 
 `scoped.schemas` keys are cross-document addresses (canonical identity); its values are references by key into the
 named foreign schema. An annotation use `@name: v` is a reference by key into the annotation namespace (§3.3.3). In a

@@ -681,11 +681,19 @@ final class ParameterTypes {
             }
         }
 
-        /** A name's resolved body, reference chains followed -- the slot type a written value faces. */
+        /**
+         * A name's resolved body, reference chains followed -- the slot type a written value faces. A namespace type
+         * faces it as the map its value is ({@link MapBody#ofNamespace}): {@code record}'s {@code fields} is written
+         * as a map. The walk is over the governing meta's vocabulary, where {@code namespace} is the kernel's.
+         */
         private Top resolve(String name) {
             Top definition = meta.apply(name);
             for (int hops = 0; definition instanceof Reference reference && hops < 32; hops++) {
                 definition = meta.apply(reference.target().name());
+            }
+            if (MapBody.isNamespace(definition, kernel -> true)) {
+                return MapBody.ofNamespace((RecordBody) definition).<Top>map(MapBody.Namespace::map)
+                        .orElse(definition);
             }
             return definition;
         }

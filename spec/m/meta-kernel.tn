@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=61bff1353c3733e9d1258af08e542385adb7d4eb30494db93d8cb72094452e9e"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=da75fbca2e9faf8abc127ca10b3d96a5a9ec2c956f2609d168abbc48065bfecd"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -17,13 +17,15 @@
   @doc:"""
     The structural root, and what a schema map's entries are: `schema` maps a
     name to a `top`, an entry being its value. Every constructor transitively
-    IS-A `atom`, `product`, `sum` or `data`, except `reference` and `template`,
-    which compose with `top` directly. `atom`, `product` and `sum` IS-A `type`,
-    which IS-A `top`; `data` IS-A `top` alone. Construction transfers kind, not
-    IS-A, so instances and fresh records sit under the kinds with empty chains.
-    `top` and the five kinds beneath it are abstract: none has instances of
-    its own, so a direct application of one is refused as any abstract
-    record's is, naming the subtypes that would satisfy it.
+    IS-A `atom`, `product`, `sum` or `data`, except `reference`, `template`
+    and `namespace`, which compose with `top` directly. `atom`, `product` and
+    `sum` IS-A `type`, which IS-A `top`; `data` and `namespace` IS-A `top`
+    alone. Construction transfers kind, not IS-A, so instances and fresh
+    records sit under the kinds with empty chains; a namespace type is
+    declared by composition, which is what places it in the order. `top` and
+    the kinds beneath it are abstract: none has instances of its own, so a
+    direct application of one is refused as any abstract record's is, naming
+    the subtypes that would satisfy it.
     """
   top       => abstract {}
 
@@ -48,7 +50,9 @@
     `product` and `sum` IS-A `type`, and nothing else does. An entry whose
     value is a body whose constructor IS-A `type` is a type; one whose
     constructor composes `data` is not, and neither is a `reference` or a
-    `template`, which compose `top`.
+    `template`, which compose `top`. A `namespace` composes `top` too, and
+    is a type of another kind: a value of it is a map, so it is the one
+    constructor `type_kind` holds.
 
     A type carries its IS-A chain. A declaration never writes `chain`, and a
     constructor never declares a field of that name: the resolver computes the
@@ -89,6 +93,29 @@
     naming one where a type is expected is a resolver error.
     """
   data      => abstract top & {}
+
+  @doc:"""
+    The constructor whose instances are maps. A value of a type IS-A
+    `namespace` is written and read as a map from `key_type` to `value_type`,
+    `ordered` as a map's is, and never as a record of these facets: the facets
+    describe the map, and a namespace type pins them by composition,
+    `api => namespace & { key_type: = identifier  value_type: = method }`.
+    Its keys are names, of an identifier family, which is what a qualified
+    name's segment is. A fixed `key_type` is the family every key is read and
+    judged under; a default one is the family that stands where the host of
+    the value states none, the host supplying the family otherwise.
+    That composition is the IS-A edge that admits `!api { ... }` wherever
+    `top` is ([TSON-SCHEMA] §3.3.1), and `api` is a type whose values are its
+    instances, so `type_kind` holds it where it holds no constructor IS-A
+    `type`. A qualified name's segment selects a key of a namespace value and
+    of no other map. The schema map (`schema`) and a record's fields
+    (`field_map`) are the kernel's two.
+    """
+  namespace => abstract top & {
+    key_type:   identifier_kind
+    value_type: type_kind
+    ordered?:   boolean ~ false
+  }
 
   @doc:"""
     Aliasing body — the entry `target` names: a type, or a constructor, since
@@ -684,10 +711,11 @@
     The fields of a record ([TSON-SCHEMA] §5.2): each field's name mapped to its
     facts, in declaration order, which is part of the value. A name is written
     once, by its spelling, as the key; two spellings that are one value of the
-    record's `name_type` are a resolver error. The keys are `text`, each judged
-    by that `name_type`.
+    record's `name_type` are a resolver error. The key family is the host
+    record's: its `name_type`, which stands at `key_type` by default, and so
+    `field_name` where neither the record nor a supertype states one.
     """
-  field_map => !namespace { key_type: text  value_type: record_field  ordered: true }
+  field_map => namespace & { key_type?: ~ field_name  value_type: = record_field  ordered?: = true }
 
   @doc:"""
     A record: named fields, fixed by the type, with the field groups over them.
@@ -807,13 +835,6 @@
     min_items?:      non_negative_integer
     max_items?:      non_negative_integer
   }
-
-  @doc:"""
-    A map whose keys name its entries: the schema map, a record's fields. A
-    namespace is a map in every fact — its keys, values, order and bounds are
-    map's, and so is how a value of it is written and read.
-    """
-  namespace => map & {}
 
   @doc:"A fixed sequence of positions, each with a type of its own."
   tuple => product & {
@@ -946,5 +967,5 @@
     with sugar expanded, bodies flattened and chains computed, and an entry
     written as a constructor application resolves to itself.
     """
-  schema => !namespace { key_type: type_name  value_type: top }
+  schema => namespace & { key_type: = type_name  value_type: = top }
 }

@@ -24,6 +24,8 @@ history lives in git.
   linker refuses any *type reference* naming a DATA entry. A value by name may name one: it is a value, not a type.
 - A meta-schema keeps a constructor this library cannot build a reader for, as an `ErrorReader`; it is never dropped.
 - `!!meta` merges nothing into the type-name namespace: shared vocabulary goes in a third ordinary schema.
+- A namespace type is a meta layer's own vocabulary: it IS-A `top`, so only a kernel-governed schema declares one
+  (§2.2.2), and a value of it is the map linking records for it (`TsonLinkedSchema.namespace`), never a `Data` body.
 
 Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/compiled-registries.md`,
 `design/schema-resolution.md`.
@@ -36,14 +38,17 @@ is not a data type — `schema`, a namespace of `top` keyed by `type_name`, admi
 exactly when its value is one. `data => abstract top & {}` is the fourth base kind that lets one say otherwise, and
 `EntryKind.DATA` is what it resolves to. The kernel names the other side:
 `type => abstract top & { chain?: type_chain }`, which `atom`, `product` and `sum` compose with (SPEC-FEEDBACK.md #9),
-so an entry is a type exactly when it IS-A `type`, and `data` IS-A `top` alone. `type` is not a base kind — kind
-derivation reads `atom`, `sum` and `data` off the chain and skips `type` as it skips `top`, each counted only as the
-kernel's own entry, so a schema's own `data` is an ordinary record. All six are abstract (SPEC-FEEDBACK.md #15): a
-`data`-typed position admits only a meta layer's own data constructors' instances. The Java model mirrors it:
-`schema.meta.Type` is the sealed interface `Atom`, `Product` and `Sum` extend, between them and `Top`, so a body is a
-type exactly when it is an `instanceof Type`; `Data` and `Reference` implement `Top` directly, and so does
-`TemplateBody`, which carries no chain. The motivating case is an HTTP operation, which must sit at the schema layer
-because that is the only layer able to name request and response types *by name*.
+so an entry is a type exactly when it IS-A `type`, and `data` IS-A `top` alone, as `namespace` does
+(SPEC-FEEDBACK.md #23). `type` is not a base kind — kind derivation reads `atom`, `product`, `sum`, `data` and
+`namespace` off the chain and skips `type` as it skips `top`, each counted only as the kernel's own entry, so a
+schema's own `data` is an ordinary record, and a chain reaching two of them is refused. All seven are abstract
+(SPEC-FEEDBACK.md #15): a `data`-typed position admits only a meta layer's own data constructors' instances. The Java
+model mirrors it: `schema.meta.Type` is the sealed interface `Atom`, `Product` and `Sum` extend, between them and
+`Top`, so a body is a type exactly when it is an `instanceof Type`; `Data` and `Reference` implement `Top` directly,
+and so does `TemplateBody`, which carries no chain. A namespace type resolves to a `RecordBody` of the facets it states,
+kind `NAMESPACE`, and its values are read through the `MapBody` linking derives from it. The motivating case is an
+HTTP operation, which must sit at the schema layer because that is the only layer able to name request and response
+types *by name*.
 
 - **`Data` is the one open branch of `Top`.** Every other branch is sealed all the way down: each leaf
   mirrors one kernel constructor, so a body's kind is decidable by inspection and each switch over them is
@@ -75,10 +80,11 @@ because that is the only layer able to name request and response types *by name*
   (`Ref.deliver`), so a host reads `binding.method().get()` after the link and the name before it. A reference in a
   data document is not yet read (`NOT_IMPLEMENTED`).
 - **A segment's type walk is schema-directed; its value walk goes through the host's object.** The linker follows
-  the declared types (`field_map` to a field's type, a namespace to its `value_type`) and enters a map only where it
-  is a namespace; the value at each step it reads off the host's record components, `data` being opaque to the type
-  system, and follows a tagged subtype through the value's own class where a record family base lacks the field.
-  The value walk goes when a namespace value is itself an entry (BACKLOG). A kind-typed slot of a value body holds
+  the declared types (a record's fields to a field's type, a namespace type to its pinned `value_type`, read off the
+  map linking records for it) and enters a map only where it is a value of a namespace type; the value at each step it
+  reads off the host's record components, `data` being opaque to the type system, and follows a tagged subtype
+  through the value's own class where a record family base lacks the field. The value walk stays until a value of a
+  namespace type can itself be an entry, `myapi => !api { … }` (BACKLOG). A kind-typed slot of a value body holds
   one bare name: a braced application there is refused and the alias spelling named, since nothing lifts or mints
   in a value body; a `type_ref` slot there is judged by resolution, arity and §4.1.
 - **§8.2 reaches a body's values at the read, not at the link.** The linker's name walk sees a bound `Data`
@@ -117,7 +123,9 @@ because that is the only layer able to name request and response types *by name*
   including the meta layer itself if it needs it too. Nor is `!!import`ing the meta layer a way round it: a
   layer chaining to meta-kernel imports meta.tn, which imports meta-kernel, and imports are transitive here
   (§2.2.3), so meta-kernel's `void` arrives alongside core.tn's and collides — correctly, and
-  with a diagnostic naming both origins. The constraint is real and worth stating; what is not acceptable is
+  with a diagnostic naming both origins. A namespace type meets both walls at once: it IS-A `top`, so it cannot go
+  in the third schema, and a schema typing a field by it imports the meta layer that declares it and so cannot import
+  core.tn too (SPEC-FEEDBACK.md #23). The constraint is real and worth stating; what is not acceptable is
   discovering it through a message about the wrong thing, which is why an application's head resolves in the
   type-name namespace only (§3.3.1) and an unresolvable one is reported as written
   (`design/template-materialisation.md`).

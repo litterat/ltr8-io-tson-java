@@ -61,20 +61,24 @@ own prose (which had gone stale on it):
   index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
   application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
-- [ ] **Namespace values as schema entries** (SPEC-FEEDBACK.md #23, step 1 of `namespace-sketch/PLAN.md`). A
-  namespace type (`api => !namespace { key_type: identifier  value_type: method }`) is a type, so a value of it,
-  `myapi => !api { ... }`, is not yet an entry: `schema.value_type` is `top`, which admits constructors' instances and
-  no value. The step is `(top | some<kind<namespace>>)`, a sum over a kind, with `data` dropped once a value lives
-  under a namespace rather than in a data constructor's instance. Until then selecting in a data-kind entry's value
-  reaches through the host's object (`ValuesByName.component`). Lands on `r2026-38-proposal` before the branch goes to
-  the reviewer.
+- [ ] **Namespace values as schema entries** (SPEC-FEEDBACK.md #23's steps after the kernel's,
+  `namespace-sketch/PLAN.md`). A namespace type (`api => namespace & { key_type: = identifier  value_type: = method }`,
+  declared by a meta layer) IS-A `top`, so `myapi => !api { ... }` passes §3.3.1's head check and `schema.value_type`
+  stays `top`; what is missing is the entry itself. First, what applying a namespace constructor builds — a `Namespace`
+  body holding the map value, read as the map `TsonLinkedSchema.namespace` gives — and the entry kind it fills, so a
+  qualified name selects in that value through the schema rather than the host's object (`ValuesByName.component`). Then
+  retire `data`, once a value lives under a namespace rather than in a data constructor's instance. Settle with the spec
+  whether a user schema may declare a namespace type (#23's composition-operand reading): today only a kernel-governed
+  one can, and a schema typing a field by it cannot also import core.tn. Lands on `r2026-38-proposal` before the branch
+  goes to the reviewer.
 - [ ] **Whether a kind admits an abstract type** (SPEC-FEEDBACK.md #22). `kind<record>` holds every type built with
   `record` (`KindMembers.isMember`), so it holds an abstract record (`pet => abstract { ... }`) and a record template's
   family base (`boxed => <T> { v: T }`), neither of which has instances of its own: a document writing `payload_type:
-  boxed` names a type no value is read through until an application is chosen. Settle it with `ref<T>` and the
-  namespace kind, when a kind's value becomes a resolved reference rather than a spelling. The choice is membership by
-  construction alone, as running, or a concrete-only kind that excludes every abstract member; never an exception for
-  record templates alone, since a family base is a type like any abstract record (§5.10).
+  boxed` names a type no value is read through until an application is chosen. `kind<namespace>` likewise holds the
+  abstract `namespace` itself. Settle it with `ref<T>` and namespace values as entries, when a kind's value becomes a
+  resolved reference rather than a spelling. The choice is membership by construction alone, as running, or a
+  concrete-only kind that excludes every abstract member; never an exception for record templates alone, since a family
+  base is a type like any abstract record (§5.10).
 - [ ] **A parameter in a record template has no channel of its own** (SPEC-FEEDBACK.md #17). An open record's
   parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
   type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a

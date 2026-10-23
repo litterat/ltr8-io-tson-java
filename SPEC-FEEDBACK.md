@@ -981,7 +981,7 @@ record_field => {
   role?:     field_role ~ FREE
   value?:    value
 }
-field_map => !map { key_type: text  value_type: record_field  ordered: true }
+field_map => namespace & { key_type?: ~ field_name  value_type: = record_field  ordered?: = true }   (#23)
 record    => product & { … fields: field_map … }
 ```
 
@@ -1000,22 +1000,24 @@ not change. A template's held body spells its record the same way: `<T> { x: T }
   from one that sorted it. The kernel states this with the explicit `!map { … ordered: true }`, since the
   brace-map sugar `{text => record_field}` has no place for the facet, and names it, `field_map`, because a type
   position admits no inline constructor application (§5.3) — as `enum_set` names its set.
-- **The key type is `text`, not `field_name`.** Which names a record may declare is its `name_type`'s to say
-  (SPEC-FEEDBACK.md #10): `json_name` admits `@id`, which `field_name` does not, and a key type of `field_name` would
-  refuse it before the name type was consulted. `record.discriminators` is `[text; 1..]` and `field_group`'s member
-  slots are `text` for the same reason; `fields` follows them. Each key is judged by the record's `name_type` at link,
-  as every other name the record states is.
-- **A duplicate is refused by the layer that can see it.** One spelling written twice in the explicit form is the
-  map's duplicate key ([TSON-DATA] §2.6), refused where the map is read and before any name type is consulted: read
-  as data governed by meta.tn it is a duplicate key at `/fields/x`, and written in a schema it is that refusal
-  restated against the declaration, a resolver error by §8.1's phase rule. Two spellings that are one value of the
-  record's name type — `name` and `NAME` under a case fold — are two keys the map admits, and remain the resolver
-  error #10 states, judged by the name type's equality, which only a resolved type has. The brace form's own repeat
-  stays the resolver's, which can say whether a field or a group member repeated the name. Running here: the first is
-  the map reader's refusal, the second the linker's name-type check, and the third the resolver's; a test pins each.
-  The split follows from the key type being `text`, and is where the implementation stands rather than where the
-  rule ends: once `field_map` is keyed by the record's name type itself, the map's key equality is that type's, and
-  the linker's check over two spellings becomes the map's own uniqueness.
+- **The key family is the record's `name_type`.** `field_map` is a namespace (#23), whose keys are names of an
+  identifier family, and it states `key_type?: ~ field_name`: a default, not a pin. A default key family is the one
+  that stands where the value's host states none; the host here is the record, which supplies its `name_type` (absent,
+  its supertypes' one, else `field_name`). Which names a record may declare is therefore its `name_type`'s to say
+  (#10): `json_name` admits `@id`, and a record typed by it declares `"@id"`. Since the family is known only once the
+  record resolves, a key is read by its spelling and judged under the name type at link, as every other name the
+  record states is. `record.discriminators` is `[text; 1..]` and `field_group`'s member slots are `text` for the same
+  reason.
+- **A duplicate is refused by the layer that can see it.** One spelling written twice in the explicit form is the map's
+  duplicate key ([TSON-DATA] §2.6), refused where the map is read and before any name type is consulted: read as data
+  governed by meta.tn it is a duplicate key at `/fields/x`, and written in a schema it is that refusal restated against
+  the declaration, a resolver error by §8.1's phase rule. Two spellings that are one value of the record's name type —
+  `name` and `NAME` under a case fold — are two keys the map admits, and remain the resolver error #10 states, judged by
+  the name type's equality, which only a resolved type has. The brace form's own repeat stays the resolver's, which can
+  say whether a field or a group member repeated the name. Running here: the first is the map reader's refusal, the
+  second the linker's name-type check, and the third the resolver's; a test pins each. The split follows from the key
+  family being the host's: a key is read by its spelling, so the map's uniqueness is the spelling's, and the name type's
+  equality, which only a resolved type has, is the linker's.
 - **Records only.** `template.parameters` and `template_param.name`, `tuple.elements` and `field_group` are unchanged,
   and this entry makes no claim about them.
 
@@ -1030,13 +1032,13 @@ not change. A template's held body spells its record the same way: `<T> { x: T }
 
 **Suggested resolution.**
 
-- [TSON-SCHEMA] §5.2: "A record's fields are a map from each field's name to its `record_field`, in declaration
-  order, which is part of the record's value. A bare record body `{ a: T … }` denotes `!record { fields: { a => {
-  type: T } … } }`. A field name is a key of `fields`, `text`, and a value of the record's `name_type`: a name written
-  twice is a duplicate key ([TSON-DATA] §2.6), and two names that are one value of the name type are a resolver
-  error."
-- [TSON-SCHEMA] §8.1: `record_field` without `name`; `field_map => !map { key_type: text  value_type: record_field
-  ordered: true }` beside it; `record.fields: field_map`; the resolved-output examples written with the map.
+- [TSON-SCHEMA] §5.2: "A record's fields are a map from each field's name to its `record_field`, in declaration order,
+  which is part of the record's value. A bare record body `{ a: T … }` denotes `!record { fields: { a => { type: T } … }
+  }`. A field name is a key of `fields`, a value of the record's `name_type`: a name written twice
+  is a duplicate key ([TSON-DATA] §2.6), and two names that are one value of the name type are a resolver error."
+- [TSON-SCHEMA] §8.1: `record_field` without `name`; `field_map => namespace & { key_type?: ~ field_name  value_type:
+  = record_field  ordered?: = true }` beside it (#23); `record.fields: field_map`; the resolved-output examples written
+  with the map.
 - [TSON-SCHEMA] §13.2: the five artifact rows carry the re-stamped pins.
 
 **Status against Revision 37:** open; running on `r2026-38-proposal`. `meta-kernel.tn` declares `field_map` and the
@@ -1210,7 +1212,7 @@ and nowhere else; a slot typed by a record holds the record's value inline. The 
 at such a slot, with the slot, and the linker judges that record, so a host declares none of its references and the
 list it might have filed one in decides nothing. A segment selects a key of a namespace value (#23) or a field of a
 record value; a map that is no namespace is not entered, so the service meta's methods are a `method_map =>
-!namespace { ... }`. `data` is opaque to the type system, so selecting in a data-kind entry's value still reaches
+namespace & { ... }`. `data` is opaque to the type system, so selecting in a data-kind entry's value still reaches
 through the host's object; the type walk beside it is schema-directed.
 
 **Against the Revision 37 change log.** §5.10 (and the preamble) record "a type slot cannot be bounded at a field"
@@ -1315,7 +1317,7 @@ constructor"), §5.7 and §5.8 (`source` "records the refinement origin"), §5.9
 `type_definition`, `record.supertypes` and `schema` entries.
 
 **Kind:** proposal — a kernel simplification with no change to any verdict. Running (Status, below); sequenced before
-the namespace kind and `ref<T>` (#13, "Interim, and what closes each"), which it simplifies, because it is a mechanical
+#23's namespaces and `ref<T>` (#13, "Interim, and what closes each"), which it simplifies, because it is a mechanical
 change to the output shape and the host model and those two entries are written against that shape.
 
 **The problem.** Resolver output wraps every entry of a schema map in a record that source never writes:
@@ -1859,20 +1861,21 @@ kind is IS-A `type`, so it stands in any value position, and in every such posit
   the governing schema's closure's, so a user meta-schema's `text_identifier` is a member of the kernel's
   `identifier_kind` when that schema is read. Nothing of the kind reaches the data the referent types: `NewYork`
   conforms to `identifier`, and the kind only judged which identifier family was allowed to stand there.
-- **Membership is one walk.** An entry is a member of `!kind_type { of: C }` iff, past its alias hops (§8.3), the
-  constructor its value applies is C or IS-A C — a constructor template followed to the constructor its body
-  applies — and the entry is not itself a constructor, which is to say not IS-A `top` (§3.3.1, #9). A record written
-  in braces is built with `record`, and so is a record template, which is a type (#17); a template over another
-  constructor is no type and no member, while what an application of one expands to is (#18); an alias of a member
-  is listed beside it. The walk runs over resolved entries, not names, and has no namespace question.
-- **`of` names a constructor of the parent system.** It resolves in the writer's **structure namespace** (§3.3.1),
-  as a constructor role does (§3.3.2): `identifier_type` is the kernel's, reached through the meta chain, and never
-  a type of the writer's type-name namespace. `of` must be `type` or at or below it: `kind<data>` names no type a
-  value can have, and is a resolver error at the declaration. `of` is typed `type_name` and not by a kind, and this
-  is a known gap rather than a design: its values are names of *constructors* at or below `type`, which #9's rule
-  excludes from membership of any kind, so `kind<type>` does not cover them. This is the one slot where the
-  type-theoretic account asks for a higher kind — a classifier of constructors — and the series has none. The
-  slot's store is stated here in prose, as every constructor role's is (§3.3.1).
+- **Membership is one walk.** An entry is a member of `!kind_type { of: C }` iff, past its alias hops (§8.3), the constructor
+  its value applies is C or IS-A C — a constructor template followed to the constructor its body applies — and the entry is
+  not itself a constructor whose instances are types, which is to say not IS-A `top` (§3.3.1, #9) unless it is a namespace
+  constructor, whose instances are maps (#23), which is a member of `type_kind` and the namespace kinds and of no other. A
+  record written in braces is built with `record`, and so is a record template, which is a type (#17); a template over
+  another constructor is no type and no member, while what an application of one expands to is (#18); an alias of a member is
+  listed beside it. The walk runs over resolved entries, not names, and has no namespace question.
+- **`of` names a constructor of the parent system.** It resolves in the writer's **structure namespace** (§3.3.1), as a
+  constructor role does (§3.3.2): `identifier_type` is the kernel's, reached through the meta chain, and never a type of the
+  writer's type-name namespace. `of` must be `type` or at or below it, or `namespace` or below it (#23): `kind<data>` names
+  no type a value can have, and is a resolver error at the declaration. `of` is typed `type_name` and not by a kind, and this
+  is a known gap rather than a design: its values are names of *constructors* at or below `type`, which #9's rule excludes
+  from membership of any kind, so `kind<type>` does not cover them. This is the one slot where the type-theoretic account
+  asks for a higher kind — a classifier of constructors — and the series has none. The slot's store is stated here in prose,
+  as every constructor role's is (§3.3.1).
 - **A kind is not a bound.** "Any type IS-A `stock_id`" names a type of the writer's type-name namespace and walks
   supertypes; a kind names a constructor of the structure namespace and walks construction. Two stores, two
   mechanisms: `template_param.bound` is untouched, and `kind<stock_id>` is not a kind.
@@ -1927,7 +1930,7 @@ identifier_kind => !kind_type { of: identifier_type  members: [field_name identi
   being applied as its target is (§3.3.1). §9's
   guidance then reads: "a slot that names a type is typed `type_kind`, or by a narrower kind; `type_ref` is for a
   slot that holds an application." Two consequences: `top` is a member of `type_kind`, being a fresh abstract record
-  IS-A nothing, which is what admits the kernel's own `schema => !namespace { value_type: top }` at a kind-typed slot;
+  IS-A nothing, which is what admits the kernel's own `schema => namespace & { value_type: = top … }` at a kind-typed slot;
   and a type parameter is one whose `type` is `type_kind`, the name `type_ref` having been that marker.
   `map.key_type` is `type_kind` and not the narrower `atom_kind`: a map's keys may be records, tuples or arrays, and
   nothing in Part 2 says otherwise.
@@ -1962,68 +1965,132 @@ declares `kind_type => atom & { of: type_name  members?: [type_name] }`, `kind`,
 `type_kind`, and types `enum_type.name_type` and `record.name_type` `identifier_kind`; `core` has its `kind` sibling;
 the resolved fixtures carry the members (`identifier_kind`'s are `[field_name identifier param_name scheme_name
 type_name]`), and the bundled schemas are restamped. The linker computes every kind's `members` over the closure by the
-walk above, imported kinds included, and refuses `kind<data>`, a constructor above or beside `type`, and an `of` naming
-a type of the writer's own namespace. A kind is a member of itself where the walk says so (`type_kind` lists itself),
-the walk reading construction and never a kind's members. The `name_type` checks read the slot's kind off the
-constructor's `name_type` field and judge the resolved referent a member of it, with the diagnostics the coded check
-had; a `~`/`=` value at a kind-typed field is judged a member where it is written, so a constructor pinning a non-member
-`name_type` fails at its own meta layer's link rather than at the first schema applying it. An entry's constructor is
-its recorded tag (`!identifier_type`), or its body's where it has none, so an application of a template over
-`identifier_type` is admitted as a `name_type`, being the instance it expands to. Both encodings read a kind as an atom:
-a type-name token, or a JSON string, naming a member of the governing schema's closure; under a meta layer, whose
-documents are schemas, the reader checks the grammar alone and the schema's own link judges membership, which is how a
-resolved form naming a user's name type reads back through meta.tn. The corpus states the city enum of the problem end
-to end, the members of `identifier_kind` under a meta layer's closure (a new link-layer fact), a user
+walk above, imported kinds included, and refuses `kind<data>`, a constructor above or beside `type` other than a
+namespace constructor (#23), and an `of` naming a type of the writer's own namespace. A kind is a member of itself where
+the walk says so (`type_kind` lists itself), the walk reading construction and never a kind's members. The `name_type`
+checks read the slot's kind off the constructor's `name_type` field and judge the resolved referent a member of it, with
+the diagnostics the coded check had; a `~`/`=` value at a kind-typed field is judged a member where it is written, so a
+constructor pinning a non-member `name_type` fails at its own meta layer's link rather than at the first schema applying
+it. An entry's constructor is its recorded tag (`!identifier_type`), or its body's where it has none, so an application
+of a template over `identifier_type` is admitted as a `name_type`, being the instance it expands to. Both encodings read
+a kind as an atom: a type-name token, or a JSON string, naming a member of the governing schema's closure; under a meta
+layer, whose documents are schemas, the reader checks the grammar alone and the schema's own link judges membership,
+which is how a resolved form naming a user's name type reads back through meta.tn. The corpus states the city enum of
+the problem end to end, the members of `identifier_kind` under a meta layer's closure (a new link-layer fact), a user
 `kind<uuid_type>`'s members, a pinned non-member, `kind<data>`, and a kind-typed field holding a member's name and a
 non-member's. The type slots above are typed `type_kind` in `meta-kernel.tn`, with the resolved fixtures and the
 corpus's service fixture (`request?: kind<record>`) following; the kernel's `type_kind` lists `top`. Part 2's cached
 §13.2 table is not re-stamped here.
 ---
 
-## 23. A namespace is a map whose keys name its entries: the schema map and a record's fields are two
+## 23. A namespace is a constructor whose instances are maps: the schema map and a record's fields are two
 
-**Section:** [TSON-SCHEMA] §4.2 (`map`), §5.2 and #12 (a record's `fields`), §8.1 (resolver output, the `schema`
-map), §9 (the inventory), #13 (a qualified name enters a value), #14 (an entry is its value); [TSON-DATA] §7.1.
+**Section:** [TSON-SCHEMA] §4.1 (`top` and the kinds), §4.2 (`map`), §2.2.2 (constructor declarations are a
+meta-schema privilege), §3.3.1 and §3.3.2 (where a composition operand resolves), §5.2 and #12 (a record's `fields`),
+§8.1 (resolver output, the `schema` map), §9 (the inventory), #13 (a qualified name enters a value), #14 (an entry is
+its value), #22 (kind membership); [TSON-DATA] §7.1.
 
 **Kind:** proposal. The second of the namespace entries the register's preface says will be raised against Revision
-38, after #22. This entry is its first step, the kernel's own namespaces; the steps after it are stated below and are
-proposals, not running.
+38, after #22. This entry's first step, the kernel's namespace constructor and how a value of one is read, is
+running; the steps after it are stated below and are proposals, not running.
 
 **The problem.** #13 lets a qualified name enter any map keyed by an identifier family or an enum, so which maps a
 name may reach into is decided by the key type, a fact about spelling. The kernel already has two maps whose keys
 *name* what they hold, the schema map (`{type_name => top}`) and a record's fields (`field_map`), and an extension
 meta-schema has a third in every use #13 was built for, a named set of methods. Nothing says these three are one
-thing, and nothing separates them from a map of headers keyed by text.
+thing, and nothing separates them from a map of headers keyed by text. And the thing they are is not a map type:
+`schema` states a key type and a value type, which is to say it describes its values, as a constructor does. Read as
+a map type built by some constructor, `api` (a meta layer's set of methods) IS-A nothing, and the entry form the
+series wants, `myapi => !api { … }`, cannot pass §3.3.1, which admits `!C` only where `C` IS-A `top`.
 
-**Proposed.** A kernel constructor IS-A `map` that adds no field:
+**Proposed, and running.** A kernel constructor beside `data`, `reference` and `template`, composing `top` directly,
+and the kernel's two namespaces declared by composition over it, each pinning its facets:
 
 ```
-namespace => map & {}
-schema    => !namespace { key_type: type_name  value_type: top }
-field_map => !namespace { key_type: text  value_type: record_field  ordered: true }
+namespace => abstract top & { key_type: identifier_kind  value_type: type_kind  ordered?: boolean ~ false }
+field_map => namespace & { key_type?: ~ field_name  value_type: = record_field  ordered?: = true }
+schema    => namespace & { key_type: = type_name  value_type: = top }
 ```
 
-A namespace is a map in every fact — keys, values, order, bounds, how a value is written and read — and a namespace
-type is declared by name as any map instance is. The `{K => V}` sugar keeps meaning `map`. The steps that follow,
-each its own change:
+- *`top` has two families of constructors.* `type`'s, whose instances are types, and `namespace`'s, whose instances
+  are maps. A namespace constructor IS-A `top` and neither `type` nor `map`; a chain reaching `namespace` and a base
+  kind (`namespace & data & { … }`) is refused as reaching two, as a chain reaching two base kinds is.
+- *The reading rule.* A value of a type IS-A `namespace` is written and read as a map from its `key_type` to its
+  `value_type`, ordered as its `ordered` is pinned and unordered where nothing pins it, its values never void and its
+  size unbounded — never as a record of those facets. A key is judged by `key_type` and a value by `value_type`, as a
+  map's are. The keys are names: `key_type` is typed `identifier_kind`, an identifier family, which is what a qualified
+  name's segment is, so an enum-keyed map is no namespace. `value_type` is pinned (`= V`). `key_type` is pinned (`= K`),
+  the family every key is read and judged under, or stated by default (`?: ~ K`), the family that stands where the
+  value's host states none, the host supplying it otherwise: `field_map`'s host is the record, and its family the
+  record's `name_type`, absent its supertypes' one, else `field_name` (#12). A key of a host-supplied family is read by
+  its spelling and judged under that family once the host resolves. A namespace type that is not abstract and states
+  `key_type` or `value_type` neither way describes no map and is refused at link; an abstract one is admitted, a family
+  over the namespace types that pin it. The `{K => V}` sugar keeps meaning `map`.
+- *Membership (#22).* A constructor is no member of a kind because its instances are types; a namespace constructor's
+  instances are values, so it is a type and a member. #22's "not itself a constructor" reads "not a constructor whose
+  instances are types": `type_kind` holds `namespace`, `field_map`, `schema` and a meta layer's own namespace types, and
+  no constructor IS-A `type`. `kind_type.of` may name `namespace` or a constructor IS-A it, and `kind<namespace>` holds
+  every namespace constructor, each being a member of the kind of every namespace constructor it is or IS-A. A namespace
+  type is a member of no other kind: it resolves to a record of its facets, but a value of it is a map, so
+  `kind<record>` and `kind<product>` exclude it, and nothing builds it with `map`, so `kind<map>` does too.
+- *Only a namespace is entered.* A segment selects a key in a value of a namespace type, or a field in a record value;
+  a map that is not a namespace is not entered, replacing #13's key-type rule. With #24.
 
-1. *A value of a namespace type is an entry.* `myapi => !api { … }`, with `api => !namespace { key_type: identifier
-   value_type: method }` declared by a meta-schema, holds a value of `api`: §3.3.1 admits `!C` only where `C` IS-A
-   `top`, and `api` is an instance, so the form needs one sentence. The entry is DATA by §4.1's own definition.
-2. *Only a namespace is entered.* A segment selects a key in a namespace value, or a field in a record value; a map
-   that is not a namespace is not entered, replacing #13's key-type rule. Running, with #24.
+**The steps after it, proposals:**
+
+1. *A value of a namespace type is an entry.* `myapi => !api { … }`, with `api => namespace & { key_type: =
+   identifier  value_type: = method }` declared by a meta-schema. `api` IS-A `top` by composition, so §3.3.1 admits
+   the head unchanged and `schema.value_type` stays `top`; what is left to state is what an application of a
+   namespace constructor builds — a map value as the entry — and the kind of the entry it fills.
+2. *`data` retires* once a value lives under a namespace rather than in a data constructor's instance, and selecting
+   in an entry's value walks the schema rather than the host's object.
+
+**Where a namespace type may be declared, and used.** A namespace type IS-A `top`, so it is a constructor, and
+§2.2.2 lets only a schema whose own `!!meta` names the meta-kernel declare one. Running: in a schema governed by
+`meta.tn`, `hs => namespace & { … }` is refused as a constructor declaration when `namespace` is in reach, and
+otherwise does not resolve, a composition operand resolving in the type-name namespace only (§3.3.2). A namespace
+type is therefore meta-layer vocabulary, declared in a kernel-governed schema that imports `meta.tn` to name
+`namespace` and its facets' types as operands (`headers => namespace & { key_type: = header_name  value_type: =
+text }`). For step 1 that is the intended shape: `api` is a meta layer's constructor, and the schemas the layer governs
+apply `!api`. For a namespace type as the type of a field it is not: `!!meta` merges nothing into the type-name
+namespace, so a schema names `headers` only by importing the meta layer; imports are transitive (§2.2.3), so the
+importer's closure then holds the meta-kernel, and a schema that also imports `core.tn` is refused for `void`, which
+both declare. Today a field typed by a namespace type stands only in a schema that does not import core. Two
+readings, and the spec states neither:
+
+- *Constructors are meta vocabulary, intended.* A user schema wanting a keyed collection writes `{K => V}`, which a
+  qualified name does not enter, so no user schema declares a collection a `ref<T>` reaches into.
+- *A composition operand is a constructor role.* §3.3.1 gains a third role: an `&` operand the type-name namespace
+  does not resolve is resolved in the structure namespace, where it must be `namespace` or IS-A it, and §2.2.2's
+  privilege is stated for a constructor whose instances are types. A meta-governed schema then declares `headers =>
+  namespace & { … }` itself, a type like any other, with no import of the kernel.
 
 **Breaking changes, against Revision 37:** `meta-kernel.tn` gains `namespace`; `schema` and `field_map` are written
-`!namespace { … }` with the same vocabulary. No document reads differently.
+as compositions over it, and their resolved form is a record carrying the facets they state. No document reads
+differently.
 
-**Suggested resolution.** [TSON-SCHEMA] §4.2, after `map`: "`namespace => map & {}` is a map whose keys name its
-entries. The schema map (§8.1) and a record's `fields` (§5.2) are namespaces." §8.1 and §9: `schema` and
-`field_map` as above.
+**Suggested resolution.** [TSON-SCHEMA] §4.1, after `data`: "`namespace => abstract top & { key_type: identifier_kind
+value_type: type_kind  ordered?: boolean ~ false }` is the constructor whose instances are maps keyed by names. A value
+of a type IS-A `namespace` is written and read as a map from its `key_type` to its `value_type`, never as a record of
+these facets; a namespace type pins `value_type` by composition and pins `key_type` or states it by default, the
+family that stands where the value's host supplies none, and one that is not abstract and states either neither way is
+a resolver error. `top`'s constructors are `type`'s, whose instances are types, and `namespace`'s, whose instances are
+maps." §5.2 and §8.1: `field_map` and `schema` as above. #22's `kind_type` paragraph: "not itself a constructor whose
+instances are types", and `of` "is `type` or `namespace`, or below either". §9's inventory names `namespace`. For where
+a namespace type is declared, the second reading, as a sentence in §3.3.1: "A composition operand (§5.8) that the
+type-name namespace does not resolve resolves in the structure namespace, and MUST be `namespace` or IS-A it", with
+§2.2.2's privilege narrowed to "an entry IS-A `type`"; or, keeping the first, a sentence in §2.2.2 that a namespace type
+is a constructor and so declared only by a meta-schema.
 
-**Status against Revision 37:** open; running on `namespace-kernel`, a branch off `r2026-38-proposal`, as far as the
-kernel: `meta-kernel.tn` declares `namespace` and writes `schema` and `field_map` as instances of it, the resolved
-fixture carries them (`ResolvedFixtureTest`), and the bundled schemas are restamped. An instance of `namespace` binds
-and reads as a `map` instance does, in both encodings. Part 2's cached §13.2 table is not re-stamped here.
+**Status against Revision 37:** open; running on `namespace-constructor`, a branch off `r2026-38-proposal`, as far as
+the reading rule and membership: `meta-kernel.tn` declares `namespace` and writes `schema` and `field_map` as
+compositions over it, the resolved fixture carries them (`ResolvedFixtureTest`), and the bundled schemas are restamped.
+The linker records each namespace type with the map a value of it is read as, and refuses an open facet on a concrete
+one; both encodings read the value as that map, a host-supplied key family's keys by spelling, judged after resolution
+as a record's field names are. The kind walk admits a namespace type to `type_kind` and the namespace kinds only. The
+corpus's `meta-service.tn` declares `method_map`, `rpc_map` and `verb_map` by composition, and `validate-namespace.tn`
+types a field by a kernel-governed `meta-headers.tn`'s `headers`, importing no core. Step 1, step 2 and the second
+reading above are not running. Part 2's cached §13.2 table is not re-stamped here.
 
 ---
 
@@ -2056,7 +2123,7 @@ else; a slot typed `T` holds a value inline and nothing else. The referent is ju
 receives the name as written with the value delivered at link.
 
 ```
-method_map => !namespace { key_type: method_name  value_type: method }
+method_map => namespace & { key_type: = method_name  value_type: = method }
 interface  => data & { methods: method_map }
 binding    => data & { method: ref<method>  verb: http_verb  route: text }
 

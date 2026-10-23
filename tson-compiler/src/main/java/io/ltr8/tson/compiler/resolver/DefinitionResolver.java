@@ -1630,11 +1630,12 @@ final class DefinitionResolver {
 
     /**
      * §4.1: a type's kind is settled by which of the kernel's four base kinds -- {@code atom}/{@code product}/
-     * {@code sum}/{@code data}, {@code top} never counts -- its transitive supertype chain reaches, each judged by
-     * where it is defined ({@link #kernel}), never by its spelling: a schema's own {@code data} is an ordinary
-     * record. The base kinds themselves and not each ancestor's own kind: the {@code atom} entry is itself a
-     * PRODUCT (its own chain is {@code [chained, top, type]}), so "inherit the nearest ancestor's kind" would
-     * give the wrong answer even for {@code atom}'s own subtypes.
+     * {@code sum}/{@code data}, {@code top} never counts -- or its {@code namespace} its transitive supertype chain
+     * reaches, each judged by where it is defined ({@link #kernel}), never by its spelling: a schema's own {@code
+     * data} is an ordinary record. The base kinds themselves and not each ancestor's own kind: the {@code atom}
+     * entry is itself a PRODUCT (its own chain is {@code [chained, top, type]}), so "inherit the nearest ancestor's
+     * kind" would give the wrong answer even for {@code atom}'s own subtypes. A chain reaching two of them is
+     * refused, {@code namespace} beside a base kind included.
      */
     EntryKind determineKind(String name, List<String> transitiveSupertypes) {
         List<String> baseKindsFound = new ArrayList<>();
@@ -1655,7 +1656,7 @@ final class DefinitionResolver {
         return EntryKind.ofChain(baseKindsFound, kernel);
     }
 
-    private static final Set<String> BASE_KINDS = Set.of("atom", "product", "sum", "data");
+    private static final Set<String> BASE_KINDS = Set.of("atom", "product", "sum", "data", "namespace");
 
     // ── Refinement (§5.7): T ^ { ... } ─────────────────────────────────────
 

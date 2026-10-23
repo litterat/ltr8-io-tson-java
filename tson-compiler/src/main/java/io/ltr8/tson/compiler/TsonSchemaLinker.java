@@ -57,6 +57,7 @@ import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.Reference;
@@ -604,12 +605,13 @@ public final class TsonSchemaLinker {
         Map<String, String> origins = new LinkedHashMap<>();
         Map<String, Normalization> enumForms = new LinkedHashMap<>();
         Map<String, Top> nameTypes = new LinkedHashMap<>();
+        Map<String, MapBody.Namespace> namespaces = new LinkedHashMap<>();
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
         // The application each instantiation closes (§8.2), off its key: an import's as its schema states it, a
         // local one's as this schema's resolution wrote it. What a message shows in place of a minted name.
         Map<String, TypeRef> applications = new LinkedHashMap<>();
-        Map<String, Top> merged = mergeImports(schema.imports(), loader, origins, enumForms, nameTypes, facts,
-                applications);
+        Map<String, Top> merged = mergeImports(schema.imports(), loader, origins, enumForms, nameTypes, namespaces,
+                facts, applications);
         schema.entries().keySet().forEach(name -> schema.applicationOf(name)
                 .ifPresent(application -> applications.put(name, application)));
 
@@ -665,9 +667,13 @@ public final class TsonSchemaLinker {
                     // Reported, but the entry is still merged: its own shape is fine, it is only not permitted
                     // here, so keeping it lets every reference to it check normally instead of turning one
                     // eligibility error into an unresolved reference at every use site.
+                    String what = MapBody.isNamespace(def, kernel)
+                            ? "a namespace type -- it composes with the kernel's 'namespace', a constructor, so it "
+                                    + "IS-A 'top' (§4.1), and a namespace type is declared in a schema the "
+                                    + "meta-kernel governs (§2.2.2)"
+                            : "a type constructor -- it composes with a base kind, so it IS-A 'top' (§4.1)";
                     report(receiver, schema, entry.getKey(), schema.positionOf(entry.getKey()), "'" + entry.getKey()
-                            + "' declares a type constructor -- it composes with a base kind, so it IS-A 'top' "
-                            + "(§4.1) -- but '" + schema.id() + "' is not governed directly by the "
+                            + "' declares " + what + " -- but '" + schema.id() + "' is not governed directly by the "
                             + "meta-kernel (its own !!meta is '" + schema.meta() + "') -- only a schema chaining "
                             + "to meta-kernel.tn directly may declare new constructors (§2.2.2's "
                             + "meta-programming case); an ordinary type library or application schema may only "
@@ -707,6 +713,7 @@ public final class TsonSchemaLinker {
             }
         }
         checkNames(receiver, schema, merged, facts, structureNamespace::get, refusedEnums, identifiers);
+        readAsMaps(receiver, schema, merged, localNames, kernel, governingMeta, namespaces);
 
         Set<String> blamedOnce = new LinkedHashSet<>();
         Map<String, Top> namespace = merged;
@@ -747,7 +754,38 @@ public final class TsonSchemaLinker {
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
-                annotated, schema.bootstrap(), schema.valuesByName(), facts), origins, enumForms, nameTypes);
+                annotated, schema.bootstrap(), schema.valuesByName(), facts), origins, enumForms, nameTypes,
+                namespaces);
+    }
+
+    /**
+     * Each local namespace type, with the map a value of it is read as ({@link MapBody#ofNamespace}), into {@code
+     * namespaces}. The kernel's {@code namespace} is a composition operand, which resolves in this schema's
+     * namespace where it holds the name and in the governing meta's otherwise (§3.3.1), and is judged the kernel's
+     * by where it is defined there. A namespace type that is not abstract and leaves {@code key_type} or {@code
+     * value_type} unstated is refused: a value of it is a map, and an open facet describes none.
+     */
+    private static void readAsMaps(DiagnosticsReceiver receiver, TsonSchema schema, Map<String, Top> merged,
+                                   Set<String> localNames, Predicate<String> kernel,
+                                   Optional<TsonLinkedSchema> governingMeta, Map<String, MapBody.Namespace> namespaces) {
+        Predicate<String> kernelInReach = name -> merged.containsKey(name) ? kernel.test(name)
+                : governingMeta.map(meta -> meta.isKernel(name)).orElse(false);
+        for (String name : localNames) {
+            Top def = merged.get(name);
+            if (OpenEntry.isOpen(def) || !MapBody.isNamespace(def, kernelInReach)) {
+                continue;
+            }
+            RecordBody record = (RecordBody) def;
+            Optional<MapBody.Namespace> map = MapBody.ofNamespace(record);
+            if (map.isPresent()) {
+                namespaces.put(name, map.get());
+            } else if (record.extension() != RecordExtensionType.ABSTRACT) {
+                report(receiver, schema, name, schema.positionOf(name), "'" + name + "' is a namespace type, so a "
+                        + "value of it is a map, and it leaves its 'key_type' or 'value_type' open -- pin both by "
+                        + "composition ('key_type: = K  value_type: = V', or 'key_type?: ~ K' for keys whose family "
+                        + "the host supplies), or declare it abstract");
+            }
+        }
     }
 
     /**
@@ -1174,6 +1212,7 @@ public final class TsonSchemaLinker {
                                                  Map<String, String> origins,
                                                  Map<String, Normalization> enumForms,
                                                  Map<String, Top> nameTypes,
+                                                 Map<String, MapBody.Namespace> namespaces,
                                                  Map<String, TsonSchema.EntryFacts> facts,
                                                  Map<String, TypeRef> applications) {
         Map<String, Top> merged = new LinkedHashMap<>();
@@ -1213,6 +1252,7 @@ public final class TsonSchemaLinker {
                     enumForms.put(name, form);
                 }
                 imported.nameType(name).ifPresent(type -> nameTypes.put(name, type));
+                imported.namespace(name).ifPresent(map -> namespaces.put(name, map));
             }
         }
         return merged;

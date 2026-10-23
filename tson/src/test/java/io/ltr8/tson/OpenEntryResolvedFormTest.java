@@ -341,6 +341,7 @@ class OpenEntryResolvedFormTest {
                     case "atom" -> { return EntryKind.ATOM; }
                     case "sum" -> { return EntryKind.SUM; }
                     case "data" -> { return EntryKind.DATA; }
+                    case "namespace" -> { return EntryKind.NAMESPACE; }
                     default -> { }
                 }
             }

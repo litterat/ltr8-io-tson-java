@@ -48,7 +48,7 @@ class ValuesByNameTest {
                   status_name => identifier
                   method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
                                    replies?: {status_name => kind<record>} }
-                  method_map  => !namespace { key_type: method_name  value_type: method }
+                  method_map  => namespace & { key_type: = method_name  value_type: = method }
                   interface   => data & { methods: method_map }
                   http_verb   => !enum [GET POST]
                   binding     => data & { method: ref<method>  verb: http_verb  route: text }

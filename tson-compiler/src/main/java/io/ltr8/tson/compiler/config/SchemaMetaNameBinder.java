@@ -60,7 +60,6 @@ public final class SchemaMetaNameBinder {
             Map.entry("record", "record_body"),
             Map.entry("array", "array_body"),
             Map.entry("map", "map_body"),
-            Map.entry("namespace", "map_body"),
             Map.entry("tuple", "tuple_body"),
             Map.entry("choice", "choice_body"),
             Map.entry("kind_type", "kind_body"),

@@ -124,7 +124,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("array", array);
         factories.put("set_type", array);
         factories.put("map", map);
-        factories.put("namespace", map);
         factories.put("tuple", tuple);
         factories.put("enum", leaf.apply(enumFactory));
         factories.put("choice", choice);

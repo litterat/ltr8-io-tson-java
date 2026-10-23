@@ -224,12 +224,14 @@ it can't handle `boolean` preceding `enum`; this ordering lives here.
   of each name in the merged namespace instead, and a name's origin is meta-kernel exactly when it is one of these.
 
 - **Constructor-application binding goes through a closed `instanceBody` switch, not the generic path.**
-  Meta-kernel instantiates constructors in exactly four shapes — a bare `{}` (each target's
-  `UNCONSTRAINED` constant), a bare token array (`enum`, via `toEnumBody` reading `TokenValue.text()`
-  directly), a record of tokens (`identifier_type`, `iri_type`, and the three `kind_type` instances, whose
-  one field is `of`), and the binding record `SchemaDesugarer` emits for an `array`/`set`/`map` application.
-  No compiled reader is involved. `enum_type.name_type` is typed by `identifier_kind`, an instance the second
-  pass builds, and nothing in the first pass reads a field's type, so the self-hosted slot needs no ordering.
+  Meta-kernel instantiates constructors in exactly four shapes — a bare `{}` (each target's `UNCONSTRAINED`
+  constant), a bare token array (`enum`, via `toEnumBody` reading `TokenValue.text()` directly), a record of tokens
+  (`identifier_type`, `iri_type`, and the three `kind_type` instances, whose one field is `of`), and the binding
+  record `SchemaDesugarer` emits for an `array`/`set`/`map` application. `schema` and `field_map` are none of them:
+  each is a composition over `namespace` pinning its facets, an ordinary first-pass declaration, so no instance
+  shape reads a namespace. No compiled reader is involved. `enum_type.name_type` is typed by `identifier_kind`, an
+  instance the second pass builds, and nothing in the first pass reads a field's type, so the self-hosted slot
+  needs no ordering.
 - **Why even a compiled-reader bootstrap can't read meta-kernel from its own in-progress state:**
   `integer_size => { bits: ... signed: boolean }` is a first-pass entry whose `signed` field already
   references `boolean`, which the *second* pass resolves — so there is no moment at which a reader could be

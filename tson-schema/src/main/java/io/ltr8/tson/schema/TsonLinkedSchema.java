@@ -4,6 +4,8 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.unicode.Normalization;
 
@@ -56,15 +58,29 @@ import java.util.Optional;
  * name_type} is not the kernel's {@code field_name} (SPEC-FEEDBACK.md #10), with the value that type
  * resolves to, by which its readers judge the field names a document writes. A record not listed has
  * identifiers for field names.
+ *
+ * <p><b>{@code namespaces} is the fourth</b>: each namespace type -- a record IS-A the kernel's {@code namespace}
+ * ({@link MapBody#isNamespace}) -- with the map a value of it is written and read as ({@link MapBody#ofNamespace}).
+ * A namespace type names the kernel's {@code namespace} as a composition operand, which resolves in the governing
+ * meta-schema, so whether the name is the kernel's is again a question only linking can answer where this schema
+ * does not hold it ({@link #namespace}).
  */
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
-                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
+                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes,
+                               Map<String, MapBody.Namespace> namespaces) {
 
     public TsonLinkedSchema {
         Objects.requireNonNull(schema, "schema");
         entryOrigins = Map.copyOf(entryOrigins);
         enumForms = Map.copyOf(enumForms);
         nameTypes = Map.copyOf(nameTypes);
+        namespaces = Map.copyOf(namespaces);
+    }
+
+    /** A schema declaring no namespace type. */
+    public TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
+                            Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
+        this(schema, entryOrigins, enumForms, nameTypes, Map.of());
     }
 
     /** A schema whose records all have the kernel's identifiers for field names. */
@@ -94,6 +110,20 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     /** What record {@code entryName}'s field names are judged by -- empty for one {@link #nameTypes} omits. */
     public Optional<Top> nameType(String entryName) {
         return Optional.ofNullable(nameTypes.get(entryName));
+    }
+
+    /**
+     * The map a value of namespace type {@code entryName} is read as: the one {@link #namespaces} records, or, where
+     * this schema holds the kernel's {@code namespace} itself, the one an entry IS-A it pins -- a schema assembled
+     * by hand from the kernel's entries reads them as linking would. Empty for any other entry.
+     */
+    public Optional<MapBody.Namespace> namespace(String entryName) {
+        MapBody.Namespace recorded = namespaces.get(entryName);
+        if (recorded != null) {
+            return Optional.of(recorded);
+        }
+        return schema.entries().get(entryName) instanceof RecordBody record
+                && MapBody.isNamespace(record, this::isKernel) ? MapBody.ofNamespace(record) : Optional.empty();
     }
 
     /**
