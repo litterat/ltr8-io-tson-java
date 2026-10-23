@@ -63,6 +63,12 @@ public record MapBody(TypeChain chain,
     public static final String NAMESPACE = "namespace";
 
     /**
+     * The fields a namespace type has: the facets of the map a value of it is, and nothing else, since that map is
+     * the whole value and a field beside them has nowhere to be written.
+     */
+    public static final List<String> NAMESPACE_FACETS = List.of("key_type", "value_type", "ordered");
+
+    /**
      * Whether {@code definition} is a namespace type: a record whose chain reaches the kernel's {@code namespace},
      * judged by where that name is defined ({@code kernel}), never by its spelling. The kernel's {@code namespace}
      * is not one of its own: it is the abstract constructor, and its chain reaches {@code top} alone.

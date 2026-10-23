@@ -2193,8 +2193,9 @@ application there (`request: { name: box  arguments: [ { name: order } ] }`, §5
 nothing lifts or mints in a value body and the application would have no entry to be the name of; the alias spelling,
 `order_box => box<order>` then `request: order_box`, gives it one. A `type_ref`-typed slot of a value body is the
 application form and is judged by resolution, arity and §4.1, as the kernel's own are. A slot reached through a record
-family base is the tagged subtype's; this implementation follows the subtype where the value is held under a namespace
-key, and reports one behind a record value's field as its own gap.
+family base is the tagged subtype's, wherever the value sits; this implementation records each name with the slot's
+declared type as the reader that read it knows it, so it judges a slot behind a record value's field as it judges one
+under a namespace key.
 
 **Breaking changes, against Revision 37:** `meta-kernel.tn` gains `ref_type` and `ref`. A meta layer's value-by-name
 slots are written `ref<T>`; a record-typed slot no longer takes a name. §9's guidance reads: a slot naming a type is
@@ -2203,6 +2204,7 @@ typed by a kind, a slot naming a value by a reference, and `type_ref` is for a s
 **Status against Revision 37:** open; running on `ref-atom`, a branch off `r2026-38-proposal`: the kernel entries, the
 resolved fixture, the corpus's `meta-service.tn` (`interface`, `rpc_interface` and `verb_interface` holding methods,
 `binding.method: ref<method>` held by `bindings`), the vectors above, and the Java host `Ref<T>` carrying the name and
-the delivered value. A host declares nothing: the read records every name at a kind- or reference-typed slot, and the
-linker judges each by its slot. A name whose walk selects a field of a record value is judged by type, every refusal
-above included, and the value behind the field is not yet delivered: reported as this implementation's gap.
+the delivered value. A host declares nothing: the read records every name at a kind- or reference-typed slot, whatever
+the host component holds there, and the linker judges each by its slot. A name whose walk selects a field of a record
+value is judged by type, every refusal above included, and the value behind the field is not yet delivered: reported
+as this implementation's gap.

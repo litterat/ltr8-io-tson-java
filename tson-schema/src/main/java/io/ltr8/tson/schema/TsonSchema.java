@@ -75,10 +75,10 @@ import java.util.Optional;
  *
  * <p><b>{@link #valuesByName()}</b> -- for each entry whose value is an instance of a namespace type
  * ({@link Namespace}), the references that value holds by name (SPEC-FEEDBACK.md #13), each with the
- * slot it fills, as the resolver's read collected them: the reader records what it produced at a slot holding a value
- * by name, so the list depends on nothing the host class declares. The linker resolves each and judges it against the
- * slot's declared type. A fact the resolver hands the linker, never part of §8's output: no resolved document writes
- * it.
+ * slot it fills and that slot's declared type, as the resolver's read collected them: the reader at a kind-, reference-
+ * or {@code type_ref}-typed slot records the name it read there whatever the host class holds, so the list depends on
+ * nothing the host declares. The linker resolves each and judges it against the slot's declared type. A fact the
+ * resolver hands the linker, never part of §8's output: no resolved document writes it.
  */
 public record TsonSchema(String id, String meta, List<String> imports, Namespace<Top> entries,
                           boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
@@ -151,14 +151,57 @@ public record TsonSchema(String id, String meta, List<String> imports, Namespace
 
     /**
      * One reference a value body holds by name: {@code slot} is the path from the body to the position it
-     * fills -- a field name at a record, a key at a map, an index at an array, as the read descended -- and
-     * {@code reference} the {@code type_ref} value read there, its {@code name} the qualified name as written.
+     * fills -- a field name at a record, a key at a map, an index at an array, as the read descended --, {@code
+     * type} that position's declared type, as the reader that read the name knows it, and {@code reference} the
+     * {@code type_ref} value read there, its {@code name} the qualified name as written; {@code cell} is the host's
+     * {@code Ref} where the host holds one.
      */
-    public record ValueByName(List<String> slot, TypeRef reference, Optional<io.ltr8.tson.schema.meta.Ref<?>> cell) {
+    public record ValueByName(List<String> slot, SlotType type, TypeRef reference,
+                              Optional<io.ltr8.tson.schema.meta.Ref<?>> cell) {
 
         public ValueByName {
             slot = List.copyOf(slot);
+            Objects.requireNonNull(type, "type");
             Objects.requireNonNull(reference, "reference");
+        }
+    }
+
+    /**
+     * The declared type of a slot holding a reference by name, in the governing meta's namespace: what the reader
+     * of that slot was built from, so the linker judges the name without walking the path back through the meta's
+     * declarations. {@code of} is a kind's {@code of} (a constructor), a reference's {@code T} (a type), and {@code
+     * type_ref} itself for the application form; {@code name} is the declared type as a message names it, {@code
+     * kind<record>} or {@code type_kind}.
+     */
+    public record SlotType(Role role, String of, String name) {
+
+        /** A {@code type_ref}-typed slot, which holds the application form. */
+        public static final SlotType APPLICATION = new SlotType(Role.APPLICATION, "type_ref", "type_ref");
+
+        /** What the slot holds, which decides how the name it holds is judged. */
+        public enum Role {
+            /** A type's name, a member of the kind ({@code kind<record>}, {@code type_kind}). */
+            KIND,
+            /** A value's qualified name, IS-A the reference's {@code T} ({@code ref<method>}). */
+            REFERENCE,
+            /** A name or application, judged by resolution and arity ({@code type_ref}). */
+            APPLICATION
+        }
+
+        public SlotType {
+            Objects.requireNonNull(role, "role");
+            Objects.requireNonNull(of, "of");
+            Objects.requireNonNull(name, "name");
+        }
+
+        /** A slot typed by a kind whose {@code of} is {@code of}, named {@code name} where an author named it. */
+        public static SlotType kind(String of, String name) {
+            return new SlotType(Role.KIND, of, name != null ? name : "kind<" + of + ">");
+        }
+
+        /** A slot typed {@code ref<of>}, named {@code name} where an author named it. */
+        public static SlotType reference(String of, String name) {
+            return new SlotType(Role.REFERENCE, of, name != null ? name : "ref<" + of + ">");
         }
     }
 

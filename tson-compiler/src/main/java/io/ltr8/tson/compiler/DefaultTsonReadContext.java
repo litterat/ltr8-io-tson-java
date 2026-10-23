@@ -5,6 +5,7 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.TsonEvent;
@@ -331,7 +332,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
-    public void heldByName(TypeRef reference, io.ltr8.tson.schema.meta.Ref<?> cell) {
+    public void heldByName(TypeRef reference, TsonSchema.SlotType type, io.ltr8.tson.schema.meta.Ref<?> cell) {
         if (cursor.heldByName == null) {
             return;
         }
@@ -340,7 +341,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
             slot.add(step.name() != null ? step.name() : Integer.toString(step.index()));
         }
         Collections.reverse(slot);
-        cursor.heldByName.held(List.copyOf(slot), reference, cell);
+        cursor.heldByName.held(List.copyOf(slot), type, reference, cell);
     }
 
     /**

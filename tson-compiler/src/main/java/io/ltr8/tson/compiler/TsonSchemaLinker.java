@@ -81,6 +81,7 @@ import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.UuidType;
 import io.ltr8.tson.schema.meta.TypeChain;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -93,6 +94,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link TsonLinkedSchema} -- pass 2, which a schema
@@ -764,6 +766,12 @@ public final class TsonSchemaLinker {
      * namespace where it holds the name and in the governing meta's otherwise (§3.3.1), and is judged the kernel's
      * by where it is defined there. A namespace type that is not abstract and leaves {@code key_type} or {@code
      * value_type} unstated is refused: a value of it is a map, and an open facet describes none.
+     *
+     * <p>A namespace type declaring a field beside its facets ({@link MapBody#NAMESPACE_FACETS}) is refused, abstract
+     * or not: a value of it is the map alone, so the field has nowhere to be written, and an abstract one passes it
+     * to every subtype. A field is blamed on the namespace type that declares it, not again on each local subtype
+     * that inherits it. A construct with fields of its own is a record holding them, held under a key of a
+     * namespace type.
      */
     private static void readAsMaps(DiagnosticsReceiver receiver, TsonSchema schema, Map<String, Top> merged,
                                    Set<String> localNames, Predicate<String> kernel,
@@ -776,6 +784,17 @@ public final class TsonSchemaLinker {
                 continue;
             }
             RecordBody record = (RecordBody) def;
+            List<String> beside = fieldsBesideTheFacets(record, merged, kernelInReach);
+            if (!beside.isEmpty()) {
+                String fields = beside.stream().map(field -> "'" + field + "'").collect(Collectors.joining(", "));
+                report(receiver, schema, name, schema.positionOf(name), "'" + name + "' is a namespace type, so a "
+                        + "value of it is the map its 'key_type' and 'value_type' describe, and it declares "
+                        + (beside.size() == 1 ? "the field " : "the fields ") + fields + " beside them, which no "
+                        + "value can carry -- declare a record holding " + (beside.size() == 1 ? "it" : "them")
+                        + " and hold that under a key of a "
+                        + "namespace type ('interface => { extends?: [type_name]  methods: method_map }' under "
+                        + "'interfaces => namespace & { key_type: = identifier  value_type: = interface }')");
+            }
             Optional<MapBody.Namespace> map = MapBody.ofNamespace(record);
             if (map.isPresent()) {
                 namespaces.put(name, map.get());
@@ -786,6 +805,28 @@ public final class TsonSchemaLinker {
                         + "the host supplies), or declare it abstract");
             }
         }
+    }
+
+    /**
+     * The fields {@code namespace} declares beside {@link MapBody#NAMESPACE_FACETS}, less any it inherits from a
+     * namespace type in reach, which is judged on its own.
+     */
+    private static List<String> fieldsBesideTheFacets(RecordBody namespace, Map<String, Top> merged,
+                                                      Predicate<String> kernelInReach) {
+        List<String> beside = new ArrayList<>();
+        for (String field : namespace.fields().keySet()) {
+            if (MapBody.NAMESPACE_FACETS.contains(field)) {
+                continue;
+            }
+            boolean inherited = namespace.supertypes().stream()
+                    .map(merged::get)
+                    .anyMatch(supertype -> MapBody.isNamespace(supertype, kernelInReach)
+                            && ((RecordBody) supertype).fields().containsKey(field));
+            if (!inherited) {
+                beside.add(field);
+            }
+        }
+        return beside;
     }
 
     /**
@@ -811,7 +852,7 @@ public final class TsonSchemaLinker {
             Top definition = merged.get(name);
             List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
             if (held != null && definition instanceof Namespace<?>) {
-                values.check(name, definition, held,
+                values.check(name, held,
                         refused -> reportOrThrow(receiver, schema, name, facts, refused.getMessage(), refused),
                         gap -> {
                             if (receiver == null) {

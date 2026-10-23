@@ -232,13 +232,13 @@ class NamespaceEntryTest {
     @Test
     void aNamespaceEntryAtATypeKindSlotIsRefused() {
         refused(schema("type-slot", "other => !api { m => { response: myapi } }"),
-                "'other' at /m/response", "'myapi'", "built by 'api'");
+                "'other' at /m/response", "'myapi' is a value of the namespace type 'api'", "not a type");
     }
 
     @Test
     void aNamespaceEntryAtARecordKindSlotIsRefused() {
         refused(schema("record-slot", "other => !api { m => { request: myapi } }"),
-                "'other' at /m/request", "'myapi'", "no 'record'");
+                "'other' at /m/request", "'myapi' is a value of the namespace type 'api'", "not a type");
     }
 
     /** A field of a type declaration is a {@code type_kind} slot too, judged by the linker. */

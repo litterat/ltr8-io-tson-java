@@ -124,15 +124,13 @@ captured before a bind reader rebinds it (`RecordAbstractReader.bareTokenFillsPo
 subsumption guard and a deferred reader; nothing about it is threaded into the record readers' constructors. JSON
 has no positional form, so the rule has no JSON side.
 
-**A value by name is read only where the bound component is a `TypeRef` at a record-typed slot.** Every reference
-has one host shape: a `type_ref` slot binds a `TypeRef`, so does a kind-typed slot, and so does a slot holding a value
-by name, whose
-`ReferenceNameReader` (set in place of the slot type's own reader by `BindTargets`) keeps the token as written in the
-`TypeRef`'s `name`. The slot is judged by the reader it would otherwise have — a record reader whose bare token is
-not positional, a dispatcher, or an `ErrorReader` for a record type no class is bound to, since a name needs no class
-for the value it names; at `type_ref`, whose bare token fills `name`, the component binds exactly as it always has.
-The reader resolves nothing — the linker does (`design/linking-and-compilation.md`); a data document's read
-resolves it no more than it resolves a `type_ref`. At such a slot a quoted token is text, and a framed (`@a x`,
-`!t x`) or braced value is refused as `expected the name of a 'method' value`. **That the host's component type
-selects the spelling is interim**: a `TypeRef` takes a name and a record class a braced value, so two hosts of one
-meta admit different documents until a reference type (`ref<T>`) makes the spelling the slot's declaration.
+**The slot declares the spelling, never the host.** A value by name stands at a reference-typed slot (`ref<T>`) and a
+type's name at a kind-typed one; a record-typed slot holds the record's value inline, and a `TypeRef` or `Ref` host
+there is a bind mismatch (`BindTargets`). Every reference has one host shape: a `type_ref` slot binds a `TypeRef`, so
+does a kind-typed slot, and a reference-typed slot a `TypeRef` or a `Ref`, whose `ReferenceNameReader` (set in place of
+the slot's atom reader by `BindTargets`) keeps the token as written in the `TypeRef`'s `name`; a host holding such a
+slot as anything else (a `String`) receives what the atom reads, and the name is recorded all the same
+(`RecordedNameReader`). At `type_ref`, whose bare token fills `name`, the component binds by the record reader. The
+reader resolves nothing — the linker does (`design/linking-and-compilation.md`). At a reference-typed slot a quoted
+token is text, and a framed (`@a x`, `!t x`) or braced value is refused as `expected the name of a 'method' value`,
+whatever the host.

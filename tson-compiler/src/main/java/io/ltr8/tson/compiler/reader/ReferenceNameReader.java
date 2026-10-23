@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.EventSkip;
@@ -13,29 +14,24 @@ import io.ltr8.tson.compiler.stream.TypeRef;
 import java.util.Optional;
 
 /**
- * A record-typed position whose bound component is a {@link io.ltr8.tson.schema.meta.TypeRef}: the value is a
- * reference written by name (SPEC-FEEDBACK.md #13), a qualified name such as {@code orders.methods.place_order},
- * and this reads it as written into a {@code TypeRef} whose {@code name} is the token and whose arguments are none.
+ * A reference-typed position ({@code ref<T>}) whose bound component is a {@link io.ltr8.tson.schema.meta.TypeRef}
+ * or a {@link io.ltr8.tson.schema.meta.Ref}: the value is a value's qualified name (SPEC-FEEDBACK.md #13), such as
+ * {@code orders.place_order}, read as written into a {@code TypeRef} whose {@code name} is the token and whose
+ * arguments are none, or into a {@code Ref} the linker delivers the value into.
  *
- * <p><b>One host shape for every reference.</b> A {@code type_ref} slot binds a {@code TypeRef}, and so does a slot
- * holding a value by name: both are references that must resolve, and differ only in how the linker judges them --
- * one segment naming a type at a {@code type_ref} slot, segments reaching a value IS-A the slot's declared type here.
- * So nothing here parses segments: the linker splits the name and applies the identifier grammar to each segment,
- * where it also resolves them.
+ * <p><b>Nothing here parses segments.</b> The linker splits the name and applies the identifier grammar to each
+ * segment, where it also resolves them.
  *
  * <p><b>Every name it reads is recorded</b> ({@link TsonReadContext#heldByName}): in a schema document the read
- * collects each with its slot, and the linker judges that collection, so a by-name reference is checked whatever the
- * host class declares of it.
+ * collects each with its slot and the slot's declared type, and the linker judges that collection.
  *
- * <p><b>What a name is, stated once for both readers that ask</b> ({@link #nameIn}): an <b>unquoted</b> token. A
+ * <p><b>What a name is, stated once for every reader that asks</b> ({@link #nameIn}): an <b>unquoted</b> token. A
  * quoted token is text, never a name. {@link RecordAbstractReader} asks the same question to decide when §5.6's
- * positional form loses the token in a schema document, so the two cannot disagree about which tokens are names.
+ * positional form loses the token in a schema document, so the readers cannot disagree about which tokens are names.
  *
- * <p><b>Names only.</b> The component holds a reference and nothing else, so a braced value here is a mismatch the
- * binding declares rather than one the schema does: a class that wants a record value inline at a record-typed slot
- * declares that record's class -- the host's component type selects the spelling until a reference type
- * ({@code ref<T>}) makes it the slot's declaration. A framed name ({@code @doc:"x" orders}, {@code !record x}) is
- * refused too: a name's type is its referent's, and an annotation would have nowhere to go.
+ * <p><b>Names only.</b> The slot holds a reference and nothing else, so a braced value, a quoted token and a framed
+ * name ({@code @doc:"x" orders}, {@code !record x}) are refused: a name's type is its referent's, and an annotation
+ * would have nowhere to go.
  */
 final class ReferenceNameReader implements TsonTypeReader<Object> {
 
@@ -45,9 +41,13 @@ final class ReferenceNameReader implements TsonTypeReader<Object> {
     /** Whether the host component is a {@link io.ltr8.tson.schema.meta.Ref}, delivered at link, not a {@code TypeRef}. */
     private final boolean toCell;
 
-    ReferenceNameReader(String expected, boolean toCell) {
+    /** The slot's declared type, {@code ref<T>}, which each name read here is recorded with. */
+    private final TsonSchema.SlotType type;
+
+    ReferenceNameReader(String expected, boolean toCell, TsonSchema.SlotType type) {
         this.expected = expected;
         this.toCell = toCell;
+        this.type = type;
     }
 
     /** The name {@code event} spells, or empty where it is no unquoted token. */
@@ -64,7 +64,7 @@ final class ReferenceNameReader implements TsonTypeReader<Object> {
             ctx.next();
             io.ltr8.tson.schema.meta.TypeRef reference = io.ltr8.tson.schema.meta.TypeRef.of(name.get());
             io.ltr8.tson.schema.meta.Ref<Object> cell = toCell ? io.ltr8.tson.schema.meta.Ref.to(name.get()) : null;
-            ctx.heldByName(reference, cell);
+            ctx.heldByName(reference, type, cell);
             return cell != null ? cell : reference;
         }
         String found = found(event);

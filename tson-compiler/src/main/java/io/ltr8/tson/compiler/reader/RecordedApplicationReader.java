@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
@@ -22,7 +23,7 @@ final class RecordedApplicationReader implements TsonTypeReader<Object> {
     public Object read(TsonReadContext ctx) {
         Object value = inner.read(ctx);
         if (value instanceof TypeRef reference && ctx.readsValueBody()) {
-            ctx.heldByName(reference, null);
+            ctx.heldByName(reference, TsonSchema.SlotType.APPLICATION, null);
         }
         return value;
     }

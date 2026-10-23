@@ -14,15 +14,17 @@ history lives in git.
   and the linker's `validateBody`, `collectNames` and coherence check.
 - A host implements no interface. Each value of the map binds to a plain class the `DataNameBinder` finds
   (`SchemaMetaNameBinder.extendedWith`, `ProcessorConfig.withMetaNameBinder`); `@Typename` is needed only where the
-  binder's convention would not find the class, or where the value walk must name a family member's subtype. There is
-  no reader family and no `ValueReaderFactoryRegistry` entry.
+  binder's convention would not find the class. There is no reader family and no `ValueReaderFactoryRegistry` entry.
 - A record with no bound class is a `BIND_MISMATCH` at the entry that applies its namespace type.
 - A host declares none of its references; the slot declares the spelling. A slot naming a type is typed by a kind
   (`request: kind<record>`), a slot naming a value by a reference (`method: ref<method>`), and a record-typed slot
   holds the record's value inline, a `TypeRef` or `Ref` component there being a bind mismatch. The read records each
-  name with its slot (`TsonSchema.valuesByName`), and the linker judges it by the slot's declared type, read off the
-  constructor's resolved fields along the recorded path, never off the Java class. The hosts are `TypeRef` (the name)
-  and, at a reference-typed slot, `Ref<T>` (the name, and the value delivered at link).
+  name with its path and the slot's declared type (`TsonSchema.valuesByName`, `TsonSchema.SlotType`), which the
+  recording reader was built from, and the linker judges it by that type; nothing walks the path back through the
+  meta's declarations, so a slot only a tagged subtype declares is judged at any depth. A name at a kind- or
+  reference-typed slot is recorded and judged whatever the host component is; the hosts that receive the name as one
+  are `TypeRef` and, at a reference-typed slot, `Ref<T>` (the name, and the value delivered at link), and any other
+  (a `String`) receives what the slot's atom reads.
 - A value by name is entered through namespace keys only. Its first segment resolves in the governed schema's own
   entries and imports, never the meta's; a further segment selects a key of a namespace value or a field of a record
   value; a map that is no namespace, `{text => method}`, is not entered whatever its key type.
@@ -40,6 +42,9 @@ history lives in git.
 - `!!meta` is not a vocabulary channel: it merges nothing into the type-name namespace, and shared vocabulary goes in a
   third ordinary schema.
 - A namespace type IS-A `top`, so only a schema governed by the meta-kernel declares one (§2.2.2).
+- A namespace type declares nothing but its facets, `key_type`, `value_type` and `ordered` (`MapBody.NAMESPACE_FACETS`):
+  a value of it is the map alone, so the linker refuses a field beside them (`readAsMaps`), abstract or not, blaming
+  the namespace type that declares it. A construct with fields is a record holding them, under a namespace type's key.
 
 Related: `design/linking-and-compilation.md` (the namespace map and values by name), `design/references.md`,
 `design/class2-compilation.md`, `design/compiled-registries.md`, `design/schema-resolution.md`.
@@ -74,6 +79,20 @@ type" would leave the entry's value opaque, its shape the host's, and `Top` with
 implement. Under a namespace constructor every branch of `Top` mirrors a kernel constructor, so a body's kind is
 decidable by inspection and every switch over it is exhaustive.
 
+**A namespace type declares only its facets.** A value of `api` is the map `key_type` and `value_type` describe and
+nothing else, so `api => namespace & { key_type: = identifier  value_type: = method  extends?: [type_name] }` declares
+a field no value can carry: `!api { extends: [a] … }` is a record field where the map wants a key, and `extends => …`
+is just a key. The linker refuses the declaration rather than leave the field dead, and refuses it on an abstract
+namespace type too, since every subtype would inherit it; a subtype is not blamed again for a field it inherits from
+a namespace type. A construct that has fields of its own and a map of members, a consumer's `interface` or `api` with
+`extends` or `implements`, is a record holding both, held under a key of a namespace type:
+
+```
+method_map => namespace & { key_type: = method_name  value_type: = method }
+interface  => { extends?: [type_name]  methods: method_map }
+interfaces => namespace & { key_type: = identifier  value_type: = interface }
+```
+
 **A kind is judged by origin.** A schema's own record named `namespace` composed into `payload => namespace & { … }`
 leaves `payload` a PRODUCT: kind derivation counts `namespace` only as the meta-kernel's own entry
 (`validate-own-namespace.tn` in the corpus).
@@ -98,16 +117,27 @@ nothing about the schema (`design/schema-side-diagnostics.md`).
 
 A slot naming a type is typed by a kind, `request: kind<record>`, and a slot naming a value by a reference,
 `method: ref<method>`; a slot typed by a record holds the record's value inline. The read records every name it
-produces at a kind- or reference-typed slot with the path it descended (`["post_orders", "method"]`), which
-`SchemaResolver` keeps per entry in `TsonSchema.valuesByName`, and the linker judges each by the slot's declared type:
-a member of the kind (`ValuesByName.judgeMember`), or a value IS-A the reference's `of` (`ValuesByName.judge`). A
-payload's Java shape says nothing about which components are references, so nothing asks it.
+produces at a kind- or reference-typed slot with the path it descended (`["post_orders", "method"]`) and the slot's
+declared type (`TsonSchema.SlotType`: the role, kind, reference or `type_ref` application, and the kind's `of` or the
+reference's `T`, in the governing meta's namespace). `SchemaResolver` keeps them per entry in
+`TsonSchema.valuesByName`, and the linker judges each by that type: a member of the kind (`ValuesByName.judgeMember`),
+or a value IS-A the reference's `T` (`ValuesByName.judge`). The type comes from the reader that read the name, which
+was built from the slot's declaration, so it is right however the value was reached -- under a key, behind a record
+field, through the subtype a tag selected -- and the path serves only to say where. A payload's Java shape says nothing
+about which components are references, so nothing asks it.
 
 **One host shape for every reference.** A `type_ref` slot binds a `TypeRef`, a kind-typed slot a `TypeRef`, and a
 reference-typed slot a `Ref<T>` or a `TypeRef`; `BindTargets` sets a `KindSlotReader` or `ReferenceNameReader` in
 place of the slot's atom reader for them, and a `Ref` receives the value the name reaches when the schema links
 (`Ref.deliver`), so a host reads `binding.method().get()` after the link and the name before it. A reference in a data
 document is not yet read (`NOT_IMPLEMENTED`).
+
+**The slot judges the name, never the host.** A host may hold a kind- or reference-typed slot as a `String`: the slot's
+atom reader binds it as any atom, and `BindTargets` wraps it in a `RecordedNameReader`, which records the name it read
+with the slot's declared type, so `method: nobody.place` and `request: no_such` are refused under a `String` exactly as
+under a `TypeRef`. The spelling is the slot's too: what is no name (a quoted token, a braced value) is refused there by
+the reader a `TypeRef` host would have, at a reference-typed slot in any schema document and at a kind-typed slot in a
+value body.
 
 **A value body lifts and mints nothing.** A namespace type's payload is a value body (`SchemaResolver.isValueBody`,
 `TsonReadContext.readsValueBody`): a kind-typed slot there holds one bare name, and a braced application is refused
@@ -137,17 +167,14 @@ reads, so it is neither found nor delivered. Reading it through raw reflection o
 binding's own naming (a renamed component, an `Optional`, a non-record host), which is why the walk stops at the type;
 BACKLOG has the route.
 
-**The slot walk follows a tagged subtype only while the value is in hand** (`ValuesByName.slotType`). At a record
-family base that lacks the field the read descended, the field is the subtype's, named by the `@Typename` on the
-value's own class. A value held directly under a namespace key is in hand; past a record's field the walk has only the
-declared types, so a subtype behind a field is reported as a gap.
-
 **Refusals and kinds.** A value by name may name a namespace entry: it is a value, and a slot holding a value is not
 a type position. A namespace entry at a type position is refused in every form: at a `type_ref` slot by
 `validateTypeRef` in a type declaration and `judgeApplication` in a value body, and `request: orders` at a
 `kind<record>` slot or `response: orders` at a `type_kind` slot as no member of the kind. A namespace entry is a
 member of `kind<interface>` and `kind<namespace>`, the construction walk reaching `interface` from its recorded
 constructor, and of no kind of types.
+A namespace entry named where a type is wanted is refused in one sentence wherever it is met, `judgeApplication`'s and
+`judgeMember`'s alike: a value of the namespace type, a map of names, and nothing can be typed by it.
 `TypeInhabitance` calls a `Namespace` inhabited and `DiscriminationClass` gives it no class, and both are right only
 because nothing may name one as a type — which is what makes that refusal load-bearing rather than a nicety.
 
@@ -165,10 +192,12 @@ receives the map: the declared class is the host's statement of what it wants, a
 the constructor. A `Namespace` component at a map that is no namespace has no constructor to name and is a bind
 mismatch.
 
-**`Namespace` is no `Map`.** A binder or writer testing `instanceof Map` would lose the constructor, so it has its
-map's read API and nothing more. Its `type` names the constructor it is an instance of; it carries no `@Typename`, so
-`TsonSchema.constructorOf` and `TsonCompiledMetaSchema.typenameOf` read `type`. Order is the constructor's `ordered`
-facet and not part of equality, so `RecordBody` compares its `field_map` in order itself.
+**`Namespace` is no `Map`.** A binder or writer testing `instanceof Map` would lose the constructor, so it has its map's read
+API and nothing more. Code that held `RecordBody.fields()` as a `Map` holds a `Namespace<RecordField>`:
+`values().iterator().next()` replaces `firstEntry()`, and iteration is over `entries()`. Its `type` names the constructor it
+is an instance of; it carries no `@Typename`, so `TsonSchema.constructorOf` and `TsonCompiledMetaSchema.typenameOf` read
+`type`. Order is the constructor's `ordered` facet and not part of equality, so `RecordBody` compares its `field_map` in
+order itself.
 
 **Resolved output is written as written.** `myapi => !api { get_orders => { response: order_list } }`: the tag is the
 value's `type`, which no Java class names, so `DataClassObjectWriter` writes a `Namespace` through `Top`'s descriptor

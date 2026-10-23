@@ -15,21 +15,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Names in a namespace value that the link does not judge, or cannot reach -- reported from tson-java-http, which
- * meets all three through its meta layer ({@code meta-http.tn}) and its meta-service experiment.
+ * Names in a namespace value at the slots tson-java-http's meta layer ({@code meta-http.tn}) uses, each judged by its
+ * slot's declared type.
  *
  * <ol>
  *   <li>A braced application at a kind-typed slot of a value body is refused, the alias spelling named: nothing lifts
  *       or mints in a value body, so an application there would have no entry to be the name of.
  *   <li>A name at a {@code type_ref}-typed slot of a value body is judged by resolution, arity and §4.1.
- *   <li>A slot reached through a record family base is followed through the subtype the value's tag selected, and a
- *       slot the walk cannot follow arrives at a collecting resolve as {@code NOT_IMPLEMENTED}.
+ *   <li>A slot that only the subtype the value's tag selected declares, below a record family base, is judged by
+ *       its declared type ({@code SubtypeBehindFieldTest} has the same one record field further down).
  *   <li>A slot's pointer writes the key for a map key that carries annotations.
  * </ol>
  */
@@ -173,7 +172,7 @@ class KindSlotGapsTest {
         refused(schema("ref-namespace", "op => !gap_ref_ops { o => { request: other } }"), "'other'");
     }
 
-    // ── 3. A slot reached through a record family base ───────────────────────────────────────────────────
+    // ── 3. A slot a tagged subtype declares ──────────────────────────────────────────────────────────────
 
     /**
      * The namespace's value type is the base; the value is the subtype its tag names, which declares {@code request}.
@@ -190,14 +189,6 @@ class KindSlotGapsTest {
     void anUndeclaredNameOnATaggedSubtypeIsRefused() {
         refused(schema("family-bad", "api => !gap_api { GET => !gap_op { request: no_such } }"),
                 "/GET/request", "'no_such'");
-    }
-
-    /** Whatever the walk does not follow, a collecting resolve reports it rather than throwing. */
-    @Test
-    void anUnfollowedSlotIsReportedNotThrown() {
-        String id = schema("family-collect", "api => !gap_api { GET => !gap_op { request: order } }");
-        List<Diagnostic> problems = assertDoesNotThrow(() -> problems(id));
-        assertTrue(problems.stream().allMatch(d -> d.code() == Diagnostic.Code.NOT_IMPLEMENTED), problems.toString());
     }
 
     // ── 4. The pointer through an annotated key ──────────────────────────────────────────────────────────

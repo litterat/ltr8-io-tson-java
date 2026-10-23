@@ -34,18 +34,20 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   depends on it. `EntryKind.isConstructor` answers a different question, applicability, and counts `top` by name.
 - A type parameter is one whose `type` is `type_kind` (`TemplateParam.TYPE_KIND`); a parameter standing at a
   `type_kind` or a `type_ref` slot is a type parameter (`ParameterTypes.typePosition`).
-- A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the
-  kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its slot
-  (`TsonReadContext.heldByName`). A braced value is read through the `type_ref` reader in a kernel body, where a
-  sugar lift writes an application into the slot it fills and the closer mints its entry afterwards; in a value body
-  (`TsonReadContext.readsValueBody`, a namespace type's instance) nothing lifts or mints, so it is refused and the
-  alias spelling named: `order_box => box<order>`, then the bare name.
+- A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the kind's own
+  atom reader (grammar, hygiene; members only where the document is data), recorded with its path and the slot's declared
+  type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). A braced value is read through the `type_ref` reader in a
+  kernel body, where a sugar lift writes an application into the slot it fills and the closer mints its entry afterwards; in
+  a value body (`TsonReadContext.readsValueBody`, a namespace type's instance) nothing lifts or mints, so it is refused and
+  the alias spelling named: `order_box => box<order>`, then the bare name.
 - A `type_ref` slot of a value body is recorded too (`RecordedApplicationReader`) and judged by resolution, arity and
   §4.1 (`ValuesByName.judgeApplication`), as the resolver judges a kernel body's own.
-- The slot walk (`ValuesByName.slotType`) follows the value beside the declared types while the value is in hand: at a
-  record family base whose field is the tagged subtype's, the value's own class names the subtype. Past a record's
-  field it has the declared types alone. A slot the walk cannot follow reaches a collecting resolve as
-  `NOT_IMPLEMENTED`, never as an exception.
+- A recorded name carries its slot's declared type from the reader that read it (`TsonSchema.SlotType`: the role and
+  the kind's `of` or the reference's `T`), so the linker never walks the path back through the meta's declarations,
+  and a slot only a tagged subtype declares is judged however deep the value sits.
+- A name at a kind- or reference-typed slot is recorded and judged whatever the host component holds: a host other
+  than `TypeRef`/`Ref` (a `String`) receives what the slot's atom reads, through a `RecordedNameReader` that records
+  the name, and what is no name is refused there as a `TypeRef` host's reader refuses it.
 - A slot that names a value is typed `ref<T>` (`ref_type => atom & { of: type_name }`, `ref => <T> !ref_type { of: T }`).
   Its value is a qualified name; `of` is a type of the writer's namespace, never a constructor (`ref<record>` is
   refused: that is `kind<record>`). A slot typed by a record holds the record's value inline and takes no name.
@@ -57,7 +59,8 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   taking the name alone. A name whose walk passes a record value's field is judged by type and then reported as a gap
   (`NOT_IMPLEMENTED`): the value behind the field is not read. A reference in a data document is not yet read
   (`NOT_IMPLEMENTED`).
-- One host shape for every reference: a `TypeRef`, whatever the slot. Only the judgement differs by slot.
+- One host shape for every reference: a `TypeRef`, whatever the slot. Only the judgement differs by slot, and it is
+  the slot's, never the host's.
 
 Related: `design/linking-and-compilation.md` (the judgements), `design/held-template-bodies.md` (parameter
 positions), `design/meta-layer-namespaces.md` (a meta's own slots), `design/record-dispatch.md` (the positional form).

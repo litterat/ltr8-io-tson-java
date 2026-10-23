@@ -979,7 +979,7 @@ public final class SchemaResolver {
                                boolean valueBody) {
         List<TsonSchema.ValueByName> held = new ArrayList<>();
         Object body = reader.read(TsonReadContext.schemaDocument(new ListEventSource(DataValueEvents.of(value)), names,
-                (slot, reference, cell) -> held.add(new TsonSchema.ValueByName(slot, reference,
+                (slot, type, reference, cell) -> held.add(new TsonSchema.ValueByName(slot, type, reference,
                         java.util.Optional.ofNullable(cell))), valueBody));
         if (!held.isEmpty() && body != null) {
             heldByName.put(body, List.copyOf(held));

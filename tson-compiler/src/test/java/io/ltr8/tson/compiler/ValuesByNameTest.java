@@ -295,7 +295,7 @@ class ValuesByNameTest {
         List<Diagnostic> problems = problems(api("data-as-type", """
                 api => !interface { m => { response: orders } }"""));
         assertEquals(1, problems.size(), problems.toString());
-        assertTrue(problems.getFirst().message().contains("built by 'interface'"),
+        assertTrue(problems.getFirst().message().contains("'orders' is a value of the namespace type 'interface'"),
                 problems.getFirst().message());
     }
 

@@ -425,7 +425,8 @@ before a reader is built, and it is linking's.
   otherwise — `field_map`'s host is the record — so `Namespace.read()` reads keys by spelling (`Namespace.HOST_KEYS`,
   `text`), and the host's family judges them once it resolves (`FieldNames`, `checkFieldNameTypes`). A concrete
   namespace type stating `key_type` or `value_type` neither FIXED nor DEFAULT describes no map and is refused here; an
-  abstract one is admitted and has no map.
+  abstract one is admitted and has no map. A namespace type with a field beside `MapBody.NAMESPACE_FACETS` is refused
+  here, abstract or not, since the map is the whole value (`design/meta-layer-namespaces.md`).
 - **The reader is the map's.** `TsonSchemaCompiler` and `JsonSchemaCompiler` ask `linked.namespace(name)` and hand its
   `read()` to the `map` factory, so neither encoding's factory table has a `namespace` entry and `SchemaMetaNameBinder`
   binds no `namespace` class; `Subsumption.guard` still gets the entry's own definition. In bind mode the map is an
@@ -468,11 +469,11 @@ by the walk below, and the value it reaches is delivered into the host's `Ref` c
   `orders.` as no qualified name before anything is looked up. At a kind-typed slot the same host shape is one
   segment naming a member of the kind (`judgeMember`); at a `type_ref` slot it is an application, judged by
   `validateTypeRef` as always.
-- **The slot's type is the meta's, the name is the schema's.** The slot's declared type is read off the entry's
-  constructor (`TsonSchemaLinker.constructorOf`, in the governing meta's namespace) by walking the recorded path
-  through the resolved fields: a field name at a record, any key at a map, any index at an array. A path through
-  anything else (a choice) is a gap this library has not filled (`UnsupportedOperationException`). The name's first
-  segment resolves in `merged` — the schema's own entries and imports — with alias hops followed (§8.3,
+- **The slot's type is the meta's, the name is the schema's.** The slot's declared type arrives with the name: the
+  reader that read it was built from the slot's declaration and recorded its role and its kind's `of` or reference's
+  `T`, in the governing meta's namespace (`TsonSchema.SlotType`), so nothing walks the recorded path back through the
+  meta's fields, and a slot reached through a record field or a tagged subtype is judged as one under a key. The
+  name's first segment resolves in `merged` — the schema's own entries and imports — with alias hops followed (§8.3,
   `ReferenceChain`), and never in the meta's namespace (§3.3.2); a member is reached through its entry, so `method:
   place_order` is unresolved even though `orders` holds a key of that name. Nothing is looked up lexically, and nothing
   is a choice among candidates: found first, judged after.

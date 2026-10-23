@@ -42,18 +42,18 @@ import java.util.Optional;
  *       one; a {@code Map} target at a namespace type receives the map.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
  *       nothing is rebuilt.</li>
- *   <li><b>A {@code Ref} or {@code TypeRef} target at a reference-typed slot</b> ({@code ref<T>}, SPEC-FEEDBACK.md
- *       #13) holds a value by name, so the position's reader is set aside for a {@link ReferenceNameReader}: a
- *       {@code Ref} receives the value when the schema links, a {@code TypeRef} the name alone. The slot declares the
- *       spelling, so a {@code TypeRef} at a record-typed slot is a mismatch: that position holds the record's value
- *       inline. At a {@code type_ref} slot nothing changes: its bare token fills {@code name} positionally
- *       ({@link RecordAbstractReader#bareTokenFillsPositionally}), and the record reader binds it as it always has.
- *       At a kind-typed slot ({@code record_field.type} is {@code type_kind}, a meta's {@code request: kind<record>})
- *       a {@link KindSlotReader} reads a type's name, recorded for the linker to judge a member of the kind, or an
- *       application still to close.
- *       At any other atom a {@code TypeRef} is a mismatch: a token there is a literal, never a reference.
- *       One host shape serves both because both are references that must resolve; the linker judges each by its
- *       slot.</li>
+ *   <li><b>A name at a reference- or kind-typed slot</b> is recorded with the slot's declared type for the linker
+ *       to judge, whatever the target holds. A {@code Ref} or {@code TypeRef} target at a reference-typed slot
+ *       ({@code ref<T>}, SPEC-FEEDBACK.md #13) reads through a {@link ReferenceNameReader}: a {@code Ref} receives
+ *       the value when the schema links, a {@code TypeRef} the name alone. A {@code TypeRef} target at a kind-typed
+ *       slot ({@code record_field.type} is {@code type_kind}, a meta's {@code request: kind<record>}) reads through
+ *       a {@link KindSlotReader}: a type's name, or in a kernel body an application still to close. Any other target
+ *       there is bound as at an atom and wrapped in a {@link RecordedNameReader}, which records the name it read.
+ *       A {@code TypeRef} target at a {@code type_ref} slot is bound by the record reader, its bare token filling
+ *       {@code name} positionally ({@link RecordAbstractReader#bareTokenFillsPositionally}), and recorded in a value
+ *       body ({@link RecordedApplicationReader}). The slot declares the spelling, so a {@code TypeRef} or {@code
+ *       Ref} target is a mismatch at a record-typed slot, which holds the record's value inline, and at any other
+ *       atom, where a token is a literal and never a reference.</li>
  * </ul>
  * The target's bridge, then its {@code Annotated} box, wrap whatever comes out. Anything else -- a dispatcher, a
  * choice, a gap -- is read as it is.
@@ -89,10 +89,11 @@ final class BindTargets {
         if (byName && readsARef(reader)) {
             // The name reader produces the host value itself -- the Ref the linker will deliver into, or the
             // TypeRef -- so the atom's own bridge (Ref's name form) is not applied on top of it.
-            TsonTypeReader<?> named = new ReferenceNameReader(expectedAt(reader, what), payload.typeClass() == Ref.class);
+            TsonTypeReader<?> named = new ReferenceNameReader(expectedAt(reader, what), payload.typeClass() == Ref.class,
+                    slotAtom(reader).slotType());
             return AnnotationBoxing.wrap(named, target, site.annotationTypes());
         } else if (payload.typeClass() == TypeRef.class && readsAKind(reader)) {
-            bound = new KindSlotReader((AtomTypeReader<?>) RecordAbstractReader.unwrapped(reader), site.resolver());
+            bound = new KindSlotReader(slotAtom(reader), site.resolver());
         } else if (byName && (recordHeldByName(reader) || readsAnAtom(reader))) {
             site.mismatches().add(what + " is not a reference, and " + where + " holds a "
                     + payload.typeClass().getSimpleName() + " -- a value stands by name only at a position typed "
@@ -105,6 +106,14 @@ final class BindTargets {
                 // A type_ref slot, the application form: in a value body its name or application is recorded for
                 // the linker to judge by resolution and arity, as a kernel body's is judged by the resolver.
                 bound = new RecordedApplicationReader(bound);
+            } else if (readsAKind(reader) || readsARef(reader)) {
+                // A name at a kind or reference is judged whatever the host holds: the host receives its value,
+                // and the name is recorded as a TypeRef host's would be.
+                AtomTypeReader<?> atom = slotAtom(reader);
+                TsonTypeReader<?> refusing = readsARef(reader)
+                        ? new ReferenceNameReader(expectedAt(reader, what), false, atom.slotType())
+                        : new KindSlotReader(atom, site.resolver());
+                bound = new RecordedNameReader(bound, atom.slotType(), refusing);
             }
         }
         return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
@@ -116,10 +125,9 @@ final class BindTargets {
     }
 
     /**
-     * Whether the record position {@code reader} reads would have taken a value by name under the retired
-     * host-decides rule: a record whose bare token is not positional, or a record position this compile cannot see
-     * into (a dispatcher, an unbuildable type). A {@code TypeRef} or {@code Ref} host there is now a mismatch; at a
-     * {@code type_ref} slot, whose bare token fills {@code name} positionally, it binds as it always has.
+     * Whether {@code reader} reads a record position a {@code TypeRef} or {@code Ref} target cannot hold: a record
+     * whose bare token is not positional, or a record position this compile cannot see into (a dispatcher, an
+     * unbuildable type). A {@code type_ref} slot, whose bare token fills {@code name} positionally, is not one.
      */
     private static boolean recordHeldByName(TsonTypeReader<?> reader) {
         return switch (RecordAbstractReader.unwrapped(reader)) {
@@ -129,6 +137,11 @@ final class BindTargets {
             case RecordMemberDispatchReader ignored -> true;
             case null, default -> false;
         };
+    }
+
+    /** The kind or reference atom {@code reader} reads, through any wrapper. */
+    private static AtomTypeReader<?> slotAtom(TsonTypeReader<?> reader) {
+        return (AtomTypeReader<?>) RecordAbstractReader.unwrapped(reader);
     }
 
     /** Whether {@code reader} reads a kind: a token there is a type's name. */

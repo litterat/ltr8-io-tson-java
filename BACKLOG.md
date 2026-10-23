@@ -70,9 +70,7 @@ own prose (which had gone stale on it):
   declared types, every refusal included, and then reported as `NOT_IMPLEMENTED`: `ValuesByName` never reads the
   host object, so the value is neither found nor delivered into the `Ref`. Reach it through `ltr8-bind`'s class
   descriptor for the host (the component the binding wrote the field to, under its wire name), not raw record
-  reflection, or bind a meta layer's values as a tree the walk can enter by field. The same gap covers
-  `ValuesByName.slotType`: past a record's field it has no value, so a slot behind a family base that only the tagged
-  subtype declares is reported as a gap rather than followed; it closes with the field walk.
+  reflection, or bind a meta layer's values as a tree the walk can enter by field.
 - [ ] **JSON bind delivers a `Namespace` at a namespace-typed slot.** The TSON reader builds one where the host
   component is a `Namespace` (`reader.BindTargets`, over a `MapBindReader` that carries the constructor's name);
   `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
