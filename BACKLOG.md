@@ -61,12 +61,11 @@ own prose (which had gone stale on it):
   index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
   application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
-- [ ] **A value reached through a record value's field** (SPEC-FEEDBACK.md #23, #24). A `ref<T>` whose last segments
-  select fields of a record value (`p.x.primary`, a `pairing` held under a namespace key) is judged by the fields'
-  declared types, every refusal included, and then reported as `NOT_IMPLEMENTED`: `ValuesByName` never reads the
-  host object, so the value is neither found nor delivered into the `Ref`. Reach it through `ltr8-bind`'s class
-  descriptor for the host (the component the binding wrote the field to, under its wire name), not raw record
-  reflection, or bind a meta layer's values as a tree the walk can enter by field.
+- [ ] **A value named through a FIXED field** (SPEC-FEEDBACK.md #24). A qualified name whose segment selects a
+  FIXED field of a record value is reported as `NOT_IMPLEMENTED`: bind agreement exempts a FIXED field from having a
+  component, so the host holds no value for it and `ValuesByName.fieldOf` finds no component to read. The value is the
+  schema's own, the field's pinned value in the record type, so the walk should take it from the declared
+  `RecordField` and continue; no test covers the case yet.
 - [ ] **A reference in a data document is not read** (SPEC-FEEDBACK.md #24). An ordinary schema types a field
   `ref<order>` through core.tn's `ref`, and a data document's read of it reports `NOT_IMPLEMENTED`: `AtomParsers`
   builds a `ref_type` reader only under a meta layer, since only a schema's link judges a name. The rule is the kind's:

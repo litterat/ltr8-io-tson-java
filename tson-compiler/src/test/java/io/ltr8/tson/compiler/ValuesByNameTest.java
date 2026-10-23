@@ -8,7 +8,9 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.compiler.consumer.Pairing;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.suite.SuiteBindings;
 import io.ltr8.tson.suite.data.Binding;
@@ -23,6 +25,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -227,19 +230,20 @@ class ValuesByNameTest {
     }
 
     /**
-     * A name whose walk passes a record value's field and arrives at the slot's type is judged by type alone: the walk
-     * enters a value by namespace keys and never reads a host's field, so the value is neither found nor delivered,
-     * and the name is reported as this library's gap rather than accepted unjudged.
+     * A name whose walk passes a record value's field reads that field of the host the read bound, and the value it
+     * reaches is delivered: {@code p.x.primary} is the {@code method} the {@code pairing} under {@code x} holds.
      */
     @Test
-    void aValueReachedThroughARecordValuesFieldIsAGap() {
-        List<Diagnostic> problems = problems(api("through-field-gap", """
+    void aValueReachedThroughARecordValuesFieldIsDelivered() {
+        String id = api("through-field", """
                 p      => !pairings { x => { primary: { request: order } } }
-                routes => !bindings { b => { method: p.x.primary  verb: POST  route: "/" } }"""));
-        assertEquals(1, problems.size(), problems.toString());
-        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, problems.getFirst().code(), problems.toString());
-        assertTrue(problems.getFirst().message().contains("'p.x.primary', a field of a record value"),
-                problems.getFirst().message());
+                routes => !bindings { b => { method: p.x.primary  verb: POST  route: "/" } }""");
+        assertEquals(List.of(), problems(id));
+        Map<String, Top> entries = registry().resolveLinked(id).schema().entries().entries();
+        Binding b = assertInstanceOf(Binding.class, ((Namespace<?>) entries.get("routes")).get("b"));
+        Pairing x = assertInstanceOf(Pairing.class, ((Namespace<?>) entries.get("p")).get("x"));
+        assertTrue(b.method().isResolved(), "delivered at link");
+        assertSame(x.primary(), b.method().get());
     }
 
     @Test

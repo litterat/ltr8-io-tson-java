@@ -23,8 +23,8 @@ Current form only; history lives in git.
 - A value by name (`TsonSchema.valuesByName`, collected by the read) resolves its first segment in the schema's own
   merged namespace, alias hops followed, never the meta's; each further segment selects in the value reached, a key
   of a `Namespace` value or a field of a record value; the referent's declared type must IS-A the slot's, compared
-  by canonical identity. A field step is judged by its declared type, and the value behind it is a gap
-  (`NOT_IMPLEMENTED`), never read off a host object. Local entries only, after
+  by canonical identity. A field step reads the host object through the bind context its values were bound under
+  (`TsonCompiledMetaRegistry.link`), by the field's wire name, never by reflection. Local entries only, after
   `validateEntry`, which skips a by-name reference a body also returns from `references()` (matched by identity).
 - `entryOrigins`, `enumForms`, `nameTypes` and `namespaces` are on `TsonLinkedSchema`, never on `TsonSchema` or an
   entry's value.
@@ -496,11 +496,15 @@ by the walk below, and the value it reaches is delivered into the host's `Ref` c
   has no named members (`…errors.x` is refused: a segment never selects a position). A map is entered only where it is
   a value of a namespace type, read as the map linking records for it; a map that is no namespace, `{text => method}`,
   is not entered whatever its key type.
-- **A field step is judged by type, and its value is a gap.** The value behind a record value's field is the host's
-  object, and the walk never reads one: past a field it follows the declared types alone, so every refusal above
-  still lands, and a name that passes them all is then reported as this library's gap (`UnsupportedOperationException`,
-  `NOT_IMPLEMENTED`), the value neither found nor delivered. A namespace entry is the schema's own map, which is why
-  entering by key needs no host object (`design/meta-layer-namespaces.md`).
+- **A field step reads the host through its binding.** The value under a key is the host object the resolver's read
+  bound, so a field of it is read through that binding's descriptor (`DataBindContext.getDescriptor` of the host's
+  class, `DataClassRecord.fieldIndex` by wire name, `DataClassField.get`), in the context the registry's resolver
+  binds with, which `TsonCompiledMetaRegistry.link` hands the linker. A component renamed with `@Field`, an
+  `Optional` component and a tagged subtype's class are each read as the binding wrote them; raw record reflection
+  would see none of that. A field the record declares and the value does not hold is refused as not present, after
+  the referent's type is judged. The linker's overloads without a context cannot read a field, and say so
+  (`IllegalStateException`) if a walk reaches one; only a FIXED field with no component, whose value the schema holds
+  and the host does not, is a gap (`NOT_IMPLEMENTED`) (`design/meta-layer-namespaces.md`).
 - **The judgement is §7.2's IS-A between two types, by canonical identity.** An entry's declared type is the
   constructor that built its body — its recorded constructor tag where that is a constructor of the *declaring*
   schema's meta (IS-A `top`), otherwise the kernel constructor its body's class mirrors (`@Typename`): a record

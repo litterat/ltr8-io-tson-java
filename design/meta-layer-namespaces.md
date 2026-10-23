@@ -28,9 +28,10 @@ history lives in git.
 - A value by name is entered through namespace keys only. Its first segment resolves in the governed schema's own
   entries and imports, never the meta's; a further segment selects a key of a namespace value or a field of a record
   value; a map that is no namespace, `{text => method}`, is not entered whatever its key type.
-- A segment selecting a field of a record value is judged by the field's declared type, every refusal first, and
-  delivering the value behind it is this library's gap (`UnsupportedOperationException`, reported as
-  `NOT_IMPLEMENTED`). The walk never reads a host object.
+- A segment selecting a field of a record value reads that field of the host object the read bound, through the
+  descriptor of the bind context it was bound under, by wire name, never by reflection over the class; the registry
+  links with that context (`TsonCompiledMetaRegistry.link`). An optional field the value does not hold is refused as
+  not present, after the referent's type is judged.
 - A read delivers a `Namespace` at four places and nowhere else: the meta's constructor reader for a namespace type
   (an `!api { … }` entry), `top`'s tag dispatcher, a namespace-typed slot whose host component is a `Namespace`
   (`BindTargets`), and a root read asked for `Namespace.class`. Everywhere else a namespace type reads as its map.
@@ -151,23 +152,29 @@ entry for it. A `type_ref` slot there is judged by resolution, arity and §4.1 (
 readers judge it as they judge a data document: the keys of the namespace and of every identifier-keyed map in it are
 scopes, and an identifier-typed value is a name (`design/name-hygiene-and-minted-names.md`).
 
-## The walk: entered by key (`ValuesByName`)
+## The walk: by key and by field (`ValuesByName`)
 
 The types are walked through the schema: a record's fields to a field's type, a namespace type to its pinned
-`value_type`, read off the map linking records for it (`TsonLinkedSchema.namespace`). The value is walked beside them
-only where it is entered by key. A namespace entry is the `Namespace` the read built; a key selects a value of the
-constructor's `value_type`, and a value of a namespace type held under a key is the map the read built for it, entered
-the same way (`ValuesByName.asMap`, which accepts a `Map` for that case alone). So `handler: myapi.get_orders` reaches
-the `method` value held under `get_orders`, and `method: orders.place_order` the one under `place_order`, delivered
-into the host's `Ref`.
+`value_type`, read off the map linking records for it (`TsonLinkedSchema.namespace`). The value is walked beside them.
+A namespace entry is the `Namespace` the read built; a key selects a value of the constructor's `value_type`, and a
+value of a namespace type held under a key or in a field is the map the read built for it, entered the same way
+(`ValuesByName.asMap`, which accepts the host's `Map` there). So `handler: myapi.get_orders` reaches the `method`
+value held under `get_orders`, `method: orders.place_order` the one under `place_order`, and `method:
+shop.orders.methods.place_order` the one under `place_order` in the interface the `orders` service holds in its
+`methods` field, each delivered into the host's `Ref`.
 
-**A field step is judged and not delivered.** A segment past a key that selects a field of the record value reached
-follows the record's declared fields: no such field is refused, listing the fields declared, a list behind it is
-refused as having no named members, and the referent's type is judged against the slot's. Only then, if every step
-held, is the name reported as a gap: the value behind a record field is the host's object, which this walk never
-reads, so it is neither found nor delivered. Reading it through raw reflection over record components would bypass
-binding's own naming (a renamed component, an `Optional`, a non-record host), which is why the walk stops at the type;
-BACKLOG has the route.
+**A field step reads the host through its binding.** A segment past a key that selects a field of the record value
+reached follows the record's declared fields: no such field is refused, listing the fields declared. The value is the
+host object the resolver's read bound, so the field is read through the descriptor that bound it: the bind context's
+`getDescriptor` of the host's class, its `fieldIndex` by the field's wire name, and that component's `get`. Raw
+reflection over record components would bypass binding's own naming -- a component renamed with `@Field`, an
+`Optional` component, a tagged subtype's class, a host that is no Java record -- and the descriptor carries all of
+it. The context is the one the registry's resolver binds with: `TsonCompiledMetaRegistry.link` passes it to
+`TsonSchemaLinker.link`, and `Tson` links through the registry. The resolver reads every namespace value in bind mode,
+so a value in hand is a host object, never a `TsonValue`; a record no class binds is a `BIND_MISMATCH` at its entry
+before any walk. An optional field the value does not hold names nothing, and is refused as not present after the
+referent's type is judged, so a name wrong by type is told so whatever the value holds. A FIXED field may have no
+component, its value being the schema's, and naming a value through one is the one field step reported as a gap.
 
 **Refusals and kinds.** A value by name may name a namespace entry: it is a value, and a slot holding a value is not
 a type position. A namespace entry at a type position is refused in every form: at a `type_ref` slot by

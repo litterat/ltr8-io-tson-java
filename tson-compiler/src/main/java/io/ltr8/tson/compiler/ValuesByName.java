@@ -1,5 +1,10 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassField;
+import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -56,13 +61,15 @@ import java.util.function.Consumer;
  * Each type is looked up in the namespace of the meta layer that governs the schema declaring it, so an imported
  * referent is judged by its own meta's vocabulary and still compared by identity.
  *
- * <p><b>A namespace value is entered by key, and only there is the value walked.</b> A namespace entry holds the
- * map its constructor describes, so a segment selects a key of it and the value reached is of the constructor's
- * {@code value_type}; a value of a namespace type reached that way is the map the read built for it, entered the
- * same way. A segment selecting a field of a record value is followed by the record's declared fields alone: the
- * value is the host's object, which this walk never reads, so a name whose walk passes through a field is judged by
- * type and then reported as this library's gap ({@link UnsupportedOperationException}), since the value it reaches
- * is neither found nor delivered.
+ * <p><b>The value is walked beside its type.</b> A namespace entry holds the map its constructor describes, so a
+ * segment selects a key of it and the value reached is of the constructor's {@code value_type}; a value of a namespace
+ * type reached that way is the map the read built for it, entered the same way. A segment selecting a field of a
+ * record value reads that field of the host object the read bound ({@link #fieldOf}), through the descriptor of the
+ * bind context it was bound under, by the field's wire name, so the walk agrees with the binding on what the field is
+ * called and where it lives; it never reflects over the host's class itself. A field the record declares and the
+ * value does not hold is refused as not present, after the referent's type is judged, so a name wrong by type is told
+ * so whatever the value holds. The resolver reads every namespace value in bind mode, so a value in hand is a bound
+ * host object, never a tree.
  *
  * <p>Every refusal is a {@link SchemaValidationException} naming the step that failed.
  */
@@ -74,15 +81,22 @@ final class ValuesByName {
     private final String ownIdentity;
     private final TsonLinkedSchema governingMeta;
     private final TsonSchemaLoader loader;
+    private final DataBindContext values;
 
+    /**
+     * @param values the bind context the schema's namespace values were bound under, which a field step reads a
+     *               record value through; {@code null} where the link was given none
+     */
     ValuesByName(TsonSchema schema, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                 Map<String, String> origins, TsonLinkedSchema governingMeta, TsonSchemaLoader loader) {
+                 Map<String, String> origins, TsonLinkedSchema governingMeta, TsonSchemaLoader loader,
+                 DataBindContext values) {
         this.merged = merged;
         this.facts = facts;
         this.origins = origins;
         this.ownIdentity = CanonicalIdentity.canonicalize(schema.id());
         this.governingMeta = governingMeta;
         this.loader = loader;
+        this.values = values;
     }
 
     /** A type named in one meta layer's namespace: where its name is looked up, and the name. */
@@ -230,7 +244,7 @@ final class ValuesByName {
                     + "type: a type entry admits no further segment, so '" + segments.get(1) + "' selects in no value");
         }
         Object value = namespace;
-        String throughField = null;
+        String absent = null;
         String reached = head;
         for (String segment : segments.subList(1, segments.size())) {
             Top body = at.body();
@@ -242,10 +256,14 @@ final class ValuesByName {
                                 + "' is " + a(at.name()) + ", which has no field '" + segment + "' -- it declares "
                                 + String.join(", ", record.fields().keySet()));
                     }
-                    if (throughField == null) {
-                        throughField = reached + '.' + segment;
+                    if (value != null) {
+                        value = fieldOf(value, segment, where + " names '" + name + "', and '" + reached + '.'
+                                + segment + "'");
+                        if (value == null) {
+                            absent = "'" + reached + "' is " + a(at.name()) + " whose field '" + segment + "' is "
+                                    + "not present in the value";
+                        }
                     }
-                    value = null;
                     at = at.of(field.type().name());
                 }
                 case MapBody map -> {
@@ -278,10 +296,9 @@ final class ValuesByName {
             throw new SchemaValidationException(where + " wants " + a(wanted.name()) + ", and '" + name + "' is "
                     + a(at.name()) + ", which is no '" + wanted.name() + "'");
         }
-        if (throughField != null) {
-            throw new UnsupportedOperationException(where + " names '" + name + "', which reaches its value through "
-                    + "'" + throughField + "', a field of a record value -- this library enters a value by the keys of "
-                    + "a namespace value and does not yet read a record value's field, so the value is not found");
+        if (absent != null) {
+            throw new SchemaValidationException(where + " names '" + name + "', and " + absent + ", so the name "
+                    + "reaches no value");
         }
         Object delivered = value;
         cell.ifPresent(c -> c.deliver(delivered));
@@ -380,8 +397,44 @@ final class ValuesByName {
     }
 
     /**
+     * The value {@code host}, a record value the resolver's read bound, holds at its field {@code field}, or {@code
+     * null} where the field is not present in it; {@code naming} says where, as a message opens. Read through the
+     * descriptor that bound it ({@link DataBindContext#getDescriptor(Class)} of the host's class, in the context the
+     * read bound it under), by the field's wire name: the component the binding wrote the field to, whatever the
+     * component is called, and the value inside an {@code Optional} component. Only a FIXED field may have no
+     * component (the bind agreement {@code RecordBindReader} enforces), and its value is the schema's, which the host
+     * does not hold.
+     */
+    private Object fieldOf(Object host, String field, String naming) {
+        if (values == null) {
+            throw new IllegalStateException(naming + " is a field of a record value, and this schema was linked with no "
+                    + "bind context to read it through -- link it with the context its values were bound under "
+                    + "(TsonCompiledMetaRegistry.link)");
+        }
+        DataClass bound;
+        try {
+            bound = values.getDescriptor(host.getClass());
+        } catch (DataBindException e) {
+            throw new IllegalStateException(naming + " is a field of a record value bound as "
+                    + host.getClass().getName() + ", which the bind context does not describe", e);
+        }
+        if (!(bound instanceof DataClassRecord record)) {
+            throw new IllegalStateException(naming + " is a field of a record value, and the value is bound as "
+                    + host.getClass().getName() + ", which is no record");
+        }
+        Integer index = record.fieldIndex().get(field);
+        if (index == null) {
+            throw new UnsupportedOperationException(naming + " is a FIXED field, which " + host.getClass().getName()
+                    + " holds no component for -- its value is the schema's, and this library does not yet name a "
+                    + "value through one");
+        }
+        DataClassField component = record.fields()[index];
+        return component.isPresent(host) ? component.get(host) : null;
+    }
+
+    /**
      * The map a value of a namespace type holds: a {@link Namespace}'s entries, or the map the read built for a value
-     * of a namespace type held under a key of another.
+     * of a namespace type held under a key of another or in a record value's field, as the host's component holds it.
      */
     private static Map<?, ?> asMap(Object value, String reached) {
         if (value instanceof Namespace<?> namespace) {

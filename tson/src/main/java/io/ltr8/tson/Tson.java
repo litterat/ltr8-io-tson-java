@@ -257,8 +257,7 @@ public final class Tson {
         TsonSchemaParser parser = new TsonSchemaParser(schemaText);
         SchemaDocument document = parser.parseSchemaDocument();
         TsonSchema resolved = new TsonSchemaResolver(core).resolveSchema(document, parser.schemaPositions());
-        return core.register(
-                TsonSchemaLinker.link(resolved, core.schemaRegistry(), core.identifierPolicy()), schemaText);
+        return core.register(core.link(resolved), schemaText);
     }
 
     /**
@@ -349,8 +348,7 @@ public final class Tson {
             if (!problems.isEmpty()) {
                 return problems.diagnostics();
             }
-            TsonLinkedSchema linked = TsonSchemaLinker.link(resolved, core.schemaRegistry(), problems,
-                    core.identifierPolicy());
+            TsonLinkedSchema linked = core.link(resolved, problems);
             if (!problems.isEmpty()) {
                 return problems.diagnostics();
             }
