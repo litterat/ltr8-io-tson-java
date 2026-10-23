@@ -2,10 +2,10 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
-import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
@@ -175,7 +175,7 @@ class SchemaAnnotationScopeTest {
         assertEquals(List.of(), tson.validateSchema(schema));
 
         var governed = tson.schemaRegistry().get("https://example.test/meta-governed.tn").orElseThrow().schema();
-        AnnotatedMap<String, Top> entries = governed.entries();
+        Namespace<Top> entries = governed.entries();
         assertEquals(Optional.of("POST"), entries.getAnnotations("order").value("method", String.class));
         assertEquals(Optional.of("GET"), governed.factsOf("item").annotations().value("method", String.class));
     }

@@ -121,6 +121,10 @@ What falls through is the set §5.3 and §5.4 spell as JSON's own kinds. Dispatc
 instead is how `litterat-json`'s `JsonMapper.writeAtom` puts a `long` and a `BigInteger` down one branch and
 writes neither by its family.
 
+**A `Namespace` writes as the map it holds**, its `entries` through their own descriptor: the value is that map
+under its constructor, and the schema position typing it is what names the constructor, as at a TSON slot
+(`design/writers-and-document-header.md`).
+
 **Two things are refused rather than approximated, both because the reader could not take them back:**
 
 - **a choice.** §8.2 admits an untagged one only by class-stable disjoint variants, a fact a *schema*

@@ -39,7 +39,6 @@ import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.FloatType;
@@ -53,10 +52,12 @@ import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.Reference;
@@ -80,6 +81,7 @@ import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.UuidType;
 import io.ltr8.tson.schema.meta.TypeChain;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -92,6 +94,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link TsonLinkedSchema} -- pass 2, which a schema
@@ -102,7 +105,7 @@ import java.util.function.Predicate;
  * entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for why crediting a
  * subtype onto an imported entry's copy here never touches the imported schema's own separately-registered
  * original), computes each kind's members ({@link #computeKinds}), derives choice disjointness, checks that every
- * reference anywhere in the schema actually resolves, and resolves and judges every value a {@code Data} body holds
+ * reference anywhere in the schema actually resolves, and resolves and judges every value a namespace entry holds
  * by name ({@code ValuesByName}). A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
@@ -403,7 +406,7 @@ public final class TsonSchemaLinker {
     private static String displayName(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
                                       Map<String, TypeRef> applications) {
         return EntryDisplayName.of(name, merged.get(name), facts.getOrDefault(name, TsonSchema.EntryFacts.NONE),
-                Optional.ofNullable(applications.get(name)), merged,
+                Optional.ofNullable(applications.get(name)), merged::get,
                 other -> facts.getOrDefault(other, TsonSchema.EntryFacts.NONE),
                 other -> Optional.ofNullable(applications.get(other)));
     }
@@ -604,12 +607,13 @@ public final class TsonSchemaLinker {
         Map<String, String> origins = new LinkedHashMap<>();
         Map<String, Normalization> enumForms = new LinkedHashMap<>();
         Map<String, Top> nameTypes = new LinkedHashMap<>();
+        Map<String, MapBody.Namespace> namespaces = new LinkedHashMap<>();
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
         // The application each instantiation closes (§8.2), off its key: an import's as its schema states it, a
         // local one's as this schema's resolution wrote it. What a message shows in place of a minted name.
         Map<String, TypeRef> applications = new LinkedHashMap<>();
-        Map<String, Top> merged = mergeImports(schema.imports(), loader, origins, enumForms, nameTypes, facts,
-                applications);
+        Map<String, Top> merged = mergeImports(schema.imports(), loader, origins, enumForms, nameTypes, namespaces,
+                facts, applications);
         schema.entries().keySet().forEach(name -> schema.applicationOf(name)
                 .ifPresent(application -> applications.put(name, application)));
 
@@ -626,7 +630,7 @@ public final class TsonSchemaLinker {
                 loader == null ? Optional.empty() : loader.load(CanonicalIdentity.canonicalize(schema.meta()));
         checkMayGovern(schema, governingMeta);
         Map<String, Top> structureNamespace = governingMeta
-                .<Map<String, Top>>map(linked -> linked.schema().entries()).orElse(Map.of());
+                .<Map<String, Top>>map(linked -> linked.schema().entries().entries()).orElse(Map.of());
 
         Set<String> localNames = new LinkedHashSet<>();
         // A constructor is judged by where `top` is defined, never by its spelling (§4.1).
@@ -665,9 +669,13 @@ public final class TsonSchemaLinker {
                     // Reported, but the entry is still merged: its own shape is fine, it is only not permitted
                     // here, so keeping it lets every reference to it check normally instead of turning one
                     // eligibility error into an unresolved reference at every use site.
+                    String what = MapBody.isNamespace(def, kernel)
+                            ? "a namespace type -- it composes with the kernel's 'namespace', a constructor, so it "
+                                    + "IS-A 'top' (§4.1), and a namespace type is declared in a schema the "
+                                    + "meta-kernel governs (§2.2.2)"
+                            : "a type constructor -- it composes with a base kind, so it IS-A 'top' (§4.1)";
                     report(receiver, schema, entry.getKey(), schema.positionOf(entry.getKey()), "'" + entry.getKey()
-                            + "' declares a type constructor -- it composes with a base kind, so it IS-A 'top' "
-                            + "(§4.1) -- but '" + schema.id() + "' is not governed directly by the "
+                            + "' declares " + what + " -- but '" + schema.id() + "' is not governed directly by the "
                             + "meta-kernel (its own !!meta is '" + schema.meta() + "') -- only a schema chaining "
                             + "to meta-kernel.tn directly may declare new constructors (§2.2.2's "
                             + "meta-programming case); an ordinary type library or application schema may only "
@@ -707,6 +715,7 @@ public final class TsonSchemaLinker {
             }
         }
         checkNames(receiver, schema, merged, facts, structureNamespace::get, refusedEnums, identifiers);
+        readAsMaps(receiver, schema, merged, localNames, kernel, governingMeta, namespaces);
 
         Set<String> blamedOnce = new LinkedHashSet<>();
         Map<String, Top> namespace = merged;
@@ -747,11 +756,81 @@ public final class TsonSchemaLinker {
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
-                annotated, schema.bootstrap(), schema.valuesByName(), facts), origins, enumForms, nameTypes);
+                annotated, schema.bootstrap(), schema.valuesByName(), facts), origins, enumForms, nameTypes,
+                namespaces);
     }
 
     /**
-     * The values each local {@code Data} entry holds by name, as the resolver's read collected them
+     * Each local namespace type, with the map a value of it is read as ({@link MapBody#ofNamespace}), into {@code
+     * namespaces}. The kernel's {@code namespace} is a composition operand, which resolves in this schema's
+     * namespace where it holds the name and in the governing meta's otherwise (§3.3.1), and is judged the kernel's
+     * by where it is defined there. A namespace type that is not abstract and leaves {@code key_type} or {@code
+     * value_type} unstated is refused: a value of it is a map, and an open facet describes none.
+     *
+     * <p>A namespace type declaring a field beside its facets ({@link MapBody#NAMESPACE_FACETS}) is refused, abstract
+     * or not: a value of it is the map alone, so the field has nowhere to be written, and an abstract one passes it
+     * to every subtype. A field is blamed on the namespace type that declares it, not again on each local subtype
+     * that inherits it. A construct with fields of its own is a record holding them, held under a key of a
+     * namespace type.
+     */
+    private static void readAsMaps(DiagnosticsReceiver receiver, TsonSchema schema, Map<String, Top> merged,
+                                   Set<String> localNames, Predicate<String> kernel,
+                                   Optional<TsonLinkedSchema> governingMeta, Map<String, MapBody.Namespace> namespaces) {
+        Predicate<String> kernelInReach = name -> merged.containsKey(name) ? kernel.test(name)
+                : governingMeta.map(meta -> meta.isKernel(name)).orElse(false);
+        for (String name : localNames) {
+            Top def = merged.get(name);
+            if (OpenEntry.isOpen(def) || !MapBody.isNamespace(def, kernelInReach)) {
+                continue;
+            }
+            RecordBody record = (RecordBody) def;
+            List<String> beside = fieldsBesideTheFacets(record, merged, kernelInReach);
+            if (!beside.isEmpty()) {
+                String fields = beside.stream().map(field -> "'" + field + "'").collect(Collectors.joining(", "));
+                report(receiver, schema, name, schema.positionOf(name), "'" + name + "' is a namespace type, so a "
+                        + "value of it is the map its 'key_type' and 'value_type' describe, and it declares "
+                        + (beside.size() == 1 ? "the field " : "the fields ") + fields + " beside them, which no "
+                        + "value can carry -- declare a record holding " + (beside.size() == 1 ? "it" : "them")
+                        + " and hold that under a key of a "
+                        + "namespace type ('interface => { extends?: [type_name]  methods: method_map }' under "
+                        + "'interfaces => namespace & { key_type: = identifier  value_type: = interface }')");
+            }
+            Optional<MapBody.Namespace> map = MapBody.ofNamespace(record);
+            if (map.isPresent()) {
+                namespaces.put(name, map.get());
+            } else if (record.extension() != RecordExtensionType.ABSTRACT) {
+                report(receiver, schema, name, schema.positionOf(name), "'" + name + "' is a namespace type, so a "
+                        + "value of it is a map, and it leaves its 'key_type' or 'value_type' open -- pin both by "
+                        + "composition ('key_type: = K  value_type: = V', or 'key_type?: ~ K' for keys whose family "
+                        + "the host supplies), or declare it abstract");
+            }
+        }
+    }
+
+    /**
+     * The fields {@code namespace} declares beside {@link MapBody#NAMESPACE_FACETS}, less any it inherits from a
+     * namespace type in reach, which is judged on its own.
+     */
+    private static List<String> fieldsBesideTheFacets(RecordBody namespace, Map<String, Top> merged,
+                                                      Predicate<String> kernelInReach) {
+        List<String> beside = new ArrayList<>();
+        for (String field : namespace.fields().keySet()) {
+            if (MapBody.NAMESPACE_FACETS.contains(field)) {
+                continue;
+            }
+            boolean inherited = namespace.supertypes().stream()
+                    .map(merged::get)
+                    .anyMatch(supertype -> MapBody.isNamespace(supertype, kernelInReach)
+                            && ((RecordBody) supertype).fields().containsKey(field));
+            if (!inherited) {
+                beside.add(field);
+            }
+        }
+        return beside;
+    }
+
+    /**
+     * The values each local namespace entry holds by name, as the resolver's read collected them
      * ({@link TsonSchema#valuesByName()}), resolved in this schema's namespace and judged against the slots they
      * fill (SPEC-FEEDBACK.md #13, {@link ValuesByName}). Each refused name is its own diagnostic, against the entry
      * that holds it.
@@ -766,14 +845,14 @@ public final class TsonSchemaLinker {
                                           Optional<TsonLinkedSchema> governingMeta, TsonSchemaLoader loader,
                                           DiagnosticsReceiver receiver) {
         if (governingMeta.isEmpty()) {
-            return; // only meta-kernel links without a registered meta, and it declares no Data entry
+            return; // only meta-kernel links without a registered meta, and it declares no value entry
         }
         ValuesByName values = new ValuesByName(schema, merged, facts, origins, governingMeta.get(), loader);
         for (String name : localNames) {
             Top definition = merged.get(name);
             List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
-            if (held != null && definition instanceof Data) {
-                values.check(name, definition, held,
+            if (held != null && definition instanceof Namespace<?>) {
+                values.check(name, held,
                         refused -> reportOrThrow(receiver, schema, name, facts, refused.getMessage(), refused),
                         gap -> {
                             if (receiver == null) {
@@ -955,8 +1034,7 @@ public final class TsonSchemaLinker {
         return carryOver(result, schema.entries());
     }
 
-    private static AnnotatedMap<String, Top> carryOver(AnnotatedMap<String, Top> into,
-            AnnotatedMap<String, Top> from) {
+    private static AnnotatedMap<String, Top> carryOver(AnnotatedMap<String, Top> into, Namespace<Top> from) {
         AnnotatedMap<String, Top> result = into;
         for (String name : from.annotatedKeys()) {
             if (result.containsKey(name)) {
@@ -1174,6 +1252,7 @@ public final class TsonSchemaLinker {
                                                  Map<String, String> origins,
                                                  Map<String, Normalization> enumForms,
                                                  Map<String, Top> nameTypes,
+                                                 Map<String, MapBody.Namespace> namespaces,
                                                  Map<String, TsonSchema.EntryFacts> facts,
                                                  Map<String, TypeRef> applications) {
         Map<String, Top> merged = new LinkedHashMap<>();
@@ -1213,6 +1292,7 @@ public final class TsonSchemaLinker {
                     enumForms.put(name, form);
                 }
                 imported.nameType(name).ifPresent(type -> nameTypes.put(name, type));
+                imported.namespace(name).ifPresent(map -> namespaces.put(name, map));
             }
         }
         return merged;
@@ -1397,7 +1477,7 @@ public final class TsonSchemaLinker {
             case Scoped ignored -> {
             }
             // A reference names values of one type: `of` resolves in the writer's own namespace, and names a type
-            // or a data constructor, never a constructor of types -- the names of the types built with a
+            // or a namespace type, never a constructor of types -- the names of the types built with a
             // constructor are a kind, and `kind<record>` is that spelling.
             case RefBody ref -> {
                 Top of = namespace.get(ReferenceChain.terminal(ref.of(), namespace));
@@ -1415,10 +1495,11 @@ public final class TsonSchemaLinker {
                             + ref.of() + "', an open entry: a template denotes no type until it is applied (§5.10)");
                 }
             }
-            // A body describing something other than a data value: its shape is the consumer's own class, opaque
-            // here by design. Every reference it holds is at a slot typed by a kind or a reference, recorded by the
-            // read and judged by its slot (ValuesByName), so nothing is asked of the class.
-            case Data ignored -> {
+            // A namespace value's keys were read under the constructor's key family and its values under its
+            // value type, so the read judged both; every reference a value holds is at a slot typed by a kind or a
+            // reference, recorded by the read and judged by its slot (ValuesByName), so nothing is asked of the
+            // host class a value binds to.
+            case Namespace<?> ignored -> {
             }
         }
     }
@@ -1550,7 +1631,9 @@ public final class TsonSchemaLinker {
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Reference reference -> collectNames(reference.target(), into);
             case TemplateBody ignored -> { } // open, answered above
-            default -> { } // an atom body names no type
+            case Atom ignored -> { } // an atom body names no type
+            case Scoped ignored -> { } // a scope names namespaces, not types
+            case Namespace<?> ignored -> { } // a value names no type of its own
         }
     }
 
@@ -1588,7 +1671,9 @@ public final class TsonSchemaLinker {
             case Atom atom -> atom.coherenceCheck();
             case Product product -> product.coherenceCheck();
             case Sum sum -> sum.coherenceCheck();
-            default -> List.of();
+            case Reference ignored -> List.of();
+            case TemplateBody ignored -> List.of();
+            case Namespace<?> ignored -> List.of();
         };
         if (!violations.isEmpty()) {
             // No name leads this one, deliberately. Only an entry resolution never produced can reach here --
@@ -1759,23 +1844,20 @@ public final class TsonSchemaLinker {
      *
      * <p>A slot typed {@code type_kind} holds the name of a type a value can have: resolved, then judged a member of
      * the kind ({@link KindMembers}) where {@code constructors} is given, so a constructor named as a type is
-     * refused, and a DATA entry with its own diagnostic. A {@code type_ref} slot passes {@code null} and is judged by
-     * resolution alone.
+     * refused, and a namespace entry with its own diagnostic. A {@code type_ref} slot passes {@code null} and is
+     * judged by resolution alone.
      */
     private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace, Map<String, Top> structureNamespace,
                                          List<String> ownParameters, Function<String, Optional<String>> constructors,
                                          String subject, String trail) {
         String context = "'" + subject + "'" + trail;
         Top target = namespace.get(ref.name());
-        if (target instanceof Data notAType) {
-            // §8.1's schema map holds only type definitions, so an entry describing something else has no
-            // way to say "declare me, but do not let anything name me as a type". The Data marker is that
-            // way. Without this the misuse resolves, links AND compiles, and fails only when a document is
-            // read against it. §4.1: naming a DATA entry where a type is expected is a resolver error.
-            throw new SchemaValidationException(context + " names '" + ref.name() + "', which is built "
-                    + "with '" + TsonCompiledMetaSchema.typenameOf(notAType) + "' and describes something "
-                    + "other than a data value -- it is declared by this schema but is not a type, so "
-                    + "nothing can be typed by it");
+        if (target instanceof Namespace<?> value) {
+            // A namespace value is a map, an instance of its constructor: a value and never a type. Without this
+            // the misuse resolves, links and compiles, and fails only when a document is read against it.
+            throw new SchemaValidationException(context + " names '" + ref.name() + "', which is a value of the "
+                    + "namespace type '" + value.type() + "', a map of names -- a value and not a type, so nothing "
+                    + "can be typed by it");
         }
         if (!namespace.containsKey(ref.name()) && !ownParameters.contains(ref.name())) {
             throw new UnresolvedReference(subject, trail, ref.name());

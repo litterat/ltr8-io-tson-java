@@ -3,19 +3,21 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -92,7 +94,7 @@ class KindMembersTest {
                 """);
         RecordBody order = assertInstanceOf(RecordBody.class, linked.schema().entries().get("order"));
         KindBody inline = kind(linked, ReferenceChain.terminal(order.fields().get("id").type().name(),
-                linked.schema().entries()));
+                linked.schema().entries()::get));
 
         assertEquals(new KindBody("uuid_type"), inline);
         assertEquals(Optional.of(List.of("stock_id", "uuid")), inline.members());
@@ -219,16 +221,79 @@ class KindMembersTest {
         assertEquals(Optional.of(List.of("stock_id", "uuid")), ids.members());
     }
 
+    /**
+     * A namespace constructor is a type, its instances being values: the kernel's {@code type_kind} holds {@code
+     * namespace}, {@code field_map} and {@code schema}, and no constructor IS-A {@code type}, whose instances are
+     * types.
+     */
     @Test
-    void aKindOfDataIsRefusedAtTheDeclaration() {
+    void typeKindHoldsTheNamespaceConstructorsAndNoTypeConstructor() {
+        TsonLinkedSchema kernel = TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(),
+                uri -> {
+                    throw new IllegalStateException("unexpected fetch: " + uri);
+                }).resolveLinked(TsonBundledSchemas.META_KERNEL_ID);
+        List<String> members = kind(kernel, "type_kind").members().orElseThrow();
+
+        assertTrue(members.containsAll(List.of("field_map", "namespace", "schema")), members::toString);
+        assertFalse(members.contains("set_type") || members.contains("record") || members.contains("reference"),
+                members::toString);
+    }
+
+    /** {@code kind<namespace>} is a kind: it holds the kernel's namespace constructors and a meta layer's own. */
+    @Test
+    void aKindOfNamespaceHoldsEveryNamespaceConstructor() {
+        KindBody namespaces = kind(link("""
+                !!id:"https://example.test/kinds.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/38/m/meta.tn"
+                {
+                  api        => namespace & { key_type: = identifier  value_type: = text }
+                  namespaces => !kind_type { of: namespace }
+                }
+                """, ""), "namespaces");
+
+        assertEquals(Optional.of(List.of("api", "field_map", "namespace", "schema")), namespaces.members());
+    }
+
+    /**
+     * A value of a namespace type is a map, not a record, and nothing builds it with {@code map}: it is a member of
+     * {@code type_kind} and {@code kind<namespace>}, and of no kind of {@code record}, {@code product} or {@code map}.
+     */
+    @Test
+    void aNamespaceTypeIsNoRecordAndNoMap() {
+        TsonLinkedSchema linked = link("""
+                !!id:"https://example.test/kinds.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/38/m/meta.tn"
+                {
+                  api        => namespace & { key_type: = identifier  value_type: = text }
+                  types      => !kind_type { of: type }
+                  namespaces => !kind_type { of: namespace }
+                  records    => !kind_type { of: record }
+                  products   => !kind_type { of: product }
+                  maps       => !kind_type { of: map }
+                }
+                """, "");
+
+        assertTrue(kind(linked, "types").members().orElseThrow().contains("api"));
+        assertTrue(kind(linked, "namespaces").members().orElseThrow().contains("api"));
+        for (String kind : List.of("records", "products", "maps")) {
+            List<String> members = kind(linked, kind).members().orElseThrow();
+            assertFalse(members.contains("api") || members.contains("field_map") || members.contains("schema"),
+                    () -> kind + ": " + members);
+        }
+    }
+
+    @Test
+    void aKindOfAConstructorBesideTypeIsRefusedAtTheDeclaration() {
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 {
-                  order => { id: kind<data> }
+                  order => { id: kind<reference> }
                 }
                 """));
 
-        assertTrue(e.getMessage().contains("'data'") && e.getMessage().contains("not 'type' or a constructor"),
-                e.getMessage());
+        assertTrue(e.getMessage().contains("'reference'")
+                        && e.getMessage().contains("not 'type', 'namespace' or a constructor"), e.getMessage());
     }
 
     @Test
@@ -284,7 +349,7 @@ class KindMembersTest {
 
     @Test
     void theResolvedFormWritesTheMembers() {
-        Map<String, Top> entries = link(IDS).schema().entries();
+        Namespace<Top> entries = link(IDS).schema().entries();
 
         assertEquals(Optional.of(List.of("customer_id", "stock_id", "uuid", "v4_stock_id")),
                 ((KindBody) entries.get("any_id")).members());

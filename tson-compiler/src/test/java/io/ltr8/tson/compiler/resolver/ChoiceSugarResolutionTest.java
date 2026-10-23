@@ -98,7 +98,7 @@ class ChoiceSugarResolutionTest {
         assertEquals(List.of("text", "integer"), variantNames(choice.getValue()));
 
         RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person"));
-        assertEquals(choice.getKey(), person.fields().sequencedValues().getFirst().type().name());
+        assertEquals(choice.getKey(), person.fields().values().iterator().next().type().name());
     }
 
     /**

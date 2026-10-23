@@ -41,7 +41,8 @@ class EnumTreeReaderTest {
         // names "enum", "enum" composes with "atom", and so on transitively; cherry-picking just
         // "boolean" drags in most of meta-kernel anyway via SchemaValidator's own reference checks,
         // so there's nothing simpler about trying to trim it down. One extra local entry on top.
-        Map<String, Top> entries = new LinkedHashMap<>(MetaKernelBootstrapResolver.getMetaKernelSchema().entries());
+        Map<String, Top> entries =
+                new LinkedHashMap<>(MetaKernelBootstrapResolver.getMetaKernelSchema().entries().entries());
         entries.put("flag_holder", RecordBody.of(RecordBody.fieldMap(Map.entry("flag",
                 RecordField.required(TypeRef.of("boolean"))))));
         // !!meta must be the real meta-kernel identity, not a placeholder -- this schema's own

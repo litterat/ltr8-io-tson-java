@@ -11,8 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
  * [TSON-SCHEMA] §8.2's freshness MUST — an internal name is a valid {@code identifier} — over the content
  * both minting sites splice into one.
  *
- * <p>The case that found it was an HTTP operation: §4.1 names one as the motivating case for the {@code data}
- * kind, and every realistic path carries a slash, so the feature's own worked example could not be templated.
+ * <p>The case that found it was an HTTP operation, the motivating case for a meta layer's own vocabulary, and
+ * every realistic path carries a slash, so the feature's own worked example could not be templated.
  */
 class InternalNameTest {
 

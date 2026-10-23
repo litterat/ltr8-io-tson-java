@@ -108,6 +108,17 @@ public class DefaultRecordBinder {
 	 */
 	public DataClassRecord resolveRecord(DataBindContext context, Class<?> targetClass)
 			throws DataBindException {
+		return resolveRecord(context, targetClass, targetClass);
+	}
+
+	/**
+	 * {@link #resolveRecord(DataBindContext, Class)} at {@code parameterizedType}: a generic class's components are
+	 * described with its type parameters replaced by the arguments given there, so {@code Box<T>(List<T> items)}
+	 * described as {@code Box<String>} has a {@code List<String>} component. A raw or unparameterised class keeps
+	 * its components as declared.
+	 */
+	public DataClassRecord resolveRecord(DataBindContext context, Class<?> targetClass, Type parameterizedType)
+			throws DataBindException {
 		try {
 
 			DataClassBridge bridge = null;
@@ -122,7 +133,7 @@ public class DefaultRecordBinder {
 						descriptor.annotationsCarrier().orElse(null));
 			} else {
 
-				DataClassRecord descriptor = resolveClassRecord(context, targetClass);
+				DataClassRecord descriptor = resolveClassRecord(context, targetClass, parameterizedType);
 
 				// At this point descriptor is not null but hasn't been added to context.
 				// Loop through know interfaces and if we find a union type add this descriptor to it.
@@ -159,6 +170,11 @@ public class DefaultRecordBinder {
 	 */
 	private DataClassRecord resolveClassRecord(DataBindContext context, Class<?> targetClass)
 			throws IllegalAccessException, NoSuchMethodException, SecurityException, DataBindException {
+		return resolveClassRecord(context, targetClass, targetClass);
+	}
+
+	private DataClassRecord resolveClassRecord(DataBindContext context, Class<?> targetClass, Type parameterizedType)
+			throws IllegalAccessException, NoSuchMethodException, SecurityException, DataBindException {
 		// This is a data class so need to decide what is/isn't data.
 		List<ComponentInfo> components = new ArrayList<>();
 
@@ -178,6 +194,8 @@ public class DefaultRecordBinder {
 			new ImmutableFinder().findComponents(targetClass, ctor, components);
 			new GetSetFinder().findComponents(targetClass, ctor, components);
 		}
+
+		TypeArguments.substitute(targetClass, parameterizedType, components);
 
 		// Modify the order of fields if order annotation supplied.
 		FieldOrder dataOrder = targetClass.getAnnotation(FieldOrder.class);

@@ -7,6 +7,7 @@ import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
@@ -249,27 +250,30 @@ public interface TsonReadContext {
     boolean readsSchemaDocument();
 
     /**
-     * Whether this reads a value body in a schema document -- a {@code data} constructor's instance, whose values the
-     * resolver never lifts or mints -- rather than one of the kernel's own bodies, where a sugar lift may leave an
-     * application in a slot for the closer to mint.
+     * Whether this reads a value body in a schema document -- an instance of a namespace type, whose values the
+     * resolver never lifts or mints -- rather than one of the kernel's own bodies, where a
+     * sugar lift may leave an application in a slot for the closer to mint.
      */
     boolean readsValueBody();
 
     /**
      * Records {@code reference}, read by name at this context's position (SPEC-FEEDBACK.md #13), with the slot it
-     * fills -- the path this context has descended from the value's root. Only a schema document's read keeps it,
-     * handing it to the sink its factory was given ({@link #schemaDocument}); anywhere else it is dropped, a data
-     * document having no namespace to judge it in.
+     * fills -- the path this context has descended from the value's root -- and that slot's declared type, which
+     * the recording reader was built from. Only a schema document's read keeps it, handing it to the sink its
+     * factory was given ({@link #schemaDocument}); anywhere else it is dropped, a data document having no namespace
+     * to judge it in.
      */
-    void heldByName(io.ltr8.tson.schema.meta.TypeRef reference, io.ltr8.tson.schema.meta.Ref<?> cell);
+    void heldByName(io.ltr8.tson.schema.meta.TypeRef reference, TsonSchema.SlotType type,
+                    io.ltr8.tson.schema.meta.Ref<?> cell);
 
     /**
-     * Where a schema document's read hands each reference it produces by name: its slot, the name, and the host's
-     * {@code Ref} cell where the host holds one.
+     * Where a schema document's read hands each reference it produces by name: its slot, the slot's declared type,
+     * the name, and the host's {@code Ref} cell where the host holds one.
      */
     @FunctionalInterface
     interface HeldByName {
-        void held(List<String> slot, io.ltr8.tson.schema.meta.TypeRef reference, io.ltr8.tson.schema.meta.Ref<?> cell);
+        void held(List<String> slot, TsonSchema.SlotType type, io.ltr8.tson.schema.meta.TypeRef reference,
+                  io.ltr8.tson.schema.meta.Ref<?> cell);
     }
 
     /**
@@ -331,7 +335,7 @@ public interface TsonReadContext {
 
     /**
      * {@link #throwing} for a value inside a schema document, which {@link #readsSchemaDocument()} answers true
-     * for -- the resolver's replay of a constructor's binding record or a data entry's body, and nothing else.
+     * for -- the resolver's replay of a constructor's binding record or a namespace entry's map, and nothing else.
      * Each reference the read produces by name reaches {@code heldByName} with its slot ({@link #heldByName}).
      */
     static TsonReadContext schemaDocument(TsonEventSource events, IdentifierPolicy identifierPolicy,

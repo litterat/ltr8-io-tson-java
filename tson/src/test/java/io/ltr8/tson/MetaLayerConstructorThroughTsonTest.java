@@ -12,7 +12,7 @@ import io.ltr8.tson.consumer.Operation;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -28,8 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A consumer's own meta-layer constructor, reached through the front door. {@code
- * MetaLayerDataConstructorTest} pins the mechanism itself against a hand-built {@code
+ * A consumer's own meta-layer vocabulary, reached through the front door. {@code
+ * MetaLayerVocabularyTest} pins the mechanism itself against a hand-built {@code
  * TsonCompiledMetaRegistry}; this pins that a caller gets it from {@link Tson#defaults()} without giving up
  * the reader, the writer or the per-mode registries that come with a {@link Tson}.
  *
@@ -43,26 +43,27 @@ class MetaLayerConstructorThroughTsonTest {
     private static final String META_HTTP = "https://example.test/meta-http.tn";
     private static final String API = "https://example.test/api.tn";
 
-    /** The meta-layer schema. {@code ~data &}: an operation describes an endpoint, not a data value. */
+    /** The meta-layer schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
             !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/38/m/meta.tn"
             {
-              operation => data & {
+              operation => {
                 path:     text
                 method:   text
                 request:  type_kind
                 response: type_kind
               }
-              webhook => data & {
+              operations => namespace & { key_type: = identifier  value_type: = operation }
+              webhook => {
                 path:     text
                 delivers?: [type_kind]?
               }
             }
             """;
 
-    /** An ordinary API schema governed by it -- two real types, and one entry that is not a type at all. */
+    /** An ordinary API schema governed by it -- two real types, and one entry that is a value, not a type. */
     private static final String API_SCHEMA = """
             !!id:"https://example.test/api.tn"
             !!meta:"https://example.test/meta-http.tn"
@@ -70,8 +71,8 @@ class MetaLayerConstructorThroughTsonTest {
             {
               search_request  => { q: text }
               search_response => { hits: [text] }
-              search => !operation {
-                path: "/search"  method: "GET"  request: search_request  response: search_response
+              api => !operations {
+                search => { path: "/search"  method: "GET"  request: search_request  response: search_response }
               }
             }
             """;
@@ -95,16 +96,16 @@ class MetaLayerConstructorThroughTsonTest {
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)).withMetaNameBinder(CONSUMER_NAMES));
     }
 
-    /** The point of the whole exercise: the resolved body <em>is</em> the consumer's own class. */
+    /** The point of the whole exercise: each resolved value of the namespace <em>is</em> the consumer's own class. */
     @Test
-    void aConsumersMetaLayerConstructorBindsThroughTheDefaults() {
+    void aConsumersMetaLayerRecordBindsThroughTheDefaults() {
         TsonLinkedSchema linked = tson().resolve(API_SCHEMA);
 
-        Operation search = assertInstanceOf(Operation.class, linked.schema().entries().get("search"));
+        Namespace<?> api = assertInstanceOf(Namespace.class, linked.schema().entries().get("api"));
+        Operation search = assertInstanceOf(Operation.class, api.get("search"));
         assertEquals("/search", search.path());
         assertEquals("GET", search.method());
         assertEquals(TypeRef.of("search_request"), search.request());
-        assertEquals(EntryKind.DATA, EntryKind.of(linked.schema().entries().get("search"), n -> true));
     }
 
     /**
@@ -112,7 +113,7 @@ class MetaLayerConstructorThroughTsonTest {
      * option identical. Pins that the option is what carries the case, not something else in the wiring.
      *
      * <p>And it fails as a <b>misconfiguration</b>, not a library gap: the consumer never registered a class
-     * for their own constructor, which is a line of wiring rather than something this library cannot do. The
+     * for their own record, which is a line of wiring rather than something this library cannot do. The
      * distinction is not cosmetic -- it used to arrive as an {@code UnsupportedOperationException}, which a
      * downstream service mapped to a 501.
      */

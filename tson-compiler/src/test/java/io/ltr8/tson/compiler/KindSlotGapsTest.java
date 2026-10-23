@@ -5,8 +5,8 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.consumer.GapApi;
 import io.ltr8.tson.compiler.consumer.GapOp;
+import io.ltr8.tson.schema.meta.Namespace;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -15,21 +15,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Names in a DATA body that the link does not judge, or cannot reach -- reported from tson-java-http, which meets
- * all three through its meta layer ({@code meta-http.tn}) and its meta-service experiment.
+ * Names in a namespace value at the slots tson-java-http's meta layer ({@code meta-http.tn}) uses, each judged by its
+ * slot's declared type.
  *
  * <ol>
  *   <li>A braced application at a kind-typed slot of a value body is refused, the alias spelling named: nothing lifts
  *       or mints in a value body, so an application there would have no entry to be the name of.
- *   <li>A name at a {@code type_ref}-typed slot of a DATA body is judged by resolution, arity and §4.1.
- *   <li>A slot reached through a record family base is followed through the subtype the value's tag selected, and a
- *       slot the walk cannot follow arrives at a collecting resolve as {@code NOT_IMPLEMENTED}.
+ *   <li>A name at a {@code type_ref}-typed slot of a value body is judged by resolution, arity and §4.1.
+ *   <li>A slot that only the subtype the value's tag selected declares, below a record family base, is judged by
+ *       its declared type ({@code SubtypeBehindFieldTest} has the same one record field further down).
  *   <li>A slot's pointer writes the key for a map key that carries annotations.
  * </ol>
  */
@@ -47,12 +46,14 @@ class KindSlotGapsTest {
                 {
                   gap_status        => !integer_type { min: 100  max: 599 }
                   gap_reply         => { status: gap_status  body: type_kind }
-                  gap_operation     => data & { request: type_kind  replies?: [gap_reply] }
-                  gap_ref_operation => data & { request: type_ref }
+                  gap_operation     => { request: type_kind  replies?: [gap_reply] }
+                  gap_operations    => namespace & { key_type: = identifier  value_type: = gap_operation }
+                  gap_ref_operation => { request: type_ref }
+                  gap_ref_ops       => namespace & { key_type: = identifier  value_type: = gap_ref_operation }
                   gap_endpoint      => { status?: gap_status ~ 200 }
                   gap_op            => gap_endpoint & { request: type_kind }
-                  gap_api           => data & { endpoints: {text => gap_endpoint} }
-                  gap_reply_map     => data & { replies: {text => gap_reply} }
+                  gap_api           => namespace & { key_type: = identifier  value_type: = gap_endpoint }
+                  gap_replies       => namespace & { key_type: = identifier  value_type: = gap_reply }
                 }
                 """);
     }
@@ -83,7 +84,7 @@ class KindSlotGapsTest {
                 {
                   order => { sku: text }
                   box   => <T> { v: T }
-                  other => !gap_operation { request: order }
+                  other => !gap_operations { o => { request: order } }
                   %s
                 }
                 """.formatted(id, more));
@@ -111,7 +112,7 @@ class KindSlotGapsTest {
     /** The bare form is judged: an undeclared name is refused at the slot, as no type declared. */
     @Test
     void baselineABareNameAtAKindSlotIsJudged() {
-        refused(schema("bare", "op => !gap_operation { request: no_such }"), "/request", "'no_such'",
+        refused(schema("bare", "op => !gap_operations { o => { request: no_such } }"), "/o/request", "'no_such'",
                 "no type declared");
     }
 
@@ -126,7 +127,8 @@ class KindSlotGapsTest {
                 "{ name: no_box  arguments: [ { name: order } ] }",
                 "{ name: box  arguments: [ { name: order } { name: order } ] }",
                 "{ name: box  arguments: [ { name: other } ] }")) {
-            refused(schema("braced-" + application.hashCode(), "op => !gap_operation { request: " + application + " }"),
+            refused(schema("braced-" + application.hashCode(),
+                            "op => !gap_operations { o => { request: " + application + " } }"),
                     "a position typed by a kind holds the name of a type", "declare an alias");
         }
     }
@@ -135,10 +137,10 @@ class KindSlotGapsTest {
     @Test
     void aBracedApplicationInANestedRecordIsRefused() {
         refused(schema("nested", """
-                op => !gap_operation {
+                op => !gap_operations { o => {
                   request: order
                   replies: [ { status: 200  body: { name: box  arguments: [ { name: no_such } ] } } ]
-                }"""),
+                } }"""),
                 "a position typed by a kind holds the name of a type");
     }
 
@@ -147,66 +149,58 @@ class KindSlotGapsTest {
     void anAliasNamesTheApplicationAtAKindSlot() {
         assertEquals(List.of(), problems(schema("alias", """
                 order_box => box<order>
-                op => !gap_operation { request: order_box }""")));
+                op => !gap_operations { o => { request: order_box } }""")));
         refused(schema("alias-bad", """
                 bad_box => box<no_such>
-                op => !gap_operation { request: bad_box }"""), "'no_such'");
+                op => !gap_operations { o => { request: bad_box } }"""), "'no_such'");
     }
 
-    // ── 2. A type_ref-typed slot of a DATA body ──────────────────────────────────────────────────────────
+    // ── 2. A type_ref-typed slot of a value body ─────────────────────────────────────────────────────────
 
     /**
      * {@code design/references.md}: "A {@code type_ref} slot is judged by resolution and arity alone", and
-     * {@code design/meta-layer-data-kind.md} gives {@code response: orders} at a {@code type_ref} slot as §4.1's
-     * refusal. Neither happens in a DATA body: a meta layer written before #747 loses every check, silently.
+     * {@code design/meta-layer-namespaces.md} gives {@code response: orders} at a {@code type_ref} slot as §4.1's
+     * refusal. Both hold in a value body as they do in a type's.
      */
     @Test
     void anUndeclaredNameAtATypeRefSlotIsRefused() {
-        refused(schema("ref-undeclared", "op => !gap_ref_operation { request: no_such }"), "'no_such'");
+        refused(schema("ref-undeclared", "op => !gap_ref_ops { o => { request: no_such } }"), "'no_such'");
     }
 
     @Test
-    void aDataEntryAtATypeRefSlotIsRefused() {
-        refused(schema("ref-data", "op => !gap_ref_operation { request: other }"), "'other'");
+    void aNamespaceEntryAtATypeRefSlotIsRefused() {
+        refused(schema("ref-namespace", "op => !gap_ref_ops { o => { request: other } }"), "'other'");
     }
 
-    // ── 3. A slot reached through a record family base ───────────────────────────────────────────────────
+    // ── 3. A slot a tagged subtype declares ──────────────────────────────────────────────────────────────
 
-    /** The map's value type is the base; the value is the subtype its tag names, which declares {@code request}. */
+    /**
+     * The namespace's value type is the base; the value is the subtype its tag names, which declares {@code request}.
+     */
     @Test
     void aSlotOnATaggedSubtypeResolves() {
-        String id = schema("family", "api => !gap_api { endpoints: { GET => !gap_op { request: order } } }");
+        String id = schema("family", "api => !gap_api { GET => !gap_op { request: order } }");
         assertEquals(List.of(), problems(id));
-        GapApi api = assertInstanceOf(GapApi.class, registry().resolveLinked(id).schema().entries().get("api"));
-        assertEquals("order", assertInstanceOf(GapOp.class, api.endpoints().get("GET")).request().name());
+        Namespace<?> api = assertInstanceOf(Namespace.class, registry().resolveLinked(id).schema().entries().get("api"));
+        assertEquals("order", assertInstanceOf(GapOp.class, api.get("GET")).request().name());
     }
 
     @Test
     void anUndeclaredNameOnATaggedSubtypeIsRefused() {
-        refused(schema("family-bad", "api => !gap_api { endpoints: { GET => !gap_op { request: no_such } } }"),
-                "/endpoints/GET/request", "'no_such'");
-    }
-
-    /** Whatever the walk does not follow, a collecting resolve reports it rather than throwing. */
-    @Test
-    void anUnfollowedSlotIsReportedNotThrown() {
-        String id = schema("family-collect", "api => !gap_api { endpoints: { GET => !gap_op { request: order } } }");
-        List<Diagnostic> problems = assertDoesNotThrow(() -> problems(id));
-        assertTrue(problems.stream().allMatch(d -> d.code() == Diagnostic.Code.NOT_IMPLEMENTED), problems.toString());
+        refused(schema("family-bad", "api => !gap_api { GET => !gap_op { request: no_such } }"),
+                "/GET/request", "'no_such'");
     }
 
     // ── 4. The pointer through an annotated key ──────────────────────────────────────────────────────────
 
     @Test
     void baselineAPlainKeyIsWrittenInThePointer() {
-        refused(schema("key", "r => !gap_reply_map { replies: { ok => { status: 200  body: no_such } } }"),
-                "/replies/ok/body");
+        refused(schema("key", "r => !gap_replies { ok => { status: 200  body: no_such } }"), "/ok/body");
     }
 
     @Test
     void anAnnotatedKeyIsWrittenInThePointer() {
         refused(schema("annotated-key",
-                "r => !gap_reply_map { replies: { @doc:\"the success reply\" ok => { status: 200  body: no_such } } }"),
-                "/replies/ok/body");
+                "r => !gap_replies { @doc:\"the success reply\" ok => { status: 200  body: no_such } }"), "/ok/body");
     }
 }

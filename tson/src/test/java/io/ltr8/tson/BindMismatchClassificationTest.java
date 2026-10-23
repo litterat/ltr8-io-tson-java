@@ -36,13 +36,14 @@ class BindMismatchClassificationTest {
 
     private static final String META_X = "https://example.test/meta-bindmismatch.tn";
 
-    /** A meta layer declaring a constructor whose instances are DATA-kinded -- and no Java class for it. */
+    /** A meta layer declaring a record held in a namespace type of its own -- and no Java class for it. */
     private static final String META_SCHEMA = """
             !!id:"https://example.test/meta-bindmismatch.tn"
             !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/38/m/meta.tn"
             {
-              notification => data & { path: text }
+              notification  => { path: text }
+              notifications => namespace & { key_type: = identifier  value_type: = notification }
             }
             """;
 
@@ -71,23 +72,23 @@ class BindMismatchClassificationTest {
     }
 
     /**
-     * {@code @data} names the kernel's own {@code data} base kind, which is abstract (SPEC-FEEDBACK.md #15): a
+     * {@code @sum} names the kernel's own {@code sum} base kind, which is abstract (SPEC-FEEDBACK.md #15): a
      * value there names the subtype it is, so an untagged one is the author's error rather than a wiring
      * problem -- a type nothing can build is never reached. §6 puts an annotation written before the name on
      * the <em>name</em> and one after the arrow on the <em>definition</em>, and both are one problem.
      */
     @Test
     void anAnnotationTypedByAnAbstractBaseKindIsTheSameProblemInEitherPosition() {
-        Diagnostic beforeTheName = only(ORDINARY_HEADER + "{\n@data:_ foo => text\n}\n");
-        Diagnostic afterTheArrow = only(ORDINARY_HEADER + "{\nfoo => @data:_ text\n}\n");
+        Diagnostic beforeTheName = only(ORDINARY_HEADER + "{\n@sum:_ foo => text\n}\n");
+        Diagnostic afterTheArrow = only(ORDINARY_HEADER + "{\nfoo => @sum:_ text\n}\n");
 
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, beforeTheName.code(), beforeTheName::message);
         assertEquals(beforeTheName.code(), afterTheArrow.code(),
                 "the same annotation, moved across the arrow, is the same problem");
         for (Diagnostic d : List.of(beforeTheName, afterTheArrow)) {
             assertEquals("/foo", d.schemaPointer().orElseThrow(), "located at the declaration");
-            assertTrue(d.message().contains("no schema in this closure declares a subtype of 'data', and it is abstract"),
-                    d::message);
+            assertTrue(d.message().contains("'sum' is abstract and has no direct instances, so a value here must name "
+                    + "its type"), d::message);
         }
     }
 
@@ -101,10 +102,10 @@ class BindMismatchClassificationTest {
      */
     @Test
     void anUnboundMetaLayerConstructorIsReportedAtTheDeclarationThatAppliedIt() {
-        Diagnostic d = only(GOVERNED_HEADER + "{\nping => !notification { path: \"/ping\" }\n}\n");
+        Diagnostic d = only(GOVERNED_HEADER + "{\npings => !notifications { ping => { path: \"/ping\" } }\n}\n");
 
         assertEquals(Diagnostic.Code.BIND_MISMATCH, d.code());
-        assertEquals("/ping", d.schemaPointer().orElseThrow());
+        assertEquals("/pings", d.schemaPointer().orElseThrow());
         assertTrue(d.schemaPosition().isPresent(), "and carries the line the author can open");
         assertTrue(d.message().contains("no bound Java class for 'notification'"), d::message);
     }

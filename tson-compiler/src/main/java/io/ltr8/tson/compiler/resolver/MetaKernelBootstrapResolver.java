@@ -313,8 +313,7 @@ public final class MetaKernelBootstrapResolver {
             // only in the defaults set tightens (§5.7): ordered/duplicating vs unordered/unique.
             case "array" -> Optional.of(toArrayBody(instance.value(), false));
             case "set_type" -> Optional.of(toArrayBody(instance.value(), true));
-            // `field_map` and `schema` are written `!namespace { ... }`: a namespace is a map in every fact.
-            case "map", "namespace" -> Optional.of(toMapBody(instance.value()));
+            case "map" -> Optional.of(toMapBody(instance.value()));
             default -> Optional.empty();
         };
     }

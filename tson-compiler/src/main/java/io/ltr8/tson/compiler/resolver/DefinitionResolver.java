@@ -30,6 +30,7 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -152,7 +153,7 @@ import java.util.function.Predicate;
  * MetaKernelBootstrapResolver}'s first pass, which never reaches {@link #resolveInstance}).
  *
  * <p><b>Kind determination</b> (§4.1, {@link #determineKind}) checks the transitive supertype chain for the
- * literal, kernel-fixed names {@code atom}/{@code product}/{@code sum}/{@code data} -- not a general
+ * literal, kernel-fixed names {@code atom}/{@code product}/{@code sum}/{@code namespace} -- not a general
  * "inherit the nearest ancestor's own kind" rule, which would be wrong: {@code atom} the entry is itself
  * {@code kind: PRODUCT}, its own chain being {@code [top type]}. None found is {@code PRODUCT} (the
  * structural default), exactly one is that kind, and two or more is a schema error. A fresh (non-composed)
@@ -219,7 +220,7 @@ final class DefinitionResolver {
 
     /**
      * Whether a name in this namespace denotes the meta-kernel's own entry -- what a kind and a constructor are
-     * judged by ([TSON-SCHEMA] §4.1), so a schema's own {@code data} or {@code top} is an ordinary type whatever
+     * judged by ([TSON-SCHEMA] §4.1), so a schema's own {@code namespace} or {@code top} is an ordinary type whatever
      * it is spelled.
      */
     private final Predicate<String> kernel;
@@ -482,10 +483,9 @@ final class DefinitionResolver {
                             + "for the type '" + annotationName + "' names -- " + e.getMessage(), e);
         } catch (BindMismatchException e) {
             // The same arm {@link #bindAtomInstance} carries, for the same reason and it is not a stylistic
-            // echo: an annotation naming a type the consumer never bound -- the kernel's own `data` among
-            // them -- is their configuration, and `MissingBindingException` exists precisely so that a
-            // missing line of wiring does not read as "this library cannot do that", which is what the
-            // catch-all below would make of it.
+            // echo: an annotation naming a type the consumer never bound is their configuration, and
+            // `MissingBindingException` exists precisely so that a missing line of wiring does not read as "this
+            // library cannot do that", which is what the catch-all below would make of it.
             String where = "'" + declaration + "': " + e.getMessage();
             throw e instanceof MissingBindingException ? new MissingBindingException(where)
                     : new BindMismatchException(where);
@@ -1154,7 +1154,12 @@ final class DefinitionResolver {
         try {
             body = definitionMetaReader.read(constructorName, value);
         } catch (ReadException e) {
-            throw bodyIsNotValidData(name, constructorName, e);
+            throw MapBody.isNamespace(metaDefinitions.definition(constructorName), metaKernel)
+                    ? payloadFailure("'" + name + "': the body", "'" + name + "': the body is no value of the "
+                            + "namespace type '" + constructorName + "', a map from its key type to its value type -- "
+                            + e.diagnostic().path().filter(path -> !path.isEmpty()).map(path -> "at " + path + ": ")
+                                    .orElse("") + e.getMessage(), e)
+                    : bodyIsNotValidData(name, constructorName, e);
         } catch (BindMismatchException e) {
             // The constructor is a meta layer's own and the consumer never registered a class for it, or
             // registered one that disagrees. Either way it is their configuration, and it already says so --
@@ -1508,7 +1513,7 @@ final class DefinitionResolver {
                     ? directSupertypes.stream().filter(parent -> !parent.arguments().isEmpty()).toList()
                     : directSupertypes);
         }
-        return new RecordBody(chain, fields, groups, RecordExtensionType.OPEN,
+        return new RecordBody(chain, RecordBody.fieldMap(fields), groups, RecordExtensionType.OPEN,
                 construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()),
                 nameType);
     }
@@ -1629,12 +1634,13 @@ final class DefinitionResolver {
     }
 
     /**
-     * §4.1: a type's kind is settled by which of the kernel's four base kinds -- {@code atom}/{@code product}/
-     * {@code sum}/{@code data}, {@code top} never counts -- its transitive supertype chain reaches, each judged by
-     * where it is defined ({@link #kernel}), never by its spelling: a schema's own {@code data} is an ordinary
-     * record. The base kinds themselves and not each ancestor's own kind: the {@code atom} entry is itself a
-     * PRODUCT (its own chain is {@code [chained, top, type]}), so "inherit the nearest ancestor's kind" would
-     * give the wrong answer even for {@code atom}'s own subtypes.
+     * §4.1: a type's kind is settled by which of the kernel's base kinds -- {@code atom}/{@code product}/
+     * {@code sum}/{@code namespace}, {@code top} never counts -- its transitive supertype chain reaches, each
+     * judged by where it is defined ({@link #kernel}), never by its spelling: a schema's own {@code namespace} is
+     * an ordinary record. The base kinds themselves and not each ancestor's own kind: the {@code atom}
+     * entry is itself a PRODUCT (its own chain is {@code [chained, top, type]}), so "inherit the nearest ancestor's
+     * kind" would give the wrong answer even for {@code atom}'s own subtypes. A chain reaching two of them is
+     * refused, {@code namespace} beside a base kind included.
      */
     EntryKind determineKind(String name, List<String> transitiveSupertypes) {
         List<String> baseKindsFound = new ArrayList<>();
@@ -1655,7 +1661,7 @@ final class DefinitionResolver {
         return EntryKind.ofChain(baseKindsFound, kernel);
     }
 
-    private static final Set<String> BASE_KINDS = Set.of("atom", "product", "sum", "data");
+    private static final Set<String> BASE_KINDS = Set.of("atom", "product", "sum", "namespace");
 
     // ── Refinement (§5.7): T ^ { ... } ─────────────────────────────────────
 
@@ -1744,7 +1750,7 @@ final class DefinitionResolver {
     private RecordBody refineOnto(String name, RefinedDef refined,
             List<String> parameters, io.ltr8.tson.schema.meta.TypeRef source,
             List<String> transitiveSupertypes, RecordBody sourceBody) {
-        SequencedMap<String, RecordField> fields = new LinkedHashMap<>(sourceBody.fields());
+        SequencedMap<String, RecordField> fields = new LinkedHashMap<>(sourceBody.fields().entries());
         List<FieldGroup> groups = new ArrayList<>(sourceBody.groups());
         Set<String> inheritedFields = Set.copyOf(sourceBody.fields().keySet());
         refuseDeclaredChain(name, refined.body().entries(), transitiveSupertypes);
@@ -1778,7 +1784,7 @@ final class DefinitionResolver {
         } else {
             chain = chain.withParents(List.of(source));
         }
-        return new RecordBody(chain, fields, groups, RecordExtensionType.OPEN,
+        return new RecordBody(chain, RecordBody.fieldMap(fields), groups, RecordExtensionType.OPEN,
                 markedNames(refined.body().entries()), sourceBody.nameType());
     }
 
@@ -1996,7 +2002,8 @@ final class DefinitionResolver {
         for (RecordEntry entry : entries) {
             resolveEntry(null, entry, fields, groups, seenFieldNames, Set.of());
         }
-        return new RecordBody(fields, groups, RecordExtensionType.OPEN, markedNames(entries), Optional.empty());
+        return new RecordBody(RecordBody.fieldMap(fields), groups, RecordExtensionType.OPEN, markedNames(entries),
+                Optional.empty());
     }
 
     /**

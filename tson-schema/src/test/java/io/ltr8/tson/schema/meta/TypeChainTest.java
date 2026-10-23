@@ -55,10 +55,10 @@ class TypeChainTest {
 
     @Test
     void aBaseKindIsJudgedByWhereItIsDefinedNeverBySpelling() {
-        RecordBody payload = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("data"));
+        RecordBody payload = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("namespace"));
 
-        assertEquals(EntryKind.DATA, EntryKind.of(payload, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(payload, n -> false), "a schema's own `data` is a record");
+        assertEquals(EntryKind.NAMESPACE, EntryKind.of(payload, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(payload, n -> false), "a schema's own `namespace` is a record");
     }
 
     @Test
@@ -66,7 +66,7 @@ class TypeChainTest {
         RecordBody constructor = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("atom", "top", "type"));
         RecordBody templated = RecordBody.of(RecordBody.fieldMap())
                 .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_KIND, Optional.empty())))
-                .withSupertypes(List.of("data", "top"));
+                .withSupertypes(List.of("namespace", "top"));
 
         assertTrue(EntryKind.isConstructor("integer_type", constructor, n -> true));
         assertTrue(EntryKind.isConstructor("op", templated, n -> true), "a template answers as its closed form");

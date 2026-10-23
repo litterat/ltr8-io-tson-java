@@ -170,7 +170,7 @@ class ApplicabilityIsIsATopTest {
 
         assertEquals(1, problems.size(), problems::toString);
         assertTrue(problems.getFirst().message().contains("'!product' names an abstract entry"), problems::toString);
-        assertTrue(problems.getFirst().message().contains("(record | array | set_type | map | namespace | tuple)"),
+        assertTrue(problems.getFirst().message().contains("(record | array | set_type | map | tuple)"),
                 problems::toString);
         assertFalse(problems.getFirst().message().contains("constraint vocabulary"),
                 "one sentence, not the applicability clause beside the abstract one: " + problems);
@@ -182,18 +182,40 @@ class ApplicabilityIsIsATopTest {
         String message = problems("  bad => !top {}").getFirst().message();
 
         assertTrue(message.contains("record"), message);
-        for (String abstractKind : List.of("type", "atom", "product", "sum", "data", "template")) {
+        for (String abstractKind : List.of("type", "atom", "product", "sum", "namespace", "template")) {
             assertFalse(message.matches("(?s).*[(| ]" + abstractKind + "[ |)].*"),
                     () -> abstractKind + " is no answer: " + message);
         }
     }
 
-    /** With nothing in scope composing it, {@code data}'s refusal says so rather than naming an empty list. */
+    /**
+     * With nothing in scope composing it, an abstract constructor's refusal says so rather than naming an empty
+     * list: a meta layer's own {@code marker => abstract top & {}}, which nothing composes, applied in a schema it
+     * governs.
+     */
     @Test
-    void dataWithNothingComposingItSaysSo() {
-        String message = problems("  bad => !data {}").getFirst().message();
+    void anAbstractConstructorWithNothingComposingItSaysSo() {
+        String meta = """
+                !!id:"https://example.test/marker-meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/38/m/meta.tn"
+                {
+                  marker => abstract top & {}
+                }
+                """;
+        String user = """
+                !!id:"https://example.test/marked.tn"
+                !!meta:"https://example.test/marker-meta.tn"
+                { bad => !marker {} }
+                """;
+        List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(
+                        "https://example.test/marker-meta.tn", meta, "https://example.test/marked.tn", user)))))
+                .validateSchema(user);
+        assertEquals(1, problems.size(), problems::toString);
+        String message = problems.getFirst().message();
 
-        assertTrue(message.contains("no constructor in scope composes 'data'"), message);
+        assertTrue(message.contains("no constructor in scope composes 'marker'"), message);
         assertFalse(message.contains("()"), message);
     }
 }

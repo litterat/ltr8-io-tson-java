@@ -25,7 +25,7 @@ that runs before it. Current form only; history lives in git.
   which keeps an instantiation entry recording the application: the record itself, or a `Reference` to the synthetic.
 - A minted record is a member of nothing: one whose chain names a declared type is refused when it is minted
   (`refuseMintedMember`), and the applied-parent fold gives it no edge.
-- An instantiation of any kind — a record member, a DATA entry, a self-reaching `Reference` hop — records the
+- An instantiation of any kind — a record member, a namespace entry, a self-reaching `Reference` hop — records the
   application it closes in the map `SchemaResolver` shares with the materialiser, which writes it on the entry's key
   as `@application`; that is what §8.2's identity and the applied-parent fold key on.
 - Kind is derived (`EntryKind.of`, judged by where each base kind is defined) and never written; a held template is
@@ -208,8 +208,8 @@ recorded open form, and replacing the application with a reference to the entry 
 - **`kind` is derived, never stored.** `EntryKind.of(value, kernel)` reads it off an entry's value — its chain and
   its branch of `Top` — so writing it would restate what the value already carries; the kernel declares no
   `type_kind`, and the model has no slot for one. A base kind in the chain counts only as the kernel's own entry
-  (`kernel` tests where the name is defined): a schema's own `data => { … }` composed into `payload => data & { … }`
-  leaves `payload` a PRODUCT. The reader stack branches on the body itself.
+  (`kernel` tests where the name is defined): a schema's own `namespace => { … }` composed into
+  `payload => namespace & { … }` leaves `payload` a PRODUCT. The reader stack branches on the body itself.
   - **Which is what the atom-refinement test rests on** (`DefinitionResolver`): an atom *instance's* body
     IS an atom (`integer` carries `!integer_type {}`), where its constructor's body is the vocabulary record
     describing one (`integer_type` carries a `!record { ... }`). So `body instanceof Atom` separates the pair
@@ -229,7 +229,8 @@ recorded open form, and replacing the application with a reference to the entry 
     makes `listed<text>` a constructor: its `!record` body describes its instances, so the body's branch
     (PRODUCT) is the wrong answer, and its kind is the base kind its chain reaches (ATOM), by the rule a
     declared entry follows (`EntryKind.ofChain`, which `DefinitionResolver.determineKind` guards). Construction then
-    transfers that kind to `!listed_text [...]`. `OpenEntryResolvedFormTest` covers `atom` and `data`.
+    transfers that kind to `!listed_text [...]`. `OpenEntryResolvedFormTest` covers `atom`, and `namespace`,
+    whose template (`payloads => <T> namespace & { … }`) closes to a namespace type the same way.
   - **And it makes the derivation total.** Every other entry's kind follows from what it already states —
     the base-kind name in its own `supertypes` for a constructor, its body's branch otherwise — and an open
     entry claiming its application's kind would be the one case needing a lookup outside itself.

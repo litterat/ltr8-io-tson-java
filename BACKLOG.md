@@ -61,20 +61,30 @@ own prose (which had gone stale on it):
   index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
   application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
-- [ ] **Namespace values as schema entries** (SPEC-FEEDBACK.md #23, step 1 of `namespace-sketch/PLAN.md`). A
-  namespace type (`api => !namespace { key_type: identifier  value_type: method }`) is a type, so a value of it,
-  `myapi => !api { ... }`, is not yet an entry: `schema.value_type` is `top`, which admits constructors' instances and
-  no value. The step is `(top | some<kind<namespace>>)`, a sum over a kind, with `data` dropped once a value lives
-  under a namespace rather than in a data constructor's instance. Until then selecting in a data-kind entry's value
-  reaches through the host's object (`ValuesByName.component`). Lands on `r2026-38-proposal` before the branch goes to
-  the reviewer.
+- [ ] **Where a namespace type may be declared** (SPEC-FEEDBACK.md #23). Settle with the
+  spec whether a user schema may declare a namespace type (#23's composition-operand reading): today only a
+  kernel-governed one can, and a schema typing a field by it cannot also import core.tn. Lands on
+  `r2026-38-proposal` before the branch goes to the reviewer.
+- [ ] **A value reached through a record value's field** (SPEC-FEEDBACK.md #23, #24). A `ref<T>` whose last segments
+  select fields of a record value (`p.x.primary`, a `pairing` held under a namespace key) is judged by the fields'
+  declared types, every refusal included, and then reported as `NOT_IMPLEMENTED`: `ValuesByName` never reads the
+  host object, so the value is neither found nor delivered into the `Ref`. Reach it through `ltr8-bind`'s class
+  descriptor for the host (the component the binding wrote the field to, under its wire name), not raw record
+  reflection, or bind a meta layer's values as a tree the walk can enter by field.
+- [ ] **JSON bind delivers a `Namespace` at a namespace-typed slot.** The TSON reader builds one where the host
+  component is a `Namespace` (`reader.BindTargets`, over a `MapBindReader` that carries the constructor's name);
+  `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
+  component there is a bind mismatch. Nothing in the JSON stack binds `schema.meta` today, so nothing fails yet; a
+  JSON reading of resolved output, a record's `fields` among it, would.
 - [ ] **Whether a kind admits an abstract type** (SPEC-FEEDBACK.md #22). `kind<record>` holds every type built with
   `record` (`KindMembers.isMember`), so it holds an abstract record (`pet => abstract { ... }`) and a record template's
   family base (`boxed => <T> { v: T }`), neither of which has instances of its own: a document writing `payload_type:
-  boxed` names a type no value is read through until an application is chosen. Settle it with `ref<T>` and the
-  namespace kind, when a kind's value becomes a resolved reference rather than a spelling. The choice is membership by
-  construction alone, as running, or a concrete-only kind that excludes every abstract member; never an exception for
-  record templates alone, since a family base is a type like any abstract record (§5.10).
+  boxed` names a type no value is read through until an application is chosen. `kind<namespace>` likewise holds the
+  abstract `namespace` itself, and `kind<api>` lists a namespace entry, `myapi`, whose value is no type (#23). Settle
+  it with `ref<T>`, when a kind's value becomes a resolved reference rather than a spelling.
+ The choice is membership by construction alone, as running, or a
+  concrete-only kind that excludes every abstract member; never an exception for record templates alone, since a family
+  base is a type like any abstract record (§5.10).
 - [ ] **A parameter in a record template has no channel of its own** (SPEC-FEEDBACK.md #17). An open record's
   parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
   type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
@@ -279,7 +289,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 - [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
   through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
-  `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
+  `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`Namespace.getAnnotations`) and survives
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => top}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else

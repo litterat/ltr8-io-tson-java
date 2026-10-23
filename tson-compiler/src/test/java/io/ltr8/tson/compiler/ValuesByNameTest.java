@@ -8,10 +8,10 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.suite.SuiteBindings;
 import io.ltr8.tson.suite.data.Binding;
-import io.ltr8.tson.suite.data.Interface;
 import io.ltr8.tson.suite.data.Method;
 import org.junit.jupiter.api.Test;
 
@@ -28,9 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A value written by name at a product-typed slot (SPEC-FEEDBACK.md #13), end to end: a meta layer declaring an
- * interface of methods and an HTTP binding naming the method it serves, a schema under it declaring an interface,
- * and a schema importing that one binding a method -- the read that keeps the name, the linker that resolves it and
- * judges its referent, and each refusal with the step it names.
+ * interface, a namespace of methods, and a namespace of HTTP bindings each naming the method it serves, a schema
+ * under it declaring an interface, and a schema importing that one binding a method -- the read that keeps the name,
+ * the linker that resolves it and judges its referent, and each refusal with the step it names.
  */
 class ValuesByNameTest {
 
@@ -48,12 +48,16 @@ class ValuesByNameTest {
                   status_name => identifier
                   method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
                                    replies?: {status_name => kind<record>} }
-                  method_map  => !namespace { key_type: method_name  value_type: method }
-                  interface   => data & { methods: method_map }
+                  interface   => namespace & { key_type: = method_name  value_type: = method }
                   http_verb   => !enum [GET POST]
-                  binding     => data & { method: ref<method>  verb: http_verb  route: text }
-                  filed_in_references => data & { request: kind<record>  method?: ref<method> }
-                  filed_nowhere       => data & { request: kind<record> }
+                  binding     => { method: ref<method>  verb: http_verb  route: text }
+                  bindings    => namespace & { key_type: = identifier  value_type: = binding }
+                  filed_in_references => { request: kind<record>  method?: ref<method> }
+                  filed_nowhere       => { request: kind<record> }
+                  refs        => namespace & { key_type: = identifier  value_type: = filed_in_references }
+                  nowheres    => namespace & { key_type: = identifier  value_type: = filed_nowhere }
+                  pairing     => { primary: method }
+                  pairings    => namespace & { key_type: = identifier  value_type: = pairing }
                 }
                 """);
         DOCUMENTS.put("https://example.test/orders.tn", orders("https://example.test/orders.tn", ""));
@@ -67,9 +71,9 @@ class ValuesByNameTest {
                 {
                   order               => { sku: text  quantity: int32 }
                   place_order_request => { order: order }
-                  orders => !interface { methods: {
+                  orders => !interface {
                     place_order => { request: place_order_request  response: order }
-                  } }
+                  }
                   %s
                 }
                 """.formatted(id, more);
@@ -130,20 +134,20 @@ class ValuesByNameTest {
     @Test
     void anInterfaceHoldsItsRequestByName() {
         TsonLinkedSchema linked = registry().resolveLinked("https://example.test/orders.tn");
-        Interface orders = assertInstanceOf(Interface.class, linked.schema().entries().get("orders"));
+        Namespace<?> orders = assertInstanceOf(Namespace.class, linked.schema().entries().get("orders"));
         assertEquals(new Method(TypeRef.of("place_order_request"), TypeRef.of("order"), null, null),
-                orders.methods().get("place_order"));
+                orders.get("place_order"));
     }
 
-    /** {@code method: orders.methods.place_order}: an entry, a field of its body, a key of that map. */
+    /** {@code method: orders.place_order}: an entry, then a key of the namespace value it holds. */
     @Test
     void aBindingNamesAMethodThroughItsInterface() {
         String id = api("binds", """
-                post_orders => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }""");
+                routes => !bindings { post_orders => { method: orders.place_order  verb: POST  route: "/orders" } }""");
         assertEquals(List.of(), problems(id));
-        Binding binding = assertInstanceOf(Binding.class,
-                registry().resolveLinked(id).schema().entries().get("post_orders"));
-        assertEquals("orders.methods.place_order", binding.method().name());
+        Binding binding = assertInstanceOf(Binding.class, ((Namespace<?>) registry().resolveLinked(id).schema().entries()
+                .get("routes")).get("post_orders"));
+        assertEquals("orders.place_order", binding.method().name());
         assertEquals("POST", binding.verb());
         assertEquals("/orders", binding.route());
     }
@@ -152,7 +156,7 @@ class ValuesByNameTest {
     void aRecordEntryIsARecord() {
         assertEquals(List.of(), problems(api("record", """
                 order_ref => { id: text }
-                api => !interface { methods: { m => { request: order_ref } } }""")));
+                api => !interface { m => { request: order_ref } }""")));
     }
 
     @Test
@@ -160,14 +164,14 @@ class ValuesByNameTest {
         assertEquals(List.of(), problems(api("alias", """
                 order_ref => { id: text }
                 req       => order_ref
-                api => !interface { methods: { m => { request: req } } }""")));
+                api => !interface { m => { request: req } }""")));
     }
 
     @Test
     void aCompositionsBodyIsBuiltByRecord() {
         assertEquals(List.of(), problems(api("composition", """
                 order_v2 => order & { note: text }
-                api => !interface { methods: { m => { request: order_v2 } } }""")));
+                api => !interface { m => { request: order_v2 } }""")));
     }
 
     /** A list slot: each element is its own name, at its own index. */
@@ -175,10 +179,10 @@ class ValuesByNameTest {
     void eachErrorRecordIsJudged() {
         assertEquals(List.of(), problems(api("errors", """
                 not_found => { id: text }
-                api => !interface { methods: { m => { errors: [not_found place_order_request] } } }""")));
+                api => !interface { m => { errors: [not_found place_order_request] } }""")));
         refused(api("errors-refused", """
-                api => !interface { methods: { m => { errors: [order uuid] } } }"""),
-                "/methods/m/errors/1", "'uuid' is an entry whose body is built by 'uuid_type'", "no 'record'");
+                api => !interface { m => { errors: [order uuid] } }"""),
+                "/m/errors/1", "'uuid' is an entry whose body is built by 'uuid_type'", "no 'record'");
     }
 
     // ── Refusals, each naming its step ──────────────────────────────────────────────────────────────
@@ -187,50 +191,75 @@ class ValuesByNameTest {
     void anAtomEntryIsNoRecord() {
         refused(api("uuid", """
                 user_id => uuid
-                api => !interface { methods: { m => { request: user_id } } }"""),
-                "/methods/m/request", "'user_id' (an alias of 'uuid')", "built by 'uuid_type'", "no 'record'");
+                api => !interface { m => { request: user_id } }"""),
+                "/m/request", "'user_id' (an alias of 'uuid')", "built by 'uuid_type'", "no 'record'");
     }
 
     /** A kind-typed slot holds a type's name, one segment: a qualified name there fails the kind's own grammar. */
     @Test
     void aMethodIsNoRecord() {
         refused(api("method-as-record", """
-                api => !interface { methods: { m => { request: orders.methods.place_order } } }"""),
-                "'orders.methods.place_order'", "cannot appear in an identifier");
+                api => !interface { m => { request: orders.place_order } }"""),
+                "'orders.place_order'", "cannot appear in an identifier");
     }
 
     @Test
     void aMemberIsReachedThroughItsEntry() {
         refused(api("no-entry", """
-                b => !binding { method: place_order  verb: POST  route: "/" }"""),
-                "'b' at /method", "'place_order' is no entry");
+                routes => !bindings { b => { method: place_order  verb: POST  route: "/" } }"""),
+                "'routes' at /b/method", "'place_order' is no entry");
     }
 
+    /** Past a key the value is a {@code method} record, and a segment there selects a field it declares. */
     @Test
     void aSegmentThatIsNoFieldNamesTheFieldsThereAre() {
         refused(api("no-field", """
-                b => !binding { method: orders.place_order  verb: POST  route: "/" }"""),
-                "'orders' is an 'interface', which has no field 'place_order'", "it declares methods");
+                routes => !bindings { b => { method: orders.place_order.nope  verb: POST  route: "/" } }"""),
+                "'orders.place_order' is a 'method', which has no field 'nope'", "it declares request, response");
+    }
+
+    /** A field a record value declares is followed by its declared type, which is judged against the slot. */
+    @Test
+    void aSegmentThroughARecordValuesFieldIsJudgedByType() {
+        refused(api("through-field", """
+                routes => !bindings { b => { method: orders.place_order.request  verb: POST  route: "/" } }"""),
+                "wants a 'method'", "'orders.place_order.request' is a ", "which is no 'method'");
+    }
+
+    /**
+     * A name whose walk passes a record value's field and arrives at the slot's type is judged by type alone: the walk
+     * enters a value by namespace keys and never reads a host's field, so the value is neither found nor delivered,
+     * and the name is reported as this library's gap rather than accepted unjudged.
+     */
+    @Test
+    void aValueReachedThroughARecordValuesFieldIsAGap() {
+        List<Diagnostic> problems = problems(api("through-field-gap", """
+                p      => !pairings { x => { primary: { request: order } } }
+                routes => !bindings { b => { method: p.x.primary  verb: POST  route: "/" } }"""));
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, problems.getFirst().code(), problems.toString());
+        assertTrue(problems.getFirst().message().contains("'p.x.primary', a field of a record value"),
+                problems.getFirst().message());
     }
 
     @Test
     void aSegmentThatIsNoKeyNamesTheKeysThereAre() {
         refused(api("no-key", """
-                b => !binding { method: orders.methods.cancel_order  verb: POST  route: "/" }"""),
-                "'orders.methods' has no key 'cancel_order'", "it holds place_order");
+                routes => !bindings { b => { method: orders.cancel_order  verb: POST  route: "/" } }"""),
+                "'orders' has no key 'cancel_order'", "it holds place_order");
     }
 
     @Test
     void aRecordIsNoMethod() {
         refused(api("record-as-method", """
-                b => !binding { method: place_order_request  verb: POST  route: "/" }"""),
+                routes => !bindings { b => { method: place_order_request  verb: POST  route: "/" } }"""),
                 "wants a 'method'", "built by 'record'", "no 'method'");
     }
 
     @Test
     void aTypeEntryAdmitsNoFurtherSegment() {
         refused(api("type-segment", """
-                b => !binding { method: order.sku  verb: POST  route: "/" }"""),
+                routes => !bindings { b => { method: order.sku  verb: POST  route: "/" } }"""),
                 "'order' is a type", "admits no further segment");
     }
 
@@ -238,35 +267,35 @@ class ValuesByNameTest {
     void aMapValueIsANameAtItsKey() {
         assertEquals(List.of(), problems(api("replies", """
                 not_found => { id: text }
-                api => !interface { methods: { m => { replies: { ok => order  missing => not_found } } } }""")));
+                api => !interface { m => { replies: { ok => order  missing => not_found } } }""")));
         refused(api("replies-refused", """
-                api => !interface { methods: { m => { replies: { ok => uuid } } } }"""),
-                "/methods/m/replies/ok", "built by 'uuid_type'");
+                api => !interface { m => { replies: { ok => uuid } } }"""),
+                "/m/replies/ok", "built by 'uuid_type'");
     }
 
     @Test
     void anOpenEntryNamesNoValue() {
         refused(api("template", """
                 box => <T> { v: T }
-                api => !interface { methods: { m => { request: box } } }"""),
+                api => !interface { m => { request: box } }"""),
                 "'box' is an open entry", "denotes no value until it is applied");
     }
 
     @Test
     void aListHasNoNamedMembers() {
         refused(api("list-segment", """
-                api => !interface { methods: { m => { errors: [order] } } }
-                b => !binding { method: api.methods.m.errors.x  verb: POST  route: "/" }"""),
-                "'api.methods.m.errors' is a list, whose elements have no names");
+                api => !interface { m => { errors: [order] } }
+                routes => !bindings { b => { method: api.m.errors.x  verb: POST  route: "/" } }"""),
+                "'api.m.errors' is a list, whose elements have no names");
     }
 
-    /** §4.1's refusal, unchanged: a product-typed position is not a type position. */
+    /** §4.1's refusal: a namespace entry is a value, and a type position holds no value. */
     @Test
-    void aDataEntryAtATypePositionIsStillRefused() {
+    void aNamespaceEntryAtATypePositionIsRefused() {
         List<Diagnostic> problems = problems(api("data-as-type", """
-                api => !interface { methods: { m => { response: orders } } }"""));
+                api => !interface { m => { response: orders } }"""));
         assertEquals(1, problems.size(), problems.toString());
-        assertTrue(problems.getFirst().message().contains("which is no 'type'"),
+        assertTrue(problems.getFirst().message().contains("'orders' is a value of the namespace type 'interface'"),
                 problems.getFirst().message());
     }
 
@@ -274,7 +303,7 @@ class ValuesByNameTest {
     @Test
     void aQuotedNameIsText() {
         List<Diagnostic> problems = problems(api("quoted", """
-                b => !binding { method: "orders.methods.place_order"  verb: POST  route: "/" }"""));
+                routes => !bindings { b => { method: "orders.place_order"  verb: POST  route: "/" } }"""));
         assertEquals(1, problems.size(), problems.toString());
         assertTrue(problems.getFirst().message().contains("expected the name of a 'method' value"),
                 problems.getFirst().message());
@@ -292,10 +321,10 @@ class ValuesByNameTest {
     @Test
     void aMalformedNameIsRefusedWhereItIsResolved() {
         refused(api("bad-segment", """
-                b => !binding { method: orders.1x  verb: POST  route: "/" }"""),
-                "'b' at /method holds 'orders.1x', which is no qualified name", "'1x' is not");
+                routes => !bindings { b => { method: orders.1x  verb: POST  route: "/" } }"""),
+                "'routes' at /b/method holds 'orders.1x', which is no qualified name", "'1x' is not");
         refused(api("leading-dot", """
-                b => !binding { method: .orders  verb: POST  route: "/" }"""),
+                routes => !bindings { b => { method: .orders  verb: POST  route: "/" } }"""),
                 "holds '.orders', which is no qualified name", "one is empty");
     }
 
@@ -306,7 +335,7 @@ class ValuesByNameTest {
                 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/38/m/meta.tn"
                 {
-                  %s => data & { a: %s }
+                  %s => { a: %s }
                 }
                 """.formatted(id, constructor, fieldType));
         DataBindContext context = SchemaMetaNameBinder.contextExtendedWith(new DataNameBinder.DefaultDataNameBinder(
@@ -327,13 +356,13 @@ class ValuesByNameTest {
     void resolvedOutputWritesTheNameAsWrittenAndReadsItBack() {
         TsonCompiledMetaRegistry registry = registry();
         String id = api("written", """
-                post_orders => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }""");
-        Object body = registry.resolveLinked(id).schema().entries().get("post_orders");
+                routes => !bindings { post_orders => { method: orders.place_order  verb: POST  route: "/orders" } }""");
+        Object body = registry.resolveLinked(id).schema().entries().get("routes");
 
         String written = new TsonObjectWriter(SuiteBindings.context()).toTson(body);
-        assertTrue(written.replaceAll("\\s+", " ").contains("method: orders.methods.place_order"), written);
+        assertTrue(written.replaceAll("\\s+", " ").contains("method: orders.place_order"), written);
 
-        Object read = registry.loadMeta(META_SERVICE).compiledSchema().find("binding").orElseThrow()
+        Object read = registry.loadMeta(META_SERVICE).compiledSchema().find("top").orElseThrow()
                 .read(TestDocuments.document(written));
         assertEquals(body, read);
     }
@@ -347,12 +376,12 @@ class ValuesByNameTest {
     @Test
     void aReferenceByNameFiledInReferencesIsStillJudgedBySlot() {
         refused(api("filed-text", """
-                a => !filed_in_references { request: text }"""), "'a' at /request", "built by 'text_type'");
+                a => !refs { x => { request: text } }"""), "'a' at /x/request", "built by 'text_type'");
         refused(api("filed-alias", """
                 user_id => uuid
-                a => !filed_in_references { request: user_id }"""), "'a' at /request", "built by 'uuid_type'");
+                a => !refs { x => { request: user_id } }"""), "'a' at /x/request", "built by 'uuid_type'");
         assertEquals(List.of(), problems(api("filed-right", """
-                a => !filed_in_references { request: order  method: orders.methods.place_order }""")));
+                a => !refs { x => { request: order  method: orders.place_order } }""")));
     }
 
     /**
@@ -362,12 +391,12 @@ class ValuesByNameTest {
     @Test
     void aReferenceHostReceivesTheValueItNamesWhenTheSchemaLinks() {
         String id = api("delivered", """
-                b => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }""");
+                routes => !bindings { b => { method: orders.place_order  verb: POST  route: "/orders" } }""");
 
-        io.ltr8.tson.suite.data.Binding b = assertInstanceOf(io.ltr8.tson.suite.data.Binding.class,
-                registry().resolveLinked(id).schema().entries().get("b"));
+        Binding b = assertInstanceOf(Binding.class,
+                ((Namespace<?>) registry().resolveLinked(id).schema().entries().get("routes")).get("b"));
 
-        assertEquals("orders.methods.place_order", b.method().name());
+        assertEquals("orders.place_order", b.method().name());
         assertTrue(b.method().isResolved(), "delivered at link");
         assertEquals("place_order_request", b.method().get().request().name());
     }
@@ -376,11 +405,11 @@ class ValuesByNameTest {
     @Test
     void aReferenceByNameDeclaredNowhereIsStillJudgedBySlot() {
         refused(api("nowhere-text", """
-                a => !filed_nowhere { request: text }"""), "'a' at /request", "built by 'text_type'");
+                a => !nowheres { x => { request: text } }"""), "'a' at /x/request", "built by 'text_type'");
         refused(api("nowhere-alias", """
                 user_id => uuid
-                a => !filed_nowhere { request: user_id }"""), "'a' at /request", "built by 'uuid_type'");
+                a => !nowheres { x => { request: user_id } }"""), "'a' at /x/request", "built by 'uuid_type'");
         assertEquals(List.of(), problems(api("nowhere-right", """
-                a => !filed_nowhere { request: order }""")));
+                a => !nowheres { x => { request: order } }""")));
     }
 }

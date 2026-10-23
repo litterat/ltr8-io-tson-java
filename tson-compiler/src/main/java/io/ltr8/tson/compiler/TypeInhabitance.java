@@ -2,6 +2,10 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Scoped;
+import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.KindBody;
@@ -118,7 +122,9 @@ final class TypeInhabitance {
             case RefBody ignored -> true; // a name; what it reaches is the linker's judgement
             case Reference reference -> refInhabited(reference.target(), namespace, inhabited);
             case TemplateBody ignored -> true; // open, answered above
-            default -> true; // an atom's own satisfiability is its family's question, not this one
+            case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
+            case Scoped ignored -> true; // a scope's values name their own types
+            case Namespace<?> ignored -> true; // a value, which nothing is typed by
         };
     }
 
@@ -293,7 +299,11 @@ final class TypeInhabitance {
                     .map(element -> element.elementType().name()).findFirst().orElse(null);
             case Reference reference -> refInhabited(reference.target(), namespace, inhabited)
                     ? null : reference.target().name();
-            default -> null; // a choice fails on every variant at once, so no single link continues the chain
+            // A choice fails on every variant at once, so no single link continues the chain; the rest name none.
+            case Sum ignored -> null;
+            case Atom ignored -> null;
+            case TemplateBody ignored -> null;
+            case Namespace<?> ignored -> null;
         };
     }
 }

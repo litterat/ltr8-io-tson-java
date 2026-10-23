@@ -12,6 +12,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.suite.SuiteBindings;
@@ -91,8 +92,8 @@ class Class2ConformanceSuiteTest {
     private static Tson newTson() {
         // The schema.meta-resolving context, because a `schema/` vector binds a resolved-form document back
         // into the value model to compare it. It changes nothing for the other two layers. Both it and the meta
-        // name binder add a host class for each `data` constructor a corpus fixture declares (SuiteBindings): an
-        // instance of one reads only into a class, when the resolver binds it and when its resolved output is
+        // name binder add a host class for each record a corpus fixture's namespace types hold (SuiteBindings): a
+        // value of one reads only into a class, when the resolver binds it and when its resolved output is
         // read back.
         //
         // The source serves the corpus's own schemas beside the bundled ones, which is what lets a subject
@@ -139,7 +140,7 @@ class Class2ConformanceSuiteTest {
             case "valid" -> {
                 assertEquals(List.of(), problems, "a valid schema vector must load cleanly");
                 Map<String, Top> ours = ResolvedForm.ownEntries(tson, identityOf(source));
-                // Under the subject's own meta, which a `data` constructor's instance needs (RUNNER.md).
+                // Under the subject's own meta, which an instance of its namespace type needs (RUNNER.md).
                 Map<String, Top> expected = ResolvedForm.readResolved(tson,
                         fieldText(outcomePayload(sidecar), "resolved"),
                         hasField(sidecar, "meta") ? Sidecar.resolveShortName(fieldText(sidecar, "meta"))
@@ -306,7 +307,7 @@ class Class2ConformanceSuiteTest {
         }
     }
 
-    private static Top definitionOf(Map<String, Top> entries, String name) {
+    private static Top definitionOf(Namespace<Top> entries, String name) {
         Top definition = entries.get(name);
         if (definition != null) {
             return definition;

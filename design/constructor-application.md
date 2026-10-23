@@ -45,55 +45,54 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   Asking the alias would answer all four from an empty supertype chain and a `REFERENCE` kind, which is what
   a hop looks like rather than what it points at. The author's spelling survives where it is visible: the tag resolved output
   writes (`EntryFacts.constructor`) is the name they wrote, so the chain stays walkable from resolved output.
-- **What `!C { … }` may apply is IS-A `top` (§4.1)** (`requireApplicable`), asked of that terminal entry. §4.1 makes
-  every base kind IS-A `top` and every constructor transitively so, while IS-A stops at construction — an
-  instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond
-  them, exactly the entries describing *a type* rather than a part of one. Over the bundled schemas that is
-  every vocabulary constructor plus `top`, `type`, the four base kinds, `reference` and `template` — judged by where
-  `top` is defined (`EntryKind.isConstructor`, one predicate the resolver's gate, the linker's §2.2.2 eligibility,
-  the meta's reader table and the governed compile all ask), and over a template's chain as over a closed one's.
-  **A per-entry constructor marker would be both too narrow and inconsistent.** `reference` describes no
-  value, so it would go unmarked, and the language needs it applicable — which takes a by-name exception that
-  the open and closed paths must then both remember, or `<T> !reference { target: T }` resolves while
-  `!reference { target: int32 }` does not, one construction with two answers. IS-A `top` needs no exception.
-  `top`, `type` and the base kinds are admitted and then refused as abstract (SPEC-FEEDBACK.md #15): each is
-  `extension: ABSTRACT`, so its reader is the abstract dispatch every abstract record has, and a tag naming the
-  base itself is refused naming the subtypes that would satisfy the position, which is the better message. What stays
-  out is the component set — `record_field`, `type_ref`, `type_argument`, `tuple_element`, `field_group`,
-  `integer_size`, `atom_specification` — record-bodied with empty chains; without a check those fail anyway on `Top`
-  being sealed, but as a `ClassCastException` surfaced as `NOT_IMPLEMENTED`, a non-verdict for an author error.
+- **What `!C { … }` may apply is IS-A `top` (§4.1)** (`requireApplicable`), asked of that terminal entry. §4.1
+  makes every base kind IS-A `top` and every constructor transitively so, while IS-A stops at construction — an
+  instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond them,
+  exactly the entries describing *a type* rather than a part of one. Over the bundled schemas that is every
+  vocabulary constructor plus `top`, `type`, the three base kinds, `namespace` (and the namespace types, `schema`
+  and `field_map` among them), `reference` and `template` — judged by where `top` is defined
+  (`EntryKind.isConstructor`, one predicate the resolver's gate, the linker's §2.2.2 eligibility, the meta's reader
+  table and the governed compile all ask), and over a template's chain as over a closed one's. **A per-entry
+  constructor marker would be both too narrow and inconsistent.** `reference` describes no value, so it would go
+  unmarked, and the language needs it applicable — which takes a by-name exception that the open and closed paths
+  must then both remember, or `<T> !reference { target: T }` resolves while `!reference { target: int32 }` does
+  not, one construction with two answers. IS-A `top` needs no exception. `top`, `type`, the base kinds and
+  `namespace` are admitted and then refused as abstract (SPEC-FEEDBACK.md #15): each is `extension: ABSTRACT`, so
+  its reader is the abstract dispatch every abstract record has, and a tag naming the base itself is refused naming
+  the subtypes that would satisfy the position, which is the better message. What stays out is the component set —
+  `record_field`, `type_ref`, `type_argument`, `tuple_element`, `field_group`, `integer_size`, `atom_specification`
+  — record-bodied with empty chains; without a check those fail anyway on `Top` being sealed, but as a
+  `ClassCastException` surfaced as `NOT_IMPLEMENTED`, a non-verdict for an author error.
   `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so a head the gate admits has a reader.
-  **Admitting `reference` closed means giving it the alias's own entry**, not just letting it through:
-  `!reference { target: X }` resolves to `kind: REFERENCE` with `X` as its body, the same entry
-  `name => X` denotes (§8.3), where a construction of any other head takes the head's kind and records the head
-  as its constructor. The closed path dispatches on the *body* being a `Reference`, having already read it;
-  `resolveInstanceTemplate` holds its body unread and so goes by the head's name.
-  **`template` is admitted by the predicate and refused by name** (`requireAuthorable`, on both paths). It is IS-A
-  `top` because resolved output is typed by it, but it is resolver vocabulary (§8.1): an open entry's body, derived
-  from a declaration's `<…>` and never applied by a source declaration. Admitted, `!template { parameters: [T]
-  template: "…" }` would mint an open entry with a hand-written held body, skipping every declaration-time check
-  §5.10 makes of a template. Tested at the chain's end, so an alias of it is refused too.
-  **Two more questions are asked in the same terms.** Atom refinement asks §5.5's question — *is this an atom instance?* —
-  as **ATOM-kinded and not itself applicable**,
-  which is exactly what an instance is: §4.1's "IS-A does not extend below construction" is what separates the
-  pair, `!T {}` transferring kind and not supertypes, so `integer` carries an empty chain where
-  `integer_type => atom & { … }` carries `[atom, top]`.
-  **Both halves are needed, and the obvious single test runs backwards.** IS-A `atom` is true of the
+  **Admitting `reference` closed means giving it the alias's own entry**, not just letting it through: `!reference
+  { target: X }` resolves to `kind: REFERENCE` with `X` as its body, the same entry `name => X` denotes (§8.3),
+  where a construction of any other head takes the head's kind and records the head as its constructor (a namespace
+  type's, `!api { … }`, is `NAMESPACE` with a `Namespace` for body, `design/schema-resolution.md`). The closed
+  path dispatches on the *body* being a `Reference`, having already read it; `resolveInstanceTemplate` holds its
+  body unread and so goes by the head's name. **`template` is admitted by the predicate and refused by name**
+  (`requireAuthorable`, on both paths). It is IS-A `top` because resolved output is typed by it, but it is resolver
+  vocabulary (§8.1): an open entry's body, derived from a declaration's `<…>` and never applied by a source
+  declaration. Admitted, `!template { parameters: [T] template: "…" }` would mint an open entry with a hand-written
+  held body, skipping every declaration-time check §5.10 makes of a template. Tested at the chain's end, so an
+  alias of it is refused too. **Two more questions are asked in the same terms.** Atom refinement asks §5.5's
+  question — *is this an atom instance?* — as **ATOM-kinded and not itself applicable**, which is exactly what an
+  instance is: §4.1's "IS-A does not extend below construction" is what separates the pair, `!T {}` transferring
+  kind and not supertypes, so `integer` carries an empty chain where `integer_type => atom & { … }` carries `[atom,
+  top]`. **Both halves are needed, and the obvious single test runs backwards.** IS-A `atom` is true of the
   *constructor* and false of every instance — measured, it disagrees with the truth on 103 of the 211 bundled
-  entries, selecting precisely the wrong side — while kind alone cannot separate them either, an atom
-  constructor being ATOM-kinded exactly like its instances. Together they agree on all 211. The construction
-  hint in the refusal rides on the same applicability question, so `!top ^ { … }` gets the plain answer rather
-  than advice that would fail in turn. And the governed-compile factory lookup asks IS-A `top`, so a
-  construction that resolved reaches a factory rather than failing "out of scope" on a narrower test.
-  **There is no marker.** §12.1's grammar has no constructor sigil and §8.1's `type` no
-  `constructor` field: what makes an entry a constructor is that it IS-A `top`, which its supertype chain
-  records. **§2.2.2 eligibility** — who may declare one —
-  asks the linker whether the entry IS-A `top`, so an ordinary type library cannot reach constructor
-  level, by composing its way there or otherwise. **There is no separate level discipline**: composition
-  propagates the chain, so an entry deriving from a constructor *is* one, and there is nothing to refuse
-  beyond eligibility — which refuses the declaration outright in an ordinary schema, and in a meta-schema,
-  where extending a vocabulary is the point, simply allows it. `ApplicabilityIsIsATopTest` and
-  `ConstructorLevelDisciplineTest` pin both halves; §3.3.1 and §4.2 are the spec side.
+  entries, selecting precisely the wrong side — while kind alone cannot separate them either, an atom constructor
+  being ATOM-kinded exactly like its instances. Together they agree on all 211. The construction hint in the
+  refusal rides on the same applicability question, so `!top ^ { … }` gets the plain answer rather than advice that
+  would fail in turn. And the governed-compile factory lookup asks IS-A `top`, so a construction that resolved
+  reaches a factory rather than failing "out of scope" on a narrower test. **There is no marker.** §12.1's grammar
+  has no constructor sigil and §8.1's `type` no `constructor` field: what makes an entry a constructor is that it
+  IS-A `top`, which its supertype chain records. **§2.2.2 eligibility** — who may declare one — asks the linker
+  whether the entry IS-A `top`, so an ordinary type library cannot reach constructor level, by composing its way
+  there or otherwise. **There is no separate level discipline**: composition propagates the chain, so an entry
+  deriving from a constructor *is* one, and there is nothing to refuse beyond eligibility — which refuses the
+  declaration outright in an ordinary schema, and in a meta-schema, where extending a vocabulary is the point,
+  simply allows it. `ApplicabilityIsIsATopTest` and `ConstructorLevelDisciplineTest` pin both halves; §3.3.1 and
+  §4.2 are the spec side.
 - **§4.2's remaining declaration-time rule is placement** — a constructor declared only in a schema whose own
   `!!meta` names the meta-kernel — which is the eligibility rule above, checked in the linker.
   **Construction is exempt**: §5.5 transfers kind and no supertypes, so `!C { … }` yields an

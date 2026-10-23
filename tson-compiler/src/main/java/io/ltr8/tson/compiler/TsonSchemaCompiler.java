@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.reader.DeferredTypeReader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
@@ -272,8 +273,13 @@ public final class TsonSchemaCompiler {
                         EntryDisplayName.of(name, definition, linked.schema().factsOf(name),
                                 linked.schema().applicationOf(name)));
             }
-            ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
-            TsonTypeReader<?> built = factory.create(name, definition,
+            // A namespace type resolves to a record of the facets it states, and a value of it is the map they
+            // describe, never a record of those facets. Its keys are read under a pinned key family, and by their
+            // spelling alone where the family is a default the host supplies (MapBody.Namespace#read): a record's
+            // field names, which linking judges by the record's name_type.
+            Top read = linked.namespace(name).<Top>map(MapBody.Namespace::read).orElse(body);
+            ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(read));
+            TsonTypeReader<?> built = factory.create(name, read,
                     new ValueReaderContext(linked, readers, foreign, namesMeaning, referrers));
             // §7.2's subsumption rule, applied at every position it governs rather than only where a record
             // happened to have subtypes -- see Subsumption for which kinds it deliberately leaves alone.

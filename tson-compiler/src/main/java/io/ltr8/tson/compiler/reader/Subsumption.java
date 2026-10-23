@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -96,10 +97,10 @@ public final class Subsumption {
      * <p>An entry with no aliases is absent rather than present-and-singleton: the overwhelming majority,
      * and {@link #admitting} adds the name itself anyway.
      */
-    public static Map<String, Set<String>> namesMeaning(Map<String, ? extends Top> entries) {
+    public static Map<String, Set<String>> namesMeaning(Namespace<? extends Top> entries) {
         Map<String, Set<String>> index = new LinkedHashMap<>();
         entries.forEach((written, definition) -> {
-            String terminal = ReferenceChain.terminal(written, entries);
+            String terminal = ReferenceChain.terminal(written, entries::get);
             if (!terminal.equals(written)) {
                 index.computeIfAbsent(terminal, ignored -> new LinkedHashSet<>()).add(written);
             }

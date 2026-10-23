@@ -11,16 +11,23 @@ Current form only; history lives in git.
   a document's own `!!id`, which must already be written canonically. Neither rewrites an identity into validity.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds.
-- A reference to a DATA-kinded entry is refused at every position a type-ref occupies.
+- A reference to a namespace entry (a `Namespace`, `myapi => !api { … }`) is refused at every position a type-ref
+  occupies: it is a value, and nothing is typed by it.
 - A kernel slot typed `type_kind` (`record_field.type`, the element and container type slots, `choice.variants`, a
   parameter's `type` and `bound`) is judged by `KindMembers` in `validateTypeRef`, after resolution: a constructor
   named as a type is refused there. A `type_ref` slot, the application form, and `reference.target`, which may name
   a constructor, are judged by resolution and arity alone (`constructors == null`). `design/references.md` has the account.
 - A value by name (`TsonSchema.valuesByName`, collected by the read) resolves its first segment in the schema's own
-  merged namespace, alias hops followed, never the meta's; each further segment selects in the bound value; the
-  referent's declared type must IS-A the slot's, compared by canonical identity. Local entries only, after
+  merged namespace, alias hops followed, never the meta's; each further segment selects in the value reached, a key
+  of a `Namespace` value or a field of a record value; the referent's declared type must IS-A the slot's, compared
+  by canonical identity. A field step is judged by its declared type, and the value behind it is a gap
+  (`NOT_IMPLEMENTED`), never read off a host object. Local entries only, after
   `validateEntry`, which skips a by-name reference a body also returns from `references()` (matched by identity).
-- `entryOrigins`, `enumForms` and `nameTypes` are on `TsonLinkedSchema`, never on `TsonSchema` or an entry's value.
+- `entryOrigins`, `enumForms`, `nameTypes` and `namespaces` are on `TsonLinkedSchema`, never on `TsonSchema` or an
+  entry's value.
+- A value of a namespace type is read as the map `TsonLinkedSchema.namespace` gives for it, never as the record of
+  facets the type resolves to: both compilers hand `MapBody.Namespace.read()` to the `map` factory, and `ValuesByName`
+  walks `map()`. A DEFAULT key family is the host's, so its keys are read by spelling and judged after resolution.
 - An enum's and a record's `name_type` is an identifier family whose `normalization` implies NFC (`NONE` never;
   `ASCII_CASEFOLD` only over ASCII — `NameType.formRefusal`); their names are judged under its profile, never the
   kernel's identifier's.
@@ -37,13 +44,14 @@ Current form only; history lives in git.
   template's held body), and otherwise in the schema's; the enum checks run before the name checks, and an enum they
   refuse is not judged by name again.
 - A kind is an atom whose values are type names. Its `members` are recomputed for **every** kind in the closure,
-  imports included, and never trusted from a body; `of` resolves in the structure namespace alone and must be `type` or
-  IS-A it. `KindBody`'s equality is `of` alone, so an importer re-deriving an import's kind unifies with it.
+  imports included, and never trusted from a body; `of` resolves in the structure namespace alone and must be `type`
+  or `namespace`, or IS-A either. `KindBody`'s equality is `of` alone, so an importer re-deriving an import's kind
+  unifies with it.
 - Whether a `name_type` referent may stand in its slot is membership of the slot's kind (`NameType.admits`, reading
   `identifier_kind` off the constructor's `name_type` field), never a test of the referent's body class; the
   diagnostics are the ones the coded check had.
 
-Related: `design/meta-layer-data-kind.md`, `design/choice-disjointness.md`, `design/name-hygiene-and-minted-names.md`,
+Related: `design/meta-layer-namespaces.md`, `design/choice-disjointness.md`, `design/name-hygiene-and-minted-names.md`,
 `design/class2-compilation.md`, `design/compiled-registries.md`, `design/schema-resolution.md`.
 
 ## Schema registry and linking (`tson-compiler/TsonSchemaLinker.java`, `tson-schema/.../`, `tson-base`)
@@ -95,14 +103,12 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   `withNameAnnotations` → the `@disjoint` check;
   (4) **validate** every reference
   resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter);
-  **a reference to a DATA-kinded entry is refused** — every schema-map entry is a name a type-ref can reach, so an
-  entry describing something other than a data value has no way to say "declare me, but let nothing name me
-  as a type"; the `Data` body *is* that way, and the check applies at every position a type-ref occupies (a
-  field type, a choice variant, an array element, a map value). Without it the misuse resolves, links **and**
-  compiles, and fails only when a document is finally read against it (§4.1 makes naming one where a type is
-  expected a resolver error). A DATA
-  entry's own references are validated too, and it is the body that says which they are — see the `Data`
-  note in `design/meta-layer-data-kind.md`;
+  **a reference to a namespace entry is refused** — every schema-map entry is a name a type-ref can reach, and a
+  namespace entry is a value, a map of names, so nothing may be typed by it; the check applies at every position a
+  type-ref occupies (a field type, a choice variant, an array element, a map value) and names the namespace type the
+  entry is a value of. Without it the misuse resolves, links **and** compiles, and fails only when a document is
+  finally read against it. A namespace entry's keys and values were judged by the read, and the names its values hold
+  are recorded and judged by `ValuesByName` (`design/meta-layer-namespaces.md`), so `validateBody` asks nothing of it;
   **a choice's variants are checked distinct** (§5.4) at the *end of each variant's §8.3 reference chain*
   (`ReferenceChain.terminal`), since an alias and its target are one type — so `(text | my_text)` with
   `my_text => text` is caught, which comparing the written names would miss and which is the only spelling
@@ -195,14 +201,17 @@ an enum's is a listed one. `computeKinds` runs after `computeSubtypes` and befor
 declares three, `identifier_kind`, `atom_kind` and `type_kind`, and types `enum_type.name_type` and `record.name_type`
 by the first.
 
-- **Membership is one walk over resolved entries** (`resolver/KindMembers`, public because `NameType` asks it too).
-  From an entry, alias hops first reach the type it is (`ReferenceChain`); that type is no member if it IS-A `top` or
-  is `top` (a constructor), a reference, or a `template` body (no type). Otherwise the constructor its value applies
-  — its recorded tag (`EntryFacts.constructor`), else its body's `@Typename` — is followed, through a constructor
-  template's held body to the constructor it applies, and the entry is a member when that constructor is `of` or has
-  `of` among its supertypes, which are already the IS-A closure. So `pet => abstract { … }` is a member of
-  `kind<record>`, and so is a record template, a type (§5.10); `set<text>` is a member of `kind<set_type>` while
-  core's `set` is not.
+- **Membership is one walk over resolved entries** (`resolver/KindMembers`, public because `NameType` asks it too). From
+  an entry, alias hops first reach the type it is (`ReferenceChain`); that type is no member if it IS-A `top` (a
+  constructor), a reference, or a `template` body (no type). A namespace constructor is the exception: its instances are
+  maps, values, so it is a type — the kernel's `namespace` and every constructor IS-A it are members of `type_kind`, and
+  each is a member of the kind of every namespace constructor it is or IS-A, so `kind<namespace>` holds them all; and of
+  no other kind, its `!record` tag not being followed, since a value of it is a map — so `kind<record>`, `kind<product>`
+  and `kind<map>` exclude it. Otherwise the constructor its value applies — its recorded tag (`EntryFacts.constructor`),
+  else its body's `@Typename` — is followed, through a constructor template's held body to the constructor it applies,
+  and the entry is a member when that constructor is `of` or has `of` among its supertypes, which are already the IS-A
+  closure. So `pet => abstract { … }` is a member of `kind<record>`, and so is a record template, a type (§5.10);
+  `set<text>` is a member of `kind<set_type>` while core's `set` is not.
 - **A kind is a member of itself where the walk says so.** `type_kind` is built with `kind_type`, which IS-A `type`, so
   it lists itself, and `kind<atom>` lists every kind. Nothing loops: the walk reads construction chains and never a
   kind's members, and a value of a kind is a name, never a value read through the type it names.
@@ -212,7 +221,8 @@ by the first.
   itself reaches it even where no namespace in reach declares it. The closure walked is the merged map only: the
   governing meta's own instances (the kernel's `text`, `identifier`) are never members of a user schema's kind.
 - **`of` is a constructor role, checked in `validateBody`.** It resolves through its alias hops in the structure
-  namespace only, and must be `type` or IS-A it; `kind<data>`, `kind<top>`, `kind<template>` and a type of the
+  namespace only, and must be `type` or `namespace`, or IS-A either; `kind<data>`, `kind<top>`, `kind<template>`,
+  `kind<reference>` and a type of the
   schema's own (`kind<stock_id>` — a kind is not a bound) are refused with a `SchemaValidationException` reported
   against the declaration that wrote the application (`reportedAgainst`). With no governing meta loaded nothing is
   judged, as `checkMayGovern` judges nothing it cannot load.
@@ -382,22 +392,74 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
   `TsonLinkedSchema.nameTypes`, with the definition it resolves to, merged through imports like `enumForms`, because its
   readers judge a document's names by it and cannot resolve it themselves.
 - **A duplicate field is refused by whichever layer can see it, and only by that one** (SPEC-FEEDBACK.md #12).
-  `record.fields` is a map keyed by the name (`field_map`, `ordered: true`, keys `text`), so one spelling written
-  twice in the explicit `!record { fields: { … } }` form is the map's duplicate key: `DUPLICATE_MAP_KEY` where the
-  form is read as data, and that refusal restated against the declaration where a schema writes it. The brace form's
-  repeat is the resolver's, which says whether a field or a group member repeated it. What no map can see — two
-  spellings that are one value of the record's name type, `name` and `NAME` under a case fold — is `FieldNames`',
-  since only a resolved name type has an equality to ask. The key type is `text` rather than `field_name` for the
-  reason `discriminators` is: the record's `name_type`, not the kernel's identifier, decides which names it may
-  declare.
+  `record.fields` is a map keyed by the name (`field_map`, `ordered: true`), so one spelling written twice in the
+  explicit `!record { fields: { … } }` form is the map's duplicate key: `DUPLICATE_MAP_KEY` where the form is read as
+  data, and that refusal restated against the declaration where a schema writes it. The brace form's repeat is the
+  resolver's, which says whether a field or a group member repeated it. What no map can see — two spellings that are one
+  value of the record's name type, `name` and `NAME` under a case fold — is `FieldNames`', since only a resolved name
+  type has an equality to ask. `field_map` states `key_type?: ~ field_name`, a default: the key family is the host
+  record's `name_type` (its supertypes' where it states none, `field_name` where neither does), which decides which
+  names the record may declare, so a key is read by its spelling and judged under that type here. `discriminators` and
+  group members are `text` for the same reason.
+
+## Namespace types (`TsonSchemaLinker.readAsMaps`, SPEC-FEEDBACK.md #23)
+
+A namespace type is a constructor IS-A the kernel's `namespace`, declared by composition stating its facets —
+`field_map` and `schema` in the kernel, `headers => namespace & { key_type: = header_name  value_type: = text }` in a
+meta layer — and it resolves to a `RecordBody` of those facets, kind `NAMESPACE`. A value of it is a map from its
+`key_type` to its `value_type`, never that record, so something has to turn the one into the other
+before a reader is built, and it is linking's.
+
+- **The map is a linking fact, the fourth.** `readAsMaps` runs over local entries after the name checks, asks
+  `MapBody.isNamespace` of each closed one, and records `MapBody.ofNamespace` of it in `TsonLinkedSchema.namespaces`,
+  merged through imports as `nameTypes` is. Whether a chain's `namespace` is the kernel's is judged by where the name
+  is defined: in the schema's own merged namespace where it holds the name (a composition operand resolves there,
+  §3.3.2), and in the governing meta otherwise. That question needs the closure and the meta, which a resolved body
+  does not carry, so the fact is `TsonLinkedSchema`'s and not the body's. `namespace(name)` also answers for a schema
+  that holds the kernel's `namespace` itself and was assembled by hand, reading it as linking would.
+- **The map is what the facets state.** `MapBody.ofNamespace` gives a `MapBody.Namespace`: the map, and whether its
+  key family is pinned. Keys of `key_type`, an identifier family (`namespace.key_type` is typed `identifier_kind`, so
+  an enum-keyed map is no namespace), values of the pinned `value_type`, ordered where `ordered` is pinned `true` and
+  unordered otherwise, values never void, no size bounds. A FIXED `key_type` is the family every key is read and
+  judged under. A DEFAULT one is the family that stands where the value's host states none, the host supplying it
+  otherwise — `field_map`'s host is the record — so `Namespace.read()` reads keys by spelling (`Namespace.HOST_KEYS`,
+  `text`), and the host's family judges them once it resolves (`FieldNames`, `checkFieldNameTypes`). A concrete
+  namespace type stating `key_type` or `value_type` neither FIXED nor DEFAULT describes no map and is refused here; an
+  abstract one is admitted and has no map. A namespace type with a field beside `MapBody.NAMESPACE_FACETS` is refused
+  here, abstract or not, since the map is the whole value (`design/meta-layer-namespaces.md`).
+- **The reader is the map's.** `TsonSchemaCompiler` and `JsonSchemaCompiler` ask `linked.namespace(name)` and hand its
+  `read()` to the `map` factory, so neither encoding's factory table has a `namespace` entry and `SchemaMetaNameBinder`
+  binds no `namespace` class; `Subsumption.guard` still gets the entry's own definition. In bind mode the map is an
+  `AnnotatedMap`, keeping its keys' annotations and order (`MapBindReader`), delivered as a `Namespace` where the
+  host component is one and as the map where the host declares a `Map` (`design/meta-layer-namespaces.md`); the
+  schema map (`TsonSchema.entries`) and a record's `fields` (`RecordBody.fields`) are `Namespace` values, typed
+  `schema` and `field_map`. `ValuesByName` reads a type's
+  body through the same accessor (`map()`, the declared key family), and `isNamespace` is that accessor being present.
+  Before linking, `ParameterTypes` reads the governing meta's namespace types (a record's `fields` among them) as their
+  maps directly, the meta's `namespace` being the kernel's.
+- **A namespace type is meta vocabulary.** It IS-A `top`, so §2.2.2's eligibility check refuses it in any schema not
+  governed by the meta-kernel, saying it composes with the kernel's `namespace`, a constructor, and a composition
+  operand resolves in the type-name namespace only, so the declaring layer imports meta.tn to name `namespace` and its
+  facets' types. A schema typing a field by it imports that layer, which brings the kernel into its closure; with
+  core.tn beside it that collides on `void` (SPEC-FEEDBACK.md #23).
+- **An instance is an entry, and a value.** `myapi => !api { … }` in a schema the layer governs resolves to a
+  `Namespace` (`design/meta-layer-namespaces.md`), kind `NAMESPACE`, its constructor recorded as `api`. `validateBody`
+  has a `Namespace` case that asks nothing; `checkValuesByName` judges the names its values hold;
+  `validateTypeRef` refuses it at a `type_ref` or `type_kind` position of a type declaration ("a value of the namespace
+  type 'api', a map of names -- a value and not a type"), and `ValuesByName.judgeApplication` at a value body's
+  `type_ref` slot. The kind walk needs no case: it reaches `api` through the recorded constructor, so `kind<api>` and
+  `kind<namespace>` list `myapi`, and a value body's `response: myapi` at a `type_kind` slot is refused by membership.
+  It compiles to an unbuildable `ErrorReader` in both stacks: `TsonCompiledMetaSchema.typenameOf` and
+  `JsonSchemaCompiler.constructorOf` read its `type`, a meta layer's constructor with no factory.
 
 ## Values by name (`ValuesByName`, SPEC-FEEDBACK.md #13)
 
-A meta layer's `data` body may hold a name — `request: place_order_request` at a slot typed `kind<record>`,
-`method: orders.methods.place_order` at a slot typed `ref<method>`. The read keeps the name as written and records it
-with the slot it fills (`design/record-dispatch.md`); `SchemaResolver` keeps that record per entry,
+A namespace entry's values may hold a name — `request: place_order_request` at a slot typed `kind<record>`,
+`method: orders.place_order` or `handler: myapi.get_orders` at a slot typed `ref<method>`.
+The read keeps the name as written and records it with the slot it fills (`design/record-dispatch.md`);
+`SchemaResolver` keeps that record per entry,
 `TsonSchema.valuesByName`, so what is judged is what was read and nothing the host class declares
-(`design/meta-layer-data-kind.md`). This is the lookup and the judgement, run by `checkValuesByName` over local
+(`design/meta-layer-namespaces.md`). This is the lookup and the judgement, run by `checkValuesByName` over local
 entries after `validateEntry`: a kind-typed slot's name is judged a member (`judgeMember`), a reference-typed slot's
 by the walk below, and the value it reaches is delivered into the host's `Ref` cell.
 
@@ -407,24 +469,27 @@ by the walk below, and the value it reaches is delivered into the host's `Ref` c
   `orders.` as no qualified name before anything is looked up. At a kind-typed slot the same host shape is one
   segment naming a member of the kind (`judgeMember`); at a `type_ref` slot it is an application, judged by
   `validateTypeRef` as always.
-- **The slot's type is the meta's, the name is the schema's.** The slot's declared type is read off the entry's
-  constructor (`TsonSchemaLinker.constructorOf`, in the governing meta's namespace) by walking the recorded path
-  through the resolved fields: a field name at a record, any key at a map, any index at an array. A path through
-  anything else (a choice) is a gap this library has not filled (`UnsupportedOperationException`). The name's first
-  segment resolves in `merged` — the schema's own entries and imports — with alias hops followed (§8.3,
+- **The slot's type is the meta's, the name is the schema's.** The slot's declared type arrives with the name: the
+  reader that read it was built from the slot's declaration and recorded its role and its kind's `of` or reference's
+  `T`, in the governing meta's namespace (`TsonSchema.SlotType`), so nothing walks the recorded path back through the
+  meta's fields, and a slot reached through a record field or a tagged subtype is judged as one under a key. The
+  name's first segment resolves in `merged` — the schema's own entries and imports — with alias hops followed (§8.3,
   `ReferenceChain`), and never in the meta's namespace (§3.3.2); a member is reached through its entry, so `method:
   place_order` is unresolved even though `orders` holds a key of that name. Nothing is looked up lexically, and nothing
   is a choice among candidates: found first, judged after.
-- **Each further segment selects in the value reached**, never in a declaration: a field of a record (read through
-  the bound body's record components, named as binding names them, `Optional` unwrapped), then a key of a map. A
-  type entry admits no further segment (`order.sku` is refused; projecting into a record type's fields is a
-  different capability, left with `discriminators` and `scope`), an open entry is no referent (a template denotes
-  no value until applied), and a list has no named members (`…errors.x` is refused: a segment never selects a
-  position). A map is entered only where its key type is an
-  identifier family or an enum, whose keys are names; a `text`-keyed map cannot be entered. A body whose class is no
-  Java record cannot be entered at all, which is this library's gap (`UnsupportedOperationException`). **Entering a
-  data body is interim**: `data` is opaque to the type system and the host's to interpret, so a segment selects in
-  the host's object and nothing in the schema walks the body's values; the namespace kind replaces the hop.
+- **Each further segment selects in the value reached**, never in a declaration: a key of a namespace value — the
+  `Namespace` entry, or the map the read built for a namespace-typed value held under one of its keys — the value
+  reached being of the constructor's `value_type`; or a field of a record value. A type entry admits no further
+  segment (`order.sku` is refused; projecting into a record type's fields is a different capability, left with
+  `discriminators` and `scope`), an open entry is no referent (a template denotes no value until applied), and a list
+  has no named members (`…errors.x` is refused: a segment never selects a position). A map is entered only where it is
+  a value of a namespace type, read as the map linking records for it; a map that is no namespace, `{text => method}`,
+  is not entered whatever its key type.
+- **A field step is judged by type, and its value is a gap.** The value behind a record value's field is the host's
+  object, and the walk never reads one: past a field it follows the declared types alone, so every refusal above
+  still lands, and a name that passes them all is then reported as this library's gap (`UnsupportedOperationException`,
+  `NOT_IMPLEMENTED`), the value neither found nor delivered. A namespace entry is the schema's own map, which is why
+  entering by key needs no host object (`design/meta-layer-namespaces.md`).
 - **The judgement is §7.2's IS-A between two types, by canonical identity.** An entry's declared type is the
   constructor that built its body — its recorded constructor tag where that is a constructor of the *declaring*
   schema's meta (IS-A `top`), otherwise the kernel constructor its body's class mirrors (`@Typename`): a record
@@ -437,9 +502,9 @@ by the walk below, and the value it reaches is delivered into the host's `Ref` c
 - **Each refusal is its own `SCHEMA_ERROR`, naming the step**, against the entry holding the name, at the slot's
   RFC 6901 pointer: no entry for the first segment; an entry (after any alias hop) built by another constructor; a
   segment that is no field (listing the fields declared) or no key (listing the keys held); a selected value of
-  another type; a type entry given a further segment; an open entry; a segment into a list; a map whose keys are not
-  names; a qualified name at a kind-typed slot, which reaches a value and no value is a type. §4.1's refusal of a
-  DATA entry at a type position is unchanged and not this pass's: `response: orders` at a `type_ref` slot is a
-  reference, and `validateTypeRef` refuses it.
+  another type; a type entry given a further segment; an open entry; a segment into a list; a map that is no
+  namespace; a qualified name at a kind-typed slot, which reaches a value and no value is a type. A namespace entry
+  at a type position is refused as a value, not as a missing segment: `response: orders` at a `type_ref` slot is an
+  application, refused by `validateTypeRef` or `judgeApplication`.
 - **Local entries only.** An imported body's names were judged when its own schema linked, in its own namespace; a
   second judgement here would be in the wrong one.

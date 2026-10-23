@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * halves are asserted here, because marking too much is as wrong as marking too little.
  *
  * <p>Key position, per §6: the marker is metadata <em>about the declaration</em>, so it lands on the schema
- * map's key ({@link AnnotatedMap#getAnnotations}) and never on the {@link Top} value.
+ * map's key ({@link Namespace#getAnnotations}) and never on the {@link Top} value.
  */
 class SyntheticEntryMarkerTest {
 
@@ -87,7 +87,7 @@ class SyntheticEntryMarkerTest {
         });
     }
 
-    private static AnnotatedMap<String, Top> entriesOf(String id) {
+    private static Namespace<Top> entriesOf(String id) {
         return registry().resolveLinked(id).schema().entries();
     }
 
@@ -109,14 +109,14 @@ class SyntheticEntryMarkerTest {
         return local;
     }
 
-    private static boolean marked(AnnotatedMap<String, Top> entries, String name) {
+    private static boolean marked(Namespace<Top> entries, String name) {
         return entries.getAnnotations(name).has("synthetic");
     }
 
     /** An inline sugar form lifts to an entry of its own (§5.3), and that entry is a synthetic one. */
     @Test
     void everyEntryLiftedFromAnInlineFormIsMarked() {
-        AnnotatedMap<String, Top> entries = entriesOf(ID);
+        Namespace<Top> entries = entriesOf(ID);
 
         Set<String> lifted = new TreeSet<>();
         localEntries().forEach((name, definition) -> {
@@ -132,7 +132,7 @@ class SyntheticEntryMarkerTest {
     /** A name the author wrote is never one, however sugary its body. */
     @Test
     void noDeclaredEntryIsMarked() {
-        AnnotatedMap<String, Top> entries = entriesOf(ID);
+        Namespace<Top> entries = entriesOf(ID);
 
         for (String name : DECLARED) {
             assertFalse(marked(entries, name), name + " is declared, not materialised");
@@ -146,7 +146,7 @@ class SyntheticEntryMarkerTest {
      */
     @Test
     void aDeclarationWhoseOwnBodyIsASugarFormIsNotSynthetic() {
-        AnnotatedMap<String, Top> entries = entriesOf(ID);
+        Namespace<Top> entries = entriesOf(ID);
 
         assertEquals(Optional.of("array"), factsOf(ID, "tag_list").constructor());
         assertFalse(marked(entries, "tag_list"), "the declaration is the construction, not a lift of one");
@@ -158,7 +158,7 @@ class SyntheticEntryMarkerTest {
      */
     @Test
     void anInstantiationEntryIsNotMarkedAndEverySyntheticSourceIsAConstructor() {
-        AnnotatedMap<String, Top> entries = entriesOf(ID);
+        Namespace<Top> entries = entriesOf(ID);
 
         Set<String> instantiations = new TreeSet<>();
         localEntries().forEach((name, definition) -> {
@@ -193,8 +193,8 @@ class SyntheticEntryMarkerTest {
      */
     @Test
     void anImportedSyntheticKeepsItsMarker() {
-        AnnotatedMap<String, Top> declaring = entriesOf(ID);
-        AnnotatedMap<String, Top> importing = entriesOf(IMPORTER_ID);
+        Namespace<Top> declaring = entriesOf(ID);
+        Namespace<Top> importing = entriesOf(IMPORTER_ID);
 
         Set<String> synthetics = new TreeSet<>();
         declaring.keySet().forEach(name -> {

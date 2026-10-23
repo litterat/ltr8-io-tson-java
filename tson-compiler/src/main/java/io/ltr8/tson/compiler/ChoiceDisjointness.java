@@ -38,7 +38,7 @@ final class ChoiceDisjointness {
     static boolean derive(ChoiceBody choice, Map<String, Top> namespace) {
         Set<DiscriminationClass> seen = EnumSet.noneOf(DiscriminationClass.class);
         for (TypeRef variant : choice.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(), namespace);
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(), namespace::get);
             if (variantClass.isEmpty() || !seen.add(variantClass.get())) {
                 return false;
             }

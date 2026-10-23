@@ -792,7 +792,7 @@ final class TemplateMaterialiser {
 
     /**
      * {@code value} as the instantiation of {@code application} (§8.2), whatever kind of entry it is: a record
-     * template's member, a DATA entry, the hop to the synthetic a non-record template closes to. Recorded in
+     * template's member, a namespace entry, the hop to the synthetic a non-record template closes to. Recorded in
      * {@link #applications}, which {@code SchemaResolver} writes onto the entry's key as {@code @application}.
      */
     private Top instantiation(String name, Top value, TypeRef application) {

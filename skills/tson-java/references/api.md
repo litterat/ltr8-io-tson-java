@@ -586,14 +586,15 @@ value); the application an entry is the instantiation of is the derived
 `@application` on its key (`TsonSchema.applicationOf`); and what is not part of the value — where it was declared, its
 value annotations, its constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The
 host values the atoms read to
-are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed except for its one deliberately open branch,
-**`Data`**, which a consumer's own class implements: §4.1's fourth base kind, where an instance of a meta-schema's own
-constructor lives when the thing it describes is not a data type. A consumer registers such a class by carrying
-`@Typename` and being findable by the `metaNameBinder`; it declares none of its references. A slot typed by a kind
-(`request: kind<record>`) binds a `TypeRef` holding a type's name; a slot typed by a reference (`method: ref<method>`)
-binds a `Ref<T>` holding the qualified name as written (`orders.methods.place_order`) and, once the schema has linked,
-the value it names (`method().get()`), or a `TypeRef` for the name alone. The resolver records each with its slot
-as it reads the body, and the linker judges it there.
+are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down. A meta-schema's own
+vocabulary is a record it declares and a namespace type holding it (`operations => namespace & { key_type: =
+identifier  value_type: = operation }`); an entry built with one, `api => !operations { search => { … } }`, is a
+**`Namespace`** — a value, never a type — whose map holds each value bound to the consumer's own class, a plain
+record found by the `metaNameBinder` (by name, or by `@Typename`). The class declares none of its references. A slot
+typed by a kind (`request: kind<record>`) binds a `TypeRef` holding a type's name; a slot typed by a reference
+(`method: ref<method>`) binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and
+then a key of its namespace) and, once the schema has linked, the value it names (`method().get()`), or a `TypeRef`
+for the name alone. The resolver records each with its slot as it reads the value, and the linker judges it there.
 
 ---
 

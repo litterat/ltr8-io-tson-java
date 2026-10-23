@@ -184,9 +184,13 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
     - **An ordered map needs a component that keeps insertion order** (`DataClassMap.ordered()`: a `SequencedMap`
       that is not a `SortedMap`, or `AnnotatedMap`), or the order the document wrote is lost; a bare `Map` is
       built as a `HashMap` and does not. The check runs one way only: an unordered map binds to either kind,
-      since keeping its order loses nothing, and `TsonSchema.entries` is exactly that case. Both readers make it
+      since keeping its order loses nothing, and the schema map's `AnnotatedMap` is exactly that case. Both readers make it
       at every depth (`BindTargets` in the TSON reader, `BindMapBuilder.forTarget` in `tson-json`), and a map
       read with no component to declare a class is built as a `LinkedHashMap` when it is ordered.
+    - **A `Namespace` component binds a namespace type's map, and nothing else** (`BindTargets`): the map is read
+      for the component's own `entries` and delivered as an instance of the constructor the position names. A map
+      that is no namespace has no constructor to name, so a `Namespace` there is a mismatch; a `Map` component at a
+      namespace type receives the map, since a host declaring a map asks for one.
     - The converse — a component no field fills — is refused at compile too: it reaches the constructor as
       `null` on every document. `@Unbound` is how a class says a component is its own and not the wire's,
       needed exactly once here (`RecordField.position`, this implementation's own addition for
@@ -195,7 +199,7 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       build.** That is the `MissingBindingException` subclass, deferred to the first read of that type, since a
       schema legitimately declares types a consumer never binds. It covers two causes the message tells apart:
       a name the binder resolves to no class (`ltr8-bind`'s `UnboundNameException`), and a class it does resolve
-      to that cannot be analysed — the kernel's `data` kind is mapped to a marker interface nothing builds.
+      to that cannot be analysed — the kernel's base kinds map to sealed marker interfaces nothing builds.
     - **There is no wholesale opt-out**, and that is deliberate: accepting fewer fields without saying *which* is the
       defect §7.2 refuses on the wire, and a class that means to read one version of a schema while another is current
       declares a `@Profile` constructor for it. Reaching a read as a diagnostic instead (a schema compiled on demand),
@@ -230,9 +234,10 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       reason. Both throw sites keep it clear of their catch-alls (`bindAtomInstance` and
       `bindAnnotationValue`, which carry the same arm): relabelling it `UnsupportedOperationException`
       rebuilds the shape `MissingBindingException` exists to retire, a missing line of wiring reading as
-      *this library cannot do that*. An annotation naming a type the consumer never bound — the kernel's own
-      `data` among them — is the reachable case, and `BindMismatchClassificationTest` pins it in both §6
-      positions plus the constructor case beside them.
+      *this library cannot do that*. A meta layer's own record the consumer never bound a class for
+      (`pings => !notifications { ping => … }` with none for `notification`) is the reachable case, reported at the
+      entry, and `BindMismatchClassificationTest` pins it beside an annotation typed by an abstract base kind
+      (`@sum:_`), which is the author's error in both §6 positions.
     - A gap that escapes some *other* way still throws and still exits 70 unchanged — compilation and the
       lexer are fail-fast, and `TsonCli.notImplemented` remains for anything that reaches it.
 - **A read that cannot get its schema classifies the failure the same way (`SchemaFailure`).** Both facades

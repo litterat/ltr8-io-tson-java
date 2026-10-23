@@ -4,6 +4,7 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -15,14 +16,15 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A resolved schema (Part 2 §8): the kernel's own {@code schema} type, <code>{type_name =&gt; top}</code>, plus
- * the governing-chain directives its own document header carried ({@code !!id}/{@code !!meta}/{@code
- * !!import}*, §2.2) -- the "produced schema" this module exists for, as opposed to {@code tson-compiler}'s
- * grammar-only {@code SchemaDocument}/{@code SchemaMap}. {@code entries}' insertion order is preserved, matching
- * {@code SchemaMap.declarations}' own ordering guarantee.
+ * A resolved schema (Part 2 §8): a value of the kernel's {@code schema}, the namespace type
+ * <code>{type_name =&gt; top}</code> ({@link #entries}, a {@link Namespace} typed {@value #SCHEMA}), plus the
+ * governing-chain directives its own document header carried ({@code !!id}/{@code !!meta}/{@code !!import}*, §2.2)
+ * -- the "produced schema" this module exists for, as opposed to {@code tson-compiler}'s grammar-only {@code
+ * SchemaDocument}/{@code SchemaMap}. {@code entries}' insertion order is preserved, matching {@code
+ * SchemaMap.declarations}' own ordering guarantee.
  *
  * <p><b>An entry is its value</b> (SPEC-FEEDBACK.md #14): a name maps to the body it resolves to -- a {@code
- * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@code Data} -- and a
+ * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@link Namespace} -- and a
  * type body, a record template's included, carries its own IS-A chain ({@code Type.chain}). The entry's kind is
  * its value's ({@code EntryKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
  *
@@ -71,13 +73,14 @@ import java.util.Optional;
  * still need to survive linking, so {@link TsonLinkedSchema} would need to carry it too) without
  * buying any safety a universal property like linked-ness actually needs.
  *
- * <p><b>{@link #valuesByName()}</b> -- for each entry whose body is a {@code data} constructor's instance, the
- * references that body holds by name (SPEC-FEEDBACK.md #13), each with the slot it fills, as the resolver's read
- * collected them: the reader records what it produced at a slot holding a value by name, so the list depends on
- * nothing the host class declares. The linker resolves each and judges it against the slot's declared type. A fact
- * the resolver hands the linker, never part of §8's output: no resolved document writes it.
+ * <p><b>{@link #valuesByName()}</b> -- for each entry whose value is an instance of a namespace type
+ * ({@link Namespace}), the references that value holds by name (SPEC-FEEDBACK.md #13), each with the
+ * slot it fills and that slot's declared type, as the resolver's read collected them: the reader at a kind-, reference-
+ * or {@code type_ref}-typed slot records the name it read there whatever the host class holds, so the list depends on
+ * nothing the host declares. The linker resolves each and judges it against the slot's declared type. A fact the
+ * resolver hands the linker, never part of §8's output: no resolved document writes it.
  */
-public record TsonSchema(String id, String meta, List<String> imports, AnnotatedMap<String, Top> entries,
+public record TsonSchema(String id, String meta, List<String> imports, Namespace<Top> entries,
                           boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
                           Map<String, EntryFacts> facts) {
 
@@ -86,7 +89,7 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
      * declaration's name sits in the schema text it was resolved from, absent for an entry the resolver minted
      * (which is what tells a derived name from a declared one). {@code annotations} are those written after
      * {@code =>}, on the value (§6): the value's own Java shape has no slot for them, and the ones written before
-     * the name are the key's ({@link #entries}' {@link AnnotatedMap}). {@code constructor} is the constructor
+     * the name are the key's ({@link #entries}). {@code constructor} is the constructor
      * the value applies -- the tag resolved output writes, {@code !integer_type}, {@code !enum}, {@code
      * !set_type} -- which binding erases into a class that several constructors share. {@code refines} is the
      * entry a {@code ^} declaration's head names, as written: §5.7's refinement restates fields and adds none,
@@ -147,15 +150,58 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
     }
 
     /**
-     * One reference a {@code data} body holds by name: {@code slot} is the path from the body to the position it
-     * fills -- a field name at a record, a key at a map, an index at an array, as the read descended -- and
-     * {@code reference} the {@code type_ref} value read there, its {@code name} the qualified name as written.
+     * One reference a value body holds by name: {@code slot} is the path from the body to the position it
+     * fills -- a field name at a record, a key at a map, an index at an array, as the read descended --, {@code
+     * type} that position's declared type, as the reader that read the name knows it, and {@code reference} the
+     * {@code type_ref} value read there, its {@code name} the qualified name as written; {@code cell} is the host's
+     * {@code Ref} where the host holds one.
      */
-    public record ValueByName(List<String> slot, TypeRef reference, Optional<io.ltr8.tson.schema.meta.Ref<?>> cell) {
+    public record ValueByName(List<String> slot, SlotType type, TypeRef reference,
+                              Optional<io.ltr8.tson.schema.meta.Ref<?>> cell) {
 
         public ValueByName {
             slot = List.copyOf(slot);
+            Objects.requireNonNull(type, "type");
             Objects.requireNonNull(reference, "reference");
+        }
+    }
+
+    /**
+     * The declared type of a slot holding a reference by name, in the governing meta's namespace: what the reader
+     * of that slot was built from, so the linker judges the name without walking the path back through the meta's
+     * declarations. {@code of} is a kind's {@code of} (a constructor), a reference's {@code T} (a type), and {@code
+     * type_ref} itself for the application form; {@code name} is the declared type as a message names it, {@code
+     * kind<record>} or {@code type_kind}.
+     */
+    public record SlotType(Role role, String of, String name) {
+
+        /** A {@code type_ref}-typed slot, which holds the application form. */
+        public static final SlotType APPLICATION = new SlotType(Role.APPLICATION, "type_ref", "type_ref");
+
+        /** What the slot holds, which decides how the name it holds is judged. */
+        public enum Role {
+            /** A type's name, a member of the kind ({@code kind<record>}, {@code type_kind}). */
+            KIND,
+            /** A value's qualified name, IS-A the reference's {@code T} ({@code ref<method>}). */
+            REFERENCE,
+            /** A name or application, judged by resolution and arity ({@code type_ref}). */
+            APPLICATION
+        }
+
+        public SlotType {
+            Objects.requireNonNull(role, "role");
+            Objects.requireNonNull(of, "of");
+            Objects.requireNonNull(name, "name");
+        }
+
+        /** A slot typed by a kind whose {@code of} is {@code of}, named {@code name} where an author named it. */
+        public static SlotType kind(String of, String name) {
+            return new SlotType(Role.KIND, of, name != null ? name : "kind<" + of + ">");
+        }
+
+        /** A slot typed {@code ref<of>}, named {@code name} where an author named it. */
+        public static SlotType reference(String of, String name) {
+            return new SlotType(Role.REFERENCE, of, name != null ? name : "ref<" + of + ">");
         }
     }
 
@@ -163,9 +209,11 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
         Objects.requireNonNull(id, "!!id is required");
         Objects.requireNonNull(meta, "!!meta is required");
         imports = List.copyOf(imports);
-        // AnnotatedMap is fillable while a binder or resolver builds one, so copy to an immutable form --
-        // entries() has always been unmodifiable and that is part of a registered schema being locked.
-        entries = AnnotatedMap.copyOf(entries);
+        // A Namespace's map is an immutable copy, which is part of a registered schema being locked.
+        if (!SCHEMA.equals(entries.type())) {
+            throw new IllegalArgumentException("a schema's entries are a value of '" + SCHEMA + "', not of '"
+                    + entries.type() + "'");
+        }
         Map<String, List<ValueByName>> held = new LinkedHashMap<>();
         valuesByName.forEach((name, values) -> held.put(name, List.copyOf(values)));
         valuesByName = Collections.unmodifiableMap(held);
@@ -187,10 +235,18 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
         this(id, meta, imports, entries, bootstrap, Map.of(), Map.of());
     }
 
+    /** {@code entries}, a map with each key's annotations, as the schema map: a value of {@value #SCHEMA}. */
+    public TsonSchema(String id, String meta, List<String> imports, AnnotatedMap<String, Top> entries,
+                       boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
+                       Map<String, EntryFacts> facts) {
+        this(id, meta, imports, new Namespace<>(SCHEMA, entries), bootstrap, valuesByName, facts);
+    }
+
     /**
      * {@code entries} as a plain map -- the ordinary case, where no declaration name carries annotations.
      * §6 binds an annotation written before a declaration's name to that name, which in resolved form is
-     * this map's key, so {@link AnnotatedMap} is what holds them; a caller with none to carry need not know.
+     * the schema map's key, so the {@link Namespace}'s {@link AnnotatedMap} is what holds them; a caller with none
+     * to carry need not know.
      */
     public TsonSchema(String id, String meta, List<String> imports, Map<String, Top> entries,
                        boolean bootstrap) {
@@ -221,7 +277,7 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
 
     /**
      * The application {@code name} is the instantiation of ([TSON-SCHEMA] §8.2): the {@code @application} its key
-     * carries, which the resolver writes wherever an entry closes one -- a record template's member, a DATA
+     * carries, which the resolver writes wherever an entry closes one -- a record template's member, a namespace
      * entry, the alias a template's application closes to. Empty for an entry that closes none.
      */
     public Optional<TypeRef> applicationOf(String name) {
@@ -240,6 +296,9 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
         values.add(io.ltr8.annotation.Annotation.of(APPLICATION, application));
         return Annotations.of(values);
     }
+
+    /** The kernel's {@code schema}, the namespace type the schema map is a value of. */
+    public static final String SCHEMA = "schema";
 
     /** The kernel's {@code application} annotation, derived and never author-written (§8.2). */
     public static final String APPLICATION = "application";
@@ -260,9 +319,13 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
     /**
      * The constructor {@code value}'s class is named for, by its {@link Typename} -- exact where one constructor
      * has that shape, and only one of them where several share it ({@code enum_type}, {@code enum} and a meta
-     * layer's own tightening of either are one class), which is why an entry's own facts are asked first.
+     * layer's own tightening of either are one class), which is why an entry's own facts are asked first. A
+     * namespace value names its own: the constructor it is an instance of.
      */
     public static String constructorOf(Top value) {
+        if (value instanceof Namespace<?> namespace) {
+            return namespace.type();
+        }
         Typename typename = value.getClass().getAnnotation(Typename.class);
         if (typename == null) {
             throw new IllegalStateException(value.getClass() + " has no @Typename -- every Top leaf carries one, "

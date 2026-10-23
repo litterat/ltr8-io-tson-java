@@ -52,6 +52,7 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
         // Reported under the template's own name: the author wrote this one, which is the whole point of the
         // template being the base -- naming `pet_base<…>` would name something the schema never declares.
         Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
+        Set<String> admitted = Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning());
 
         this.dispatcher = (TsonTypeReader<Object>) (FamilySelectors.dispatchesOnMembers(definition)
                 // The selectors are the base's, at the types the base declares -- the one set known before a
@@ -61,9 +62,9 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
                 ? new RecordMemberDispatchReader(selfNames, name,
                         FamilySelectors.of(definition),
                         Set.copyOf(context.subtypesOf(name, definition)), context, readers)
-                : new RecordTagDispatchReader(selfNames, name,
-                        Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning()),
-                        context.instantiableSubtypesOf(name, definition), readers));
+                : new RecordTagDispatchReader(selfNames, name, admitted,
+                        context.instantiableSubtypesOf(name, definition),
+                        RecordTagDispatchReader.namespaces(admitted, context), readers));
     }
 
     @Override

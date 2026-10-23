@@ -158,7 +158,7 @@ meta the way an author-written annotation is: there is no author to resolve agai
   author wrote depends on.
 - **Key position, per §6.** An annotation before a declared name is metadata *about the declaration*, and a
   resolved schema is a `{type_name => top}` — so the marker lands on the map's key, which
-  `TsonSchema.entries()` keeps reachable through `AnnotatedMap.getAnnotations(name)`, never on the
+  `TsonSchema.entries()` keeps reachable through `Namespace.getAnnotations(name)`, never on the
   entry's value. §6 forbids hoisting between the two positions and nothing here does.
 - **Marked: exactly the synthetic entries, from both channels.** The desugar lift produces them and
   `SchemaDesugarer.lifted` names them as the document's own set difference
@@ -175,14 +175,14 @@ meta the way an author-written annotation is: there is no author to resolve agai
   little, so `SyntheticEntryMarkerTest` asserts both halves.
 - **`@application` is the second derived key annotation** (SPEC-FEEDBACK.md #14): on the key of every entry that
   closes a template application, the application it is the instantiation of, `@application:{ name: box  arguments:
-  [{ name: int32 }] }`. It is about the entry, not about a type — a record template's member, a DATA entry
-  (`getOrder => fetch<order>` over `fetch => <T> !operation { … }`), the `Reference` a non-record template's
-  application closes to — which is why it is no field of `type_chain`. The materialiser records each application
-  in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on it, an import's
-  read off its keys), and `SchemaResolver` writes it where it attaches `@synthetic`; `TsonSchema.applicationOf` is
-  the one accessor. **Unlike `@synthetic` it is read as stated on ingest**, not recomputed: it is the one fact the
-  entry's value does not state, and what an imported schema's instantiations unify by. An author writing it is a
-  resolver error (`DefinitionResolver.refuseWrittenApplication`), as writing `chain` is.
+  [{ name: int32 }] }`. It is about the entry, not about a type — a record template's member, a namespace entry
+  (`order_api => orders<order>` over `orders => <T> !interface { get => { response: T } }`), the `Reference` a
+  non-record template's application closes to — which is why it is no field of `type_chain`. The materialiser records
+  each application in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on
+  it, an import's read off its keys), and `SchemaResolver` writes it where it attaches `@synthetic`;
+  `TsonSchema.applicationOf` is the one accessor. **Unlike `@synthetic` it is read as stated on ingest**, not
+  recomputed: it is the one fact the entry's value does not state, and what an imported schema's instantiations unify
+  by. An author writing it is a resolver error (`DefinitionResolver.refuseWrittenApplication`), as writing `chain` is.
 - **It survives linking and the import merge**, which is where a key-side fact is easiest to lose: the linker
   rebuilds its entry map several times and re-attaches key annotations at the one point every entry passes
   through (`withNameAnnotations`), imports included, so an imported synthetic keeps the marker its own schema
@@ -224,12 +224,14 @@ it can't handle `boolean` preceding `enum`; this ordering lives here.
   of each name in the merged namespace instead, and a name's origin is meta-kernel exactly when it is one of these.
 
 - **Constructor-application binding goes through a closed `instanceBody` switch, not the generic path.**
-  Meta-kernel instantiates constructors in exactly four shapes — a bare `{}` (each target's
-  `UNCONSTRAINED` constant), a bare token array (`enum`, via `toEnumBody` reading `TokenValue.text()`
-  directly), a record of tokens (`identifier_type`, `iri_type`, and the three `kind_type` instances, whose
-  one field is `of`), and the binding record `SchemaDesugarer` emits for an `array`/`set`/`map` application.
-  No compiled reader is involved. `enum_type.name_type` is typed by `identifier_kind`, an instance the second
-  pass builds, and nothing in the first pass reads a field's type, so the self-hosted slot needs no ordering.
+  Meta-kernel instantiates constructors in exactly four shapes — a bare `{}` (each target's `UNCONSTRAINED`
+  constant), a bare token array (`enum`, via `toEnumBody` reading `TokenValue.text()` directly), a record of tokens
+  (`identifier_type`, `iri_type`, and the three `kind_type` instances, whose one field is `of`), and the binding
+  record `SchemaDesugarer` emits for an `array`/`set`/`map` application. `schema` and `field_map` are none of them:
+  each is a composition over `namespace` pinning its facets, an ordinary first-pass declaration, so no instance
+  shape reads a namespace. No compiled reader is involved. `enum_type.name_type` is typed by `identifier_kind`, an
+  instance the second pass builds, and nothing in the first pass reads a field's type, so the self-hosted slot
+  needs no ordering.
 - **Why even a compiled-reader bootstrap can't read meta-kernel from its own in-progress state:**
   `integer_size => { bits: ... signed: boolean }` is a first-pass entry whose `signed` field already
   references `boolean`, which the *second* pass resolves — so there is no moment at which a reader could be

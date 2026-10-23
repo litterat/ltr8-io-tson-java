@@ -21,16 +21,21 @@ import java.util.function.Function;
  * and the {@code name_type} checks ask {@link #isMember} of the one entry a name resolved to.
  *
  * <p><b>Membership is one walk</b> over resolved entries, never over spellings. From an entry, alias hops first
- * ([TSON-SCHEMA] §8.3) reach the type the entry is; that type is no member if it is itself a constructor (IS-A
- * {@code top}), a reference, or a template over another constructor (a {@code template} body, which is no type).
- * Otherwise the constructor its value applies -- the tag resolved output writes, {@code !identifier_type}, {@code
- * !enum} -- is followed, through a constructor template's held body to the constructor it applies, until a
- * constructor is reached, and the entry is a member when that constructor is {@code of} or has {@code of} among its
- * supertypes. A record template is built with {@code record}: it is a type, the family base its members are IS-A
- * (§5.10), so a kind of {@code record} holds it. So does the kernel's {@code top}: a fresh abstract record built
- * with {@code record} and IS-A nothing, it is a type and not a constructor by the rule, and a member of every kind
- * whose {@code of} is {@code record} or above it -- {@link io.ltr8.tson.schema.meta.EntryKind#isConstructor}
- * answers for applicability, a different question, and is not consulted here.
+ * ([TSON-SCHEMA] §8.3) reach the type the entry is; that type is no member if it is a type constructor, a
+ * reference, or a template over another constructor (a {@code template} body, which is no type). A constructor
+ * IS-A {@code top}, and is excluded because its instances are types; a namespace constructor -- the kernel's
+ * {@code namespace}, or one IS-A it -- is a type, because its instances are values, maps. It is a member of {@code
+ * type_kind} and of the kind of each namespace constructor it is or IS-A, so {@code kind<namespace>} holds every
+ * one, and of no other kind: its body's {@code !record} tag is not followed, a value of it being a map and not a
+ * record, and nothing builds it with {@code map}. For every other type the constructor its value applies -- the
+ * tag resolved output writes, {@code !identifier_type}, {@code !enum} -- is followed, through a constructor
+ * template's held body to the constructor it applies, until a constructor is reached, and the entry is a member
+ * when that constructor is {@code of} or has {@code of} among its supertypes. A record template is built with
+ * {@code record}: it is a type, the family base its members are IS-A (§5.10), so a kind of {@code record} holds
+ * it. So does the kernel's {@code top}: a fresh abstract record built with {@code record} and IS-A nothing, it is
+ * a type and not a constructor by the rule, and a member of every kind whose {@code of} is {@code record} or above
+ * it -- {@link io.ltr8.tson.schema.meta.EntryKind#isConstructor} answers for applicability, a different question,
+ * and is not consulted here.
  *
  * <p><b>A kind is a member of itself where the walk says so.</b> {@code type_kind} is built with {@code
  * kind_type}, which IS-A {@code type}, so it is one of the names it holds. Nothing loops: membership reads
@@ -51,6 +56,7 @@ public final class KindMembers {
 
     private static final String TOP = "top";
     private static final String TYPE = "type";
+    private static final String NAMESPACE = "namespace";
 
     private KindMembers() {
     }
@@ -82,7 +88,7 @@ public final class KindMembers {
                                    Function<String, Optional<String>> constructorOf, Function<String, Top> structure) {
         String terminal = ReferenceChain.terminal(name, local);
         Top type = local.apply(terminal);
-        return type != null && isMember(type, constructorOf.apply(terminal)
+        return type != null && isMember(terminal, type, constructorOf.apply(terminal)
                 .orElseGet(() -> TsonSchema.constructorOf(type)), of, local, structure);
     }
 
@@ -92,12 +98,26 @@ public final class KindMembers {
      */
     public static boolean isMember(Top type, String head, String of, Function<String, Top> local,
                                    Function<String, Top> structure) {
+        return isMember(null, type, head, of, local, structure);
+    }
+
+    /** {@link #isMember(Top, String, String, Function, Function)} for the entry {@code name}, where it is known. */
+    private static boolean isMember(String name, Top type, String head, String of, Function<String, Top> local,
+                                    Function<String, Top> structure) {
         Function<String, Top> constructors = structureFirst(structure, local);
-        if (type == null || isConstructor(type)
-                || type instanceof TemplateBody || type instanceof Reference) {
+        if (type == null || type instanceof TemplateBody || type instanceof Reference) {
             return false;
         }
         String constructorOf = ReferenceChain.terminal(of, constructors);
+        if (isConstructor(type)) {
+            List<String> supertypes = TypeChain.supertypesOf(type);
+            if (!NAMESPACE.equals(name) && !supertypes.contains(NAMESPACE)) {
+                return false;
+            }
+            // A value of it is a map and not a record, and it is not built with `map`: its `!record` tag is not
+            // followed. It is a type, and the namespace constructor it is or IS-A.
+            return constructorOf.equals(TYPE) || constructorOf.equals(name) || supertypes.contains(constructorOf);
+        }
         Set<String> walked = new HashSet<>();
         String current = head;
         while (walked.add(current)) {
@@ -121,10 +141,10 @@ public final class KindMembers {
 
     /**
      * Why {@code kind}'s {@code of} cannot be a kind's, or empty where it can: it names a constructor of the
-     * structure namespace, followed through its alias hops, that is {@code type} or IS-A it. A name that
-     * namespace does not declare is refused, a type of the schema's own namespace among them; so is a
-     * constructor above {@code type} or beside it, {@code data} and {@code template} included, which no value
-     * has a type built with.
+     * structure namespace, followed through its alias hops, that is {@code type} or IS-A it, or is the kernel's
+     * {@code namespace} or IS-A it. A name that namespace does not declare is refused, a type of the schema's own
+     * namespace among them; so is a constructor above {@code type} or beside it, {@code template}
+     * and {@code reference} included, which no value has a type built with.
      */
     public static Optional<String> ofRefusal(KindBody kind, Function<String, Top> structure) {
         String of = kind.of();
@@ -134,13 +154,14 @@ public final class KindMembers {
                     + "kind names a constructor of the governing meta, as a constructor role does (§3.3.1), and "
                     + "never a type of this schema's own namespace");
         }
-        if (constructor.get().name().equals(TYPE)
-                || TypeChain.supertypesOf(constructor.get().definition()).contains(TYPE)) {
+        List<String> supertypes = TypeChain.supertypesOf(constructor.get().definition());
+        if (constructor.get().name().equals(TYPE) || supertypes.contains(TYPE)
+                || constructor.get().name().equals(NAMESPACE) || supertypes.contains(NAMESPACE)) {
             return Optional.empty();
         }
-        return Optional.of("its 'of' names '" + of + "', which is not 'type' or a constructor below it, so no "
-                + "value has a type built with it and the kind could have no members -- name 'type', a base "
-                + "kind, or a constructor that IS-A one");
+        return Optional.of("its 'of' names '" + of + "', which is not 'type', 'namespace' or a constructor below "
+                + "either, so no value has a type built with it and the kind could have no members -- name 'type', "
+                + "a base kind, 'namespace', or a constructor that IS-A one");
     }
 
     private static boolean reaches(Found constructor, String of) {

@@ -4,6 +4,11 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Sum;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -39,8 +44,8 @@ import io.ltr8.tson.schema.meta.UuidType;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * The granularity at which TSON text discriminates an untagged value: [TSON-DATA] §4's three scalar
@@ -72,7 +77,7 @@ public enum DiscriminationClass {
      * the enclosing choice non-disjoint and blocks untagged recovery -- the conservative side, the tag
      * stays required.
      */
-    public static Optional<DiscriminationClass> of(String name, Map<String, ? extends Top> namespace) {
+    public static Optional<DiscriminationClass> of(String name, Function<String, ? extends Top> namespace) {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
         return ReferenceChain.terminalDefinition(name, namespace).flatMap(DiscriminationClass::classify);
@@ -111,7 +116,11 @@ public enum DiscriminationClass {
             case MapBody ignored -> Optional.of(BRACE);
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
-            default -> Optional.empty(); // rational/complex (need a tag), value, void, unknown, choice, extern
+            case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
+            case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
+            case Reference ignored -> Optional.empty();
+            case TemplateBody ignored -> Optional.empty();
+            case Namespace<?> ignored -> Optional.empty();
         };
     }
 

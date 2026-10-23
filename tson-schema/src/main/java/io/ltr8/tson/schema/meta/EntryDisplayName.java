@@ -4,7 +4,6 @@ import io.ltr8.tson.schema.TsonSchema;
 
 import java.math.BigInteger;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -48,7 +47,7 @@ public final class EntryDisplayName {
      * one its key carries ({@link TsonSchema#applicationOf(String)}).
      */
     public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<TypeRef> application) {
-        return of(name, value, facts, application, Map.of(), ignored -> TsonSchema.EntryFacts.NONE,
+        return of(name, value, facts, application, ignored -> null, ignored -> TsonSchema.EntryFacts.NONE,
                 ignored -> Optional.empty());
     }
 
@@ -60,7 +59,7 @@ public final class EntryDisplayName {
     public static String of(String name, TsonSchema schema) {
         Top value = schema.entries().get(name);
         return value == null ? name : of(name, value, schema.factsOf(name), schema.applicationOf(name),
-                schema.entries(), schema::factsOf, schema::applicationOf);
+                schema.entries()::get, schema::factsOf, schema::applicationOf);
     }
 
     /**
@@ -70,7 +69,8 @@ public final class EntryDisplayName {
      * reporting on.
      */
     public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<TypeRef> application,
-                            Map<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
+                            Function<String, ? extends Top> namespace,
+                            Function<String, TsonSchema.EntryFacts> factsOf,
                             Function<String, Optional<TypeRef>> applicationOf) {
         Lookup lookup = new Lookup(namespace, factsOf, applicationOf);
         lookup.rendering().add(name);
@@ -85,7 +85,7 @@ public final class EntryDisplayName {
     public static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
                                             Optional<TypeRef> application) {
         return authored(name, value, facts, application,
-                new Lookup(Map.of(), ignored -> TsonSchema.EntryFacts.NONE, ignored -> Optional.empty()));
+                new Lookup(ignored -> null, ignored -> TsonSchema.EntryFacts.NONE, ignored -> Optional.empty()));
     }
 
     private static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
@@ -120,10 +120,10 @@ public final class EntryDisplayName {
      * form ({@code { v: text  next: <itself>? }}) names itself inside its own rendering, and is shown there by
      * its entry name rather than unrolled.
      */
-    private record Lookup(Map<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
+    private record Lookup(Function<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
                           Function<String, Optional<TypeRef>> applicationOf, Set<String> rendering) {
 
-        Lookup(Map<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
+        Lookup(Function<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
                Function<String, Optional<TypeRef>> applicationOf) {
             this(namespace, factsOf, applicationOf, new HashSet<>());
         }
@@ -131,7 +131,7 @@ public final class EntryDisplayName {
 
     /** One name inside a form, itself display-rendered when the namespace knows it and it is derived. */
     private static String shown(TypeRef ref, Lookup lookup) {
-        Top referenced = lookup.namespace().get(ref.name());
+        Top referenced = lookup.namespace().apply(ref.name());
         if (referenced == null || !lookup.rendering().add(ref.name())) {
             return ref.name();
         }

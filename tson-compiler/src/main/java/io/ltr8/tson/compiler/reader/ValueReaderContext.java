@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
@@ -117,7 +118,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      * compilation for the reason {@code namesMeaning} is: it is a property of the schema, not of the entry
      * being looked up.
      */
-    public static Map<String, List<String>> referrers(Map<String, ? extends Top> entries) {
+    public static Map<String, List<String>> referrers(Namespace<? extends Top> entries) {
         Map<String, List<String>> byTarget = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
             if (definition instanceof Reference reference) {
@@ -188,7 +189,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
         if (refined == null) {
             return null;
         }
-        String source = ReferenceChain.terminal(refined, schema().entries());
+        String source = ReferenceChain.terminal(refined, schema().entries()::get);
         boolean constructor = schema().entries().get(source) instanceof RecordBody body
                 && linked.isConstructor(source, body);
         return constructor ? source : null;

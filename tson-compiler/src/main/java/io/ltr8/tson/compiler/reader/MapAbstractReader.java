@@ -111,7 +111,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * refinement of either.
      */
     static boolean keysAreNames(MapBody body, ValueReaderContext context) {
-        return ReferenceChain.terminalDefinition(body.keyType().name(), context.schema().entries())
+        return ReferenceChain.terminalDefinition(body.keyType().name(), context.schema().entries()::get)
                 .map(key -> key instanceof IdentifierType)
                 .orElse(false);
     }

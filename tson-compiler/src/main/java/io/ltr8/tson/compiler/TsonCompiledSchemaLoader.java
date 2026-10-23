@@ -57,7 +57,7 @@ public interface TsonCompiledSchemaLoader {
     /**
      * [TSON-DATA] §8.2's identifier policy the schemas this loader resolves are judged under. The resolver reads
      * a constructor payload under it, so an identifier-typed value there -- a key of an identifier-keyed map in a
-     * governed schema's {@code data} body -- is judged as a name, as it is in a data document.
+     * governed schema's namespace value -- is judged as a name, as it is in a data document.
      */
     IdentifierPolicy identifierPolicy();
 }

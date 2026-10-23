@@ -5,6 +5,7 @@ import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class SchemaNameAnnotationTest {
 
-    private static AnnotatedMap<String, Top> entriesOf(String id) {
+    private static Namespace<Top> entriesOf(String id) {
         return linked(id).entries();
     }
 
@@ -42,7 +43,7 @@ class SchemaNameAnnotationTest {
     /** Bound through the type §6 says the name refers to -- {@code doc => documentation => text}, so a String. */
     @Test
     void aDeclarationsDocArrivesAsAString() {
-        AnnotatedMap<String, Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
+        Namespace<Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
 
         assertEquals("Two-value boolean enumeration.",
                 core.getAnnotations("boolean").value("doc", String.class).orElseThrow());
@@ -51,7 +52,7 @@ class SchemaNameAnnotationTest {
     /** The plain-key interface is untouched, which is the whole point of the facade. */
     @Test
     void theMapStillBehavesAsAPlainStringKeyedMap() {
-        AnnotatedMap<String, Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
+        Namespace<Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
 
         assertTrue(core.containsKey("boolean"));
         assertEquals(core.get("boolean"), core.entrySet().stream()
@@ -65,7 +66,7 @@ class SchemaNameAnnotationTest {
      */
     @Test
     void everyCoreDeclarationKeepsItsDocumentationThroughLinking() {
-        AnnotatedMap<String, Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
+        Namespace<Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
 
         long documented = core.keySet().stream().filter(k -> core.getAnnotations(k).has("doc")).count();
         assertEquals(core.size(), documented, "core.tn documents every declaration it makes");
@@ -74,8 +75,8 @@ class SchemaNameAnnotationTest {
     /** An imported name keeps the documentation its own schema resolved, not the importer's. */
     @Test
     void animportedNameKeepsItsOwnDocumentation() {
-        AnnotatedMap<String, Top> meta = entriesOf(TsonBundledSchemas.META_ID);
-        AnnotatedMap<String, Top> kernel = entriesOf(TsonBundledSchemas.META_KERNEL_ID);
+        Namespace<Top> meta = entriesOf(TsonBundledSchemas.META_ID);
+        Namespace<Top> kernel = entriesOf(TsonBundledSchemas.META_KERNEL_ID);
 
         // schema is the meta-kernel's own declaration, reached by meta.tn through its !!import.
         assertEquals(kernel.getAnnotations("schema").value("doc", String.class),
@@ -90,7 +91,7 @@ class SchemaNameAnnotationTest {
      */
     @Test
     void nameAndDefinitionAnnotationsStaySeparate() {
-        AnnotatedMap<String, Top> kernel = entriesOf(TsonBundledSchemas.META_KERNEL_ID);
+        Namespace<Top> kernel = entriesOf(TsonBundledSchemas.META_KERNEL_ID);
 
         Annotations onValue = factsOf(TsonBundledSchemas.META_KERNEL_ID, "annotation").annotations();
         assertTrue(onValue.has("annotation"), "the definition's own marker");

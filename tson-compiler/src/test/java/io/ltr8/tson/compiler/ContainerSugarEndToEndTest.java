@@ -483,8 +483,8 @@ class ContainerSugarEndToEndTest {
                   direct => { d: [box<text>] }""");
 
         String direct = ((RecordBody) compiled.schema().entries().get("direct"))
-                .fields().sequencedValues().getFirst().type().name();
-        String closed = ((RecordBody) bodyOf(compiled, "use")).fields().sequencedValues().getFirst().type().name();
+                .fields().values().iterator().next().type().name();
+        String closed = ((RecordBody) bodyOf(compiled, "use")).fields().values().iterator().next().type().name();
 
         assertEquals(closed, direct, () -> "one entry for one form: " + compiled.schema().entries().keySet());
         // The closed form only: `array_box_p0_...` is the template's own open synthetic, which stays an entry
@@ -508,7 +508,7 @@ class ContainerSugarEndToEndTest {
                   direct => { d: [box<text>] }""");
 
         String array = ((RecordBody) compiled.schema().entries().get("direct"))
-                .fields().sequencedValues().getFirst().type().name();
+                .fields().values().iterator().next().type().name();
         String element = ((ArrayBody) compiled.schema().entries().get(array)).elementType().name();
 
         assertTrue(array.contains(element),
@@ -531,7 +531,7 @@ class ContainerSugarEndToEndTest {
             // it is `use` itself, a declaration naming an application being that instantiation (#15).
             RecordBody closed = assertInstanceOf(RecordBody.class,
                     compiled.schema().entries().get("use"), body);
-            Top variant = compiled.schema().entries().get(closed.fields().sequencedValues().getFirst().type().name());
+            Top variant = compiled.schema().entries().get(closed.fields().values().iterator().next().type().name());
             assertTrue(variant instanceof ChoiceBody || variant instanceof TupleBody,
                     () -> body + " closed to " + variant);
         }

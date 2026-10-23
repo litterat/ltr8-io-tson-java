@@ -49,11 +49,18 @@ final class RecordDispatch {
                         ? new RecordMemberDispatchReader(selfNames, displayName,
                                 FamilySelectors.of(definition),
                                 Set.copyOf(context.subtypesOf(name, definition)), context, context.readers())
-                        : new RecordTagDispatchReader(selfNames, displayName,
+                        : tagDispatch(selfNames, displayName,
                                 Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning()),
-                                context.instantiableSubtypesOf(name, definition), context.readers());
+                                context.instantiableSubtypesOf(name, definition), context);
                 case OPEN, FINAL -> concrete.create(name, definition, context);
             };
         };
+    }
+
+    /** A tag dispatcher over {@code subtypes}, a namespace type among them read as an instance of its constructor. */
+    private static RecordTagDispatchReader tagDispatch(Set<String> selfNames, String displayName, Set<String> subtypes,
+                                                       List<String> named, ValueReaderContext context) {
+        return new RecordTagDispatchReader(selfNames, displayName, subtypes, named,
+                RecordTagDispatchReader.namespaces(subtypes, context), context.readers());
     }
 }

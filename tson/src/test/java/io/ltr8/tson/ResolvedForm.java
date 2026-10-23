@@ -331,8 +331,8 @@ final class ResolvedForm {
 
     /**
      * {@link #readResolved(Tson, String)} under the meta layer {@code governingMeta} instead of meta.tn: the schema
-     * the subject's own {@code !!meta} names, which imports meta.tn and adds the constructors only it declares. A
-     * {@code data} constructor's instance is typed by that layer alone, so a resolved document holding one reads
+     * the subject's own {@code !!meta} names, which imports meta.tn and adds the constructors only it declares. An
+     * instance of its namespace type is typed by that layer alone, so a resolved document holding one reads
      * back only under it; for a subject governed by meta.tn the two are the same read.
      */
     @SuppressWarnings("unchecked")
