@@ -20,7 +20,7 @@ form only; history lives in git.
 - A cache hit takes no lock; a read canonicalizes its schema URI once.
 - A compile with no registry behind it passes `ForeignSchemas.none()`, whose every lookup is `SCHEMA_NOT_PERMITTED`.
 
-Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/meta-layer-data-kind.md`,
+Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/meta-layer-namespaces.md`,
 `design/cli-config-hashing.md`, `design/facades-and-tree.md`.
 
 ## The registries (`tson-compiler/{TsonCompiledMetaRegistry,TsonCompiledSchemaRegistry}.java`)

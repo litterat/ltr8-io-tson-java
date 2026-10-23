@@ -49,7 +49,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   makes every base kind IS-A `top` and every constructor transitively so, while IS-A stops at construction — an
   instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond them,
   exactly the entries describing *a type* rather than a part of one. Over the bundled schemas that is every
-  vocabulary constructor plus `top`, `type`, the four base kinds, `namespace` (and the namespace types, `schema`
+  vocabulary constructor plus `top`, `type`, the three base kinds, `namespace` (and the namespace types, `schema`
   and `field_map` among them), `reference` and `template` — judged by where `top` is defined
   (`EntryKind.isConstructor`, one predicate the resolver's gate, the linker's §2.2.2 eligibility, the meta's reader
   table and the governed compile all ask), and over a template's chain as over a closed one's. **A per-entry

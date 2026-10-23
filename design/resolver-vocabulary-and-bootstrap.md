@@ -175,14 +175,14 @@ meta the way an author-written annotation is: there is no author to resolve agai
   little, so `SyntheticEntryMarkerTest` asserts both halves.
 - **`@application` is the second derived key annotation** (SPEC-FEEDBACK.md #14): on the key of every entry that
   closes a template application, the application it is the instantiation of, `@application:{ name: box  arguments:
-  [{ name: int32 }] }`. It is about the entry, not about a type — a record template's member, a DATA entry
-  (`getOrder => fetch<order>` over `fetch => <T> !operation { … }`), the `Reference` a non-record template's
-  application closes to — which is why it is no field of `type_chain`. The materialiser records each application
-  in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on it, an import's
-  read off its keys), and `SchemaResolver` writes it where it attaches `@synthetic`; `TsonSchema.applicationOf` is
-  the one accessor. **Unlike `@synthetic` it is read as stated on ingest**, not recomputed: it is the one fact the
-  entry's value does not state, and what an imported schema's instantiations unify by. An author writing it is a
-  resolver error (`DefinitionResolver.refuseWrittenApplication`), as writing `chain` is.
+  [{ name: int32 }] }`. It is about the entry, not about a type — a record template's member, a namespace entry
+  (`order_api => orders<order>` over `orders => <T> !interface { get => { response: T } }`), the `Reference` a
+  non-record template's application closes to — which is why it is no field of `type_chain`. The materialiser records
+  each application in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on
+  it, an import's read off its keys), and `SchemaResolver` writes it where it attaches `@synthetic`;
+  `TsonSchema.applicationOf` is the one accessor. **Unlike `@synthetic` it is read as stated on ingest**, not
+  recomputed: it is the one fact the entry's value does not state, and what an imported schema's instantiations unify
+  by. An author writing it is a resolver error (`DefinitionResolver.refuseWrittenApplication`), as writing `chain` is.
 - **It survives linking and the import merge**, which is where a key-side fact is easiest to lose: the linker
   rebuilds its entry map several times and re-attaches key annotations at the one point every entry passes
   through (`withNameAnnotations`), imports included, so an imported synthetic keeps the marker its own schema

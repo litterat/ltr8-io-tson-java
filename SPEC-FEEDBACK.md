@@ -625,7 +625,7 @@ media type, canonical text lowercase with parameters sorted".
 
 ---
 
-## 9. The `type` kind: `atom`, `product` and `sum` IS-A `type`, and `data` does not
+## 9. The `type` kind: `atom`, `product` and `sum` IS-A `type`, and nothing else does
 
 **Section:** [TSON-SCHEMA] §4.1 (the base kinds, each "composing with `top` via `top & {}`"), §8.1 (kind
 determination, "the base kind … excluding `top`"; kind derivation), §13.2's `meta-kernel.tn` row.
@@ -647,15 +647,15 @@ type    => top & {}
 atom    => type & {}
 product => type & { access_pattern: product_access_type  size_type: product_size_type }
 sum     => type & {}
-data    => top & {}
 ```
 
-- **An entry is a type exactly when it IS-A `type`.** `data` IS-A `top` alone, and so do `reference` and
-  `template`, which compose with `top` directly, as now.
-- **`type` is not a base kind.** §8.1's kind determination reads `atom`, `product`, `sum` or `data` off the chain,
-  "excluding `top`", and should say "excluding `top` and `type`". Kind derivation's branch (3) already names only
-  `atom`, `sum` and `data`. No entry's kind changes. An entry composing with `type` alone is PRODUCT by the
-  structural default, exactly as one composing with `top` alone is.
+- **An entry is a type exactly when it IS-A `type`.** `reference` and `template` compose with `top` directly, as
+  now, and so does `namespace`, whose instances are maps (#23). `data` is not declared: a meta layer's own
+  vocabulary is a record held by a namespace type (#23), which leaves `data` nothing to describe.
+- **`type` is not a base kind.** §8.1's kind determination reads a base kind off the chain, "excluding `top`", and
+  should say "excluding `top` and `type`"; the base kinds it reads are `atom`, `product` and `sum`, with `namespace`
+  read the same way (#23). An entry composing with `type` alone is PRODUCT by the structural default, exactly as one
+  composing with `top` alone is.
 - **IS-A `top` is still the constructor predicate** (§3.3.1, §4.2), since `type` IS-A `top`.
 - **What moves is complete supertype lists.** Every constructor under `atom`, `product` or `sum` gains `type` in
   its resolved `supertypes` (`integer_type`'s is `[atom top type]`), and `top`'s subtypes gain `type`. A schema's
@@ -665,15 +665,16 @@ This is the kernel half of typed references. A later rule can say "this slot nam
 than as one more exclusion in a resolver.
 
 **Suggested resolution.** In §4.1: "The kernel defines `top` as the structural root, `type => top & {}` as the kind
-of the kinds that describe data values, and four base kinds: `atom`, `product` and `sum`, each composing with `type`,
-and `data`, composing with `top`. An entry describes a type exactly when it IS-A `type`." In §8.1, kind determination
-excludes `top` and `type`. §13.2's table names `type` among the kernel's entries.
+of the kinds that describe data values, and three base kinds, `atom`, `product` and `sum`, each composing with `type`.
+An entry describes a type exactly when it IS-A `type`." `data` is removed from §4.1, with #23's `namespace` in its
+place. In §8.1, kind determination excludes `top` and `type`. §13.2's table names `type` among the kernel's entries.
 
-**Status against Revision 37:** open; running on `r2026-38-proposal`. `meta-kernel.tn` declares `type`, and the
-three kinds compose with it; the resolved fixtures carry the entry and the longer chains (`ResolvedFixtureTest`), and
-the bundled schemas are restamped. The Java value model mirrors it: `schema.meta.Type` is a sealed interface between
-`Top` and `Atom`/`Product`/`Sum`, so a body is a type exactly when it is an `instanceof Type`. No check reads `type`
-yet, so no verdict changes: the corpus passes unchanged.
+**Status against Revision 37:** open; running on `r2026-38-proposal`. `meta-kernel.tn` declares `type`, the three
+kinds compose with it, and it declares no `data`; the resolved fixtures carry the entry and the longer chains
+(`ResolvedFixtureTest`), and the bundled schemas are restamped. The Java value model mirrors it: `schema.meta.Type` is
+a sealed interface between `Top` and `Atom`/`Product`/`Sum`, so a body is a type exactly when it is an `instanceof
+Type`, and `Top` permits `Type`, `Reference`, `TemplateBody` and `Namespace`, sealed all the way down. Kind
+derivation reads `atom`, `product`, `sum` and `namespace` off the chain, each counted only as the kernel's own entry.
 
 ---
 
@@ -1064,9 +1065,9 @@ it serves. Today the method's request is `type_ref`, so a `uuid` passes where a 
 carries two bare identifiers, a method name and an interface name, that no resolver checks — the layer checks them
 itself at startup, which is the check this entry moves into the schema.
 
-**The problem.** A meta-schema can declare an interface today — `method => { request?: record  response?: type_ref }`
-and `interface => data & { methods: {method_name => method} }` resolve, link and compile on `r2026-38-proposal` as
-written — and a schema under it cannot write the one thing an interface is for. `request: place_order_request` is
+**The problem.** A meta-schema can declare an interface under Revision 37 — `method => { request?: record  response?:
+type_ref }` and `interface => data & { methods: {method_name => method} }` are valid there — and a schema under it
+cannot write the one thing an interface is for. `request: place_order_request` is
 refused: §5.6's positional form, applied at every data position, reads the token as `{ fields: place_order_request }`
 and fails on `fields`. `request?: type_ref` accepts the name and checks nothing, so a `uuid` passes where a record is
 wanted. And a binding that names a method, `method: orders.methods.place_order`, has no spelling at all, because a
@@ -1077,7 +1078,7 @@ holds a value declared elsewhere, written by its name.**
 **Proposed.** Two rules, both outside the kernel.
 
 *A bare name at a product-typed position in a schema document is a qualified name.* At a position inside a schema
-document — a constructor's binding record, a data entry's body — whose declared type is PRODUCT-kind — a
+document — a constructor's binding record, a meta layer's own value — whose declared type is PRODUCT-kind — a
 constructor, or a record a schema declares — an unquoted token that is well-formed as a qualified name is one, and
 the position's value is the value it names. The name resolves to a store element whose declared type IS-A the
 position's type (§7.2), and is refused where nothing resolves or where what resolves is of another type: found
@@ -1093,10 +1094,10 @@ explicit record). The positional form stays a spelling rule for data values; by 
 for a value that already has a name.
 
 *A qualified name is segments joined by `.`.* The first segment is a type name and resolves as a `type_ref` does,
-locally and through imports, alias hops followed (§8.3). Each further segment selects **in a value**: a field of a
-record value, then a key of a map value, so `orders.methods.place_order` is an entry, a field of its body, and a key
-of that field's map. Every hop is written; nothing is skipped and nothing is looked up lexically, so a name means the
-same wherever it is written in a document. A segment is an identifier, judged by the key type of the collection it
+locally and through imports, alias hops followed (§8.3). Each further segment selects **in a value**: a key of a
+namespace value (#23) or a field of a record value, so `orders.place_order` is an entry and a key of its map. Every
+hop is written; nothing is skipped and nothing is looked up lexically, so a name means the same wherever it is written
+in a document. A segment is an identifier, judged by the key type of the collection it
 selects in — the schema's type-name family, the record's name type, the map's key type — and a map whose keys are not
 spellable as identifiers (a path template, a text) cannot be entered. A type entry admits no further segment:
 projecting into a record type's fields (`order.sku`) is a different capability (a field is a declaration, and the
@@ -1105,12 +1106,13 @@ rule. [TSON-DATA] §7.1 reserved `.` for exactly this, and a dotted token alread
 qualified name is a parse of a token the lexer accepts today, performed by the position's type.
 
 **The two layers, and an example over the current schemas.** The slot's type is the meta-schema's to declare, and
-the name is the governed schema's to resolve: `request?: record` is written in the meta, where `record` resolves to
-the kernel's constructor, and `request: place_order_request` is written in a schema under that meta, where the name
+the name is the governed schema's to resolve: `request?: kind<record>` is written in the meta, where `record` resolves
+to the kernel's constructor, and `request: place_order_request` is written in a schema under that meta, where the name
 resolves as every other name in that document does — locally, then through its imports, never in the meta (§2.2.2).
 The judgement meets the two: the referent's constructor, found in the schema's chain, and the slot's type, found in
-the meta's, are one entry by canonical identity, or are not. The three documents below are the probe; the meta
-compiles today on `r2026-38-proposal`, and the two schemas are what this entry makes valid.
+the meta's, are one entry by canonical identity, or are not. The three documents below are the probe, written as the
+corpus's `meta-service.tn` and its fixtures write them, with #22's kinds, #23's namespaces and #24's references in
+place; all three resolve and link on `r2026-38-proposal`.
 
 ```
 !!id:"https://example.com/meta-service.tn"
@@ -1118,10 +1120,11 @@ compiles today on `r2026-38-proposal`, and the two schemas are what this entry m
 !!import:"https://tson.io/2026/38/m/meta.tn"
 {
   method_name => identifier
-  method      => { request?: record  response?: type_ref  errors?: [record] }
-  interface   => data & { methods: {method_name => method} }
+  method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>] }
+  interface   => namespace & { key_type: = method_name  value_type: = method }
   http_verb   => !enum [GET POST]
-  binding     => data & { method: method  verb: http_verb  route: text }
+  binding     => { method: ref<method>  verb: http_verb  route: text }
+  bindings    => namespace & { key_type: = identifier  value_type: = binding }
 }
 ```
 
@@ -1132,9 +1135,9 @@ compiles today on `r2026-38-proposal`, and the two schemas are what this entry m
 {
   order               => { sku: text  quantity: int32 }
   place_order_request => { order: order }
-  orders => !interface { methods: {
+  orders => !interface {
     place_order => { request: place_order_request  response: order }
-  } }
+  }
 }
 ```
 
@@ -1143,34 +1146,33 @@ compiles today on `r2026-38-proposal`, and the two schemas are what this entry m
 !!meta:"https://example.com/meta-service.tn"
 !!import:"https://example.com/orders.tn"
 {
-  post_orders => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }
+  routes => !bindings { post_orders => { method: orders.place_order  verb: POST  route: "/orders" } }
 }
 ```
 
-`request: place_order_request` resolves in `orders.tn` to an entry whose body is `!record { … }`; `record` is the
-slot's type; accepted. `method: orders.methods.place_order` resolves `orders` in `orders-api.tn`'s imports to a
-DATA entry, `methods` to a field of its body, `place_order` to a key of that map, whose declared type is `method`;
-accepted. Each refusal names its own step:
+`request: place_order_request` resolves in `orders.tn` to an entry whose body is `!record { … }`, a member of
+`kind<record>`; accepted. `method: orders.place_order` resolves `orders` in `orders-api.tn`'s imports to a namespace
+entry built by `interface`, and `place_order` to a key of its map, whose value is of `interface`'s `value_type`,
+`method`; accepted. Each refusal names its own step:
 
 | Written in a governed schema | Result |
 |---|---|
 | `request: order_ref`, `order_ref => { id: text }` | accepted: the referent's body is built by `record` |
 | `request: req`, `req => order_ref` | accepted: the alias hop is followed (§8.3) |
 | `request: order_v2`, `order_v2 => order & { note: text }` | accepted: a composition's body is built by `record` |
-| `request: user_id`, `user_id => uuid` | refused: the hop reaches a body built by `uuid_type`, no `record` |
-| `request: orders.methods.place_order` | refused: a `method`, where a `record` is wanted |
+| `request: user_id`, `user_id => uuid` | refused: the hop reaches a body built by `uuid_type`, no member of `kind<record>` |
+| `request: orders.place_order` | refused: a qualified name reaching a value, where the name of a record type is wanted |
 | `method: place_order` | refused: no entry `place_order`; a member is reached through its entry |
-| `method: orders.place_order` | refused: `orders`'s body has no field `place_order`; the hop is `methods` |
-| `method: orders.methods.cancel_order` | refused: `methods` has no key `cancel_order` |
+| `method: orders.place_order.nope` | refused: a `method` value has no field `nope` |
+| `method: orders.cancel_order` | refused: `orders` has no key `cancel_order` |
 | `method: place_order_request` | refused: a `record`, where a `method` is wanted |
-| `response: orders` | refused: a DATA entry where a type is expected (§4.1, unchanged) |
-| `request: { … }` | not decided here: a braced value at a constructor-typed slot is the later entry's (below) |
+| `response: orders` | refused: a namespace entry is a value, where a type is expected (#23) |
+| `request: { … }` | refused: a kind-typed slot of a value body holds one bare name (#24) |
 
-The last row is deliberate. This entry admits the by-name spelling at a constructor-typed slot and says nothing
-about a braced value there: what it would mean, if anything, is exactly the question the two readings below answer
-differently — a reference type (`ref<record>`) refuses it, substitution has to say what a `record`-value written in
-place is — and settling it is more than this entry's PR. A slot typed by a record the meta declares is unaffected:
-`method: { response: order }` is plain data of that record, inline or by name.
+The last row is #24's: nothing lifts or mints in a value body, so a braced application at a kind-typed slot would have
+no entry to be the name of, and the alias spelling (`order_box => box<order>`, then `request: order_box`) gives it one.
+A slot typed by a record the meta declares holds that record's value inline: `method: { response: order }` at a slot
+typed `method` is plain data of the record.
 
 **The name, and what the standards do.** The dotted-names family, where each segment is a name and nothing is a
 position, is the *qualified name*: Java's (JLS §6.5), XML's QName, Python's dotted name, protobuf's fully-qualified
@@ -1211,25 +1213,28 @@ segments because methods live in collections.
 and nowhere else; a slot typed by a record holds the record's value inline. The read records every name it produces
 at such a slot, with the slot, and the linker judges that record, so a host declares none of its references and the
 list it might have filed one in decides nothing. A segment selects a key of a namespace value (#23) or a field of a
-record value; a map that is no namespace is not entered, so the service meta's methods are a `method_map =>
-namespace & { ... }`. `data` is opaque to the type system, so selecting in a data-kind entry's value still reaches
-through the host's object; the type walk beside it is schema-directed. A namespace entry (`myapi => !api { … }`,
-#23) is the schema's own map, entered by key with no host object in the way.
+record value; a map that is no namespace is not entered, so the service meta's interface is a namespace type,
+`interface => namespace & { … }`. A namespace entry (`orders => !interface { … }`, #23) is the schema's own map,
+entered by key with no host object in the way. A field of a record value reached past a key is judged by its
+declared type; this implementation does not yet deliver the value behind it, and reports such a name as its own gap
+rather than as the author's error.
 
 **Against the Revision 37 change log.** §5.10 (and the preamble) record "a type slot cannot be bounded at a field"
 as a deferral, and the bounded type slot at a field as withdrawn. This entry does not reinstate it: `request?:
 record` is not a type slot and carries no bound. It is an ordinary field whose declared type is a constructor and
 whose value is written by name, and "the referent must be a record" is §7.2's subsumption at that field, the same
 judgement any field makes of its value. It delivers what the withdrawn feature was for by a route that adds no
-syntax and no kernel entry. §4.1's refusal of a DATA entry where a type is expected is unchanged — `response: orders`
-is still refused — because a product-typed position is not a type position.
+syntax and no kernel entry. A value named where a type is expected is still refused — `response: orders`, a
+namespace entry, is refused as §4.1 refuses a non-type entry there (#23) — because a product-typed position is not a
+type position.
 
-**What runs.** The three documents above resolve and link, with a host class bound for `interface` and `binding`
-(a DATA instance reads only through one, `design/meta-layer-data-kind.md`), and every row of the table gives the
-result it states. The corpus carries them, with the cases around them, as `class2/link/`, `schema/` and `validate/`
+**What runs.** The three documents above resolve and link, with a host class bound for the records `method` and
+`binding` (a namespace value's values read only through one), and every row of the table gives the result it
+states. The corpus carries them, with the cases around them, as `class2/link/`, `schema/` and `validate/`
 vectors over a `meta-service.tn` fixture: names as list elements and map values, alias chains, a value of a strict
-subtype of the slot's type, an enum-keyed map entered by a label, literals at atom-typed slots, the resolved output,
-and refusals of a quoted name, malformed segments, a dotted name at a `type_ref` slot, a text-keyed map, a framed
+subtype of the slot's type, a namespace keyed by a member set entered by a member, literals at atom-typed slots, the
+resolved output, and refusals of a quoted name, malformed segments, a dotted name at a `type_ref` slot, a map that is
+no namespace, a framed
 name, the meta's own constructor named from a governed schema, an open entry, a segment through a list, and the
 withdrawn positional spelling `!record { fields: { p => x } }`; a `validate/` vector pins that a data document's
 positional fills, the product-typed one included, read as before. The pieces:
@@ -1237,7 +1242,7 @@ positional fills, the product-typed one included, read as before. The pieces:
 - *The value.* A by-name slot is bound to the host's type reference (`TypeRef` in this implementation), the token as
 written in its `name`, the same shape a `type_ref` slot binds; nothing in the host model is specific to a qualified
 name.
-- *The read.* In a schema document — the resolver's replay of a binding record or a data body, which the read
+- *The read.* In a schema document — the resolver's replay of a binding record or a namespace value, which the read
 context marks — §5.6's positional form keeps a bare token where the record's one positional field is atom-typed and
 loses it where that field is a product or a sum; there an unquoted token is a name. A component bound to a type
 reference reads it as written; the record's own reader refuses it as no record (`TYPE_MISMATCH`). A quoted token is
@@ -1272,8 +1277,9 @@ judgement by the slot's declared type.
 5. *IS-A* is identity, or membership in the declared type's resolved `supertypes`, compared by canonical identity
    (declaring schema and entry), each type named in the namespace of the meta governing the schema that declares it.
 6. *"A segment is an identifier, judged by the key type of the collection it selects in"*: a segment is judged by the
-   §7.7 grammar wherever it stands, when the name is resolved, and a map is entered only where its key type is an
-   identifier family or an enum; a key outside §7.7 under a wider key profile cannot be written as a segment.
+   §7.7 grammar wherever it stands, when the name is resolved, and a map is entered only where it is a value of a
+   namespace type (#23), whose key type is an identifier family; a key outside §7.7 under a wider key profile cannot
+   be written as a segment.
    Judging each segment by its own key type would make the grammar depend on what the walk has reached so far.
 7. *A framed name* (`@doc:"x" orders`, `!record x`) is refused: a name's type is its referent's, and an annotation on
    it would have nowhere to go.
@@ -1284,9 +1290,9 @@ judgement by the slot's declared type.
 10. *An empty segment cannot be written*: `orders..place_order` is three tokens under [TSON-DATA] §7.2's range rule,
     so it fails to parse before the name grammar is asked. A trailing or leading `.` lexes as one token and is
     refused by the segment grammar when the name is resolved.
-11. *Part 3* needs no sentence yet: there are no JSON schema documents (§1), and the JSON stack reads no `data`
-    body, so a qualified name has no JSON position. The suggestion's "a JSON string at the position" stands for when
-    one exists.
+11. *Part 3* needs no sentence yet: there are no JSON schema documents (§1), so the JSON stack reads no namespace
+    value of a schema map, and a qualified name has no JSON position. The suggestion's "a JSON string at the
+    position" stands for when one exists.
 
 **Breaking changes, against Revision 37:** in a schema document, the positional bare token at a product-typed fill is
 withdrawn (no bundled schema or corpus vector writes one); data documents are unchanged; no kernel entry, pin or
@@ -1299,7 +1305,7 @@ resolved fixture changes.
   would fill an atom-typed field, in which case it fills it; there the explicit record is the only spelling of a
   product-typed fill. A data document has no namespace to resolve a name in, and reads every bare token positionally."
 - [TSON-SCHEMA] new §5.12 "Values by name": the two rules above — the position, the store, the judgement, the segment
-  grammar, resolution "as written" in output — with `orders.methods.place_order` as the example and the refusal table.
+  grammar, resolution "as written" in output — with `orders.place_order` as the example and the refusal table.
 - [TSON-SCHEMA] §5.10: the sentence on a bound at a field notes that a product-typed field written by name needs none.
 - [TSON-SCHEMA] §9: a slot holding a value by name is typed by the value's type; `type_ref` remains the type slot.
 - [TSON-DATA] §7.1: `.` is the identifier separator of [TSON-SCHEMA] §5.12, no longer "future".
@@ -1328,8 +1334,8 @@ stated elsewhere in the same entry:
 
 - `body: top` is the entry's value. `schema => {type_name => top}`.
 - `supertypes` and `subtypes` are a fact about a type, so fields of `type`. Every type kind composes `type`, so
-  every `!record`, `!integer_type`, `!array` and `!choice` body has the slots; `data`, `reference` and `template`
-  compose `top` and have none — a value, a hop and an open body carry no IS-A, which is the rule now.
+  every `!record`, `!integer_type`, `!array` and `!choice` body has the slots; `namespace` (#23), `reference` and
+  `template` compose `top` and have none — a value, a hop and an open body carry no IS-A, which is the rule now.
 - `source`, for a construction, is the body's tag: `source: record  body: !record { … }` states one fact twice.
 - `source`, for a refinement: §5.5 already makes an instance's `source` the base constructor, so the tag again; the
   refined-from entry is the chain's nearest member.
@@ -1364,13 +1370,13 @@ schema   => {type_name => top}
 
 - **An entry resolves to its value.** `person => !record { fields: { … } }`,
   `integer => !integer_type {}`, `age => !integer_type { min: 0  chain: { supertypes: [integer] } }`,
-  `type_name => !reference { target: identifier }`, `vec => <T> !template { … }`, and a DATA entry
-  `my_op => !operation { … }`. Resolved output and source are one grammar: output is source with sugar expanded,
+  `type_name => !reference { target: identifier }`, `vec => <T> !template { … }`, and a namespace entry (#23)
+  `orders => !interface { … }`. Resolved output and source are one grammar: output is source with sugar expanded,
   bodies flattened and chains computed, and an entry written as a constructor application resolves to itself.
 - **An entry's kind is its value's type's kind** (§5.5's transfer, unchanged): a body whose constructor IS-A
-  `type` is a type entry; one whose constructor composes `data` is DATA; `!reference` is REFERENCE; `!template` is
-  open. `type_ref` is a name in `schema` whose value is a type, and the DATA-at-a-type-position rule (§4.1) is
-  "the value is not a type", with no wrapper to consult.
+  `type` is a type entry; an instance of a namespace type is NAMESPACE (#23); `!reference` is REFERENCE; `!template`
+  is open. `type_ref` is a name in `schema` whose value is a type, and §4.1's rule against a non-type entry at a type
+  position is "the value is not a type", with no wrapper to consult.
 - **One record, three states named.** `parents` is what was written, and is the only list that ever holds an
   application; it is a record template's slot, kept after closing, since its parents are closed entries and a FINAL
   parent is refused there as anywhere (§5.2). `supertypes` is the closed chain, complete
@@ -1379,7 +1385,7 @@ schema   => {type_name => top}
   A record template is the ABSTRACT base its members are IS-A (#17), and it stands in its own parents' `subtypes` as
   any record does.
 - **An entry's application is an annotation on its key.** `application` is the entry's identity as an
-  instantiation (§8.2), and an entry of any kind can be one: a record template's member, a DATA entry
+  instantiation (§8.2), and an entry of any kind can be one: a record template's member, a namespace entry
   closed from a templated instance, the alias a template's application closes to. It is a fact about
   the entry, not about a type, so it lives beside the entry as `@synthetic` does (§8.2): the resolver writes
   `@application:{ name: box  arguments: [{ name: int32 }] }` on the key wherever an entry closes an application,
@@ -1398,8 +1404,8 @@ schema   => {type_name => top}
   application dropped from lineage) go with `record.supertypes`; a subtracted record is a record with an empty
   `supertypes`. The application is not provenance, above.
 - **Kind is judged by origin, not spelling.** A body's kind is read off the chain by which entry of the kernel it
-  reaches, so a schema's own `data => { … }` composed into `payload => data & { … }` is PRODUCT: a value conforms
-  to where it is defined.
+  reaches, so a schema's own `namespace => { … }` composed into `payload => namespace & { … }` is PRODUCT: a value
+  conforms to where it is defined.
 - **The profile rule (#10) reads unchanged.** "Absent, it is its supertypes' one name type": every member of the
   chain agrees, each having inherited its own.
 
@@ -1438,7 +1444,7 @@ point over every local chain, so an entry IS-A everything its supertypes are, an
 included (`small => !int32 ^ { … }` carries `[int32 integer]`). A closed type keeps no `parents`; a record template
 keeps its written ones, is IS-A the closed entries they reach and stands in their `subtypes`, so a template composing
 or refining a final record is refused at its own declaration. `application` is a key annotation, written
-wherever an entry closes one — a member of a record template, a DATA entry, the alias a template's application closes
+wherever an entry closes one — a member of a record template, a namespace entry, the alias a template's application closes
 to — and read through `TsonSchema.applicationOf`. Kind and constructor-hood are judged by where
 `top` and the base kinds are defined. Writing `chain` is a resolver error on an explicit construction, a held
 construction and an atom refinement alike, and so is a constructor declaring a field named `chain`. Beyond the
@@ -1450,7 +1456,7 @@ differences from "no diagnostic changes" above: a template application with an u
 holding it (`'box<some_typo>' field 'v' has an unresolved reference 'some_typo'`), and a resolved atom refinement's
 chain is complete. The corpus restates every resolved output in the nested form and adds vectors for the refusals, an
 emptied chain under subtraction, a complete chain, a chain completed through an applied parent, a template refused
-against a final parent, and a schema's own `data`. Part 2's cached §13.2 table is not re-stamped here. #17 resolves
+against a final parent, and a schema's own `namespace`. Part 2's cached §13.2 table is not re-stamped here. #17 resolves
 a record template as a `record` with `parameters`, which leaves the chain to `type` alone; that is the running form.
 ---
 
@@ -1463,8 +1469,9 @@ is refused", "a position typed by it admits exactly its subtypes"), §8 (resolve
 **Kind:** proposal — one special sentence replaced by a mark the kernel already has. Sequenced with #14, which it
 shares fixtures with.
 
-**The problem.** §3.3.1 carries a rule of its own for six entries: `!top {}`, `!type {}`, `!atom {}`, `!product {}`,
-`!sum {}` and `!data {}` are refused by "the base kind's own reader". That is ABSTRACT's definition in §12.1 stated
+**The problem.** §3.3.1 carries a rule of its own for the base kinds, and with `type` (#9) and `namespace` (#23) in
+the kernel it covers six entries: `!top {}`, `!type {}`, `!atom {}`, `!product {}`, `!sum {}` and `!namespace {}` are
+refused by "the base kind's own reader". That is ABSTRACT's definition in §12.1 stated
 without the word. And under #14 a schema map is `{type_name => top}`, so every entry's value is a tagged value at a
 `top`-typed position; the rule that reads it — dispatch by tag among the subtypes of a base that has no instances
 of its own, the family open across schemas (§3.3.4) — is the rule every abstract record without discriminators
@@ -1473,12 +1480,12 @@ already has.
 **Proposed.** The six are marked, each for itself since extensibility is never inherited (§5.2):
 
 ```
-top     => abstract {}
-type    => abstract top & { chain?: type_chain }
-atom    => abstract type & {}
-product => abstract type & { access_pattern: product_access_type  size_type: product_size_type }
-sum     => abstract type & {}
-data    => abstract top & {}
+top       => abstract {}
+type      => abstract top & { chain?: type_chain }
+atom      => abstract type & {}
+product   => abstract type & { access_pattern: product_access_type  size_type: product_size_type }
+sum       => abstract type & {}
+namespace => abstract top & { key_type: identifier_kind  value_type: type_kind  ordered?: boolean ~ false }
 ```
 
 - A direct application of any of the six is refused by the abstract rule, with the diagnostic naming the subtypes
@@ -1486,8 +1493,8 @@ data    => abstract top & {}
 - Constructors stay OPEN: `!record { … }` and `!integer_type {}` are direct instances. `reference` and `template`
   have direct instances and stay OPEN. The supporting records (`record_field`, `type_ref`, `atom_specification`) are
   values everywhere and are not applicable for a different reason, not being IS-A `top`.
-- `schema => {type_name => top}` reads each entry by its tag among `top`'s subtypes, `!operation { … }` from a
-  meta-schema admitted through `data`'s chain. No verdict changes: nothing was ever read against a base kind.
+- `schema => {type_name => top}` reads each entry by its tag among `top`'s subtypes, `!interface { … }` from a
+  meta-schema admitted through `namespace`'s chain. No verdict changes: nothing was ever read against a base kind.
 
 **Breaking changes, against Revision 37:** none in behaviour; `extension: ABSTRACT` appears on the six entries in
 resolved output.
@@ -1501,10 +1508,10 @@ application is refused as any abstract record's is (§12.1)". §12.1's abstract 
 naming one passes the applicability gate — `top` answering for itself — and is refused as abstract in one sentence,
 naming only the instantiable subtypes that would satisfy the position (`'!atom' names an abstract entry, which has no
 direct instances (§5.2), so there is nothing for '!atom { ... }' to build -- construct one of its instantiable subtypes
-instead: (value_type | void_type | integer_type | …)`); a `data` that nothing in scope composes says so. One verdict
-moves: an annotation typed by a base kind (`@data:_`) was a bind mismatch,
-the type having no class to build, and is now a schema error, a value at an abstract position naming no subtype. The
-corpus carries a refusal vector for each of the six and a valid vector for `!record { … }` and `!integer_type { … }`.
+instead: (value_type | void_type | integer_type | …)`); an abstract constructor that nothing in scope composes, such
+as a meta layer's own `marker => abstract top & {}`, says so. An annotation typed by a base kind (`@sum:_`) is a schema
+error in either §6 position, a value at an abstract position naming no subtype. The corpus carries a refusal vector
+for each of the six and a valid vector for `!record { … }` and `!integer_type { … }`.
 
 ## 16. A record template's parameters stand in three places, and a parameter is never an operand
 
@@ -1871,12 +1878,12 @@ kind is IS-A `type`, so it stands in any value position, and in every such posit
   listed beside it. The walk runs over resolved entries, not names, and has no namespace question.
 - **`of` names a constructor of the parent system.** It resolves in the writer's **structure namespace** (§3.3.1), as a
   constructor role does (§3.3.2): `identifier_type` is the kernel's, reached through the meta chain, and never a type of the
-  writer's type-name namespace. `of` must be `type` or at or below it, or `namespace` or below it (#23): `kind<data>` names
-  no type a value can have, and is a resolver error at the declaration. `of` is typed `type_name` and not by a kind, and this
-  is a known gap rather than a design: its values are names of *constructors* at or below `type`, which #9's rule excludes
-  from membership of any kind, so `kind<type>` does not cover them. This is the one slot where the type-theoretic account
-  asks for a higher kind — a classifier of constructors — and the series has none. The slot's store is stated here in prose,
-  as every constructor role's is (§3.3.1).
+  writer's type-name namespace. `of` must be `type` or at or below it, or `namespace` or below it (#23): `kind<reference>`
+  names no type a value can have, and is a resolver error at the declaration. `of` is typed `type_name` and not by a kind,
+  and this is a known gap rather than a design: its values are names of *constructors* at or below `type`, which #9's rule
+  excludes from membership of any kind, so `kind<type>` does not cover them. This is the one slot where the type-theoretic
+  account asks for a higher kind — a classifier of constructors — and the series has none. The slot's store is stated here in
+  prose, as every constructor role's is (§3.3.1).
 - **A kind is not a bound.** "Any type IS-A `stock_id`" names a type of the writer's type-name namespace and walks
   supertypes; a kind names a constructor of the structure namespace and walks construction. Two stores, two
   mechanisms: `template_param.bound` is untouched, and `kind<stock_id>` is not a kind.
@@ -1966,7 +1973,7 @@ declares `kind_type => atom & { of: type_name  members?: [type_name] }`, `kind`,
 `type_kind`, and types `enum_type.name_type` and `record.name_type` `identifier_kind`; `core` has its `kind` sibling;
 the resolved fixtures carry the members (`identifier_kind`'s are `[field_name identifier param_name scheme_name
 type_name]`), and the bundled schemas are restamped. The linker computes every kind's `members` over the closure by the
-walk above, imported kinds included, and refuses `kind<data>`, a constructor above or beside `type` other than a
+walk above, imported kinds included, and refuses `kind<reference>`, a constructor above or beside `type` other than a
 namespace constructor (#23), and an `of` naming a type of the writer's own namespace. A kind is a member of itself where
 the walk says so (`type_kind` lists itself), the walk reading construction and never a kind's members. The `name_type`
 checks read the slot's kind off the constructor's `name_type` field and judge the resolved referent a member of it, with
@@ -1978,7 +1985,7 @@ a kind as an atom: a type-name token, or a JSON string, naming a member of the g
 layer, whose documents are schemas, the reader checks the grammar alone and the schema's own link judges membership,
 which is how a resolved form naming a user's name type reads back through meta.tn. The corpus states the city enum of
 the problem end to end, the members of `identifier_kind` under a meta layer's closure (a new link-layer fact), a user
-`kind<uuid_type>`'s members, a pinned non-member, `kind<data>`, and a kind-typed field holding a member's name and a
+`kind<uuid_type>`'s members, a pinned non-member, `kind<reference>`, and a kind-typed field holding a member's name and a
 non-member's. The type slots above are typed `type_kind` in `meta-kernel.tn`, with the resolved fixtures and the
 corpus's service fixture (`request?: kind<record>`) following; the kernel's `type_kind` lists `top`. Part 2's cached
 §13.2 table is not re-stamped here.
@@ -1992,8 +1999,8 @@ meta-schema privilege), §3.3.1 and §3.3.2 (where a composition operand resolve
 its value), #22 (kind membership); [TSON-DATA] §7.1.
 
 **Kind:** proposal. The second of the namespace entries the register's preface says will be raised against Revision
-38, after #22. The kernel's namespace constructor, how a value of one is read, and a value of one standing as an
-entry are running; `data`'s retirement and where a namespace type may be declared are proposals, not running.
+38, after #22. The kernel's namespace constructor, how a value of one is read, a value of one standing as an entry,
+and `data`'s removal from the kernel are running; where a namespace type may be declared is a proposal, not running.
 
 **The problem.** #13 lets a qualified name enter any map keyed by an identifier family or an enum, so which maps a
 name may reach into is decided by the key type, a fact about spelling. The kernel already has two maps whose keys
@@ -2004,7 +2011,7 @@ thing, and nothing separates them from a map of headers keyed by text. And the t
 a map type built by some constructor, `api` (a meta layer's set of methods) IS-A nothing, and the entry form the
 series wants, `myapi => !api { … }`, cannot pass §3.3.1, which admits `!C` only where `C` IS-A `top`.
 
-**Proposed, and running.** A kernel constructor beside `data`, `reference` and `template`, composing `top` directly,
+**Proposed, and running.** A kernel constructor beside `reference` and `template`, composing `top` directly,
 and the kernel's two namespaces declared by composition over it, each pinning its facets:
 
 ```
@@ -2015,7 +2022,7 @@ schema    => namespace & { key_type: = type_name  value_type: = top }
 
 - *`top` has two families of constructors.* `type`'s, whose instances are types, and `namespace`'s, whose instances
   are maps. A namespace constructor IS-A `top` and neither `type` nor `map`; a chain reaching `namespace` and a base
-  kind (`namespace & data & { … }`) is refused as reaching two, as a chain reaching two base kinds is.
+  kind (`namespace & atom & { … }`) is refused as reaching two, as a chain reaching two base kinds is.
 - *The reading rule.* A value of a type IS-A `namespace` is written and read as a map from its `key_type` to its
   `value_type`, ordered as its `ordered` is pinned and unordered where nothing pins it, its values never void and its
   size unbounded — never as a record of those facets. A key is judged by `key_type` and a value by `value_type`, as a
@@ -2044,10 +2051,11 @@ value is the entry:
 
 - *Read as the map.* The payload is read as the map `api` describes, each key under `key_type` and each value under
   `value_type`, as a value body: nothing in it lifts or mints, so a kind-typed slot holds one bare name and a braced
-  application there is refused, and its names are judged under the processor's identifier policy as a data body's
+  application there is refused, and its names are judged under the processor's identifier policy as a data document's
   are. A payload that is no such map is a resolver error against the entry.
-- *A value, never a type.* Naming the entry where a type is expected is a resolver error, as naming a `data` entry
-  is (§4.1): `{ s: myapi }` is refused, and so is `response: myapi` at a `type_kind` slot of a value body.
+- *A value, never a type.* Naming the entry where a type is expected is a resolver error, as §4.1 makes naming a
+  non-type entry there: `{ s: myapi }` is refused, and so is `response: myapi` at a `type_kind` slot of a value
+  body.
 - *Entered by key.* A qualified name's further segment selects a key of the entry's map, and the value reached is of
   the constructor's `value_type`: `handler: myapi.get_orders` at a slot typed `ref<method>` reaches the `method`
   value held under `get_orders` (#24).
@@ -2060,9 +2068,14 @@ types, though `myapi` names a value and a kind's values are names of types. No k
 `kind<record>`) lists it. Running as stated; the alternative is to state that a kind's members are entries IS-A
 `type` or namespace constructors, which excludes an entry whose value is a map.
 
-**`data` retires, proposed.** Once a value lives under a namespace rather than in a data constructor's instance, the
-`data` base kind has no use the namespace does not cover, and selecting in an entry's value walks the schema rather
-than the host's object.
+**`data` goes, and running.** Once a meta layer's vocabulary is a record held by a namespace type, the `data` base
+kind has no use the namespace does not cover. The layer declares `method => { … }` and `interface => namespace & {
+key_type: = method_name  value_type: = method }`; a schema it governs holds `orders => !interface { place_order => {
+… } }`, an entry whose value is a map the schema describes, each of its values an ordinary record value. Selecting in
+an entry's value then walks the schema by key rather than a host's object, and `top`'s constructors are `type`'s and
+`namespace`'s, with `reference` and `template` beside them. A segment past a key that selects a field of a record
+value is judged by the field's declared type; this implementation does not yet deliver the value behind it, and
+reports such a name as its own gap rather than as the author's error.
 
 **Where a namespace type may be declared, and used.** A namespace type IS-A `top`, so it is a constructor, and
 §2.2.2 lets only a schema whose own `!!meta` names the meta-kernel declare one. Running: in a schema governed by
@@ -2084,24 +2097,27 @@ core. Two readings, and the spec states neither:
   privilege is stated for a constructor whose instances are types. A meta-governed schema then declares `headers =>
   namespace & { … }` itself, a type like any other, with no import of the kernel.
 
-**Breaking changes, against Revision 37:** `meta-kernel.tn` gains `namespace`; `schema` and `field_map` are written
-as compositions over it, and their resolved form is a record carrying the facets they state. No document reads
-differently.
+**Breaking changes, against Revision 37:** `meta-kernel.tn` gains `namespace` and loses `data`; `schema` and
+`field_map` are written as compositions over `namespace`, and their resolved form is a record carrying the facets they
+state. A meta layer composing `data` declares its vocabulary as a record and a namespace type of it instead, and the
+schemas it governs hold an instance of the namespace where they held an instance of the constructor. No data document
+reads differently.
 
-**Suggested resolution.** [TSON-SCHEMA] §4.1, after `data`: "`namespace => abstract top & { key_type: identifier_kind
+**Suggested resolution.** [TSON-SCHEMA] §4.1, in place of `data`: "`namespace => abstract top & { key_type: identifier_kind
 value_type: type_kind  ordered?: boolean ~ false }` is the constructor whose instances are maps keyed by names. A value
 of a type IS-A `namespace` is written and read as a map from its `key_type` to its `value_type`, never as a record of
 these facets; a namespace type pins `value_type` by composition and pins `key_type` or states it by default, the
 family that stands where the value's host supplies none, and one that is not abstract and states either neither way is
 a resolver error. `top`'s constructors are `type`'s, whose instances are types, and `namespace`'s, whose instances are
-maps." §5.2 and §8.1: `field_map` and `schema` as above. #22's `kind_type` paragraph: "not itself a constructor whose
+maps." `data` and the sentences naming it leave §4.1, §8.1's kind determination and §13.2's table. §5.2 and §8.1:
+`field_map` and `schema` as above. #22's `kind_type` paragraph: "not itself a constructor whose
 instances are types", and `of` "is `type` or `namespace`, or below either". §9's inventory names `namespace`. For where
 a namespace type is declared, the second reading, as a sentence in §3.3.1: "A composition operand (§5.8) that the
 type-name namespace does not resolve resolves in the structure namespace, and MUST be `namespace` or IS-A it", with
 §2.2.2's privilege narrowed to "an entry IS-A `type`"; or, keeping the first, a sentence in §2.2.2 that a namespace type
 is a constructor and so declared only by a meta-schema. For the entry, §4.1 after the paragraph above: "An application
 of a namespace type builds a map value, and an entry whose value it is is no type: naming it where a type is expected
-is a resolver error, as naming a `data` entry is. A qualified name's segment after the entry's selects a key of that
+is a resolver error. A qualified name's segment after the entry's selects a key of that
 map, and the value reached is a value of the namespace type's `value_type`." And #22's membership stated either way
 for such an entry: listed by the kinds of its constructor, as running, or a member only where its value is a type.
 
@@ -2111,14 +2127,21 @@ compositions over it, the resolved fixture carries them (`ResolvedFixtureTest`),
 The linker records each namespace type with the map a value of it is read as, and refuses an open facet on a concrete
 one; both encodings read the value as that map, a host-supplied key family's keys by spelling, judged after resolution
 as a record's field names are. The kind walk admits a namespace type to `type_kind` and the namespace kinds only. The
-corpus's `meta-service.tn` declares `method_map`, `rpc_map` and `verb_map` by composition, and `validate-namespace.tn`
-types a field by a kernel-governed `meta-headers.tn`'s `headers`, importing no core. An entry `myapi => !api { … }`
+corpus's `meta-service.tn` declares its vocabulary as records held by namespace types — `interface`, `rpc_interface`
+and `verb_interface` holding methods, `bindings` holding `binding`, and `header_sets` holding `header_set`, a record
+whose plain map `{text => method}` no qualified name enters — so a governed schema writes `orders => !interface {
+place_order => { … } }` and names the method `orders.place_order`. `validate-namespace.tn` types a field by a
+kernel-governed `meta-headers.tn`'s `headers`, importing no core, and `validate-own-namespace.tn` shows a schema's own
+record named `namespace` composing as an ordinary record, a kind being judged by origin. An entry `myapi => !api { … }`
 resolves to the map, refused at every type position, entered by key by a qualified name at a `ref<T>` slot, listed by
 `kind<api>` and `kind<namespace>`, and written and read back in resolver output as written; the corpus's `meta-api.tn`
 declares `api` and its vectors cover each. The Java model holds the kernel's two namespace values as namespace values
 too: the schema map is a `Namespace` typed `schema`, a record's `fields` one typed `field_map`, and a position typed by
-a namespace type binds a `Namespace` where its host declares one and the map where its host declares a map. What
-remains: `data`'s retirement and the second reading above, neither running. Part 2's cached §13.2 table is not
+a namespace type binds a `Namespace` where its host declares one and the map where its host declares a map.
+`meta-kernel.tn` declares no `data`, and the Java model has no branch for it: `Top` permits `Type`, `Reference`,
+`TemplateBody` and `Namespace`, and each value of a namespace entry binds to a plain host class the consumer's name
+binder finds. A name whose walk selects a field of a record value past a key is judged by type and reported as this
+implementation's gap. What remains is the second reading above, not running. Part 2's cached §13.2 table is not
 re-stamped here.
 
 ---
@@ -2152,32 +2175,34 @@ else; a slot typed `T` holds a value inline and nothing else. The referent is ju
 receives the name as written with the value delivered at link.
 
 ```
-method_map => namespace & { key_type: = method_name  value_type: = method }
-interface  => data & { methods: method_map }
-binding    => data & { method: ref<method>  verb: http_verb  route: text }
+interface => namespace & { key_type: = method_name  value_type: = method }
+binding   => { method: ref<method>  verb: http_verb  route: text }
+bindings  => namespace & { key_type: = identifier  value_type: = binding }
 
-orders => !interface { methods: { place_order => { request: place_order_request } } }
-http   => !binding { method: orders.methods.place_order  verb: POST  route: "/orders" }
+orders => !interface { place_order => { request: place_order_request } }
+routes => !bindings { post_orders => { method: orders.place_order  verb: POST  route: "/orders" } }
 ```
 
-Refusals, each where it stands: `method: orders` (an interface, no method); `method: orders.methods` (the namespace,
-no method); `method: orders.methods.nope` (no key, the keys listed); `method: hs.headers.accept` where `headers` is
-`{text => method}` (a map that is no namespace); `r: ref<record>` (a constructor); a reference in a data document (not
-yet read: a data document has no link to resolve it at).
+Refusals, each where it stands: `method: orders` (an interface, no method); `method: orders.cancel_order` (no key,
+the keys listed); `method: orders.place_order.nope` (a method has no field `nope`); `method: hs.h.headers.accept`
+where `header_set.headers` is `{text => method}` (a map that is no namespace); `r: ref<record>` (a constructor); a
+reference in a data document (not yet read: a data document has no link to resolve it at).
 
 **A value body's slots, under #22 and this entry.** A kind-typed slot of a value body holds one bare name: a braced
 application there (`request: { name: box  arguments: [ { name: order } ] }`, §5.6's data spelling) is refused, since
 nothing lifts or mints in a value body and the application would have no entry to be the name of; the alias spelling,
 `order_box => box<order>` then `request: order_box`, gives it one. A `type_ref`-typed slot of a value body is the
 application form and is judged by resolution, arity and §4.1, as the kernel's own are. A slot reached through a record
-family base is the tagged subtype's.
+family base is the tagged subtype's; this implementation follows the subtype where the value is held under a namespace
+key, and reports one behind a record value's field as its own gap.
 
 **Breaking changes, against Revision 37:** `meta-kernel.tn` gains `ref_type` and `ref`. A meta layer's value-by-name
 slots are written `ref<T>`; a record-typed slot no longer takes a name. §9's guidance reads: a slot naming a type is
 typed by a kind, a slot naming a value by a reference, and `type_ref` is for a slot that holds an application.
 
 **Status against Revision 37:** open; running on `ref-atom`, a branch off `r2026-38-proposal`: the kernel entries, the
-resolved fixture, the corpus's `meta-service.tn` (`method_map`, `rpc_map`, `verb_map`, `binding.method: ref<method>`),
-the vectors above, and the Java host `Ref<T>` carrying the name and the delivered value. `Data.references()` is gone:
-a host declares nothing, the read records every name at a kind- or reference-typed slot, and the linker judges each
-by its slot.
+resolved fixture, the corpus's `meta-service.tn` (`interface`, `rpc_interface` and `verb_interface` holding methods,
+`binding.method: ref<method>` held by `bindings`), the vectors above, and the Java host `Ref<T>` carrying the name and
+the delivered value. A host declares nothing: the read records every name at a kind- or reference-typed slot, and the
+linker judges each by its slot. A name whose walk selects a field of a record value is judged by type, every refusal
+above included, and the value behind the field is not yet delivered: reported as this implementation's gap.

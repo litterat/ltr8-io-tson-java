@@ -38,13 +38,14 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its slot
   (`TsonReadContext.heldByName`). A braced value is read through the `type_ref` reader in a kernel body, where a
   sugar lift writes an application into the slot it fills and the closer mints its entry afterwards; in a value body
-  (`TsonReadContext.readsValueBody`, a `data` constructor's or a namespace type's instance) nothing lifts or mints, so
-  it is refused and the alias spelling named: `order_box => box<order>`, then the bare name.
+  (`TsonReadContext.readsValueBody`, a namespace type's instance) nothing lifts or mints, so it is refused and the
+  alias spelling named: `order_box => box<order>`, then the bare name.
 - A `type_ref` slot of a value body is recorded too (`RecordedApplicationReader`) and judged by resolution, arity and
   §4.1 (`ValuesByName.judgeApplication`), as the resolver judges a kernel body's own.
-- The slot walk (`ValuesByName.slotType`) follows the value beside the declared types: at a record family base whose
-  field is the tagged subtype's, the value's own class names the subtype. A slot the walk cannot follow reaches a
-  collecting resolve as `NOT_IMPLEMENTED`, never as an exception.
+- The slot walk (`ValuesByName.slotType`) follows the value beside the declared types while the value is in hand: at a
+  record family base whose field is the tagged subtype's, the value's own class names the subtype. Past a record's
+  field it has the declared types alone. A slot the walk cannot follow reaches a collecting resolve as
+  `NOT_IMPLEMENTED`, never as an exception.
 - A slot that names a value is typed `ref<T>` (`ref_type => atom & { of: type_name }`, `ref => <T> !ref_type { of: T }`).
   Its value is a qualified name; `of` is a type of the writer's namespace, never a constructor (`ref<record>` is
   refused: that is `kind<record>`). A slot typed by a record holds the record's value inline and takes no name.
@@ -53,11 +54,13 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   types. A recorded name at a reference-typed slot resolves its first segment in the schema map and each further
   one as a key of a namespace value or a field of a record value, never into a map that is no namespace; the
   referent IS-A `of`, and the value reached is delivered into the host's `Ref<T>` (`Ref.deliver`), a `TypeRef` host
-  taking the name alone. A reference in a data document is not yet read (`NOT_IMPLEMENTED`).
+  taking the name alone. A name whose walk passes a record value's field is judged by type and then reported as a gap
+  (`NOT_IMPLEMENTED`): the value behind the field is not read. A reference in a data document is not yet read
+  (`NOT_IMPLEMENTED`).
 - One host shape for every reference: a `TypeRef`, whatever the slot. Only the judgement differs by slot.
 
 Related: `design/linking-and-compilation.md` (the judgements), `design/held-template-bodies.md` (parameter
-positions), `design/meta-layer-data-kind.md` (a meta's own slots), `design/record-dispatch.md` (the positional form).
+positions), `design/meta-layer-namespaces.md` (a meta's own slots), `design/record-dispatch.md` (the positional form).
 
 ## The five forms
 
@@ -102,7 +105,7 @@ map.
 | `record.discriminators`, `field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
 | `record.name_type`, `enum_type.name_type` | reference | structure namespace for a constructor-pinned value, else type-name | `identifier_kind` | `NameType.admits` |
 | `kind_type.of` | reference | structure namespace | a constructor, `type` or `namespace`, or IS-A either | `KindMembers.ofRefusal` |
-| `ref_type.of` | reference | type-name namespace | a type or a data constructor, never a constructor of types | `validateBody` |
+| `ref_type.of` | reference | type-name namespace | a type or a namespace type, never a constructor of types | `validateBody` |
 | a slot typed `ref<T>` | reference by key, a path | schema map, then namespace values and record fields | `ref<T>`: the referent IS-A `T` | `ValuesByName.judge` |
 | `schema.value_type: = top` | tag | structure namespace | IS-A `top` | `DefinitionResolver` |
 | `myapi => !api { … }` | tag | structure namespace | an instance of a namespace constructor, IS-A `top`; the payload a map of `api`'s keys and values | `DefinitionResolver` |

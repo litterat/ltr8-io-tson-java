@@ -187,8 +187,7 @@ are kept in step deliberately.
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
   references (§8.3); constructor application (`!C value`, §5.5, binds generically via the compiled
   reader — no hand-rolled name→class table, `ltr8-bind`'s union resolution finds the `Top` member by
-  `@Typename`; a kernel body is a leaf of the sealed hierarchy, and a meta-schema's own constructor is an
-  implementation of the open `Data` branch, admitted by the same lookup); an application of a namespace type
+  `@Typename`; a kernel body is a leaf of the sealed hierarchy); an application of a namespace type
   (`myapi => !api { ... }`, below); atom refinement (`!I ^ { ... }`, §5.5/§5.7); subtraction (`A & { ... } - { f }`, §5.9);
   restating a field group in a refinement or composition body (§5.11 — the same options, their members in the
   same order, types verbatim, a member's `?` dropped but never added, state tightening OPTIONAL→REQUIRED only;
@@ -196,8 +195,9 @@ are kept in step deliberately.
 - **A namespace type's payload is a map, read as a value body.** `!api { … }`, `api` IS-A the kernel's `namespace`,
   reads through the meta's constructor reader for `api`: the map `TsonLinkedSchema.namespace` gives for it, keys under
   the pinned family and each value under `value_type`, bound to an `AnnotatedMap` and delivered as a `Namespace`
-  (`NamespaceInstanceReader`), kind `NAMESPACE`, `api` recorded as the constructor. It is read as a `data` payload is:
-  under the loader's identifier policy (`SchemaResolver.payloadNames`) and as a value body (`isValueBody`), so a
+  (`NamespaceInstanceReader`), kind `NAMESPACE`, `api` recorded as the constructor, each value bound to the class the
+  meta name binder finds for `value_type` (`design/meta-layer-namespaces.md`). It is the one payload read under the
+  loader's identifier policy (`SchemaResolver.payloadNames`) and as a value body (`isValueBody`), so a
   kind-typed or `type_ref` slot in a value is recorded with its path for the linker (`TsonSchema.valuesByName`) and a
   braced application at a kind slot is refused, nothing lifting or minting there. A payload that is no such map is
   refused against the entry as no value of the namespace type, with the read's path and message
@@ -300,10 +300,10 @@ are kept in step deliberately.
   replicate the kernel's composition chain (§4.1) as real Java subtyping — a consumer tests kind ancestry with `instanceof
   Product`, and an entry's kind is `EntryKind.of(value, kernel)`. Every `Type` record carries `TypeChain chain` as its first
   component, mirroring the constructor's flattened shape (`type`'s field comes first), with `withChain` to place a body and
-  the chain's accessors as defaults on `Type`; `Reference`, `Data` and `TemplateBody` carry none, and `TypeChain`'s statics
-  (`supertypesOf`, …) answer empty for them. Body leaves are named `RecordBody`/`EnumBody`/etc. (not `Record`, which would
-  collide with `java.lang.Record`). Multi-word fields carry `@Field("snake_case")`. **A `schema.meta` class used as a bind
-  target with more than one public constructor needs `@Record` on the canonical one** or `DefaultRecordBinder` throws
+  the chain's accessors as defaults on `Type`; `Reference`, `TemplateBody` and `Namespace` carry none, and `TypeChain`'s
+  statics (`supertypesOf`, …) answer empty for them. Body leaves are named `RecordBody`/`EnumBody`/etc. (not `Record`, which
+  would collide with `java.lang.Record`). Multi-word fields carry `@Field("snake_case")`. **A `schema.meta` class used as a
+  bind target with more than one public constructor needs `@Record` on the canonical one** or `DefaultRecordBinder` throws
   (`IntegerType`/`IntegerSize` hit this) — the annotation and the fallback both exist for exactly this case.
 - **No hand-written writer** — resolved values serialize through `TsonObjectWriter.toTson` directly,
   deliberately, to prove the model is idiomatic Java `ltr8-bind` already binds. Documented textual

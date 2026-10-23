@@ -100,8 +100,9 @@ public final class SchemaMetaNameBinder {
      * record}/{@code enum}, and cannot lose {@link ResolverBindContext}'s registrations by building a context
      * that forgets them -- what the extension adds is names, and nothing else.
      *
-     * <p>This is the whole seam. A meta-layer constructor needs three things and no more: the meta schema
-     * declaring it, a class carrying {@code @Typename} for it, and a binder that can find that class.
+     * <p>This is the whole seam. A meta layer's record needs three things and no more: the meta schema
+     * declaring it, a class for it ({@code @Typename} only where the binder's convention would not find it),
+     * and a binder that can find that class.
      */
     public static DataBindContext contextExtendedWith(DataNameBinder additional) {
         return context(extendedWith(additional));

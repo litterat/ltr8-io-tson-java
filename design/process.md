@@ -44,7 +44,7 @@ constructor — the parameter names and the application as text (§8.1). A schem
 (`type => abstract top & { chain?: type_chain }`), and nothing carries `parameters` (they are the template body's),
 `disjoint` (derived over the choice body, §5.4) or `kind`: a kind is derived from an entry's own chain and body (§4.1,
 `EntryKind.of`, judged by where each base kind is defined), and the kernel's `type_kind` is the kind of the types, not
-that derivation. `top`, `type`, the four base kinds and `namespace` are `abstract` (SPEC-FEEDBACK.md #15).
+that derivation. `top`, `type`, the three base kinds and `namespace` are `abstract` (SPEC-FEEDBACK.md #15).
 
 **Changing a bundled schema means re-stamping all three digests bottom-up**, moving the matching
 `*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the

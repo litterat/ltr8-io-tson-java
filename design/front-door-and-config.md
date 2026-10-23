@@ -24,8 +24,8 @@ the registries a `Tson` holds, and `validate`. Current form only; history lives 
   vocabulary, composed over `SchemaMetaNameBinder.INSTANCE`.
 
 Related: `design/facades-and-tree.md` (the readers a `Tson` hands out), `design/writers-and-document-header.md`
-(`TsonDocumentPeek`, the writers), `design/tree-model.md`, `design/linking-and-compilation.md` (registries, the
-`data` base kind), `design/cli-config-hashing.md`.
+(`TsonDocumentPeek`, the writers), `design/tree-model.md`, `design/linking-and-compilation.md` (registries),
+`design/meta-layer-namespaces.md` (a meta layer's own vocabulary), `design/cli-config-hashing.md`.
 
 ## Front door: `Tson` (`tson` module) and `ProcessorConfig` (`tson-base`)
 
@@ -221,7 +221,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   needs to re-derive the binding without the application in between.
 - **Two binding seams, never merged.** `ProcessorConfig.withDataBindContext` binds the *data* a schema
   describes (`order` → `Order`); `ProcessorConfig.withMetaNameBinder` binds a governing meta's own *vocabulary*
-  (`operation` → `Operation`, the `data` base kind's case — `design/meta-layer-data-kind.md`). One
+  (`method` → `Method`, a record a namespace constructor holds — `design/meta-layer-namespaces.md`). One
   namespace holding both would collide the first time a schema type and a meta-layer constructor shared a
   name. The meta binder is composed over `SchemaMetaNameBinder.INSTANCE` rather than replacing it, so what a
   consumer supplies adds names and gives up nothing: the standard library still compiles in object-binding

@@ -61,12 +61,18 @@ own prose (which had gone stale on it):
   index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
   application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
-- [ ] **`data` retired, and where a namespace type may be declared** (SPEC-FEEDBACK.md #23,
-  `namespace-sketch/PLAN.md`). Retire `data`: once a value lives under a namespace rather than in a data
-  constructor's instance, the host-object hop (`ValuesByName.component`) and `Data`'s open branch go. Settle with
-  the spec whether a user schema may declare a namespace type (#23's composition-operand reading): today only a
+- [ ] **Where a namespace type may be declared** (SPEC-FEEDBACK.md #23). Settle with the
+  spec whether a user schema may declare a namespace type (#23's composition-operand reading): today only a
   kernel-governed one can, and a schema typing a field by it cannot also import core.tn. Lands on
   `r2026-38-proposal` before the branch goes to the reviewer.
+- [ ] **A value reached through a record value's field** (SPEC-FEEDBACK.md #23, #24). A `ref<T>` whose last segments
+  select fields of a record value (`p.x.primary`, a `pairing` held under a namespace key) is judged by the fields'
+  declared types, every refusal included, and then reported as `NOT_IMPLEMENTED`: `ValuesByName` never reads the
+  host object, so the value is neither found nor delivered into the `Ref`. Reach it through `ltr8-bind`'s class
+  descriptor for the host (the component the binding wrote the field to, under its wire name), not raw record
+  reflection, or bind a meta layer's values as a tree the walk can enter by field. The same gap covers
+  `ValuesByName.slotType`: past a record's field it has no value, so a slot behind a family base that only the tagged
+  subtype declares is reported as a gap rather than followed; it closes with the field walk.
 - [ ] **JSON bind delivers a `Namespace` at a namespace-typed slot.** The TSON reader builds one where the host
   component is a `Namespace` (`reader.BindTargets`, over a `MapBindReader` that carries the constructor's name);
   `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`

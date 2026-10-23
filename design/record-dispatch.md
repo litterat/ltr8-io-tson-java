@@ -44,7 +44,7 @@ play, so no family-base position reaches it.
   `myapi => !api { … }` read at `top`) reads the map that type reads as and delivers it as an instance of the
   constructor, a `Namespace` (`RecordTagDispatchReader.namespaces`, `NamespaceInstanceReader.instance`); a position
   typed by the namespace type itself reads the map, delivered as a `Namespace` only where its host component is one
-  (`BindTargets`, `design/meta-layer-data-kind.md`).
+  (`BindTargets`, `design/meta-layer-namespaces.md`).
 - **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up.
 
 **One reader for both modes**, on `ChoiceReader`'s reasoning — dispatch reads the type-ref without consuming
@@ -107,7 +107,7 @@ order — the selector may arrive after the fields it selects.
 
 **In a schema document, §5.6's positional form keeps a bare token only where it would fill an atom-typed field**
 (SPEC-FEEDBACK.md #13). The rule belongs to the read, not to the readers: a value inside a schema document — a
-constructor's binding record, a data entry's body — reaches the governing meta's compiled readers as a replay from
+constructor's binding record, a namespace entry's values — reaches the governing meta's compiled readers as a replay from
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a
 bare value as that field — `type_ref`'s `name` is a `type_name`, which is how `request: search_request` at a

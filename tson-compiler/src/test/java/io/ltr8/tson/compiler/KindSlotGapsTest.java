@@ -160,7 +160,7 @@ class KindSlotGapsTest {
 
     /**
      * {@code design/references.md}: "A {@code type_ref} slot is judged by resolution and arity alone", and
-     * {@code design/meta-layer-data-kind.md} gives {@code response: orders} at a {@code type_ref} slot as §4.1's
+     * {@code design/meta-layer-namespaces.md} gives {@code response: orders} at a {@code type_ref} slot as §4.1's
      * refusal. Both hold in a value body as they do in a type's.
      */
     @Test
