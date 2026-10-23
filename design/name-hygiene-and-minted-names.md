@@ -10,8 +10,9 @@ history lives in git.
 - What stays at the reading positions is §7.7's grammar (`IdentifierGrammar.validate`); `IdentifierGrammar.hygiene`
   returns a verdict rather than throwing.
 - A template's parameters are a checked scope although §11.4 declines to list them; a choice's variants are not.
-- A `data` body and an annotation value are judged at the payload read (`SchemaResolver.payloadNames`), not in the
-  walk, which cannot see into them; every other constructor payload is read under no policy.
+- A `data` body, a namespace type's instance and an annotation value are judged at the payload read
+  (`SchemaResolver.payloadNames`), not in the walk, which cannot see into them; every other constructor payload is
+  read under no policy.
 - A minted name is ASCII and an identifier by construction, and is never exempted from the walk.
 - Non-ASCII or non-admitted content in a minted name is hashed rather than dropped; a part is capped at 64 characters,
   hash included.
@@ -49,7 +50,8 @@ omits the field, so a value the reader would refuse if written must not be one i
 payload binds to the consumer's own class (`design/meta-layer-data-kind.md`) and an annotation value to whatever
 its type binds, so by link time the field types that make a value a name are behind them — a meta layer's
 `methods: {method_name => …}` arrives as a `Map<String, String>`. `SchemaResolver` reads those two payloads under
-the registry's policy instead, and the readers apply §8.2 exactly as they do in a data document: the keys of one
+the registry's policy instead, and a namespace type's instance with them (`!api { … }`, a map of such values keyed by
+names), and the readers apply §8.2 exactly as they do in a data document: the keys of one
 identifier-keyed map are one scope, and an identifier-typed value meets the per-name rules. Every other
 constructor builds the schema layer's own vocabulary and is read under `IdentifierPolicy.none()`: its names are
 the walk's scopes, and its identifier-typed values outside them are references — a choice's variants, a

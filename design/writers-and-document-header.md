@@ -22,6 +22,10 @@ keeps the rest of the document. Current form only; history lives in git.
   [TSON-SCHEMA] §8.1 writes it positionally and as a value written by name has only that spelling
   (SPEC-FEEDBACK.md #13); an application keeps the explicit `{ name: … arguments: [ … ] }` record. A name some
   segment of which is no identifier is written as the record too, so it never comes back as text.
+- `DataClassObjectWriter` writes a `Namespace` as `!api { key => value … }`: the tag is its `type`, which no class
+  carries, so it is written through `Top`'s descriptor; each key keeps its annotations and is bare where it is an
+  identifier, quoted otherwise; a value is tagged only where its class carries `@Typename`, which is what selects a
+  subtype of the value type on the way back in.
 - `TsonDocumentPeek` performs no second header scan and rewinds nothing; a continuing reader whose lexical
   policy (token policy, limits) disagrees with the peek's is refused.
 - A peek is total: a malformed header yields nothing rather than throwing, never a schema the document does

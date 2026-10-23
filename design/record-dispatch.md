@@ -40,7 +40,10 @@ play, so no family-base position reaches it.
 - **OPEN and FINAL** are the mode's own reader, unchanged. They read identically; the difference is which
   names a tag may carry, and a FINAL record's subtype set is empty by construction rather than by a check.
 - **ABSTRACT** is `RecordTagDispatchReader`: the `!name` annotation is the only selector and is required, and
-  the failure lands before the record's shape is consulted.
+  the failure lands before the record's shape is consulted. A tag selecting a namespace type (resolved output's
+  `myapi => !api { … }` read at `top`) reads the map that type reads as and delivers it as an instance of the
+  constructor, a `Namespace` (`RecordTagDispatchReader.namespaces`, `NamespaceInstanceReader.instance`); a position
+  typed by the namespace type itself reads the bare map.
 - **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up.
 
 **One reader for both modes**, on `ChoiceReader`'s reasoning — dispatch reads the type-ref without consuming

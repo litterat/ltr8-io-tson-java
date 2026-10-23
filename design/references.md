@@ -19,7 +19,10 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   `namespace`, `field_map`, `schema` and a meta layer's own namespace types; `kind<namespace>` holds every namespace
   constructor, each being a member of the kind of every namespace constructor it is or IS-A. A namespace type is a
   member of no other kind: its `!record` tag is not followed, a value of it being a map, so `kind<record>`,
-  `kind<product>` and `kind<map>` exclude it.
+  `kind<product>` and `kind<map>` exclude it. An entry that is an instance of one, `myapi => !api { … }`, is reached
+  by the same walk through its recorded constructor, so `kind<api>` and `kind<namespace>` list it beside the types;
+  no kind of types does, and every type position refuses it as a value (`validateTypeRef`,
+  `ValuesByName.judgeApplication`).
 - `type_ref` is the application form. It stands where an application may (`type_chain.parents`,
   `type_argument.name`, the `application` annotation, held text) and at `reference.target`, which may name a
   constructor. A `type_ref` slot is judged by resolution and arity alone.
@@ -35,8 +38,8 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its slot
   (`TsonReadContext.heldByName`). A braced value is read through the `type_ref` reader in a kernel body, where a
   sugar lift writes an application into the slot it fills and the closer mints its entry afterwards; in a value body
-  (`TsonReadContext.readsValueBody`, a `data` constructor's instance) nothing lifts or mints, so it is refused and
-  the alias spelling named: `order_box => box<order>`, then the bare name.
+  (`TsonReadContext.readsValueBody`, a `data` constructor's or a namespace type's instance) nothing lifts or mints, so
+  it is refused and the alias spelling named: `order_box => box<order>`, then the bare name.
 - A `type_ref` slot of a value body is recorded too (`RecordedApplicationReader`) and judged by resolution, arity and
   §4.1 (`ValuesByName.judgeApplication`), as the resolver judges a kernel body's own.
 - The slot walk (`ValuesByName.slotType`) follows the value beside the declared types: at a record family base whose
@@ -45,7 +48,7 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
 - A slot that names a value is typed `ref<T>` (`ref_type => atom & { of: type_name }`, `ref => <T> !ref_type { of: T }`).
   Its value is a qualified name; `of` is a type of the writer's namespace, never a constructor (`ref<record>` is
   refused: that is `kind<record>`). A slot typed by a record holds the record's value inline and takes no name.
-- A recorded name at a kind-typed slot of a DATA body is judged a member by `ValuesByName.judgeMember`; a qualified
+- A recorded name at a kind-typed slot of a value body is judged a member by `ValuesByName.judgeMember`; a qualified
   name there is refused where it reaches a value, and is a gap where it would reach a type through a namespace of
   types. A recorded name at a reference-typed slot resolves its first segment in the schema map and each further
   one as a key of a namespace value or a field of a record value, never into a map that is no namespace; the
@@ -102,6 +105,7 @@ map.
 | `ref_type.of` | reference | type-name namespace | a type or a data constructor, never a constructor of types | `validateBody` |
 | a slot typed `ref<T>` | reference by key, a path | schema map, then namespace values and record fields | `ref<T>`: the referent IS-A `T` | `ValuesByName.judge` |
 | `schema.value_type: = top` | tag | structure namespace | IS-A `top` | `DefinitionResolver` |
+| `myapi => !api { … }` | tag | structure namespace | an instance of a namespace constructor, IS-A `top`; the payload a map of `api`'s keys and values | `DefinitionResolver` |
 | `!I ^ { … }` head | reference | type-name namespace | an atom instance, never the family's constructor | resolver |
 | `A & B` operand, `A - { … }` source | reference | type-name namespace | a constructor or a record type | resolver |
 
@@ -112,6 +116,12 @@ field_name  value_type: = record_field  ordered?: = true }`), and a value of one
 rows above: of the pinned family where `key_type` is FIXED, and where it is a DEFAULT, of the family the host supplies,
 read by spelling and judged once the host resolves (a record's field names by its `name_type`). Its values are judged
 by `value_type`.
+
+An entry may itself be a value of a namespace type: `myapi => !api { get_orders => { response: order_list } }`,
+under a meta layer declaring `api => namespace & { key_type: = identifier  value_type: = method }`. Its tag is the
+constructor, its keys the key rows above under `api`'s family, its values judged by `method`, and it is what a
+qualified name's further segment enters (`myapi.get_orders` at a `ref<method>` slot). In Java it is a `Namespace`,
+the constructor's name beside the map, and its kind is `NAMESPACE`.
 
 `scoped.schemas` keys are cross-document addresses (canonical identity); its values are references by key into the
 named foreign schema. An annotation use `@name: v` is a reference by key into the annotation namespace (§3.3.3). In a

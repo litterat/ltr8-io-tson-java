@@ -188,11 +188,20 @@ are kept in step deliberately.
   references (§8.3); constructor application (`!C value`, §5.5, binds generically via the compiled
   reader — no hand-rolled name→class table, `ltr8-bind`'s union resolution finds the `Top` member by
   `@Typename`; a kernel body is a leaf of the sealed hierarchy, and a meta-schema's own constructor is an
-  implementation of the open `Data` branch, admitted by the same lookup); atom refinement (`!I ^ { ... }`, §5.5/§5.7);
-  subtraction (`A & { ... } - { f }`, §5.9);
+  implementation of the open `Data` branch, admitted by the same lookup); an application of a namespace type
+  (`myapi => !api { ... }`, below); atom refinement (`!I ^ { ... }`, §5.5/§5.7); subtraction (`A & { ... } - { f }`, §5.9);
   restating a field group in a refinement or composition body (§5.11 — the same options, their members in the
   same order, types verbatim, a member's `?` dropped but never added, state tightening OPTIONAL→REQUIRED only;
   the member fields never change, since members flatten as optional regardless).
+- **A namespace type's payload is a map, read as a value body.** `!api { … }`, `api` IS-A the kernel's `namespace`,
+  reads through the meta's constructor reader for `api`: the map `TsonLinkedSchema.namespace` gives for it, keys under
+  the pinned family and each value under `value_type`, bound to an `AnnotatedMap` and delivered as a `Namespace`
+  (`NamespaceInstanceReader`), kind `NAMESPACE`, `api` recorded as the constructor. It is read as a `data` payload is:
+  under the loader's identifier policy (`SchemaResolver.payloadNames`) and as a value body (`isValueBody`), so a
+  kind-typed or `type_ref` slot in a value is recorded with its path for the linker (`TsonSchema.valuesByName`) and a
+  braced application at a kind slot is refused, nothing lifting or minting there. A payload that is no such map is
+  refused against the entry as no value of the namespace type, with the read's path and message
+  (`DefinitionResolver`); `!namespace { … }` itself is refused as abstract.
 - **A resolved field is four facts, not a state** (`RecordField`, the kernel's `record_field`), held under its
   name in `record.fields`: the name is the map's key, said once, so a resolver building a body puts each field
   under the name its entry declares, and a tightening replaces the inherited value in place, keeping its position

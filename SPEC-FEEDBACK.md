@@ -1213,7 +1213,8 @@ at such a slot, with the slot, and the linker judges that record, so a host decl
 list it might have filed one in decides nothing. A segment selects a key of a namespace value (#23) or a field of a
 record value; a map that is no namespace is not entered, so the service meta's methods are a `method_map =>
 namespace & { ... }`. `data` is opaque to the type system, so selecting in a data-kind entry's value still reaches
-through the host's object; the type walk beside it is schema-directed.
+through the host's object; the type walk beside it is schema-directed. A namespace entry (`myapi => !api { … }`,
+#23) is the schema's own map, entered by key with no host object in the way.
 
 **Against the Revision 37 change log.** §5.10 (and the preamble) record "a type slot cannot be bounded at a field"
 as a deferral, and the bounded type slot at a field as withdrawn. This entry does not reinstate it: `request?:
@@ -1991,8 +1992,8 @@ meta-schema privilege), §3.3.1 and §3.3.2 (where a composition operand resolve
 its value), #22 (kind membership); [TSON-DATA] §7.1.
 
 **Kind:** proposal. The second of the namespace entries the register's preface says will be raised against Revision
-38, after #22. This entry's first step, the kernel's namespace constructor and how a value of one is read, is
-running; the steps after it are stated below and are proposals, not running.
+38, after #22. The kernel's namespace constructor, how a value of one is read, and a value of one standing as an
+entry are running; `data`'s retirement and where a namespace type may be declared are proposals, not running.
 
 **The problem.** #13 lets a qualified name enter any map keyed by an identifier family or an enum, so which maps a
 name may reach into is decided by the key type, a fact about spelling. The kernel already has two maps whose keys
@@ -2036,14 +2037,32 @@ schema    => namespace & { key_type: = type_name  value_type: = top }
 - *Only a namespace is entered.* A segment selects a key in a value of a namespace type, or a field in a record value;
   a map that is not a namespace is not entered, replacing #13's key-type rule. With #24.
 
-**The steps after it, proposals:**
+**A value of a namespace type is an entry, and running.** `myapi => !api { … }`, with `api => namespace & {
+key_type: = identifier  value_type: = method }` declared by a meta-schema. `api` IS-A `top` by composition, so §3.3.1
+admits the head unchanged and `schema.value_type` stays `top`. What the application builds is a map value, and that
+value is the entry:
 
-1. *A value of a namespace type is an entry.* `myapi => !api { … }`, with `api => namespace & { key_type: =
-   identifier  value_type: = method }` declared by a meta-schema. `api` IS-A `top` by composition, so §3.3.1 admits
-   the head unchanged and `schema.value_type` stays `top`; what is left to state is what an application of a
-   namespace constructor builds — a map value as the entry — and the kind of the entry it fills.
-2. *`data` retires* once a value lives under a namespace rather than in a data constructor's instance, and selecting
-   in an entry's value walks the schema rather than the host's object.
+- *Read as the map.* The payload is read as the map `api` describes, each key under `key_type` and each value under
+  `value_type`, as a value body: nothing in it lifts or mints, so a kind-typed slot holds one bare name and a braced
+  application there is refused, and its names are judged under the processor's identifier policy as a data body's
+  are. A payload that is no such map is a resolver error against the entry.
+- *A value, never a type.* Naming the entry where a type is expected is a resolver error, as naming a `data` entry
+  is (§4.1): `{ s: myapi }` is refused, and so is `response: myapi` at a `type_kind` slot of a value body.
+- *Entered by key.* A qualified name's further segment selects a key of the entry's map, and the value reached is of
+  the constructor's `value_type`: `handler: myapi.get_orders` at a slot typed `ref<method>` reaches the `method`
+  value held under `get_orders` (#24).
+- *Written as written.* Resolver output (§8.1) writes the entry in the schema map as `myapi => !api { get_orders => {
+  response: order_list } … }`, the constructor's tag on the map, and reads it back as the same value.
+
+One consequence is not asked for and is stated here so the spec can decide it: membership by construction (#22)
+reaches the entry through its constructor, so `kind<api>` and `kind<namespace>` list `myapi` beside the namespace
+types, though `myapi` names a value and a kind's values are names of types. No kind of types (`type_kind`,
+`kind<record>`) lists it. Running as stated; the alternative is to state that a kind's members are entries IS-A
+`type` or namespace constructors, which excludes an entry whose value is a map.
+
+**`data` retires, proposed.** Once a value lives under a namespace rather than in a data constructor's instance, the
+`data` base kind has no use the namespace does not cover, and selecting in an entry's value walks the schema rather
+than the host's object.
 
 **Where a namespace type may be declared, and used.** A namespace type IS-A `top`, so it is a constructor, and
 §2.2.2 lets only a schema whose own `!!meta` names the meta-kernel declare one. Running: in a schema governed by
@@ -2051,12 +2070,12 @@ schema    => namespace & { key_type: = type_name  value_type: = top }
 otherwise does not resolve, a composition operand resolving in the type-name namespace only (§3.3.2). A namespace
 type is therefore meta-layer vocabulary, declared in a kernel-governed schema that imports `meta.tn` to name
 `namespace` and its facets' types as operands (`headers => namespace & { key_type: = header_name  value_type: =
-text }`). For step 1 that is the intended shape: `api` is a meta layer's constructor, and the schemas the layer governs
-apply `!api`. For a namespace type as the type of a field it is not: `!!meta` merges nothing into the type-name
-namespace, so a schema names `headers` only by importing the meta layer; imports are transitive (§2.2.3), so the
-importer's closure then holds the meta-kernel, and a schema that also imports `core.tn` is refused for `void`, which
-both declare. Today a field typed by a namespace type stands only in a schema that does not import core. Two
-readings, and the spec states neither:
+text }`). For an entry that is the intended shape, and it runs: `api` is a meta layer's constructor, and the schemas
+the layer governs apply `!api`. For a namespace type as the type of a field it is not: `!!meta` merges nothing into
+the type-name namespace, so a schema names `headers` only by importing the meta layer; imports are transitive
+(§2.2.3), so the importer's closure then holds the meta-kernel, and a schema that also imports `core.tn` is refused
+for `void`, which both declare. Today a field typed by a namespace type stands only in a schema that does not import
+core. Two readings, and the spec states neither:
 
 - *Constructors are meta vocabulary, intended.* A user schema wanting a keyed collection writes `{K => V}`, which a
   qualified name does not enter, so no user schema declares a collection a `ref<T>` reaches into.
@@ -2080,17 +2099,26 @@ instances are types", and `of` "is `type` or `namespace`, or below either". §9'
 a namespace type is declared, the second reading, as a sentence in §3.3.1: "A composition operand (§5.8) that the
 type-name namespace does not resolve resolves in the structure namespace, and MUST be `namespace` or IS-A it", with
 §2.2.2's privilege narrowed to "an entry IS-A `type`"; or, keeping the first, a sentence in §2.2.2 that a namespace type
-is a constructor and so declared only by a meta-schema.
+is a constructor and so declared only by a meta-schema. For the entry, §4.1 after the paragraph above: "An application
+of a namespace type builds a map value, and an entry whose value it is is no type: naming it where a type is expected
+is a resolver error, as naming a `data` entry is. A qualified name's segment after the entry's selects a key of that
+map, and the value reached is a value of the namespace type's `value_type`." And #22's membership stated either way
+for such an entry: listed by the kinds of its constructor, as running, or a member only where its value is a type.
 
 **Status against Revision 37:** open; running on `namespace-constructor`, a branch off `r2026-38-proposal`, as far as
-the reading rule and membership: `meta-kernel.tn` declares `namespace` and writes `schema` and `field_map` as
+the reading rule, membership and the entry: `meta-kernel.tn` declares `namespace` and writes `schema` and `field_map` as
 compositions over it, the resolved fixture carries them (`ResolvedFixtureTest`), and the bundled schemas are restamped.
 The linker records each namespace type with the map a value of it is read as, and refuses an open facet on a concrete
 one; both encodings read the value as that map, a host-supplied key family's keys by spelling, judged after resolution
 as a record's field names are. The kind walk admits a namespace type to `type_kind` and the namespace kinds only. The
 corpus's `meta-service.tn` declares `method_map`, `rpc_map` and `verb_map` by composition, and `validate-namespace.tn`
-types a field by a kernel-governed `meta-headers.tn`'s `headers`, importing no core. Step 1, step 2 and the second
-reading above are not running. Part 2's cached §13.2 table is not re-stamped here.
+types a field by a kernel-governed `meta-headers.tn`'s `headers`, importing no core. An entry `myapi => !api { … }`
+resolves to the map, refused at every type position, entered by key by a qualified name at a `ref<T>` slot, listed by
+`kind<api>` and `kind<namespace>`, and written and read back in resolver output as written; the corpus's `meta-api.tn`
+declares `api` and its vectors cover each. What remains: `data`'s retirement and the second reading above, neither
+running; and in this implementation the schema map and a record's `fields`, values of the kernel's two namespace types,
+are not yet held as namespace values, so a position typed by a namespace type still binds a plain map. Part 2's cached
+§13.2 table is not re-stamped here.
 
 ---
 

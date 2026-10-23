@@ -66,7 +66,8 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so a head the gate admits has a reader.
   **Admitting `reference` closed means giving it the alias's own entry**, not just letting it through: `!reference
   { target: X }` resolves to `kind: REFERENCE` with `X` as its body, the same entry `name => X` denotes (§8.3),
-  where a construction of any other head takes the head's kind and records the head as its constructor. The closed
+  where a construction of any other head takes the head's kind and records the head as its constructor (a namespace
+  type's, `!api { … }`, is `NAMESPACE` with a `Namespace` for body, `design/schema-resolution.md`). The closed
   path dispatches on the *body* being a `Reference`, having already read it; `resolveInstanceTemplate` holds its
   body unread and so goes by the head's name. **`template` is admitted by the predicate and refused by name**
   (`requireAuthorable`, on both paths). It is IS-A `top` because resolved output is typed by it, but it is resolver

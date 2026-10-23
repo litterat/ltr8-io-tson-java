@@ -20,12 +20,20 @@ history lives in git.
   inline, and a `TypeRef` component there is a bind mismatch.
 - The linker reads a name's slot type off the constructor's resolved fields along the path the read recorded,
   never off the Java class.
-- `TypeInhabitance` and `DiscriminationClass` handle a `Data` body by their `default` arm, which is safe only while the
-  linker refuses any *type reference* naming a DATA entry. A value by name may name one: it is a value, not a type.
+- `TypeInhabitance` and `DiscriminationClass` handle a `Data` body and a `Namespace` by their `default` arm, which is
+  safe only while the linker refuses any *type reference* naming a DATA or namespace entry. A value by name may name
+  either: it is a value, not a type.
 - A meta-schema keeps a constructor this library cannot build a reader for, as an `ErrorReader`; it is never dropped.
 - `!!meta` merges nothing into the type-name namespace: shared vocabulary goes in a third ordinary schema.
 - A namespace type is a meta layer's own vocabulary: it IS-A `top`, so only a kernel-governed schema declares one
   (§2.2.2), and a value of it is the map linking records for it (`TsonLinkedSchema.namespace`), never a `Data` body.
+- An entry applying a namespace type, `myapi => !api { … }`, is a `Namespace<V>`, a sealed `Top` branch: `type` names
+  the constructor it is an instance of (it carries no `@Typename`, so `TsonSchema.constructorOf` and
+  `TsonCompiledMetaSchema.typenameOf` read `type`), `entries` is the map with each key's annotations and the order
+  written, and `EntryKind.of` gives `NAMESPACE`. It is a value and never a type.
+- A qualified name's further segment selects a key of a `Namespace` entry's `entries()` through the schema, the value
+  reached being of the constructor's `value_type`; it reads a `Data` body's record components through the host's
+  object, and that hop is the one `data`'s retirement removes.
 
 Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/compiled-registries.md`,
 `design/schema-resolution.md`.
@@ -46,7 +54,8 @@ schema's own `data` is an ordinary record, and a chain reaching two of them is r
 model mirrors it: `schema.meta.Type` is the sealed interface `Atom`, `Product` and `Sum` extend, between them and
 `Top`, so a body is a type exactly when it is an `instanceof Type`; `Data` and `Reference` implement `Top` directly,
 and so does `TemplateBody`, which carries no chain. A namespace type resolves to a `RecordBody` of the facets it states,
-kind `NAMESPACE`, and its values are read through the `MapBody` linking derives from it. The motivating case is an
+kind `NAMESPACE`, and its values are read through the `MapBody` linking derives from it; an entry that is one of those
+values is a `Namespace`, which implements `Top` directly too (below). The motivating case is an
 HTTP operation, which must sit at the schema layer because that is the only layer able to name request and response
 types *by name*.
 
@@ -79,32 +88,50 @@ types *by name*.
   place of the slot's atom reader for them, and a `Ref` receives the value the name reaches when the schema links
   (`Ref.deliver`), so a host reads `binding.method().get()` after the link and the name before it. A reference in a
   data document is not yet read (`NOT_IMPLEMENTED`).
-- **A segment's type walk is schema-directed; its value walk goes through the host's object.** The linker follows
+- **A segment's type walk is schema-directed; so is its value walk, except inside a `Data` body.** The linker follows
   the declared types (a record's fields to a field's type, a namespace type to its pinned `value_type`, read off the
-  map linking records for it) and enters a map only where it is a value of a namespace type; the value at each step it
-  reads off the host's record components, `data` being opaque to the type system, and follows a tagged subtype
-  through the value's own class where a record family base lacks the field. The value walk stays until a value of a
-  namespace type can itself be an entry, `myapi => !api { … }` (BACKLOG). A kind-typed slot of a value body holds
+  map linking records for it) and enters a map only where it is a value of a namespace type. A `Namespace` entry is
+  entered by key: the first further segment selects in `entries()` and the value reached is of the constructor's
+  `value_type`, so `handler: myapi.get_orders` reaches the `method` value and is delivered into the host's `Ref`. A
+  `Data` body is opaque to the type system, so there the value at each step is read off the host's record components,
+  a tagged subtype followed through the value's own class where a record family base lacks the field; that hop goes
+  with `data` (BACKLOG). A segment past a namespace key selects a field of the record value reached, read off its
+  host's components as in a `Data` body. A kind-typed slot of a value body holds
   one bare name: a braced application there is refused and the alias spelling named, since nothing lifts or mints
   in a value body; a `type_ref` slot there is judged by resolution, arity and §4.1.
 - **§8.2 reaches a body's values at the read, not at the link.** The linker's name walk sees a bound `Data`
   body as an opaque object, so `SchemaResolver` reads a `data` constructor's payload under the registry's
-  identifier policy and the readers judge it as they judge a data document: the keys of an identifier-keyed map
+  identifier policy, and a namespace type's payload under the same policy (`payloadNames`, kind `DATA` or
+  `NAMESPACE`), and the readers judge it as they judge a data document: the keys of an identifier-keyed map
   are one scope, and an identifier-typed value is a name (`design/name-hygiene-and-minted-names.md`). A
   `type_ref` in the body is judged there too, being one; it names a declaration the walk judges anyway, so the
   only difference is that a name refused at both is reported once, against the body that references it.
-- **The silent defaults are worth knowing.** `TypeInhabitance` calls a `Data` body inhabited and
+- **The silent defaults are worth knowing.** `TypeInhabitance` calls a `Data` body or a `Namespace` inhabited and
   `DiscriminationClass` gives it none, both by their `default` arm. Neither matters while the linker refuses
   to let anything name such an entry as a type — which is what makes that refusal load-bearing rather than
-  a nicety. A value by name may reach a DATA entry (`orders.methods.place_order` starts at one), and that is
-  no exception: a slot holding a value is not a type position, so `response: orders` at a `type_ref` slot is
-  still §4.1's refusal and `request: orders` at a `kind<record>` slot is refused as no member of the kind.
+  a nicety. A value by name may reach a DATA or namespace entry (`orders.methods.place_order` starts at one,
+  `myapi.get_orders` at the other), and that is no exception: a slot holding a value is not a type position, so
+  `response: orders` at a `type_ref` slot is still §4.1's refusal, `request: orders` at a `kind<record>` slot is
+  refused as no member of the kind, and `response: myapi` at a `type_kind` slot of a value body is refused the same
+  way. A namespace entry is a member of `kind<api>` and `kind<namespace>`, the construction walk reaching `api` from
+  its recorded constructor, and of no kind of types.
 - **Resolved output is ordinary.** §8.1's `body` carries an instance of whichever constructor built the entry, and a
   meta-schema's own constructor is not a special case: a DATA entry writes as `body: !operation { ... }`, formally
   indistinguishable from `!record { ... }`. A value by name is a `TypeRef` and is written as any `TypeRef` is; the
   name in it is the one written, as a reference chain is (§8.3). What makes that work is a general `ltr8-bind` rule
   (`DataClassUnion`) — a non-sealed union branch stands for its own implementations, which exact-class membership
-  would never match.
+  would never match. A namespace entry writes as written, `myapi => !api { get_orders => { response: order_list } }`:
+  the tag is the value's `type`, which no Java class names, so `DataClassObjectWriter` writes a `Namespace` through
+  `Top`'s descriptor and emits the map itself, each key with its annotations, bare where it is an identifier and
+  quoted otherwise, each value tagged only where its class carries `@Typename`. It reads back through `top`'s tag
+  dispatcher, which delivers a `Namespace` where the tag selects a namespace type (`design/record-dispatch.md`).
+- **A namespace entry is read in bind mode, and two readers build the `Namespace`.** A namespace type's own reader is
+  its map's (`design/linking-and-compilation.md`), and in bind mode it yields an `AnnotatedMap`, keeping each key's
+  annotations and order (`MapBindReader`). Where the position is the entry itself, the map becomes an instance of
+  the constructor: the meta's constructor reader for a namespace type is that map reader wrapped in
+  `NamespaceInstanceReader`, which is what `!api { … }` as an entry reads through; and resolved output read at `top`
+  wraps the same way in `RecordTagDispatchReader`. A position typed by a namespace type (`methods: method_map`, a
+  record's `fields`) still binds the plain map; the schema map and `fields` becoming `Namespace` is BACKLOG.
 - **A meta-schema keeps a constructor this library cannot build a reader for**, its factory standing in as
   an `ErrorReader` carrying the real cause (`TsonCompiledMetaSchema`'s `unbuildable`). Dropping it would lose
   the constructor from the scoped vocabulary silently, so a governing meta would compile and register looking
@@ -112,7 +139,8 @@ types *by name*.
   is told the meta-schema does not declare it, which is both false and unactionable. **This is the only
   constructor that reaches an `ErrorReader` for want of a reader**: every constructor the kernel and meta.tn
   declare builds a real one, and `CoreSchemaImportTest` asserts that no entry of core.tn compiles to an
-  `ErrorReader`.
+  `ErrorReader`. A governed schema's DATA or namespace entry compiles to an unbuildable `ErrorReader` in both stacks:
+  its body names a meta layer's constructor, which has no factory there, and nothing is typed by such an entry.
 
 - **A meta layer is not a vocabulary channel, and this is the first thing an author tries.** The instinct on
   declaring `operation` in a meta layer is to put the shared types beside it — a `status_code` atom, an
