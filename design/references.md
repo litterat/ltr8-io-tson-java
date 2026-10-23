@@ -50,15 +50,20 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   the name, and what is no name is refused there as a `TypeRef` host's reader refuses it.
 - A slot that names a value is typed `ref<T>` (`ref_type => atom & { of: type_name }`, `ref => <T> !ref_type { of: T }`).
   Its value is a qualified name; `of` is a type of the writer's namespace, never a constructor (`ref<record>` is
-  refused: that is `kind<record>`). A slot typed by a record holds the record's value inline and takes no name.
+  refused: that is `kind<record>`; in an ordinary schema, whose namespace holds no constructor, the linker finds the
+  name in the structure namespace and refuses it the same way). A slot typed by a record holds the record's value
+  inline and takes no name. core.tn declares a sibling `ref`, as it does `kind`, so an ordinary schema reaches it
+  through its core import.
 - A recorded name at a kind-typed slot of a value body is judged a member by `ValuesByName.judgeMember`; a qualified
   name there is refused where it reaches a value, and is a gap where it would reach a type through a namespace of
   types. A recorded name at a reference-typed slot resolves its first segment in the schema map and each further
   one as a key of a namespace value or a field of a record value, never into a map that is no namespace; the
   referent IS-A `of`, and the value reached is delivered into the host's `Ref<T>` (`Ref.deliver`), a `TypeRef` host
   taking the name alone. A name whose walk passes a record value's field is judged by type and then reported as a gap
-  (`NOT_IMPLEMENTED`): the value behind the field is not read. A reference in a data document is not yet read
-  (`NOT_IMPLEMENTED`).
+  (`NOT_IMPLEMENTED`): the value behind the field is not read. A reference in a data document is not yet read: no
+  link judges it, so `AtomParsers` refuses to build its reader outside a meta layer and the compile carries that as
+  `NOT_IMPLEMENTED` to the read, in tree and bind mode alike. The rule that closes it is the kind's: the name resolves
+  in the closure of the document's `!!schema`.
 - One host shape for every reference: a `TypeRef`, whatever the slot. Only the judgement differs by slot, and it is
   the slot's, never the host's.
 

@@ -27,7 +27,7 @@ class JsonFieldNameTypeTest {
               json_name => !identifier_type { start_add: "@$" }
               node => !record { name_type: json_name  fields: {
                 "@id" => { type: text }  label => { type: text } } }
-              ref => !record { name_type: json_name  fields: {
+              json_ref => !record { name_type: json_name  fields: {
                 "$ref" => { type: text }  "$id" => { type: text  optional: true } } }
               typed => !record { name_type: json_name  fields: { "$type" => { type: text } } }
               address => json_record & { city: text }
@@ -73,7 +73,7 @@ class JsonFieldNameTypeTest {
      */
     @Test
     void aDollarNameOutsideTheThreeIsAnOrdinaryField() {
-        assertEquals(List.of(), read("ref", "{\"$ref\": \"#/defs/a\", \"$id\": \"urn:a\"}"));
+        assertEquals(List.of(), read("json_ref", "{\"$ref\": \"#/defs/a\", \"$id\": \"urn:a\"}"));
     }
 
     /**

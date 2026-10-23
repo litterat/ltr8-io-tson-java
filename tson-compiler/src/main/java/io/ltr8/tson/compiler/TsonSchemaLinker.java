@@ -1520,17 +1520,20 @@ public final class TsonSchemaLinker {
             }
             // A reference names values of one type: `of` resolves in the writer's own namespace, and names a type
             // or a namespace type, never a constructor of types -- the names of the types built with a
-            // constructor are a kind, and `kind<record>` is that spelling.
+            // constructor are a kind, and `kind<record>` is that spelling. An ordinary schema's namespace holds no
+            // constructor, so there a constructor is the name the structure namespace holds, and is refused as one.
             case RefBody ref -> {
                 Top of = namespace.get(ReferenceChain.terminal(ref.of(), namespace));
                 if (of == null) {
+                    Top constructor = structureNamespace.get(ref.of());
+                    if (constructor != null && (TypeChain.supertypesOf(constructor).contains(TYPE)
+                            || TYPE.equals(ref.of()))) {
+                        throw referenceToAConstructor(entryName, ref);
+                    }
                     throw new UnresolvedReference(entryName, " of", ref.of());
                 }
                 if (TypeChain.supertypesOf(of).contains(TYPE) || of == namespace.get(TYPE)) {
-                    throw new SchemaValidationException("'" + entryName + "' is a reference whose 'of' names '"
-                            + ref.of() + "', a constructor -- a reference (ref<T>) names a value of the type T, and "
-                            + "the names of the types built with a constructor are a kind: write kind<" + ref.of()
-                            + ">");
+                    throw referenceToAConstructor(entryName, ref);
                 }
                 if (OpenEntry.isOpen(of)) {
                     throw new SchemaValidationException("'" + entryName + "' is a reference whose 'of' names '"
@@ -1544,6 +1547,13 @@ public final class TsonSchemaLinker {
             case Namespace<?> ignored -> {
             }
         }
+    }
+
+    /** {@code ref<C>} with {@code C} a constructor: the names of the types built with one are a kind. */
+    private static SchemaValidationException referenceToAConstructor(String entryName, RefBody ref) {
+        return new SchemaValidationException("'" + entryName + "' is a reference whose 'of' names '" + ref.of()
+                + "', a constructor -- a reference (ref<T>) names a value of the type T, and the names of the types "
+                + "built with a constructor are a kind: write kind<" + ref.of() + ">");
     }
 
     /**

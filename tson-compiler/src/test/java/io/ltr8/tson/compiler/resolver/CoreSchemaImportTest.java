@@ -75,7 +75,7 @@ class CoreSchemaImportTest {
         assertTrue(registered.isPresent(), "expected core.tn to be registered");
 
         TsonSchema core = registered.get().schema();
-        assertEquals(44, core.entries().size(), "expected every core.tn declaration to resolve");
+        assertEquals(45, core.entries().size(), "expected every core.tn declaration to resolve");
 
         // A representative spread of core.tn's own real declarations -- atom refinements
         // (int32/positive_integer) and constructor applications (hex, float32, email, complex, unknown) --

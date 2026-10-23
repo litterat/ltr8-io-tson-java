@@ -2176,8 +2176,13 @@ routes => !bindings { post_orders => { method: orders.place_order  verb: POST  r
 
 Refusals, each where it stands: `method: orders` (an interface, no method); `method: orders.cancel_order` (no key,
 the keys listed); `method: orders.place_order.nope` (a method has no field `nope`); `method: hs.h.headers.accept`
-where `header_set.headers` is `{text => method}` (a map that is no namespace); `r: ref<record>` (a constructor); a
-reference in a data document (not yet read: a data document has no link to resolve it at).
+where `header_set.headers` is `{text => method}` (a map that is no namespace); `r: ref<record>` (a constructor).
+
+**A reference in a data document.** `core.tn` declares `ref` beside the kernel's, as it declares `kind`, so an ordinary
+schema types a field `ref<order>` through its core import, and refuses `ref<record>` there as the kernel's does. The
+intended rule for the data document's value is the kind's: the name resolves in the closure of the document's
+`!!schema`, and the referent is judged a value of `T` there. This implementation does not yet read it, and reports
+the read as its gap rather than a verdict.
 
 **A value body's slots, under #22 and this entry.** A kind-typed slot of a value body holds one bare name: a braced
 application there (`request: { name: box  arguments: [ { name: order } ] }`, §5.6's data spelling) is refused, since
@@ -2188,7 +2193,8 @@ family base is the tagged subtype's, wherever the value sits; this implementatio
 declared type as the reader that read it knows it, so it judges a slot behind a record value's field as it judges one
 under a namespace key.
 
-**Breaking changes, against Revision 37:** `meta-kernel.tn` gains `ref_type` and `ref`. A meta layer's value-by-name
+**Breaking changes, against Revision 37:** `meta-kernel.tn` gains `ref_type` and `ref`, and `core.tn` a sibling `ref`
+under the same name. A meta layer's value-by-name
 slots are written `ref<T>`; a record-typed slot no longer takes a name. §9's guidance reads: a slot naming a type is
 typed by a kind, a slot naming a value by a reference, and `type_ref` is for a slot that holds an application.
 
@@ -2231,12 +2237,13 @@ not, judged once per import edge, against the imported schema's own `!!meta`. Th
 
 A consequence the spec should state with it: a meta layer declares the vocabulary its constructors use rather than
 importing `core.tn` or `net.tn`; a field typed by a namespace type or a kernel record exists only in a kernel-governed
-document; and a constructor is reachable by an ordinary schema only through its `!!meta`. A kind is not among them:
-core.tn declares its own `kind` template beside the kernel's, so an ordinary schema types a field by `kind<C>` through
-its core import, and a data document holds a type's name there. §2.2.2's placement rule and the §2.2.3 cycle rule,
-which counts `!!meta` as an edge, are unchanged. With the rule in place an ordinary schema's closure holds no
-meta-kernel entry, so §2.2.2's refusal of a constructor declared in one is reached by no loaded document: such a
-schema has no base kind to compose with.
+document; and a constructor is reachable by an ordinary schema only through its `!!meta`. A kind and a reference are
+not among them: `kind` and `ref` reach an ordinary schema through core.tn's own declarations, siblings of the kernel's,
+so the level rule removes nothing an ordinary schema types a field by. Through its core import an ordinary schema types
+a field `kind<C>` or `ref<T>`, and a data document holds a type's or a value's name there. §2.2.2's placement rule and
+the §2.2.3 cycle rule, which counts `!!meta` as an edge, are unchanged. With the rule in place an ordinary schema's
+closure holds no meta-kernel entry, so §2.2.2's refusal of a constructor declared in one is reached by no loaded
+document: such a schema has no base kind to compose with.
 
 **Breaking changes, against Revision 37:** a schema governed by `meta.tn` that imports `meta-kernel.tn` or a meta layer
 is refused, as is a kernel-governed schema importing `core.tn`. The bundled chain imports at one level throughout.

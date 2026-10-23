@@ -62,7 +62,7 @@ public final class TsonBundledSchemas {
     public static final String META_SHA256 = "f5ad23d847515d1cac1570a879c0238ec638ecaa5df1d3a414fad3c8e025d86e";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "072df189501a84f394c3efb2f852a38afb0868a972112bdc77c5c7f49e432c86";
+    public static final String CORE_SHA256 = "8bef0794d3e3f2144bc89ce6170845e59fd0bef5a7b90509a06254d62c76c35b";
 
     /**
      * net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code
@@ -74,7 +74,7 @@ public final class TsonBundledSchemas {
      * policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s {@code
      * !!id}. See {@link #META_KERNEL_SHA256}.
      */
-    public static final String POLICY_SHA256 = "5e483f326b3ec91797b737d197ce2ed9c2b4db35f285e034162f2997493adcab";
+    public static final String POLICY_SHA256 = "a3aecceb6fca83e2819b7e663ccb2fefc9f7f11ace3b10e59634b6ec8f375ece";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",
