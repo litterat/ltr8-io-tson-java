@@ -61,10 +61,6 @@ own prose (which had gone stale on it):
   index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
   application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
-- [ ] **Where a namespace type may be declared** (SPEC-FEEDBACK.md #23). Settle with the
-  spec whether a user schema may declare a namespace type (#23's composition-operand reading): today only a
-  kernel-governed one can, and a schema typing a field by it cannot also import core.tn. Lands on
-  `r2026-38-proposal` before the branch goes to the reviewer.
 - [ ] **A value reached through a record value's field** (SPEC-FEEDBACK.md #23, #24). A `ref<T>` whose last segments
   select fields of a record value (`p.x.primary`, a `pairing` held under a namespace key) is judged by the fields'
   declared types, every refusal included, and then reported as `NOT_IMPLEMENTED`: `ValuesByName` never reads the

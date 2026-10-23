@@ -41,7 +41,9 @@ history lives in git.
 - A meta-schema keeps a constructor this library cannot build a reader for, as an `ErrorReader`; it is never dropped.
 - `!!meta` is not a vocabulary channel: it merges nothing into the type-name namespace, and shared vocabulary goes in a
   third ordinary schema.
-- A namespace type IS-A `top`, so only a schema governed by the meta-kernel declares one (§2.2.2).
+- A namespace type IS-A `top`, so only a schema governed by the meta-kernel declares one (§2.2.2), and only a
+  kernel-governed document types a field by one: an import stands at the importer's governing level (§2.2.3), so no
+  ordinary schema imports the layer declaring it. The schemas the layer governs hold values of it as entries.
 - A namespace type declares nothing but its facets, `key_type`, `value_type` and `ordered` (`MapBody.NAMESPACE_FACETS`):
   a value of it is the map alone, so the linker refuses a field beside them (`readAsMaps`), abstract or not, blaming
   the namespace type that declares it. A construct with fields is a record holding them, under a namespace type's key.
@@ -227,12 +229,14 @@ typed by such an entry.
 the governed schemas name them. They cannot: `!!meta` says where this schema's *constructors* come from and merges
 nothing into the type-name namespace (§3.3.2), so every such name is an unresolved reference in a schema the layer
 governs, whether it is written bare, in a field, or applied with its arguments. **Shared vocabulary goes in a third
-ordinary schema**, `!!import`ed by whoever needs it, including the meta layer itself if it needs it too. Nor is
-`!!import`ing the meta layer a way round it: a layer chaining to meta-kernel imports meta.tn, which imports
-meta-kernel, and imports are transitive here (§2.2.3), so meta-kernel's `void` arrives alongside core.tn's and
-collides — correctly, and with a diagnostic naming both origins. A namespace type meets both walls at once: it IS-A
-`top`, so it cannot go in the third schema, and a schema typing a field by it imports the meta layer that declares it
-and so cannot import core.tn too (SPEC-FEEDBACK.md #23). The constraint is real and worth stating; what is not
-acceptable is discovering it through a message about the wrong thing, which is why an application's head resolves in
-the type-name namespace only (§3.3.1) and an unresolvable one is reported as written
-(`design/template-materialisation.md`).
+ordinary schema**, `!!import`ed by the governed schemas that need it. Nor is `!!import`ing the meta layer a way round
+it: an import stands at the importer's governing level, both schemas naming the meta-kernel as their `!!meta` or
+neither (§2.2.3, SPEC-FEEDBACK.md #25), so an ordinary schema importing a kernel-governed layer is refused, in one
+diagnostic naming both documents and both `!!meta`s. The rule runs the other way too: a meta layer cannot import the
+third schema, nor core.tn or net.tn, and declares the vocabulary its constructors use itself. A namespace type meets
+both walls at once: it IS-A `top`, so it cannot go in the third schema, and no ordinary schema can import the layer
+that declares it, so a field typed by it exists only in a kernel-governed document (SPEC-FEEDBACK.md #23). A data
+document holds a value of one only where its own schema is kernel-governed, as resolved output read through meta.tn is.
+The constraint is real and worth stating; what is not acceptable is discovering it through a message about the wrong
+thing, which is why an application's head resolves in the type-name namespace only (§3.3.1) and an unresolvable one is
+reported as written (`design/template-materialisation.md`).

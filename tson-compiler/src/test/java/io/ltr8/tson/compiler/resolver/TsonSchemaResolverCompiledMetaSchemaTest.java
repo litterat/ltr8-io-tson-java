@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -23,6 +24,7 @@ import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -80,10 +82,15 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
      * {@code MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern.
      */
     private static TsonCompiledSchemaLoader loadMetaKernelAndMeta() {
+        return loadMetaKernelAndMeta(TsonBundledSchemas::fetch);
+    }
+
+    /** The same, fetching through {@code source}. */
+    private static TsonCompiledMetaRegistry loadMetaKernelAndMeta(SchemaSource source) {
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
 
-        TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, TsonBundledSchemas::fetch);
-        TsonCompiledSchemaLoader loader = registry;
+        TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
+        TsonCompiledMetaRegistry loader = registry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
@@ -342,7 +349,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
             {
               my_type => atom & {}
@@ -355,13 +362,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // exists anywhere, so that alone wouldn't prove anything -- composition is the real test:
         // resolveComposition does exactly one resolved.get(supertypeName), no fallback, so "atom"
         // (meta-kernel's own, zero fields) is only findable here if !!import's own entries were
-        // genuinely merged into the type-name namespace, not just validated as well-formed URIs.
-        //
-        // "atom" rather than "unit", which this used before: unit is a *constructor*, and §4.2's level
-        // discipline makes an unmarked declaration deriving from one a resolver error. Marking this one
-        // is not the fix either -- the document's !!meta is meta.tn, so §4.2's placement rule refuses a
-        // constructor declaration here. A base kind is a non-constructor with a supertype chain of its
-        // own, so it demonstrates the same merge and the same transitivity.
+        // genuinely merged into the type-name namespace, not just validated as well-formed URIs. The
+        // document is kernel-governed, the level an import of meta-kernel stands at (§2.2.3).
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_IMPORT_MERGED).parseSchemaDocument();
 
@@ -375,7 +377,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
             {
               void => !void_type {}
@@ -398,7 +400,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/38/m/meta.tn"
             {
@@ -407,7 +409,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             """;
 
     /**
-     * The bundled chain's own diamond: this document imports meta-kernel directly *and* meta.tn, which
+     * The bundled chain's own diamond: this kernel-governed document imports meta-kernel directly *and* meta.tn, which
      * imports meta-kernel itself. Every one of meta-kernel's names therefore arrives by two routes -- but
      * they are one schema's entries, so they unify rather than colliding, and {@code unit} resolves
      * (§2.2.3). A name-occurrence collision rule rejects this document instead, which
@@ -422,6 +424,65 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         assertTrue(resolved.entries().containsKey("placeholder"),
                 () -> "'unit' arrives through both imports and must unify: " + resolved.entries().keySet());
+    }
+
+    /**
+     * An import stands at the importer's governing level (§2.2.3), and the resolver, which merges imports a
+     * phase before the linker, refuses the edge in the linker's wording: an ordinary schema importing a
+     * kernel-governed one, and a kernel-governed one importing an ordinary library.
+     */
+    @Test
+    void resolveSchemaRefusesAnImportAtAnotherGoverningLevel() {
+        SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
+        String ordinaryImportingTheKernel = """
+                !!id:"https://example.test/mini.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
+                { my_type => { v: identifier } }
+                """;
+        String kernelGovernedImportingCore = """
+                !!id:"https://example.test/mini.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
+                { my_type => { v: text } }
+                """;
+        for (String source : List.of(ordinaryImportingTheKernel, kernelGovernedImportingCore)) {
+            SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
+
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> resolver.resolveSchema(document));
+            assertTrue(thrown.getMessage().contains("https://example.test/mini.tn")
+                    && thrown.getMessage().contains("governing level"), thrown::getMessage);
+        }
+    }
+
+    /**
+     * The level rule admits every edge the bundled chain and a meta layer use: meta.tn importing the meta-kernel,
+     * policy.tn importing core.tn, a meta layer importing meta.tn, and a schema that layer governs importing
+     * core.tn -- both ordinary under different {@code !!meta}s, which is why the rule is the level, not one meta.
+     */
+    @Test
+    void theBundledChainAndALayersGovernedSchemaStillLink() {
+        Map<String, String> sources = Map.of(
+                "https://example.test/meta-api.tn", """
+                        !!id:"https://example.test/meta-api.tn"
+                        !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+                        !!import:"https://tson.io/2026/38/m/meta.tn"
+                        { status_name => identifier }
+                        """,
+                "https://example.test/orders.tn", """
+                        !!id:"https://example.test/orders.tn"
+                        !!meta:"https://example.test/meta-api.tn"
+                        !!import:"https://tson.io/2026/38/m/core.tn"
+                        { order => { sku: text  quantity: int32 } }
+                        """);
+        SchemaSource local = SchemaSource.ofMap(sources);
+        TsonCompiledMetaRegistry registry = loadMetaKernelAndMeta(uri -> uri.contains("example.test")
+                ? local.fetch(uri) : TsonBundledSchemas.fetch(uri.replaceFirst("\\?.*", "")));
+
+        assertNotNull(registry.loadMeta(TsonBundledSchemas.META_ID));
+        assertNotNull(registry.resolveLinked(TsonBundledSchemas.POLICY_ID));
+        assertTrue(registry.resolveLinked("https://example.test/orders.tn").schema().entries().containsKey("order"));
     }
 
     // ── TsonCompiledMetaRegistry's own bootstrap behavior ──

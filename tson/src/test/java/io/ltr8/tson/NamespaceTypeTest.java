@@ -20,12 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A namespace type -- a constructor IS-A the kernel's {@code namespace}, pinning its {@code key_type} and {@code
  * value_type} by composition -- is read as the map it describes, never as a record of those facets. It IS-A {@code
- * top}, so a meta layer declares it, and a schema importing that layer types a field by it.
+ * top}, so a meta layer declares it, and a schema the layer governs holds a value of it as an entry; an ordinary
+ * schema cannot import the layer to type a field by it (§2.2.3).
  */
 class NamespaceTypeTest {
 
     private static final String META = "https://example.test/meta-headers.tn";
-    private static final String USER = "https://example.test/request.tn";
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-headers.tn"
@@ -40,45 +40,60 @@ class NamespaceTypeTest {
 
     private static final String USER_TEXT = """
             !!id:"https://example.test/request.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://example.test/meta-headers.tn"
+            !!meta:"https://example.test/meta-headers.tn"
             {
-              request => { headers: headers }
+              defaults => !headers %s
             }
             """;
 
     private static Tson tson(String more) {
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(
-                Map.of(META, META_TEXT.formatted(more), USER, USER_TEXT)))));
+                Map.of(META, META_TEXT.formatted(more))))));
     }
 
-    private static List<Diagnostic> read(String request) {
-        return tson("").validate("!!schema:\"" + USER + "\"\n!request " + request);
+    /** The problems with a governed schema whose one entry is {@code !headers} applied to {@code map}. */
+    private static List<Diagnostic> read(String map) {
+        return tson("").validateSchema(USER_TEXT.formatted(map));
     }
 
     @Test
     void aValueIsReadAsAMap() {
-        assertEquals(List.of(), read("{ headers: { accept => \"text/plain\"  user-agent => \"probe\" } }"));
+        assertEquals(List.of(), read("{ accept => \"text/plain\"  user-agent => \"probe\" }"));
     }
 
     @Test
     void aKeyIsJudgedByTheKeyType() {
-        List<Diagnostic> problems = read("{ headers: { \"1st\" => \"text/plain\" } }");
+        List<Diagnostic> problems = read("{ \"1st\" => \"text/plain\" }");
 
         assertEquals(1, problems.size(), problems::toString);
-        assertEquals(Optional.of("/headers/1st"), problems.getFirst().path().map(Object::toString),
-                problems::toString);
+        assertTrue(problems.getFirst().message().contains("1st"), problems::toString);
     }
 
     @Test
     void aValueIsJudgedByTheValueType() {
-        assertEquals(1, read("{ headers: { accept => [text] } }").size());
+        assertEquals(1, read("{ accept => [text] }").size());
     }
 
     /** The record of facets is never what is read: a field named for one is a key like any other. */
     @Test
     void theFacetsAreNoFields() {
-        assertEquals(List.of(), read("{ headers: { key_type => \"x\" } }"));
+        assertEquals(List.of(), read("{ key_type => \"x\" }"));
+    }
+
+    /** A schema importing the layer to type a field by its namespace type is refused at the import (§2.2.3). */
+    @Test
+    void anOrdinarySchemaMayNotImportTheLayerToTypeAFieldByIt() {
+        List<Diagnostic> problems = tson("").validateSchema("""
+                !!id:"https://example.test/request.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://example.test/meta-headers.tn"
+                {
+                  request => { headers: headers }
+                }
+                """);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("governing level"), problems::toString);
     }
 
     @Test
@@ -116,7 +131,10 @@ class NamespaceTypeTest {
         assertEquals(TypeRef.of(MapBody.Namespace.HOST_KEYS), fields.read().keyType());
     }
 
-    /** A namespace type IS-A {@code top}, so only a schema the meta-kernel governs declares one. */
+    /**
+     * A namespace type IS-A {@code top}, so only a schema the meta-kernel governs declares one: an ordinary schema
+     * reaches the kernel's {@code namespace} only by importing a kernel-governed schema, which is refused (§2.2.3).
+     */
     @Test
     void aNamespaceTypeIsDeclaredUnderTheMetaKernel() {
         List<Diagnostic> problems = tson("").validateSchema("""
@@ -129,8 +147,7 @@ class NamespaceTypeTest {
                 """);
 
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("composes with the kernel's 'namespace', a constructor"),
-                problems::toString);
+        assertTrue(problems.getFirst().message().contains("governing level"), problems::toString);
     }
 
     /** A namespace type leaving a facet open describes no map, unless it is abstract. */

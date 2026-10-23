@@ -276,9 +276,10 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       (`Code.isRefusal()`). The CLI's exit codes follow — 70, 78, and 69 or 75 by whether a rerun could help,
       a name or limit refusal exiting 1 because the runner can act — and a mixed run ranks by who must act
       first: 70 > 78 > 69 > 1 > 75, a rerun last since every other fix ends in one.
-- **What still throws even with a receiver:** an `!!import` that won't load, a `!!meta` that may not
-  govern, or a reference whose target owns a different `!!id` than it was fetched under (§2.2.1's
-  cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Those make the namespace itself unusable rather
+- **What still throws even with a receiver:** an `!!import` that won't load or stands at another governing level
+  (`TsonSchemaLinker.checkImportLevel`), a `!!meta` that may not govern, or a reference whose target owns a
+  different `!!id` than it was fetched under (§2.2.1's cross-check, `TsonCompiledMetaRegistry.crossCheckId`).
+  Those make the namespace itself unusable rather
   than one entry wrong, and continuing would report a page of unresolved references that are all
   consequences of the one real problem. Each is a `SchemaValidationException` — an authoring or
   publishing error, not a library fault, which is what lets `Tson.validateSchema` catch them and report

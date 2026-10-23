@@ -137,6 +137,9 @@ import java.util.stream.Collectors;
  * it imported", matching the {@code !!meta} half §3.3.1 defines as "the target's local declarations
  * <i>plus its imports</i>". A flat namespace with no hiding is the rule the rest of the format is built on.
  *
+ * <p><b>An import stands at the importer's governing level</b> ({@link #checkImportLevel}): a schema the
+ * meta-kernel governs imports only schemas it governs, and an ordinary schema only ordinary ones.
+ *
  * <p><b>Collisions are decided by entry identity.</b> One schema reached by several routes unifies; two
  * *different* schemas declaring one name is the error, as is a local declaration shadowing any name the
  * import closure already binds (no redefinition -- see {@link #mergeImports}). <b>Merged entries keep
@@ -612,7 +615,7 @@ public final class TsonSchemaLinker {
         // The application each instantiation closes (§8.2), off its key: an import's as its schema states it, a
         // local one's as this schema's resolution wrote it. What a message shows in place of a minted name.
         Map<String, TypeRef> applications = new LinkedHashMap<>();
-        Map<String, Top> merged = mergeImports(schema.imports(), loader, origins, enumForms, nameTypes, namespaces,
+        Map<String, Top> merged = mergeImports(schema, loader, origins, enumForms, nameTypes, namespaces,
                 facts, applications);
         schema.entries().keySet().forEach(name -> schema.applicationOf(name)
                 .ifPresent(application -> applications.put(name, application)));
@@ -1097,7 +1100,36 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * Whether {@code schema} is entitled to declare its own {@code ~}-marked constructors -- true
+     * [TSON-SCHEMA] §2.2.3's level rule for one {@code !!import} edge: the imported schema stands at the
+     * importer's governing level, both naming the meta-kernel as their {@code !!meta} or neither. A
+     * kernel-governed schema (the meta-kernel, meta.tn, a meta layer) is meta vocabulary; any other schema is
+     * governed by a meta-schema and describes data or, under a meta layer, applies its constructors. So meta.tn
+     * imports the meta-kernel, a meta layer imports meta.tn, and a schema a meta layer governs imports core.tn
+     * -- both ordinary, which is why the rule is the level and not one {@code !!meta}: an API description
+     * imports the records it describes. An ordinary schema importing a meta layer, or a meta layer importing an
+     * ordinary library, is refused: a field typed by a kernel entry ({@code type_ref}, {@code record_field},
+     * {@code value}) or by a meta layer's namespace type stands only in a kernel-governed document, and a meta
+     * layer declares the vocabulary its constructors use.
+     *
+     * <p>Judged once per edge, against the imported schema's own {@code !!meta}, and before its entries are
+     * merged. Public because {@code SchemaResolver} merges imports a phase earlier and asks the same question
+     * there, in this wording; a {@link SchemaValidationException}, as every import refusal is, because the
+     * importing document is wrong and the namespace it would build is not one to continue checking.
+     */
+    public static void checkImportLevel(String importerId, String importerMeta, String importedId,
+                                        String importedMeta) {
+        if (isMetaKernelGoverned(importerMeta) == isMetaKernelGoverned(importedMeta)) {
+            return;
+        }
+        throw new SchemaValidationException("'" + importerId + "' (its !!meta '" + importerMeta + "') imports '"
+                + importedId + "' (its !!meta '" + importedMeta + "'), but an !!import stands at the importer's "
+                + "governing level, both schemas naming meta-kernel.tn as their !!meta or neither (§2.2.3, §3.1) "
+                + "-- a meta layer reaches the schemas it governs only as their !!meta, and declares the "
+                + "vocabulary its constructors use itself");
+    }
+
+    /**
+     * Whether {@code schema} is entitled to declare its own constructors, entries IS-A {@code top} -- true
      * only if its own {@code !!meta} target is exactly {@link TsonBundledSchemas#META_KERNEL_ID}, the *specific*
      * meta-kernel this library's own compiled-reader machinery is built against, not merely "some
      * self-referencing schema." This is stricter than structural self-reference alone: every
@@ -1113,7 +1145,12 @@ public final class TsonSchemaLinker {
      * meta.tn (governed one hop below it) alike.
      */
     private static boolean isMetaKernelGoverned(TsonSchema schema) {
-        return CanonicalIdentity.sameIdentity(schema.meta(), TsonBundledSchemas.META_KERNEL_ID);
+        return isMetaKernelGoverned(schema.meta());
+    }
+
+    /** Whether a schema whose {@code !!meta} is {@code meta} is governed by the meta-kernel itself. */
+    private static boolean isMetaKernelGoverned(String meta) {
+        return CanonicalIdentity.sameIdentity(meta, TsonBundledSchemas.META_KERNEL_ID);
     }
 
     // ── Subtypes (reverse index) ─────────────────────────────────────────
@@ -1245,8 +1282,11 @@ public final class TsonSchemaLinker {
      *
      * <p>Identity is the canonical one ([TSON-DATA] §2.2.1), so a pinned and an unpinned reference to one
      * schema unify -- which is what lets an author pin their own import while a peer's is unpinned.
+     *
+     * <p>Each import edge is judged by {@link #checkImportLevel} before its entries are taken, so an import at
+     * the wrong level is reported as that, not as the collision its closure would bring.
      */
-    private static Map<String, Top> mergeImports(List<String> imports, TsonSchemaLoader loader,
+    private static Map<String, Top> mergeImports(TsonSchema importer, TsonSchemaLoader loader,
                                                  Map<String, String> origins,
                                                  Map<String, Normalization> enumForms,
                                                  Map<String, Top> nameTypes,
@@ -1255,7 +1295,7 @@ public final class TsonSchemaLinker {
                                                  Map<String, TypeRef> applications) {
         Map<String, Top> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
-        for (String importUri : imports) {
+        for (String importUri : importer.imports()) {
             String importIdentity = CanonicalIdentity.canonicalize(importUri);
             // Listing one schema twice (or under two spellings of one identity) is redundant, not an error:
             // the second mention asks for a namespace already present and contributes nothing new.
@@ -1264,6 +1304,7 @@ public final class TsonSchemaLinker {
             }
             TsonLinkedSchema imported = loader.load(importIdentity).orElseThrow(() -> new SchemaValidationException(
                     "!!import '" + importUri + "' is not registered"));
+            checkImportLevel(importer.id(), importer.meta(), imported.schema().id(), imported.schema().meta());
             for (Map.Entry<String, Top> entry : imported.schema().entries().entrySet()) {
                 String name = entry.getKey();
                 // The import's own answer, not importIdentity: an entry it reached through an import of its

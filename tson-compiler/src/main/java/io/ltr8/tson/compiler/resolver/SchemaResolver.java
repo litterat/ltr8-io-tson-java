@@ -7,6 +7,7 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.TsonDiagnostics;
+import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -1010,7 +1011,9 @@ public final class SchemaResolver {
      * TsonSchemaLinker.mergeImports} exactly, including its transitivity and its identity-based collision
      * rule (§2.2.3), since this is the same concept applied one stage earlier: an
      * import contributes everything its namespace holds, one schema reached by several routes unifies, and
-     * two different schemas declaring one name is the error.
+     * two different schemas declaring one name is the error. Each import edge is judged by {@link
+     * TsonSchemaLinker#checkImportLevel} before its entries are taken, in the linker's wording: an import stands
+     * at the importer's governing level (§2.2.3).
      *
      * <p>Unlike the linker's, this merge has no {@code subtypes} to reconcile when a route repeats --
      * {@code subtypes} is populated at link time, one phase later, so both copies are still as their
@@ -1028,6 +1031,8 @@ public final class SchemaResolver {
                 continue;
             }
             TsonLinkedSchema imported = loader.resolveLinked(importUri);
+            TsonSchemaLinker.checkImportLevel(document.id().orElseThrow(), document.meta(),
+                    imported.schema().id(), imported.schema().meta());
             for (Map.Entry<String, Top> entry : imported.schema().entries().entrySet()) {
                 String name = entry.getKey();
                 String origin = imported.originOf(name);

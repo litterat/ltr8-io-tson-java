@@ -17,7 +17,11 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/** A value of a namespace type is a JSON object read as the map the type describes, never as a record of its facets. */
+/**
+ * A value of a namespace type is a JSON object read as the map the type describes, never as a record of its facets.
+ * A field is typed by a namespace type only in a schema the meta-kernel governs, since an import stands at the
+ * importer's governing level (§2.2.3).
+ */
 class JsonNamespaceTypeTest {
 
     private static final String META = "https://example.test/meta-headers.tn";
@@ -34,7 +38,7 @@ class JsonNamespaceTypeTest {
 
     private static final String USER_TEXT = """
             !!id:"https://example.test/request.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
             !!import:"https://example.test/meta-headers.tn"
             {
               request => { headers: headers }
