@@ -105,10 +105,8 @@ class ApplicabilityIsIsATopTest {
      * alias. Everything the head is asked (is it a template, is it applicable, what kind does construction
      * transfer, whose vocabulary reads the payload) is a question about the terminal entry.
      *
-     * <p>Asking the alias instead answered every one of them from an empty supertype chain and a {@code
-     * REFERENCE} kind, which is what a hop looks like rather than what it points at. The old {@code
-     * constructor: true} flag had the same hole — it was hardcoded {@code false} on a reference — so this is
-     * a defect the predicate inherited rather than one it introduced.
+     * <p>Asking the alias instead would answer every one of them from an empty supertype chain and a {@code
+     * REFERENCE} kind, which is what a hop looks like rather than what it points at.
      */
     @Test
     void applicationFollowsAnAliasToItsTarget() {
@@ -125,8 +123,8 @@ class ApplicabilityIsIsATopTest {
             String user = """
                     !!id:"https://example.test/u.tn"
                     !!meta:"https://example.test/m.tn"
-                    !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
-                    { tags => !%s { element_type: identifier } }
+                    !!import:"https://tson.io/2026/38/m/core.tn"
+                    { tags => !%s { element_type: text } }
                     """.formatted(head);
             List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
                     .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(

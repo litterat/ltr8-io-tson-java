@@ -62,7 +62,8 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       the specific constructs still out of scope)
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
       directives during resolution, flattens argument-bearing type references into real named
-      entries, merges `!!import`s, validates every reference in a schema actually resolves, and
+      entries, merges `!!import`s (each standing at the importer's governing level, kernel-governed or
+      ordinary), validates every reference in a schema actually resolves, and
       locks a schema into a registry keyed by its canonical `!!id`
 - [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated

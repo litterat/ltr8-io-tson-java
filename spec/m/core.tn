@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/core.tn?sha256=072df189501a84f394c3efb2f852a38afb0868a972112bdc77c5c7f49e432c86"
+!!id:"https://tson.io/2026/38/m/core.tn?sha256=8bef0794d3e3f2144bc89ce6170845e59fd0bef5a7b90509a06254d62c76c35b"
 !!meta:"https://tson.io/2026/38/m/meta.tn?sha256=f5ad23d847515d1cac1570a879c0238ec638ecaa5df1d3a414fad3c8e025d86e"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
@@ -29,8 +29,9 @@
   they must be reachable through the `!!meta` chain; they appear here only by
   use. Core's own `doc` declaration, and its same-named siblings
   of kernel and meta entries (`void`, `boolean`, `integer`, `text`, `regex`,
-  `uri`, `set` and `kind`), face the other direction: they exist so that *data
-  documents* and user schemas governed by or importing core can use them.
+  `uri`, `set`, `kind` and `ref`), face the other direction: they exist so
+  that *data documents* and user schemas governed by or importing core can
+  use them.
 
   References:
     ISO/IEC 11404:2007    General Purpose Datatypes
@@ -332,6 +333,18 @@
     schemas reach it through their core import.
     """
   kind => <T> !kind_type { of: T }
+
+  @doc:"""
+    The spelling of a reference an author writes inline: `ref<order>` holds a
+    qualified name naming a value of `order`, as `!ref_type { of: order }`
+    does. `T` names a type of this schema's namespace, never a constructor:
+    `ref<record>` is a resolver error at the declaration, and `kind<record>`
+    names the types built with `record`.
+
+    A sibling of the meta-kernel's declaration under the same name: user
+    schemas reach it through their core import.
+    """
+  ref => <T> !ref_type { of: T }
 
   @doc:"""
     A tuple of exactly one element: `tuple1<text>` admits `[a]` and

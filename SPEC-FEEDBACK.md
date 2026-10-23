@@ -2000,7 +2000,7 @@ its value), #22 (kind membership); [TSON-DATA] §7.1.
 
 **Kind:** proposal. The second of the namespace entries the register's preface says will be raised against Revision
 38, after #22. The kernel's namespace constructor, how a value of one is read, a value of one standing as an entry,
-and `data`'s removal from the kernel are running; where a namespace type may be declared is a proposal, not running.
+`data`'s removal from the kernel, and where a namespace type may be declared and used are running.
 
 **The problem.** #13 lets a qualified name enter any map keyed by an identifier family or an enum, so which maps a
 name may reach into is decided by the key type, a fact about spelling. The kernel already has two maps whose keys
@@ -2077,25 +2077,16 @@ an entry's value then walks the schema by key rather than a host's object, and `
 value is judged by the field's declared type; this implementation does not yet deliver the value behind it, and
 reports such a name as its own gap rather than as the author's error.
 
-**Where a namespace type may be declared, and used.** A namespace type IS-A `top`, so it is a constructor, and
-§2.2.2 lets only a schema whose own `!!meta` names the meta-kernel declare one. Running: in a schema governed by
-`meta.tn`, `hs => namespace & { … }` is refused as a constructor declaration when `namespace` is in reach, and
-otherwise does not resolve, a composition operand resolving in the type-name namespace only (§3.3.2). A namespace
-type is therefore meta-layer vocabulary, declared in a kernel-governed schema that imports `meta.tn` to name
-`namespace` and its facets' types as operands (`headers => namespace & { key_type: = header_name  value_type: =
-text }`). For an entry that is the intended shape, and it runs: `api` is a meta layer's constructor, and the schemas
-the layer governs apply `!api`. For a namespace type as the type of a field it is not: `!!meta` merges nothing into
-the type-name namespace, so a schema names `headers` only by importing the meta layer; imports are transitive
-(§2.2.3), so the importer's closure then holds the meta-kernel, and a schema that also imports `core.tn` is refused
-for `void`, which both declare. Today a field typed by a namespace type stands only in a schema that does not import
-core. Two readings, and the spec states neither:
-
-- *Constructors are meta vocabulary, intended.* A user schema wanting a keyed collection writes `{K => V}`, which a
-  qualified name does not enter, so no user schema declares a collection a `ref<T>` reaches into.
-- *A composition operand is a constructor role.* §3.3.1 gains a third role: an `&` operand the type-name namespace
-  does not resolve is resolved in the structure namespace, where it must be `namespace` or IS-A it, and §2.2.2's
-  privilege is stated for a constructor whose instances are types. A meta-governed schema then declares `headers =>
-  namespace & { … }` itself, a type like any other, with no import of the kernel.
+**Where a namespace type may be declared, and used, and running.** A namespace type IS-A `top`, so it is a
+constructor, and §2.2.2 lets only a schema whose own `!!meta` names the meta-kernel declare one: a namespace type is
+meta-layer vocabulary, declared in a kernel-governed schema that imports `meta.tn` to name `namespace` and its facets'
+types as operands (`headers => namespace & { key_type: = header_name  value_type: = text }`). The schemas the layer
+governs hold a value of it as an entry (`!api { … }`), which is the use it exists for. No schema types a field by it
+outside a kernel-governed document: `!!meta` merges nothing into the type-name namespace, and an import stands at the
+importer's governing level (#25), so an ordinary schema cannot import the layer that declares it. A user schema
+wanting a keyed collection writes `{K => V}`, which a qualified name does not enter, so no user schema declares a
+collection a `ref<T>` reaches into. The alternative, a composition operand resolving in the structure namespace as a
+third constructor role of §3.3.1, lost: it puts constructors in ordinary schemas, which §2.2.2 exists to keep out.
 
 **Breaking changes, against Revision 37:** `meta-kernel.tn` gains `namespace` and loses `data`; `schema` and
 `field_map` are written as compositions over `namespace`, and their resolved form is a record carrying the facets they
@@ -2112,10 +2103,10 @@ a resolver error. `top`'s constructors are `type`'s, whose instances are types, 
 maps." `data` and the sentences naming it leave §4.1, §8.1's kind determination and §13.2's table. §5.2 and §8.1:
 `field_map` and `schema` as above. #22's `kind_type` paragraph: "not itself a constructor whose
 instances are types", and `of` "is `type` or `namespace`, or below either". §9's inventory names `namespace`. For where
-a namespace type is declared, the second reading, as a sentence in §3.3.1: "A composition operand (§5.8) that the
-type-name namespace does not resolve resolves in the structure namespace, and MUST be `namespace` or IS-A it", with
-§2.2.2's privilege narrowed to "an entry IS-A `type`"; or, keeping the first, a sentence in §2.2.2 that a namespace type
-is a constructor and so declared only by a meta-schema. For the entry, §4.1 after the paragraph above: "An application
+a namespace type is declared and used, a sentence in §2.2.3: "An imported schema MUST stand at the importer's governing
+level: both named the meta-kernel as their `!!meta`, or neither" (#25); and a sentence in §2.2.2: "A namespace type is a
+constructor, and so is declared only by a meta-schema, which then owns the vocabulary its constructors use." For the
+entry, §4.1 after the paragraph above: "An application
 of a namespace type builds a map value, and an entry whose value it is is no type: naming it where a type is expected
 is a resolver error. A qualified name's segment after the entry's selects a key of that
 map, and the value reached is a value of the namespace type's `value_type`." And #22's membership stated either way
@@ -2130,8 +2121,8 @@ as a record's field names are. The kind walk admits a namespace type to `type_ki
 corpus's `meta-service.tn` declares its vocabulary as records held by namespace types — `interface`, `rpc_interface`
 and `verb_interface` holding methods, `bindings` holding `binding`, and `header_sets` holding `header_set`, a record
 whose plain map `{text => method}` no qualified name enters — so a governed schema writes `orders => !interface {
-place_order => { … } }` and names the method `orders.place_order`. `validate-namespace.tn` types a field by a
-kernel-governed `meta-headers.tn`'s `headers`, importing no core, and `validate-own-namespace.tn` shows a schema's own
+place_order => { … } }` and names the method `orders.place_order`. `meta-headers.tn` declares `headers`, and an
+ordinary schema importing it to type a field by it is refused (#25), and `validate-own-namespace.tn` shows a schema's own
 record named `namespace` composing as an ordinary record, a kind being judged by origin. An entry `myapi => !api { … }`
 resolves to the map, refused at every type position, entered by key by a qualified name at a `ref<T>` slot, listed by
 `kind<api>` and `kind<namespace>`, and written and read back in resolver output as written; the corpus's `meta-api.tn`
@@ -2141,8 +2132,8 @@ a namespace type binds a `Namespace` where its host declares one and the map whe
 `meta-kernel.tn` declares no `data`, and the Java model has no branch for it: `Top` permits `Type`, `Reference`,
 `TemplateBody` and `Namespace`, and each value of a namespace entry binds to a plain host class the consumer's name
 binder finds. A name whose walk selects a field of a record value past a key is judged by type and reported as this
-implementation's gap. What remains is the second reading above, not running. Part 2's cached §13.2 table is not
-re-stamped here.
+implementation's gap. Nothing remains open on where a namespace type is declared or used. Part 2's cached §13.2
+table is not re-stamped here.
 
 ---
 
@@ -2185,8 +2176,13 @@ routes => !bindings { post_orders => { method: orders.place_order  verb: POST  r
 
 Refusals, each where it stands: `method: orders` (an interface, no method); `method: orders.cancel_order` (no key,
 the keys listed); `method: orders.place_order.nope` (a method has no field `nope`); `method: hs.h.headers.accept`
-where `header_set.headers` is `{text => method}` (a map that is no namespace); `r: ref<record>` (a constructor); a
-reference in a data document (not yet read: a data document has no link to resolve it at).
+where `header_set.headers` is `{text => method}` (a map that is no namespace); `r: ref<record>` (a constructor).
+
+**A reference in a data document.** `core.tn` declares `ref` beside the kernel's, as it declares `kind`, so an ordinary
+schema types a field `ref<order>` through its core import, and refuses `ref<record>` there as the kernel's does. The
+intended rule for the data document's value is the kind's: the name resolves in the closure of the document's
+`!!schema`, and the referent is judged a value of `T` there. This implementation does not yet read it, and reports
+the read as its gap rather than a verdict.
 
 **A value body's slots, under #22 and this entry.** A kind-typed slot of a value body holds one bare name: a braced
 application there (`request: { name: box  arguments: [ { name: order } ] }`, §5.6's data spelling) is refused, since
@@ -2197,7 +2193,8 @@ family base is the tagged subtype's, wherever the value sits; this implementatio
 declared type as the reader that read it knows it, so it judges a slot behind a record value's field as it judges one
 under a namespace key.
 
-**Breaking changes, against Revision 37:** `meta-kernel.tn` gains `ref_type` and `ref`. A meta layer's value-by-name
+**Breaking changes, against Revision 37:** `meta-kernel.tn` gains `ref_type` and `ref`, and `core.tn` a sibling `ref`
+under the same name. A meta layer's value-by-name
 slots are written `ref<T>`; a record-typed slot no longer takes a name. §9's guidance reads: a slot naming a type is
 typed by a kind, a slot naming a value by a reference, and `type_ref` is for a slot that holds an application.
 
@@ -2208,3 +2205,54 @@ the delivered value. A host declares nothing: the read records every name at a k
 the host component holds there, and the linker judges each by its slot. A name whose walk selects a field of a record
 value is judged by type, every refusal above included, and the value behind the field is not yet delivered: reported
 as this implementation's gap.
+
+---
+
+## 25. An import stands at the importer's governing level
+
+**Section:** [TSON-SCHEMA] §2.2.3 (imports), §3.1 (the ladder of governing levels); §2.2.2 (constructor declarations are
+a meta-schema privilege), #23 (where a namespace type is used).
+
+**Kind:** proposal, running.
+
+**The problem.** §3.1 sets the meta-kernel above meta-schemas and meta-schemas above ordinary schemas, and §2.2.2 keeps
+constructor declarations at the meta-schema level, but §2.2.3 lets any schema import any other. An ordinary schema can
+import `meta.tn` or a meta layer and so put kernel entries (`type_ref`, `record_field`, `value`) or a meta layer's
+namespace type into its type-name namespace, where a field may be typed by one and a data document then holds a value
+of it. A meta layer can import `core.tn` or `net.tn` and take its constructors' vocabulary from an ordinary library.
+Either way the levels §3.1 draws meet in one closure, and the only thing that stops it today is incidental: the
+meta-kernel and `core.tn` both declare `void`, so a closure holding both is refused for a collision that names neither
+the cause nor the fix.
+
+**Proposed.** A schema is kernel-governed when its own `!!meta` is the meta-kernel; otherwise it is an ordinary schema,
+governed by a meta-schema. An import is admitted only when importer and imported are both kernel-governed or both
+not, judged once per import edge, against the imported schema's own `!!meta`. The rule is the level and not one
+`!!meta`: an API description, governed by a meta layer, must be able to import the records it describes, governed by
+`meta.tn`, and both are ordinary. Running in this implementation:
+
+- *Admitted:* `meta.tn` importing the meta-kernel; a meta layer importing `meta.tn`; `policy.tn` importing `core.tn`;
+  a schema a meta layer governs importing `core.tn`.
+- *Refused:* an ordinary schema importing a meta layer (to type a field by its namespace type) or the meta-kernel (to
+  type a field by `record_field`); a meta layer importing an ordinary library (`core.tn`, or one declaring `money`).
+
+A consequence the spec should state with it: a meta layer declares the vocabulary its constructors use rather than
+importing `core.tn` or `net.tn`; a field typed by a namespace type or a kernel record exists only in a kernel-governed
+document; and a constructor is reachable by an ordinary schema only through its `!!meta`. A kind and a reference are
+not among them: `kind` and `ref` reach an ordinary schema through core.tn's own declarations, siblings of the kernel's,
+so the level rule removes nothing an ordinary schema types a field by. Through its core import an ordinary schema types
+a field `kind<C>` or `ref<T>`, and a data document holds a type's or a value's name there. §2.2.2's placement rule and
+the §2.2.3 cycle rule, which counts `!!meta` as an edge, are unchanged. With the rule in place an ordinary schema's
+closure holds no meta-kernel entry, so §2.2.2's refusal of a constructor declared in one is reached by no loaded
+document: such a schema has no base kind to compose with.
+
+**Breaking changes, against Revision 37:** a schema governed by `meta.tn` that imports `meta-kernel.tn` or a meta layer
+is refused, as is a kernel-governed schema importing `core.tn`. The bundled chain imports at one level throughout.
+
+**Suggested resolution.** [TSON-SCHEMA] §2.2.3, after the paragraph making an import contribute its whole namespace:
+"An imported schema MUST stand at the importer's governing level: both named the meta-kernel as their `!!meta`, or
+neither. A meta-schema declares the vocabulary its constructors use; an ordinary schema reaches a meta-schema's
+constructors only through its `!!meta`."
+
+**Status against Revision 37:** open; running on `governing-levels`, a branch off `r2026-38-proposal`: the linker's
+import merge and the resolver's, one phase earlier, refuse an edge at another level in one wording naming both
+documents and both `!!meta`s. The corpus states both refusals as link-layer vectors.

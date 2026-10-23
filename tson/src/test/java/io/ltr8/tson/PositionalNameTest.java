@@ -10,24 +10,25 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * §5.6's positional form in a data document, which values by name (SPEC-FEEDBACK.md #13) do not reach: a data
  * document has no namespace to resolve a name in, so a bare token at a record position fills the one positional
- * field whatever that field's type, as it always has. A schema that imports the kernel can type a field by its
- * records, which is the one way a data document reaches these positions. The one schema-document case here is
- * the contrast: the same token in a constructor's binding record is a value by name, not a product-typed fill.
+ * field whatever that field's type. A kind-typed field reaches a data document through core.tn's own {@code kind};
+ * a field typed by a kernel record ({@code type_ref}, {@code record_field}) does not, since an ordinary schema
+ * imports only ordinary ones (§2.2.3). The one schema-document case here is the contrast: the same token in a
+ * constructor's binding record is a value by name, not a product-typed fill.
  */
 class PositionalNameTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/positional-name.tn"
             !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               named  => { v: text }
-              holder => { p?: record_field  q?: kind<record>  t?: type_ref }
+              slot   => { type: kind<record> }
+              holder => { c?: named  p?: slot  q?: kind<record> }
             }""";
 
     private static List<Diagnostic> read(String data) {
@@ -41,14 +42,14 @@ class PositionalNameTest {
         return reported;
     }
 
-    /** {@code type_ref}'s one field is {@code name}, a {@code type_name}: the token fills it. */
+    /** {@code named}'s one field is {@code v}, text: the token fills it. */
     @Test
-    void aTypeReferenceKeepsItsBareSpelling() {
-        assertEquals(List.of(), read("!holder { t: some_type  p: { type: named } }"));
+    void aTokenFillsAnAtomTypedPositionalField() {
+        assertEquals(List.of(), read("!holder { c: some_text }"));
     }
 
     /**
-     * {@code record_field}'s one field is {@code type}, a {@code type_kind}: in a data document a name fills it, and is
+     * {@code slot}'s one field is {@code type}, a {@code kind<record>}: in a data document a name fills it, and is
      * judged a member of the kind in the governing schema's namespace.
      */
     @Test

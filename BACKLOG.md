@@ -61,16 +61,19 @@ own prose (which had gone stale on it):
   index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
   application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
-- [ ] **Where a namespace type may be declared** (SPEC-FEEDBACK.md #23). Settle with the
-  spec whether a user schema may declare a namespace type (#23's composition-operand reading): today only a
-  kernel-governed one can, and a schema typing a field by it cannot also import core.tn. Lands on
-  `r2026-38-proposal` before the branch goes to the reviewer.
 - [ ] **A value reached through a record value's field** (SPEC-FEEDBACK.md #23, #24). A `ref<T>` whose last segments
   select fields of a record value (`p.x.primary`, a `pairing` held under a namespace key) is judged by the fields'
   declared types, every refusal included, and then reported as `NOT_IMPLEMENTED`: `ValuesByName` never reads the
   host object, so the value is neither found nor delivered into the `Ref`. Reach it through `ltr8-bind`'s class
   descriptor for the host (the component the binding wrote the field to, under its wire name), not raw record
   reflection, or bind a meta layer's values as a tree the walk can enter by field.
+- [ ] **A reference in a data document is not read** (SPEC-FEEDBACK.md #24). An ordinary schema types a field
+  `ref<order>` through core.tn's `ref`, and a data document's read of it reports `NOT_IMPLEMENTED`: `AtomParsers`
+  builds a `ref_type` reader only under a meta layer, since only a schema's link judges a name. The rule is the kind's:
+  the name resolves in the closure of the document's `!!schema`, the referent is judged a value of `T` there, and the
+  value is delivered into a `Ref<T>` host. A consumer's `Ref<T>` component also needs `Ref`'s bridge in the consumer's
+  bind context, which `ResolverBindContext` registers only for the schema model: today such a class is a
+  `MissingBindingException` before the read starts.
 - [ ] **JSON bind delivers a `Namespace` at a namespace-typed slot.** The TSON reader builds one where the host
   component is a `Namespace` (`reader.BindTargets`, over a `MapBindReader` that carries the constructor's name);
   `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
@@ -330,6 +333,17 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **A kind's member list names a minted application.** The refusal of a name at a `kind<type>` slot lists the
+  kind's members, and the list holds `kind_type_type_c430c650`, the entry minted for the application `kind<type>`
+  itself: a `kind_type` instance IS-A `type`, so the construction walk admits it. A minted name is no spelling an
+  author can write (`InternalName`), so `KindMembers` should pass over `@synthetic` entries, in the message's list
+  and in `expected` alike, or the walk should exclude an application's minted entry from every kind.
+- [ ] **A linker refusal of an atom application names its minted entry.** `pick => { m: ref<record> }` reads
+  "'ref_type_record_3034e1a1' is a reference whose 'of' names 'record', a constructor …", and an unresolved
+  `ref<nope>` or `kind<nope>` the same way: an application nothing declares is its expansion, which `EntryDisplayName`
+  gives no authored name, so `TsonSchemaLinker.validateEntry`'s subject falls back to the key. Name it by the
+  application the key's facts carry (`ref<record>`), or state the refusal without a subject, since the diagnostic is
+  already located at the declaration that wrote it.
 - [ ] **The §7.2 refusal names a synthetic by its key.** `VariantSchemaReader` builds its `SubsumptionDiagnostics`
   from the entry name and keeps it through `renamed`, so beside `text_list => [text]` and `r => { t: [text] }`,
   `!r { t: !text_list [a] }` reads "'text_list' is not admissible at a 'array_text_4cc4a482' position". The position

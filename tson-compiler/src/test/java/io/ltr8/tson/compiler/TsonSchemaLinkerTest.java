@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.*;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.AnnotatedMap;
@@ -243,10 +243,8 @@ class TsonSchemaLinkerTest {
 
     /**
      * A pure alias cycle -- an {@code a} is a {@code b} is an {@code a} -- has no base case, so nothing can
-     * ever be one. It used to link cleanly, with this fixture asserting only that the variant-flattening walk
-     * terminated rather than hanging; the diagnostic it called "separate and unimplemented" now exists
-     * (§5.10.1). Termination is still what the walk needs and is still proved here --
-     * by a verdict arriving at all.
+     * ever be one (§5.10.1). Termination is what the variant-flattening walk needs, and it is proved here by a
+     * verdict arriving at all.
      */
     @Test
     void aReferenceCycleAmongVariantsIsUninhabited() {
@@ -444,7 +442,7 @@ class TsonSchemaLinkerTest {
         localEntries.put("local_a", RecordBody.of(RecordBody.fieldMap(Map.entry("field",
                 RecordField.required(TypeRef.of("imported_a"))))));
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                "https://example.test/meta.tn", List.of("https://example.test/import.tn"), localEntries);
+                TsonBundledSchemas.META_KERNEL_ID, List.of("https://example.test/import.tn"), localEntries);
 
         TsonLinkedSchema result = TsonSchemaLinker.link(local, loader);
 
@@ -455,16 +453,15 @@ class TsonSchemaLinkerTest {
     void rejectsAnImportThatIsNotRegistered() {
         TsonSchemaLoader loader = id -> Optional.empty();
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                "https://example.test/meta.tn", List.of("https://example.test/missing.tn"), Map.of());
+                TsonBundledSchemas.META_KERNEL_ID, List.of("https://example.test/missing.tn"), Map.of());
 
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(local, loader));
     }
 
     @Test
     void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
-        // A genuinely different type under the same name. This used to declare `emptyRecord()` on both
-        // sides, which is not a collision at all: [TSON-SCHEMA] §8.2 makes two entries that are the same
-        // entry one entry, so the assertion passed only because nothing checked whether they agreed.
+        // A genuinely different type under the same name: two identical entries are one entry ([TSON-SCHEMA]
+        // §8.2), which is no collision.
         assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), valueEntry()));
     }
 
@@ -487,7 +484,7 @@ class TsonSchemaLinkerTest {
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                "https://example.test/meta.tn", List.of("https://example.test/import.tn"),
+                TsonBundledSchemas.META_KERNEL_ID, List.of("https://example.test/import.tn"),
                 Map.of(name, localEntry));
         return TsonSchemaLinker.link(local, loader);
     }
@@ -599,7 +596,7 @@ class TsonSchemaLinkerTest {
         localEntries.put("local_child",
                 ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("imported_base")));
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                "https://example.test/meta.tn", List.of("https://example.test/import.tn"), localEntries);
+                TsonBundledSchemas.META_KERNEL_ID, List.of("https://example.test/import.tn"), localEntries);
 
         TsonLinkedSchema result = TsonSchemaLinker.link(local, loader);
 
@@ -629,7 +626,7 @@ class TsonSchemaLinkerTest {
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                "https://example.test/meta.tn",
+                TsonBundledSchemas.META_KERNEL_ID,
                 List.of("https://example.test/import-one.tn", "https://example.test/import-two.tn"), Map.of());
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -664,7 +661,7 @@ class TsonSchemaLinkerTest {
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                "https://example.test/meta.tn",
+                TsonBundledSchemas.META_KERNEL_ID,
                 List.of("https://example.test/shared.tn", "https://example.test/b.tn"), Map.of());
 
         TsonLinkedSchema linked = TsonSchemaLinker.link(local, loader);
@@ -674,5 +671,61 @@ class TsonSchemaLinkerTest {
         // The declaring schema, not the intermediary that passed it along.
         assertEquals(CanonicalIdentity.canonicalize("https://example.test/shared.tn"),
                 linked.originOf("shared_name"));
+    }
+
+    /**
+     * An import stands at the importer's governing level (§2.2.3): an ordinary schema imports only ordinary ones.
+     * A kernel-governed schema's entries are meta vocabulary, reached through {@code !!meta}.
+     */
+    @Test
+    void anOrdinarySchemaMayNotImportAKernelGovernedOne() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> linkImporting(
+                "https://example.test/meta.tn", TsonBundledSchemas.META_KERNEL_ID));
+
+        assertLevelRefusal(thrown, "https://example.test/meta.tn", TsonBundledSchemas.META_KERNEL_ID);
+    }
+
+    /** And the other direction: a kernel-governed layer declares the vocabulary its constructors use itself. */
+    @Test
+    void aKernelGovernedSchemaMayNotImportAnOrdinaryOne() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> linkImporting(
+                TsonBundledSchemas.META_KERNEL_ID, "https://example.test/meta.tn"));
+
+        assertLevelRefusal(thrown, TsonBundledSchemas.META_KERNEL_ID, "https://example.test/meta.tn");
+    }
+
+    /**
+     * Two ordinary schemas under different {@code !!meta}s stand at one level: a schema a meta layer governs
+     * imports the library of records it describes.
+     */
+    @Test
+    void twoOrdinarySchemasUnderDifferentMetasLink() {
+        TsonLinkedSchema linked = linkImporting("https://example.test/meta-api.tn", "https://example.test/meta.tn");
+
+        assertEquals(Set.of("imported_a", "local_a"), linked.schema().entries().keySet());
+    }
+
+    /** {@code importer.tn}, governed by {@code importerMeta}, importing {@code import.tn} under {@code importedMeta}. */
+    private static TsonLinkedSchema linkImporting(String importerMeta, String importedMeta) {
+        TsonLinkedSchema imported = new TsonLinkedSchema(new TsonSchema("https://example.test/import.tn",
+                importedMeta, List.of(), Map.of("imported_a", emptyRecord())));
+        Map<String, TsonLinkedSchema> byIdentity =
+                Map.of(CanonicalIdentity.canonicalize("https://example.test/import.tn"), imported);
+        TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
+
+        TsonSchema importer = new TsonSchema("https://example.test/importer.tn", importerMeta,
+                List.of("https://example.test/import.tn"), Map.of("local_a", emptyRecord()));
+        return TsonSchemaLinker.link(importer, loader);
+    }
+
+    /** Both documents and both {@code !!meta}s named, and the rule stated. */
+    private static void assertLevelRefusal(SchemaValidationException thrown, String importerMeta,
+                                           String importedMeta) {
+        String message = thrown.getMessage();
+        for (String named : List.of("https://example.test/importer.tn", "https://example.test/import.tn",
+                CanonicalIdentity.canonicalize(importerMeta), CanonicalIdentity.canonicalize(importedMeta),
+                "governing level", "§2.2.3")) {
+            assertTrue(message.contains(named), () -> named + " in: " + message);
+        }
     }
 }

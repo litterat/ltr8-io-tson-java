@@ -11,6 +11,9 @@ Current form only; history lives in git.
   a document's own `!!id`, which must already be written canonically. Neither rewrites an identity into validity.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds.
+- An import stands at the importer's governing level: importer and imported both name the meta-kernel as their
+  `!!meta`, or neither (`TsonSchemaLinker.checkImportLevel`, §2.2.3). It is judged once per edge, against the import's
+  own `!!meta`, before the import's entries merge; `SchemaResolver` asks it a phase earlier in the same wording.
 - A reference to a namespace entry (a `Namespace`, `myapi => !api { … }`) is refused at every position a type-ref
   occupies: it is a value, and nothing is typed by it.
 - A kernel slot typed `type_kind` (`record_field.type`, the element and container type slots, `choice.variants`, a
@@ -84,7 +87,13 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   imported schema's entire namespace"), keeping their home namespace, and **each merged
   entry's origin recorded** (`TsonLinkedSchema.entryOrigins`, name → the canonical identity of the schema
   that *declared* it, taken from the import's own `originOf` so an entry two hops away keeps its author
-  rather than the intermediary). **Collisions are decided by that origin, not by name occurrence**: one
+  rather than the intermediary). **Each edge stands at the importer's level** (`checkImportLevel`): a
+  kernel-governed schema imports only kernel-governed ones and an ordinary schema only ordinary ones, whatever their
+  own `!!meta`s, so meta.tn imports the kernel and a schema a meta layer governs imports core.tn. The level and not
+  one `!!meta`, because an API description must import the records it describes. Judged before the edge's entries
+  are taken, so the refusal names the two documents and their `!!meta`s rather than the `void` collision the mixed
+  closure would otherwise reach; a namespace-level `SchemaValidationException`, as the other import refusals are.
+  **Collisions are decided by that origin, not by name occurrence**: one
   schema reached by several routes unifies (the diamond every schema importing core.tn forms — the two
   copies differ only in the `subtypes` each route's own linking credited, so they union), two *different*
   schemas declaring one name is an error naming both, and a local declaration may not reuse a name the
@@ -129,7 +138,9 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   lint, not a guard**: an entry that IS-A `top` in a user schema is *inert*, because applicability is read in
   exactly one place — resolving a `!C value` against the **governing meta's** entries — and the target half
   already refuses to let a user-level schema be named as anyone's `!!meta`, on the same predicate. Nothing
-  can chain to it, so no `!xxx_type` can ever occupy a schema position. (In a *data*
+  can chain to it, so no `!xxx_type` can ever occupy a schema position. And since an ordinary schema imports only
+  ordinary ones, its closure holds no meta-kernel entry and so no base kind to compose with: no loaded document
+  reaches the declaring half, which stays as §2.2.2's statement at the declaration. (In a *data*
   document `!xxx_type { ... }` is an ordinary record annotation and reads fine, which is what makes §8
   resolver-output bodies like `!record { ... }` expressible at all.) Worth keeping anyway, at one comparison:
   "you wrote something that can never do anything" is better said at the declaration than in whichever
@@ -437,11 +448,11 @@ before a reader is built, and it is linking's.
   body through the same accessor (`map()`, the declared key family), and `isNamespace` is that accessor being present.
   Before linking, `ParameterTypes` reads the governing meta's namespace types (a record's `fields` among them) as their
   maps directly, the meta's `namespace` being the kernel's.
-- **A namespace type is meta vocabulary.** It IS-A `top`, so §2.2.2's eligibility check refuses it in any schema not
-  governed by the meta-kernel, saying it composes with the kernel's `namespace`, a constructor, and a composition
-  operand resolves in the type-name namespace only, so the declaring layer imports meta.tn to name `namespace` and its
-  facets' types. A schema typing a field by it imports that layer, which brings the kernel into its closure; with
-  core.tn beside it that collides on `void` (SPEC-FEEDBACK.md #23).
+- **A namespace type is meta vocabulary.** It IS-A `top`, so only a kernel-governed schema declares it (§2.2.2), and a
+  composition operand resolves in the type-name namespace only, so the declaring layer imports meta.tn to name
+  `namespace` and its facets' types. An ordinary schema cannot import that layer (`checkImportLevel`), so a field
+  typed by a namespace type stands only in a kernel-governed document; the schemas the layer governs hold values of it
+  as entries (SPEC-FEEDBACK.md #23, #25).
 - **An instance is an entry, and a value.** `myapi => !api { … }` in a schema the layer governs resolves to a
   `Namespace` (`design/meta-layer-namespaces.md`), kind `NAMESPACE`, its constructor recorded as `api`. `validateBody`
   has a `Namespace` case that asks nothing; `checkValuesByName` judges the names its values hold;

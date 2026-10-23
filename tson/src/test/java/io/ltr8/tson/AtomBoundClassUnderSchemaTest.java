@@ -154,7 +154,7 @@ class AtomBoundClassUnderSchemaTest {
         assertEquals(new Sku("12.34"), invoice.total());
     }
 
-    /** And a collecting read of a good document reports nothing -- it used to throw straight past the receiver. */
+    /** And a collecting read of a good document reports nothing, and never throws past the receiver. */
     @Test
     void aCollectingReadOfAGoodDocumentReportsNothing() {
         DiagnosticsCollector collector = new DiagnosticsCollector();
@@ -183,12 +183,12 @@ class AtomBoundClassUnderSchemaTest {
 
     /**
      * A schema reaching {@code value} imports meta-kernel.tn, which is why this is a meta-layer facility
-     * rather than something a consumer adopts: meta-kernel.tn and core.tn both declare {@code void}, so a
-     * schema reaching the escape hatch gives up the standard library to do it.
+     * rather than something a consumer adopts: an import stands at the importer's governing level (§2.2.3),
+     * so a schema reaching the escape hatch is one the meta-kernel governs.
      */
     private static final String VALUE_SCHEMA = """
             !!id:"https://example.test/holder-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
             {
               holder => { slot: value }
