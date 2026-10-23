@@ -326,6 +326,11 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **A kind's member list names a minted application.** The refusal of a name at a `kind<type>` slot lists the
+  kind's members, and the list holds `kind_type_type_c430c650`, the entry minted for the application `kind<type>`
+  itself: a `kind_type` instance IS-A `type`, so the construction walk admits it. A minted name is no spelling an
+  author can write (`InternalName`), so `KindMembers` should pass over `@synthetic` entries, in the message's list
+  and in `expected` alike, or the walk should exclude an application's minted entry from every kind.
 - [ ] **The §7.2 refusal names a synthetic by its key.** `VariantSchemaReader` builds its `SubsumptionDiagnostics`
   from the entry name and keeps it through `renamed`, so beside `text_list => [text]` and `r => { t: [text] }`,
   `!r { t: !text_list [a] }` reads "'text_list' is not admissible at a 'array_text_4cc4a482' position". The position

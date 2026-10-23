@@ -1118,14 +1118,17 @@ public final class TsonSchemaLinker {
      */
     public static void checkImportLevel(String importerId, String importerMeta, String importedId,
                                         String importedMeta) {
-        if (isMetaKernelGoverned(importerMeta) == isMetaKernelGoverned(importedMeta)) {
+        boolean importerIsKernelGoverned = isMetaKernelGoverned(importerMeta);
+        if (importerIsKernelGoverned == isMetaKernelGoverned(importedMeta)) {
             return;
         }
-        throw new SchemaValidationException("'" + importerId + "' (its !!meta '" + importerMeta + "') imports '"
-                + importedId + "' (its !!meta '" + importedMeta + "'), but an !!import stands at the importer's "
-                + "governing level, both schemas naming meta-kernel.tn as their !!meta or neither (§2.2.3, §3.1) "
-                + "-- a meta layer reaches the schemas it governs only as their !!meta, and declares the "
-                + "vocabulary its constructors use itself");
+        throw new SchemaValidationException("'" + importerId + "' (its !!meta '"
+                + CanonicalIdentity.canonicalize(importerMeta) + "') imports '" + importedId + "' (its !!meta '"
+                + CanonicalIdentity.canonicalize(importedMeta) + "'), but an !!import stands at the importer's "
+                + "governing level, both schemas naming meta-kernel.tn as their !!meta or neither (§2.2.3, §3.1) -- "
+                + (importerIsKernelGoverned
+                        ? "a meta layer declares the vocabulary its constructors use itself"
+                        : "an ordinary schema reaches a meta-schema's constructors only through its !!meta"));
     }
 
     /**

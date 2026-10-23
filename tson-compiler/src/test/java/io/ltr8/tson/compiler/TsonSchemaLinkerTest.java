@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.*;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.AnnotatedMap;
@@ -723,7 +723,8 @@ class TsonSchemaLinkerTest {
                                            String importedMeta) {
         String message = thrown.getMessage();
         for (String named : List.of("https://example.test/importer.tn", "https://example.test/import.tn",
-                importerMeta, importedMeta, "governing level", "§2.2.3")) {
+                CanonicalIdentity.canonicalize(importerMeta), CanonicalIdentity.canonicalize(importedMeta),
+                "governing level", "§2.2.3")) {
             assertTrue(message.contains(named), () -> named + " in: " + message);
         }
     }
