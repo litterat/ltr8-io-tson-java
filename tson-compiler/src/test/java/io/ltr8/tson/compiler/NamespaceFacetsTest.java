@@ -66,7 +66,8 @@ class NamespaceFacetsTest {
         refused(link("""
                 api => namespace & { key_type: = identifier  value_type: = method  extends?: [type_name] }
                 """), "'api' is a namespace type", "the field 'extends' beside them",
-                "hold that under a key of a namespace type");
+                "declare a record holding 'extends' beside a field typed by the map, and hold that record under a key "
+                        + "of a namespace type");
     }
 
     @Test

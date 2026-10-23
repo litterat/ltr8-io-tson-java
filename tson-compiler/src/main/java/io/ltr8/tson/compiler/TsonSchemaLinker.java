@@ -790,10 +790,8 @@ public final class TsonSchemaLinker {
                 report(receiver, schema, name, schema.positionOf(name), "'" + name + "' is a namespace type, so a "
                         + "value of it is the map its 'key_type' and 'value_type' describe, and it declares "
                         + (beside.size() == 1 ? "the field " : "the fields ") + fields + " beside them, which no "
-                        + "value can carry -- declare a record holding " + (beside.size() == 1 ? "it" : "them")
-                        + " and hold that under a key of a "
-                        + "namespace type ('interface => { extends?: [type_name]  methods: method_map }' under "
-                        + "'interfaces => namespace & { key_type: = identifier  value_type: = interface }')");
+                        + "value can carry -- declare a record holding " + fields + " beside a field typed by the "
+                        + "map, and hold that record under a key of a namespace type");
             }
             Optional<MapBody.Namespace> map = MapBody.ofNamespace(record);
             if (map.isPresent()) {
