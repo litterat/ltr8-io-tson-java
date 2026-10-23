@@ -59,8 +59,8 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   types. A recorded name at a reference-typed slot resolves its first segment in the schema map and each further
   one as a key of a namespace value or a field of a record value, never into a map that is no namespace; the
   referent IS-A `of`, and the value reached is delivered into the host's `Ref<T>` (`Ref.deliver`), a `TypeRef` host
-  taking the name alone. A name whose walk passes a record value's field is judged by type and then reported as a gap
-  (`NOT_IMPLEMENTED`): the value behind the field is not read. A reference in a data document is not yet read: no
+  taking the name alone. A field step reads the record value the read bound, through its binding's descriptor, so
+  a value reached through a field is delivered as one reached by key. A reference in a data document is not yet read: no
   link judges it, so `AtomParsers` refuses to build its reader outside a meta layer and the compile carries that as
   `NOT_IMPLEMENTED` to the read, in tree and bind mode alike. The rule that closes it is the kind's: the name resolves
   in the closure of the document's `!!schema`.

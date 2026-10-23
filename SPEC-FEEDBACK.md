@@ -1215,9 +1215,8 @@ at such a slot, with the slot, and the linker judges that record, so a host decl
 list it might have filed one in decides nothing. A segment selects a key of a namespace value (#23) or a field of a
 record value; a map that is no namespace is not entered, so the service meta's interface is a namespace type,
 `interface => namespace & { … }`. A namespace entry (`orders => !interface { … }`, #23) is the schema's own map,
-entered by key with no host object in the way. A field of a record value reached past a key is judged by its
-declared type; this implementation does not yet deliver the value behind it, and reports such a name as its own gap
-rather than as the author's error.
+entered by key with no host object in the way. A field of a record value reached past a key selects in that value
+as a key does in a map: the name reaches what the field holds, and a field the value does not state names nothing.
 
 **Against the Revision 37 change log.** §5.10 (and the preamble) record "a type slot cannot be bounded at a field"
 as a deferral, and the bounded type slot at a field as withdrawn. This entry does not reinstate it: `request?:
@@ -2131,9 +2130,10 @@ too: the schema map is a `Namespace` typed `schema`, a record's `fields` one typ
 a namespace type binds a `Namespace` where its host declares one and the map where its host declares a map.
 `meta-kernel.tn` declares no `data`, and the Java model has no branch for it: `Top` permits `Type`, `Reference`,
 `TemplateBody` and `Namespace`, and each value of a namespace entry binds to a plain host class the consumer's name
-binder finds. A name whose walk selects a field of a record value past a key is judged by type and reported as this
-implementation's gap. Nothing remains open on where a namespace type is declared or used. Part 2's cached §13.2
-table is not re-stamped here.
+binder finds. A name whose walk selects a field of a record value past a key reads that field of the value there and
+is delivered: `meta-service.tn`'s `service` holds an `interface` in its `methods` field, the shape a namespace type
+cannot take since it declares only its facets, and a binding names `shop.orders.methods.place_order`. Nothing remains
+open on where a namespace type is declared or used. Part 2's cached §13.2 table is not re-stamped here.
 
 ---
 
@@ -2176,7 +2176,10 @@ routes => !bindings { post_orders => { method: orders.place_order  verb: POST  r
 
 Refusals, each where it stands: `method: orders` (an interface, no method); `method: orders.cancel_order` (no key,
 the keys listed); `method: orders.place_order.nope` (a method has no field `nope`); `method: hs.h.headers.accept`
-where `header_set.headers` is `{text => method}` (a map that is no namespace); `r: ref<record>` (a constructor).
+where `header_set.headers` is `{text => method}` (a map that is no namespace); `method: shop.reads.fallback` where
+`service.fallback?: method` is absent from the value under `reads` (a field the value does not state names nothing, as
+a key the map lacks does); `r: ref<record>` (a constructor). The referent's type is judged before the value is, so a
+name wrong by type is refused for its type whatever the value holds.
 
 **A reference in a data document.** `core.tn` declares `ref` beside the kernel's, as it declares `kind`, so an ordinary
 schema types a field `ref<order>` through its core import, and refuses `ref<record>` there as the kernel's does. The
@@ -2203,8 +2206,9 @@ resolved fixture, the corpus's `meta-service.tn` (`interface`, `rpc_interface` a
 `binding.method: ref<method>` held by `bindings`), the vectors above, and the Java host `Ref<T>` carrying the name and
 the delivered value. A host declares nothing: the read records every name at a kind- or reference-typed slot, whatever
 the host component holds there, and the linker judges each by its slot. A name whose walk selects a field of a record
-value is judged by type, every refusal above included, and the value behind the field is not yet delivered: reported
-as this implementation's gap.
+value reads the field of the value the read bound, through the binding's own descriptor, and delivers the value it
+reaches; the corpus's `link-orders-service.tn` holds `service` records under a namespace key, and its vectors name a
+method through a service's `methods` field, a field the record does not declare, and a key that field's map lacks.
 
 ---
 

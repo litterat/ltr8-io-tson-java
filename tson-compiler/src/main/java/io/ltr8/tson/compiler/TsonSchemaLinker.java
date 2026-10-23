@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.CanonicalIdentity;
@@ -199,16 +200,32 @@ public final class TsonSchemaLinker {
         }
         // The bootstrap is this library's own artifact, not user input, so it is linked under the default
         // rather than under whatever a caller configured -- a policy should not be able to break meta-kernel.
-        return linkWith(bootstrap, null, null, IdentifierPolicy.defaults());
+        return linkWith(bootstrap, null, null, IdentifierPolicy.defaults(), null);
     }
 
+    /**
+     * Links {@code schema}, throwing at the first entry that fails, with no bind context: a value by name whose walk
+     * selects a field of a record value cannot be read, so a schema whose namespace values are named through a field
+     * is linked with the context they were bound under ({@link #link(TsonSchema, TsonSchemaLoader, IdentifierPolicy,
+     * DataBindContext)}).
+     */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
-        return linkWith(schema, loader, null, IdentifierPolicy.defaults());
+        return linkWith(schema, loader, null, IdentifierPolicy.defaults(), null);
     }
 
     /** {@link #link(TsonSchema, TsonSchemaLoader)} with the §5.2 restriction level for declared names chosen. */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, IdentifierPolicy identifiers) {
-        return linkWith(schema, loader, null, identifiers);
+        return linkWith(schema, loader, null, identifiers, null);
+    }
+
+    /**
+     * {@link #link(TsonSchema, TsonSchemaLoader, IdentifierPolicy)} with {@code values}, the bind context the
+     * resolver bound {@code schema}'s namespace values under: a value by name whose walk selects a field of a record
+     * value reads the field through that context's descriptor of the value's class ({@code ValuesByName}).
+     */
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, IdentifierPolicy identifiers,
+                                        DataBindContext values) {
+        return linkWith(schema, loader, null, identifiers, Objects.requireNonNull(values, "values"));
     }
 
     /**
@@ -238,7 +255,15 @@ public final class TsonSchemaLinker {
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
                                         DiagnosticsReceiver receiver, IdentifierPolicy identifiers) {
         Objects.requireNonNull(receiver, "receiver");
-        return linkWith(schema, loader, receiver, identifiers);
+        return linkWith(schema, loader, receiver, identifiers, null);
+    }
+
+    /** The reporting overload with the bind context the namespace values were bound under, as for throwing. */
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
+                                        DiagnosticsReceiver receiver, IdentifierPolicy identifiers,
+                                        DataBindContext values) {
+        Objects.requireNonNull(receiver, "receiver");
+        return linkWith(schema, loader, receiver, identifiers, Objects.requireNonNull(values, "values"));
     }
 
     /**
@@ -606,7 +631,8 @@ public final class TsonSchemaLinker {
 
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
-                                             DiagnosticsReceiver receiver, IdentifierPolicy identifiers) {
+                                             DiagnosticsReceiver receiver, IdentifierPolicy identifiers,
+                                             DataBindContext values) {
         Map<String, String> origins = new LinkedHashMap<>();
         Map<String, Normalization> enumForms = new LinkedHashMap<>();
         Map<String, Top> nameTypes = new LinkedHashMap<>();
@@ -751,7 +777,7 @@ public final class TsonSchemaLinker {
             }
         }
 
-        checkValuesByName(schema, merged, facts, origins, localNames, governingMeta, loader, receiver);
+        checkValuesByName(schema, merged, facts, origins, localNames, governingMeta, loader, values, receiver);
         checkEveryEntryIsInhabited(schema, merged, facts, applications, localNames, receiver);
         checkRecordExtension(schema, merged, facts, applications, localNames, origins, enumForms, receiver);
 
@@ -844,16 +870,17 @@ public final class TsonSchemaLinker {
                                           Map<String, TsonSchema.EntryFacts> facts,
                                           Map<String, String> origins, Set<String> localNames,
                                           Optional<TsonLinkedSchema> governingMeta, TsonSchemaLoader loader,
-                                          DiagnosticsReceiver receiver) {
+                                          DataBindContext values, DiagnosticsReceiver receiver) {
         if (governingMeta.isEmpty()) {
             return; // only meta-kernel links without a registered meta, and it declares no value entry
         }
-        ValuesByName values = new ValuesByName(schema, merged, facts, origins, governingMeta.get(), loader);
+        ValuesByName judged = new ValuesByName(schema, merged, facts, origins, governingMeta.get(), loader,
+                values);
         for (String name : localNames) {
             Top definition = merged.get(name);
             List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
             if (held != null && definition instanceof Namespace<?>) {
-                values.check(name, held,
+                judged.check(name, held,
                         refused -> reportOrThrow(receiver, schema, name, facts, refused.getMessage(), refused),
                         gap -> {
                             if (receiver == null) {

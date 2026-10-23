@@ -76,6 +76,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
 
     private final TsonSchemaRegistry schemaRegistry;
     private final ValueReaderFactoryResolver resolver;
+    /** What {@link #resolver} binds with, and so what every namespace value the resolver reads is bound under. */
+    private final DataBindContext context;
     private final SchemaSource source;
     private final Map<String, TsonCompiledMetaSchema> compiled = new LinkedHashMap<>();
     // Content hash per canonical identity, recorded when an identity is first resolved. Every
@@ -162,6 +164,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
                                       SchemaSource source) {
         this.schemaRegistry = schemaRegistry;
         this.resolver = ValueReaderFactoryRegistry.bind(context);
+        this.context = context;
         this.source = source;
     }
 
@@ -247,7 +250,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         if (isMetaLayer(resolved)) {
             register(resolved, loadMeta(document.meta()));
         } else {
-            schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry));
+            schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry, IdentifierPolicy.defaults(),
+                    context));
         }
     }
 
@@ -425,8 +429,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             SchemaDocument document = parser.parseSchemaDocument();
             crossCheckId(document, uri, identity);
             TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.schemaPositions());
-            return schemaRegistry.registerIfAbsent(
-                    TsonSchemaLinker.link(resolved, schemaRegistry, identifierPolicy));
+            return schemaRegistry.registerIfAbsent(link(resolved));
         }
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         Optional<SchemaDocument> parsed = parser.parseSchemaDocument(problems);
@@ -439,14 +442,28 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         TsonSchema resolved = new SchemaResolver(this)
                 .resolveSchema(document, parser.schemaPositions(), problems);
         if (problems.isEmpty()) {
-            TsonLinkedSchema linked =
-                    TsonSchemaLinker.link(resolved, schemaRegistry, problems, identifierPolicy);
+            TsonLinkedSchema linked = link(resolved, problems);
             if (problems.isEmpty()) {
                 return schemaRegistry.registerIfAbsent(linked);
             }
         }
         problems.diagnostics().forEach(receiver::report);
         return null;
+    }
+
+    /**
+     * Links {@code resolved}, a schema this registry's resolver read, against the schemas registered here, under
+     * {@link #identifierPolicy} and the bind context its namespace values were bound under, which a value named
+     * through a record value's field is read by ({@link TsonSchemaLinker#link(TsonSchema,
+     * io.ltr8.tson.schema.TsonSchemaLoader, IdentifierPolicy, DataBindContext)}). Throws at the first failing entry.
+     */
+    public TsonLinkedSchema link(TsonSchema resolved) {
+        return TsonSchemaLinker.link(resolved, schemaRegistry, identifierPolicy, context);
+    }
+
+    /** {@link #link(TsonSchema)} reporting each failing entry through {@code receiver} instead of throwing. */
+    public TsonLinkedSchema link(TsonSchema resolved, DiagnosticsReceiver receiver) {
+        return TsonSchemaLinker.link(resolved, schemaRegistry, receiver, identifierPolicy, context);
     }
 
     /**
@@ -488,7 +505,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      *                       always a previous call's own {@link #get} result
      */
     public synchronized TsonCompiledMetaSchema register(TsonSchema schema, TsonCompiledMetaSchema governingMeta) {
-        TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(schema, schemaRegistry));
+        TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(schema, schemaRegistry,
+                IdentifierPolicy.defaults(), context));
         if (!isMetaLayer(registered.schema())) {
             throw new IllegalStateException("register is for meta-layer schemas only, but '"
                     + registered.schema().id() + "' is not one (its !!meta is not meta-kernel) -- a non-meta "
