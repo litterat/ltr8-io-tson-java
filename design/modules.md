@@ -41,7 +41,11 @@ module has a real `module-info.java`; module names mirror each module's root exp
   through others: `getDescriptor` hands a re-entrant call a deferred supplier and each holder keeps it in a
   final `Memoized`, so laziness is confined to the cyclic edge and every other component still resolves
   eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` → `ScopedValue` →
-  `DataValue`), which is what lets a held template body be written at all.
+  `DataValue`), which is what lets a held template body be written at all. **A generic record is described at its
+  arguments**: a component's declared type has the class's type parameters replaced by the arguments it is
+  described at (`TypeArguments`, `DefaultRecordBinder.resolveRecord(context, class, parameterizedType)`), so
+  `Namespace<RecordField>` binds `entries` as a map of `RecordField`; a type variable left in place has no
+  descriptor, so a raw generic record is still not describable.
 - **`tson-schema`** — `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
   records/sealed interfaces/enums, §8's `Top` and its bodies, `TsonSchema`; `Top` is sealed except for its one
   deliberately open branch, `Data`, which a consumer's own class implements — see below). **The host value

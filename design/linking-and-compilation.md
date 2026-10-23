@@ -19,7 +19,7 @@ Current form only; history lives in git.
   a constructor, are judged by resolution and arity alone (`constructors == null`). `design/references.md` has the account.
 - A value by name (`TsonSchema.valuesByName`, collected by the read) resolves its first segment in the schema's own
   merged namespace, alias hops followed, never the meta's; each further segment selects in the value reached, a key
-  of a `Namespace` entry or a field of a record value; the referent's declared type must IS-A the slot's, compared
+  of a `Namespace` value or a field of a record value; the referent's declared type must IS-A the slot's, compared
   by canonical identity. Local entries only, after
   `validateEntry`, which skips a by-name reference a body also returns from `references()` (matched by identity).
 - `entryOrigins`, `enumForms`, `nameTypes` and `namespaces` are on `TsonLinkedSchema`, never on `TsonSchema` or an
@@ -431,7 +431,10 @@ before a reader is built, and it is linking's.
 - **The reader is the map's.** `TsonSchemaCompiler` and `JsonSchemaCompiler` ask `linked.namespace(name)` and hand its
   `read()` to the `map` factory, so neither encoding's factory table has a `namespace` entry and `SchemaMetaNameBinder`
   binds no `namespace` class; `Subsumption.guard` still gets the entry's own definition. In bind mode the map is an
-  `AnnotatedMap`, keeping its keys' annotations and order (`MapBindReader`). `ValuesByName` reads a type's
+  `AnnotatedMap`, keeping its keys' annotations and order (`MapBindReader`), delivered as a `Namespace` where the
+  host component is one and as the map where the host declares a `Map` (`design/meta-layer-data-kind.md`); the
+  schema map (`TsonSchema.entries`) and a record's `fields` (`RecordBody.fields`) are `Namespace` values, typed
+  `schema` and `field_map`. `ValuesByName` reads a type's
   body through the same accessor (`map()`, the declared key family), and `isNamespace` is that accessor being present.
   Before linking, `ParameterTypes` reads the governing meta's namespace types (a record's `fields` among them) as their
   maps directly, the meta's `namespace` being the kernel's.
@@ -475,13 +478,15 @@ by the walk below, and the value it reaches is delivered into the host's `Ref` c
   `ReferenceChain`), and never in the meta's namespace (§3.3.2); a member is reached through its entry, so `method:
   place_order` is unresolved even though `orders` holds a key of that name. Nothing is looked up lexically, and nothing
   is a choice among candidates: found first, judged after.
-- **Each further segment selects in the value reached**, never in a declaration: a key of a namespace entry's
-  `entries()`, the value reached being of the constructor's `value_type`; a field of a record (read through the bound
+- **Each further segment selects in the value reached**, never in a declaration: a key of a namespace value — a
+  `Namespace` entry, or a `Namespace` reached as a component (a record value's `fields`) — the value reached being of
+  the constructor's `value_type`; a field of a record (read through the bound
   value's record components, named as binding names them, `Optional` unwrapped); a key of a map. A
   type entry admits no further segment (`order.sku` is refused; projecting into a record type's fields is a
   different capability, left with `discriminators` and `scope`), an open entry is no referent (a template denotes
   no value until applied), and a list has no named members (`…errors.x` is refused: a segment never selects a
-  position). A map is entered only where it is a value of a namespace type, read as the map linking records for it; a
+  position). A map is entered only where it is a value of a namespace type, read as the map linking records for it (a
+  data body's host may declare a plain map for a namespace-typed component, entered the same way); a
   map that is no namespace, `{text => method}`, is not entered whatever its key type. A body whose class is no
   Java record cannot be entered at all, which is this library's gap (`UnsupportedOperationException`). **Entering a
   data body goes through the host's object**: `data` is opaque to the type system and the host's to interpret, so

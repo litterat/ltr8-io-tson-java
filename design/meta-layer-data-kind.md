@@ -31,9 +31,18 @@ history lives in git.
   the constructor it is an instance of (it carries no `@Typename`, so `TsonSchema.constructorOf` and
   `TsonCompiledMetaSchema.typenameOf` read `type`), `entries` is the map with each key's annotations and the order
   written, and `EntryKind.of` gives `NAMESPACE`. It is a value and never a type.
-- A qualified name's further segment selects a key of a `Namespace` entry's `entries()` through the schema, the value
-  reached being of the constructor's `value_type`; it reads a `Data` body's record components through the host's
-  object, and that hop is the one `data`'s retirement removes.
+- The model holds every value of a namespace type as a `Namespace`: an entry applying one, and the kernel's own two,
+  the schema map (`TsonSchema.entries`, typed `schema`) and a record's fields (`RecordBody.fields`, typed
+  `field_map`). `Namespace` has its map's read API and is no `Map`, since a binder or writer testing `instanceof Map`
+  would lose the constructor. Its equality is `type`, the entries as a map and each key's annotations, never order:
+  order is the constructor's `ordered` facet, so `RecordBody` compares its `field_map` in order itself.
+- A read delivers a `Namespace` at four places and nowhere else: the meta's constructor reader for a namespace type
+  (an `!api { … }` entry), `top`'s tag dispatcher, a namespace-typed slot whose host component is a `Namespace`
+  (`BindTargets`), and a root read asked for `Namespace.class`. Everywhere else a namespace type reads as its map: a
+  host declaring a `Map` asks for the map, and only a declared `Namespace` names the constructor.
+- A qualified name's further segment selects a key of a namespace value through the schema — a `Namespace` entry, or
+  a `Namespace` reached as a component — the value reached being of the constructor's `value_type`; it reads a `Data`
+  body's record components through the host's object, and that hop is the one `data`'s retirement removes.
 
 Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/compiled-registries.md`,
 `design/schema-resolution.md`.
@@ -54,8 +63,8 @@ schema's own `data` is an ordinary record, and a chain reaching two of them is r
 model mirrors it: `schema.meta.Type` is the sealed interface `Atom`, `Product` and `Sum` extend, between them and
 `Top`, so a body is a type exactly when it is an `instanceof Type`; `Data` and `Reference` implement `Top` directly,
 and so does `TemplateBody`, which carries no chain. A namespace type resolves to a `RecordBody` of the facets it states,
-kind `NAMESPACE`, and its values are read through the `MapBody` linking derives from it; an entry that is one of those
-values is a `Namespace`, which implements `Top` directly too (below). The motivating case is an
+kind `NAMESPACE`, and its values are read through the `MapBody` linking derives from it; a value of one, an entry
+among them, is a `Namespace`, which implements `Top` directly too (below). The motivating case is an
 HTTP operation, which must sit at the schema layer because that is the only layer able to name request and response
 types *by name*.
 
@@ -90,9 +99,10 @@ types *by name*.
   data document is not yet read (`NOT_IMPLEMENTED`).
 - **A segment's type walk is schema-directed; so is its value walk, except inside a `Data` body.** The linker follows
   the declared types (a record's fields to a field's type, a namespace type to its pinned `value_type`, read off the
-  map linking records for it) and enters a map only where it is a value of a namespace type. A `Namespace` entry is
-  entered by key: the first further segment selects in `entries()` and the value reached is of the constructor's
-  `value_type`, so `handler: myapi.get_orders` reaches the `method` value and is delivered into the host's `Ref`. A
+  map linking records for it) and enters a map only where it is a value of a namespace type. A namespace value is
+  entered by key — a `Namespace` entry, a `Namespace` component (a record value's `fields`), or the plain map a data
+  body's host declares for a namespace-typed component — and the value reached is of the constructor's `value_type`,
+  so `handler: myapi.get_orders` reaches the `method` value and is delivered into the host's `Ref`. A
   `Data` body is opaque to the type system, so there the value at each step is read off the host's record components,
   a tagged subtype followed through the value's own class where a record family base lacks the field; that hop goes
   with `data` (BACKLOG). A segment past a namespace key selects a field of the record value reached, read off its
@@ -123,15 +133,22 @@ types *by name*.
   would never match. A namespace entry writes as written, `myapi => !api { get_orders => { response: order_list } }`:
   the tag is the value's `type`, which no Java class names, so `DataClassObjectWriter` writes a `Namespace` through
   `Top`'s descriptor and emits the map itself, each key with its annotations, bare where it is an identifier and
-  quoted otherwise, each value tagged only where its class carries `@Typename`. It reads back through `top`'s tag
-  dispatcher, which delivers a `Namespace` where the tag selects a namespace type (`design/record-dispatch.md`).
-- **A namespace entry is read in bind mode, and two readers build the `Namespace`.** A namespace type's own reader is
+  quoted otherwise, each value tagged only where its class carries `@Typename`. The tag is written where the position
+  admits more than one constructor (`top`, a union); at a slot whose host types it as a `Namespace` the slot's type
+  already names the constructor, so the map is written untagged (`fields: { name => … }`). It reads back through
+  `top`'s tag dispatcher, which delivers a `Namespace` where the tag selects a namespace type
+  (`design/record-dispatch.md`).
+- **A namespace value is read in bind mode, and four places build the `Namespace`.** A namespace type's own reader is
   its map's (`design/linking-and-compilation.md`), and in bind mode it yields an `AnnotatedMap`, keeping each key's
-  annotations and order (`MapBindReader`). Where the position is the entry itself, the map becomes an instance of
-  the constructor: the meta's constructor reader for a namespace type is that map reader wrapped in
-  `NamespaceInstanceReader`, which is what `!api { … }` as an entry reads through; and resolved output read at `top`
-  wraps the same way in `RecordTagDispatchReader`. A position typed by a namespace type (`methods: method_map`, a
-  record's `fields`) still binds the plain map; the schema map and `fields` becoming `Namespace` is BACKLOG.
+  annotations and order (`MapBindReader`, which also carries the name of the constructor it reads). The map becomes
+  an instance of the constructor, wrapped in `NamespaceInstanceReader`, where the position asks for one: the meta's
+  constructor reader for a namespace type, which is what `!api { … }` as an entry reads through; `top`'s tag
+  dispatcher (`RecordTagDispatchReader`), for resolved output; a namespace-typed slot whose host component is a
+  `Namespace`, where `BindTargets` rebinds the map reader to the component's `entries` and wraps it, which is how a
+  record's `fields` binds; and a root read asked for `Namespace.class` (`TsonObjectReader`). A host declaring a
+  `Map` at a namespace-typed slot (`methods: method_map` as `Map<String, Method>`) receives the map: the declared
+  class is the host's statement of what it wants, and only a declared `Namespace` names the constructor. A
+  `Namespace` component at a map that is no namespace has no constructor to name and is a bind mismatch.
 - **A meta-schema keeps a constructor this library cannot build a reader for**, its factory standing in as
   an `ErrorReader` carrying the real cause (`TsonCompiledMetaSchema`'s `unbuildable`). Dropping it would lose
   the constructor from the scoped vocabulary silently, so a governing meta would compile and register looking

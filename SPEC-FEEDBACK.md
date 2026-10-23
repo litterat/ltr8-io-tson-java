@@ -1043,8 +1043,8 @@ not change. A template's held body spells its record the same way: `<T> { x: T }
 
 **Status against Revision 37:** open; running on `r2026-38-proposal`. `meta-kernel.tn` declares `field_map` and the
 new `record_field`; the resolved fixtures carry both (`ResolvedFixtureTest`), and the bundled schemas are restamped.
-The Java value model mirrors it: `RecordField` has no name, and `RecordBody.fields` is a `SequencedMap<String,
-RecordField>` whose order `RecordBody.equals` compares. The resolver, the linker, held template bodies and both
+The Java value model mirrors it: `RecordField` has no name, and `RecordBody.fields` is a `Namespace<RecordField>`, a
+value of `field_map` (#23), whose order `RecordBody.equals` compares. The resolver, the linker, held template bodies and both
 encodings' readers key fields by name; the corpus restates every explicit record and every resolved output in the
 map form and adds vectors for the explicit form, its duplicate key, and declaration order. Part 2's cached §13.2
 table is not re-stamped here.
@@ -2115,10 +2115,11 @@ corpus's `meta-service.tn` declares `method_map`, `rpc_map` and `verb_map` by co
 types a field by a kernel-governed `meta-headers.tn`'s `headers`, importing no core. An entry `myapi => !api { … }`
 resolves to the map, refused at every type position, entered by key by a qualified name at a `ref<T>` slot, listed by
 `kind<api>` and `kind<namespace>`, and written and read back in resolver output as written; the corpus's `meta-api.tn`
-declares `api` and its vectors cover each. What remains: `data`'s retirement and the second reading above, neither
-running; and in this implementation the schema map and a record's `fields`, values of the kernel's two namespace types,
-are not yet held as namespace values, so a position typed by a namespace type still binds a plain map. Part 2's cached
-§13.2 table is not re-stamped here.
+declares `api` and its vectors cover each. The Java model holds the kernel's two namespace values as namespace values
+too: the schema map is a `Namespace` typed `schema`, a record's `fields` one typed `field_map`, and a position typed by
+a namespace type binds a `Namespace` where its host declares one and the map where its host declares a map. What
+remains: `data`'s retirement and the second reading above, neither running. Part 2's cached §13.2 table is not
+re-stamped here.
 
 ---
 

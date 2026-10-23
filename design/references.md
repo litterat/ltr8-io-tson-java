@@ -109,7 +109,8 @@ map.
 | `!I ^ { … }` head | reference | type-name namespace | an atom instance, never the family's constructor | resolver |
 | `A & B` operand, `A - { … }` source | reference | type-name namespace | a constructor or a record type | resolver |
 
-The schema map and a record's `fields` are values of the kernel's two namespace types, `schema` and `field_map`. A
+The schema map and a record's `fields` are values of the kernel's two namespace types, `schema` and `field_map`,
+and in Java each is a `Namespace` (`TsonSchema.entries`, `RecordBody.fields`). A
 namespace type is a constructor composed over `namespace` stating its facets (`field_map => namespace & { key_type?: ~
 field_name  value_type: = record_field  ordered?: = true }`), and a value of one is written and read as a map from its
 `key_type` to its `value_type`, never as a record of those facets (`TsonLinkedSchema.namespace`). Its keys are the key

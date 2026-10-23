@@ -184,9 +184,13 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
     - **An ordered map needs a component that keeps insertion order** (`DataClassMap.ordered()`: a `SequencedMap`
       that is not a `SortedMap`, or `AnnotatedMap`), or the order the document wrote is lost; a bare `Map` is
       built as a `HashMap` and does not. The check runs one way only: an unordered map binds to either kind,
-      since keeping its order loses nothing, and `TsonSchema.entries` is exactly that case. Both readers make it
+      since keeping its order loses nothing, and the schema map's `AnnotatedMap` is exactly that case. Both readers make it
       at every depth (`BindTargets` in the TSON reader, `BindMapBuilder.forTarget` in `tson-json`), and a map
       read with no component to declare a class is built as a `LinkedHashMap` when it is ordered.
+    - **A `Namespace` component binds a namespace type's map, and nothing else** (`BindTargets`): the map is read
+      for the component's own `entries` and delivered as an instance of the constructor the position names. A map
+      that is no namespace has no constructor to name, so a `Namespace` there is a mismatch; a `Map` component at a
+      namespace type receives the map, since a host declaring a map asks for one.
     - The converse — a component no field fills — is refused at compile too: it reaches the constructor as
       `null` on every document. `@Unbound` is how a class says a component is its own and not the wire's,
       needed exactly once here (`RecordField.position`, this implementation's own addition for

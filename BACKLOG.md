@@ -61,16 +61,17 @@ own prose (which had gone stale on it):
   index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
   application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
-- [ ] **The kernel's namespace values as `Namespace`, and `data` retired** (SPEC-FEEDBACK.md #23,
-  `namespace-sketch/PLAN.md`). An entry `myapi => !api { ... }` is a `Namespace`; the kernel's own two namespace
-  values are not. Hold the schema map (`TsonSchema.entries`) and a record's `fields` (`RecordBody.fields`) as
-  `Namespace`, and have a position typed by a namespace type (`methods: method_map`) bind one, where today it binds
-  the plain map (`MapBindReader`'s `AnnotatedMap`) and only an entry or resolved output read at `top` is wrapped
-  (`NamespaceInstanceReader`, `RecordTagDispatchReader`). Then retire `data`: once a value lives under a namespace
-  rather than in a data constructor's instance, the host-object hop (`ValuesByName.component`) and `Data`'s open
-  branch go. Settle with the spec whether a user schema may declare a namespace type (#23's composition-operand
-  reading): today only a kernel-governed one can, and a schema typing a field by it cannot also import core.tn. Lands
-  on `r2026-38-proposal` before the branch goes to the reviewer.
+- [ ] **`data` retired, and where a namespace type may be declared** (SPEC-FEEDBACK.md #23,
+  `namespace-sketch/PLAN.md`). Retire `data`: once a value lives under a namespace rather than in a data
+  constructor's instance, the host-object hop (`ValuesByName.component`) and `Data`'s open branch go. Settle with
+  the spec whether a user schema may declare a namespace type (#23's composition-operand reading): today only a
+  kernel-governed one can, and a schema typing a field by it cannot also import core.tn. Lands on
+  `r2026-38-proposal` before the branch goes to the reviewer.
+- [ ] **JSON bind delivers a `Namespace` at a namespace-typed slot.** The TSON reader builds one where the host
+  component is a `Namespace` (`reader.BindTargets`, over a `MapBindReader` that carries the constructor's name);
+  `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
+  component there is a bind mismatch. Nothing in the JSON stack binds `schema.meta` today, so nothing fails yet; a
+  JSON reading of resolved output, a record's `fields` among it, would.
 - [ ] **Whether a kind admits an abstract type** (SPEC-FEEDBACK.md #22). `kind<record>` holds every type built with
   `record` (`KindMembers.isMember`), so it holds an abstract record (`pet => abstract { ... }`) and a record template's
   family base (`boxed => <T> { v: T }`), neither of which has instances of its own: a document writing `payload_type:
@@ -284,7 +285,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 - [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
   through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
-  `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
+  `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`Namespace.getAnnotations`) and survives
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => top}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else

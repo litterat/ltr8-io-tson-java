@@ -158,7 +158,7 @@ meta the way an author-written annotation is: there is no author to resolve agai
   author wrote depends on.
 - **Key position, per §6.** An annotation before a declared name is metadata *about the declaration*, and a
   resolved schema is a `{type_name => top}` — so the marker lands on the map's key, which
-  `TsonSchema.entries()` keeps reachable through `AnnotatedMap.getAnnotations(name)`, never on the
+  `TsonSchema.entries()` keeps reachable through `Namespace.getAnnotations(name)`, never on the
   entry's value. §6 forbids hoisting between the two positions and nothing here does.
 - **Marked: exactly the synthetic entries, from both channels.** The desugar lift produces them and
   `SchemaDesugarer.lifted` names them as the document's own set difference

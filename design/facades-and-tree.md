@@ -182,7 +182,9 @@ admit UTS #39's own `Toys-Я-Us`.
   scopes `ctx.field`/`ctx.index` as it descends, so a diagnostic carries a real RFC 6901 path.
 - **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
   already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`
-  reported *before* the value is read, not a cast failure after.
+  reported *before* the value is read, not a cast failure after. A root typed by a namespace type reads as its map;
+  asked for `Namespace.class`, the map is delivered as an instance of the constructor the root names
+  (`NamespaceInstanceReader`).
 - **Both tree read paths capture wire annotations** onto each node's `annotations()`, at every position §3.1
   permits one (root, record field value, array element, both sides of a map entry, and recursively an
   annotation's own value). `AnnotationCapture` (in `reader`) is the shared helper: an annotation's value

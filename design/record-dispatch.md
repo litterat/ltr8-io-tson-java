@@ -43,7 +43,8 @@ play, so no family-base position reaches it.
   the failure lands before the record's shape is consulted. A tag selecting a namespace type (resolved output's
   `myapi => !api { … }` read at `top`) reads the map that type reads as and delivers it as an instance of the
   constructor, a `Namespace` (`RecordTagDispatchReader.namespaces`, `NamespaceInstanceReader.instance`); a position
-  typed by the namespace type itself reads the bare map.
+  typed by the namespace type itself reads the map, delivered as a `Namespace` only where its host component is one
+  (`BindTargets`, `design/meta-layer-data-kind.md`).
 - **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up.
 
 **One reader for both modes**, on `ChoiceReader`'s reasoning — dispatch reads the type-ref without consuming
