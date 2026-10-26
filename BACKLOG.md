@@ -108,27 +108,14 @@ it — and no schema declares one, so nothing in this stack reads a schema-side 
 written. A record is closed under its type and open-ended data is a declared map-typed field, identically in both
 encodings ([TSON-JSON] §6.1.1).
 
-- [ ] **A key-sorted JSON document with a `$`-named field loses its tag — [TSON-JSON] §3.3.** §3.3 requires `$type`
-  (after any `$schema`) to lead its object and argues that code-point sorting preserves that; with `record.name_type`
-  admitting `$ref`, `$id` and `$defs` as field names, those sort first, so RFC 8785 canonical output of a tagged
-  value — `{"$ref": "#/a", "$type": "sub", …}` — is refused as a misplaced `$type`. The leading-`$type` rule itself
-  is expected to be relaxed, so settle that first, then decide what the reader admits: the annotation members
-  anywhere within the object's leading run of `$`-named members (a run bounded by the record's declared `$` fields,
-  so the lookahead stays fixed by the schema), or the sorting claim withdrawn.
-
-- [ ] **A record declaring `$schema`, `$type` or `$value` encodes to JSON that reads back as something else.**
-  [TSON-JSON] §3.2 says a schema SHOULD NOT declare one of the three, and a record that does obscures it on read
-  (`JsonFieldNameTypeTest.aRecordDeclaringATagMemberObscuresIt`); written, its value is a JSON object whose leading
-  `$type` member is taken as a tag, which principle 5 ("never a silent drop") and the Class 3 equivalence rule do not
-  allow. For review: make it a JSON encode error while the schema stays legal (a TSON-only schema may want the
-  field), or refuse the schema outright, and make §3.2 a MUST either way.
-
-- [ ] **How an enum whose members can begin with a digit encodes in JSON — [TSON-JSON] §5.2.** A name type may admit
-  a leading digit, which makes an enum over it number-class (`ports => !enum_type { name_type: digits  members: ["80"
-  "443"] }`; `(ports | integer)` with `@disjoint` is refused), and §5.2's headline (number-class encodes as a JSON
-  number) contradicts its next sentence (a member beyond the identifier grammar encodes as a string); an enum whose
-  members span classes is not covered. Candidate rule: an enum always encodes as a JSON string, its members being
-  names, while its class stays its members' for TSON's disjointness.
+- [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 39.** §3.3 requires `$type` (after any `$schema`)
+  to lead its object and argues that code-point sorting preserves that; with `record.name_type` admitting `$ref`,
+  `$id` and `$defs` as field names, those sort first, so RFC 8785 canonical output of a tagged value —
+  `{"$ref": "#/a", "$type": "sub", …}` — is refused as a misplaced `$type`. Decided: the reader admits the annotation
+  members anywhere within the object's leading run of `$`-named members, a run bounded by the record's declared `$`
+  fields so the lookahead stays fixed by the schema. Implement it in the JSON readers (`RecordPlan`,
+  `DispatchChoiceReader`, `DispatchScopedReader`) and edit §3.3 with it, as a Revision 39 proposal; Revision 38
+  keeps the strict lead.
 
 - [ ] **A JSON document has no in-band way to name its schema — §3.4's second route.** The out-of-band route
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
