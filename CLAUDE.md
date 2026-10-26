@@ -57,12 +57,12 @@ build time, and `spec/tson-part3-json.md` is edited in place.
 table in `spec/` is the one pin it does not write. Keep `spec/m/*-resolved.tn` in step — `ResolvedFixtureTest` checks
 them. `design/process.md` has the procedure, and the rules for what a schema's `@doc` may say.
 
-**Branches.** `main` is the reference implementation of the *published* revision (37): identities `/2026/37/m/`,
-version `0.37.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`), each added
-when the next revision merges. **`r2026-38-proposal` is open**, with a corpus branch of the same name, for work the
-published spec cannot carry; it carries Revision 38 identities (`/2026/38/m/`) and version `0.38.0-SNAPSHOT`, and
-merges when the spec lands and not before. Proposal work branches off it and PRs into it; work Revision 37 can carry
-still goes to `main`. Check the branch before quoting identities or the version. `design/process.md` has the procedure.
+**Branches.** `main` is the reference implementation of the *published* revision (38): identities `/2026/38/m/`,
+version `0.38.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`, `r2026-37`),
+each added when the next revision merges. **No proposal branch is open.** Work the published spec cannot carry goes
+on `r2026-NN-proposal`, with a corpus branch of the same name, carrying the next revision's identities and version
+from its first commit and merging when the spec lands and not before; work the published revision can carry goes
+to `main`. Check the branch before quoting identities or the version. `design/process.md` has the procedure.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** No published releases, every version
 `-SNAPSHOT`. So correctness wins over stability every time: a wrong rule gets fixed, a bad name changed rather than
