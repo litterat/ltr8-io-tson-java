@@ -10,7 +10,8 @@ import java.util.Optional;
  * Parses a reference -- an instance of the meta-kernel's {@code ref_type}, the atom whose values are qualified names
  * naming a value. A value is a qualified name: segments between dots, each a [TSON-DATA] §7.7 identifier read as the
  * kernel's {@code type_name} reads it, none empty. What the name reaches is judged where it resolves, when the schema
- * links, never here; and a reference in a data document is not yet read, so this parser serves schema documents only.
+ * links, never here. A reference is declared only in a kernel-governed schema, so this parser reads schema documents
+ * alone.
  *
  * <p>Not part of Part 1's published built-in vocabulary (§5), like {@link KindParser}.
  */

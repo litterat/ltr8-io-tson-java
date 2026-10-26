@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=48699b346722c105f886b5beac011865fd4b61ec42f920133e45d8c030e77d23"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=44c9268cd1d42875fe7eb002e4968a51be6b18cc7ba3409e8a558f54b718760f"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -941,8 +941,11 @@
 
     `of` names a type of the writer's own namespace, never a constructor: a
     reference to a type is a kind (`kind<record>`), and `ref<record>` is a
-    resolver error at the declaration. A reference in a data document is not
-    yet read.
+    resolver error at the declaration.
+
+    A reference is declared only in a schema whose `!!meta` is this
+    meta-kernel, since only there does an entry hold a value. A schema that
+    governs data declares only types, so it has nothing a reference could name.
     """
   ref_type => atom & {
     of: type_name

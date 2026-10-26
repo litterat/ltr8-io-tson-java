@@ -19,8 +19,8 @@
   (`integer_type`, `decimal_type`, `float_type`, `complex_type`, ...)
   likewise name meta- and kernel-level entries.
 
-  The open entries (`extern_of`, `extern_type`, `set`, `kind`, `ref`,
-  `tuple1`, `voidable_tuple1`) hold their bodies — the application as written,
+  The open entries (`extern_of`, `extern_type`, `set`, `kind`, `tuple1`,
+  `voidable_tuple1`) hold their bodies — the application as written,
   unread until materialisation substitutes the parameters away — so a
   token in one is a parameter reference rather than a value of the
   slot's declared type (Section 8.1's shadowing rule). A processor comparing these compares wire
@@ -145,8 +145,6 @@
   set => !template { parameters: [{ name: T  type: type_kind }]  template: "!set_type { element_type: T }" }
 
   kind => !template { parameters: [{ name: T  type: type_name }]  template: "!kind_type { of: T }" }
-
-  ref => !template { parameters: [{ name: T  type: type_name }]  template: "!ref_type { of: T }" }
 
   tuple1 => !template { parameters: [{ name: T  type: type_kind }]  template: "!tuple { elements: [{ element_type: T }] }" }
 

@@ -50,20 +50,20 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
   the name, and what is no name is refused there as a `TypeRef` host's reader refuses it.
 - A slot that names a value is typed `ref<T>` (`ref_type => atom & { of: type_name }`, `ref => <T> !ref_type { of: T }`).
   Its value is a qualified name; `of` is a type of the writer's namespace, never a constructor (`ref<record>` is
-  refused: that is `kind<record>`; in an ordinary schema, whose namespace holds no constructor, the linker finds the
-  name in the structure namespace and refuses it the same way). A slot typed by a record holds the record's value
-  inline and takes no name. core.tn declares a sibling `ref`, as it does `kind`, so an ordinary schema reaches it
-  through its core import.
+  refused: that is `kind<record>`). A slot typed by a record holds the record's value inline and takes no name.
+- A reference is kernel vocabulary, declared only in a kernel-governed schema: it names an entry holding a value, and
+  only a schema that can declare a namespace type has one; a schema governing data declares only types. core.tn
+  declares no `ref`, and the type-name namespace is not inherited through `!!meta`, so `ref<order>` in an ordinary
+  schema is an unresolved name. The constructor applied directly, `!ref_type { of: order }`, which the structure
+  namespace supplies, is refused by the linker for the schema's level. So a compiled reader meets a `ref_type` body
+  only under a kernel-governed schema, and `AtomParsers` treats any other as a broken invariant.
 - A recorded name at a kind-typed slot of a value body is judged a member by `ValuesByName.judgeMember`; a qualified
   name there is refused where it reaches a value, and is a gap where it would reach a type through a namespace of
   types. A recorded name at a reference-typed slot resolves its first segment in the schema map and each further
   one as a key of a namespace value or a field of a record value, never into a map that is no namespace; the
   referent IS-A `of`, and the value reached is delivered into the host's `Ref<T>` (`Ref.deliver`), a `TypeRef` host
   taking the name alone. A field step reads the record value the read bound, through its binding's descriptor, so
-  a value reached through a field is delivered as one reached by key. A reference in a data document is not yet read: no
-  link judges it, so `AtomParsers` refuses to build its reader outside a meta layer and the compile carries that as
-  `NOT_IMPLEMENTED` to the read, in tree and bind mode alike. The rule that closes it is the kind's: the name resolves
-  in the closure of the document's `!!schema`.
+  a value reached through a field is delivered as one reached by key.
 - One host shape for every reference: a `TypeRef`, whatever the slot. Only the judgement differs by slot, and it is
   the slot's, never the host's.
 
