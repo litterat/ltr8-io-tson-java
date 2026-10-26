@@ -52,6 +52,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li><b>Deny by default.</b> No allowed host means nothing is fetched. A host is compared exactly -- there
  *       is no suffix or wildcard matching, because {@code .example.com} written as a suffix test also matches
  *       {@code evil-example.com}, which is how this control is usually defeated.</li>
+ *   <li><b>A refusal does not disclose the allow-list.</b> It names the refused host and the rule, never the
+ *       hosts that are allowed: [TSON-SCHEMA] §11.2 says the report SHOULD NOT, since telling an untrusted
+ *       sender which hosts this source will fetch from is reconnaissance for request forgery.</li>
  *   <li><b>The reference must be a legal identity</b> -- §2.2.1's own rule, enforced by {@link
  *       SchemaReference} before any connection is opened.</li>
  *   <li><b>Redirects are never followed.</b> A redirect is the allow-list's exit door: the check happened on
@@ -176,14 +179,17 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
     private record Target(String canonical, URI location) {
     }
 
-    /** Where this source will go for {@code reference}, or a policy failure. */
+    /**
+     * Where this source will go for {@code reference}, or a policy failure. A refusal names the host and the
+     * rule, never the allow-list -- see the class note.
+     */
     private Target permitted(String reference) {
         SchemaReference identity = SchemaReference.of(reference, fetchPolicy.requireContentHashPin());
         URI base = hosts.get(identity.host());
         if (base == null) {
             throw SchemaReference.notPermitted(reference, hosts.isEmpty()
                     ? "no host is allowed by this source"
-                    : "host '" + identity.host() + "' is not one of " + hosts.keySet());
+                    : "host '" + identity.host() + "' is not an allowed host");
         }
         return new Target(identity.canonical(), base.resolve(identity.uriPath()));
     }

@@ -113,7 +113,9 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
     one is an SSRF risk, so it never follows redirects and caps size against bytes delivered rather than
     `Content-Length`; the file one is an arbitrary-read risk, so containment is checked **after**
     `toRealPath`, which settles `..` and symlink escape together — checking the unresolved path is the usual
-    way that control is defeated.
+    way that control is defeated. Neither discloses its configuration in a failure: a refusal names the host and
+    the rule, never the allowed hosts ([TSON-SCHEMA] §11.2's SHOULD NOT), and no file-source message names a
+    local path.
   - **And the pair is one value, `SchemaAccess`** (`base.source`): the source plus the `FetchPolicy`
     governing it, answering "where may this deployment obtain a schema, and under what constraints". The two
     facts always travel together and are meaningless apart — a source with no policy has unstated bounds, a

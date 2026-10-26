@@ -40,6 +40,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <ul>
  *   <li><b>Deny by default.</b> No mapped host means nothing is read, and a host is compared exactly.</li>
+ *   <li><b>A failure discloses neither the allow-list nor the disk.</b> A refusal names the refused host and
+ *       the rule, never the hosts that are mapped -- [TSON-SCHEMA] §11.2 says the report SHOULD NOT disclose
+ *       the allowlist, since that is reconnaissance for an untrusted sender -- and no message names a local
+ *       path: not the mapped directory, not the file a reference resolved to, not an {@link IOException}'s
+ *       own text, which carries the path. The exception's cause keeps the detail for an operator's log.</li>
  *   <li><b>The resolved file must be inside its directory</b>, checked after the path is made real --
  *       {@link Path#toRealPath} resolves {@code ..} and follows every symlink, so one check covers traversal
  *       and symlink escape together. Checking the unresolved path instead passes a symlink that points
@@ -142,11 +147,11 @@ public final class FileSchemaSource implements SchemaSource {
         if (directory == null) {
             throw SchemaReference.notPermitted(reference, hosts.isEmpty()
                     ? "no host is mapped to a directory by this source"
-                    : "host '" + identity.host() + "' is not one of " + hosts.keySet());
+                    : "host '" + identity.host() + "' is not an allowed host");
         }
         String relative = identity.path().startsWith("/") ? identity.path().substring(1) : identity.path();
         if (relative.isEmpty()) {
-            throw SchemaReference.notPermitted(reference, "names no path under '" + directory + "'");
+            throw SchemaReference.notPermitted(reference, "names no path");
         }
         return new Permitted(identity.canonical(), directory, relative);
     }
@@ -169,17 +174,17 @@ public final class FileSchemaSource implements SchemaSource {
             real = root.resolve(permitted.relative()).toRealPath();
         } catch (NoSuchFileException e) {
             throw new SchemaFetchException(reference, SchemaFetchException.Reason.NOT_FOUND,
-                    "no file backs it under '" + permitted.directory() + "'", e);
+                    "no file backs it", e);
         } catch (IOException e) {
             throw new SchemaFetchException(reference, SchemaFetchException.Reason.TRANSPORT,
-                    "could not be resolved under '" + permitted.directory() + "': " + e, e);
+                    "could not be resolved (" + e.getClass().getSimpleName() + ")", e);
         }
         if (!real.startsWith(root)) {
-            throw SchemaReference.notPermitted(reference, "resolves to '" + real + "', which is outside '"
-                    + root + "' -- a schema path may not escape the directory its host is mapped to");
+            throw SchemaReference.notPermitted(reference, "resolves outside the directory its host is mapped to "
+                    + "-- a schema path may not escape it");
         }
         if (!Files.isRegularFile(real)) {
-            throw SchemaReference.notPermitted(reference, "resolves to '" + real + "', which is not a regular file");
+            throw SchemaReference.notPermitted(reference, "does not resolve to a regular file");
         }
         return real;
     }
@@ -197,10 +202,10 @@ public final class FileSchemaSource implements SchemaSource {
         } catch (NoSuchFileException e) {
             // Between the containment check and the open -- rare, and still "not here" rather than a fault.
             throw new SchemaFetchException(reference, SchemaFetchException.Reason.NOT_FOUND,
-                    "no file backs it at '" + file + "'", e);
+                    "no file backs it", e);
         } catch (IOException e) {
             throw new SchemaFetchException(reference, SchemaFetchException.Reason.TRANSPORT,
-                    "could not be read from '" + file + "': " + e, e);
+                    "could not be read (" + e.getClass().getSimpleName() + ")", e);
         }
     }
 
