@@ -40,8 +40,8 @@ for an entry below, where there is no section to point at yet. When an entry clo
 citations and the entry is deleted — nothing here is an archive.
 
 **The two directions Revision 37 carried open are now entries**: a namespace as a value is #22, #23 and #24, and a
-JSON member name that is not an identifier is #10, whose "Open" item still holds its default. The rest of what was
-carried is settled in Revision 37's change log: the policy's home is `policy.tn`, the constructor bound
+JSON member name that is not an identifier is #10. The rest of what was carried is settled in Revision 37's change
+log: the policy's home is `policy.tn`, the constructor bound
 is declined, and the bounded type slot at a field is withdrawn as the wrong feature for now.
 
 ---
@@ -687,7 +687,7 @@ derivation reads `atom`, `product`, `sum` and `namespace` off the chain, each co
 constructor's `discriminators`), §8.2's constructor-refinement table (`text_enum`), §10's meta-kernel inventory,
 §12.1, §13.2 (the artifact pins); [TSON-JSON] §1, §3 (the annotation members), §6.1.1, §9.4.
 
-**Kind:** proposal, under consideration for adoption; running on `r2026-38-proposal`.
+**Kind:** proposal, adopted as built; running on `r2026-38-proposal`.
 
 **The problem.** A field name is an identifier at every layer, so `{ "@id": x }` and `{ "$ref": x }` are parse
 errors, and §2.5's remedy is a map: "a key that is not a name belongs in a map". That serves TSON's own data. It
@@ -880,10 +880,12 @@ relaxed type, defined by the translation and not by the series, such as
 - [TSON-SCHEMA] §8.2's constructor-refinement table drops `text_enum`.
 - [TSON-SCHEMA] §13.2: the five artifact rows carry the re-stamped pins.
 
-**Open:** the default for a JSON member name that is not an identifier; whether a template's field names are
-judged at its declaration, where today they are judged at each application, under the closed record's name type.
+**Two readings the proposal left open are settled as built.** The default name type is the identifier in both
+encodings, and in a document read without a schema: a JSON member name that is no identifier is an unrecognised field
+under a record stating no name type, and `$ref` or `$id` is declared only under a name type admitting `$` as a first
+character. A template's field names are judged at each application, under the closed record's name type.
 
-**Status against Revision 37:** open; under consideration, running on `r2026-38-proposal`.
+**Status against Revision 37:** open; running on `r2026-38-proposal`.
 
 ## 11. The guide and the schema skill should say what `record.name_type` makes possible, and when to use it
 
