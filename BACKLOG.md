@@ -36,12 +36,11 @@ distinction, and a misfiled entry is how a wrong classification gets adopted rat
 Every real schema resolved so far (meta-kernel, meta.tn, core.tn, and hand-built test fixtures)
 happens to fit a narrow shape this pipeline already handles — declared in dependency order, with
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
-spec-required case, found by re-auditing Part 2 against the current source rather than CLAUDE.md's
-own prose (which had gone stale on it):
+spec-required case:
 
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
-  dependencies-first; every caller (including this session's own `TinySchemaImportsCoreTn1Test`) has to
+  dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to
   already know and hand-sequence the correct registration order itself. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the five bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
@@ -400,8 +399,8 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   [TSON-DATA] §8.1 gives to the layer that detects them -- the resolver, following the reference.
 
 - [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is the policy value
-  and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one table with a default
-  each, so nothing here is a judgement call any more — what is left is eleven document limits and five schema-side
+  and carries nesting depth at §9.1's own default of 64. §9.1 states the whole set as one table with a default
+  each, so none of the values is a judgement call — what is left is eleven document limits and five schema-side
   ones, each a component on `LimitsPolicy`, a field on `spec/m/policy.tn`'s `limits` (optional, defaulting to
   §9.1's value, then a restamp), a `CliPolicy.CliLimits` field and a `--flag`. Document side: **token length**
   (1,048,576 code points), **decoded text length** after escape processing (1,048,576), **numeric literal length**

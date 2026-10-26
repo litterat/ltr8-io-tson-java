@@ -75,7 +75,7 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
   and re-parsed, either failure being a fault here. Every other annotation stays, since several are checked.
 - **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole bundled chain, which no
   single-file command can do: a digest is over a document's own bytes, so an edit to meta.tn moves meta's
-  `!!id`, core.tn's `!!meta`, core's own `!!id`, `TsonBundledSchemas`' three constants, and the
+  `!!id`, core.tn's `!!meta`, core's own `!!id`, every downstream `TsonBundledSchemas` constant, and the
   getting-started example's pins in `README.md`/`InitCommand.java` — the example pinning meta and core, its
   own digest moves with theirs. The script walks that order bottom-up; `--check` reports staleness and
   writes nothing. It hashes with `tail -n +2 | shasum -a 256` rather than calling `tson hash`, so it runs

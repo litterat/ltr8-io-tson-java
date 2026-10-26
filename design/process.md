@@ -20,33 +20,27 @@ Related: `design/cli-config-hashing.md` (bundled schemas, restamping), `design/c
 The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
 doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
 copy. `spec/` holds local snapshots for quick reference: `spec/tson-part1-data.md`,
-`spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core}.tn` (the spec's own bundled schema
-documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
-on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not a
-source of truth — with **two** standing exceptions. The three `.tn` schemas are **packaged from here at build
-time**, so they are the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in
-place**: see "Part 3 is drafted here" below.
+`spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core,net,policy}.tn` (the spec's own bundled
+schema documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core, network and
+policy libraries built on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat
+`spec/` as a cache, not a source of truth — with **two** standing exceptions. The five `.tn` schemas are
+**packaged from here at build time**, so they are the live copies rather than a snapshot. And
+**`spec/tson-part3-json.md` is editable in place**: see "Part 3 is drafted here" below.
 
 On `main` the bundled schemas carry **Revision 38 identities** (`https://tson.io/2026/38/m/*.tn`); a proposal
 branch carries the next revision's. `spec/` holds
-**Revision 38** of Parts 1 and 2, a cache, not edited here except for §13.2's four artifact rows,
+**Revision 38** of Parts 1 and 2, a cache, not edited here except for §13.2's five artifact rows,
 so the table names the bytes beside it and stays checkable; its Part 1 and Guide rows stay at the revision
-those documents actually are. **§13.2 is a fourth pin to move** whenever the artifacts change.
+those documents actually are. **§13.2 is one more pin to move** whenever the artifacts change.
 `scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins, and the spec
 document is a cache — so §13.2 is re-stamped by hand and is the one that silently drifts.
 `tson hash spec/m/<name>.tn` is the check.
 
-The bundled schemas and the spec agree on shape: `reference.target` is typed `type_ref`; there is no
-`instance_template`/`template_argument`/`value_param` (§5.10's held bodies carry an open body); `map`'s `state`
-field sits behind `{K => V?}` (§5.3). An open entry's body is an instance of the kernel's `template`
-constructor — the parameter names and the application as text (§8.1). A schema map's entry is its value
-(`schema => namespace & { key_type: = type_name  value_type: = top }`): a type carries its own chain
-(`type => abstract top & { chain?: type_chain }`), and nothing carries `parameters` (they are the template body's),
-`disjoint` (derived over the choice body, §5.4) or `kind`: a kind is derived from an entry's own chain and body (§4.1,
-`EntryKind.of`, judged by where each base kind is defined), and the kernel's `type_kind` is the kind of the types, not
-that derivation. `top`, `type`, the three base kinds and `namespace` are `abstract` (§4.1).
+The bundled schemas are the kernel's own statement of its shape. What the resolver derives rather than reads
+from them — an entry's kind through `EntryKind.of`, a choice's disjointness, a template's parameters — is in
+`design/schema-resolution.md` and `design/held-template-bodies.md`.
 
-**Changing a bundled schema means re-stamping all three digests bottom-up**, moving the matching
+**Changing a bundled schema means re-stamping every digest downstream of it, bottom-up**, moving the matching
 `*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the
 published values. `scripts/restamp-bundled-schemas.sh` does the digest half — every pin in the repo, in
 dependency order, plus the getting-started example, which pins meta and core and so has a digest of its own

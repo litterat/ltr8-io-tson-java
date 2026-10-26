@@ -12,15 +12,8 @@ resolution where there is one.
 closes.** It is an input to the next revision's adjudication, so its numbering is the numbering that revision's
 change log will answer against — a stable index of the open set, not an archive of everything ever raised.
 
-**Revision 38 closed every entry open against Revision 37, and nothing is open against it.** Verifying the
-adjudicated text against each closed entry before publication found eleven defects, and they were fixed in the text
-in the same pass (the Revision 38 change log, §9), so the register opens empty. The closed entries are gone: the
-spec now carries their rules — the network library `net.tn` with `hostname`, `host` and `media_type`; refused and
-undetermined as two outcomes beside the four categories; an unknown schemaless annotation as a resolver error; an
-identity's host as a `host` value; the `type` kind; `record.name_type` and `enum_type.name_type`; a record's fields
-as a map; the qualified name and `ref<T>`; `type_definition` gone and `type_chain` in its place; the abstract
-kernel entries; record templates as `record` with `parameters`, the three places a parameter stands, an application
-nothing declares as its expansion, and the selector rules; `kind_type`; `namespace`; and the import level rule.
+**Nothing is open against Revision 38.** The entries Revision 38 adjudicated are gone, and the spec carries their
+rules; the change log in `spec/` keeps them under their numbers.
 **This file is the as-built record**, not a pointer to one: where an entry proposes a design this implementation
 has built, the entry states the design, what is running, and what is not, so that a reviewer editing the spec needs
 nothing beside it. **Where the evidence is a consumer of this library rather than this library** — the HTTP layer
@@ -29,11 +22,11 @@ states what is running there on the same terms.
 
 **Part 3 is not in this register.** [TSON-JSON] is an early draft this implementation exists to validate, and
 `spec/tson-part3-json.md` is edited **directly** as findings arise — so a Part 3 finding becomes a spec change in
-the same session, with git history as its record, rather than an entry waiting for adjudication. **The numbers are
-not reused and the gaps are left** — the register renumbers only when a revision closes, so that a citation written
-against the open set stays valid until then. What stays here is Parts 1 and 2, whose current revision is published
-and whose changes this implementation proposes rather than makes. An entry spanning both stays, and says which half
-is which.
+the same session, with git history as its record, rather than an entry waiting for adjudication. What stays here is
+Parts 1 and 2, whose current revision is published and whose changes this implementation proposes rather than makes.
+An entry spanning both stays, and says which half is which. **Numbers are not reused and gaps are left** while a
+revision is open — the register renumbers only when one closes, so a citation written against the open set stays
+valid until then.
 
 **Cite the spec, not the argument that got it there:** `design/` and the Javadoc name the section that requires a
 behaviour, and a `SPEC-FEEDBACK.md #N` citation is for an entry below, where there is no section to point at yet.

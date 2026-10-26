@@ -19,7 +19,7 @@ the spec, and the one the TypeScript port and the shared conformance suite are c
 (the text data format) and Class 2 (the schema layer) — passes the shared conformance suite, and carries a
 JSON encoding of the same data model ([TSON-JSON], Part 3, drafted in the repository).
 
-Twelve JPMS modules, all published together as `io.ltr8:<module>`:
+Thirteen JPMS modules, all published together as `io.ltr8:<module>`:
 
 | Module           | Java module name          | What it is                                                     |
 | ---------------- | ------------------------- | -------------------------------------------------------------- |
@@ -32,7 +32,8 @@ Twelve JPMS modules, all published together as `io.ltr8:<module>`:
 | `ltr8-bind`      | `io.ltr8.bind`            | the generic `DataValue`↔Java-object binding engine              |
 | `ltr8-annotation`| `io.ltr8.annotation`      | `@Typename`/`@Field`/`@Record`/… and the `Annotations` carrier  |
 | `ltr8-regex`     | `io.ltr8.regex`           | a standalone RFC 9485 I-Regexp engine (no TSON dependency)      |
-| `ltr8-net`       | `io.ltr8.net`             | network text formats to their RFCs — `Iri` (RFC 3986/3987), IP addresses, CIDR, EUI-48 (no TSON dependency) |
+| `ltr8-net`       | `io.ltr8.net`             | network text formats to their RFCs — `Iri` (RFC 3986/3987), IP addresses, CIDR, EUI-48, IDNA2008 host names, media types (no TSON dependency) |
+| `ltr8-unicode`   | `io.ltr8.unicode`         | Unicode properties and algorithms — XID, normalization, UAX #31 profiles, UTS #39 (no TSON dependency) |
 | `tson-json`      | `io.ltr8.tson.json`       | the JSON encoding: `Json`, its readers and writers, `JsonValue` — no dependency on `tson-compiler` |
 | `tson-cli`       | `io.ltr8.tson.cli`        | the `tson` command (`validate`, `compile`, `policy`, `hash`, …) |
 
