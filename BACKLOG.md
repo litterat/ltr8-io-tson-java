@@ -86,6 +86,21 @@ spec-required case:
   `kind_type`, `ref_type` and the name-only `type_ref` into one reference atom, a Revision 39 direction, which needs
   exactly that, and with what `@application` means on a declared entry that is no record.
 
+- [ ] **A closed refinement source mints its application.** [TSON-SCHEMA] §8.2's trigger positions say an application
+  at a composition target or a refinement source is subsumed as an operand and mints nothing (§5.8). Composition does
+  that (`DefinitionResolver.openOperand` absorbs by value); a closed refinement source (`x => box<text> ^ {…}`) goes
+  through `resolveRefinementSource` → `closedApplication` → `TemplateMaterialiser.close` → `instantiate`, which mints
+  the expansion through `mintedRecord` and publishes it, and which entry it gets depends on whether the owning
+  declaration resolved first. Decide whether the code follows §8.2 (absorb the closed body as an operand) or the spec
+  needs the refinement case stated differently; `design/template-materialisation.md` states what runs.
+
+- [ ] **An alias of a schema-namespace template is read in the structure namespace.** `ParameterTypes.readsInStructure`
+  treats an alias as a structure-namespace template because its held head, `reference`, is a meta constructor, so
+  `rb => <N: int8> box<N>` with `box => <N> { w?: integer ~ N }` is refused ("`'int8' is not in the structure
+  namespace`"). [TSON-SCHEMA] §5.10 says a template whose body applies another template takes that template's form,
+  which reads the alias in the schema's namespace like `box`. Either `readsInStructure` follows the applied template
+  through the alias, or the spec says which reading holds; `design/held-template-bodies.md` gives the example.
+
 ## Checked annotations
 
 [TSON-SCHEMA] §6 defines the category and §5.4's `@disjoint` is the precedent both follow: an annotation with
@@ -210,6 +225,12 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   `JsonTaggedValueReadTest`): `$ref`/`$id` read as declared fields; a declared `$type` obscured by the annotation
   member; an undeclared `$foo` as a validation error; a member outside its record's name type unknown, not refused;
   a member matched in a folding name type's form, its repeat a duplicate at its own spelling.
+
+- [ ] **The JSON object writer strips annotations unconditionally.** [TSON-JSON] §4.3 makes encoding an annotated value
+  an encode error, with stripping allowed only as explicit configuration; `DataClassObjectWriter` drops the
+  `Annotations` carrier and annotated-box annotations silently. Either the writer refuses unless configured to strip
+  (a `WriteException` with the position), or §4.3 is edited to admit silent stripping for a writer with no
+  annotation channel; `design/json-facades-binding-writing.md` states the conflict.
 
 ## Module structure
 
@@ -414,3 +435,10 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   still needs deciding per limit is only *where it is counted*: the ones that bound shape are per-container state
   the stream does not keep, where depth was a counter it already had, and the two aggregates (total values,
   foreign schemas) need their own counter since §9.1 is explicit that the total is not bounded by the parts.
+
+- [ ] **`Tson.validateSchema` throws on a schema with no `!!id`.** `!!id` is optional in the grammar ([TSON-DATA]
+  §2.2), but `SchemaResolver.resolve` throws `IllegalStateException` when it is missing; in `validateSchema` that falls
+  to the `RuntimeException` catch and `TsonDiagnostics.ofSchemaSyntaxError` rethrows it, against the method's promise
+  never to throw for a bad input document, and against its own comment listing "a document with no `!!id`" among the
+  `SchemaValidationException` cases. No test covers it. Fix: report it as a schema error, and pin it with a test shown
+  to fail without the fix.
