@@ -126,10 +126,11 @@ public final class AtomParsers {
 
     /**
      * {@link #forType(Top, Normalization)} for a position read under a schema that {@code governsSchemas} -- a meta
-     * layer, whose documents are schemas. A name such a document writes at a kind-typed position resolves in that
-     * document's own namespace and not in the closure the kind's members were computed over, so the kind reads the
-     * type-name grammar alone ({@link KindParser#namesOnly}) and the document's own link judges membership. Every
-     * other body is read as {@link #forType(Top, Normalization)} reads it.
+     * layer, whose documents are schemas or describe one. A name such a document writes at a kind-typed position
+     * resolves in the described schema's namespace and not in the closure the kind's members were computed over, so
+     * the kind reads the type-name grammar alone ({@link KindParser#namesOnly}) and that schema's link, or ingest,
+     * judges membership ([TSON-SCHEMA] §4.2, §8.1). Every other body is read as {@link #forType(Top, Normalization)}
+     * reads it.
      *
      * <p>A reference ({@code ref_type}) is read only here, with {@code governsSchemas} true: a reference names an
      * entry holding a value, which only a kernel-governed schema has, so the linker refuses one declared anywhere

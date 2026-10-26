@@ -50,8 +50,10 @@ own prose (which had gone stale on it):
   so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest verifies rather than
   recomputes what an author may have written into a derived fact: a recorded `template_param.type` or `bound`
   must be IS-A the type the held body derives, since a written narrowing lives nowhere else; it also re-runs the
-  family checks (no member minted at a use site) over the ingested map and its closure, and the §5.11 group
-  declaration rules over every `field_group`. `ParameterTypes` already derives the type to check against.
+  family checks (no member minted at a use site) over the ingested map and its closure, the §5.11 group
+  declaration rules over every `field_group`, and every kind-typed slot's name against its kind, which the reader
+  of a meta-governed data document checks for grammar alone ([TSON-SCHEMA] §4.2, `KindParser.namesOnly`).
+  `ParameterTypes` already derives the type to check against.
 - [ ] **An application is not yet unified with an imported library's entry for it** ([TSON-SCHEMA] §8.1, §8.2). A
   library declaring `int_box => box<int32>` writes `@application:{ name: box  arguments: [{ name: int32 }] }` on that
   key, and a schema importing it that writes `box<int32>` still closes the application to an entry of its own rather
@@ -318,10 +320,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   under [TSON-SCHEMA] §5.6 and §8.1 the fill is atom-typed (`type_kind`) and admitted (`PositionalNameTest`), and the
   vector fails only because `x` is undeclared. Retitle it as the unresolved-reference case it is, and add a valid
   vector for `fields: { p => text }`.
-- [ ] **A data document validated against the meta-kernel admits `fields: { p => no_such_type }`.** A `type_kind`
-  value is a member of the kernel closure's `type_kind`, and `no_such_type` is none, yet `tson validate` reports
-  nothing, where the same name at a user schema's kind-typed slot is refused (`PositionalNameTest`). Find where kind
-  membership is skipped for a kernel-governed data read and pin it.
 - [ ] **A kind's member list names a minted application.** The refusal of a name at a `kind<type>` slot lists the
   kind's members, and the list holds `kind_type_type_c430c650`, the entry minted for the application `kind<type>`
   itself: a `kind_type` instance IS-A `type`, so the construction walk admits it. A minted name is no spelling an

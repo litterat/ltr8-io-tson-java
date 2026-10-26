@@ -9,7 +9,9 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
 - A slot that names the type of a value is typed `type_kind` (`record_field.type`, `tuple_element.element_type`,
   `array.element_type`, `map.key_type` and `value_type`, `namespace.value_type`, `choice.variants`,
   `template_param.type` and `bound`). Its value is one bare name, judged a member of the kind at link (`KindMembers`),
-  never by the reader against the kernel's own members. `namespace.key_type` is typed `identifier_kind`: a
+  never by the reader against the kernel's own members: a data document a meta layer governs describes a schema
+  whose namespace it does not carry, so its kind slots are read for grammar alone and membership waits for ingest
+  ([TSON-SCHEMA] §4.2, §8.1). `namespace.key_type` is typed `identifier_kind`: a
   namespace's keys are names, which is what a qualified name's segment selects, so an enum-keyed map is no namespace.
   A FIXED `key_type` is the family every key is read and judged under; a DEFAULT one stands where the value's host
   states none, and the host supplies it otherwise: `field_map`'s keys are the record's `name_type`'s, its supertypes'
