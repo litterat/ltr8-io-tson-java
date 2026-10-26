@@ -315,11 +315,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   (`my_record => record - { groups }` in a meta layer) resolves with an empty chain and `!my_record { … }` is refused
   as not IS-A `top`, which is the rule; nothing in the suite or the corpus exercises it, and the refusal's hint
   ("Did you mean atom refinement") misleads there. Add a vector and drop the hint for a subtracted head.
-- [ ] **The corpus vector `class2/schema/invalid/the-explicit-record-form-writes-no-positional-record-field` is
-  stale.** Its description says `record_field.type` is a `type_ref`, a product, so `fields: { p => x }` is refused;
-  under [TSON-SCHEMA] §5.6 and §8.1 the fill is atom-typed (`type_kind`) and admitted (`PositionalNameTest`), and the
-  vector fails only because `x` is undeclared. Retitle it as the unresolved-reference case it is, and add a valid
-  vector for `fields: { p => text }`.
 - [ ] **A kind's member list names a minted application.** The refusal of a name at a `kind<type>` slot lists the
   kind's members, and the list holds `kind_type_type_c430c650`, the entry minted for the application `kind<type>`
   itself: a `kind_type` instance IS-A `type`, so the construction walk admits it. A minted name is no spelling an
