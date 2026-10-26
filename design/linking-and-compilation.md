@@ -14,6 +14,10 @@ Current form only; history lives in git.
 - An import stands at the importer's governing level: importer and imported both name the meta-kernel as their
   `!!meta`, or neither (`TsonSchemaLinker.checkImportLevel`, §2.2.3). It is judged once per edge, against the import's
   own `!!meta`, before the import's entries merge; `SchemaResolver` asks it a phase earlier in the same wording.
+- A reference (`ref_type`) is declared only in a kernel-governed schema, the one level where an entry holds a value.
+  `ref<T>` is out of an ordinary schema's reach (core.tn declares no `ref`), so the linker's level check meets only
+  the constructor applied directly, `!ref_type { … }`, and refuses it (`referenceOutsideTheKernelLevel`); a compiled
+  reader therefore meets a `ref_type` body only under a schema that `governsSchemas` (`design/references.md`).
 - A reference to a namespace entry (a `Namespace`, `myapi => !api { … }`) is refused at every position a type-ref
   occupies: it is a value, and nothing is typed by it.
 - A kernel slot typed `type_kind` (`record_field.type`, the element and container type slots, `choice.variants`, a

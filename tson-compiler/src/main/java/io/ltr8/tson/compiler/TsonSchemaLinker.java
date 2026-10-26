@@ -139,7 +139,8 @@ import java.util.stream.Collectors;
  * <i>plus its imports</i>". A flat namespace with no hiding is the rule the rest of the format is built on.
  *
  * <p><b>An import stands at the importer's governing level</b> ({@link #checkImportLevel}): a schema the
- * meta-kernel governs imports only schemas it governs, and an ordinary schema only ordinary ones.
+ * meta-kernel governs imports only schemas it governs, and an ordinary schema only ordinary ones. A reference
+ * ({@code ref_type}) is declared only in a schema the meta-kernel governs, the one level where an entry holds a value.
  *
  * <p><b>Collisions are decided by entry identity.</b> One schema reached by several routes unifies; two
  * *different* schemas declaring one name is the error, as is a local declaration shadowing any name the
@@ -749,7 +750,14 @@ public final class TsonSchemaLinker {
         Set<String> blamedOnce = new LinkedHashSet<>();
         Map<String, Top> namespace = merged;
         Function<String, Optional<String>> constructors = name -> constructorOf(name, namespace.get(name), facts);
+        boolean kernelGoverned = isMetaKernelGoverned(schema);
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
+            if (!kernelGoverned && entry.getValue() instanceof RefBody && localNames.contains(entry.getKey())) {
+                reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged, facts), facts,
+                        referenceOutsideTheKernelLevel(displayName(entry.getKey(), merged, facts, applications),
+                                schema), null);
+                continue;
+            }
             try {
                 // Named by what the author wrote, not by the content-derived name a derived entry carries:
                 // `[some_typo]` is a form they can find in their source where `array_some_typo_95c9a10f` is
@@ -1574,6 +1582,21 @@ public final class TsonSchemaLinker {
             case Namespace<?> ignored -> {
             }
         }
+    }
+
+    /**
+     * A reference ({@code ref_type}) declared in a schema the meta-kernel does not govern. A reference names an entry
+     * whose value is a value of its {@code of}, and an entry holds a value only where a namespace type can be
+     * declared, in a kernel-governed schema; a schema governing data declares only types, so a reference there names
+     * nothing. {@code ref<T>} is out of such a schema's reach (core.tn declares no {@code ref}, and an ordinary
+     * schema imports no kernel-governed one), so this meets only the constructor applied directly, {@code
+     * !ref_type { of: T }}, which the structure namespace supplies.
+     */
+    private static String referenceOutsideTheKernelLevel(String entryName, TsonSchema schema) {
+        return "'" + entryName + "' is a reference (ref_type), but '" + schema.id() + "' is not governed by the "
+                + "meta-kernel (its own !!meta is '" + schema.meta() + "') -- a reference names an entry holding a "
+                + "value, and only a schema chaining to meta-kernel.tn directly has one (§2.2.2, §4.1); a schema "
+                + "governing data declares only types, so a reference there names nothing";
     }
 
     /** {@code ref<C>} with {@code C} a constructor: the names of the types built with one are a kind. */

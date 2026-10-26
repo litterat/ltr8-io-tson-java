@@ -111,8 +111,16 @@ public final class AtomParsers {
      * ([TSON-SCHEMA] §5.5), which the body does not carry -- {@code enum_type.name_type} names an entry the governing
      * meta may hold, which only linking sees, so the caller supplies what linking recorded
      * ({@code TsonLinkedSchema.enumForms}). Ignored for every other body.
+     *
+     * <p>A reference body is this library's gap here, an {@link UnsupportedOperationException}: these callers judge a
+     * value a schema writes ({@code ~}/{@code =}, a template argument) by its token, and a reference's value is judged
+     * by what its name reaches, which only a value body's recorded names are.
      */
     public static Optional<AtomType<?>> forType(Top body, Normalization enumForm) {
+        if (body instanceof RefBody reference) {
+            throw new UnsupportedOperationException("a value a schema writes at a reference-typed position ('ref<"
+                    + reference.of() + ">') is not yet judged: a reference's value is judged by what its name reaches");
+        }
         return forType(body, enumForm, false);
     }
 
@@ -122,6 +130,10 @@ public final class AtomParsers {
      * document's own namespace and not in the closure the kind's members were computed over, so the kind reads the
      * type-name grammar alone ({@link KindParser#namesOnly}) and the document's own link judges membership. Every
      * other body is read as {@link #forType(Top, Normalization)} reads it.
+     *
+     * <p>A reference ({@code ref_type}) is read only here, with {@code governsSchemas} true: a reference names an
+     * entry holding a value, which only a kernel-governed schema has, so the linker refuses one declared anywhere
+     * else and a reference body reaching here under any other schema is a broken invariant.
      */
     public static Optional<AtomType<?>> forType(Top body, Normalization enumForm, boolean governsSchemas) {
         if (governsSchemas && body instanceof KindBody kind) {
@@ -129,9 +141,9 @@ public final class AtomParsers {
         }
         if (body instanceof RefBody reference) {
             if (!governsSchemas) {
-                throw new UnsupportedOperationException("a reference ('ref<" + reference.of() + ">') in a data "
-                        + "document is not yet read: this library resolves a reference when a schema links, and a "
-                        + "data document has no link");
+                throw new IllegalStateException("a reference ('ref<" + reference.of() + ">') reached a schema the "
+                        + "meta-kernel does not govern: the linker refuses a reference declared outside a "
+                        + "kernel-governed schema");
             }
             return Optional.of(new RefParser(reference));
         }

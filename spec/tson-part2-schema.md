@@ -1969,11 +1969,11 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/37/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/37/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/37/tson-guide |
-| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/38/m/meta-kernel.tn?sha256=ebc246b5185d8d7c7829113f9c8a242324452542dc2ad32f11a4bbdbe0adde12 |
-| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/38/m/meta.tn?sha256=db4054f1cce260c1da0d93d44bd246dae399434564f7342ee5b9813768eb89df |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/38/m/core.tn?sha256=1d0237afbc49c6f204c17fcabae084ab62e35999c5fa1869ad208d814c694152 |
-| net.tn | TSON Network Type Library (companion artifact) | https://tson.io/2026/38/m/net.tn?sha256=d178f7196d269ac4b18cbc8668498268a2df093907681eb077a928ae20660d1b |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/38/m/policy.tn?sha256=5d2ad26508c28ec1b2188bdd19fc610171d6f41e1b629f52509d6814b93cfc27 |
+| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/38/m/meta-kernel.tn?sha256=44c9268cd1d42875fe7eb002e4968a51be6b18cc7ba3409e8a558f54b718760f |
+| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/38/m/meta.tn?sha256=1c1d87b4b41d22e6443ebee0137faa266cf95fd37446296030f1ed1ef1797d3f |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/38/m/core.tn?sha256=11e69386274d7e79760a0df757685590dc66fda4912ee66664c5d7a586be22d7 |
+| net.tn | TSON Network Type Library (companion artifact) | https://tson.io/2026/38/m/net.tn?sha256=765628e653cef722e884b38b4f606f95dc8d6baa61aec61ad8baf50b3479f1ec |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/38/m/policy.tn?sha256=bd5949377e0d4117d92fec8fe5194e9328f8340d45ce30d8c0adf5838a73e17b |
 
 ### 13.3 Informative References
 

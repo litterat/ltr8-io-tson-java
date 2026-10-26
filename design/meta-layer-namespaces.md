@@ -132,8 +132,9 @@ about which components are references, so nothing asks it.
 **One host shape for every reference.** A `type_ref` slot binds a `TypeRef`, a kind-typed slot a `TypeRef`, and a
 reference-typed slot a `Ref<T>` or a `TypeRef`; `BindTargets` sets a `KindSlotReader` or `ReferenceNameReader` in
 place of the slot's atom reader for them, and a `Ref` receives the value the name reaches when the schema links
-(`Ref.deliver`), so a host reads `binding.method().get()` after the link and the name before it. A reference in a data
-document is not yet read (`NOT_IMPLEMENTED`).
+(`Ref.deliver`), so a host reads `binding.method().get()` after the link and the name before it. A reference is
+declared only in a kernel-governed schema, a meta layer among them, since only there does an entry hold a value; a
+schema governing data has no reference to read (`design/references.md`).
 
 **The slot judges the name, never the host.** A host may hold a kind- or reference-typed slot as a `String`: the slot's
 atom reader binds it as any atom, and `BindTargets` wraps it in a `RecordedNameReader`, which records the name it read
@@ -242,8 +243,9 @@ neither (§2.2.3, SPEC-FEEDBACK.md #25), so an ordinary schema importing a kerne
 diagnostic naming both documents and both `!!meta`s. The rule runs the other way too: a meta layer cannot import the
 third schema, nor core.tn or net.tn, and declares the vocabulary its constructors use itself. A namespace type meets
 both walls at once: it IS-A `top`, so it cannot go in the third schema, and no ordinary schema can import the layer
-that declares it, so a field typed by it exists only in a kernel-governed document (SPEC-FEEDBACK.md #23). A data
-document holds a value of one only where its own schema is kernel-governed, as resolved output read through meta.tn is.
-The constraint is real and worth stating; what is not acceptable is discovering it through a message about the wrong
-thing, which is why an application's head resolves in the type-name namespace only (§3.3.1) and an unresolvable one is
-reported as written (`design/template-materialisation.md`).
+that declares it, so a field typed by it exists only in a kernel-governed document (SPEC-FEEDBACK.md #23), and so does
+a field typed `ref<T>`, which names an entry holding a value: core.tn declares no `ref`, so a governed schema writing
+one meets an unresolved name. A data document holds a value of one only where its own schema is kernel-governed, as
+resolved output read through meta.tn is. The constraint is real and worth stating; what is not acceptable is
+discovering it through a message about the wrong thing, which is why an application's head resolves in the type-name
+namespace only (§3.3.1) and an unresolvable one is reported as written (`design/template-materialisation.md`).

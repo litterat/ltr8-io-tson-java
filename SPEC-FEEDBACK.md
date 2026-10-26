@@ -2181,11 +2181,15 @@ where `header_set.headers` is `{text => method}` (a map that is no namespace); `
 a key the map lacks does); `r: ref<record>` (a constructor). The referent's type is judged before the value is, so a
 name wrong by type is refused for its type whatever the value holds.
 
-**A reference in a data document.** `core.tn` declares `ref` beside the kernel's, as it declares `kind`, so an ordinary
-schema types a field `ref<order>` through its core import, and refuses `ref<record>` there as the kernel's does. The
-intended rule for the data document's value is the kind's: the name resolves in the closure of the document's
-`!!schema`, and the referent is judged a value of `T` there. This implementation does not yet read it, and reports
-the read as its gap rather than a verdict.
+**A reference is kernel vocabulary.** A reference names an entry whose value is a value of `T`, and an entry holds a
+value only where a namespace type can be declared, which #25 confines to kernel-governed schemas. A schema that
+governs data declares only types, so a reference there would name nothing. `core.tn` therefore declares no `ref`,
+unlike `kind`, whose value is a type name and is judged in the closure of whichever schema types the document holding
+it: an ordinary schema cannot reach the kernel's `ref` (#25 keeps the kernel out of its closure, and `!!meta` merges
+nothing into the type-name namespace), so `ref<order>` there is an unresolved name. The constructor applied directly,
+`!ref_type { of: order }`, reaches an ordinary schema through the structure namespace, and this implementation refuses
+it at link for the schema's level. The spec should say the same of `ref_type`: a reference is declared only in a
+schema the meta-kernel governs.
 
 **A value body's slots, under #22 and this entry.** A kind-typed slot of a value body holds one bare name: a braced
 application there (`request: { name: box  arguments: [ { name: order } ] }`, §5.6's data spelling) is refused, since
@@ -2196,8 +2200,8 @@ family base is the tagged subtype's, wherever the value sits; this implementatio
 declared type as the reader that read it knows it, so it judges a slot behind a record value's field as it judges one
 under a namespace key.
 
-**Breaking changes, against Revision 37:** `meta-kernel.tn` gains `ref_type` and `ref`, and `core.tn` a sibling `ref`
-under the same name. A meta layer's value-by-name
+**Breaking changes, against Revision 37:** `meta-kernel.tn` gains `ref_type` and `ref`; `core.tn` declares none. A
+meta layer's value-by-name
 slots are written `ref<T>`; a record-typed slot no longer takes a name. §9's guidance reads: a slot naming a type is
 typed by a kind, a slot naming a value by a reference, and `type_ref` is for a slot that holds an application.
 
@@ -2241,10 +2245,11 @@ not, judged once per import edge, against the imported schema's own `!!meta`. Th
 
 A consequence the spec should state with it: a meta layer declares the vocabulary its constructors use rather than
 importing `core.tn` or `net.tn`; a field typed by a namespace type or a kernel record exists only in a kernel-governed
-document; and a constructor is reachable by an ordinary schema only through its `!!meta`. A kind and a reference are
-not among them: `kind` and `ref` reach an ordinary schema through core.tn's own declarations, siblings of the kernel's,
-so the level rule removes nothing an ordinary schema types a field by. Through its core import an ordinary schema types
-a field `kind<C>` or `ref<T>`, and a data document holds a type's or a value's name there. §2.2.2's placement rule and
+document; and a constructor is reachable by an ordinary schema only through its `!!meta`. A kind is not among them:
+`kind` reaches an ordinary schema through core.tn's own declaration, a sibling of the kernel's, so through its core
+import an ordinary schema types a field `kind<C>`, and a data document holds a type's name there. A reference is among
+them: it names an entry holding a value, and only a kernel-governed schema has one, so core.tn declares no `ref` and
+a field typed `ref<T>` exists only in a kernel-governed document (#24). §2.2.2's placement rule and
 the §2.2.3 cycle rule, which counts `!!meta` as an edge, are unchanged. With the rule in place an ordinary schema's
 closure holds no meta-kernel entry, so §2.2.2's refusal of a constructor declared in one is reached by no loaded
 document: such a schema has no base kind to compose with.
