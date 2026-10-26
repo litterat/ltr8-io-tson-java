@@ -309,10 +309,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **A fetch refusal names the allowlist** (#763). `HttpSchemaSource` and `FileSchemaSource` refuse an unlisted
-  host with "host '…' is not one of [the allowed hosts]", and the file source's not-found and outside-root messages
-  name the local mapped directory; [TSON-SCHEMA] §11.2 says the report SHOULD NOT disclose the allowlist. Name the
-  host and the rule only; `SchemaSourceConfigTest` pins the wording and moves with it.
 - [ ] **No test pins [TSON-SCHEMA] §5.9 rule 8.** A subtracted construction whose head is a constructor
   (`my_record => record - { groups }` in a meta layer) resolves with an empty chain and `!my_record { … }` is refused
   as not IS-A `top`, which is the rule; nothing in the suite or the corpus exercises it, and the refusal's hint
