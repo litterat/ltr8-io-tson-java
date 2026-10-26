@@ -1,7 +1,7 @@
 ---
 title: "TSON 2026 Revision 38 — Change Log"
 against: "TSON 2026 Revision 37 (Working Draft)"
-status: "Adjudicated 2026-10-26. The five normative artifacts and four resolved fixtures are as received at `/2026/38/` identities, each pin verified over the shipped bytes, and Part 2 §13.2 carries them (§6). Part 1, Part 2, Part 3 and the Developer Guide are revised against them in the order §3 lists; Part 3 arrived partly consumed and is completed in a second pass (§7); an independent verification pass over the four documents, the register and the artifacts is recorded in §8."
+status: "Adjudicated 2026-10-26. The five normative artifacts and four resolved fixtures are at `/2026/38/` identities, re-stamped after adjudication for the doc lines §6 lists, each pin verified over the shipped bytes, and Part 2 §13.2 carries them (§6). Part 1, Part 2, Part 3 and the Developer Guide are revised against them in the order §3 lists; Part 3 arrived partly consumed and is completed in a second pass (§7); an independent verification pass over the four documents, the register and the artifacts is recorded in §8, and the implementation's own, which folded eleven findings into the text, in §9."
 inputs:
   - "SPEC-FEEDBACK.md (25 entries, renumbered against Revision 37; all new — Revision 37 closed every entry open against Revision 36)"
   - "Revised companion artifacts at /2026/38/ identities: meta-kernel.tn, meta.tn, core.tn, net.tn, policy.tn and four resolved fixtures (implementing #2, #5, #6, #8, #9, #10, #12, #14, #15, #17, #22, #23 and #24)"
@@ -429,13 +429,13 @@ only — the specification text carries no open questions.
 |---|---|---|
 | Rev 35 #25 (→ —) | Annotation cardinality as the means of per-name replacement. | Open — recorded as considered. |
 | Rev 37 #10 (Part 3) | The two MUSTs [TSON-JSON] §6.4 states for an ordered map. | Open — still the spec author's to confirm; not raised in the register. |
-| #22 (remainder) | Whether a kind admits an abstract type: membership by construction, as running (`kind<record>` holds `pet => abstract { … }` and a family base; `kind<namespace>` holds `namespace` itself), or a concrete-only kind. | Open — the text states membership by construction; never an exception for record templates alone. |
+| #22 (remainder) | Whether a kind admits an abstract type: membership by construction, as running (`kind<record>` holds `pet => abstract { … }` and a family base; `kind<namespace>` holds `namespace` itself), or a concrete-only kind. | **Confirmed** (§9): membership by construction, as the text states; a record template is listed, and naming it at a kind-typed slot is refused as open (§4.2, §5.12). |
 | #22 (remainder) | `kind_type.of` is typed `type_name` and not by a kind: its values are names of constructors, which no kind covers, so it would want a classifier of constructors the series has none of. | Open — the store is stated in prose, as every constructor role's is. |
-| #23 (remainder) | Whether a namespace *entry* (`myapi => !api { … }`) is listed by `kind<api>` and `kind<namespace>`, as running, or a kind's members are entries IS-A `type` or namespace constructors only. | Open — the text states the running behaviour. **[editorial]** |
-| #13 (reading) | `record_field.type` is `type_kind` under #22, an atom; by §5.6's rule as #13 states it, `!record { fields: { p => x } }` is then an atom-typed positional fill of `type`, not the withdrawn product-typed spelling the register's vector pins. The text states the rule; the vector may be stale. | **[editorial]** — the spec author's to confirm. |
-| #1 (addition) | A refusal under a fetch policy SHOULD NOT disclose the allowlist ([TSON-SCHEMA] §11.2). | **[editorial]** — the register's reasoning, stated as a SHOULD NOT. |
-| §5.9 rule 8 (reading) | A subtracted construction headed by a constructor is not itself a constructor: its chain is empty, and IS-A `top` is the predicate (§4.2). Revision 37 said "a constructor with lineage and no contract". | **[editorial]** — follows from #14; the spec author's to confirm. |
-| §8.1 (consequence of #22) | `record_field.type` is `type_kind`, an atom, so `record_field` has a positional form and a data document may write `fields: { x => text }`; canonical output writes the explicit record. | **[editorial]** — stated in §8.1 with #13's reading above. |
+| #23 (remainder) | Whether a namespace *entry* (`myapi => !api { … }`) is listed by `kind<api>` and `kind<namespace>`, as running, or a kind's members are entries IS-A `type` or namespace constructors only. | **Confirmed** (§9): a namespace entry is listed by the kinds of its constructor and by no kind of types; the sentence was missing and §4.2 now carries it. |
+| #13 (reading) | `record_field.type` is `type_kind` under #22, an atom; by §5.6's rule as #13 states it, `!record { fields: { p => x } }` is then an atom-typed positional fill of `type`, not the withdrawn product-typed spelling the register's vector pins. The text states the rule; the vector may be stale. | **Confirmed** (§9): the text is right and the implementation admits the fill; the register's vector was stale. |
+| #1 (addition) | A refusal under a fetch policy SHOULD NOT disclose the allowlist ([TSON-SCHEMA] §11.2). | **Confirmed** (§9). The reference implementation discloses the list at adjudication and is to change. |
+| §5.9 rule 8 (reading) | A subtracted construction headed by a constructor is not itself a constructor: its chain is empty, and IS-A `top` is the predicate (§4.2). Revision 37 said "a constructor with lineage and no contract". | **Confirmed** (§9): the chain is empty and the application is refused as not applicable. |
+| §8.1 (consequence of #22) | `record_field.type` is `type_kind`, an atom, so `record_field` has a positional form and a data document may write `fields: { x => text }`; canonical output writes the explicit record. | **Confirmed** (§9), in a schema document as in a data document (§5.6). |
 | #4 (considered) | An identity atom whose equality is canonical identity. | **Not taken** — every atom pins an external standard, `identity` is a name core should not take, and canonical text in `text` meets the need. |
 | #6 (considered) | `allow_zone` on `host_type`, for a listener binding a link-local address. | **Not taken** — recorded as the likely first facet. |
 | #8 (considered) | `uri_template`. | **Not taken** — a pattern over values is not a value. |
@@ -454,27 +454,30 @@ level rule per import edge.
 
 1. **Received at Revision 38** — all nine artifacts carry "2026 Revision 38 draft" and
    `/2026/38/` identities, and each normative pin was checked against sha256 over the
-   bytes past the `!!id` line of the copy received and **matches**: kernel `44c9268c…`,
+   bytes past the `!!id` line of the copy received and **matched**: kernel `44c9268c…`,
    meta `1c1d87b4…`, core `11e69386…`, net `765628e6…`, policy `bd594937…`. The chain is
-   consistent — meta pins the kernel, core, net and policy pin meta, policy pins core —
-   and Part 2 §13.2 carries the five rows. Hash *values* remain non-normative; only the
-   pin's shape is.
-2. **Nothing edited.** No artifact is edited by this adjudication, so no pin moves.
-3. **Three doc lines disagree with the text and are left as received**, for the spec
-   author to take with the next re-stamp:
-   - The kernel's `application` doc writes its application of a namespace entry as "a
-     DATA entry", a kind #23 removes; the text says "a namespace entry".
-   - The kernel's `kind_type` doc says `of` "is `type` or at or below it; any other `of`
-     is a resolver error", where #23 admits `namespace` or a constructor below it and the
-     fixture lists `namespace`, `field_map` and `schema` in `type_kind`; the text follows
-     #23.
-   - `core.tn`'s header lists `uri` among core's same-named siblings of kernel and meta
-     entries; the sibling is `iri` (the kernel's), as Revision 37 §9 already said, and
-     `kind` is correctly added.
-   - `meta-kernel-resolved.tn`'s conventions note still says a parametric `= P` or `~ P`
-     "fixes nothing until materialisation makes the value concrete", the rule #20
-     replaces — the kernel's own `record_field` doc and §5.7 state the new one — and
-     counts "the four base kinds" where the text has three and `namespace`.
+   consistent — meta pins the kernel, core, net and policy pin meta, policy pins core.
+   Hash *values* remain non-normative; only the pin's shape is.
+2. **Re-stamped before publication** (§9). The doc lines below disagreed with the text
+   and are corrected, so every pin moves: kernel `9cc191d3…`, meta `62dde2f3…`, core
+   `95f66505…`, net `06a939fa…`, policy `fc9208c7…`; Part 2 §13.2 carries the five rows.
+3. **The doc lines corrected:**
+   - The kernel's `application` doc wrote its application of a namespace entry as "a
+     DATA entry", a kind #23 removes; it now says "a namespace entry".
+   - The kernel's `kind_type` doc said `of` "is `type` or at or below it", where #23
+     admits `namespace` or a constructor below either, and said a kind is "not IS-A
+     `top`" with no exception for a namespace constructor; it now states §4.2's rule,
+     membership by construction included.
+   - The kernel's `type` doc said `type_kind` holds "the one constructor"; its `top` doc
+     omitted the namespace types; its `type_chain` doc said a template's `parents` are
+     "kept after it closes" — each now says what §4.1 and §4.2 say.
+   - `core.tn`'s header listed `uri` among core's same-named siblings of kernel and meta
+     entries; the sibling is `iri`.
+   - `meta-kernel-resolved.tn`'s conventions note said a parametric `= P` or `~ P`
+     "fixes nothing until materialisation", counted "the four base kinds", and described
+     every open entry as held; it now states #20's rule, three base kinds and
+     `namespace`, and a record template as a `record` with `parameters`. `core-resolved.tn`'s
+     note cited §8.1 for the shadowing rule, which is §5.10's.
 4. **Not verified**, carried as a note: ingest of resolved output is unimplemented, so
    #14's "read `chain` as stated" and "keep `@application`" and #22's recomputed `members`
    are stated in §8.1 and not running; a later schema's application is not yet unified
@@ -591,4 +594,46 @@ pass found, and what was done:
 8. The guide's §2.11 lacked one of the register's four stated costs (a host binding names
    a relaxed name through the name the record states); added.
 
-What remains open is §5's, and SPEC-FEEDBACK.md's, renumbered against this revision.
+
+---
+
+## 9. Fourth pass: the implementation's verification
+
+Run by the implementer against the adjudicated text, entry by entry, before publication,
+with each of the five editorial readings of §5 checked against running code and confirmed
+as the table now records. The text carried every entry's substance; what it did not carry,
+or carried against itself, was raised as eleven findings and folded into Parts 1 and 2 in
+this pass, so the register opens against Revision 38 empty:
+
+1. Part 2 §5.5 carried no value-space clause for `hostname`, `host` or `media_type`,
+   though §3.2 item 14 above claimed them and six citations pointed there; the three
+   clauses are written, `types` and `suffixes` compared without ASCII case.
+2. "Refused" being a term, Part 1 §8.1's validity-at-every-processor claim is qualified by
+   the Unicode version the text needs, an earlier-version processor's report is a lexer
+   or resolver error, and twenty-four loose uses of "refuse" for a validity error now name
+   the error.
+3. Part 1 §7.7 named the joining-control contexts' properties as stabilised; they are
+   not, and the monotone guarantee now states its one exception, for identifiers and for
+   host names alike (§2.2.1, §5.5, §7.1, §8.1, §8.3).
+4. Part 2 §5.2 and §11.4 put an undeclared name at closure before hygiene, against
+   [TSON-JSON] §9.4 and the readers; a value of the name type now meets §8.2 first.
+5. Part 2 §4.2 states that a namespace entry is listed by its constructor's kinds, the
+   namespace-type carve-out in the membership walk, where `kind<namespace>` holds
+   `namespace` itself, `top` as a constructor and a `type_kind` member, and why
+   `ref_type.of` is `type_name`; §9's "the one slot typed `type_name`" is corrected.
+6. §5.12 refused a record template a kind lists; both facts are now stated together.
+7. §5.6 and §5.12 overstated which bare tokens are refused; §4.2's placement paragraph
+   said a subtraction off a constructor IS-A `top`, against §5.9 rule 8.
+8. Seven sentences from the held-template reading survived for record templates: the
+   base's `extension` "stated", "ABSTRACT does travel", the `type_ref` slot lists,
+   §12.1's `instance` comment, §5.2's "same checks", a deferred-diagnostic example and
+   §5.8's alias-to-instantiation sentence.
+9. §8.2's `vector<pixel, 1920>` use site beside `hd_row`, its identity bullet, §8.3's
+   "the one `!reference`", §5.10's `c3` and §5.10.1 disagreed on instantiation identity
+   and `@application`; and #18's verdict change is now stated in §8.2.
+10. "Empty chain" where the fixture has `subtypes`, "four facts" counting `type`,
+    `extension` unmarked in §9, and the canonical `!record_field` tag.
+11. A dozen wrong examples and cross-references, the §5.10 selector example, `{ _id: 1 }`
+    in Part 1 §2.5 and a literal U+00AD in §8.2 among them.
+
+What remains open is §5's, and the `tson-schema` skill's edits.
