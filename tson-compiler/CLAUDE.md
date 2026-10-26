@@ -13,7 +13,9 @@ before editing — each opens with its invariants.
 | `resolver/DefinitionResolver`, `SchemaResolver` | `schema-resolution.md`, `constructor-application.md`, `atom-refinement-and-coherence.md` |
 | `resolver/WireForm`, `MetaRefs`, `DerivedName`, `MetaKernelBootstrapResolver` | `resolver-vocabulary-and-bootstrap.md` |
 | `resolver/TemplateMaterialiser`, `SyntheticMerge`, `ParameterTypes`, `HeldBody` | `held-template-bodies.md`, `template-materialisation.md` |
-| `TsonSchemaLinker`, `ChoiceDisjointness`, `TypeInhabitance` | `linking-and-compilation.md`, `choice-disjointness.md`, `name-hygiene-and-minted-names.md` |
+| `TsonSchemaLinker`, `ChoiceDisjointness`, `ValuesByName` | `linking-and-compilation.md`, `choice-disjointness.md`, `name-hygiene-and-minted-names.md` |
+| `TypeInhabitance`, `RecordExtension` | `inhabitance-and-record-extension.md` |
+| `EnumLabels`, `FieldNames`, `resolver/KindMembers`, `resolver/NameType` | `kinds-and-name-types.md` |
 | `TsonSchemaCompiler`, the registries | `class2-compilation.md`, `compiled-registries.md` |
 | `reader/` | `readers-and-diagnostics.md`, then `record-dispatch.md`, `scope-push.md`, `reader-naming-and-schema-location.md`, `name-hygiene-read-path.md` as the class requires |
 | A diagnostic's code, message or location | `diagnostic-model.md`, `diagnostic-rules-and-messages.md`, `schema-side-diagnostics.md` |

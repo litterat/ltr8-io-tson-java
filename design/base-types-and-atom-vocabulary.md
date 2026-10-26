@@ -1,14 +1,14 @@
 # Base types and atom vocabulary
 
-Design notes for what a token means: §4 base type resolution for untyped tokens, and the built-in atom vocabulary
-(`tson-atom`) that reads typed ones. Current form only; history lives in git.
+What a token means: §4 base type resolution for untyped tokens, and the built-in atom vocabulary (`tson-atom`) that
+reads typed ones. Current form only; history lives in git.
 
 **Invariants**
 
 - `AtomType` takes a `String`; only the kernel's `value` and `Token` need the lexical form, and they stay with the text
   encoding.
 - A token's form is consulted exactly once, by base type resolution: a quoted token is a `StringValue` only at an
-  *untyped* position, and no atom parser consults `TokenForm` (§7.4).
+  *untyped* position, and no atom parser consults `TokenForm` ([TSON-DATA] §2.4).
 - There is no `null`: absence is `_` and is lexical, never a `TokenValue`; the unquoted token `null` is the string
   `null`.
 - `NumberGrammar` identifies and extracts a `NumberForm`; it does not convert to a host numeric type — binding does.
@@ -23,324 +23,236 @@ Design notes for what a token means: §4 base type resolution for untyped tokens
 - Facet comparisons are on the value denoted, never the token: `members` uses §4.3 identity (`compareTo`), and no facet
   counts written digits.
 
-Related: `design/lexer-and-data-parsing.md` (the tokens these rules read), `design/schema-resolution.md` (atom
-narrowing and coherence checks), `design/json-encoding.md` (the other encoding the vocabulary serves),
-`design/readers-and-diagnostics.md`.
+Related: `design/lexer-and-data-parsing.md` (the tokens these rules read), `design/atom-refinement-and-coherence.md`
+(refinement, narrowing and the per-family coherence checks over these facets), `design/json-encoding.md` (the other
+encoding the vocabulary serves), `design/readers-and-diagnostics.md`.
 
 ## Where the atom vocabulary lives
 
-`tson-atom`, not `tson-compiler`. [TSON-JSON] §5.1 hands a JSON string's content to the atom's own parser
-exactly as a TSON quoted token's text would be, so which families a reader can bind, and what host value
-each produces, is a property of the type system rather than of the encoding that carried them. Left inside
-the text engine it would be TSON text's by accident of placement, and a second encoding would either depend
-on the whole engine or mint a second vocabulary for one fact.
+`tson-atom`, not `tson-compiler`, because [TSON-JSON] §5.1 hands a JSON string's content to the atom's own parser
+exactly as a TSON quoted token's text would be: which families a reader can bind, and what each produces, is the type
+system's, not an encoding's. `module-info.java` states the split by package.
 
-**`AtomType` takes a `String`.** Of 25 parsers, two need the lexical form and both are escape hatches rather
-than types — the kernel's `value`, decoded by §4 base type resolution whose §4.4 rule is that a quoted token
-is a string, and `Token`, which *is* the token because §8's resolved form records the spelling. Those two,
-`TokenAtomType` which describes them, `TokenValue`/`TokenForm` and `BaseTypeResolver` stay with the text
-encoding. That the form-dependent set is exactly where the two encodings legitimately differ is not a
-coincidence: JSON has no token forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
+**`AtomType` takes a `String`.** Two atoms need the lexical form, and both are escape hatches rather than types: the
+kernel's `value`, decoded by §4 base type resolution whose §4.4 rule is that a quoted token is a string, and `Token`,
+which *is* the token because §8's resolved form records the spelling. Those two, `TokenAtomType` which describes them,
+`TokenValue`/`TokenForm` and `BaseTypeResolver` stay in `tson-compiler`. The form-dependent set is exactly where the
+two encodings legitimately differ: JSON has no token forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
 
-**Three indices, three questions, and no fourth.** `BuiltinTypeVocabulary` maps a built-in *name* to a
-parser carrying the constraints §5 fixes; `AtomParsers` maps a resolved *body* to one carrying whatever the
-schema resolved, which is what a user's own `!integer ^ { max: 100 }` needs; `HostAtoms` maps a *host class*
-back to the family that produces it, which is what a reader with no type-ref dispatches on and what a
-`value`-typed slot asks. `VocabularyAtoms` is the write direction. A second body→parser table in the compiled
-reader stack, restating `AtomParsers` entry for entry, is what drifts — a `period`-typed field's `~` default
-reported as "not a scalar type" while `duration` beside it works.
-The compiled readers and the linker both ask `AtomParsers`, so there is no second opinion about which parser reads
-which body. `value_type` and `void_type` are the *encoding's* rather than this vocabulary's: `AtomParsers` declines
-both, their readings depending on the lexical form and on a sentinel no token is.
+**Three indices, three questions, and no fourth.** `BuiltinTypeVocabulary` maps a built-in *name* to a parser carrying
+the constraints §5 fixes; `AtomParsers` maps a resolved *body* to one carrying whatever the schema resolved, which is
+what a user's own `!integer ^ { max: 100 }` needs; `HostAtoms` maps a *host class* back to the family that produces
+it. `VocabularyAtoms` is the write direction. The compiled readers (`AtomTypeReader.ATOM`, one factory for every atom
+family) and the linker both ask `AtomParsers`, so there is no second opinion about which parser reads which body; a
+second table restating it entry for entry is what lets a family be present in one and missing from the other.
+`value_type` and `void_type` are the *encoding's*: `AtomParsers` declines both, their readings depending on the
+lexical form and on a sentinel no token is.
 
-`HostAtoms` is itself three maps over one question, split by **what may reach the position**.
-`forStringContentHostType` and `forNumberContentHostType` are [TSON-JSON] §5's per-family *kinds*, since
-JSON's grammar tells a string from a number and §5's table admits one or the other per family;
-`forTypedPosition` is the union plus `text` and `boolean`, for TSON, where a typed position never consults
-the form and `12` and `"12"` are one `int32` ([TSON-SCHEMA] §4.2). One question, two encodings, and the split
-is the encodings' rather than the vocabulary's. `forHostType` is the fourth and answers something else: what
-a `value`-typed slot meant, where §7.4's bootstrap ordering leaves the position's own type as the only
-evidence.
+`HostAtoms` answers by **what may reach the position**. `forStringContentHostType` and `forNumberContentHostType` are
+[TSON-JSON] §5's per-family *kinds*, since JSON's grammar tells a string from a number and §5's table admits one or
+the other per family; `forTypedPosition` is their union plus `text` and `boolean`, for TSON, where a typed position
+never consults the form and `12` and `"12"` are one `int32` ([TSON-SCHEMA] §7.3). `forHostType` answers something
+else: what a `value`-typed slot meant (below).
 
 ## Base type resolution (`tson-compiler/.../base/`, over `tson-atom`'s `atom.number`)
 
-`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (boolean → number → string,
-§4.5) for untyped tokens. `NumberGrammar.tryParse` (`atom.number`, exported because base type resolution
-stays with the text encoding and reads it) recognizes the `number` production (§7.6).
+`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (boolean → number → string, §4.5) for untyped
+tokens. `NumberGrammar.tryParse` (`atom.number`, exported because base type resolution stays with the text encoding
+and reads it) recognizes the `number` production (§7.6).
 
-**What counts as untyped is narrower than "no `!!schema`".** §4.1 states its applicability over what types a
-position, not over the header, and a document with no `!!schema` read *into a Java class* is the case that
-difference decides: nothing in the document types the position and the target does. That is a **typed**
-position — the class already fixes the shape of every record and array under it, and fixing the leaf too is
-what makes `{ i: "12" }` read as `12` at an `int`, exactly as it does at a schema's `int32`. So §4 is reached
-only where nothing types the position at all: a **tree** read (`TsonValue`, and `JsonValue` beside it), and
-the handful of targets no built-in family names — `char`, an opaque `Object`, a host type outside §5's
-vocabulary. [TSON-DATA] §4.1 names a declared host type naming a §5 family among what types a position, and
-[TSON-JSON] §4.1 and §5.7 answer the identical question the same way for JSON. `HostAtoms.forTypedPosition` is
-the lookup, and `ClassTypedPositionTest` asserts every case against the schema declaring the same types, so the
-schema is the oracle rather than a literal in a test.
+**What counts as untyped is narrower than "no `!!schema`".** [TSON-DATA] §4.1 states its applicability over what
+types a position, and names a declared host type naming a §5 family among what does. So a document with no `!!schema`
+read *into a Java class* is **typed**: `{ i: "12" }` reads as `12` at an `int`, exactly as at a schema's `int32`. §4 is
+reached only where nothing types the position: a **tree** read (`TsonValue`, and `JsonValue` beside it), and targets
+no built-in family names — `char`, an opaque `Object`, a host type outside §5's vocabulary. [TSON-JSON] §4.1 and §5.7
+answer the same way. `HostAtoms.forTypedPosition` is the lookup (`DataClassObjectReader`), and
+`ClassTypedPositionTest` asserts every case against a schema declaring the same types, the schema being the oracle.
 
-- **Identification is separate from binding to a host numeric type.** `NumberGrammar` decides which of the
-  four grammar alternatives matches and extracts structural pieces into `NumberForm` — it does **not**
-  convert to `long`/`double`/`BigInteger`/`BigDecimal`. The spec leaves that mapping to the implementation
-  (§4.3); binding is where the required `255`/`0xFF`, `.5`/`0.5` equivalences get enforced, and different
-  consumers want different host types.
+- **Identification is separate from binding to a host numeric type.** `NumberGrammar` decides which grammar
+  alternative matches and extracts its structural pieces into `NumberForm`; it does **not** convert to
+  `long`/`double`/`BigInteger`/`BigDecimal`. The spec leaves that mapping to the implementation (§4.3); binding is
+  where the required `255`/`0xFF`, `.5`/`0.5` equivalences are enforced, and different consumers want different host
+  types.
 - **The grammar is hand-written, one method per ABNF rule** (`NumberScanner`, package-private beneath
-  `NumberGrammar`), and that is a decision about what a *reference* implementation should contain rather
-  than a performance one. A grammar stated as a `java.util.regex` pattern with named groups is stated in a
-  dialect no other language shares — an unspecified host dependency in the artifact other implementations
-  copy, and TSON pins I-Regexp for a schema's `pattern` facets while saying nothing about how a number is
-  recognized. (This repo's own `ltr8-regex` is not the substitute: I-Regexp deliberately has no named
-  groups, so it cannot extract what `NumberForm` carries.) The scanner is single-pass, with explicit
-  `mark`/`reset` at the two places the grammar is genuinely optional — a float's fraction and its exponent —
-  because a regex backtracks there and the two must agree. It is also a fifth of a read's allocation
-  cheaper: nine anchored patterns tried in turn cost a `Matcher` and its internals per attempt, 47 of them
-  per read of a document holding seven numbers.
-  - **The scanner is checked against a regex oracle.** `NumberScannerEquivalenceTest` holds the equivalent
-    patterns — whose `MAGNITUDE` (the complex form's part, group-less because a named group cannot repeat)
-    must parenthesise `decimal-natural`'s bare `|`, or a zero-led magnitude with anything after it (`0.5i`,
-    `0e3j`, `0.5-0.25i`) is refused where §7.6 admits it — running both over every string up to length four
-    across the grammar's own alphabet and 120,000 fuzzed longer ones, comparing whole `NumberForm`s rather
-    than match/no-match.
-- **Quoted tokens always resolve to `StringValue`** regardless of content (§4.4) — form is consulted once,
-  here. `"42"` and unquoted `42` differ even though their text is identical.
-    - **And exactly once, which is the half that keeps getting re-derived backwards.** §7.4: "a token's form
-      is consulted exactly once: by base type resolution (§4) … Everywhere else only the text matters. Type
-      contracts operate on text — `!number 10.2` and `!number "10.2"` are the same value". So a quoted token
-      at a *typed* position — a field declared `int32`, an `array`'s own `min_items`, a `~`/`=` value — is
-      that type's value if its text is, and no atom parser consults `TokenForm`. Reading §4.4 as a general
-      rule about quoting rather than a rule about *untyped* tokens makes an implementation reject documents
-      the spec requires it to accept.
-      `FieldValueConformanceTest.aQuotedNumericIsAValueOfAnIntegerFieldBecauseFormIsNotMeaning` pins it.
-- **There is no `null`, and the order has three steps rather than four.** Absence has one spelling, `_`,
-  and it is lexical: the lexer gives it `TokenType.VOID`, the stream a `VoidEvent` and the parser a
-  `ast.VoidValue`, so it is never a `TokenValue` and no order here could reach it. The unquoted token
-  `null` is the string `null`, as `frobnicate` is — §7.7 rule 3 holds with no word to except, and the
-  token stays available to `enum`/`token`/FIXED-`text` positions like any other. `BaseValue` carries an
-  `VoidValue` member all the same, and `BaseTypeResolver` never returns it: binding an identified value
-  to a host type is one switch (`AtomBinder.bind`), and a schemaless bind reaching `_` needs a way into
-  it. A JSON document's `null` reaches absence through a JSON reader, which maps it in the model, where
-  the position's own state decides whether absence is admitted at all.
-- **§9.1's numeric-literal length limit** (4,096 digits by default, annotated tokens included) is **not
-  enforced**: `LimitsPolicy` bounds nesting depth only, and `BACKLOG.md` carries the rest of §9.1's table.
+  `NumberGrammar`), because of what a *reference* implementation should contain: a `java.util.regex` pattern with
+  named groups is stated in a dialect no other language shares, an unspecified host dependency in the artifact other
+  implementations copy. `ltr8-regex` is not the substitute: I-Regexp has no named groups, so it cannot extract what
+  `NumberForm` carries. The scanner is single-pass, with explicit `mark`/`reset` at each optional group a regex
+  would backtrack over (a fraction, an exponent, a radix prefix whose digits do not follow), and is checked against a
+  regex oracle: `NumberScannerEquivalenceTest` runs both over every string up to length three across the grammar's
+  alphabet, 120,000 seeded fuzzed longer ones and near-misses of real numbers, comparing whole `NumberForm`s.
+- **Quoted tokens always resolve to `StringValue`** regardless of content (§4.4) — `"42"` and unquoted `42` differ
+  though their text is identical. **And the form is consulted exactly once** ([TSON-DATA] §2.4), the half that is
+  easy to re-derive backwards: a quoted token at a *typed* position — a field declared `int32`, an `array`'s own
+  `min_items`, a `~`/`=` value — is that type's value if its text is. Reading §4.4 as a rule about quoting rather than
+  about *untyped* tokens rejects documents the spec requires accepted.
+  `FieldValueConformanceTest.aQuotedNumericIsAValueOfAnIntegerFieldBecauseFormIsNotMeaning` pins it.
+- **There is no `null`, and the order has three steps.** Absence has one spelling, `_`, and it is lexical (`TokenType.VOID`),
+  so it is never a `TokenValue` and no order here could reach it. The unquoted token `null` is the string `null`, as
+  `frobnicate` is — §7.7 rule 3 holds with no word to except. `BaseValue` carries a `VoidValue` member all the same,
+  which `BaseTypeResolver` never returns: binding an identified value to a host type is one switch
+  (`AtomBinder.bind`), and a schemaless bind reaching `_` needs a way into it.
+- **§9.1's numeric-literal length limit** (4,096 digits, annotated tokens included) is **not enforced**: `LimitsPolicy`
+  bounds nesting depth only, and `BACKLOG.md` carries the rest of §9.1's table.
 
 ## Built-in atom vocabulary (`tson-atom`)
 
-`AtomType<T>` is a built-in atom's parsing contract (§5.2), over text: `read(String)` (its natural host
-value), `write(T)`, and `boundTo(Class<?>)` — the family reading into a caller's target, bound once where the
-reader is built rather than carried into every read. `BuiltinTypeVocabulary` is the fixed, closed
-name→`AtomType` table (§5).
+`AtomType<T>` is a built-in atom's parsing contract (§5.2), over text: `read(String)`, `write(T)`, and `boundTo`, the
+family reading into a caller's target, bound once where the reader is built.
 
-**Each name denotes the type its library declares under it** — core.tn's, or net.tn's for the five network families
-and `hostname` — so a document keeps its meaning when it moves under a schema importing that library
-([TSON-DATA] §5.6). net.tn's `hostname` and `host` are families of their own ([TSON-DATA] §5.5): `HostnameParser` reads a
-domain name in either label form to an `io.ltr8.net.HostName`, and `HostParser` a host name or an address to an
-`io.ltr8.net.Host`, and `MediaTypeParser` a media type with its parameters to an `io.ltr8.net.MediaType`.
-All three are string-class, their grammar is `io.ltr8.net`'s, and a `String` target receives the
-canonical text — lowercase U-labels, a dotted-quad, unbracketed RFC 5952 — so a list of names declared
-`List<String>` compares by name. A token outside the grammar is a parse failure; `allow_idn: false` refusing an
-internationalized name is a constraint violation, the name being one, as are a media type's parameters where
-`allow_parameters` is false and a type or suffix outside `types` or `suffixes`. Only `charset`'s parameter value
-folds: a closed list, since which other registrations fold is the registry's to say.
+**Each name denotes the type its library declares under it** — core.tn's, or net.tn's for its eight (`ipv4`, `ipv6`,
+`cidr4`, `cidr6`, `mac`, `hostname`, `host`, `media_type`) — so a document keeps its meaning when it moves under a
+schema importing that library ([TSON-DATA] §5.6). `HostnameParser` reads a domain name in either label form to an
+`io.ltr8.net.HostName`, `HostParser` a host name or an address to an `io.ltr8.net.Host`, and `MediaTypeParser` a media
+type with its parameters to an `io.ltr8.net.MediaType` ([TSON-DATA] §5.5). All three are string-class, and a `String`
+target receives the canonical text — lowercase U-labels, a dotted-quad, unbracketed RFC 5952 — so a list of names
+declared `List<String>` compares by name. A token outside the grammar is a parse failure; one outside a facet
+(`allow_idn`, `allow_parameters`, `types`, `suffixes`) is a constraint violation, the value being one.
 
-**`boolean` is in that table** ([TSON-DATA] §5.5): the tokens `true` and `false`, case-sensitive, over
-meta-kernel's `!enum [true false]`. A typed position does not consult the form, so `!boolean "true"` and
-`!boolean true` are one value — §4.2's special status for the two tokens is a base-resolution rule a typed
-position never reaches. `BooleanParser` is the one statement of what `boolean` reads, and the compiled reader
-stack asks the vocabulary for it rather than keeping a second (`AtomTypeReader.ENUM_OBJECT_MODE`); a token
-that is neither member is the enum miss it is — `ATOM_CONSTRAINT_VIOLATION`, matching every other enum.
+**`boolean` is in that table** ([TSON-DATA] §5.5): the tokens `true` and `false`, case-sensitive, over the kernel's
+`!enum [true false]`. A typed position does not consult the form, so `!boolean "true"` and `!boolean true` are one
+value — §4.2's special status for the two tokens is a base-resolution rule a typed position never reaches.
+`BooleanParser` is the one statement of what `boolean` reads; the compiled reader stack's enum factory
+(`AtomTypeReader.ENUM_OBJECT_MODE`) asks the vocabulary for it by name, which is the name-keyed read the invariant
+allows, rather than keeping a second. A token that is neither member is the enum miss it is —
+`ATOM_CONSTRAINT_VIOLATION`, matching every other enum. It stays out of `VocabularyAtoms` on `text`'s own terms: base
+resolution recovers a boolean from an unquoted `true`, so a writer annotating every one would restate the token.
 
-**An enum's members are text and its `type` says what they are labels of**, which changes nothing here:
-matching is an identity check of the token's decoded text against the members, and the host value is the natural
-parse of the member that matched. `type` governs what may be *declared* — each member a value of it, none two of
-one value — so it is a schema-load question the linker asks (`EnumLabels`). The one fact a reader needs from it
-is the name type's `normalization`: the token and each member are compared in that form, so under a
-case-folding name type `Content-Type` is the member written `content-type`. The type may be an entry of the
-governing meta, which only linking sees, so the linker records each enum's form
-(`EnumLabels.labelForm`, `TsonLinkedSchema.enumForms`) and every site that builds an enum parser passes it to
-`AtomParsers.forType(body, form)` — both encodings' atom readers, map keys, pins and selectors, and the linker's
-own default and pin checks. `text_type.members` is likewise an
-ordinary facet on the shared parser — `TextParser` checks it last, as the numeric tiers do, a member set naming
-the whole value space so the other facets hold vacuously where it is present.
-It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recovers a boolean from an unquoted
-`true`, so a writer annotating every one with `!boolean` would be restating what the token already says.
+**An enum's members are text and its `type` says what they are labels of**, which changes nothing here: matching is
+an identity check of the token's text against the members, and the host value is the member that matched. `type`
+governs what may be *declared* — each member a value of it, none two of one value — so it is a schema-load question the
+linker asks (`EnumLabels`). The one fact a reader needs from it is the name type's `normalization`: the token and each
+member are compared in that form, so under a case-folding name type `Content-Type` is the member written
+`content-type`. The type may be an entry of the governing meta, which only linking sees, so the linker records each
+enum's form (`EnumLabels.labelForm`, `TsonLinkedSchema.enumForms`) and every site that builds an enum parser passes it
+to `AtomParsers.forType(body, form)` — both encodings' atom readers, map keys, pins and selectors, and the linker's own
+default and pin checks. `text_type.members` is an ordinary facet on the shared parser, which `TextParser` checks last,
+as the numeric tiers do: a member set names the whole value space, so the other facets hold vacuously where it is
+present.
 
 **A text family's value is its text in the type's `normalization` form** (`Normalization`, `ltr8-unicode`'s, which
-`schema.meta` binds the meta-kernel's enum to directly; [TSON-SCHEMA] §5.5). No comparison goes below NFC: two values
-are one when, each in its form, they are NFC-equal, so `NONE` and `NFC` share one equality and differ in the value.
-`text_type` carries the facet and every family composing it inherits it — `NONE` by default, `NFC` on
-`identifier_type`, fixed to `NONE` on `regex_type`, since folding a pattern changes what it matches, and on
-`uri_type`, `iri_type` and `email_type`, since a URI's path and query and a mailbox's local part compare with case and
-a form over the whole text would change what the value names. Each parser puts the text into the form first and judges
-the result: the lengths, `pattern`, the members (normalised the same way, `TextType.normalizedMembers`), an
-identifier's profile, a URI's or an address's grammar. The three lengths are one helper, `TextParser.checkLengths`,
-which the URI and email parsers call too, and they count code points, as `text_type` says and
-`TextType.coherenceCheck` does. Since every comparison downstream — map keys, set elements, pins, look-alike scopes,
-hygiene — already runs on the parser's value, none of them needed a change of its own beyond reading the value rather
-than the token. A refusal names the token as written and then the value it was judged as — `'PUT' (read as 'put' under
-NFKC_CASEFOLD) is not a member of this type` — through `TextParser.subject`, threaded into every facet's message: the
-written spelling is the text a reader or a repair loop has to find, and the value is what the facet compared.
-`NFKC_CASEFOLD` is `NfkcCasefold`, derived from the JDK's normalizer and case mappings with three exceptions and
-checked against `DerivedNormalizationProps.txt` over every code point. `ASCII_CASEFOLD` lowercases A..Z and touches
-nothing else — no NFC either — so a profile of ASCII letters under it refuses the full-width and Kelvin-sign spellings
-`NFKC_CASEFOLD` would fold into the profile. It is the form of the case-insensitive ASCII naming systems (field names,
-schemes, DNS names), and `scheme_name` uses it; `NFKC_CASEFOLD` is for names compared without case across Unicode.
-**No comparison goes below NFC** ([TSON-SCHEMA] §5.5), whatever the form: `ValueIdentity` compares map keys, set
-elements, FIXED values and pins in NFC of the value, so under `NONE` or `ASCII_CASEFOLD` a composed and a decomposed
-`É` are one key and one member while each value keeps its spelling. The `members` checks in `TextParser` and
-`EnumParser` still compare the form exactly (`BACKLOG.md`).
+`schema.meta` binds the kernel's enum to directly; [TSON-SCHEMA] §5.5). `text_type` carries the facet and every family
+composing it inherits it — `NONE` by default, `NFC` on `identifier_type`, fixed to `NONE` on `regex_type` (folding a
+pattern changes what it matches) and on `uri_type`, `iri_type` and `email_type` (a URI's path and query and a
+mailbox's local part compare with case). Each parser puts the text into the form first and judges the result: the
+lengths, `pattern`, the members (normalised the same way, `TextType.normalizedMembers`), an identifier's profile, a
+URI's or an address's grammar. The three lengths are one helper, `TextParser.checkLengths`, which `UriParser` and
+`EmailParser` call too, and they count code points, as `text_type` says. Every comparison downstream — map keys, set
+elements, pins, look-alike scopes, hygiene — runs on the parser's value rather than the token. A refusal names the
+token as written and then the value it was judged as — `'PUT' (read as 'put' under NFKC_CASEFOLD) is not a member of
+this type` — through `TextParser.subject`: the written spelling is what a reader or a repair loop has to find, and the
+value is what the facet compared.
 
-**`text_type` has no facet for the text's format, deliberately.** A facet narrows a value space (§5.7), and a
-format such as CommonMark narrows nothing — every string is valid CommonMark — so it would fail §6's own test for
-an annotation rather than a facet; that is why `doc`'s CommonMark is its type's documented contract and not a
-facet. A format that does narrow, such as a media type that must parse, is a type of its own rather than a facet
-on every text family.
+- **`ASCII_CASEFOLD` against `NFKC_CASEFOLD`** (`ltr8-unicode`'s `NfkcCasefold`): the first lowercases A..Z and
+  touches nothing else — no NFC either — so a profile of ASCII letters under it refuses the full-width and Kelvin-sign
+  spellings `NFKC_CASEFOLD` would fold into the profile. It is the form of the case-insensitive ASCII naming systems
+  (field names, schemes, DNS names), and `scheme_name` uses it; `NFKC_CASEFOLD` is for names compared without case
+  across Unicode.
+- **No comparison goes below NFC** ([TSON-SCHEMA] §5.5), whatever the form: two values are one when, each in its
+  form, they are NFC-equal, so `NONE` and `NFC` share one equality and differ in the value. `ValueIdentity` compares
+  map keys, set elements, FIXED values and pins in NFC of the value, and the `members` checks in `TextParser` and
+  `EnumParser` compare NFC of the form, so under `NONE` or `ASCII_CASEFOLD` a composed and a decomposed `É` are one key
+  and one member while each value keeps its spelling.
 
-- **Each constructor splits into two classes across two modules:** a pure constraint-*values* record in
-  `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`, `RegexType`, `DateType`, …, matching the kernel's
-  `*_type` shape) and a same-named `*Parser` in `tson-atom`'s unexported `atom.parser` (`IntegerParser`,
-  `TextParser`, …) that holds one and does the `read`/`write`/validate work. `tson-atom` depends on
-  `tson-schema`, which is what lets a parser consult its constraint record directly.
-- **`RegexParser` returns `String`, and `TextType.pattern`/`UriType.pattern` are `Optional<String>`, not
-  `Pattern`** — `regex` IS-A piece of text (§5.7), so its host value is `String` like every other
-  text-composing atom; the text is validated as I-Regexp via `ltr8-regex`'s `IRegex.parse` (not
-  `java.util.regex`, whose grammar is a superset — `regex_type`'s `spec` is fixed to RFC 9485),
-  and the parsed form discarded once it's confirmed well-formed. Keeping these as plain equatable `String`
-  (not a compiled matcher) is also what lets them bind generically with no `DataBridge`. **Matching** a value
-  against a `pattern` constraint (`TextParser`/`UriParser`) runs through `ltr8-regex`'s `IRegex.matches` —
-  a Thompson-NFA, linear-time and ReDoS-safe — not `java.util.regex`.
-- **`value`, `void` and `identifier` each have a constructor**, and are read by it: `value_type` by `ValueParser`
-  (in `tson-compiler`, base-type resolution to the natural host), `void_type` by `VoidReader` (the void sentinel
-  `_` alone), and `identifier_type` by `IdentifierParser` — the text put into its `normalization` form, then
-  matched against the type's own `IdentifierProfile`, a profile failure being a parse failure, then `text_type`'s
-  facets through `TextParser`. So a naming convention is a `pattern` and a closed vocabulary of names is
-  `members`, and an identifier is string-class (§5.4).
-- **`identifier_type` is a UAX #31 profile**: `start`/`continue` bases (`XID`, `ID`, `NONE`), `start_add`,
+**`text_type` has no facet for the text's format, deliberately.** A facet narrows a value space (§5.7), and a format
+such as CommonMark narrows nothing — every string is valid CommonMark — so it would fail §6's test for an annotation
+rather than a facet; that is why `doc`'s CommonMark is its type's documented contract and not a facet. A format that
+does narrow, such as a media type that must parse, is a type of its own.
+
+- **Each constructor splits into two classes across two modules:** a constraint-*values* record in
+  `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`, …, the kernel's `*_type` shape) and a same-named `*Parser` in
+  the unexported `atom.parser` that holds one and does the `read`/`write`/validate work.
+- **`RegexParser` returns `String`, and `TextType.pattern`/`UriType.pattern` are `Optional<String>`, not `Pattern`**:
+  `regex` IS-A piece of text (§5.7), and a plain equatable `String` binds generically with no `DataBridge`. The text is
+  validated by `IRegex.parse` (`regex_type`'s `spec` is fixed to RFC 9485; `java.util.regex`'s grammar is a superset)
+  and matched by `IRegex.matches`, linear-time and ReDoS-safe.
+- **`value`, `void` and `identifier` each have a constructor**, and are read by it: `value_type` by `ValueParser` (in
+  `tson-compiler`, base type resolution to the natural host), `void_type` by `VoidReader` (the void sentinel `_`
+  alone), and `identifier_type` by `IdentifierParser` — the text put into its `normalization` form, matched against
+  the type's own `IdentifierProfile` (a profile failure is a parse failure), then `text_type`'s facets through
+  `TextParser`. So a naming convention is a `pattern`, a closed vocabulary of names is `members`, and an identifier is
+  string-class (§5.4). Core's `void` is `!void_type {}` too, so the linker's refusal of a `void` variant and the
+  inhabitance check ask the body (`ReferenceChain.resolvesToVoid`), not the name.
+- **`identifier_type` is a UAX #31 profile**: `start`/`continue` bases (`XID`, `ID`, `ASCII`, `NONE`), `start_add`,
   `continue_add`, `medial` and `exclude` code-point sets, with `text_type`'s `normalization` defaulting to `NFC`.
-  `IdentifierType.profile()` builds the `IdentifierProfile`; the parser builds it once, so a read builds nothing. The
-  kernel's `identifier` is `!identifier_type { continue_add: "-" }` (`IdentifierType.IDENTIFIER`), and
-  `IdentifierGrammar.PROFILE` is built from it — §7.7's grammar, which both encodings' readers, the schema parser, the
-  resolver and the linker hold statically, since the kernel's own names are read before the kernel exists.
-  `MetaKernelBootstrapResolver` refuses a kernel `identifier` stating any other body, so the constant and the
-  declaration cannot drift, and the grammar is not restated anywhere. The kernel's second instance, `scheme_name`
-  (`IdentifierType.SCHEME_NAME`), is told apart by its entry name and checked the same way. **The profile facets never
-  move under refinement** (`IdentifierType.constraintsCheck`): a refinement restates them or leaves them, and narrows
-  only the text facets. Set-once would not do — setting `start_add` where the source left it unset widens the profile.
-  `coherenceCheck` holds each member to the type's profile as well as to the facets, since a member the profile refuses
-  is one no value can reach, and refuses a profile with an empty Start set or a medial that is also Start or Continue.
-  Core declares no `identifier`; a schema wanting one writes the kernel's line. Core's `void` is `!void_type {}` too, so
-  the linker's refusal of a `void` variant and the inhabitance check ask the body (`ReferenceChain.resolvesToVoid`), not
-  the name.
-- **`IdentifierGrammar` is the series' name grammar, beside the atom it is the profile of.** `validate` is [TSON-DATA]
-  §7.7 and `hygiene` §8.2's restricted-character rule, both over `PROFILE`, and both **report** a violation rather than
-  throwing one — what lets one check serve a caller that owes a parse error and one that owes a diagnostic: the
-  identical violation is a `ParseException` from the lexer and a refusal from the linker. It is not a parser: it
-  answers *is this a legal name* over text a caller already holds, and refuses text not in NFC, where
-  `IdentifierParser.IDENTIFIER` reads a value and puts it into NFC first. It lives here rather than in `tson-base`
-  because its one definition is `tson-schema`'s `IdentifierType.IDENTIFIER`, and `tson-atom` is the module under both
+  `IdentifierType.profile()` builds the `IdentifierProfile` on each call, and `IdentifierParser` holds the one it
+  built, so a read builds nothing. The kernel declares two instances, told apart by entry name:
+  `identifier => !identifier_type { continue_add: "-" }` (`IdentifierType.IDENTIFIER`) and `scheme_name`
+  (`IdentifierType.SCHEME_NAME`). `MetaKernelBootstrapResolver` refuses either stating any other body, so the
+  constants and the declarations cannot drift. Core declares no `identifier`; a schema wanting one writes the kernel's
+  line. How the profile facets behave under refinement and what `coherenceCheck` holds them to is
+  `design/atom-refinement-and-coherence.md`'s.
+- **`IdentifierGrammar` is the series' name grammar, beside the atom it is the profile of.** `PROFILE` is built from
+  `IdentifierType.IDENTIFIER` and held statically by both encodings' readers, the schema parser, the resolver and the
+  linker, since the kernel's own names are read before the kernel exists. `validate` is [TSON-DATA] §7.7 and
+  `hygiene` §8.2's restricted-character rule, both over `PROFILE`, and both **report** a violation rather than
+  throwing one, so one check serves a caller that owes a parse error and one that owes a diagnostic: the identical
+  violation is a `ParseException` from the lexer and a refusal from the linker. It is not a parser — it refuses text
+  not in NFC, where `IdentifierParser.IDENTIFIER` reads a value and puts it into NFC first. It lives in `tson-atom`
+  rather than `tson-base` because its one definition is `tson-schema`'s, and `tson-atom` is the module under both
   encodings that can see it.
-- **The network family reuses one grammar per address form, never a second copy.** Both grammars are `ltr8-net`'s
-  `io.ltr8.net.InternetAddress`, which `Iri` reads its IP literals through too: its IPv6 half parses RFC 4291 §2.2's
-  embedded IPv4 tail through the same strict `dec-octet` pattern `Ipv4Parser` reads, and `Cidr4Parser`/`Cidr6Parser`
-  parse the address half of a network through those two — so the leniency gap `Ipv4Parser`'s Javadoc documents is
-  shut down once, in one place. What the CIDR pair adds on top is §5.5's own two validation rules (prefix length
-  inside the family range; host bits zero under that prefix, since a network that accepted and masked would be
-  lossy) plus the `min_prefix`/`max_prefix` facets. **`within`/`excluding` apply across all four**, each family
-  asking its own question of the same arithmetic: an address must fall inside some permitted network and outside
-  every excluded one, and a network must be a subnet of a permitted one and must not overlap an excluded one — the
-  difference being that a block partly inside an exclusion is partly excluded, which for a value denoting a whole
-  block is a rejection.
+- **The network family reuses one grammar per address form, never a second copy.** Both are `ltr8-net`'s
+  `InternetAddress`, which `Iri`'s grammar reads its IP literals through too: its IPv6 half parses RFC 4291 §2.2's
+  embedded IPv4 tail through the same strict `dec-octet` rule `Ipv4Parser` reads, and `Cidr4Parser`/`Cidr6Parser`
+  parse a network's address half through those two — so the JDK leniency `Ipv4Parser`'s Javadoc documents is shut out
+  in one place. The CIDR pair adds §5.5's two validation rules (prefix length inside the family range; host bits zero
+  under that prefix, since a network that accepted and masked would be lossy) and the `min_prefix`/`max_prefix`
+  facets. **`within`/`excluding` apply across all four**, each family asking its own question of the same arithmetic:
+  an address must fall inside some permitted network and outside every excluded one; a network must be a subnet of a
+  permitted one and must not overlap an excluded one, since a block partly inside an exclusion is partly excluded.
 - **`uri`/`uri_reference` (`uri_type`, RFC 3986) and `iri`/`iri_reference` (`iri_type`, RFC 3987) share one
-  recognizer, `ltr8-net`'s `Iri`**, under its URI or IRI grammar, and read to the `Iri` itself: the text as
-  written, split into its components. `java.net.URI` (RFC 2396) is a binding target, never the judge —
-  `JavaUriAtom` holds a value as a `URI` or refuses it as a binding failure (`IllegalArgumentException`, so
-  `AtomRefusal` files it `TYPE_MISMATCH`), and answers `boundTo` itself because `HostAtoms` hands it out as
-  `URI`'s entry. Each `_reference` admits a relative reference and its sibling withdraws `allow_relative`; a
-  URI is US-ASCII. Every one of them is an IRI-reference, so `HostAtoms` answers `URI` and `Iri` with
-  `iri_reference`, the widest — one class over two
-  families answers here, where the CIDR pair's does not, because one family's value space contains the
-  other's. `VocabularyAtoms` names the
-  atom per value — `iri` once a character is beyond US-ASCII, `_reference` where there is no scheme — so a
-  written value reads back. `iri_type`'s facets are `uri_type`'s, compared by `UriType`'s rules through
-  `IriType.uriFacets`. A directive argument is read as `iri_reference` ([TSON-DATA] §3.3: a reference or a file
-  reference, its name free to reach beyond US-ASCII); whether an identity is absolute is §2.2.1's question,
-  asked where the identity is formed.
-  The facets narrow by kind: `schemes` is a member set of `scheme_name` values — a case-folding identifier, so a
-  scheme is held folded and two casings of one are a duplicate element, and `UriType.admitsScheme` compares a
-  value's scheme in that form (RFC 3986 §3.1) — and `allow_relative` and `allow_fragment` are permissions, as
-  `float_type`'s `allow_*` flags are.
-- **A CIDR value is a network, not its text, and a family each** — `cidr4` reads to
-  `io.ltr8.net.CidrInet4Network` and `cidr6` to `CidrInet6Network` (the prefix octets and the prefix length),
-  so two spellings of one network are one value and `2001:0db8:0000:…/32` binds equal to `2001:db8::/32`.
-  Writing goes back through RFC 5952's canonical form rather than the authored spelling, which is what it
-  means for the value to be the octets. **A type each because a host type is how a component names a family**:
-  `HostAtoms` inverts the vocabulary by class, so one class two families produce answers nothing and a
-  schemaless read of it is refused — the two are separate for exactly the reason `Inet4Address` and
-  `Inet6Address` already are. They share the sealed `CidrNetwork` supertype and, through `CidrBits`, one
-  implementation of the prefix arithmetic: only the width differs and it arrives with the value. A component
-  naming the supertype binds as a union, which is what it honestly is. `mac` and `email` keep `String` for
-  the reason the CIDR pair does not: nothing about their text decomposes into a value a schema
-  compares. Both networks are Java records registered as **atoms** (`AtomContext.hostTypes()`), or
-  ltr8-bind's record auto-detection would expect `{ prefix: … prefixLength: … }` on the wire where one token
-  stands.
-- **The exact tiers' sparse `members` set is a facet, and its identity is [TSON-DATA] §4.3's.** `integer`
-  and `number` carry a member set (§5.6) for a value set that is neither a contiguous range nor an
-  arithmetic progression, so none of the other facets denotes it; `IntegerParser`/`DecimalParser` apply it
-  beside the bounds and `multiple_of`. Membership is the value denoted, never the token: `0x50` is the
-  member written `80`, having reduced to one `BigInteger` before the check runs, and `2.5` is the member
-  written `2.50`, which needs `compareTo` — `BigDecimal` carries its scale and its own equality is not
-  §4.3's. `decimal_type.members` is typed `set<value>` (the family cannot name its own atom, §7.4), so a
-  collection element arrives as whatever §4 resolved it to and nothing narrows it the way a record field's
-  scalar is narrowed; `DecimalType`'s own constructor reads each member as a decimal before the set is
-  formed, which is where "`1` and `1.0` are one member and a duplicate rather than two" is enforced and what
-  lets the read, the tightening (`AtomNarrowing.checkSubset`) and the coherence check
-  (`AtomCoherence.checkMembers`) share one identity. `float_type` carries no member set, on the same
+  recognizer, `ltr8-net`'s `Iri`**, under its URI or IRI grammar, and read to the `Iri` itself: the text as written,
+  split into its components. `java.net.URI` (RFC 2396) is a binding target, never the judge — `JavaUriAtom` holds a
+  value as a `URI` or refuses it as a binding failure (`IllegalArgumentException`, which `AtomRefusal` files as
+  `TYPE_MISMATCH`). Every one is an IRI-reference, so `HostAtoms` answers `URI` and `Iri` with `iri_reference`, the
+  widest — one class over several families answers here, where the CIDR pair's does not, because one family's value
+  space contains the others'. `VocabularyAtoms` names the narrowest atom per value, so a written value reads back.
+  `iri_type`'s facets are `uri_type`'s, compared through `IriType.uriFacets`. A directive argument is read as
+  `iri_reference` ([TSON-DATA] §3.3); whether an identity is absolute is §2.2.1's question, asked where the identity is
+  formed. `schemes` is a member set of `scheme_name` values, so a scheme is held folded, two casings of one are a
+  duplicate, and `UriType.admitsScheme` compares a value's scheme in that form (RFC 3986 §3.1).
+- **A CIDR value is a network, not its text, and a family each** — `cidr4` reads to `io.ltr8.net.CidrInet4Network`
+  and `cidr6` to `CidrInet6Network` (the prefix octets and the prefix length), so `2001:0db8:0000:…/32` binds equal to
+  `2001:db8::/32`, and writing goes through RFC 5952's canonical form. **A type each because a host type is how a
+  component names a family**: `HostAtoms` inverts the vocabulary by class, so a class two families produce answers
+  nothing — the reason `Inet4Address` and `Inet6Address` are separate too. They share the sealed `CidrNetwork`
+  supertype and, through `CidrBits`, one implementation of the prefix arithmetic; a component naming the supertype
+  binds as a union, which is what it is. `mac` and `email` keep `String`: nothing about their text decomposes into a
+  value a schema compares. Both networks are Java records registered as **atoms** (`AtomContext.hostTypes()`), or
+  `ltr8-bind`'s record auto-detection would expect `{ prefix: … prefixLength: … }` on the wire where one token stands.
+- **The exact tiers' sparse `members` set is a facet, and its identity is [TSON-DATA] §4.3's.** `integer` and `number`
+  carry a member set (§5.6) for a value set that is neither a contiguous range nor an arithmetic progression;
+  `IntegerParser`/`DecimalParser` apply it beside the bounds and `multiple_of`. Membership is the value denoted: `0x50`
+  is the member written `80`, having reduced to one `BigInteger`, and `2.5` is the member written `2.50`, which needs
+  `compareTo` — `BigDecimal`'s own equality carries scale and is not §4.3's. `decimal_type.members` is typed
+  `set<value>` (the family cannot name its own atom, §7.4), so an element arrives as whatever §4 resolved it to;
+  `DecimalType`'s constructor reads each member as a decimal before the set is formed, which is where "`1` and `1.0`
+  are one member and a duplicate" is enforced and what lets the read, the tightening (`AtomNarrowing.checkSubset`) and
+  the coherence check (`AtomCoherence.checkMembers`) share one identity. `float_type` carries no member set, on the
   rationale it carries no `multiple_of`: a step cannot hold on a binary grid.
-- **A `value`-typed slot is read under the atom of the position it stands in.** §7.4 types a constructor's
-  constraint fields `value` and the bootstrap ordering leaves no alternative — `duration_type` is what defines
-  a duration, and `duration => !duration_type {}` is a layer up in core.tn — so a bound is decoded by §4 base
-  type resolution, which resolves boolean, number and string and none of those is a duration, a date or a
-  UUID. `ValueParser.read(token, target)` asks `HostAtoms` which built-in produces the position's own host
-  type and re-reads the token under it; `reader.BindTargets` is where a position's reader is swapped for one,
-  at a record field and at any depth below it, beside `RecordBindReader.tokenAware`, which specialises the
-  same slot on the same evidence. **The host type is the class a component's bridge takes, never the one it declares** — a
-  registered atom or a `@Transparent` wrapper is reached through its wire type, so the family is chosen by
-  what the bridge can be handed, the same class the ordinary atom branch binds against. **Additive by
-  construction**: a value the component can already hold, or that the caller's
-  own numeric narrowing reaches, is returned untouched, so `!number ^ { min: 0x10 }` stays the integer 16
-  rather than being re-read under `number`, whose grammar admits no based-integer form. Only a token the
-  position could not have held under any narrowing reaches the atom — which is also what turns
-  `!number ^ { min: "abc" }` from a cast failure reported as a library gap into `number`'s own verdict.
-- **No facet counts written digits, because scale is not part of the value.** meta.tn says it for both
-  families that carry a digit-count facet — `decimal_type`'s "`1`, `1.0` and `1.00` are one value… whether a
-  spelling's trailing zeros survive a round trip is an encoding's promise, not the type's", and
-  `time_type`'s worked example, "`12:00:00.500` is admitted under `precision: 1`". So `precision: N` tests that
-  the value is a whole number of 10⁻ᴺ seconds (`FractionalSeconds`, over the parsed nanosecond field for
-  `time`/`datetime` and over the seconds count's own scale for `duration`), and `total_digits`/`fraction_digits`
-  measure `stripTrailingZeros()` (`DecimalParser`). The value handed back is still exactly as written — only the
-  measurement strips, the same split `members` already makes.
+- **A `value`-typed slot is read under the atom of the position it stands in.** [TSON-SCHEMA] §7.4 types a
+  constructor's constraint fields `value`, and the bootstrap ordering leaves no alternative — `duration_type` defines a
+  duration and `duration => !duration_type {}` is a layer up in core.tn — so a bound is decoded by §4, which resolves
+  boolean, number and string and none of those is a duration, a date or a UUID. `ValueParser.read(token, target)` asks
+  `HostAtoms.forHostType` which built-in produces the position's own host type and re-reads the token under it;
+  `ValueParser.at(target)` is the same as a reader, which `reader.BindTargets` swaps in at a record field and at any
+  depth below it, beside `RecordBindReader.tokenAware`, which specialises the same slot on the same evidence. **The
+  host type is the class a component's bridge takes, never the one it declares** — a registered atom or a
+  `@Transparent` wrapper is reached through its wire type, the same class the ordinary atom branch binds against.
+  **Additive by construction**: a value the component can already hold, or that a numeric narrowing reaches, is
+  returned untouched, so `!number ^ { min: 0x10 }` stays the integer 16 rather than being re-read under `number`,
+  whose grammar admits no based-integer form. Only a token the position could not hold under any narrowing reaches the
+  atom — which is what makes `!number ^ { min: "abc" }` `number`'s own verdict rather than a cast failure reported as
+  a library gap. The resolver side of the same rule is `design/atom-refinement-and-coherence.md`'s.
+- **No facet counts written digits, because scale is not part of the value.** meta.tn says it for both families
+  that carry a digit-count facet — `decimal_type`'s "`1`, `1.0` and `1.00` are one value", and `time_type`'s
+  "`12:00:00.500` is admitted under `precision: 1`". So `precision: N` tests that the value is a whole number of
+  10⁻ᴺ seconds (`FractionalSeconds`, over the parsed nanosecond field, for `time`/`datetime`; `DurationParser`, over
+  the seconds count's stripped scale, for `duration`), and `total_digits`/`fraction_digits` measure
+  `stripTrailingZeros()` (`DecimalParser`). The value handed back is exactly as written — only the measurement strips,
+  the same split `members` makes.
 - **`duration` is a signed exact decimal number of seconds, bounded at both ends by a signed 64-bit count of
-  nanoseconds.** The lexical form puts a fraction on the seconds component and nowhere else, so no
-  non-terminating fraction is writable and every duration is a terminating decimal count — `number`'s value
-  space in seconds, which is what makes `precision` exactly `fraction_digits` on that count and `multiple_of`
-  exactly `number`'s. Both ends are §5.5's and not the host's: `DurationParser` refuses a tenth fractional
-  digit and a magnitude past 2⁶³ − 1 ns, though `java.time.Duration` would take spans three orders of
-  magnitude wider. That ceiling is also what makes `DurationType.isMultiple`'s `toNanos` total — the range
-  is the range `toNanos` has — and `coherenceCheck` refuses a bound or a `precision` outside it, so a
-  `DurationType` built in Java cannot carry one either. Longer spans are `period`, finer or wider quantities
-  are `number` in the unit the schema names. [TSON-SCHEMA] §5.5 and §5.4 here state both ends.
-- **A leap second is refused.** RFC 3339's grammar admits second 60, but `time` is the time of day on
-  `[00:00:00, 24:00:00)` and `datetime` an instant on the UTC timeline, so `23:59:60Z` is neither, as [TSON-DATA]
-  §5.4 says. `java.time` refuses it as well, so `TimeParser` and `DateTimeParser` report it as a parse error with no
-  check of their own.
-- The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.
-- **The atom vocabulary is complete** —
-  `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email`/`hostname`/`host`/`media_type` all have parsers, the CIDR pair
-  reusing the two address grammars and validating §5.5's family-range and host-bits-zero rules on top. All four network
-  families apply `within`/`excluding` and judge the pair for emptiness at schema load — exactly, prefix-tree cover being
-  counting rather than searching, with a network family's prefix bounds folded in, both halves stated by §5.5. The
-  address grammars (`InternetAddress`, `MacAddress`) and the network values live in `ltr8-net`, a leaf beneath
-  `tson-schema`, so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries without the
-  linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its siblings**, and its
-  format check is the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted local parts, domain literals or
-  comments.
+  nanoseconds** ([TSON-DATA] §5.4, [TSON-SCHEMA] §5.5) — the spec's range, not `java.time.Duration`'s, which is three
+  orders of magnitude wider. `DurationParser` enforces it on read and `DurationType.coherenceCheck` on every bound and
+  `precision`, so a `DurationType` built in Java cannot carry one outside it either; that is what makes
+  `DurationType.isMultiple`'s `toNanos` total.

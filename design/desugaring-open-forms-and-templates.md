@@ -63,7 +63,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
       entry names something that is not an entry yet — for exactly the window an ordinary forward reference
       lives in, since `close()` walks every closed entry's references after the driving loop. It rests on the
       bind readers reading an untagged labelled choice, which is what `type_argument` is
-      (`design/linking-and-compilation.md`).
+      (`design/class2-compilation.md`).
     - **A *value* argument makes the trip intact.** `type_argument`'s value channel binds a raw `Token` —
       §5.10 calls a type argument's literal a bare token rather than the value it denotes — so the slot reads
       the token rather than decoding it (`RawTokenParser`). The spelling is therefore what reaches identity,

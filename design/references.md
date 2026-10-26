@@ -108,7 +108,7 @@ map.
 | `type_chain.parents`, `type_argument.name`, `application` | application | type-name namespace | a constructor or a record type for an operand; an open entry or a parameter for a head | resolver, `checkArity` |
 | `type_chain.supertypes`, `subtypes`, `kind_type.members` | index | — | — | link |
 | `reference.target` | reference | type-name namespace | any entry, type or constructor; `type_ref`, by resolution | `validateTypeRef` |
-| `template_param.type`, `bound` | reference | type-name namespace | `type_kind`; the argument is judged IS-A `bound` at the application | `validateTypeRef`, `TemplateMaterialiser.checkBound` |
+| `template_param.type`, `bound` | reference | type-name namespace | `type_kind`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
 | `template.template` | parameters and applications as parsed | `parameters`, then type-name namespace | §5.10's shadowing rule | `HeldBody` |
 | `record_field.type`, `tuple_element.element_type`, `array.element_type`, `map.key_type`, `map.value_type`, `namespace.value_type`, `choice.variants` | reference | type-name namespace | `type_kind`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
 | `record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference | type-name, then structure namespace | member of the slot's kind | `checkKindValue` |

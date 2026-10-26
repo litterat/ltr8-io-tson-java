@@ -20,7 +20,8 @@ The schema grammar itself is in `design/schema-grammar.md`.
 
 Related: `design/schema-grammar.md` (the parser producing the AST this rewrites),
 `design/desugaring-open-forms-and-templates.md` (open lifts, parameterised aliases, record templates),
-`design/template-materialisation.md` (materialisation, the synthetic merge), `design/schema-side-diagnostics.md`.
+`design/template-materialisation.md` (materialisation), `design/held-template-bodies.md` (the synthetic merge),
+`design/schema-side-diagnostics.md`.
 
 ## Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
 
@@ -117,7 +118,7 @@ rebuilt and called a cache.
   §5.4's "each variant resolves to a distinct type" is deliberately not checked here — it is a question about
   what names *resolve to*, at the end of each variant's reference chain, which has no answer until the whole
   namespace exists, imports merged. `TsonSchemaLinker.checkVariantsAreDistinct` asks it
-  (`design/schema-resolution.md`).
+  (`design/choice-disjointness.md`).
 - **Both declaration-level tiers desugar in place.** At declaration position the form *is* the construction
   (`pair => [integer, text]` becomes `!tuple { … }`, like `ids => [text]`, `entries => {text => integer}` and
   `contact => (A | B)`); inline, each is hoisted into its own declaration and referenced.
