@@ -77,22 +77,13 @@ own prose (which had gone stale on it):
   `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
   component there is a bind mismatch. Nothing in the JSON stack binds `schema.meta` today, so nothing fails yet; a
   JSON reading of resolved output, a record's `fields` among it, would.
-- [ ] **Whether a kind admits an abstract type** (SPEC-FEEDBACK.md #22). `kind<record>` holds every type built with
-  `record` (`KindMembers.isMember`), so it holds an abstract record (`pet => abstract { ... }`) and a record template's
-  family base (`boxed => <T> { v: T }`), neither of which has instances of its own: a document writing `payload_type:
-  boxed` names a type no value is read through until an application is chosen. `kind<namespace>` likewise holds the
-  abstract `namespace` itself, and `kind<api>` lists a namespace entry, `myapi`, whose value is no type (#23). Settle
-  it with `ref<T>`, when a kind's value becomes a resolved reference rather than a spelling.
- The choice is membership by construction alone, as running, or a
-  concrete-only kind that excludes every abstract member; never an exception for record templates alone, since a family
-  base is a type like any abstract record (§5.10).
 - [ ] **A parameter in a record template has no channel of its own** (SPEC-FEEDBACK.md #17). An open record's
   parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
   type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
   channel: `record_field` `( type: type_kind | type_param: param_name )` and `( value: value | value_param: param_name
-  )`, `type_argument` a `param` member, so `type_ref.name` always names an entry. Sequenced with the `type_ref` /
-  `type_name` normalisation (qualified names, `!ref`), which needs exactly that, and with what `@application` means
-  on a declared entry that is no record.
+  )`, `type_argument` a `param` member, so `type_ref.name` always names an entry. Sequenced with the collapse of
+  `kind_type`, `ref_type` and the name-only `type_ref` into one reference atom, a Revision 39 direction, which needs
+  exactly that, and with what `@application` means on a declared entry that is no record.
 
 ## Checked annotations
 

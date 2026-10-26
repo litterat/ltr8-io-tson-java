@@ -39,9 +39,9 @@ spanning both stays, and says which half is which.
 for an entry below, where there is no section to point at yet. When an entry closes, its citations become spec
 citations and the entry is deleted — nothing here is an archive.
 
-**Two directions Revision 37 carried open are not here**: a namespace as a value and a JSON member name that is not
-an identifier are being reworked together, and will be raised against Revision 38 as entries of their own. The rest
-of what was carried is settled in Revision 37's change log: the policy's home is `policy.tn`, the constructor bound
+**The two directions Revision 37 carried open are now entries**: a namespace as a value is #22, #23 and #24, and a
+JSON member name that is not an identifier is #10, whose "Open" item still holds its default. The rest of what was
+carried is settled in Revision 37's change log: the policy's home is `policy.tn`, the constructor bound
 is declined, and the bounded type slot at a field is withdrawn as the wrong feature for now.
 
 ---
@@ -687,8 +687,7 @@ derivation reads `atom`, `product`, `sum` and `namespace` off the chain, each co
 constructor's `discriminators`), §8.2's constructor-refinement table (`text_enum`), §10's meta-kernel inventory,
 §12.1, §13.2 (the artifact pins); [TSON-JSON] §1, §3 (the annotation members), §6.1.1, §9.4.
 
-**Kind:** proposal, under consideration for adoption — on the branch `record-name-type`, PR into
-`r2026-38-proposal`.
+**Kind:** proposal, under consideration for adoption; running on `r2026-38-proposal`.
 
 **The problem.** A field name is an identifier at every layer, so `{ "@id": x }` and `{ "$ref": x }` are parse
 errors, and §2.5's remedy is a map: "a key that is not a name belongs in a map". That serves TSON's own data. It
@@ -723,8 +722,7 @@ relaxed type, defined by the translation and not by the series, such as
   ["80" "443"] }`, string-class as every text atom is. So **`text_enum` is removed** from the kernel; the series
   supplies `enum` over its own identifier, and an author declares the identifier type their names need and an
   `enum_type` over it. The linking fact recording which enums were text-membered (`textEnums`) goes with it, an
-  enum's discrimination class being read off its members as every identifier enum's already was. *Implemented on
-  the branch.*
+  enum's discrimination class being read off its members as every identifier enum's already was. *Running.*
 - **The default does not change.** A schemaless record's field names are identifiers. A field-name position admits
   any single-line token, and the identifier match moves from the parser to the record, so a schemaless
   `{ "first name": 1 }` is a resolver error rather than a parse error.
@@ -739,7 +737,7 @@ relaxed type, defined by the translation and not by the series, such as
   §8.1's fifth outcome, rather than judging it by the schemaless rule. Part 1 §1.5's MUST would read "a field
   name that is not an identifier, in a document that names no schema". This keeps Part 1 a layer that Parts 2
   and 3 add to rather than modify: Part 1 decides which documents its own rule reaches, and leaves the rest to
-  the layer that owns the type. *Implemented on the branch.*
+  the layer that owns the type. *Running.*
 - **Part 3's three names stay, and are used rather than reserved.** Part 3 reserved every `$`-initial member name,
   sound because no declared name could begin with `$`, which a `name_type` admitting `$` breaks: JSON Schema's and
   OpenAPI's own members are `$ref`, `$id` and `$defs`. The three annotation members keep their names — `$schema`,
@@ -748,7 +746,7 @@ relaxed type, defined by the translation and not by the series, such as
   member. A record that declares one of the three obscures it — a leading one is read as the annotation member, one
   elsewhere is misplaced — and Part 3 §3.2 says so and that a schema SHOULD NOT, rather than refusing the schema.
   Rejected: moving the three to an unused prefix (`!schema`), which would keep a reservation sound by construction
-  at the price of spellings no JSON user expects. *Implemented on the branch*, in Part 3 §1.3, §3.2, §6.1.1 and
+  at the price of spellings no JSON user expects. *Running*, in Part 3 §1.3, §3.2, §6.1.1 and
   §8.3.1 and in the JSON reader.
 - **No shipped `json_name`.** A relaxed type is the translation's own and differs between sources, and the
   implementation needed nothing from the series to support one: `!identifier_type { start_add: "@$" }` is a
@@ -818,8 +816,7 @@ relaxed type, defined by the translation and not by the series, such as
   since `ASCII_CASEFOLD` implies NFC only over ASCII. `identifier_base` gains `ASCII`, XID's ASCII members
   (Start `A-Z a-z`, Continue adding `0-9 _`), so an HTTP-style header name is one line —
   `!identifier_type { start: ASCII  continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD }` — and the
-  kernel's `scheme_name` is `start: ASCII  continue: ASCII  continue_add: "+-."  exclude: "_"`. *Implemented on
-  the branch.*
+  kernel's `scheme_name` is `start: ASCII  continue: ASCII  continue_add: "+-."  exclude: "_"`. *Running.*
 - **A name binds and writes as the record states it.** A host component binds a relaxed name through the name it
   states (`@Field("@id")`), as it binds any other, and a writer quotes a name that is no identifier, so the
   document reads back. A template's held body is written the same way, a declared name that is no identifier
@@ -886,7 +883,7 @@ relaxed type, defined by the translation and not by the series, such as
 **Open:** the default for a JSON member name that is not an identifier; whether a template's field names are
 judged at its declaration, where today they are judged at each application, under the closed record's name type.
 
-**Status against Revision 37:** open; under consideration, implemented on `record-name-type`.
+**Status against Revision 37:** open; under consideration, running on `r2026-38-proposal`.
 
 ## 11. The guide and the schema skill should say what `record.name_type` makes possible, and when to use it
 
@@ -1047,8 +1044,7 @@ new `record_field`; the resolved fixtures carry both (`ResolvedFixtureTest`), an
 The Java value model mirrors it: `RecordField` has no name, and `RecordBody.fields` is a `Namespace<RecordField>`, a
 value of `field_map` (#23), whose order `RecordBody.equals` compares. The resolver, the linker, held template bodies and both
 encodings' readers key fields by name; the corpus restates every explicit record and every resolved output in the
-map form and adds vectors for the explicit form, its duplicate key, and declaration order. Part 2's cached §13.2
-table is not re-stamped here.
+map form and adds vectors for the explicit form, its duplicate key, and declaration order.
 
 ## 13. A value written by name: a qualified name at a product-typed position
 
@@ -1056,7 +1052,7 @@ table is not re-stamped here.
 be bounded at a *field*"), §4.1 (`data`), §9 (extension meta-schemas); [TSON-DATA] §7.1 (`.` "reserved as a future
 identifier separator").
 
-**Kind:** proposal, running on the `qualified-name` branch of `r2026-38-proposal` as stated under "What runs" below.
+**Kind:** proposal, running on `r2026-38-proposal` as stated under "What runs" below.
 It is the first of the two
 directions the preamble carries open against Revision 38, a namespace as a value, cut to the part that needs no
 kernel change. The evidence is a consumer, the HTTP layer: its meta-schema declares an interface as a named set of
@@ -1433,7 +1429,7 @@ schema changes; no verdict on a data document changes.
 - [TSON-SCHEMA] §13.2 and `meta-kernel.tn`: `type_definition` removed, `record.supertypes` removed, `type` as
   above, `schema => {type_name => top}`.
 
-**Status against Revision 37:** open; running on the `entry-is-value` branch of `r2026-38-proposal`. `meta-kernel.tn`
+**Status against Revision 37:** open; running on `r2026-38-proposal`. `meta-kernel.tn`
 declares `type_chain`, `type` carrying it, `record` without `supertypes`, and `schema =>
 {type_name => top}`, with no `type_definition`; the resolved fixtures carry the nested chain (`ResolvedFixtureTest`), and
 the bundled schemas are restamped. The Java model mirrors it: `schema.meta.TypeDefinition` is gone, `TsonSchema` maps a
@@ -1455,8 +1451,8 @@ differences from "no diagnostic changes" above: a template application with an u
 holding it (`'box<some_typo>' field 'v' has an unresolved reference 'some_typo'`), and a resolved atom refinement's
 chain is complete. The corpus restates every resolved output in the nested form and adds vectors for the refusals, an
 emptied chain under subtraction, a complete chain, a chain completed through an applied parent, a template refused
-against a final parent, and a schema's own `namespace`. Part 2's cached §13.2 table is not re-stamped here. #17 resolves
-a record template as a `record` with `parameters`, which leaves the chain to `type` alone; that is the running form.
+against a final parent, and a schema's own `namespace`. #17 resolves a record template as a `record` with
+`parameters`, which leaves the chain to `type` alone; that is the running form.
 ---
 
 ## 15. `top`, `type` and the base kinds are `abstract`
@@ -1502,7 +1498,7 @@ resolved output.
 declarations as above, with "the base kinds have no instances of their own: each is `abstract`, and a direct
 application is refused as any abstract record's is (§12.1)". §12.1's abstract rows gain the six.
 
-**Status against Revision 37:** open; running on the `entry-is-value` branch of `r2026-38-proposal`, with #14.
+**Status against Revision 37:** open; running on `r2026-38-proposal`, with #14.
 `meta-kernel.tn` marks the six `abstract` and the resolved fixture states `extension: ABSTRACT` on each. A construction
 naming one passes the applicability gate — `top` answering for itself — and is refused as abstract in one sentence,
 naming only the instantiable subtypes that would satisfy the position (`'!atom' names an abstract entry, which has no
@@ -1639,7 +1635,7 @@ is a family base": the base is the record template entry, ABSTRACT by constructi
 `extension`" becomes "the base's is ABSTRACT by construction; the record's own `extension` is each application's".
 §4.1 and `meta-kernel.tn`: as above.
 
-**Status against Revision 37:** open; running on the `record-families` branch of `r2026-38-proposal`. `RecordBody`
+**Status against Revision 37:** open; running on `r2026-38-proposal`. `RecordBody`
 carries `parameters`, and `schema.meta.OpenEntry` is where every phase asks whether an entry is open and whether it is
 a family base. Closing builds the open record's tree (`WireForm.heldRecord`) and runs the one substitution every
 other template closes by. `meta-kernel.tn` and its resolved fixture state the shapes above; the corpus vector
@@ -1967,7 +1963,14 @@ resolves, to a member. The members are computed at link and written in resolved 
 `enum_type.name_type` is typed `identifier_kind`, and the "must name an identifier family" sentence becomes a
 consequence. §8.1: `members` among the derived indexes. §9's inventory names the five entries.
 
-**Status against Revision 37:** open; running on `kind-type`, a branch off `r2026-38-proposal`. `meta-kernel.tn`
+**Open:** whether a kind admits an abstract type. Membership is by construction, so `kind<record>` holds an abstract
+record (`pet => abstract { … }`) and a record template's family base, neither of which has instances of its own, and
+`kind<namespace>` holds the abstract `namespace` itself; a document writing a base's name at a kind-typed slot names a
+type no value is read through until a member is chosen. The choice is membership by construction alone, as running,
+or a concrete-only kind that excludes every abstract member; never an exception for record templates alone, since a
+family base is a type like any abstract record (§5.10).
+
+**Status against Revision 37:** open; running on `r2026-38-proposal`. `meta-kernel.tn`
 declares `kind_type => atom & { of: type_name  members?: [type_name] }`, `kind`, `identifier_kind`, `atom_kind` and
 `type_kind`, and types `enum_type.name_type` and `record.name_type` `identifier_kind`; `core` has its `kind` sibling;
 the resolved fixtures carry the members (`identifier_kind`'s are `[field_name identifier param_name scheme_name
@@ -1986,8 +1989,7 @@ which is how a resolved form naming a user's name type reads back through meta.t
 the problem end to end, the members of `identifier_kind` under a meta layer's closure (a new link-layer fact), a user
 `kind<uuid_type>`'s members, a pinned non-member, `kind<reference>`, and a kind-typed field holding a member's name and a
 non-member's. The type slots above are typed `type_kind` in `meta-kernel.tn`, with the resolved fixtures and the
-corpus's service fixture (`request?: kind<record>`) following; the kernel's `type_kind` lists `top`. Part 2's cached
-§13.2 table is not re-stamped here.
+corpus's service fixture (`request?: kind<record>`) following; the kernel's `type_kind` lists `top`.
 ---
 
 ## 23. A namespace is a constructor whose instances are maps: the schema map and a record's fields are two
@@ -2073,8 +2075,7 @@ key_type: = method_name  value_type: = method }`; a schema it governs holds `ord
 … } }`, an entry whose value is a map the schema describes, each of its values an ordinary record value. Selecting in
 an entry's value then walks the schema by key rather than a host's object, and `top`'s constructors are `type`'s and
 `namespace`'s, with `reference` and `template` beside them. A segment past a key that selects a field of a record
-value is judged by the field's declared type; this implementation does not yet deliver the value behind it, and
-reports such a name as its own gap rather than as the author's error.
+value is judged by the field's declared type and delivers the value the field holds.
 
 **Where a namespace type may be declared, and used, and running.** A namespace type IS-A `top`, so it is a
 constructor, and §2.2.2 lets only a schema whose own `!!meta` names the meta-kernel declare one: a namespace type is
@@ -2111,7 +2112,7 @@ is a resolver error. A qualified name's segment after the entry's selects a key 
 map, and the value reached is a value of the namespace type's `value_type`." And #22's membership stated either way
 for such an entry: listed by the kinds of its constructor, as running, or a member only where its value is a type.
 
-**Status against Revision 37:** open; running on `namespace-constructor`, a branch off `r2026-38-proposal`, as far as
+**Status against Revision 37:** open; running on `r2026-38-proposal`, as far as
 the reading rule, membership and the entry: `meta-kernel.tn` declares `namespace` and writes `schema` and `field_map` as
 compositions over it, the resolved fixture carries them (`ResolvedFixtureTest`), and the bundled schemas are restamped.
 The linker records each namespace type with the map a value of it is read as, and refuses an open facet on a concrete
@@ -2133,7 +2134,7 @@ a namespace type binds a `Namespace` where its host declares one and the map whe
 binder finds. A name whose walk selects a field of a record value past a key reads that field of the value there and
 is delivered: `meta-service.tn`'s `service` holds an `interface` in its `methods` field, the shape a namespace type
 cannot take since it declares only its facets, and a binding names `shop.orders.methods.place_order`. Nothing remains
-open on where a namespace type is declared or used. Part 2's cached §13.2 table is not re-stamped here.
+open on where a namespace type is declared or used.
 
 ---
 
@@ -2205,7 +2206,7 @@ meta layer's value-by-name
 slots are written `ref<T>`; a record-typed slot no longer takes a name. §9's guidance reads: a slot naming a type is
 typed by a kind, a slot naming a value by a reference, and `type_ref` is for a slot that holds an application.
 
-**Status against Revision 37:** open; running on `ref-atom`, a branch off `r2026-38-proposal`: the kernel entries, the
+**Status against Revision 37:** open; running on `r2026-38-proposal`: the kernel entries, the
 resolved fixture, the corpus's `meta-service.tn` (`interface`, `rpc_interface` and `verb_interface` holding methods,
 `binding.method: ref<method>` held by `bindings`), the vectors above, and the Java host `Ref<T>` carrying the name and
 the delivered value. A host declares nothing: the read records every name at a kind- or reference-typed slot, whatever
@@ -2262,6 +2263,6 @@ is refused, as is a kernel-governed schema importing `core.tn`. The bundled chai
 neither. A meta-schema declares the vocabulary its constructors use; an ordinary schema reaches a meta-schema's
 constructors only through its `!!meta`."
 
-**Status against Revision 37:** open; running on `governing-levels`, a branch off `r2026-38-proposal`: the linker's
+**Status against Revision 37:** open; running on `r2026-38-proposal`: the linker's
 import merge and the resolver's, one phase earlier, refuse an edge at another level in one wording naming both
 documents and both `!!meta`s. The corpus states both refusals as link-layer vectors.
