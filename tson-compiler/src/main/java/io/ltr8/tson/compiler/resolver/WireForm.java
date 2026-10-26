@@ -107,7 +107,7 @@ final class WireForm {
     static final String EXTENSION = "extension";
 
     /**
-     * {@code record.name_type} -- the type a record's field names are values of (SPEC-FEEDBACK.md #10). Written
+     * {@code record.name_type} -- the type a record's field names are values of ([TSON-SCHEMA] §5.2). Written
      * exactly where the record states one, so a held body keeps the difference between stating and not.
      */
     static final String NAME_TYPE = "name_type";
@@ -188,7 +188,7 @@ final class WireForm {
     /**
      * A declared field name -- in {@code fields}, a group, {@code discriminators} -- as an author writes one:
      * unquoted where it is an identifier, quoted where it is not. A record's names are its name type's values
-     * (SPEC-FEEDBACK.md #10), so {@code "@id"} or {@code "first name"} is a field name, and written unquoted
+     * ([TSON-SCHEMA] §5.2), so {@code "@id"} or {@code "first name"} is a field name, and written unquoted
      * it is not one token: a held body would not parse back. Quoting is safe for the parameter channel, which
      * keys on unquoted tokens, because a parameter's name is an identifier and so is never quoted here.
      */

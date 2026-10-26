@@ -536,7 +536,7 @@ class CrossEncodingParityTest {
                 {"v": {"$type": "robot", "serial": "R2"}}""");
     }
 
-    // ── Kind positions (SPEC-FEEDBACK.md #22): an atom whose values are member names ─────────────────
+    // ── Kind positions ([TSON-SCHEMA] §4.2): an atom whose values are member names ───────────────────
 
     @Test
     void aMemberNameAtAKindIsAcceptedByBoth() {

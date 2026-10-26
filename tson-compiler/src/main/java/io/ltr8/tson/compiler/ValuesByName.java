@@ -31,7 +31,7 @@ import java.util.function.Consumer;
 
 /**
  * The names a value entry holds -- a {@link Namespace}, a value of a namespace type -- resolved and judged by their slots
- * (SPEC-FEEDBACK.md #13, #24): a value's qualified name at a slot typed {@code ref<T>}, held as a {@link Ref} the
+ * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code ref<T>}, held as a {@link Ref} the
  * linker delivers into or a {@link TypeRef} carrying the name alone; and a type's name at a slot typed by a kind,
  * judged a member ({@link #judgeMember}).
  *

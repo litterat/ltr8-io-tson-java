@@ -79,17 +79,18 @@ import java.util.stream.Collectors;
  * reads whatever's already sitting at the cursor directly as that single field's own value, with no
  * synthetic wrapping needed at all.
  *
- * <p><b>In a schema document, a name is not a positional fill where the fill would be product-typed</b>
- * (SPEC-FEEDBACK.md #13). When the read is of a value inside a schema document ({@link
+ * <p><b>In a schema document, a bare token is a positional fill only where the positional field is atom-typed</b>
+ * ([TSON-SCHEMA] §5.6). When the read is of a value inside a schema document ({@link
  * TsonReadContext#readsSchemaDocument()}), an unquoted token at a record position ({@link
- * ReferenceNameReader#nameIn}) is a value written by name, so the positional form keeps a bare token only where its
- * one field is <b>atom</b>-typed -- {@code type_ref}'s {@code name}, a {@code type_name}, which is how a type
- * reference keeps its bare spelling -- and loses it where the field is a product or a sum: {@code !record { fields:
- * { p => x } }} is refused. The record reader refuses a name it does not take as no record, since a component that
- * holds the name is read by {@link ReferenceNameReader} instead and never reaches this class. A data document has no
- * namespace to resolve a name in, so its reads are untouched: there {@code p: x} at a {@code record_field} position
- * still fills {@code type}. Whether the positional field is atom-typed is read off its own compiled reader ({@link
- * #bareTokenFillsPositionally}), the one this class was built with.
+ * ReferenceNameReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
+ * positional field is <b>atom</b>-typed -- {@code type_ref}'s {@code name}, a {@code type_name}, and {@code
+ * record_field}'s {@code type}, a {@code type_kind}, so {@code !record { fields: { p => text } }} fills {@code type}
+ * -- and loses it where that field is a product or a sum, where the explicit record is the only spelling. The record
+ * reader refuses a name it does not take as no record, since a component that holds the name is read by {@link
+ * ReferenceNameReader} instead and never reaches this class. A data document has no namespace to resolve a name in,
+ * so its reads are untouched: there a bare token fills the positional field whatever its type. Whether the positional
+ * field is atom-typed is read off its own compiled reader ({@link #bareTokenFillsPositionally}), the one this class
+ * was built with.
  */
 abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
@@ -294,7 +295,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     /**
      * Whether a bare token at this record's position fills its one positional field (§5.6) in a schema document --
      * false where the record has none, and where that field is product- or sum-typed, so a token well-formed as a
-     * qualified name there is a value by name (SPEC-FEEDBACK.md #13). {@link BindTargets} asks it before giving a
+     * qualified name there is a value by name ([TSON-SCHEMA] §5.6). {@link BindTargets} asks it before giving a
      * {@code TypeRef} component at a slot of this type a {@link ReferenceNameReader}: a type whose bare token is
      * positional binds the reference through its own reader, as {@code type_ref} does.
      *

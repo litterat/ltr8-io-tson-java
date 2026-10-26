@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A value at a kind position (SPEC-FEEDBACK.md #22), read in TSON text: a kind is an atom whose values are the
+ * A value at a kind position ([TSON-SCHEMA] §4.2), read in TSON text: a kind is an atom whose values are the
  * names of the types built with its constructor, so a value is a type name ([TSON-DATA] §7.7) that resolves, in
  * the governing schema's type-name namespace, to a member. {@code kind<uuid_type>} holds {@code stock_id}, never a
  * uuid.

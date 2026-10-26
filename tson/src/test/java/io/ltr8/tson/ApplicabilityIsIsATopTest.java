@@ -158,7 +158,7 @@ class ApplicabilityIsIsATopTest {
     }
 
     /**
-     * A base kind is admitted by the predicate and refused as abstract (SPEC-FEEDBACK.md #15), which is the
+     * A base kind is admitted by the predicate and refused as abstract ([TSON-SCHEMA] §4.1), which is the
      * better answer: it names the instantiable subtypes that would satisfy the position instead of saying the head
      * was the wrong kind of thing.
      */

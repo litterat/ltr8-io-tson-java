@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A value written by name at a product-typed slot (SPEC-FEEDBACK.md #13), end to end: a meta layer declaring an
+ * A value written by name at a slot typed {@code ref<T>} ([TSON-SCHEMA] §5.12), end to end: a meta layer declaring an
  * interface, a namespace of methods, and a namespace of HTTP bindings each naming the method it serves, a schema
  * under it declaring an interface, and a schema importing that one binding a method -- the read that keeps the name,
  * the linker that resolves it and judges its referent, and each refusal with the step it names.

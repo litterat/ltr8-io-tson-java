@@ -63,7 +63,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  *       compares entry for entry, through {@link ResolvedForm}'s normalisations.</li>
  *   <li>{@code link/} -- individual facts about the linked namespace: §2.2.3's import closure, §5.4's
  *       derived disjointness, §8.2's {@code subtypes} index, and a kind's {@code members} index
- *       (SPEC-FEEDBACK.md #22).</li>
+ *       (§4.2).</li>
  *   <li>{@code validate/} -- a data document against a schema that loaded, where the expected side of a
  *       failure is §8.1's category and the RFC 6901 pointer into the data, and nothing else.</li>
  * </ul>

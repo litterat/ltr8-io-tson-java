@@ -45,7 +45,7 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
 
     /**
      * {@link #unrecognizedField(String)} for a name that is no value of the record's name type {@code nameType}
-     * (SPEC-FEEDBACK.md #10), which {@code reason} says why: no declared field can be it, so it is unknown on
+     * ([TSON-SCHEMA] §5.2), which {@code reason} says why: no declared field can be it, so it is unknown on
      * the same terms, and the field list is the repair either way.
      */
     public Refusal unrecognizedField(String field, String nameType, String reason) {

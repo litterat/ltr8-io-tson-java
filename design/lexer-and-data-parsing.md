@@ -196,15 +196,16 @@ Key points:
   token-Start carries `Nd`/`-`/`+`/`.` so a *number* can be an unquoted token, and those reach names only
   because names and values share one lexical class. So `!42x` and `@x.y` are syntax errors rather than a
   reference to an undeclared type and an annotation carrying a name the format reserves — the dot being
-  reserved as a future identifier separator. **`field-name` does not reach that check** (SPEC-FEEDBACK.md #10,
-  experimental): its production `unquoted-token / single-line-token` (`isFieldNameTokenType`, narrower than the map
-  key's `isBareTokenType`, a key being a value and not a name, §2.6) is the whole grammar rule, because what a field
-  name may be is its record's to say. The stream NFC-normalises the name and delivers it; `DefaultTsonReadContext`
-  matches each freshly pulled `FieldName` against the record's field name type — the identifier, for every record
-  until a record can say otherwise — and reports a failure as `ATOM_FORM_INVALID`, a resolver error. So
+  reserved as a future identifier separator. **`field-name` does not reach that check** ([TSON-DATA] §2.5,
+  [TSON-SCHEMA] §5.2): its production `unquoted-token / single-line-token` (`isFieldNameTokenType`, narrower than
+  the map key's `isBareTokenType`, a key being a value and not a name, §2.6) is the whole grammar rule, because what a
+  field name may be is its record's to say. The stream NFC-normalises the name and delivers it; `DefaultTsonReadContext`
+  judges each freshly pulled `FieldName` by the record's name type. A schemaless record's is the identifier, and a
+  failure there is `ATOM_FORM_INVALID`, a resolver error; under a schema a name the type refuses is the record
+  reader's `UNRECOGNIZED_FIELD` (`design/name-hygiene-read-path.md`). So schemaless
   `{"first name": 1}` parses and is refused, and the diagnostic names the remedy the format already has: a key that
-  is not a name belongs in a map. A name declared in a schema is still matched by the schema parser
-  (`expectDeclaredFieldName`), a parse error.
+  is not a name belongs in a map. A name declared in a schema is read by the same production
+  (`expectDeclaredFieldName`) and judged at link by its record's name type, a resolver error.
   **Normalisation runs before the match**, which is the one thing the profile does not decide here.
   `IdentifierProfile` requires NFC as a *form* and would refuse a decomposed name outright, where §2.5 gives a
   field name its identity by NFC-normalised comparison — a decomposed spelling is the same name, and a

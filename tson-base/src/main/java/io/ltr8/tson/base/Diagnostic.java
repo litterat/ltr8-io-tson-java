@@ -407,7 +407,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
          * this deployment's own policy, {@link #SCHEMA_NOT_PERMITTED} (what it holds and may fetch) and {@link
          * #SCHEMA_TOO_LARGE} ([TSON-SCHEMA] §11.2's size limit). Not a {@link #verdict()}, since one configured
          * otherwise may accept the same bytes, yet a rejection by <em>this</em> processor, which is the answer a
-         * sender asking "will it be accepted here" needs (SPEC-FEEDBACK.md #1). The other three fetch codes are
+         * sender asking "will it be accepted here" needs ([TSON-DATA] §8.1). The other three fetch codes are
          * what this processor <em>could not</em> obtain, and leave acceptance undetermined.
          */
         public boolean isRefusal() {

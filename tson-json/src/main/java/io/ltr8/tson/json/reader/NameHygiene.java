@@ -46,7 +46,7 @@ final class NameHygiene {
 
     /**
      * The same judgement of an unmatched member name, under its record's name type's {@code profile}, whose
-     * added characters are its own (SPEC-FEEDBACK.md #10), reported at the member.
+     * added characters are its own ([TSON-SCHEMA] §5.2), reported at the member.
      */
     static boolean refusesMember(JsonReadContext ctx, String name, IdentifierProfile profile) {
         return judge(ctx, name, profile, true);

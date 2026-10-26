@@ -57,7 +57,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   unmarked, and the language needs it applicable — which takes a by-name exception that the open and closed paths
   must then both remember, or `<T> !reference { target: T }` resolves while `!reference { target: int32 }` does
   not, one construction with two answers. IS-A `top` needs no exception. `top`, `type`, the base kinds and
-  `namespace` are admitted and then refused as abstract (SPEC-FEEDBACK.md #15): each is `extension: ABSTRACT`, so
+  `namespace` are admitted and then refused as abstract (§4.1): each is `extension: ABSTRACT`, so
   its reader is the abstract dispatch every abstract record has, and a tag naming the base itself is refused naming
   the subtypes that would satisfy the position, which is the better message. What stays out is the component set —
   `record_field`, `type_ref`, `type_argument`, `tuple_element`, `field_group`, `integer_size`, `atom_specification`

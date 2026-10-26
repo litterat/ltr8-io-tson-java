@@ -867,7 +867,7 @@ public final class TsonSchemaLinker {
     /**
      * The values each local namespace entry holds by name, as the resolver's read collected them
      * ({@link TsonSchema#valuesByName()}), resolved in this schema's namespace and judged against the slots they
-     * fill (SPEC-FEEDBACK.md #13, {@link ValuesByName}). Each refused name is its own diagnostic, against the entry
+     * fill ([TSON-SCHEMA] §5.12, {@link ValuesByName}). Each refused name is its own diagnostic, against the entry
      * that holds it.
      *
      * <p><b>Local entries only</b>, as for inhabitance: an imported body's names were judged when its own schema
@@ -956,7 +956,7 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * What each record's {@code name_type} obliges ({@link FieldNames}, SPEC-FEEDBACK.md #10): a text
+     * What each record's {@code name_type} obliges ({@link FieldNames}, [TSON-SCHEMA] §5.2): an identifier
      * family, of which every field name the record states is a value, no two of its fields one. Refused at schema
      * load, against the record that states it; the names of the records refused are returned, so the name checks
      * do not judge the same names a second time.
@@ -1272,7 +1272,7 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * Derives every kind's {@code members} (SPEC-FEEDBACK.md #22) over the fully-merged namespace, by {@link
+     * Derives every kind's {@code members} ([TSON-SCHEMA] §4.2) over the fully-merged namespace, by {@link
      * KindMembers}' construction walk. Every kind in the closure is recomputed, an imported one included: members
      * are computed over the <em>governing</em> schema's closure, so one kind holds different members in two
      * schemas importing different sets, and whatever a body arrived carrying -- an import's own closure, or an
@@ -1482,7 +1482,7 @@ public final class TsonSchemaLinker {
                 checkVariantsAreNotVoid(entryName, c, namespace);
             }
             // `of` is a constructor role, so it resolves in the structure namespace and nowhere else (§3.3.1),
-            // and must name `type` or a constructor below it (SPEC-FEEDBACK.md #22). The members are the linker's
+            // and must name `type` or a constructor below it ([TSON-SCHEMA] §4.2). The members are the linker's
             // own computation, not references an author wrote, so there is nothing else here to validate. With
             // no governing meta loaded there is nothing to resolve `of` against, and no verdict is given.
             case KindBody kind -> {
@@ -1862,7 +1862,7 @@ public final class TsonSchemaLinker {
 
     /**
      * A {@code ~}/{@code =} value at a kind-typed field: a type name, judged a member of the kind by the walk over
-     * the entry it resolves to (SPEC-FEEDBACK.md #22) -- {@code enum => enum_type ^ { name_type?: = identifier }}
+     * the entry it resolves to ([TSON-SCHEMA] §4.2) -- {@code enum => enum_type ^ { name_type?: = identifier }}
      * pins a name, and the pin is judged here, after resolution. The name resolves where the constructor pinning it
      * is declared: this schema's own namespace, then the structure namespace, so a meta layer pins a name type it
      * declares itself and an ordinary schema one of its meta's. A name resolving to nothing, or to an entry not

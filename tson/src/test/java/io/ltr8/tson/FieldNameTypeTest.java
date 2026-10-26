@@ -8,7 +8,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * A record's field names have a type (SPEC-FEEDBACK.md #10). The grammar admits any single-line token in name
+ * A record's field names have a type ([TSON-SCHEMA] §5.2). The grammar admits any single-line token in name
  * position; a record judges its names by its field name type, an identifier unless it says otherwise.
  */
 class FieldNameTypeTest {
@@ -317,7 +317,7 @@ class FieldNameTypeTest {
     /**
      * A template composing a base closes to the record its hand-written spelling is, the base's name type
      * included; and the chain is the resolver's, so the explicit {@code !record} cannot state one
-     * (SPEC-FEEDBACK.md #14) -- a record takes a name type from supertypes only through {@code &}.
+     * ([TSON-SCHEMA] §4.1) -- a record takes a name type from supertypes only through {@code &}.
      */
     @Test
     void aClosedTemplateTakesItsBasesNameTypeAndADeclarationWritesNoChain() {

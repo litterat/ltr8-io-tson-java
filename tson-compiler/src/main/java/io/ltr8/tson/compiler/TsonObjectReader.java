@@ -221,7 +221,7 @@ public final class TsonObjectReader {
      * this one unchanged, sharing its compiled-schema registry.
      *
      * <p>A schemaless bind reports a type-ref naming no built-in type: §5's vocabulary is a schemaless
-     * document's only source of type names (SPEC-FEEDBACK.md #3). This keeps such a tag instead, so a
+     * document's only source of type names ([TSON-DATA] §3.2). This keeps such a tag instead, so a
      * document tagged with names this reader knows nothing about still binds on the strength of the target
      * class alone -- a reading of its structure that sets its tags aside, and so not a verdict on it. Built-in
      * names are still checked, so {@code !uuid nope} remains a problem. Affects the schemaless path only.
@@ -240,7 +240,7 @@ public final class TsonObjectReader {
      * member is the one its tag names ({@code !circle} into a sealed {@code Shape}) -- which is what a
      * schemaless bind into a sealed hierarchy needs to choose a member at all. Without it, a schemaless bind
      * judges a document exactly as {@code tson validate} does, and such a tag is {@code UNKNOWN_TYPE_REF}: a
-     * schemaless document has no source of type names but §5's vocabulary (SPEC-FEEDBACK.md #3). With it,
+     * schemaless document has no source of type names but §5's vocabulary ([TSON-DATA] §3.2). With it,
      * the reader accepts what the vocabulary alone refuses, which is why it is the caller's explicit choice
      * and never the default. Built-in names are still checked. Affects the schemaless path only; under a
      * schema, the schema names the types.

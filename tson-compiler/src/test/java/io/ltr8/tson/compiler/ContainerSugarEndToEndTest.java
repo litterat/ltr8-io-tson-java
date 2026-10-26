@@ -364,7 +364,7 @@ class ContainerSugarEndToEndTest {
 
     /**
      * A declared field name is a value of its record's field name type, an identifier by default
-     * (SPEC-FEEDBACK.md #10): the grammar admits any single-line token, and the linker refuses a name the record's
+     * ([TSON-SCHEMA] §5.2): the grammar admits any single-line token, and the linker refuses a name the record's
      * type does not admit, at schema load.
      */
     @Test

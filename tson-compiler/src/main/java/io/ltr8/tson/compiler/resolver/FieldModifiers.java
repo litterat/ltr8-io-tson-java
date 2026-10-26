@@ -34,7 +34,7 @@ final class FieldModifiers {
      * nothing here labels it as one: §8.1's shadowing rule -- a token is a parameter exactly when its text
      * resolves into the enclosing entry's own {@code parameters} -- is what tells the two apart wherever the
      * question is asked. The role is the modifier's either way, so {@code = P} is FIXED where it is written,
-     * as {@code = 201} is, and closing substitutes the value and changes no fact (SPEC-FEEDBACK.md #20).
+     * as {@code = 201} is, and closing substitutes the value and changes no fact ([TSON-SCHEMA] §5.7).
      */
     record Resolved(boolean optional, boolean voidable, FieldRole role, Optional<TokenValue> value) {
     }

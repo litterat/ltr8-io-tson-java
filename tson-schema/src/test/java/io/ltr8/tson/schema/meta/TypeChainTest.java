@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A type carries its own IS-A chain (SPEC-FEEDBACK.md #14): {@code type}'s one field on every type body, a record
+ * A type carries its own IS-A chain ([TSON-SCHEMA] §4.1): {@code type}'s one field on every type body, a record
  * template's included, the kind an entry's value gives it, judged by where a base kind is defined, and the constructor test.
  */
 class TypeChainTest {

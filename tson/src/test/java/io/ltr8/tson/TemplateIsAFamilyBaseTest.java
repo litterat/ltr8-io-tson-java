@@ -78,7 +78,7 @@ class TemplateIsAFamilyBaseTest {
 
     /**
      * A subtype template is a subtype of its base, and so are the members its applications close to: a template
-     * carries a chain like any record composing the base (SPEC-FEEDBACK.md #14), so {@code computeSubtypes}
+     * carries a chain like any record composing the base ([TSON-SCHEMA] §4.1), so {@code computeSubtypes}
      * credits it.
      */
     @Test

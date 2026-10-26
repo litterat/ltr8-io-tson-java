@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Where a record template's parameters may stand (SPEC-FEEDBACK.md #16): a field's type, a field's default or fixed
+ * Where a record template's parameters may stand ([TSON-SCHEMA] §5.10): a field's type, a field's default or fixed
  * value, and an argument of an application. Anywhere else in a {@code !record} body would leave the family base
  * without a shape its applications share, and a parameter is never itself the operand of {@code &} or {@code ^}.
  */

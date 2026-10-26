@@ -25,8 +25,8 @@ import io.ltr8.tson.compiler.stream.VoidEvent;
  * </ol>
  *
  * <p><b>Rule 3 is a resolver error</b> ({@code UNKNOWN_TYPE_REF}): a schemaless document has no source of
- * type names but §5's vocabulary, so a name outside it names no type, at every processor (SPEC-FEEDBACK.md
- * #3). A typo like {@code !Uuid} (case-sensitive per §5.1, so not {@code !uuid}) would otherwise disable the
+ * type names but §5's vocabulary, so a name outside it names no type, at every processor ([TSON-DATA] §3.2). A
+ * typo like {@code !Uuid} (case-sensitive per §5.1, so not {@code !uuid}) would otherwise disable the
  * validation its author intended and report nothing. {@code TsonDataStream} and {@code TsonDataParser} keep
  * every name they see, which is what lets the readers report one at its position; both schemaless readers
  * report by default, and {@code preservingUnknownTypeRefs()} is the caller's opt-out.

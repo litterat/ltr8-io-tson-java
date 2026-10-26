@@ -21,7 +21,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
  * the resolver closes it afterwards. So in a kernel body a braced value is read as the {@code type_ref} record it is,
  * by that record's own reader, and the closer mints its entry; the name that replaces it is judged then. In a value
  * body ({@link TsonReadContext#readsValueBody()}) nothing lifts or mints, so a braced value is refused and the alias
- * spelling named (SPEC-FEEDBACK.md #24).
+ * spelling named ([TSON-SCHEMA] §5.6).
  */
 final class KindSlotReader implements TsonTypeReader<TypeRef> {
 

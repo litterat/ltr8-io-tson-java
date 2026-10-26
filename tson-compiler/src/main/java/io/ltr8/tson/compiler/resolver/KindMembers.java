@@ -17,7 +17,7 @@ import java.util.function.Function;
 
 /**
  * The members of a {@code kind_type} instance: every entry of the governing schema's closure built with the
- * constructor its {@code of} names (SPEC-FEEDBACK.md #22), and the rule {@code of} itself obeys. Linking asks both,
+ * constructor its {@code of} names ([TSON-SCHEMA] §4.2), and the rule {@code of} itself obeys. Linking asks both,
  * and the {@code name_type} checks ask {@link #isMember} of the one entry a name resolved to.
  *
  * <p><b>Membership is one walk</b> over resolved entries, never over spellings. From an entry, alias hops first

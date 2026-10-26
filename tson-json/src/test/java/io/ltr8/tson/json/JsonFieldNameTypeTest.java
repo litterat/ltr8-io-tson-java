@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A record's field names have a type (SPEC-FEEDBACK.md #10), and a JSON record's member names are its field names
+ * A record's field names have a type ([TSON-SCHEMA] §5.2), and a JSON record's member names are its field names
  * ([TSON-JSON] §6.1): a member is matched and judged by its record's {@code name_type}, as a TSON text field
  * name is.
  */

@@ -52,7 +52,7 @@ own prose (which had gone stale on it):
   must be IS-A the type the held body derives, since a written narrowing lives nowhere else; it also re-runs the
   family checks (no member minted at a use site) over the ingested map and its closure, and the §5.11 group
   declaration rules over every `field_group`. `ParameterTypes` already derives the type to check against.
-- [ ] **An application is not yet unified with an imported library's entry for it** (SPEC-FEEDBACK.md #14, §8.2). A
+- [ ] **An application is not yet unified with an imported library's entry for it** ([TSON-SCHEMA] §8.1, §8.2). A
   library declaring `int_box => box<int32>` writes `@application:{ name: box  arguments: [{ name: int32 }] }` on that
   key, and a schema importing it that writes `box<int32>` still closes the application to an entry of its own rather
   than resolving to `int_box`. The lookup runs application to entry, so it needs an index over imported keys keyed by
@@ -61,12 +61,12 @@ own prose (which had gone stale on it):
   index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
   application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
-- [ ] **A value named through a FIXED field** (SPEC-FEEDBACK.md #24). A qualified name whose segment selects a
+- [ ] **A value named through a FIXED field** ([TSON-SCHEMA] §5.12). A qualified name whose segment selects a
   FIXED field of a record value is reported as `NOT_IMPLEMENTED`: bind agreement exempts a FIXED field from having a
   component, so the host holds no value for it and `ValuesByName.fieldOf` finds no component to read. The value is the
   schema's own, the field's pinned value in the record type, so the walk should take it from the declared
   `RecordField` and continue; no test covers the case yet.
-- [ ] **A value a schema writes at a reference-typed field is not judged** (SPEC-FEEDBACK.md #24). In a kernel-governed
+- [ ] **A value a schema writes at a reference-typed field is not judged** ([TSON-SCHEMA] §4.2, §5.12). In a kernel-governed
   schema, `rpick => { m: ref<order> = os.o1 }` (or `~`) reaches `AtomParsers.forType`'s token-level reading from the
   linker's field-value check, which a reference has none of, and the `UnsupportedOperationException` escapes
   `validateSchema` rather than arriving as a `NOT_IMPLEMENTED` diagnostic. The name is to be recorded with the field's
@@ -77,7 +77,7 @@ own prose (which had gone stale on it):
   `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
   component there is a bind mismatch. Nothing in the JSON stack binds `schema.meta` today, so nothing fails yet; a
   JSON reading of resolved output, a record's `fields` among it, would.
-- [ ] **A parameter in a record template has no channel of its own** (SPEC-FEEDBACK.md #17). An open record's
+- [ ] **A parameter in a record template has no channel of its own** ([TSON-SCHEMA] §5.10). An open record's
   parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
   type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
   channel: `record_field` `( type: type_kind | type_param: param_name )` and `( value: value | value_param: param_name
@@ -309,6 +309,31 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **A fetch refusal names the allowlist** (#763). `HttpSchemaSource` and `FileSchemaSource` refuse an unlisted
+  host with "host '…' is not one of [the allowed hosts]", and the file source's not-found and outside-root messages
+  name the local mapped directory; [TSON-SCHEMA] §11.2 says the report SHOULD NOT disclose the allowlist. Name the
+  host and the rule only; `SchemaSourceConfigTest` pins the wording and moves with it.
+- [ ] **Artifact doc lines to take with the next re-stamp** (each moves every pin and Part 2 §13.2's table, so they
+  go together): the kernel's `application` doc says "a DATA entry" for a namespace entry; its `kind_type` doc says
+  `of` is `type` or below it, where §4.2 admits `namespace` or a constructor below either, and says a kind is "not
+  IS-A `top`" with no namespace-constructor exception; its `type` doc says "the one constructor `type_kind` holds"
+  where the fixture also lists `top`, `field_map` and `schema`; its `top` doc omits the namespace types; its
+  `type_chain` doc says `parents` are "kept after it closes"; `core.tn`'s header lists `uri` among the same-named
+  siblings where the sibling is `iri`; and `meta-kernel-resolved.tn`'s conventions note still says a parametric
+  `= P` "fixes nothing until materialisation", counts "the four base kinds", and describes a held record's `chain`.
+- [ ] **No test pins [TSON-SCHEMA] §5.9 rule 8.** A subtracted construction whose head is a constructor
+  (`my_record => record - { groups }` in a meta layer) resolves with an empty chain and `!my_record { … }` is refused
+  as not IS-A `top`, which is the rule; nothing in the suite or the corpus exercises it, and the refusal's hint
+  ("Did you mean atom refinement") misleads there. Add a vector and drop the hint for a subtracted head.
+- [ ] **The corpus vector `class2/schema/invalid/the-explicit-record-form-writes-no-positional-record-field` is
+  stale.** Its description says `record_field.type` is a `type_ref`, a product, so `fields: { p => x }` is refused;
+  under [TSON-SCHEMA] §5.6 and §8.1 the fill is atom-typed (`type_kind`) and admitted (`PositionalNameTest`), and the
+  vector fails only because `x` is undeclared. Retitle it as the unresolved-reference case it is, and add a valid
+  vector for `fields: { p => text }`.
+- [ ] **A data document validated against the meta-kernel admits `fields: { p => no_such_type }`.** A `type_kind`
+  value is a member of the kernel closure's `type_kind`, and `no_such_type` is none, yet `tson validate` reports
+  nothing, where the same name at a user schema's kind-typed slot is refused (`PositionalNameTest`). Find where kind
+  membership is skipped for a kernel-governed data read and pin it.
 - [ ] **A kind's member list names a minted application.** The refusal of a name at a `kind<type>` slot lists the
   kind's members, and the list holds `kind_type_type_c430c650`, the entry minted for the application `kind<type>`
   itself: a `kind_type` instance IS-A `type`, so the construction walk admits it. A minted name is no spelling an

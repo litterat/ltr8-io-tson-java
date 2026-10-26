@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
- * The Java model's kinds mirror the kernel's composition (Part 2 §4.1, SPEC-FEEDBACK.md #9): {@code atom},
+ * The Java model's kinds mirror the kernel's composition (Part 2 §4.1): {@code atom},
  * {@code product} and {@code sum} compose with {@code type}, and {@code reference}, {@code template} and
  * {@code namespace} with {@code top} directly -- a {@link Namespace} being the value of a namespace type.
  */

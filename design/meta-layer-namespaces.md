@@ -116,7 +116,7 @@ schema asserting structure nothing can interpret is worth failing on. It is a `B
 applies the namespace type (`/pings` for `pings => !notifications { ping => … }`), since a missing line of wiring says
 nothing about the schema (`design/schema-side-diagnostics.md`).
 
-## Names inside a value: the slot declares the spelling (SPEC-FEEDBACK.md #13, #22, #24)
+## Names inside a value: the slot declares the spelling (§4.2, §5.12)
 
 A slot naming a type is typed by a kind, `request: kind<record>`, and a slot naming a value by a reference,
 `method: ref<method>`; a slot typed by a record holds the record's value inline. The read records every name it
@@ -239,11 +239,11 @@ nothing into the type-name namespace (§3.3.2), so every such name is an unresol
 governs, whether it is written bare, in a field, or applied with its arguments. **Shared vocabulary goes in a third
 ordinary schema**, `!!import`ed by the governed schemas that need it. Nor is `!!import`ing the meta layer a way round
 it: an import stands at the importer's governing level, both schemas naming the meta-kernel as their `!!meta` or
-neither (§2.2.3, SPEC-FEEDBACK.md #25), so an ordinary schema importing a kernel-governed layer is refused, in one
+neither (§2.2.3), so an ordinary schema importing a kernel-governed layer is refused, in one
 diagnostic naming both documents and both `!!meta`s. The rule runs the other way too: a meta layer cannot import the
 third schema, nor core.tn or net.tn, and declares the vocabulary its constructors use itself. A namespace type meets
 both walls at once: it IS-A `top`, so it cannot go in the third schema, and no ordinary schema can import the layer
-that declares it, so a field typed by it exists only in a kernel-governed document (SPEC-FEEDBACK.md #23), and so does
+that declares it, so a field typed by it exists only in a kernel-governed document (§2.2.2), and so does
 a field typed `ref<T>`, which names an entry holding a value: core.tn declares no `ref`, so a governed schema writing
 one meets an unresolved name. A data document holds a value of one only where its own schema is kernel-governed, as
 resolved output read through meta.tn is. The constraint is real and worth stating; what is not acceptable is

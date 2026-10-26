@@ -55,7 +55,7 @@ import java.util.Optional;
  * Like {@code entryOrigins} it is carried through {@code !!import}, each enum judged in the schema that declared it.
  *
  * <p><b>{@code nameTypes} is the third</b>, for the same reason: each record whose {@code
- * name_type} is not the kernel's {@code field_name} (SPEC-FEEDBACK.md #10), with the value that type
+ * name_type} is not the kernel's {@code field_name} ([TSON-SCHEMA] §5.2), with the value that type
  * resolves to, by which its readers judge the field names a document writes. A record not listed has
  * identifiers for field names.
  *
@@ -145,7 +145,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      * so that a document it governs is a schema. A name such a document writes at a kind-typed position resolves
      * in that document's own namespace or its constructor's, where the position's prose says ([TSON-SCHEMA] §7.4
      * for {@code name_type}), and not in this schema's: its readers check the name's grammar and leave membership
-     * to the link of the schema being read (SPEC-FEEDBACK.md #22). A {@code !!meta} that is no identity at all, as a
+     * to the link of the schema being read ([TSON-SCHEMA] §4.2). A {@code !!meta} that is no identity at all, as a
      * schema assembled by hand may carry, names no meta-kernel.
      */
     public boolean governsSchemas() {

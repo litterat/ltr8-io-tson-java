@@ -29,7 +29,7 @@ place**: see "Part 3 is drafted here" below.
 
 On `main` the bundled schemas carry **Revision 37 identities** (`https://tson.io/2026/37/m/*.tn`); on
 `r2026-38-proposal` they carry Revision 38's (`/2026/38/m/`). `spec/` holds
-**Revision 37** of Parts 1 and 2, the published cache, not edited here except for §13.2's four artifact rows,
+**Revision 38** of Parts 1 and 2, a cache, not edited here except for §13.2's four artifact rows,
 so the table names the bytes beside it and stays checkable; its Part 1 and Guide rows stay at the revision
 those documents actually are. **§13.2 is a fourth pin to move** whenever the artifacts change.
 `scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins, and the spec
@@ -44,7 +44,7 @@ constructor — the parameter names and the application as text (§8.1). A schem
 (`type => abstract top & { chain?: type_chain }`), and nothing carries `parameters` (they are the template body's),
 `disjoint` (derived over the choice body, §5.4) or `kind`: a kind is derived from an entry's own chain and body (§4.1,
 `EntryKind.of`, judged by where each base kind is defined), and the kernel's `type_kind` is the kind of the types, not
-that derivation. `top`, `type`, the three base kinds and `namespace` are `abstract` (SPEC-FEEDBACK.md #15).
+that derivation. `top`, `type`, the three base kinds and `namespace` are `abstract` (§4.1).
 
 **Changing a bundled schema means re-stamping all three digests bottom-up**, moving the matching
 `*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the

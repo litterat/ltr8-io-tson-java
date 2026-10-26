@@ -23,14 +23,14 @@ import java.util.stream.Stream;
 
 /**
  * Where an entry's {@code name_type} resolves, and whether what it resolves to may stand there: an enum's, which its
- * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of (SPEC-FEEDBACK.md
- * #10). A value the entry's constructor wrote resolves where that constructor is declared, the governing meta's
- * namespace -- so {@code !enum [A B]} names the kernel's {@code identifier}, and a record that says nothing the
- * kernel's {@code field_name}, whatever the schema declares or imports; one an author wrote resolves in the schema's
- * own namespace first. Shared by the linker's enum and field name checks and by materialisation, which checks a
- * template's value argument of an enum type before linking has run.
+ * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of
+ * ([TSON-SCHEMA] §5.2). A value the entry's constructor wrote resolves where that constructor is declared, the
+ * governing meta's namespace -- so {@code !enum [A B]} names the kernel's {@code identifier}, and a record that says
+ * nothing the kernel's {@code field_name}, whatever the schema declares or imports; one an author wrote resolves in
+ * the schema's own namespace first. Shared by the linker's enum and field name checks and by materialisation, which
+ * checks a template's value argument of an enum type before linking has run.
  *
- * <p><b>What may stand there is the slot's kind's to say</b> (SPEC-FEEDBACK.md #22). The kernel types both slots
+ * <p><b>What may stand there is the slot's kind's to say</b> ([TSON-SCHEMA] §4.2). The kernel types both slots
  * {@code identifier_kind}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
  * kind off the constructor the entry is built with -- the {@code name_type} field's own type -- and asks {@link
  * KindMembers} whether the referent is a member. The resolution above is the store and the kind the judgment: the

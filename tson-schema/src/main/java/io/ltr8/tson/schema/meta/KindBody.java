@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * An instance of the meta-kernel's {@code kind_type} constructor, resolved (SPEC-FEEDBACK.md #22): the atom whose
+ * An instance of the meta-kernel's {@code kind_type} constructor, resolved ([TSON-SCHEMA] §4.2): the atom whose
  * values are the names of the types built with the constructor {@link #of}. {@code kind<uuid_type>} and {@code
  * !kind_type { of: uuid_type }} are one instance, and a value at a position typed by it is a type name that
  * resolves to one of its {@link #members} -- the name, never a value of the type it names.

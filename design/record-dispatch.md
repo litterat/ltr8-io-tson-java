@@ -106,7 +106,7 @@ order — the selector may arrive after the fields it selects.
 ## A bare token at a record position: positional, or a value by name
 
 **In a schema document, §5.6's positional form keeps a bare token only where it would fill an atom-typed field**
-(SPEC-FEEDBACK.md #13). The rule belongs to the read, not to the readers: a value inside a schema document — a
+(§5.6). The rule belongs to the read, not to the readers: a value inside a schema document — a
 constructor's binding record, a namespace entry's values — reaches the governing meta's compiled readers as a replay from
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a

@@ -153,7 +153,7 @@ public final class DataClassObjectWriter {
             }
             if (value instanceof Ref<?> reference) {
                 // A value held by name writes as the name, a bare token, as a type_ref does: resolved output states
-                // the reference as written (SPEC-FEEDBACK.md #24), so its bridge's text form is not what is wanted.
+                // the reference as written ([TSON-SCHEMA] §5.12), so its bridge's text form is not what is wanted.
                 writeAnnotations(value, dataClass, writer);
                 writer.unquotedToken(reference.name());
                 return;
@@ -242,7 +242,7 @@ public final class DataClassObjectWriter {
     /**
      * Whether {@code reference} writes as its bare name: no arguments, and a name every {@code .}-separated segment
      * of which is an identifier, so the token reads back as written. [TSON-SCHEMA] §8.1 writes an argument-free
-     * {@code type_ref} positionally, and a value written by name (SPEC-FEEDBACK.md #13) has only that spelling; an
+     * {@code type_ref} positionally, and a value written by name ([TSON-SCHEMA] §5.12) has only that spelling; an
      * application keeps the explicit record, which carries its arguments.
      */
     private static boolean bare(TypeRef reference) {

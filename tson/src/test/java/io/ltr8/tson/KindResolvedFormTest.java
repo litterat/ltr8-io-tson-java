@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
- * A kind in resolved output ([TSON-SCHEMA] §8.1, SPEC-FEEDBACK.md #22): its body writes {@code of} and the derived
+ * A kind in resolved output ([TSON-SCHEMA] §4.2, §8.1): its body writes {@code of} and the derived
  * {@code members} index, and reads back through meta.tn's own {@code kind_type} vocabulary. The whole {@code
  * !kind_type { ... }} spelling is what the Class 2 corpus's schema-layer vector compares.
  */

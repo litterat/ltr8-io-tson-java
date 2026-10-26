@@ -134,7 +134,7 @@ reading messages. `compile` renders a bare `ValidationReport` instead, having on
 name. Every file's report is collected before anything prints, since the envelope's outcome is taken across
 them: `REJECTED` if any file is, else `UNDETERMINED` if any file is, else `ACCEPTED`.
 
-**`outcome` answers "will this be accepted" (SPEC-FEEDBACK.md #1)**: `ACCEPTED`; `REJECTED` for an invalidity
+**`outcome` answers "will this be accepted" ([TSON-DATA] §8.1)**: `ACCEPTED`; `REJECTED` for an invalidity
 or a refusal under this processor's §8.2 policy or §9.1 limits, one rejection settling it whatever else went
 unjudged; `UNDETERMINED` where nothing rejected the document but something could not be judged. Which kind a
 rejection was is each diagnostic's code (`Code.verdict()`, `Code.isRefusal()`).

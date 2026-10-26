@@ -44,7 +44,7 @@ import java.util.Optional;
  *       nothing is rebuilt.</li>
  *   <li><b>A name at a reference- or kind-typed slot</b> is recorded with the slot's declared type for the linker
  *       to judge, whatever the target holds. A {@code Ref} or {@code TypeRef} target at a reference-typed slot
- *       ({@code ref<T>}, SPEC-FEEDBACK.md #13) reads through a {@link ReferenceNameReader}: a {@code Ref} receives
+ *       ({@code ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}: a {@code Ref} receives
  *       the value when the schema links, a {@code TypeRef} the name alone. A {@code TypeRef} target at a kind-typed
  *       slot ({@code record_field.type} is {@code type_kind}, a meta's {@code request: kind<record>}) reads through
  *       a {@link KindSlotReader}: a type's name, or in a kernel body an application still to close. Any other target

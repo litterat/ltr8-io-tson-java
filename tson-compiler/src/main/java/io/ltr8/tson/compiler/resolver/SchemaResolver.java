@@ -278,7 +278,7 @@ public final class SchemaResolver {
         // name, verified later by the linker), so those are the only edges that create a resolution
         // dependency -- and the only recursion that cannot resolve.
         OnDemand namespaceGetter = new OnDemand(namespace, declarations, problems, facts);
-        // Each body a read produced, with the references it read by name (SPEC-FEEDBACK.md #13), keyed by the body
+        // Each body a read produced, with the references it read by name ([TSON-SCHEMA] §5.12), keyed by the body
         // itself: the read hooks know the constructor and the value, not the entry, and the body is the one thing
         // that reaches the entry unchanged.
         Map<Object, List<TsonSchema.ValueByName>> heldByName = new IdentityHashMap<>();
@@ -678,7 +678,7 @@ public final class SchemaResolver {
     /**
      * Every closed chain with the applications the fold left standing dropped: an application no declaration
      * names denotes an entry nothing can be declared as, so it reaches no edge, and a closed type's parents are
-     * not part of it (SPEC-FEEDBACK.md #14). A template keeps its written parents.
+     * not part of it ([TSON-SCHEMA] §4.1). A template keeps its written parents.
      */
     private static void closeChains(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
                                     Map<String, Top> instantiations) {

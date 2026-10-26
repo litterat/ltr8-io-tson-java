@@ -189,7 +189,7 @@ public interface TsonReadContext {
 
     /**
      * Pulls the next event, a record's field name, under {@code rule} -- the name type of the schema-directed
-     * record reading it (SPEC-FEEDBACK.md #10), where {@link #next()} reads a field name as a schemaless record's,
+     * record reading it ([TSON-SCHEMA] §5.2), where {@link #next()} reads a field name as a schemaless record's,
      * an identifier or {@code ATOM_FORM_INVALID}. A name its type admits meets §8.2's per-name rules under the
      * type's profile; one it refuses is reported nothing here, since it can match no declared field and the
      * reader's {@code UNRECOGNIZED_FIELD} says so with the type's reason ({@link FieldNameRule#refusal}). A field
@@ -244,7 +244,7 @@ public interface TsonReadContext {
      * Whether this read is of a value inside a <b>schema document</b> -- a constructor's binding record or a data
      * entry's body, replayed through the governing meta's readers by the resolver ({@link #schemaDocument}).
      * There, and only there, a bare name at a record position is a value written by name rather than §5.6's
-     * positional fill (SPEC-FEEDBACK.md #13): a schema has a namespace to resolve the name in, and a data document
+     * positional fill ([TSON-SCHEMA] §5.6): a schema has a namespace to resolve the name in, and a data document
      * has none. False for every data document, so a data read is unchanged by the rule.
      */
     boolean readsSchemaDocument();
@@ -257,7 +257,7 @@ public interface TsonReadContext {
     boolean readsValueBody();
 
     /**
-     * Records {@code reference}, read by name at this context's position (SPEC-FEEDBACK.md #13), with the slot it
+     * Records {@code reference}, read by name at this context's position ([TSON-SCHEMA] §5.12), with the slot it
      * fills -- the path this context has descended from the value's root -- and that slot's declared type, which
      * the recording reader was built from. Only a schema document's read keeps it, handing it to the sink its
      * factory was given ({@link #schemaDocument}); anywhere else it is dropped, a data document having no namespace

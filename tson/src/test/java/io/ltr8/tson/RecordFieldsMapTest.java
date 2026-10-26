@@ -13,7 +13,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@code record.fields} is an ordered map from a field's name to its facts (SPEC-FEEDBACK.md #12). A name written
+ * {@code record.fields} is an ordered map from a field's name to its facts ([TSON-SCHEMA] §5.2). A name written
  * twice by its spelling is the map's duplicate key, refused where the explicit form is read; two spellings that are
  * one name under the record's name type are the linker's to refuse, since only a resolved name type can say so.
  * Declaration order is part of the value.

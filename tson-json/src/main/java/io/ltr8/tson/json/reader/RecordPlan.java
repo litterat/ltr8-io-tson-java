@@ -214,7 +214,7 @@ final class RecordPlan {
 
     /**
      * A member no declared field matches: §6.1.1's closure error, judged by the record's name type
-     * (SPEC-FEEDBACK.md #10). A name that is no value of the type can be no field and is no name, so it is
+     * ([TSON-SCHEMA] §5.2). A name that is no value of the type can be no field and is no name, so it is
      * unknown, with the type's reason, and meets no hygiene rule. One the type admits meets §8.2 first, under
      * the type's profile, and the order is the point: a name-hygiene refusal MUST NOT be reported in one of
      * §8.1's four categories, so a look-alike field name is refused here rather than told it is unknown -- which

@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * How a {@code type_ref} value is written: an argument-free one as its bare name, which [TSON-SCHEMA] §8.1 requires
- * of canonical output and which is the only spelling a value written by name has (SPEC-FEEDBACK.md #13); an
+ * of canonical output and which is the only spelling a value written by name has ([TSON-SCHEMA] §5.12); an
  * application as the explicit record, which carries its arguments.
  */
 class TypeRefWriteTest {

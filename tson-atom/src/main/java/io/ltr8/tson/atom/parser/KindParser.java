@@ -7,7 +7,7 @@ import io.ltr8.tson.schema.meta.KindBody;
 import java.util.Optional;
 
 /**
- * Parses and validates against a kind -- an instance of the meta-kernel's {@code kind_type} (SPEC-FEEDBACK.md #22),
+ * Parses and validates against a kind -- an instance of the meta-kernel's {@code kind_type} ([TSON-SCHEMA] §4.2),
  * the atom whose values are the names of the types built with one constructor. A value is a type name: §7.7's
  * grammar, read as the kernel's {@code type_name} reads it ({@link IdentifierParser#IDENTIFIER}), and then a
  * member of the kind's linked {@code members}. The value is the name, never a value of the type it names.

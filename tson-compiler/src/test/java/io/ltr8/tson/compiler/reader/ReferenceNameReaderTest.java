@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A reference written by name at a reference-typed slot (SPEC-FEEDBACK.md #13): an unquoted token, read as written into
+ * A reference written by name at a reference-typed slot ([TSON-SCHEMA] §5.12): an unquoted token, read as written into
  * a {@link TypeRef}, the one host shape every reference has. The segment grammar is the linker's.
  */
 class ReferenceNameReaderTest {

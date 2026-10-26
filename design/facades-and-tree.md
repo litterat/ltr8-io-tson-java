@@ -156,7 +156,7 @@ admit UTS #39's own `Toys-Я-Us`.
   range); (2) `X` **names the target** being bound, on an object reader given `withHostTypes()` → accepted,
   a tree read having no target; (3) otherwise it links to nothing → `UNKNOWN_TYPE_REF`.
   **Rule 3 is a resolver error**: a schemaless document has no source of type names but §5's vocabulary, so a
-  name outside it names no type at any processor (SPEC-FEEDBACK.md #3), and a case-sensitive typo (`!Uuid`)
+  name outside it names no type at any processor ([TSON-DATA] §3.2), and a case-sensitive typo (`!Uuid`)
   never silently disables the validation its author intended. The parse step still keeps every name, which is
   what lets a reader report one at its position.
   **Rule 2 is the caller's, not the default**, so a schemaless bind and `tson validate` reach one verdict on

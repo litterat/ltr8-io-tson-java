@@ -40,7 +40,7 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
 ## Held bodies and how they close (`schema.meta.TemplateBody`, `tson-compiler/.../resolver/HeldBody.java`)
 
 - **A record template is the record it is.** Every slot a record template admits a parameter in already holds a name
-  or an uninterpreted token (SPEC-FEEDBACK.md #16) — a field's `type`, its `value`, an application's arguments — so
+  or an uninterpreted token (§5.10) — a field's `type`, its `value`, an application's arguments — so
   the open record is a value of the vocabulary as it stands: a `RecordBody` with `parameters`, its chain keeping the
   parents as written. `HeldBody.of` writes its tree through `WireForm.heldRecord`, the record's own `extension` (each
   application's) stated where it is not OPEN, so closing reads one tree shape whichever kind of open entry it came
@@ -177,7 +177,7 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       source close during resolution's driving loop, before the batch pass can run; the template in hand has
       resolved by then, which is all the walk needs, so only a parameter awaiting the cross-template fixed
       point is left undetermined there.
-    - **A record template confines its parameters to three places** (SPEC-FEEDBACK.md #16): a field's type, a
+    - **A record template confines its parameters to three places** (§5.10): a field's type, a
       field's default or fixed value, and an argument of an application. The walk carries the slot it is in as
       `constructor.field`, and in a body headed `record` a whole-token parameter anywhere but `record_field.type`
       is refused, naming the slot (`parameter 'K' stands at a key of record.fields`) -- a field name, a group

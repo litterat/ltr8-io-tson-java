@@ -93,7 +93,7 @@ class SubtypeTemplateFamilyTest {
     }
 
     /**
-     * <b>A family-base template is IS-A its parents, and so are its instantiations</b> (SPEC-FEEDBACK.md #14). A
+     * <b>A family-base template is IS-A its parents, and so are its instantiations</b> ([TSON-SCHEMA] §4.1). A
      * record template carries a chain: it holds {@code base} as written and as reached, which puts the
      * template in {@code base.subtypes} as any record composing {@code base} is, and every instantiation closing
      * from it completes the same parents into a chain naming {@code base}.

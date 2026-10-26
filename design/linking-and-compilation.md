@@ -70,8 +70,8 @@ so every phase that will grow schema-side diagnostics is in one module with `Dia
 `ltr8-regex` directly (what §5.4 pattern disjointness needs, with no injected-oracle seam); the registry is
 storage over the `schema.meta` value model and stays in `tson-schema`, the leaf everything else depends on.
 
-- **`CanonicalIdentity.canonicalize(String)`** (`tson-base`) implements §2.2.1's canonical identity over the IRI
-  (SPEC-FEEDBACK.md #4) — **not** general URI normalization. Scheme and query are stripped (`http://` and `https://`
+- **`CanonicalIdentity.canonicalize(String)`** (`tson-base`) implements [TSON-DATA] §2.2.1's canonical identity over the IRI
+  — **not** general URI normalization. Scheme and query are stripped (`http://` and `https://`
   are one identity, a `?sha256=` pin is dropped, not validated); the host is read as an `ltr8-net` `Host` value
   (lowercase U-labels, a dotted-quad, RFC 5952 in brackets — so `Example.COM`, A-labels and an uncompressed IPv6
   address name the identity their canonical form does); the path is read back from its URI spelling (percent-encoded
@@ -207,7 +207,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   registered-only by default (nothing fetched). `TsonSchemaLinker.linkBootstrap` is the one sanctioned way
   to link meta-kernel's raw bootstrap output without registering it.
 
-## The types built with a constructor (`KindMembers`, SPEC-FEEDBACK.md #22)
+## The types built with a constructor (`KindMembers`, §4.2)
 
 A `kind_type` instance — `!kind_type { of: uuid_type }`, or `kind<uuid_type>` through the kernel's or core's template
 — is an atom whose values are the names of the closure's types built with one constructor: a computed set of names, as
@@ -386,7 +386,7 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
   form)`; the linker's own default and pin checks ask `labelForm` or the map directly. Where `name_type` resolves is
   `resolver.NameType`'s, for enums and records alike, shared with materialisation, which checks a template's value
   argument of an enum type before linking has recorded anything.
-- **A record's `name_type` is the same contract over its field names** (SPEC-FEEDBACK.md #10). `FieldNames` is
+- **A record's `name_type` is the same contract over its field names** (§5.2). `FieldNames` is
   `EnumLabels`' peer: the type must be an identifier family, every name the record states — in `fields`,
   `discriminators` and its groups — must be a value of it, and no two fields may be one value under its equality. Both
   checkers refuse a type whose `normalization` does not imply NFC (`NameType.formRefusal`): a reader matches names in
@@ -406,7 +406,7 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
   document's names are matched in the type's form. Each record with a type other than the default is recorded in
   `TsonLinkedSchema.nameTypes`, with the definition it resolves to, merged through imports like `enumForms`, because its
   readers judge a document's names by it and cannot resolve it themselves.
-- **A duplicate field is refused by whichever layer can see it, and only by that one** (SPEC-FEEDBACK.md #12).
+- **A duplicate field is refused by whichever layer can see it, and only by that one** (§5.2).
   `record.fields` is a map keyed by the name (`field_map`, `ordered: true`), so one spelling written twice in the
   explicit `!record { fields: { … } }` form is the map's duplicate key: `DUPLICATE_MAP_KEY` where the form is read as
   data, and that refusal restated against the declaration where a schema writes it. The brace form's repeat is the
@@ -417,7 +417,7 @@ ordinary text atom, string-class like any other (`design/choice-disjointness.md`
   names the record may declare, so a key is read by its spelling and judged under that type here. `discriminators` and
   group members are `text` for the same reason.
 
-## Namespace types (`TsonSchemaLinker.readAsMaps`, SPEC-FEEDBACK.md #23)
+## Namespace types (`TsonSchemaLinker.readAsMaps`, §4.1)
 
 A namespace type is a constructor IS-A the kernel's `namespace`, declared by composition stating its facets —
 `field_map` and `schema` in the kernel, `headers => namespace & { key_type: = header_name  value_type: = text }` in a
@@ -456,7 +456,7 @@ before a reader is built, and it is linking's.
   composition operand resolves in the type-name namespace only, so the declaring layer imports meta.tn to name
   `namespace` and its facets' types. An ordinary schema cannot import that layer (`checkImportLevel`), so a field
   typed by a namespace type stands only in a kernel-governed document; the schemas the layer governs hold values of it
-  as entries (SPEC-FEEDBACK.md #23, #25).
+  as entries (§2.2.2, §2.2.3).
 - **An instance is an entry, and a value.** `myapi => !api { … }` in a schema the layer governs resolves to a
   `Namespace` (`design/meta-layer-namespaces.md`), kind `NAMESPACE`, its constructor recorded as `api`. `validateBody`
   has a `Namespace` case that asks nothing; `checkValuesByName` judges the names its values hold;
@@ -467,7 +467,7 @@ before a reader is built, and it is linking's.
   It compiles to an unbuildable `ErrorReader` in both stacks: `TsonCompiledMetaSchema.typenameOf` and
   `JsonSchemaCompiler.constructorOf` read its `type`, a meta layer's constructor with no factory.
 
-## Values by name (`ValuesByName`, SPEC-FEEDBACK.md #13)
+## Values by name (`ValuesByName`, §5.12)
 
 A namespace entry's values may hold a name — `request: place_order_request` at a slot typed `kind<record>`,
 `method: orders.place_order` or `handler: myapi.get_orders` at a slot typed `ref<method>`.

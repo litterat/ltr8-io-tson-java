@@ -130,40 +130,35 @@ source for it, or because reaching it would break documents already on the wire.
   route — "the expected production route" in the spec's own words — through `Json.withSchemas` and
   `tson validate --schema --type`.
 
-And two shapes that look like they belong on that list and do not: **tuples** convert from `prefixItems` and
-are ordinary JSON arrays, and **defaults** convert and inject on decode (§6.1.3), so a document omitting a
-defaulted member reads. Neither is friction.
+And three shapes that look like they belong on that list and do not: **tuples** convert from `prefixItems` and
+are ordinary JSON arrays; **defaults** convert and inject on decode (§6.1.3), so a document omitting a
+defaulted member reads; and **a member name that is not an identifier** — JSON-LD's `@type`, JSON Schema's `$ref` —
+is a field name under the record's name type ([TSON-SCHEMA] §5.2): the converter declares the profile its names
+need, `json_name => !identifier_type { start_add: "@$" }`, once on a fieldless abstract base its records compose,
+and the names are judged under it with full hygiene. None is friction for the producer.
 
 ### Where the on-ramp actually breaks
 
 These are the ones that cost a producer a change, ordered by how often real JSON hits them. They are the
-work, and the first is the largest single obstacle to the stated goal.
+work.
 
-1. **A member name that is not an identifier.** `@type`, `2fa_enabled`, `_id`, `first name`, `""` — all
-   ordinary JSON, none a TSON field name. This is [TSON-DATA] §7.7's **grammar**, not §8.2's policy, so no
-   configuration reaches it and no relaxation exists. Kebab-case is *not* affected — §7.7 admits `-` in
-   `identifier-continue`, so `user-name` and OpenAPI's `x-` extensions are declarable — which leaves
-   JSON-LD's `@`-prefixed keys and digit- or underscore-initial names as what cannot be spelled. The only
-   answer today is to refuse, or to type the position as a map and forgo per-field validation. A projection
-   annotation binding a wire spelling to a declared field would fit [TSON-SCHEMA] §6's licence exactly, and is
-   the proposal to be raised against Revision 38.
-2. **Records are closed and JSON Schema's are open.** `additionalProperties` defaults to *true*, so a
+1. **Records are closed and JSON Schema's are open.** `additionalProperties` defaults to *true*, so a
    converted record fails §6.1.1 on the first document carrying an extra member. There is no flattened tail
    to relax it (§7.2): open-ended data is a declared map-typed field, which the producer
    must nest. This is the largest producer-visible cost of a conversion and §6.1.1 states it outright.
-3. **An untagged `oneOf` over object schemas.** All brace class, so non-disjoint; with no OpenAPI
+2. **An untagged `oneOf` over object schemas.** All brace class, so non-disjoint; with no OpenAPI
    `discriminator` there is no in-band selector, and §8.2 requires the tag. JSON Schema validates such a union
    by *trying each branch*, which §8.2 forbids in as many words ("no trying variants in order"). Existing
    documents carry nothing to dispatch on, so this is a genuine wall: the converter finds a discriminator or
    reports. A `oneOf` that *does* carry one converts to a sealed record family rather than to a choice —
    §6.1.5, where member dispatch lives — which is the shape the contract already had.
-4. **Enum members must be identifiers.** `"in-progress"` converts; `"not found"` does not. The fallback is a
+3. **Enum members must be identifiers.** `"in-progress"` converts; `"not found"` does not. The fallback is a
    `text` refinement with a pattern, which costs the enum its discrimination class and so costs §8.2's untagged
    route a variant it could have dispatched on.
-5. **Required-but-nullable converts; a pin beside null does not.** `required: [x]` beside `type: [X, "null"]`
+4. **Required-but-nullable converts; a pin beside null does not.** `required: [x]` beside `type: [X, "null"]`
    is `x: X?` — each keyword decides one mark (§7.3). What has no spelling is `const` or a one-member `enum`
    beside null, a pin on a voidable type. Drop-with-report, per the companion note's list D.
-6. **`format` becomes binding.** JSON Schema's `format` is advisory; the atom it converts to is not. A
+5. **`format` becomes binding.** JSON Schema's `format` is advisory; the atom it converts to is not. A
    document that passed with a malformed `format: email` value fails here. That is the point of converting and
    still a change of behaviour, so a converter should say so rather than let it surface as a first-request
    failure.

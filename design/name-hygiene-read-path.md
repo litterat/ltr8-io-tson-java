@@ -91,7 +91,7 @@ failure really is a parse error.
 one name once per lookahead that crossed it. `NameHygieneTest` counts every shape an annotation takes,
 because that is the failure that would survive every other test.
 
-**A field name is judged by the record that reads it** (SPEC-FEEDBACK.md #10). The grammar admits any single-line
+**A field name is judged by the record that reads it** ([TSON-SCHEMA] §5.2). The grammar admits any single-line
 token in name position, and the match against the record's `name_type` is here: a name the type refuses meets no
 hygiene rule and is reported nothing at the pull, since it can match no declared field and `RecordAbstractReader`
 reports it `UNRECOGNIZED_FIELD` — plain under the default, naming the type and its reason under a declared one; one it

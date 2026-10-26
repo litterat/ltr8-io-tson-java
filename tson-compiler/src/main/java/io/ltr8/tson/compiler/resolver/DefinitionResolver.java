@@ -63,7 +63,7 @@ import java.util.function.Predicate;
 
 /**
  * Resolves one declaration from a {@link SchemaMap} (the grammar-layer AST) into the value its entry maps to
- * ([TSON-SCHEMA] §4, §8; SPEC-FEEDBACK.md #14) -- a type body carrying its own IS-A chain, a {@code Reference},
+ * ([TSON-SCHEMA] §4.1, §8.1) -- a type body carrying its own IS-A chain, a {@code Reference},
  * a held {@code TemplateBody} or a constructor's instance -- and records the entry's facts that no value holds
  * ({@link TsonSchema.EntryFacts}). Per-declaration work only: ordering, imports, materialisation and everything else
  * that needs the whole schema is {@link SchemaResolver}'s. {@link #resolveTypeDef} dispatches on the shape of
@@ -160,7 +160,7 @@ import java.util.function.Predicate;
  * record has an empty chain by construction, so it is always {@code PRODUCT}. The kind is not stored: it is
  * the value's ({@code EntryKind.of}), read from the same chain.
  *
- * <p><b>A chain is the resolver's to compute, never the author's to write</b> (SPEC-FEEDBACK.md #14): a
+ * <p><b>A chain is the resolver's to compute, never the author's to write</b> ([TSON-SCHEMA] §4.1): a
  * construction or an atom refinement stating {@code supertypes} or {@code subtypes} is refused
  * ({@link #refuseWrittenChain}), as stating {@code choice.disjoint} would be. In a closed body {@code supertypes}
  * is the complete chain; in a template's held body it is the parents as written, which closing completes.
@@ -587,7 +587,7 @@ final class DefinitionResolver {
      *   applicable, open and closed alike: {@code <T> !reference { target: T }} and
      *   {@code !reference { target: int32 }} are one construction and get one answer.</li>
      *   <li>{@code top}, {@code type} and the four base kinds, which cost nothing: each is abstract
-     *   (SPEC-FEEDBACK.md #15), so its reader refuses a direct application as any abstract record's does,
+     *   ([TSON-SCHEMA] §4.1), so its reader refuses a direct application as any abstract record's does,
      *   naming the subtypes that would satisfy it.</li>
      * </ul>
      *
@@ -610,8 +610,8 @@ final class DefinitionResolver {
     }
 
     /**
-     * Refuses a construction whose head is abstract -- {@code top}, {@code type}, a base kind (SPEC-FEEDBACK.md
-     * #15), or a meta layer's own abstract record: it has no direct instances (§5.2), so {@code !C { ... }} builds
+     * Refuses a construction whose head is abstract -- {@code top}, {@code type}, a base kind ([TSON-SCHEMA] §4.1),
+     * or a meta layer's own abstract record: it has no direct instances (§5.2), so {@code !C { ... }} builds
      * nothing. One sentence, naming what would satisfy it: the instantiable entries IS-A the head in the structure
      * namespace, every abstract one among them left out, since naming one would refuse in turn, and {@code
      * template}, which no declaration constructs ({@link #requireAuthorable}).
@@ -720,7 +720,7 @@ final class DefinitionResolver {
      * Refuses a construction that writes {@code type}'s {@code chain}: the IS-A chain is the resolver's,
      * computed from what composition and refinement say and from the whole schema map, so a value written for it
      * is a claim no declaration can make -- as {@code choice.disjoint} is derived and never written
-     * (SPEC-FEEDBACK.md #14). Read off the binding record as written, before the constructor's reader
+     * ([TSON-SCHEMA] §4.1). Read off the binding record as written, before the constructor's reader
      * binds it, so the refusal names the field rather than a value that bound.
      */
     private static void refuseWrittenChain(String name, String target, DataValue written) {
@@ -868,7 +868,7 @@ final class DefinitionResolver {
     /**
      * A record template, as the record it is: its payload bound through {@code record}'s own reader with the
      * parameters standing as names and tokens, which every slot a record template admits a parameter in already
-     * holds (SPEC-FEEDBACK.md #16). The slot rule runs first, on the payload as written, so a parameter in a
+     * holds ([TSON-SCHEMA] §5.10). The slot rule runs first, on the payload as written, so a parameter in a
      * scalar slot is refused for standing there rather than for not reading as a boolean.
      */
     private Top openRecord(String name, List<String> parameters, DataValue payload) {
@@ -1364,7 +1364,7 @@ final class DefinitionResolver {
     private RecordBody resolveComposition(String name, ConstructionDef construction,
                                           List<String> parameters) {
         List<io.ltr8.tson.schema.meta.TypeRef> directSupertypes = new ArrayList<>();
-        // SPEC-FEEDBACK.md #10: a record's name type is set where it is declared, the kernel's default included,
+        // [TSON-SCHEMA] §5.2: a record's name type is set where it is declared, the kernel's default included,
         // and a composition takes its supertypes' one type: supertypes that disagree compose names of two types,
         // and choosing either would re-judge the other's names by a type they were never declared under.
         Optional<String> nameType = Optional.empty();
@@ -1845,7 +1845,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * A parameter is never an operand of {@code &} or {@code ^} (SPEC-FEEDBACK.md #16): both read the operand's
+     * A parameter is never an operand of {@code &} or {@code ^} ([TSON-SCHEMA] §5.10): both read the operand's
      * field set to flatten, and a parameter has none until the template is applied, so {@code <T> T & { … }} and
      * {@code <T> T ^ { … }} have no body to hold. An operand applied <em>to</em> a parameter, {@code result<T>},
      * is a different thing and is admitted. Checked before the name is looked up, as §5.10's shadowing rule
@@ -2219,7 +2219,7 @@ final class DefinitionResolver {
      * parameter, and the kernel declares none, a held body being unread until its parameters are gone.
      *
      * <p><b>The role is the modifier's, whatever stands in {@code value}.</b> {@code =} gives FIXED and
-     * {@code ~} DEFAULT, a parameter as a literal does (SPEC-FEEDBACK.md #20): the parameter is the value an
+     * {@code ~} DEFAULT, a parameter as a literal does ([TSON-SCHEMA] §5.7): the parameter is the value an
      * application will supply, and closing substitutes it without changing a fact. Whether omission reaches the
      * value is the name's {@code ?}, which {@link FieldModifiers} reads beside it.
      *

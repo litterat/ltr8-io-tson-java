@@ -72,7 +72,7 @@ class MetaKernelEndToEndTest {
     }
 
     /**
-     * {@code top => abstract {}} (SPEC-FEEDBACK.md #15): the root has no instances of its own, so a value at a
+     * {@code top => abstract {}} ([TSON-SCHEMA] §4.1): the root has no instances of its own, so a value at a
      * {@code top}-typed position names the subtype it is -- an untagged one is refused, and so is a tag naming
      * {@code top} itself, each naming the subtypes that would satisfy the position.
      */

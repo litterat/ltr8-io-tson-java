@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A kind-typed position in JSON (SPEC-FEEDBACK.md #22, [TSON-JSON] §5): a kind is an atom whose values are type
+ * A kind-typed position in JSON ([TSON-SCHEMA] §4.2, [TSON-JSON] §5): a kind is an atom whose values are type
  * names, so its JSON form is a string naming a member of the kind in the governing schema's closure, read as the
  * same token in TSON text is. It is never a discrimination case: {@code kind<uuid_type>} takes {@code "stock_id"}
  * and refuses a uuid.

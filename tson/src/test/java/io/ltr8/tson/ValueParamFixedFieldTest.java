@@ -74,7 +74,7 @@ class ValueParamFixedFieldTest {
     /**
      * The role is the modifier's, settled where the field is written: {@code status?: int32 = S} is an optional
      * FIXED field exactly as {@code status?: int32 = 201} is, and only the value waits for an application
-     * (SPEC-FEEDBACK.md #20).
+     * ([TSON-SCHEMA] §5.7).
      *
      * <p>A record template is the record it is, so the role and the parameter are read off its own {@code
      * RecordField}: the parameter stands in the ordinary {@code value} slot, with §8.1's shadowing rule to tell it

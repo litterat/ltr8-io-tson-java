@@ -225,7 +225,7 @@ class OpenEntryResolvedFormTest {
     /**
      * <b>{@code EntryKind.of} agrees with what the entry's own value determines</b>, over every entry of the
      * three bundled schemas plus a schema exercising each declaration form. An entry's kind is its value's
-     * type's kind (SPEC-FEEDBACK.md #14), derived and never written, so nothing but this test stands between
+     * type's kind ([TSON-SCHEMA] §4.1), derived and never written, so nothing but this test stands between
      * the derivation and a model that quietly stops agreeing with the rule it states.
      *
      * <p><b>The rule has four branches and two of them are special cases</b>: branch 4 is a namespace lookup,

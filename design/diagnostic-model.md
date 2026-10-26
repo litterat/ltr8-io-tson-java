@@ -105,10 +105,10 @@ differ on purpose.
 scope to be distinct within.
 
 **`Code.verdict()` answers the other question a consumer asks** — whether the code is a verdict on the document at
-all, which `NOT_IMPLEMENTED`, `BIND_MISMATCH` and [TSON-DATA] §8.1's fifth outcome are not: the five fetch codes,
-and the refusals (§8.2's three name-hygiene codes and `LIMIT_EXCEEDED`). `Code.isRefusal()` names those four: not a verdict
-on validity, yet a rejection by this processor, which is what the CLI's `REJECTED` outcome reports (SPEC-FEEDBACK.md
-#1).
+all, which `NOT_IMPLEMENTED`, `BIND_MISMATCH` and [TSON-DATA] §8.1's refused and undetermined outcomes are not: the
+five fetch codes, and the refusals (§8.2's three name-hygiene codes and `LIMIT_EXCEEDED`). `Code.isRefusal()` names
+those four: not a verdict on validity, yet a rejection by this processor, which is what the CLI's `REJECTED` outcome
+reports ([TSON-DATA] §8.1).
 
 ## When a fact earns a component
 

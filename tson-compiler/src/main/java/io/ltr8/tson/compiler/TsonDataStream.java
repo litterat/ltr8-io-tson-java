@@ -741,7 +741,7 @@ public final class TsonDataStream implements TsonEventSource {
      * {@code construct} names the position in the author's voice, exactly as {@link #expect}'s does.
      *
      * <p>The grammar admits any single-line token here: what a field name may be is its record's to say
-     * (SPEC-FEEDBACK.md #10), so the identifier match is not this production's. A schemaless record's field
+     * ([TSON-DATA] §2.5), so the identifier match is not this production's. A schemaless record's field
      * names are identifiers, and the read context judges each one as it is delivered.
      */
     Token expectFieldNameToken(String construct) {

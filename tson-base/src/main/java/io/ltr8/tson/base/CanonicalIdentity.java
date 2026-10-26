@@ -17,7 +17,7 @@ import java.nio.charset.StandardCharsets;
  * path; the scheme is a transport hint and the query verification metadata, so both are removed, and what remains
  * -- the host's canonical text plus the path -- is the identity, compared byte for byte.
  *
- * <p><b>The host is a {@link Host} value</b> (SPEC-FEEDBACK.md #4, #6): RFC 3987's {@code ihost} with a DNS name.
+ * <p><b>The host is a {@link Host} value</b> ([TSON-DATA] §2.2.1, §5.5): RFC 3987's {@code ihost} with a DNS name.
  * A registered name must be a {@link HostName}, an IP literal an IPv6 address (no IPvFuture, no zone), and the
  * host's canonical text is the value's -- lowercase U-labels, a dotted-quad, RFC 5952 text in brackets -- so
  * {@code Example.COM} and {@code example.com} are one identity, as are {@code xn--bcher-kva.example} and

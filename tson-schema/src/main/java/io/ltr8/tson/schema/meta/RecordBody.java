@@ -57,7 +57,7 @@ public record RecordBody(TypeChain chain, Namespace<RecordField> fields,
 
     /**
      * The kernel's {@code field_name}, an identifier: a record's name type where neither it nor a supertype states
-     * one (SPEC-FEEDBACK.md #10). {@link #nameType} keeps the difference between stating {@code field_name} and
+     * one ([TSON-SCHEMA] §5.2). {@link #nameType} keeps the difference between stating {@code field_name} and
      * stating nothing, because the two resolve in different namespaces: a name an author wrote resolves in the
      * author's own schema first, as an enum's does, and the absent default is the kernel's.
      */

@@ -64,7 +64,7 @@ import java.util.function.Function;
  * parameters to references, so a parameter standing for a whole {@code enum_set} is neither, and refusing it
  * at the declaration is what turns "every application of this fails" into "this template is wrong".
  *
- * <p><b>A record template admits a parameter in three places only</b> (SPEC-FEEDBACK.md #16): a field's type, a
+ * <p><b>A record template admits a parameter in three places only</b> ([TSON-SCHEMA] §5.10): a field's type, a
  * field's default or fixed value, and an argument of an application -- a field type's or a parent's. Anywhere
  * else in a {@code !record} body -- a field name, a group member, a field's {@code optional}, {@code voidable} or
  * {@code role}, the record's {@code extension}, {@code name_type} or {@code discriminators}, a bare parent -- is
@@ -239,7 +239,7 @@ final class ParameterTypes {
     /**
      * The walk's own refusals, thrown, over a held payload not yet bound: a record template's parameters are
      * confined to its field types and values before {@code record}'s reader is asked to bind them, so a parameter
-     * in a scalar slot is refused for where it stands (SPEC-FEEDBACK.md #16) rather than for the token it is.
+     * in a scalar slot is refused for where it stands ([TSON-SCHEMA] §5.10) rather than for the token it is.
      */
     static void checkSlots(List<String> parameters, DataValue payload, Function<String, Top> meta) {
         Walk.over(HeldBody.ofTree(parameters, payload), new Occurrences(parameters, Map.of(), false), meta);

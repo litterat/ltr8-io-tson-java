@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * SPEC-FEEDBACK.md #22's {@code kind_type}: the atom whose values are the names of the types built with a
+ * [TSON-SCHEMA] §4.2's {@code kind_type}: the atom whose values are the names of the types built with a
  * constructor, its members computed at link by {@link KindMembers}' construction walk.
  *
  * <p>Each walk case the kernel's {@code kind_type} doc names is pinned on its own: a construction is a member, a

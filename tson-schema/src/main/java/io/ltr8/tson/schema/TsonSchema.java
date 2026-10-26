@@ -23,7 +23,7 @@ import java.util.Optional;
  * SchemaDocument}/{@code SchemaMap}. {@code entries}' insertion order is preserved, matching {@code
  * SchemaMap.declarations}' own ordering guarantee.
  *
- * <p><b>An entry is its value</b> (SPEC-FEEDBACK.md #14): a name maps to the body it resolves to -- a {@code
+ * <p><b>An entry is its value</b> ([TSON-SCHEMA] §8.1): a name maps to the body it resolves to -- a {@code
  * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@link Namespace} -- and a
  * type body, a record template's included, carries its own IS-A chain ({@code Type.chain}). The entry's kind is
  * its value's ({@code EntryKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
@@ -74,7 +74,7 @@ import java.util.Optional;
  * buying any safety a universal property like linked-ness actually needs.
  *
  * <p><b>{@link #valuesByName()}</b> -- for each entry whose value is an instance of a namespace type
- * ({@link Namespace}), the references that value holds by name (SPEC-FEEDBACK.md #13), each with the
+ * ({@link Namespace}), the references that value holds by name ([TSON-SCHEMA] §5.12), each with the
  * slot it fills and that slot's declared type, as the resolver's read collected them: the reader at a kind-, reference-
  * or {@code type_ref}-typed slot records the name it read there whatever the host class holds, so the list depends on
  * nothing the host declares. The linker resolves each and judges it against the slot's declared type. A fact the

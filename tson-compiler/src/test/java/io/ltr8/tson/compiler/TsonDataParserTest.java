@@ -776,7 +776,7 @@ class TsonDataParserTest {
 
     /**
      * A quoted field name parses whatever its text: what a field name may be is its record's to say
-     * (SPEC-FEEDBACK.md #10), so the grammar admits any single-line token in name position and a reader judges it
+     * ([TSON-DATA] §2.5), so the grammar admits any single-line token in name position and a reader judges it
      * ({@code SchemalessTreeReaderTest} has the schemaless refusal).
      */
     @Test

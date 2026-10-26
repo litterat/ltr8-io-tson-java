@@ -117,7 +117,7 @@ recorded open form, and replacing the application with a reference to the entry 
   hole the alternative is a `StackOverflowError`, which is neither a diagnosis nor something the exception
   policy can classify.
 - **Substitution changes no field fact.** A routed `= P` is FIXED where it is written and `~ P` DEFAULT, each with
-  `optional` as the name was marked (SPEC-FEEDBACK.md #20), so closing puts the argument in `value` and
+  `optional` as the name was marked (§5.7), so closing puts the argument in `value` and
   `response<order, 201>` lands on exactly what the literal `status?: int32 = 201` beside it lands on. What closing
   does change is the record-level selector list: the member names none (`asMember`), its pins being in place.
 - **An application whose head names nothing in scope is left whole, arguments and all.** This pass gives no
@@ -198,7 +198,7 @@ recorded open form, and replacing the application with a reference to the entry 
       gone — leaving either an arity error against a content-derived name nobody typed, or a wire-vocabulary
       mismatch, neither of which names what the author did.
     - **A parameter is never an operand.** `<T> T & { … }` and `<T> T ^ { … }` are refused at the declaration
-      (`DefinitionResolver.refuseParameterOperand`, SPEC-FEEDBACK.md #16): both operators read the operand's field
+      (`DefinitionResolver.refuseParameterOperand`, §5.8): both operators read the operand's field
       set to flatten, and a parameter has none until applied. The check runs before the name is looked up, so a
       parameter shadows an entry of the same name here as everywhere; an operand *applied to* a parameter
       (`result<T>`) is the open-operand case above.

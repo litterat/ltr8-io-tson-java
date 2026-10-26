@@ -19,7 +19,7 @@ git.
   default, and a pin that is never supplied.
 - Refinement of a field is three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
   omission yields, so the order on it is checked on `RecordField.omitted`.
-- An entry is its value (SPEC-FEEDBACK.md #14): `schema` maps each `type_name` to a `top`, and a type body, a record
+- An entry is its value (§8.1): `schema` maps each `type_name` to a `top`, and a type body, a record
   template's included, carries its own chain, `type`'s one field `chain`, a `type_chain` (`TypeChain`): `parents` as written,
   `supertypes` and `subtypes`. The application an entry is the instantiation of, of whatever kind, is the derived
   `@application` on its key (`TsonSchema.applicationOf`). What no value holds and nothing writes — where the entry was
@@ -246,7 +246,7 @@ are kept in step deliberately.
   that order because a body-introduced field *is* in the merged set and "no such field" would be the wrong
   diagnosis. The chain is **emptied** — so §7.2's subsumption check won't let a subtracted type stand where its
   source is expected — and nothing is kept in its place: a subtracted record is a record with an empty chain
-  (SPEC-FEEDBACK.md #14). **Every** supertype goes, including one that contributed nothing to the removal — `A &
+  (§5.9). **Every** supertype goes, including one that contributed nothing to the removal — `A &
   B - { f }` with `f` from `A` drops IS-A with `B` too, though `B`'s fields all survive. §5.9 gives the reason:
   the clause is head-level, so its effect is readable without scanning the parents' field sets. Subtract first
   and compose second where an author wants partial retention.

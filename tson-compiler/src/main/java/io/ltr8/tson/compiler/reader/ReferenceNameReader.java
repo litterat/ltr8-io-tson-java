@@ -15,7 +15,7 @@ import java.util.Optional;
 
 /**
  * A reference-typed position ({@code ref<T>}) whose bound component is a {@link io.ltr8.tson.schema.meta.TypeRef}
- * or a {@link io.ltr8.tson.schema.meta.Ref}: the value is a value's qualified name (SPEC-FEEDBACK.md #13), such as
+ * or a {@link io.ltr8.tson.schema.meta.Ref}: the value is a value's qualified name ([TSON-SCHEMA] §5.12), such as
  * {@code orders.place_order}, read as written into a {@code TypeRef} whose {@code name} is the token and whose
  * arguments are none, or into a {@code Ref} the linker delivers the value into.
  *

@@ -173,7 +173,7 @@ meta the way an author-written annotation is: there is no author to resolve agai
   fold-back-into-display case the marker serves; an instantiation is a type the author named by its
   application. Marking too much would be as wrong as marking too
   little, so `SyntheticEntryMarkerTest` asserts both halves.
-- **`@application` is the second derived key annotation** (SPEC-FEEDBACK.md #14): on the key of every entry that
+- **`@application` is the second derived key annotation** (§6, §8.1): on the key of every entry that
   closes a template application, the application it is the instantiation of, `@application:{ name: box  arguments:
   [{ name: int32 }] }`. It is about the entry, not about a type — a record template's member, a namespace entry
   (`order_api => orders<order>` over `orders => <T> !interface { get => { response: T } }`), the `Reference` a

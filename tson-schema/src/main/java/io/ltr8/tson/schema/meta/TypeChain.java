@@ -6,7 +6,7 @@ import io.ltr8.annotation.Typename;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code type_chain} ([TSON-SCHEMA] §4.1, SPEC-FEEDBACK.md #14): where an entry sits in the
+ * The meta-kernel's {@code type_chain} ([TSON-SCHEMA] §4.1): where an entry sits in the
  * IS-A order. Carried by every {@link Type}, as {@code type}'s one field, and asked of any {@link Top} by the
  * statics here, which answer empty for a value that carries none. Which application an entry is the instantiation
  * of is no part of it: an entry of any kind can be one, so that fact sits on the entry's key ({@code

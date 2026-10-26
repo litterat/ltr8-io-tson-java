@@ -18,7 +18,7 @@ import java.util.Map;
 /**
  * {@code type}'s one field, {@code chain}, for a hand-built constructor record, with every kernel entry its type
  * reaches copied into the schema being built. A constructor composing {@code atom} flattens it in first
- * (SPEC-FEEDBACK.md #14), and its body class carries a component for it, so a schema standing in for the kernel's
+ * ([TSON-SCHEMA] §4.1), and its body class carries a component for it, so a schema standing in for the kernel's
  * own states it as the kernel does.
  */
 final class KernelChainFields {

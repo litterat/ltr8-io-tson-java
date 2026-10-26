@@ -65,7 +65,7 @@ import java.util.Set;
  * not just at an atom leaf. A name {@link BuiltinTypeVocabulary} resolves (§5) is a built-in atom, so it
  * must sit on a token; any other name is {@code UNKNOWN_TYPE_REF}, a resolver error, exactly as {@code tson
  * validate} reports it: a schemaless document has no source of type names but §5's vocabulary
- * (SPEC-FEEDBACK.md #3), and a verdict that changed with the class a caller binds into would not be one.
+ * ([TSON-DATA] §3.2), and a verdict that changed with the class a caller binds into would not be one.
  *
  * <p><b>{@link #withHostTypes} makes the target classes a schema for tags</b>: a name that names the class
  * being bound links to it, and a union's member is chosen by the tag naming it. That is what a schemaless

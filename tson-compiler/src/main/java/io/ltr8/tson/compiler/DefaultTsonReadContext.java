@@ -276,7 +276,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     /**
-     * [TSON-DATA] §2.5: a record's field name is read by its record's name type (SPEC-FEEDBACK.md #10). Under a
+     * [TSON-DATA] §2.5: a record's field name is read by its record's name type ([TSON-SCHEMA] §5.2). Under a
      * schema-directed record's {@link FieldNameRule}, a name the type refuses is reported nothing here: it can
      * match no declared field, the reader reports it {@code UNRECOGNIZED_FIELD} with the type's reason, and being
      * no name of the type it meets no hygiene rule. One the type admits meets the per-name rules under its profile.
@@ -373,7 +373,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
     /**
      * Marks {@code ctx}'s read as one without a schema of a document that names one: a Class 1 read, or one
      * told to ignore the schema. [TSON-DATA] §2.5's identifier rule holds a schemaless document's field names,
-     * and a document that names a schema has field names of that schema's types (SPEC-FEEDBACK.md #10), which a
+     * and a document that names a schema has field names of that schema's types ([TSON-SCHEMA] §5.2), which a
      * read without it cannot know; so its field names meet neither the identifier grammar nor the per-name
      * rules, and the read judges what it can -- syntax, type-refs and annotation names, which are identifiers
      * at every layer, and the built-in vocabulary. The look-alike rule over a record's set stays, being a

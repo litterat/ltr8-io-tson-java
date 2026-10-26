@@ -50,7 +50,7 @@ class TopKindHierarchyTest {
         assertInstanceOf(Top.class, choice);
     }
 
-    /** A kind is an atom whose values are names (SPEC-FEEDBACK.md #22), as an enum is: a set of names, not a sum. */
+    /** A kind is an atom whose values are names (Part 2 §4.2), as an enum is: a set of names, not a sum. */
     @Test
     void aKindIsAnAtom() {
         KindBody kind = new KindBody("uuid_type");

@@ -90,8 +90,8 @@ a qualified name); a foreign schema map named by identity (`scoped.schemas` valu
 **Judgement.** One predicate covers every reference row: *the referent's value is a value of `T`*. For a constructor
 `T` that is `kind<T>`, the referent being a type built with `T`, less the constructors whose instances are types
 (`KindMembers`); for
-a type `T` it is a value entry or a key of a namespace value whose declared type IS-A `T`, which is #13's by-name slot
-(`ValuesByName`). The two relations behind it are distinct and both recorded: IS-A (`supertypes`, inverse
+a type `T` it is a value entry or a key of a namespace value whose declared type IS-A `T`, which is §5.12's by-name
+slot (`ValuesByName`). The two relations behind it are distinct and both recorded: IS-A (`supertypes`, inverse
 `subtypes`) and instance-of (the body's tag, inverse `kind_type.members`). Folding instance-of into the chain would
 claim a value of `uuid` is a value of `uuid_type`, whose values are types, which it is not. A namespace type is the
 other way round: `api => namespace & { … }` is a composition, so `api` IS-A `namespace`, and a value of `api` is a
@@ -138,4 +138,4 @@ the constructor's name beside the map, and its kind is `NAMESPACE`.
 `scoped.schemas` keys are cross-document addresses (canonical identity); its values are references by key into the
 named foreign schema. An annotation use `@name: v` is a reference by key into the annotation namespace (§3.3.3). In a
 data document a tag resolves in the governing type-name namespace (or the family's `subtypes` index, or the scope a
-`scoped` position admits), and a qualified name at a vocabulary-typed slot is a path of keys (#13).
+`scoped` position admits), and a qualified name at a vocabulary-typed slot is a path of keys (§5.12).

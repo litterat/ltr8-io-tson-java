@@ -459,7 +459,7 @@ meaning nothing, the `--output json`/`tson` shapes field by field, and the CLI's
 A record's field names are identifiers by default. A schema translated from JSON-LD, JSON Schema or OpenAPI
 has members such as `@id`, `@type` or `$ref`, and a record can declare them as written by naming a **name
 type**: an `identifier_type` whose profile admits the extra characters. State it once, on a fieldless abstract
-base, and compose that base; a composition takes its supertypes' one name type (`SPEC-FEEDBACK.md` #10):
+base, and compose that base; a composition takes its supertypes' one name type (Part 2 §5.2):
 
 ```
 json_name   => !identifier_type { start_add: "@$" }

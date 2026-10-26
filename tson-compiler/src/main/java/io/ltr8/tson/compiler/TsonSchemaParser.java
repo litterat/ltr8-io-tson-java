@@ -1013,7 +1013,7 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     /**
      * A field name a schema declares: the shared {@code field-name} production, any single-line token. What the
-     * name may be is its record's field name type (SPEC-FEEDBACK.md #10), which the linker judges every declared
+     * name may be is its record's field name type ([TSON-SCHEMA] §5.2), which the linker judges every declared
      * name by once the record and the type it inherits are resolved.
      */
     private Token expectDeclaredFieldName(String construct) {

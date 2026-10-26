@@ -647,7 +647,7 @@ class DefinitionResolverTest {
      *
      * <p>The field is FIXED where it is declared, as its literal spelling would be: the role is the modifier's,
      * and only the value waits for an application. Closing substitutes the value and changes no fact -- {@code
-     * ValueParamFixedFieldTest} pins both ends (SPEC-FEEDBACK.md #20).
+     * ValueParamFixedFieldTest} pins both ends ([TSON-SCHEMA] §5.7).
      *
      * <p><b>The pin also makes the field this template's selector</b>, which is the derivation and not an
      * extra claim: one value per application is one value per member, so the base dispatches on
@@ -1866,7 +1866,7 @@ class DefinitionResolverTest {
     }
 
     /**
-     * A parametric {@code = P} pins the field where it is written, as a literal would (SPEC-FEEDBACK.md #20).
+     * A parametric {@code = P} pins the field where it is written, as a literal would ([TSON-SCHEMA] §5.7).
      * Its type slot is elided, so it inherits the source's type -- here {@code integer}, the source being
      * {@code bound?: integer} -- and the open record holds the flattened field with the parameter in the
      * ordinary {@code value} slot.

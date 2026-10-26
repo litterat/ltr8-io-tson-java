@@ -71,7 +71,7 @@ class SchemalessValidationTest {
     }
 
     /**
-     * A document naming a schema has field names of that schema's types (SPEC-FEEDBACK.md #10), which a Class 1
+     * A document naming a schema has field names of that schema's types ([TSON-DATA] §2.5), which a Class 1
      * read cannot know, so it holds them to no name rule -- where a schemaless document's field names are
      * identifiers, and {@code "@id"} there is a resolver error at its own pointer.
      */

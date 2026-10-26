@@ -72,7 +72,7 @@ class BindMismatchClassificationTest {
     }
 
     /**
-     * {@code @sum} names the kernel's own {@code sum} base kind, which is abstract (SPEC-FEEDBACK.md #15): a
+     * {@code @sum} names the kernel's own {@code sum} base kind, which is abstract ([TSON-SCHEMA] §4.1): a
      * value there names the subtype it is, so an untagged one is the author's error rather than a wiring
      * problem -- a type nothing can build is never reached. §6 puts an annotation written before the name on
      * the <em>name</em> and one after the arrow on the <em>definition</em>, and both are one problem.
