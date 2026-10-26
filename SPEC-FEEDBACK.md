@@ -357,6 +357,16 @@ business. [TSON-JSON] §3.5 then needs a sentence: a reference beyond US-ASCII i
 3987 §3.1, the host by ToASCII). A processor that reports a fetch it made in that spelling should name both — the
 identity, and the URI it requested — since the first says which schema and the second is what DNS and a proxy saw.
 
+**An identity as a value is text in its canonical form, and the series defines no atom for it.** The HTTP layer
+asked for one (its `UPSTREAM.md`, "formats this project needs and the vocabulary cannot state"): a family whose equality
+is canonical identity, so that `https://x/a.tn`, `http://x/a.tn?sha256=…` and `HTTPS://X/a.tn` are one set element
+or map key, and whose values the canonical form `example.com/people.tn`, which is no URI, spells. It was built and
+withdrawn. Every atom constructor pins an external standard the series profiles, and this one would pin §2.2.1
+itself; `identity` is a name core should not take from every importing schema; and the need is met already: a
+processor emits an identity in one spelling, its canonical form, so a field holding one is `text` with the right
+equality, and the places spellings vary — a directive, a configuration, a header — are read by the processor's own
+canonicalisation. A schema that holds schema references holds their canonical text.
+
 **Status against Revision 37:** open; running on `r2026-38-proposal`. `CanonicalIdentity.canonicalize` reads a
 reference as above (the host through `io.ltr8.net.Host`, #6), `CanonicalIdentity.validate` holds a schema's `!!id` to
 the canonical form and names it in the refusal, and `CanonicalIdentity.toUri` gives the URI spelling. The fetching
@@ -2089,6 +2099,12 @@ importer's governing level (#25), so an ordinary schema cannot import the layer 
 wanting a keyed collection writes `{K => V}`, which a qualified name does not enter, so no user schema declares a
 collection a `ref<T>` reaches into. The alternative, a composition operand resolving in the structure namespace as a
 third constructor role of §3.3.1, lost: it puts constructors in ordinary schemas, which §2.2.2 exists to keep out.
+
+**Two things the HTTP layer asks of a namespace are not proposed here.** A namespace keyed by text is refused, a
+qualified name's segment being an identifier, so that layer's path-and-verb map stays a plain map no name enters, and
+an entry in it is reached by location, not by name. And `&` over two namespace values, merging their maps so that an
+interface extends another, has no rule: composition is over types, and an interface's `extends` stays a list of names
+the layer checks itself. Both may be revisited with a reference in a data document, which Revision 38 does not reach.
 
 **Breaking changes, against Revision 37:** `meta-kernel.tn` gains `namespace` and loses `data`; `schema` and
 `field_map` are written as compositions over `namespace`, and their resolved form is a record carrying the facets they
